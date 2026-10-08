@@ -1,19 +1,19 @@
 --!strict
--- AxeArt: every axe in ItemCatalog, built to read by silhouette
--- (GAME_DESIGN §13): the Rusty Axe is dull, pitted and chipped; Steel is
--- clean; Hardened is dark and riveted with a hammer poll; Silver sweeps
--- into a long bearded bit; Cobalt is icy blue with a spike; Gold is a
--- double-bitted labrys with a ruby; Obsidian is jagged black glass;
--- Inferno has a glowing edge, flame tongues and embers; Starfall is a
--- white crescent with a glowing gold rim on an indigo haft, with a star and
--- sparkles. Pure (see Kit).
+-- AxeArt: every axe in ItemCatalog, built from AxeModels.Look so each rung
+-- reads as its own silhouette at a distance (GAME_DESIGN §13, the v1 remake).
+-- Rusty is a short chipped wedge with tape. Steel is a clean wedge and one
+-- collar. Hardened adds a back spike and two collars. Silver is bearded with
+-- a brass pin. Cobalt is a thin double bevel with a white edge. Gold is a
+-- wide crescent and three bands. Obsidian is three glass facets in an iron
+-- frame with a violet edge. Inferno is a notched flame. Starfall is a
+-- star-tipped double head. Lux is an ornate fan. The Hermit's Maul is a
+-- block on a rope-wrapped haft. Pure (see Kit).
 --
 -- Contract (AxeService, the preview):
 --   * Build(def) returns a Model built upright around the origin: the
 --     handle's foot at y = 0, the blade facing -Z (forward). PrimaryPart
 --     "Handle" (a Tool needs it): the haft, centred at half its length.
---     Every other part is welded to the Handle (Weld), so the head and its
---     details follow it wherever it goes.
+--     Every other part is welded to the Handle (Weld).
 --   * Held(def): Build, then everything unanchored, massless and
 --     non-colliding, ready to move into a Tool.
 --   * Dropped(def): Build, lying on its side with its lowest point at
@@ -22,9 +22,17 @@
 --     handle with the blade facing forward (Roblox's grip frame points -Z
 --     along the arm when it's raised to hold a tool).
 --   * Glowing axes (look.glow) carry a PointLight and particles.
+--   * ApplyTemper(model, prefix, tier) dresses a built axe. A nil prefix
+--     changes nothing.
+--
+-- The hand stays 0.75 studs up the haft (GripFromFoot). That is what the
+-- swing pose uses. Moving it to 25–30% of the haft would mean changing
+-- SwingLogic, which this lane does not own. The Lux gameplay haft stays
+-- 3.5 studs for the same reason (tests/MeshArt.spec).
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local AxeModels = require(script.Parent.AxeModels)
+local TemperLook = require(script.Parent.TemperLook)
 local Kit = require(script.Parent.Kit)
 local MeshKit = require(script.Parent.MeshKit)
 
@@ -36,13 +44,24 @@ local AxeArt = {}
 -- leans forward in the hand (radians).
 local GRIP_FROM_FOOT = 0.75
 local LEAN = 0.15
-local COLLAR_D = 0.62 -- the head's eye block, front to back
 
-type Ctx = { model: Model, handle: Part, len: number, headY: number }
+-- The head's back face, in studs. Positive is behind the origin, so the
+-- eye of the head sits on the haft (the haft is 0.32 deep).
+local HEAD_BACK = 0.06
+
+type Ctx = { model: Model, handle: Part, len: number }
 
 ---------------------------------------------------------------------------
 -- Pieces
 ---------------------------------------------------------------------------
+
+local function materialOf(name: string): Enum.Material
+	local ok, found = pcall(function(): any
+		return (Enum.Material :: any)[name]
+	end)
+	local mat: Enum.Material = if ok and found then found else Enum.Material.Metal
+	return mat
+end
 
 local function part(ctx: Ctx, name: string, size: Vector3, cf: CFrame, color: Color3, material: Enum.Material?): Part
 	local p = Kit.part(ctx.model, name, size, cf, color, material or Enum.Material.SmoothPlastic)
@@ -63,697 +82,347 @@ local function wedge(
 	return p
 end
 
--- The haft, a knob at its foot, a wrapped grip with bands.
-local function haft(model: Model, len: number, wood: Color3, grip: Color3, gripMaterial: Enum.Material?): Ctx
-	local handle =
-		Kit.part(model, "Handle", Vector3.new(0.26, len, 0.32), CFrame.new(0, len / 2, 0), wood, Enum.Material.Wood)
+-- A bit: two wedges, sharp edges meeting at the front (-Z), thick faces
+-- at the back. `upShare` is how much of the height sits above the edge
+-- (0.5 is symmetric, less hangs a beard).
+local function bit(
+	ctx: Ctx,
+	name: string,
+	size: Vector3,
+	y: number,
+	z: number,
+	color: Color3,
+	material: Enum.Material,
+	upShare: number?
+)
+	local share = upShare or 0.5
+	local up = size.Y * share
+	local down = size.Y - up
+	if up > 0.02 then
+		wedge(ctx, name, Vector3.new(size.X, up, size.Z), CFrame.new(0, y + down / 2, z), color, material)
+	end
+	if down > 0.02 then
+		wedge(
+			ctx,
+			name,
+			Vector3.new(size.X, down, size.Z),
+			CFrame.new(0, y - up / 2, z) * CFrame.Angles(0, 0, math.pi),
+			color,
+			material
+		)
+	end
+end
+
+local function emitter(parent: BasePart, name: string, color: Color3, rate: number)
+	local e = Instance.new("ParticleEmitter")
+	e.Name = name
+	e.Rate = rate
+	e.Lifetime = NumberRange.new(0.35, 0.8)
+	e.Speed = NumberRange.new(0.15, 0.6)
+	e.SpreadAngle = Vector2.new(25, 25)
+	e.LightEmission = 0.7
+	e.Color = ColorSequence.new(color)
+	e.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.08),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	e.Parent = parent
+end
+
+local function glowLight(parent: BasePart, color: Color3)
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = 8
+	light.Brightness = 1.2
+	light.Shadows = false
+	light.Parent = parent
+end
+
+local function shine(host: BasePart, color: Color3, particleName: string, rate: number)
+	glowLight(host, color)
+	emitter(host, particleName, color, rate)
+end
+
+-- The haft, a knob at its foot, a wrapped grip. Foot at y = 0.
+local function haft(model: Model, axeId: string, look: AxeModels.AxeLook): Ctx
+	local len = AxeModels.GameplayLength(axeId)
+	local wood = Kit.hex(look.handleColor)
+	local gripColor = Kit.hex(look.gripColor)
+	local handleMat = materialOf(look.handleMaterial)
+	local gripMat = materialOf(look.gripMaterial)
+	local handle = Kit.part(model, "Handle", Vector3.new(0.26, len, 0.32), CFrame.new(0, len / 2, 0), wood, handleMat)
 	handle.CanTouch = false
+	if look.handleMaterial == "Glass" then
+		handle.Transparency = 0.35
+	end
 	model.PrimaryPart = handle
-	local ctx: Ctx = { model = model, handle = handle, len = len, headY = len - 0.39 }
-	part(
-		ctx,
-		"Knob",
-		Vector3.new(0.34, 0.26, 0.44),
-		CFrame.new(0, 0.13, 0.04),
-		Kit.shade(wood, -0.12),
-		Enum.Material.Wood
-	)
-	local mat = gripMaterial or Enum.Material.Leather
-	part(ctx, "Grip", Vector3.new(0.31, 0.95, 0.37), CFrame.new(0, 0.775, 0), grip, mat)
-	for _, y in ipairs({ 0.32, 1.23 }) do
-		part(ctx, "GripBand", Vector3.new(0.33, 0.07, 0.39), CFrame.new(0, y, 0), Kit.shade(grip, -0.25), mat)
+	local ctx: Ctx = { model = model, handle = handle, len = len }
+	part(ctx, "Knob", Vector3.new(0.34, 0.22, 0.38), CFrame.new(0, 0.12, 0), Kit.shade(wood, -0.12), handleMat)
+	part(ctx, "Grip", Vector3.new(0.31, 0.95, 0.37), CFrame.new(0, GRIP_FROM_FOOT, 0), gripColor, gripMat)
+	for _, y in ipairs({ 0.32, 1.18 }) do
+		part(ctx, "GripBand", Vector3.new(0.33, 0.06, 0.36), CFrame.new(0, y, 0), Kit.shade(gripColor, -0.22), gripMat)
 	end
 	return ctx
 end
 
--- The eye of the head, wrapped round the top of the haft, with the haft's
--- end and its wedge showing on top.
-local function collar(ctx: Ctx, color: Color3, material: Enum.Material, height: number?): Part
-	local h = height or 0.78
-	local c = part(ctx, "Collar", Vector3.new(0.42, h, COLLAR_D), CFrame.new(0, ctx.headY, 0), color, material)
-	part(
-		ctx,
-		"HaftEnd",
-		Vector3.new(0.27, 0.03, 0.33),
-		CFrame.new(0, ctx.headY + h / 2 + 0.01, 0),
-		ctx.handle.Color,
-		Enum.Material.Wood
-	)
-	part(
-		ctx,
-		"HaftWedge",
-		Vector3.new(0.05, 0.035, 0.3),
-		CFrame.new(0, ctx.headY + h / 2 + 0.02, 0),
-		Color3.fromRGB(60, 58, 60),
-		Enum.Material.Metal
-	)
-	return c
+-- Centre of a head whose back face is HEAD_BACK + nudge and whose top
+-- stays just under the haft's end. Returns centre y, centre z, front z.
+local function seat(ctx: Ctx, size: Vector3, nudge: number): (number, number, number)
+	local y = ctx.len - 0.05 - size.Y / 2
+	local back = HEAD_BACK + nudge
+	local z = back - size.Z / 2
+	return y, z, back - size.Z
 end
 
-export type BladeShape = {
-	dir: number?, -- -1 = forward (default), 1 = backward
-	reach: number, -- from the collar's face to the edge
-	near: number, -- height where it meets the collar
-	up: number, -- flare above, at the edge
-	down: number, -- flare below (the beard), at the edge
-	thick: number,
-	y: number?, -- centre height offset from the head
-}
-
--- A bit: a block from the collar, flaring (wedges above and below) to its
--- full height at the edge. Returns the edge's centre (y, z) and height.
-local function blade(ctx: Ctx, shape: BladeShape, color: Color3, material: Enum.Material): (number, number, number)
-	local dir = shape.dir or -1
-	local y = ctx.headY + (shape.y or 0)
-	local z0 = dir * COLLAR_D / 2
-	local zc = z0 + dir * shape.reach / 2
-	part(ctx, "Blade", Vector3.new(shape.thick, shape.near, shape.reach), CFrame.new(0, y, zc), color, material)
-	if shape.up > 0 then
-		-- A wedge is tallest at its +Z face: turn it so that's the edge.
-		local turn = if dir < 0 then CFrame.Angles(0, math.pi, 0) else CFrame.identity
-		wedge(
-			ctx,
-			"Blade",
-			Vector3.new(shape.thick, shape.up, shape.reach),
-			CFrame.new(0, y + shape.near / 2 + shape.up / 2, zc) * turn,
-			color,
-			material
-		)
-	end
-	if shape.down > 0 then
-		local flip = if dir < 0 then CFrame.Angles(math.pi, 0, 0) else CFrame.Angles(0, 0, math.pi)
-		wedge(
-			ctx,
-			"Blade",
-			Vector3.new(shape.thick, shape.down, shape.reach),
-			CFrame.new(0, y - shape.near / 2 - shape.down / 2, zc) * flip,
-			color,
-			material
-		)
-	end
-	local height = shape.near + shape.up + shape.down
-	return y + (shape.up - shape.down) / 2, z0 + dir * shape.reach, height
-end
-
--- The honed edge: a thinner strip along the front of a bit.
-local function edge(
-	ctx: Ctx,
-	y: number,
-	z: number,
-	height: number,
-	thick: number,
-	color: Color3,
-	material: Enum.Material,
-	depth: number?
-): Part
-	local d = depth or 0.16
-	local dir = if z < 0 then -1 else 1
+local function core(ctx: Ctx, size: Vector3, y: number, z: number, color: Color3, material: Enum.Material): Part
 	return part(
 		ctx,
-		"Edge",
-		Vector3.new(thick * 0.55, height + 0.02, d),
-		CFrame.new(0, y, z - dir * (d / 2 - 0.05)),
+		"Head",
+		Vector3.new(size.X * 0.82, size.Y * 0.42, size.Z * 0.5),
+		CFrame.new(0, y, z + size.Z * 0.08),
 		color,
 		material
 	)
 end
 
--- Small flat marks on both cheeks of a bit (rust, rivets, inlays).
-local function cheeks(
-	ctx: Ctx,
-	name: string,
-	thick: number,
-	size: Vector3,
-	y: number,
-	z: number,
-	color: Color3,
-	material: Enum.Material?,
-	roll: number?
-)
-	for _, side in ipairs({ -1, 1 }) do
+local function collar(ctx: Ctx, y: number, color: Color3, material: Enum.Material, name: string?)
+	part(ctx, name or "Collar", Vector3.new(0.4, 0.14, 0.42), CFrame.new(0, y, 0), color, material)
+end
+
+---------------------------------------------------------------------------
+-- Silhouettes
+---------------------------------------------------------------------------
+
+local function buildLook(model: Model, def: AxeDef, look: AxeModels.AxeLook)
+	local ctx = haft(model, def.id, look)
+	local color = Kit.hex(look.headColor)
+	local mat = materialOf(look.headMaterial)
+	local size = look.head
+	local shape = look.shape
+	-- The crescent sits a little further forward than the cobalt bevel so
+	-- the two 3.7-stud hafts do not share an outline.
+	local nudge = if shape == "crescent" then -0.2 else 0
+	local y, z, front = seat(ctx, size, nudge)
+	-- The maul's head is the block itself. A second core would sit on the haft.
+	local host: Part? = if shape == "maul" then nil else core(ctx, size, y, z, color, mat)
+
+	if shape == "chipped" then
+		bit(ctx, "Blade", size, y, z, color, mat, 0.46)
 		part(
 			ctx,
-			name,
-			size,
-			CFrame.new(side * (thick / 2 + size.X / 2 - 0.005), y, z) * CFrame.Angles(roll or 0, 0, 0),
+			"Chip",
+			Vector3.new(size.X + 0.02, 0.2, 0.18),
+			CFrame.new(0, y + size.Y * 0.18, front + 0.06),
+			Kit.hex("#4A3A30"),
+			mat
+		)
+		for _, ty in ipairs({ 1.55, 1.92 }) do
+			part(
+				ctx,
+				"Tape",
+				Vector3.new(0.3, 0.1, 0.36),
+				CFrame.new(0, ty, 0),
+				Kit.hex("#C8BBA4"),
+				Enum.Material.Fabric
+			)
+		end
+	elseif shape == "wedge" then
+		bit(ctx, "Blade", size, y, z, color, mat, 0.5)
+		collar(ctx, y - size.Y * 0.35, Kit.shade(color, -0.15), mat, "Collar")
+	elseif shape == "spike" then
+		bit(ctx, "Blade", size, y, z, color, mat, 0.48)
+		wedge(
+			ctx,
+			"Spike",
+			Vector3.new(0.12, 0.26, 0.46),
+			CFrame.new(0, y, 0.3) * CFrame.Angles(0, math.pi, 0),
 			color,
-			material
-		)
-	end
-end
-
-local function glowLight(p: BasePart, color: Color3, range: number, brightness: number)
-	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Range = range
-	light.Brightness = brightness
-	light.Shadows = false
-	light.Parent = p
-end
-
----------------------------------------------------------------------------
--- One builder per axe
----------------------------------------------------------------------------
-
-type Builder = (model: Model, def: AxeDef) -> ()
-
-local builders: { [string]: Builder } = {}
-
-local function hex(h: string): Color3
-	return Color3.fromHex(h)
-end
-
--- Rusty: small, pitted, its edge chipped, its haft taped up.
-builders.RustyAxe = function(model, def)
-	local ctx = haft(model, 3.0, hex("#8C7358"), hex("#B9A27E"), Enum.Material.Fabric)
-	local iron = hex(def.look.headColor)
-	local mat = Enum.Material.CorrodedMetal
-	collar(ctx, iron, mat, 0.7)
-	local shape = { reach = 0.78, near = 0.5, up = 0.1, down = 0.24, thick = 0.22 }
-	local ey, ez, eh = blade(ctx, shape, iron, mat)
-	-- A chip out of the edge: two pieces of edge with a gap between.
-	local dull = hex("#A99A8A")
-	local lowH = eh * 0.48
-	local highH = eh * 0.3
-	edge(ctx, ey - eh / 2 + lowH / 2, ez, lowH, shape.thick, dull, mat)
-	edge(ctx, ey + eh / 2 - highH / 2, ez, highH, shape.thick, dull, mat)
-	part(
-		ctx,
-		"Chip",
-		Vector3.new(shape.thick + 0.02, 0.16, 0.16),
-		CFrame.new(0, ey + eh / 2 - highH - 0.1, ez + 0.06) * CFrame.Angles(math.rad(45), 0, 0),
-		hex("#4A3A30"),
-		mat
-	)
-	-- Rust blooms.
-	local rng = Kit.rng(7)
-	for i = 1, 4 do
-		local s = rng:range(0.1, 0.2)
-		cheeks(
-			ctx,
-			"Rust",
-			shape.thick,
-			Vector3.new(0.02, s, s * rng:range(0.8, 1.4)),
-			ctx.headY + rng:range(-0.28, 0.24),
-			-COLLAR_D / 2 - rng:range(0.12, 0.6),
-			if i % 2 == 0 then hex("#9A4E22") else hex("#5B3A26"),
 			mat
 		)
-	end
-	part(ctx, "Poll", Vector3.new(0.36, 0.42, 0.18), CFrame.new(0, ctx.headY, COLLAR_D / 2 + 0.09), iron, mat)
-	-- Repair tape halfway up the haft.
-	part(ctx, "Tape", Vector3.new(0.3, 0.22, 0.36), CFrame.new(0, 1.85, 0), hex("#9C968C"), Enum.Material.Fabric)
-end
-
--- Steel: a clean, honest felling axe.
-builders.SteelAxe = function(model, def)
-	local ctx = haft(model, 3.2, hex("#B9824C"), hex("#2C2622"))
-	local steel = hex(def.look.headColor)
-	local mat = Enum.Material.Metal
-	collar(ctx, steel, mat, 0.68)
-	local shape = { reach = 0.95, near = 0.55, up = 0.18, down = 0.3, thick = 0.24 }
-	local ey, ez, eh = blade(ctx, shape, steel, mat)
-	edge(ctx, ey, ez, eh, shape.thick, hex("#EEF2F5"), mat)
-	cheeks(ctx, "Mark", shape.thick, Vector3.new(0.02, 0.14, 0.14), ctx.headY, -COLLAR_D / 2 - 0.3, hex("#C9A050"), mat)
-	part(ctx, "Poll", Vector3.new(0.38, 0.5, 0.2), CFrame.new(0, ctx.headY, COLLAR_D / 2 + 0.1), steel, mat)
-end
-
--- Hardened: dark, thick, riveted, with a hammer poll and steel langets.
-builders.HardenedAxe = function(model, def)
-	local ctx = haft(model, 3.3, hex("#5A3A22"), hex("#8E2F25"))
-	local dark = hex(def.look.headColor)
-	local mat = Enum.Material.DiamondPlate
-	local steel = hex("#B8BEC6")
-	collar(ctx, dark, mat, 0.86)
-	local shape = { reach = 1.0, near = 0.7, up = 0.14, down = 0.36, thick = 0.3 }
-	local ey, ez, eh = blade(ctx, shape, dark, mat)
-	edge(ctx, ey, ez, eh, shape.thick, hex("#C9D0D8"), Enum.Material.Metal, 0.2)
-	for _, p in ipairs({ { 0.2, -0.25 }, { -0.2, -0.25 }, { 0, -0.6 } }) do
-		cheeks(
-			ctx,
-			"Rivet",
-			shape.thick,
-			Vector3.new(0.05, 0.12, 0.12),
-			ctx.headY + p[1],
-			-COLLAR_D / 2 + p[2],
-			steel,
-			Enum.Material.Metal,
-			math.rad(45)
+		collar(ctx, y - size.Y * 0.28, Kit.shade(color, -0.12), mat, "Collar")
+		collar(ctx, y + size.Y * 0.22, Kit.shade(color, -0.2), mat, "Collar")
+	elseif shape == "bearded" then
+		bit(ctx, "Blade", size, y, z, color, mat, 0.36)
+		local pinY = y + size.Y * 0.08
+		Kit.decor(
+			Kit.cylinder(
+				ctx.model,
+				"Pin",
+				0.4,
+				0.08,
+				CFrame.new(0, pinY, z + size.Z * 0.12),
+				Kit.hex("#C9A24A"),
+				Enum.Material.Metal
+			),
+			false
 		)
-	end
-	part(ctx, "HammerPoll", Vector3.new(0.44, 0.56, 0.4), CFrame.new(0, ctx.headY, COLLAR_D / 2 + 0.2), dark, mat)
-	part(
-		ctx,
-		"HammerFace",
-		Vector3.new(0.48, 0.6, 0.08),
-		CFrame.new(0, ctx.headY, COLLAR_D / 2 + 0.42),
-		steel,
-		Enum.Material.Metal
-	)
-	-- Langets: straps down the haft, front and back, and a band.
-	for _, z in ipairs({ -0.17, 0.17 }) do
-		part(ctx, "Langet", Vector3.new(0.2, 0.9, 0.04), CFrame.new(0, ctx.headY - 0.86, z), steel, Enum.Material.Metal)
-	end
-	part(ctx, "Band", Vector3.new(0.3, 0.1, 0.36), CFrame.new(0, ctx.headY - 1.28, 0), steel, Enum.Material.Metal)
-end
-
--- Silver: a long bearded bit with an engraved line, silver fittings.
-builders.SilverAxe = function(model, def)
-	local ctx = haft(model, 3.3, hex("#E8D8B8"), hex("#5E5A66"))
-	local silver = hex(def.look.headColor)
-	local mat = Enum.Material.Foil
-	collar(ctx, silver, mat)
-	local shape = { reach = 1.0, near = 0.42, up = 0.1, down = 0.8, thick = 0.2, y = 0.1 }
-	local ey, ez, eh = blade(ctx, shape, silver, mat)
-	edge(ctx, ey, ez, eh, shape.thick, hex("#FFFFFF"), Enum.Material.Metal)
-	-- The engraving follows the edge.
-	cheeks(
-		ctx,
-		"Engraving",
-		shape.thick,
-		Vector3.new(0.02, eh * 0.7, 0.05),
-		ey,
-		ez + 0.24,
-		hex("#7D8896"),
-		Enum.Material.Metal
-	)
-	cheeks(
-		ctx,
-		"Engraving",
-		shape.thick,
-		Vector3.new(0.02, 0.16, 0.16),
-		ctx.headY + 0.08,
-		-COLLAR_D / 2 - 0.25,
-		hex("#7D8896"),
-		Enum.Material.Metal,
-		math.rad(45)
-	)
-	part(ctx, "Poll", Vector3.new(0.36, 0.42, 0.16), CFrame.new(0, ctx.headY + 0.05, COLLAR_D / 2 + 0.08), silver, mat)
-	for _, y in ipairs({ 1.55, 2.2 }) do
-		part(ctx, "Band", Vector3.new(0.3, 0.08, 0.36), CFrame.new(0, y, 0), silver, mat)
-	end
-	part(ctx, "Pommel", Vector3.new(0.38, 0.12, 0.48), CFrame.new(0, 0.06, 0.04), silver, mat)
-end
-
--- Cobalt: icy blue, a frost-white edge, a spike behind, ice on top.
-builders.CobaltAxe = function(model, def)
-	local ctx = haft(model, 3.3, hex("#24314F"), hex("#D9F1FF"), Enum.Material.Fabric)
-	local cobalt = hex(def.look.headColor)
-	local mat = Enum.Material.Metal
-	local ice = hex("#C8F0FF")
-	collar(ctx, cobalt, mat)
-	local shape = { reach = 1.0, near = 0.55, up = 0.3, down = 0.3, thick = 0.24 }
-	local ey, ez, eh = blade(ctx, shape, cobalt, mat)
-	edge(ctx, ey, ez, eh, shape.thick, ice, Enum.Material.Ice, 0.2)
-	-- The spike: two wedges meeting in a point behind the head.
-	local sz = COLLAR_D / 2 + 0.3
-	wedge(ctx, "Spike", Vector3.new(0.2, 0.2, 0.6), CFrame.new(0, ctx.headY + 0.1, sz), cobalt, mat)
-	wedge(
-		ctx,
-		"Spike",
-		Vector3.new(0.2, 0.2, 0.6),
-		CFrame.new(0, ctx.headY - 0.1, sz) * CFrame.Angles(0, 0, math.pi),
-		cobalt,
-		mat
-	)
-	-- Ice crystals growing on the head.
-	for i, a in ipairs({ -0.5, 0.15, 0.6 }) do
-		local crystal = part(
-			ctx,
-			"Crystal",
-			Vector3.new(0.12, 0.34 - i * 0.04, 0.12),
-			CFrame.new(0, ctx.headY + 0.52, -0.12 + i * 0.1) * CFrame.Angles(a, 0, a * 0.5),
-			ice,
-			Enum.Material.Glass
-		)
-		crystal.Transparency = 0.15
-	end
-	cheeks(
-		ctx,
-		"Frost",
-		shape.thick,
-		Vector3.new(0.02, 0.08, 0.3),
-		ey + eh * 0.3,
-		ez + 0.3,
-		ice,
-		Enum.Material.Ice,
-		0.4
-	)
-	cheeks(
-		ctx,
-		"Frost",
-		shape.thick,
-		Vector3.new(0.02, 0.07, 0.22),
-		ey - eh * 0.25,
-		ez + 0.35,
-		ice,
-		Enum.Material.Ice,
-		-0.3
-	)
-	for _, y in ipairs({ 1.55, 1.95 }) do
-		part(ctx, "Band", Vector3.new(0.3, 0.07, 0.36), CFrame.new(0, y, 0), ice, Enum.Material.Ice)
-	end
-end
-
--- Gold: a double-bitted labrys with a ruby set in the eye.
-builders.GoldAxe = function(model, def)
-	local ctx = haft(model, 3.3, hex("#4A2E1C"), hex("#6E1F2A"))
-	local gold = hex(def.look.headColor)
-	local mat = Enum.Material.Foil
-	collar(ctx, gold, mat, 0.9)
-	for _, dir in ipairs({ -1, 1 }) do
-		local shape = { dir = dir, reach = 0.85, near = 0.5, up = 0.26, down = 0.26, thick = 0.22 }
-		local ey, ez, eh = blade(ctx, shape, gold, mat)
-		edge(ctx, ey, ez, eh, shape.thick, hex("#FFE7A0"), Enum.Material.Metal)
-	end
-	cheeks(
-		ctx,
-		"Ruby",
-		0.42,
-		Vector3.new(0.05, 0.22, 0.22),
-		ctx.headY,
-		0,
-		hex("#D8304A"),
-		Enum.Material.Glass,
-		math.rad(45)
-	)
-	for _, y in ipairs({ 1.4, 1.75, 2.1 }) do
-		part(ctx, "Band", Vector3.new(0.3, 0.07, 0.36), CFrame.new(0, y, 0), gold, mat)
-	end
-	part(ctx, "Pommel", Vector3.new(0.4, 0.14, 0.5), CFrame.new(0, 0.07, 0.04), gold, mat)
-end
-
--- Obsidian: knapped black volcanic glass, a jagged edge of shards, the
--- haft lashed with leather.
-builders.ObsidianAxe = function(model, def)
-	local ctx = haft(model, 3.3, hex("#3A3536"), hex("#6B4A33"))
-	local glass = hex(def.look.headColor)
-	local mat = Enum.Material.Glass
-	local sheen = hex("#5A4380")
-	part(
-		ctx,
-		"Collar",
-		Vector3.new(0.48, 0.84, COLLAR_D + 0.04),
-		CFrame.new(0, ctx.headY, 0) * CFrame.Angles(0.08, 0, 0.05),
-		glass,
-		mat
-	)
-	local shape = { reach = 0.6, near = 0.62, up = 0.12, down = 0.12, thick = 0.24 }
-	blade(ctx, shape, glass, mat)
-	-- Shards fanning out from the front of the core to a jagged edge, each
-	-- pivoting on the core (no gaps) and ending in a point: upper shards
-	-- point up, lower ones down.
-	local root = -COLLAR_D / 2 - shape.reach + 0.1
-	for i, s in ipairs({
-		{ y = 0.26, len = 0.55, tilt = 0.5, h = 0.3 },
-		{ y = 0.08, len = 0.72, tilt = 0.14, h = 0.32 },
-		{ y = -0.12, len = 0.62, tilt = -0.22, h = 0.3 },
-		{ y = -0.3, len = 0.5, tilt = -0.6, h = 0.28 },
-	}) do
-		local at = CFrame.new(0, ctx.headY + s.y, root) * CFrame.Angles(s.tilt, 0, 0)
+	elseif shape == "doubleBevel" then
+		bit(ctx, "Blade", size, y, z, color, mat, 0.5)
 		part(
 			ctx,
-			"Shard",
-			Vector3.new(0.2 - i * 0.012, s.h, s.len),
-			at * CFrame.new(0, 0, -s.len / 2),
-			if i % 2 == 0 then Kit.shade(glass, 0.06) else glass,
-			mat
+			"Edge",
+			Vector3.new(size.X * 0.7, size.Y * 0.86, 0.05),
+			CFrame.new(0, y, front - 0.025),
+			Color3.new(1, 1, 1),
+			Enum.Material.SmoothPlastic
 		)
-		wedge(
-			ctx,
-			"ShardTip",
-			Vector3.new(0.17 - i * 0.012, s.h, 0.26),
-			at
-				* CFrame.new(0, 0, -s.len - 0.12)
-				* (if s.tilt > 0 then CFrame.Angles(0, 0, math.pi) else CFrame.identity),
-			hex("#2E2838"),
-			mat
-		)
-	end
-	cheeks(ctx, "Sheen", 0.24, Vector3.new(0.02, 0.2, 0.36), ctx.headY + 0.12, -COLLAR_D / 2 - 0.35, sheen, mat, 0.5)
-	cheeks(ctx, "Sheen", 0.24, Vector3.new(0.02, 0.12, 0.2), ctx.headY - 0.22, -COLLAR_D / 2 - 0.5, sheen, mat, -0.4)
-	part(
-		ctx,
-		"Poll",
-		Vector3.new(0.38, 0.5, 0.22),
-		CFrame.new(0, ctx.headY, COLLAR_D / 2 + 0.11) * CFrame.Angles(0.2, 0, 0),
-		glass,
-		mat
-	)
-	-- Leather lashings, wound on a slant.
-	for _, y in ipairs({ ctx.headY - 0.55, ctx.headY - 0.75, 1.6 }) do
+	elseif shape == "crescent" then
+		for i = -2, 2 do
+			local ang = i * 0.36
+			local sy = size.Y * 0.4
+			local sz = size.Z * 0.52
+			local cy = y + math.sin(ang) * size.Y * 0.26
+			local cz = front + sz / 2 + (1 - math.cos(ang)) * 0.16
+			bit(ctx, "Crescent", Vector3.new(size.X, sy, sz), cy, cz, color, mat, 0.5)
+		end
+		for n = 0, 2 do
+			part(
+				ctx,
+				"Band",
+				Vector3.new(0.32, 0.07, 0.38),
+				CFrame.new(0, ctx.len * 0.42 + n * 0.28, 0),
+				Kit.hex("#E1B530"),
+				Enum.Material.Foil
+			)
+		end
+	elseif shape == "facets" then
+		local iron = Kit.hex("#2B2B2E") -- IronBlack
+		local shards = {
+			{ off = size.Y * 0.2, depth = size.Z * 0.78, tall = size.Y * 0.34 },
+			{ off = 0, depth = size.Z, tall = size.Y * 0.4 },
+			{ off = -size.Y * 0.22, depth = size.Z * 0.88, tall = size.Y * 0.32 },
+		}
+		for _, shard in ipairs(shards) do
+			local sy = shard.tall
+			local sz = shard.depth
+			local szc = HEAD_BACK - sz / 2
+			bit(ctx, "Facet", Vector3.new(size.X, sy, sz), y + shard.off, szc, color, mat, 0.5)
+		end
+		local barH = ctx.len - 0.36
+		for _, side in ipairs({ -1, 1 }) do
+			for _, fore in ipairs({ -1, 1 }) do
+				part(
+					ctx,
+					"Frame",
+					Vector3.new(0.05, barH, 0.05),
+					CFrame.new(side * 0.12, barH / 2 + 0.1, fore * 0.13),
+					iron,
+					Enum.Material.Metal
+				)
+			end
+		end
 		part(
 			ctx,
-			"Lashing",
-			Vector3.new(0.3, 0.09, 0.36),
-			CFrame.new(0, y, 0) * CFrame.Angles(0.35, 0, 0),
-			hex("#6B4A33"),
-			Enum.Material.Leather
-		)
-	end
-end
-
--- Inferno: charred iron with a glowing edge, flames licking off the top,
--- embers in the haft, sparks drifting up.
-builders.InfernoAxe = function(model, def)
-	local ctx = haft(model, 3.4, hex("#2E211C"), hex("#3A2A22"))
-	local iron = hex("#2A1E1A")
-	local mat = Enum.Material.Metal
-	local fire = hex(def.look.headColor)
-	local hot = hex("#FFC23A")
-	collar(ctx, iron, mat, 0.82)
-	local shape = { reach = 1.0, near = 0.56, up = 0.24, down = 0.36, thick = 0.26 }
-	local ey, ez, eh = blade(ctx, shape, iron, mat)
-	local glow = edge(ctx, ey, ez, eh, shape.thick, fire, Enum.Material.Neon, 0.24)
-	-- Flame tongues leaning back off the top of the head.
-	for i, f in ipairs({ { z = -0.75, h = 0.42 }, { z = -0.4, h = 0.6 }, { z = -0.02, h = 0.46 } }) do
-		wedge(
-			ctx,
-			"Flame",
-			Vector3.new(0.14, f.h, 0.3),
-			CFrame.new(0, ctx.headY + 0.36 + f.h / 2, f.z) * CFrame.Angles(0.3, 0, 0),
-			if i == 2 then hot else fire,
+			"Edge",
+			Vector3.new(size.X * 0.72, size.Y * 0.7, 0.04),
+			CFrame.new(0, y, front - 0.02),
+			Kit.hex("#8A4DFF"),
 			Enum.Material.Neon
 		)
-	end
-	-- Glowing cracks in the cheeks and the haft.
-	cheeks(ctx, "Crack", shape.thick, Vector3.new(0.02, 0.05, 0.42), ey + 0.1, ez + 0.4, fire, Enum.Material.Neon, 0.5)
-	cheeks(
-		ctx,
-		"Crack",
-		shape.thick,
-		Vector3.new(0.02, 0.05, 0.3),
-		ey - 0.25,
-		ez + 0.36,
-		fire,
-		Enum.Material.Neon,
-		-0.4
-	)
-	for _, p in ipairs({ { 1.6, 0.4 }, { 2.15, -0.3 } }) do
+	elseif shape == "flame" then
+		bit(ctx, "Blade", size, y, z, color, mat, 0.62)
+		-- Sit the bite on the blade, not out past the tip: the axes preview
+		-- camera keeps every part centre in frame (PreviewCameras, axes 8).
 		part(
 			ctx,
-			"Ember",
-			Vector3.new(0.04, 0.3, 0.04),
-			CFrame.new(0, p[1], -0.165) * CFrame.Angles(0, 0, p[2]),
-			fire,
-			Enum.Material.Neon
+			"Notch",
+			Vector3.new(size.X + 0.02, 0.28, 0.22),
+			CFrame.new(0, y - size.Y * 0.08, front + 0.4),
+			Kit.hex("#3A2A24"),
+			Enum.Material.Basalt
 		)
-	end
-	part(ctx, "Poll", Vector3.new(0.4, 0.52, 0.22), CFrame.new(0, ctx.headY, COLLAR_D / 2 + 0.11), iron, mat)
-	glowLight(glow, hex("#FF7A2A"), 9, 1.6)
-	local sparks = Instance.new("ParticleEmitter")
-	sparks.Name = "Embers"
-	sparks.Color = ColorSequence.new(hot, fire)
-	sparks.LightEmission = 1
-	sparks.LightInfluence = 0
-	sparks.Rate = 7
-	sparks.Lifetime = NumberRange.new(0.6, 1.3)
-	sparks.Speed = NumberRange.new(0.6, 1.6)
-	sparks.SpreadAngle = Vector2.new(40, 40)
-	sparks.Acceleration = Vector3.new(0, 4, 0)
-	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.12), NumberSequenceKeypoint.new(1, 0) })
-	sparks.Parent = glow
-end
-
--- Starfall: a white crescent with a glowing gold rim (its only Neon) on a
--- deep indigo haft with gold bands, a gold star on the poll and a drift of
--- sparkles.
-builders.StarfallAxe = function(model, def)
-	local indigo = hex("#2B3A6B")
-	local ctx = haft(model, 3.4, indigo, Kit.shade(indigo, -0.25), Enum.Material.Fabric)
-	local white = hex("#F4EEDC")
-	local gold = hex("#E1B530")
-	local rim = hex("#FFE7A0")
-	local blue = hex(def.look.headColor)
-	local mat = Enum.Material.SmoothPlastic
-	-- The grip's two bands in gold, like the ones up the haft.
-	for _, d in ipairs(model:GetChildren()) do
-		if d:IsA("BasePart") and d.Name == "GripBand" then
-			d.Color = gold
-			d.Material = Enum.Material.Foil
+		bit(
+			ctx,
+			"Tongue",
+			Vector3.new(size.X * 0.8, size.Y * 0.45, size.Z * 0.55),
+			y + size.Y * 0.12,
+			z - 0.08,
+			color,
+			mat,
+			0.7
+		)
+	elseif shape == "star" then
+		bit(ctx, "Star", size, y, z, color, mat, 0.5)
+		local backSize = Vector3.new(size.X * 0.72, size.Y * 0.52, size.Z * 0.32)
+		local backZ = 0.12 + backSize.Z / 2
+		bit(ctx, "StarBack", backSize, y, backZ, color, mat, 0.5)
+		-- Tips sit on the front face and poke a little past it, still inside
+		-- the haft's height so the foot and the top stay put.
+		local tips = {
+			Vector3.new(0, size.Y * 0.36, -0.02),
+			Vector3.new(0, -size.Y * 0.36, -0.02),
+			Vector3.new(0, 0, -0.08),
+		}
+		for _, tip in ipairs(tips) do
+			wedge(
+				ctx,
+				"StarTip",
+				Vector3.new(size.X * 0.7, 0.16, 0.2),
+				CFrame.new(tip.X, y + tip.Y, front + tip.Z),
+				color,
+				mat
+			)
 		end
-	end
-	collar(ctx, white, mat, 0.8)
-	part(
-		ctx,
-		"CollarBand",
-		Vector3.new(0.44, 0.1, COLLAR_D + 0.02),
-		CFrame.new(0, ctx.headY, 0),
-		gold,
-		Enum.Material.Foil
-	)
-	local shape = { thick = 0.2 }
-	-- A short neck from the eye out to the crescent.
-	local neck = 0.36
-	part(
-		ctx,
-		"Neck",
-		Vector3.new(0.22, 0.42, neck + 0.04),
-		CFrame.new(0, ctx.headY, -COLLAR_D / 2 - neck / 2),
-		white,
-		mat
-	)
-	-- The crescent: a band of segments on an arc bowing forward, its horns
-	-- sweeping back past the eye, a glowing rim round its outer curve. The
-	-- pieces are long enough (and the horns close enough, at 65 degrees)
-	-- that their outer corners meet at every joint, so the band and its rim
-	-- read as one unbroken curve (AxeArt.spec walks the joints). The horns
-	-- are thinner on the inside only: the outer edge stays smooth while the
-	-- inner one tapers.
-	local radius = 0.95
-	local front = -COLLAR_D / 2 - neck - 0.15 -- the band's middle (its front-to-back centre)
-	local glow: BasePart = ctx.handle
-	for i, deg in ipairs({ 0, 35, -35, 65, -65 }) do
-		local a = math.rad(deg)
-		local horn = math.abs(deg) > 50
-		local len = if horn then 0.64 else 0.8
-		local at = CFrame.new(0, ctx.headY + radius * math.sin(a), front + radius * (1 - math.cos(a)))
-			* CFrame.Angles(a, 0, 0)
-		part(
-			ctx,
-			if horn then "Horn" else "Crescent",
-			Vector3.new(shape.thick, len, if horn then 0.24 else 0.32),
-			if horn then at * CFrame.new(0, 0, -0.04) else at,
-			white,
-			mat
-		)
-		local r =
-			part(ctx, "Rim", Vector3.new(0.12, len + 0.04, 0.07), at * CFrame.new(0, 0, -0.18), rim, Enum.Material.Neon)
-		if i == 1 then
-			glow = r
+	elseif shape == "fan" then
+		for i = -2, 2 do
+			local ang = i * 0.22
+			local blade = Vector3.new(size.X, size.Y * 0.28, size.Z * 0.82)
+			wedge(ctx, "Fan", blade, CFrame.new(0, y, z) * CFrame.Angles(ang, 0, 0), color, mat)
 		end
+		collar(ctx, y - size.Y * 0.2, Kit.hex("#C9A24A"), Enum.Material.Metal, "Collar") -- Brass
+	elseif shape == "maul" then
+		local mz = -1.02 + size.Z / 2
+		part(ctx, "Head", size, CFrame.new(0, y, mz), color, mat)
+		for _, ry in ipairs({ 0.55, 0.9, 1.25 }) do
+			part(
+				ctx,
+				"Rope",
+				Vector3.new(0.32, 0.1, 0.38),
+				CFrame.new(0, ry, 0),
+				Kit.hex("#8A7048"),
+				Enum.Material.Fabric
+			)
+		end
+	else
+		bit(ctx, "Blade", size, y, z, color, mat, 0.5)
 	end
-	-- The star on the poll.
-	local starAt = CFrame.new(0, ctx.headY, COLLAR_D / 2 + 0.3)
-	part(
-		ctx,
-		"Star",
-		Vector3.new(0.08, 0.44, 0.44),
-		starAt * CFrame.Angles(math.rad(45), 0, 0),
-		gold,
-		Enum.Material.Foil
-	)
-	part(ctx, "Star", Vector3.new(0.1, 0.3, 0.3), starAt, rim, mat)
-	cheeks(
-		ctx,
-		"Gem",
-		shape.thick,
-		Vector3.new(0.04, 0.14, 0.14),
-		ctx.headY,
-		-COLLAR_D / 2 - 0.24,
-		blue,
-		Enum.Material.Glass,
-		math.rad(45)
-	)
-	-- Gold bands spiralling up the haft.
-	for i, y in ipairs({ 1.45, 1.8, 2.15, 2.5 }) do
-		part(
-			ctx,
-			"Spiral",
-			Vector3.new(0.3, 0.06, 0.36),
-			CFrame.new(0, y, 0) * CFrame.Angles(if i % 2 == 0 then 0.3 else -0.3, 0, 0),
-			gold,
-			Enum.Material.Foil
-		)
+
+	if def.look.glow and host ~= nil then
+		local particleName = if shape == "fan" then "Glint" elseif shape == "star" then "Spark" else "Ember"
+		shine(host, color, particleName, 5)
 	end
-	glowLight(glow, hex("#CFE4FF"), 8, 1.2)
-	local sparkle = Instance.new("ParticleEmitter")
-	sparkle.Name = "Sparkles"
-	sparkle.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), blue)
-	sparkle.LightEmission = 1
-	sparkle.LightInfluence = 0
-	sparkle.Rate = 5
-	sparkle.Lifetime = NumberRange.new(0.6, 1.2)
-	sparkle.Speed = NumberRange.new(0.2, 0.7)
-	sparkle.SpreadAngle = Vector2.new(180, 180)
-	sparkle.RotSpeed = NumberRange.new(-90, 90)
-	sparkle.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0),
-		NumberSequenceKeypoint.new(0.3, 0.18),
-		NumberSequenceKeypoint.new(1, 0),
-	})
-	sparkle.Parent = glow
 end
 
--- Lux: a polished black haft with gold inlays, a gold head set with
--- diamonds, and a glint the client scales with the graphics tier.
-builders.LuxAxe = function(model, _def)
-	local black = hex("#141414")
-	local gold = hex("#E8C547")
-	local diamond = hex("#E7FBFF")
-	local ctx = haft(model, 3.5, black, gold, Enum.Material.Metal)
-	collar(ctx, gold, Enum.Material.Metal, 0.8)
-	local shape = { reach = 1.02, near = 0.58, up = 0.22, down = 0.34, thick = 0.24 }
-	local ey, ez, eh = blade(ctx, shape, gold, Enum.Material.Metal)
-	local e = edge(ctx, ey, ez, eh, shape.thick, diamond, Enum.Material.Neon, 0.18)
-	cheeks(
-		ctx,
-		"Inlay",
-		shape.thick,
-		Vector3.new(0.02, 0.16, 0.28),
-		ey + 0.05,
-		ez + 0.35,
-		gold,
-		Enum.Material.Metal,
-		0.2
-	)
-	cheeks(ctx, "Diamond", shape.thick, Vector3.new(0.06, 0.08, 0.08), ey, ez + 0.15, diamond, Enum.Material.Neon, 0)
-	part(ctx, "Poll", Vector3.new(0.36, 0.42, 0.2), CFrame.new(0, ctx.headY, 0.28), gold, Enum.Material.Metal)
-	glowLight(e, gold, 7, 0.8)
-	local glint = Instance.new("ParticleEmitter")
-	glint.Name = "Glint"
-	glint.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-	glint.Color = ColorSequence.new(gold, diamond)
-	glint.LightEmission = 1
-	glint.LightInfluence = 0
-	glint.Rate = 5
-	glint.Lifetime = NumberRange.new(0.35, 0.7)
-	glint.Speed = NumberRange.new(0.1, 0.4)
-	glint.SpreadAngle = Vector2.new(180, 180)
-	glint.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0),
-		NumberSequenceKeypoint.new(0.4, 0.12),
-		NumberSequenceKeypoint.new(1, 0),
-	})
-	glint.Parent = e
-end
-
--- Anything not listed above: a plain bit in the catalog's colours.
+-- Anything not listed in AxeModels: a plain bit in the catalog's colours.
 local function generic(model: Model, def: AxeDef)
-	local ctx = haft(model, 3.2, hex("#A87444"), hex("#2C2622"))
-	local color = hex(def.look.headColor)
-	-- An unknown material name errors when indexed, so look it up safely.
-	local ok, found = pcall(function(): any
-		return (Enum.Material :: any)[def.look.material]
-	end)
-	local mat: Enum.Material = if ok and found then found else Enum.Material.Metal
-	collar(ctx, color, mat)
-	local shape = { reach = 0.95, near = 0.55, up = 0.18, down = 0.3, thick = 0.24 }
-	local ey, ez, eh = blade(ctx, shape, color, mat)
-	local e =
-		edge(ctx, ey, ez, eh, shape.thick, Kit.shade(color, 0.4), if def.look.glow then Enum.Material.Neon else mat)
+	local plain: AxeModels.AxeLook = {
+		length = 3.2,
+		handleColor = "#A87444",
+		handleMaterial = "Wood",
+		gripColor = "#2C2622",
+		gripMaterial = "Leather",
+		shape = "wedge",
+		head = Vector3.new(0.24, 1.0, 1.05),
+		headColor = def.look.headColor,
+		headMaterial = "Metal",
+		trim = "none",
+	}
+	local ctx = haft(model, def.id, plain)
+	local color = Kit.hex(def.look.headColor)
+	local mat = materialOf(def.look.material)
+	local size = plain.head
+	local y, z, front = seat(ctx, size, 0)
+	bit(ctx, "Blade", size, y, z, color, mat, 0.5)
 	if def.look.glow then
-		glowLight(e, color, 8, 1.4)
+		local e = part(
+			ctx,
+			"Edge",
+			Vector3.new(size.X * 0.6, size.Y * 0.8, 0.08),
+			CFrame.new(0, y, front - 0.04),
+			Kit.shade(color, 0.35),
+			Enum.Material.Neon
+		)
+		shine(e, color, "Ember", 4)
 	end
 end
 
@@ -815,10 +484,10 @@ local function applyAxeMeshes(model: Model, def: AxeDef): boolean
 	local visualLen = handleMesh.Size.Y
 	handleMesh.CFrame = CFrame.new(0, visualLen / 2, 0)
 	local function placeOnBlade(mesh: MeshPart)
-		local size = mesh.Size
-		local y = visualLen - size.Y / 2 + 0.05
-		local z = AxeModels.BladeFrontZ + size.Z / 2
-		mesh.CFrame = CFrame.new(0, y, z)
+		local meshSize = mesh.Size
+		local meshY = visualLen - meshSize.Y / 2 + 0.05
+		local meshZ = AxeModels.BladeFrontZ + meshSize.Z / 2
+		mesh.CFrame = CFrame.new(0, meshY, meshZ)
 	end
 	placeOnBlade(headMesh)
 	if glowMesh then
@@ -836,18 +505,27 @@ local function applyAxeMeshes(model: Model, def: AxeDef): boolean
 	return true
 end
 
+local function weldTo(handle: BasePart, piece: BasePart)
+	local w = Instance.new("Weld")
+	w.Name = "Weld"
+	w.Part0 = handle
+	w.Part1 = piece
+	w.C0 = handle.CFrame:Inverse() * piece.CFrame
+	w.Parent = piece
+end
+
 -- Every axe id with its own design (the rest get the generic one).
 function AxeArt.Designed(axeId: string): boolean
-	return builders[axeId] ~= nil
+	return AxeModels.Look(axeId) ~= nil
 end
 
 -- The axe standing on its foot, blade forward (-Z), anchored, every part
 -- welded to the Handle.
 function AxeArt.Build(def: AxeDef): Model
 	local model = Kit.model(def.id)
-	local build = builders[def.id]
-	if build then
-		build(model, def)
+	local look = AxeModels.Look(def.id)
+	if look then
+		buildLook(model, def, look)
 	else
 		generic(model, def)
 	end
@@ -862,12 +540,7 @@ function AxeArt.Build(def: AxeDef): Model
 	handleLengths[def.id] = handle.Size.Y
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and d ~= handle then
-			local w = Instance.new("Weld")
-			w.Name = "Weld"
-			w.Part0 = handle
-			w.Part1 = d
-			w.C0 = handle.CFrame:Inverse() * d.CFrame
-			w.Parent = d
+			weldTo(handle, d)
 		end
 	end
 	return model
@@ -938,5 +611,84 @@ end
 
 -- How far up the handle the hand holds (studs from its foot).
 AxeArt.GripFromFoot = GRIP_FROM_FOOT
+
+local TEMPER_NAMES = { "TemperTrim", "TemperEdge", "TemperFx" }
+
+local function clearTemper(model: Model)
+	local drop: { Instance } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if table.find(TEMPER_NAMES, d.Name) then
+			table.insert(drop, d)
+		end
+	end
+	for _, d in ipairs(drop) do
+		d:Destroy()
+	end
+end
+
+-- Look only. Tier 1 is a trim ring, tier 2 adds a thin Neon edge, tier 3
+-- adds a slow particle. A nil or unknown prefix leaves the model alone,
+-- including a temper that was already applied.
+function AxeArt.ApplyTemper(model: Model, prefix: string?, tier: number)
+	if prefix == nil or prefix == "" then
+		return
+	end
+	local look = TemperLook.For(prefix, tier)
+	if look == nil then
+		return
+	end
+	local handle = model.PrimaryPart
+	if handle == nil then
+		return
+	end
+	clearTemper(model)
+	local len = handle.Size.Y
+	local function dress(piece: BasePart)
+		piece.Massless = true
+		piece.Anchored = handle.Anchored
+		piece.CanCollide = false
+		piece.CanTouch = false
+		piece.CanQuery = false
+		weldTo(handle, piece)
+	end
+	local trim = Kit.part(
+		model,
+		"TemperTrim",
+		Vector3.new(0.36, 0.08, 0.4),
+		handle.CFrame * CFrame.new(0, len / 2 - 0.42, 0),
+		look.trimColor,
+		Enum.Material.Metal
+	)
+	Kit.decor(trim, false)
+	dress(trim)
+	if tier >= 2 and look.glow > 0 then
+		local edge = Kit.part(
+			model,
+			"TemperEdge",
+			Vector3.new(0.16, 0.55, 0.04),
+			handle.CFrame * CFrame.new(0, len / 2 - 0.7, -0.72),
+			look.trimColor,
+			Enum.Material.Neon
+		)
+		Kit.decor(edge, false)
+		dress(edge)
+	end
+	if tier >= 3 and look.particle ~= nil then
+		local fx = Instance.new("ParticleEmitter")
+		fx.Name = "TemperFx"
+		fx.Rate = 3
+		fx.Lifetime = NumberRange.new(0.4, 0.9)
+		fx.Color = ColorSequence.new(look.trimColor)
+		fx.LightEmission = if look.particle == "Sheen" then 1 else 0.65
+		fx.Speed = if look.particle == "Wind" then NumberRange.new(1.4, 2.6) else NumberRange.new(0.1, 0.45)
+		fx.SpreadAngle = if look.particle == "Wind" then Vector2.new(10, 10) else Vector2.new(40, 40)
+		fx.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.06),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		fx:SetAttribute("Kind", look.particle)
+		fx.Parent = trim
+	end
+end
 
 return AxeArt

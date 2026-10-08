@@ -8,7 +8,37 @@ Last updated 8 October 2026 (Lane D axe, box, shelf and hover remake, branch `ph
 
 Branch `phase-2/v1-d-axes-displays`. Connor reviews each render before this merges. Paths below are the pictures to open.
 
-- `previews/v1-d/axes-before-lineup.png` — the 11 axes as they stand today (Rusty through Starfall, Lux, Hermit's Maul), side-on, before the remake.
+Axes and temper colours are built (part-built fallback). Boxes, shelves, the store board and hover colours are not in yet.
+
+- `previews/v1-d/axes-before-lineup.png` — the 11 axes as they stood before the remake.
+- `previews/v1-d/axes-after-lineup.png` — the same 11 after the remake, side-on.
+- `previews/v1-d/axes-after-rusty-steel-hardened.png`
+- `previews/v1-d/axes-after-silver-cobalt-gold.png`
+- `previews/v1-d/axes-after-obsidian-inferno-starfall.png`
+- `previews/v1-d/axes-after-lux-maul.png`
+- `previews/v1-d/axe-rusty.png`
+- `previews/v1-d/axe-steel.png`
+- `previews/v1-d/axe-hardened.png`
+- `previews/v1-d/axe-silver.png`
+- `previews/v1-d/axe-cobalt.png`
+- `previews/v1-d/axe-gold.png`
+- `previews/v1-d/axe-obsidian.png`
+- `previews/v1-d/axe-inferno.png`
+- `previews/v1-d/axe-starfall.png`
+- `previews/v1-d/axe-lux.png`
+- `previews/v1-d/axe-hermits-maul.png`
+- `previews/v1-d/tempers-lineup.png` — Swift, Keen and Prosperous, tiers 1 to 3, on a Steel Axe.
+- `previews/v1-d/temper-swift-1.png`
+- `previews/v1-d/temper-swift-2.png`
+- `previews/v1-d/temper-swift-3.png`
+- `previews/v1-d/temper-keen-1.png`
+- `previews/v1-d/temper-keen-2.png`
+- `previews/v1-d/temper-keen-3.png`
+- `previews/v1-d/temper-prosperous-1.png`
+- `previews/v1-d/temper-prosperous-2.png`
+- `previews/v1-d/temper-prosperous-3.png`
+
+Awaiting Connor: the hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Damage, range and cooldown are unchanged.
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (dialogue box branch on top of main at #95), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 

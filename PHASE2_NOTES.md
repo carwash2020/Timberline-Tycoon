@@ -1,5 +1,17 @@
 # Phase 2+ build notes
 
+## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
+
+In progress. Renders for Connor live in `previews/v1-d/` (listed in STATUS.md). Boxes, shelves, the store board and hover colours are not in yet. Nothing here is on main yet.
+
+Axes (part-built; uploaded meshes still replace them when they load):
+
+1. PC. Equip Rusty, then each rung, then the Lux Axe and the Hermit's Maul. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat (the maul included). Good: each axe is a different shape, matching `previews/v1-d/axe-*.png`. The Rusty head is chipped, Steel is a clean wedge, Hardened has a back spike, Silver is bearded, Cobalt has a white edge, Gold is a crescent, Obsidian is dark glass with a violet edge, Inferno glows, Starfall is a pale double head, Lux is a gold fan with its trail, the maul is a block.
+2. Phone emulator. The same equip, swing and drop. Drop is a long press on the hotbar. No new button, and nothing sits on the thumbstick or the jump button.
+3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
+
+Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Swift, Keen or Prosperous until lane A2 wires it. The pictures are `previews/v1-d/temper-*.png`. Stats do not move.
+
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).
 

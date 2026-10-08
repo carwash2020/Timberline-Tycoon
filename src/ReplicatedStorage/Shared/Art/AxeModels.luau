@@ -110,6 +110,176 @@ function AxeModels.AttachmentOffset(foot: Vector3, handleLength: number): CFrame
 	return CFrame.new(foot - Vector3.new(0, handleLength / 2, 0))
 end
 
+-- Look data for the part-built axe (AxeArt). Uploaded meshes stay optional:
+-- a mesh id of 0, or a mesh that fails to load, keeps this silhouette.
+-- `length` is the handle in studs. The Lux Axe's design length is 4.0, but
+-- the gameplay Handle stays 3.5 (tests/MeshArt.spec pins that haft).
+export type AxeLook = {
+	length: number,
+	handleColor: string,
+	handleMaterial: string,
+	gripColor: string,
+	gripMaterial: string,
+	shape: string,
+	head: Vector3, -- thick, tall, deep (X, Y, Z); the edge faces -Z
+	headColor: string,
+	headMaterial: string,
+	trim: string,
+}
+
+local looks: { [string]: AxeLook } = {
+	RustyAxe = {
+		length = 3.2,
+		handleColor = "#6B4A2F", -- Timber, tape wrap
+		handleMaterial = "Wood",
+		gripColor = "#C8BBA4",
+		gripMaterial = "Fabric",
+		shape = "chipped",
+		head = Vector3.new(0.25, 0.9, 1.0),
+		headColor = "#7D6A5A",
+		headMaterial = "CorrodedMetal",
+		trim = "tape",
+	},
+	SteelAxe = {
+		length = 3.4,
+		handleColor = "#8A6A45",
+		handleMaterial = "Wood",
+		gripColor = "#3A322C",
+		gripMaterial = "Leather",
+		shape = "wedge",
+		head = Vector3.new(0.25, 1.0, 1.15),
+		headColor = "#A7ADB4",
+		headMaterial = "Metal",
+		trim = "collar",
+	},
+	HardenedAxe = {
+		length = 3.5,
+		handleColor = "#5A4632",
+		handleMaterial = "Wood",
+		gripColor = "#4A3428",
+		gripMaterial = "Leather",
+		shape = "spike",
+		head = Vector3.new(0.28, 1.1, 1.3),
+		headColor = "#5E6670",
+		headMaterial = "DiamondPlate",
+		trim = "collars2",
+	},
+	SilverAxe = {
+		length = 3.6,
+		handleColor = "#D8D2C4",
+		handleMaterial = "Wood",
+		gripColor = "#5C534C",
+		gripMaterial = "Leather",
+		shape = "bearded",
+		head = Vector3.new(0.25, 1.3, 1.3),
+		headColor = "#DCE1E6",
+		headMaterial = "Foil",
+		trim = "brassPin",
+	},
+	CobaltAxe = {
+		length = 3.7,
+		handleColor = "#2B2B2E", -- IronBlack
+		handleMaterial = "Metal",
+		gripColor = "#1A1A1C",
+		gripMaterial = "Metal",
+		shape = "doubleBevel",
+		head = Vector3.new(0.22, 1.25, 1.4),
+		headColor = "#3A6FD8",
+		headMaterial = "Metal",
+		trim = "whiteEdge",
+	},
+	GoldAxe = {
+		length = 3.7,
+		handleColor = "#6B4A2F",
+		handleMaterial = "Wood",
+		gripColor = "#4A3018",
+		gripMaterial = "Leather",
+		shape = "crescent",
+		head = Vector3.new(0.25, 1.5, 1.45),
+		headColor = "#E1B530",
+		headMaterial = "Foil",
+		trim = "bands3",
+	},
+	ObsidianAxe = {
+		length = 3.9,
+		handleColor = "#3A3548",
+		handleMaterial = "Glass",
+		gripColor = "#2A2436",
+		gripMaterial = "Leather",
+		shape = "facets",
+		head = Vector3.new(0.3, 1.6, 1.6),
+		headColor = "#1D1A24",
+		headMaterial = "Glass",
+		trim = "violetEdge",
+	},
+	InfernoAxe = {
+		length = 4.0,
+		handleColor = "#3A2A24",
+		handleMaterial = "Basalt",
+		gripColor = "#2A1C18",
+		gripMaterial = "Basalt",
+		shape = "flame",
+		head = Vector3.new(0.3, 1.6, 1.7),
+		headColor = "#FF6A1A",
+		headMaterial = "Neon",
+		trim = "none",
+	},
+	StarfallAxe = {
+		length = 4.2,
+		handleColor = "#F2E6C8",
+		handleMaterial = "Wood",
+		gripColor = "#D4C4A4",
+		gripMaterial = "Leather",
+		shape = "star",
+		head = Vector3.new(0.28, 1.8, 1.8),
+		headColor = "#BFD8FF",
+		headMaterial = "Neon",
+		trim = "none",
+	},
+	-- Design length 4.0. Gameplay Handle is 3.5 (see GameplayLength).
+	LuxAxe = {
+		length = 4.0,
+		handleColor = "#F2D36B",
+		handleMaterial = "Metal",
+		gripColor = "#C9A24A", -- Brass
+		gripMaterial = "Metal",
+		shape = "fan",
+		head = Vector3.new(0.25, 1.6, 1.6),
+		headColor = "#F2D36B",
+		headMaterial = "Metal",
+		trim = "none",
+	},
+	HermitsMaul = {
+		length = 3.6,
+		handleColor = "#5A4632",
+		handleMaterial = "Wood",
+		gripColor = "#6B5340",
+		gripMaterial = "Fabric",
+		shape = "maul",
+		head = Vector3.new(0.8, 0.8, 1.2),
+		headColor = "#6F7B5C",
+		headMaterial = "Slate",
+		trim = "rope",
+	},
+}
+
+function AxeModels.Look(axeId: string): AxeLook?
+	return looks[axeId]
+end
+
+-- The Handle part's length. Lux stays 3.5 so the pinned swing haft and the
+-- Lux attachment offsets do not move. Every other axe uses its design length.
+function AxeModels.GameplayLength(axeId: string): number
+	local look = looks[axeId]
+	if not look then
+		return 3.2
+	end
+	if axeId == "LuxAxe" then
+		return 3.5
+	end
+	return look.length
+end
+
 -- TrailTop, TrailBottom and LuxBurst on the gameplay Handle. Safe to call
 -- again. The visual handle length is not used: the tool's Handle size is.
 function AxeModels.AddLuxAttachments(handle: BasePart)

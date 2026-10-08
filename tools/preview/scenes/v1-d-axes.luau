@@ -57,17 +57,22 @@ return {
 		local function at(i)
 			return (i - 1) * GAP
 		end
+		local cameras = {
+			cam(width / 2, 3.4, -24, width / 2, 1.7, 0, "eleven axes side-on"),
+			cam(at(2), 2.4, -8, at(2), 2.0, 0, "Rusty, Steel, Hardened"),
+			cam(at(5), 2.4, -8, at(5), 2.0, 0, "Silver, Cobalt, Gold"),
+			cam(at(8), 2.4, -8, at(8), 2.2, 0, "Obsidian, Inferno, Starfall"),
+			cam(at(10.5), 2.4, -8, at(10.5), 2.0, 0, "Lux and the Hermit's Maul"),
+		}
+		for i, def in ipairs(axes) do
+			local x = at(i)
+			table.insert(cameras, cam(x, 2.1, -6.2, x, 2.0, 0, def.displayName))
+		end
 		return {
 			root = root,
 			shadowRadius = 70,
 			fov = 32,
-			cameras = {
-				cam(width / 2, 3.4, -24, width / 2, 1.7, 0, "eleven axes side-on"),
-				cam(at(2), 2.4, -8, at(2), 2.0, 0, "Rusty, Steel, Hardened"),
-				cam(at(5), 2.4, -8, at(5), 2.0, 0, "Silver, Cobalt, Gold"),
-				cam(at(8), 2.4, -8, at(8), 2.2, 0, "Obsidian, Inferno, Starfall"),
-				cam(at(10.5), 2.4, -8, at(10.5), 2.0, 0, "Lux and the Hermit's Maul"),
-			},
+			cameras = cameras,
 		}
 	end,
 }
