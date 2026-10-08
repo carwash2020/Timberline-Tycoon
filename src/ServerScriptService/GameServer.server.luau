@@ -1125,7 +1125,7 @@ BootReport.StartStubs({
 
 safely("V1Boot", function()
 	local V1Boot = require(script.Parent.V1Boot)
-	V1Boot.Start(safely)
+	V1Boot.Start(safely, remote)
 end)
 
 -- The pose only. Damage stays on Chop / ChopTree / MineNode, which still
