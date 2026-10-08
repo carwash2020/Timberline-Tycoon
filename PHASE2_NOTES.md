@@ -48,7 +48,8 @@ One upgraded look for the town buildings. Shops keep the pinned footprints (Tool
 - Hearth and Home: green sign (#2F5D3A). The porch posts stand just inside the front wall (the pad starts at the wall; posts outside it sat on grass).
 - Dealership: red sign (#D9534F). The showroom walkway is clear. The three nearest bays have a low plinth and a dim lamp. The porch lantern is no brighter than the showroom lamps.
 - Weigh House: red metal roof, a round scale on the side. No new price text.
-- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage, sky forge court (stone and timber, anvil, timber ORDERS board, four relic sockets). The fishing dock, campfire, lookout and park bench are preview props only (`PropArt.Scene`); they are not in the live town.
+- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage (the live office is still PlotService's).
+- The sky forge court, the pond dock, the campfire, the lookout and the park bench are in the built town (`TownScenes`). Walk south-west across the meadow: the forge court is at (-112, -20), front toward the mill, stone floor, anvil, ORDERS board, four relic sockets. The lookout just west of it (-136, -20) has a ladder you can climb and a telescope aimed at town. On the green south of the main street, west of the well: a park bench at (-84, 56) and a teepee campfire at (-72, 56) with a pot. South of town, the fishing dock stands on the pond's north bank (pond at 78, -182): planks, posts in the water, a rod, a bucket and a crate. No second sheet of water.
 
 **Phone emulator**
 

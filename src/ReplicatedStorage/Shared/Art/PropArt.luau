@@ -1994,13 +1994,15 @@ function PropArt.Scene(kind: string): Model
 				Enum.Material.WoodPlanks
 			)
 		)
+		-- Posts run from the deck down into the pond (the bank sits about
+		-- 3 studs over the water). The preview's water plane is higher.
 		for _, spot in ipairs({
-			Vector3.new(-1.35, -1.1, -7.6),
-			Vector3.new(1.35, -1.1, -7.6),
-			Vector3.new(-1.35, -1.1, -1.2),
-			Vector3.new(1.35, -1.1, -1.2),
+			Vector3.new(-1.35, -4, -7.6),
+			Vector3.new(1.35, -4, -7.6),
+			Vector3.new(-1.35, -4, -1.2),
+			Vector3.new(1.35, -4, -1.2),
 		}) do
-			decor(Kit.post(model, "Pile", spot, 2.25, 0.38, TIMBER, Enum.Material.Wood))
+			decor(Kit.post(model, "Pile", spot, 5.15, 0.38, TIMBER, Enum.Material.Wood))
 		end
 		decor(Kit.post(model, "Holder", Vector3.new(-0.15, 1.2, -8.2), 0.7, 0.16, TIMBER))
 		local fishingRod = decor(
@@ -2198,6 +2200,30 @@ function PropArt.Scene(kind: string): Model
 		end
 		decor(Kit.part(model, "Stretcher", Vector3.new(3.2, 0.12, 0.12), CFrame.new(0, 0.4, -0.4), TIMBER))
 		stand(seat)
+	end
+	-- The walkable bits collide. Flames, the rod, the pot and the
+	-- telescope stay looks, so a player can stand on the dock, the
+	-- lookout and the bench.
+	local solidNames = {
+		Deck = true,
+		Pile = true,
+		Stone = true,
+		Seat = true,
+		FireLog = true,
+		Post = true,
+		Rail = true,
+		Ladder = true,
+		Rung = true,
+		Rock = true,
+		Back = true,
+		Arm = true,
+		Leg = true,
+		Stretcher = true,
+	}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and solidNames[d.Name] then
+			Kit.solid(d)
+		end
 	end
 	return model
 end

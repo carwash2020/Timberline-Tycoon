@@ -35,6 +35,8 @@ Round 1 framing (8 October 2026). `town-overview.png` is one elevated three-quar
 
 Round 2 (8 October 2026). The sky forge court uses the street palette: honey plank walls, a weathered-timber furnace with thick timber and honey bands, and a stone chimney. Darker slate photographed as a missing material on the shadowed street face. The four scene props are rebuilt, 10 to 30 parts each: a teepee fire with a tripod pot and log seats, a dock on water with posts, a rod, a bucket and a crate, a lookout platform about 9 studs up with a ladder and a coin telescope, and a park bench with a back and arms. `mill-foreman.png` is unchanged.
 
+Round 3 (8 October 2026). Those five are in the live town (`WorldPlan.Town().scenes`, built by MapBuilder into `TownScenes`). Lane B's map has not merged, so the spots are the current town layout. The sky forge court is on the south-west meadow at (-112, -20), front toward the mill, on `SkyForgeFloor`. The lookout is just west of it at (-136, -20), telescope toward town. The park bench is at (-84, 56) and the campfire at (-72, 56), on the green south of MainStreet. The fishing dock is on the Starter Forest pond's north bank (pond centre 78, -182), posts down into the water; MapBuilder drops the preview water sheet. The town-overview aerial reshoot waits on `phase-2/v1-preview-meshes` (the exporter still drops MeshParts, so the Blender shops still read as boxes).
+
 Paths:
 - `previews/v1-c/sawmill-front.png`
 - `previews/v1-c/toolshed-front.png`
