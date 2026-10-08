@@ -79,6 +79,7 @@ local TextAnchor = require(ReplicatedStorage.Shared.TextAnchor)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
+local TalkLock = require(ReplicatedStorage.Shared.TalkLock)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local DialogueUI = require(script.Parent.DialogueUI)
 local UITheme = require(script.Parent.UITheme)
@@ -843,7 +844,43 @@ local FLOURISHES: { [string]: { length: number, gap: { number } } } = {
 	lookAround = { length = 2.8, gap = { 6, 11 } },
 }
 
-local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focusHead: Vector3?, selfDist: number)
+-- Who this NPC is in a conversation with, if anyone: their body and head
+-- positions. The server names the player (the NPC's TalkLock.Attribute: the
+-- most recent talker; NPCTalkService), and this client's own open box counts
+-- at once, before that arrives. The NPC turns to them from any distance (a
+-- walker holds where it stands) until the attribute goes and the box is
+-- shut: all of it only what this screen shows.
+local function talkPartner(rig: Rig): (Vector3?, Vector3?)
+	local named = rig.model:GetAttribute(TalkLock.Attribute)
+	local who: Player? = nil
+	if type(named) == "number" then
+		who = Players:GetPlayerByUserId(named)
+	end
+	if who == nil and DialogueUI.IsTalkingTo(rig.model) then
+		who = player
+	end
+	if who == nil then
+		return nil, nil
+	end
+	local char = who.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if not (root and root:IsA("BasePart")) then
+		return nil, nil
+	end
+	local head = if char then char:FindFirstChild("Head") else nil
+	return root.Position,
+		if head and head:IsA("BasePart") then head.Position else root.Position + Vector3.new(0, 1.5, 0)
+end
+
+local function animate(
+	rig: Rig,
+	now: number,
+	dt: number,
+	focus: Vector3?,
+	focusHead: Vector3?,
+	selfDist: number,
+	locked: boolean
+)
 	local s = rig.scale
 	local npc = rig.npc
 
@@ -869,7 +906,9 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	if route then
 		moving = rig.moving
 	else
-		local want = NPCData.FaceYaw(rig.homeYaw, rig.root.Position, focus, NPCData.FaceRange)
+		-- Talking: face the partner at any distance (yaw only, the usual
+		-- turn rate). Otherwise the nearest player within FaceRange, else home.
+		local want = TalkLock.Want(rig.homeYaw, rig.root.Position, if locked then focus else nil, focus)
 		local turned = NPCData.TurnToward(rig.bodyYaw, want, NPCData.TurnRate * dt)
 		if turned ~= rig.bodyYaw then
 			rig.bodyYaw = turned
@@ -892,7 +931,7 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 		else math.huge
 	local wantYaw, wantPitch = 0, 0
 	local neck = rig.neck
-	if focusHead and neck and lookDist < LOOK_RANGE then
+	if focusHead and neck and (locked or lookDist < LOOK_RANGE) then
 		local yaw, pitch, inReach = HeadLook.Aim(rig.torso.CFrame * neck.C0, focusHead, 0.7 * s)
 		if inReach then
 			wantYaw, wantPitch = yaw, pitch
@@ -1131,6 +1170,17 @@ local function presentWalkers(dt: number)
 			moving = isMoving,
 			walked = walked,
 		}
+		-- In a conversation a walker stops where it stands (not where the clock
+		-- says the route has got to), so it never slides while it talks. When
+		-- the talk ends it eases back onto the clock like after any lag.
+		local partner = talkPartner(rig)
+		local held = rig.visual
+		if partner and held then
+			local hx, hz = TalkLock.HoldAt(true, held.x, held.z, x, z)
+			-- (the heading carries the turn toward them, so the release turns smoothly)
+			target = { x = hx, y = held.y, z = hz, yaw = rig.bodyYaw, moving = false, walked = held.walked }
+			isMoving = false
+		end
 		local visual, snapped = NPCWalk.Follow(rig.visual, target, dt, rig.speed, walkerOnScreen(rig.root.Position))
 		rig.visual = visual
 		if snapped then
@@ -1143,7 +1193,7 @@ local function presentWalkers(dt: number)
 			local at = Vector3.new(visual.x, visual.y, visual.z)
 			local index = NPCData.NearestIndex(at, bodies, NPCData.FaceRange)
 			local focus = if index then bodies[index] else nil
-			local want = NPCData.FaceYaw(visual.yaw, at, focus, NPCData.FaceRange)
+			local want = TalkLock.Want(visual.yaw, at, partner, focus)
 			rig.bodyYaw = NPCData.TurnToward(rig.bodyYaw, want, NPCData.TurnRate * dt)
 			yaw = rig.bodyYaw
 		end
@@ -1233,8 +1283,12 @@ local function step(dt: number)
 			local index = NPCData.NearestIndex(rig.root.Position, bodies, LOOK_RANGE)
 			local focus = if index then bodies[index] else nil
 			local focusHead = if index then bodyHeads[index] else nil
+			local partner, partnerHead = talkPartner(rig)
+			if partner then
+				focus, focusHead = partner, partnerHead
+			end
 			rig.active = true
-			animate(rig, now, elapsed, focus, focusHead, d)
+			animate(rig, now, elapsed, focus, focusHead, d, partner ~= nil)
 			if now >= rig.textAt and (rig.bubble or rig.tag) and d < phoneLayout.tagDistance then
 				checkText(rig, now)
 			end

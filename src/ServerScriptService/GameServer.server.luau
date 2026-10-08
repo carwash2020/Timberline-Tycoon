@@ -56,6 +56,7 @@ local MonetizationService = require(script.Parent.MonetizationService)
 local PaintService = require(script.Parent.PaintService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
+local NPCTalkService = require(script.Parent.NPCTalkService)
 local PickupGrace = require(script.Parent.PickupGrace)
 local JoinSync = require(script.Parent.JoinSync)
 local LoadState = require(script.Parent.LoadState)
@@ -704,6 +705,14 @@ safely("SaveSlotService.Init", SaveSlotService.Init, remote.SlotAction, remote.S
 		rebuildSlot(player)
 	end,
 })
+-- Old Hank's replies are the dialogue box like everyone's, not a toast.
+PlotService.Speak = function(player: Player, text: string)
+	remote.Dialogue:FireClient(
+		player,
+		{ line = "hank", text = text, speaker = PlotSalesmanData.Id, choice = false, noLabel = "Close" }
+	)
+	NPCTalkService.BeginById(player, PlotSalesmanData.Id)
+end
 safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlaceBlueprint = remote.PlaceBlueprint,
 	MoveBlueprint = remote.MoveBlueprint,
@@ -972,6 +981,12 @@ BootReport.StartStubs({
 			if DialogueService.Init then
 				DialogueService.Init(remote.Dialogue)
 			end
+		end,
+	},
+	{
+		name = "NPCTalkService",
+		init = function()
+			NPCTalkService.Init()
 		end,
 	},
 	{

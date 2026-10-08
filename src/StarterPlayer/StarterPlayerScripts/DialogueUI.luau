@@ -311,8 +311,21 @@ function DialogueUI.Start()
 		paintPrompt()
 	end
 
+	-- Tells the server this conversation is over, so the NPC stops facing
+	-- you and goes back to what it was doing (NPCTalkService also lets go by
+	-- itself when you walk off, go down or leave).
+	local function sendEnd(speaker: string)
+		if speaker == "" then
+			return
+		end
+		pcall(function()
+			Net.Remote("Dialogue"):FireServer("end", speaker)
+		end)
+	end
+
 	local function hide()
 		local was = state ~= nil
+		local spoke = if state then state.speaker else ""
 		holder.Visible = false
 		choosing = false
 		boxUid = nil
@@ -334,6 +347,9 @@ function DialogueUI.Start()
 					ProximityPromptService.Enabled = true
 				end
 			end)
+		end
+		if was then
+			sendEnd(spoke)
 		end
 		local after = onClose
 		onClose = nil
@@ -460,6 +476,9 @@ function DialogueUI.Start()
 		if state ~= nil and previous ~= nil then
 			previous() -- the box being replaced is over
 		end
+		if state ~= nil and state.speaker ~= convo.speaker then
+			sendEnd(state.speaker) -- and its speaker is let go
+		end
 		state = convo
 		choosing = isChoice
 		boxUid = uid
@@ -534,8 +553,11 @@ function DialogueUI.Start()
 		local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
 		local from = if hrp and hrp:IsA("BasePart") then hrp.Position else nil
 		local model = if speakerId then findSpeaker(speakerId, from) else nil
-		-- An offer is one short card; any other line is paged to fit.
-		local pages = if isChoice then { payload.text } else DialogueFlow.Pages({ payload.text }, pageChars())
+		-- An offer is one short card; any other talk is its lines (a keeper's
+		-- greeting, the shop's line, a line of their own), paged to fit.
+		local pages = if isChoice
+			then { payload.text }
+			else DialogueFlow.Pages(DialogueFlow.ServerLines(payload), pageChars())
 		local convo = DialogueFlow.New(speakerId, if npc then npc.name else nil, if npc then npc.role else nil, pages)
 		if convo == nil then
 			return
