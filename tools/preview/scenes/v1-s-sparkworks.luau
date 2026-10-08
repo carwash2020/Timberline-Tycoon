@@ -1,7 +1,7 @@
 --!nocheck
--- Sparkworks pieces, a wired demo board, and the settings panel, as parts.
--- Prices stay off the models. The panel is a physical stand-in for
--- LogicPanelUI so the preview can show the layout.
+-- Sparkworks pieces, and one wired example, lit and unlit.
+-- Prices stay off the models. The settings panel is a screen, shot
+-- separately (tools/preview/logic-panel.html), not as parts.
 
 local Common = require("./_common")
 
@@ -15,7 +15,7 @@ return {
 		local Models = ctx.shared("BlueprintModels")
 		local LogicItems = ctx.shared("LogicItems")
 		local root = roblox.Instance.new("Model")
-		Common.ground(ctx, root, 160, C3.fromRGB(116, 164, 84), V3.new(20, -0.5, 24))
+		Common.ground(ctx, root, 220, C3.fromRGB(116, 164, 84), V3.new(40, -0.5, 10))
 
 		local function put(id, x, z, rot)
 			local model = Models.Build(PlotData.Blueprint(id), false)
@@ -37,119 +37,107 @@ return {
 			return board
 		end
 
-		local function beam(name, a, b)
+		local function beam(name, a, b, lit)
 			local part = Kit.part(
 				root,
 				name,
-				V3.new(0.14, 0.14, math.max((b - a).Magnitude, 0.2)),
+				V3.new(0.22, 0.22, math.max((b - a).Magnitude, 0.2)),
 				CF.lookAt((a + b) / 2, b),
-				C3.fromHex("#FFC872"),
-				Enum.Material.Neon
+				C3.fromHex(if lit then "#FFC872" else "#6E6254"),
+				if lit then Enum.Material.Neon else Enum.Material.Metal
 			)
 			part.CanCollide = false
 			return part
 		end
 
-		-- Every piece, names only.
+		local function wire(name, a, b, lit)
+			local mid = (a + b) / 2 + V3.new(0, 2.2, 0.6)
+			beam(name .. "A", a, mid, lit)
+			beam(name .. "B", mid, b, lit)
+		end
+
+		-- Two rows, names above the pieces so a 3/4 view keeps every label.
+		local cols = 7
+		local gapX = 11
+		local gapZ = 20
+		local cam = V3.new(80, 24, 70)
 		for i, bp in ipairs(LogicItems) do
-			local x = (i - 1) * 7
-			put(bp.id, x, 0, 0)
-			sign(bp.displayName, CF.new(x, 0.7, 4.2), V3.new(4.4, 1.2, 0.12))
+			local col = (i - 1) % cols
+			local row = math.floor((i - 1) / cols)
+			local x = col * gapX
+			local z = row * gapZ
+			put(bp.id, x, z, 0)
+			local at = V3.new(x, 8.2, z)
+			sign(bp.displayName, CF.lookAt(at, V3.new(cam.X, at.Y, cam.Z)), V3.new(9.2, 1.6, 0.1))
 		end
 
-		-- Demo board: lever into an AND, a clock into a lamp, a plate into a hatch.
-		local board = Kit.part(
-			root,
-			"DemoBoard",
-			V3.new(28, 8, 0.6),
-			CF.new(18, 4.2, -16),
-			C3.fromHex("#3B3634"),
-			Enum.Material.Metal
-		)
-		Kit.signText(board, "SPARKWORKS", C3.fromHex("#F2E7CF"), { Enum.NormalId.Front })
-		local lever = put("Lever", 8, -12, 0)
-		local gate = put("GateAnd", 14, -12, 0)
-		local clock = put("Clock", 22, -12, 0)
-		local lamp = put("SparkLamp", 28, -12, 0)
-		put("PressurePlate", 8, -8, 0)
-		local hatch = put("Hatch", 16, -8, 0)
+		-- Lever and button into AND into a lamp. The same circuit, off and on.
+		local function circuit(ox, lit)
+			local lever = put("Lever", ox, -28, 0)
+			local button = put("Button", ox, -22, 0)
+			local gate = put("GateAnd", ox + 8, -25, 0)
+			local lamp = put("SparkLamp", ox + 16, -25, 0)
+			local function at(model, dx, dy, dz)
+				return model:GetPivot().Position + V3.new(dx, dy, dz)
+			end
+			wire("W" .. ox .. "L", at(lever, 0, 2.6, 0.3), at(gate, -0.45, 1.3, 0.5), lit)
+			wire("W" .. ox .. "B", at(button, 0, 1.3, 0.2), at(gate, 0.45, 1.3, 0.5), lit)
+			wire("W" .. ox .. "A", at(gate, 0, 1.4, -0.5), at(lamp, 0, 4.2, 0.4), lit)
+			local pip = gate:FindFirstChild("Part4")
+			local bulb = lamp:FindFirstChild("Part2")
+			if lit then
+				local handle = lever:FindFirstChild("Part3")
+				local leverRoot = lever:FindFirstChild("Root")
+				if handle and leverRoot then
+					handle.CFrame = leverRoot.CFrame * CF.new(0, 2.3, 0.25) * CF.Angles(0, 0, -0.7)
+				end
+				local cap = button:FindFirstChild("Part3")
+				if cap then
+					cap.CFrame = cap.CFrame * CF.new(0, -0.12, 0)
+					cap.Material = Enum.Material.Neon
+					cap.Color = C3.fromHex("#FF7A2E")
+				end
+				if pip then
+					pip.Material = Enum.Material.Neon
+					pip.Color = C3.fromHex("#FFC872")
+				end
+				if bulb then
+					bulb.Material = Enum.Material.Neon
+					bulb.Color = C3.fromHex("#FFE9A8")
+				end
+			else
+				if pip then
+					pip.Material = Enum.Material.Metal
+					pip.Color = C3.fromHex("#3B3634")
+				end
+				if bulb then
+					bulb.Material = Enum.Material.SmoothPlastic
+					bulb.Color = C3.fromHex("#8A8172")
+				end
+			end
+			local tag = if lit then "Lit" else "Unlit"
+			local tagAt = V3.new(ox + 8, 8.2, -25)
+			sign(tag, CF.lookAt(tagAt, V3.new(ox + 8, tagAt.Y, 20)), V3.new(6, 1.5, 0.1))
+		end
 
-		local function top(model, y)
-			return model:GetPivot().Position + V3.new(0, y, 0)
-		end
-		beam("DemoWireAnd", top(lever, 2.4), top(gate, 1.2))
-		beam("DemoWireLamp", top(clock, 1.6), top(lamp, 4))
-		beam("DemoWireHatch", V3.new(8, 0.6, -8), V3.new(16, 0.5, -8))
-
-		-- Lever on, AND glowing, lamp lit, hatch open: one moment of the demo.
-		local handle = lever:FindFirstChild("Part3")
-		local leverRoot = lever:FindFirstChild("Root")
-		if handle and leverRoot then
-			handle.CFrame = leverRoot.CFrame * CF.new(0, 2.3, 0.25) * CF.Angles(0, 0, -0.7)
-		end
-		local pip = gate:FindFirstChild("Part4")
-		if pip then
-			pip.Material = Enum.Material.Neon
-			pip.Color = C3.fromHex("#FFC872")
-		end
-		local bulb = lamp:FindFirstChild("Part2")
-		if bulb then
-			bulb.Material = Enum.Material.Neon
-			bulb.Color = C3.fromHex("#FFE9A8")
-		end
-		local leaf = hatch:FindFirstChild("Part2")
-		if leaf then
-			local half = leaf.Size.Z / 2
-			leaf.CFrame = leaf.CFrame * CF.new(0, 0, half) * CF.Angles(-1.25, 0, 0) * CF.new(0, 0, -half)
-		end
-
-		-- Settings panel, the same layout as LogicPanelUI: title, value, minus, plus, Done.
-		local card = Kit.part(
-			root,
-			"SettingsCard",
-			V3.new(8, 5.2, 0.25),
-			CF.new(48, 3.2, 0),
-			C3.fromHex("#F0E1C3"),
-			Enum.Material.SmoothPlastic
-		)
-		sign("Delay", CF.new(48, 4.7, 0.2), V3.new(6, 0.9, 0.08))
-		sign("2.0 s", CF.new(48, 3.5, 0.2), V3.new(4, 0.9, 0.08))
-		local minus = Kit.part(
-			root,
-			"Minus",
-			V3.new(2.2, 1.1, 0.16),
-			CF.new(45.6, 2.3, 0.2),
-			C3.fromHex("#E2CFAA"),
-			Enum.Material.SmoothPlastic
-		)
-		Kit.signText(minus, "-", C3.fromHex("#3C2814"), { Enum.NormalId.Front })
-		local plus = Kit.part(
-			root,
-			"Plus",
-			V3.new(2.2, 1.1, 0.16),
-			CF.new(50.4, 2.3, 0.2),
-			C3.fromHex("#FFB840"),
-			Enum.Material.SmoothPlastic
-		)
-		Kit.signText(plus, "+", C3.fromHex("#3C2814"), { Enum.NormalId.Front })
-		local done = Kit.part(
-			root,
-			"Done",
-			V3.new(6.4, 0.9, 0.16),
-			CF.new(48, 1.2, 0.2),
-			C3.fromHex("#4C8C40"),
-			Enum.Material.SmoothPlastic
-		)
-		Kit.signText(done, "DONE", C3.fromHex("#F5EBD7"), { Enum.NormalId.Front })
-		card.CanCollide = false
+		circuit(0, false)
+		circuit(28, true)
 
 		return {
 			root = root,
 			cameras = {
-				{ pos = { 42, 10, 16 }, target = { 42, 2, 0 }, label = "pieces" },
-				{ pos = { 18, 8, 2 }, target = { 18, 2, -12 }, label = "wires" },
-				{ pos = { 18, 7, -4 }, target = { 18, 3, -14 }, label = "demo" },
-				{ pos = { 48, 3.4, 8 }, target = { 48, 3.2, 0 }, label = "panel" },
+				{
+					pos = { 80, 24, 70 },
+					target = { 33, 4, 8 },
+					fov = 52,
+					label = "pieces",
+				},
+				{
+					pos = { 22, 14, 8 },
+					target = { 22, 3, -25 },
+					fov = 46,
+					label = "wired",
+				},
 			},
 		}
 	end,

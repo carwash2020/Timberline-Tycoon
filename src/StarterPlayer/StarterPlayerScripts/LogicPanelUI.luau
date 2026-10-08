@@ -20,6 +20,13 @@ local LogicPanelUI = {}
 
 local player = Players.LocalPlayer
 local C = UITheme.Colors
+
+-- Lane U owns UITheme. These are the Sparkworks values it does not have yet.
+-- Fills, edges and ink come from UITheme.Colors and the skip, amber and buy
+-- styles. U can fold Layer in as UITheme.Layers.LogicPanel.
+local SparkworksTheme = {
+	Layer = 16, -- over QuickMenu (15), under Store (20)
+}
 local ACTIONS = { "LogicMinus", "LogicPlus", "LogicClose" }
 
 local open = false
@@ -179,7 +186,7 @@ local function openFrom(prompt: ProximityPrompt)
 end
 
 function LogicPanelUI.Start()
-	local screen = UITheme.Screen("LogicPanel", UITheme.Layers.LogicPanel)
+	local screen = UITheme.Screen("LogicPanel", SparkworksTheme.Layer)
 	local panel = Instance.new("Frame")
 	panel.Name = "Card"
 	panel.AnchorPoint = Vector2.new(0.5, 0)
@@ -232,7 +239,7 @@ function LogicPanelUI.Start()
 	layout.Parent = row
 
 	local minus = UITheme.Button({
-		text = "−",
+		text = "-",
 		size = Vector2.new(96, 48),
 		style = "skip",
 		textSize = 22,
@@ -259,7 +266,7 @@ function LogicPanelUI.Start()
 	end)
 
 	local done = UITheme.Button({
-		text = "DONE",
+		text = "Done",
 		size = Vector2.new(280, 44),
 		style = "buy",
 		textSize = 16,
@@ -268,6 +275,11 @@ function LogicPanelUI.Start()
 	done.root.Position = UDim2.fromOffset(20, 156)
 	done.root.Parent = panel
 	done.face.Activated:Connect(close)
+	-- UITheme.Button already scales the label to the face. Say it here so
+	-- the three labels stay readable if that default changes.
+	for _, button in ipairs({ minus, plus, done }) do
+		button.face.TextScaled = true
+	end
 
 	screen.Parent = player:WaitForChild("PlayerGui")
 

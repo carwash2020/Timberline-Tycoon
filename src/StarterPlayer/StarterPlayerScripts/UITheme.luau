@@ -528,7 +528,6 @@ UITheme.Layers = {
 	Settings = 13, -- a modal: over the HUD and the cash row
 	Admin = 14, -- the owner menu (AdminUI), over Settings
 	QuickMenu = 15, -- the gamepad's quick menu (QuickMenuUI), over the owner menu
-	LogicPanel = 16, -- Sparkworks Set panel, over the quick menu, under the store
 	Store = 20,
 	Dialogue = 30,
 	PlotPicker = 80,
