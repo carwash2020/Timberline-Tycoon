@@ -68,38 +68,36 @@ return function(t)
 		t.eq(model:FindFirstChild("Instant Delivery", true), nil)
 	end)
 
-	t.test("poster descriptions are 14 px, wrapped, and at most two lines", function()
+	t.test("posters show the name and R$, scaled and wrapped, with no description", function()
 		local Enum = t.roblox.Enum
 		local model = StoreBoard.Build()
-		local gui = model:FindFirstChild("Posters", true)
-		local width = StoreBoard.BodyWidth(gui.CanvasSize.X)
 		local StoreData = t.shared("StoreData")
 		local function check(item)
 			local card = model:FindFirstChild(item.name, true)
-			local body = card:FindFirstChild("Description")
-			t.eq(body.TextSize, 14, item.name)
-			t.eq(body.TextWrapped, true, item.name)
-			t.eq(body.TextTruncate, Enum.TextTruncate.AtEnd, item.name)
-			t.eq(body.Size.Y.Offset, 28, item.name)
-			t.ok(StoreBoard.LineCount(body.Text, width, 14) <= 2, item.name)
-			if StoreBoard.LineCount(item.description, width, 14) <= 2 then
-				t.eq(body.Text, item.description, item.name .. " fits whole")
-			else
-				t.ok(string.sub(body.Text, -#"…") == "…", item.name .. " clips")
-			end
-			local title = nil
-			for _, d in ipairs(card:GetChildren()) do
-				if d:IsA("TextLabel") and d.Text == item.name then
-					title = d
-				end
-			end
-			t.eq(title.TextSize, 16, item.name .. " title")
+			t.eq(card:FindFirstChild("Description"), nil, item.name .. " has no description")
+			local title = card:FindFirstChild("Name")
+			local price = card:FindFirstChild("Price")
+			t.eq(title.Text, item.name)
+			t.eq(price.Text, "R$")
+			t.eq(title.TextScaled, true, item.name)
+			t.eq(price.TextScaled, true, item.name)
+			t.eq(title.TextWrapped, true, item.name)
+			t.eq(price.TextWrapped, true, item.name)
+			t.eq(title.TextTruncate, Enum.TextTruncate.None, item.name)
+			t.eq(price.TextTruncate, Enum.TextTruncate.None, item.name)
+			t.ok(card.Size.Y.Offset <= 56, item.name .. " stays a short card")
 		end
 		for _, pass in ipairs(StoreData.ListedPasses()) do
 			check(pass)
 		end
 		for _, product in ipairs(StoreData.ListedProducts()) do
 			check(product)
+		end
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("TextLabel") then
+				t.ok(string.find(d.Text, "…", 1, true) == nil, "no cut-off line")
+				t.ok(string.find(d.Text, "...", 1, true) == nil, "no cut-off line")
+			end
 		end
 	end)
 

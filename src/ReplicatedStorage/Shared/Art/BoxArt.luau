@@ -278,18 +278,22 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	)
 	write(strip, Enum.NormalId.Front, spec.name, ink, Enum.Font.FredokaOne)
 
-	-- A brass plate on the band. This is the one spare shell part
+	-- A brass plate under the name band, on the left. It used to sit on
+	-- the band and covered the name. This is the one spare shell part
 	-- (BoxLogic.ShellPartCap is 9, and the body plus the walls, windows
 	-- and strip already use 8). Four 0.1 corner bevels would need that
 	-- cap raised, so they are not separate parts.
 	local logoT = 0.05
+	local logoH = 0.3
+	local gap = 0.06
 	local stripFront = -(D / 2 + L.stripProud)
+	local stripBottom = H / 2 - L.stripH
 	add(plate(
 		parent,
 		body,
 		"Logo",
-		Vector3.new(0.6, 0.3, logoT),
-		Vector3.new(-W / 2 + 0.55, H / 2 - L.stripH / 2, stripFront - 0.02 - logoT / 2),
+		Vector3.new(0.6, logoH, logoT),
+		Vector3.new(-W / 2 + 0.55, stripBottom - gap - logoH / 2, stripFront - 0.02 - logoT / 2),
 		Color3.fromHex("#C9A24A"), -- Brass
 		Enum.Material.Metal
 	))

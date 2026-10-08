@@ -8,7 +8,7 @@ Last updated 8 October 2026 (Lane D axe, box, shelf and hover remake, branch `ph
 
 Branch `phase-2/v1-d-axes-displays`. Connor reviews each render before this merges. Paths below are the pictures to open.
 
-The lane is done on this branch. Axes, temper colours, the stepped shelf unit, window boxes, the store board and hover price colours are built. The shop's shelves on screen are still `ShopInterior.SteppedUnit` (lane C). `ShelfLayout.Build` is the unit those shelves should copy; the pictures of it are below. Economy numbers did not move.
+The lane is done on this branch. Axes, temper colours, the stepped shelf unit, window boxes, the store board and hover price colours are built. Lineups are a three-quarter view, 30 degrees off the side and 15 degrees down, in two rows where one row would crop them. The brass plate sits under the name. The store board shows the item name and R$ only. The shop's shelves on screen are still `ShopInterior.SteppedUnit` (lane C). `ShelfLayout.Build` is the unit those shelves should copy; the pictures of it are below. Economy numbers did not move.
 
 - `previews/v1-d/axes-before-lineup.png` — the 11 axes as they stood before the remake.
 - `previews/v1-d/axes-after-lineup.png` — the same 11 after the remake, side-on.
@@ -28,6 +28,7 @@ The lane is done on this branch. Axes, temper colours, the stepped shelf unit, w
 - `previews/v1-d/axe-lux.png`
 - `previews/v1-d/axe-hermits-maul.png`
 - `previews/v1-d/tempers-lineup.png` — Swift, Keen and Prosperous, tiers 1 to 3, on a Steel Axe.
+- `previews/v1-d/tempers-tier-3.png` — the three families at tier 3, close, so the band and the edge read.
 - `previews/v1-d/temper-swift-1.png`
 - `previews/v1-d/temper-swift-2.png`
 - `previews/v1-d/temper-swift-3.png`

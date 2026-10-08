@@ -14,7 +14,7 @@ Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet
 
 Boxes (the window crate; shell stays at 9 parts, a full box at 42):
 
-4. PC. Buy or spawn a boxed axe and a boxed truck. The box has a wood body, a glass front, a 0.1 accent band and a small brass plate. No price, no decal, no billboard on the box. The item shows through the glass. Good: it matches `previews/v1-d/boxes-after-axe.png` and `boxes-after-sawmill.png`. A truck box still appears (the shell did not grow, so the 42-part cap still holds).
+4. PC. Buy or spawn a boxed axe and a boxed truck. The box has a wood body, a glass front, a 0.1 accent band and a small brass plate under the name, clear of the letters. No price, no decal, no billboard on the box. The item shows through the glass. Good: it matches `previews/v1-d/boxes-after-axe.png` and `boxes-after-sawmill.png`. A truck box still appears (the shell did not grow, so the 42-part cap still holds).
 5. Phone emulator, Lower quality. The same boxes. The copies of the item inside are gone and the glass is tinted. The shell, the band and the plate stay. Nothing new sits on the thumbstick or the jump button.
 6. Xbox. Look at a box on a shelf. The tag hangs on it. No control is bound to ButtonR2.
 
@@ -24,7 +24,7 @@ Shelves (the unit is `ShelfLayout.Build`; the shop on screen still uses lane C's
 
 Store board:
 
-8. PC. Walk to the store board in town. The board is cream, the heading and the poster text are dark ink, and a thin brass frame sits on the face. The banner words and where the board stands are the same as before. Good: `previews/v1-d/board-after.png`.
+8. PC. Walk to the store board in town. The board is cream, the heading is dark ink, and each poster is the item's name plus R$ (the Robux number stays on the store screen). No description, no cut-off line. A thin brass frame sits on the face. The banner words and where the board stands are the same as before. Good: `previews/v1-d/board-after.png`.
 9. Phone emulator. The board is still readable. Body text stays at least 14px. No new control.
 10. Xbox. The board prompt still works. B closes whatever it opened.
 
