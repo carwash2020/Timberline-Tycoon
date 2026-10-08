@@ -94,6 +94,8 @@ type Hold = {
 	device: Device,
 	touch: InputObject?, -- the finger holding it
 	confirmed: boolean, -- the server said it's ours (HeldBy)
+	box: boolean, -- a shop box: held at its centre of mass, upright, with a torque sized to it
+	radius: number, -- studs, centre to far corner of the whole piece
 	mass: number, -- what the pull is sized by (GrabLogic.PullMass); re-read when the piece's assembly changes
 	assemblyMass: number, -- part.AssemblyMass when the pull was last sized
 	conn: RBXScriptConnection?, -- HeldBy changes
@@ -631,9 +633,9 @@ end
 
 -- Sizes the pull and the turn to `h.mass`.
 local function sizePull(h: Hold)
-	local force = GrabLogic.Force(h.mass, tune("DragForcePerMass"), tune("DragForceCap"))
+	local force = GrabLogic.HoldForce(h.mass, h.box, tune("DragForcePerMass"), tune("DragForceCap"))
 	h.pull.MaxForce = force
-	h.turn.MaxTorque = GrabLogic.Torque(force)
+	h.turn.MaxTorque = GrabLogic.HoldTorque(force, h.box, h.radius)
 end
 
 -- Starts holding what `device` points at (see the header).
@@ -667,7 +669,11 @@ local function grab(device: Device, touch: InputObject?)
 		return
 	end
 	local mass = massOf(model, part)
-	local force = GrabLogic.Force(mass, tune("DragForcePerMass"), tune("DragForceCap"))
+	local isBox = CollectionService:HasTag(model, SHOP_TAG)
+	local radius = model:GetExtentsSize().Magnitude / 2
+	local force = GrabLogic.HoldForce(mass, isBox, tune("DragForcePerMass"), tune("DragForceCap"))
+	-- A box is held upright at the yaw it stands at (see GrabLogic.HoldForce).
+	local startRot = if isBox then GrabLogic.Upright(part.CFrame) else part.CFrame.Rotation
 	local grip = Instance.new("Attachment")
 	grip.Name = "DragGrip"
 	grip.CFrame = CFrame.new(part.CFrame:PointToObjectSpace(at))
@@ -676,7 +682,7 @@ local function grab(device: Device, touch: InputObject?)
 	pull.Name = "DragPull"
 	pull.Mode = Enum.PositionAlignmentMode.OneAttachment
 	pull.Attachment0 = grip
-	pull.ApplyAtCenterOfMass = false -- it swings from your grip
+	pull.ApplyAtCenterOfMass = GrabLogic.PullsAtCentre(isBox) -- wood swings from your grip; a box hangs from its centre
 	pull.RigidityEnabled = false
 	pull.MaxForce = force
 	pull.MaxVelocity = tune("DragMaxSpeed")
@@ -688,10 +694,10 @@ local function grab(device: Device, touch: InputObject?)
 	turn.Mode = Enum.OrientationAlignmentMode.OneAttachment
 	turn.Attachment0 = grip
 	turn.RigidityEnabled = false
-	turn.MaxTorque = GrabLogic.Torque(force)
+	turn.MaxTorque = GrabLogic.HoldTorque(force, isBox, radius)
 	turn.MaxAngularVelocity = GrabLogic.MaxSpin
 	turn.Responsiveness = tune("DragResponsiveness")
-	turn.CFrame = part.CFrame.Rotation
+	turn.CFrame = startRot
 	turn.Parent = part
 	local h: Hold = {
 		model = model,
@@ -699,7 +705,9 @@ local function grab(device: Device, touch: InputObject?)
 		grip = grip,
 		pull = pull,
 		turn = turn,
-		rot = part.CFrame.Rotation,
+		rot = startRot,
+		box = isBox,
+		radius = radius,
 		distance = GrabLogic.StartHold(at, anchorOf(char, hrp), tune("HoldMin"), tune("HoldMax")),
 		device = device,
 		touch = touch,
@@ -719,6 +727,12 @@ local function grab(device: Device, touch: InputObject?)
 		end
 		if model:GetAttribute("HeldBy") == player.UserId then
 			h.confirmed = true
+			if h.box then
+				-- Whatever spin the shelf release left on it is damped at once.
+				pcall(function()
+					h.part.AssemblyAngularVelocity = Vector3.zero
+				end)
+			end
 		elseif h.confirmed then
 			drop(false) -- the server let go (sold, cut, too far, put back)
 		end
