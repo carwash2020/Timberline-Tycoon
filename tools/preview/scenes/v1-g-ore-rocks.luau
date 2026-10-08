@@ -20,8 +20,20 @@ return {
 		local caveX, caveZ = 46, 78
 		pad("CaveFloor", V3.new(86, 1, 56), CF.new(caveX, -0.5, caveZ - 4), C3.fromRGB(36, 34, 40), Enum.Material.Slate)
 		pad("CaveWall", V3.new(86, 26, 1), CF.new(caveX, 13, caveZ + 22), C3.fromRGB(28, 26, 32), Enum.Material.Slate)
-		pad("CaveWall", V3.new(1, 26, 56), CF.new(caveX - 43, 13, caveZ - 4), C3.fromRGB(32, 30, 36), Enum.Material.Slate)
-		pad("CaveWall", V3.new(1, 26, 56), CF.new(caveX + 43, 13, caveZ - 4), C3.fromRGB(32, 30, 36), Enum.Material.Slate)
+		pad(
+			"CaveWall",
+			V3.new(1, 26, 56),
+			CF.new(caveX - 43, 13, caveZ - 4),
+			C3.fromRGB(32, 30, 36),
+			Enum.Material.Slate
+		)
+		pad(
+			"CaveWall",
+			V3.new(1, 26, 56),
+			CF.new(caveX + 43, 13, caveZ - 4),
+			C3.fromRGB(32, 30, 36),
+			Enum.Material.Slate
+		)
 
 		-- Preview-only fill. The night preset stays the cave's darkness;
 		-- these lamps are not part of the rock, they just let the shot read.
@@ -35,9 +47,11 @@ return {
 			light.Color = C3.fromRGB(186, 196, 214)
 			light.Parent = lamp
 		end
-		fill(caveX - 16, 5.2, caveZ - 8, 2.4)
-		fill(caveX + 16, 5.2, caveZ - 8, 2.4)
-		fill(caveX, 4.6, caveZ + 4, 1.5)
+		-- Close to the stone and strong enough that night lighting still
+		-- leaves a cave, but the faces and veins are readable.
+		fill(caveX - 12, 2.6, caveZ - 2, 10)
+		fill(caveX + 12, 2.6, caveZ - 2, 10)
+		fill(caveX, 2.4, caveZ + 8, 8)
 
 		local function plaque(text, x, z)
 			local board = Kit.part(
@@ -119,9 +133,15 @@ return {
 		row1.label = "ores 1"
 		local row2 = frameRow(76.5, 0, 48)
 		row2.label = "ores 2"
-		local cave = frameRow(caveX, caveZ, 58, 42)
-		cave.label = "cave"
-		cave.night = true
+		-- Same 30-degree 3/4 as the daylight rows, pulled in so both cave
+		-- rows fill the frame instead of sitting in a black void.
+		local cave = {
+			pos = { caveX - 18, 20, caveZ - 34 },
+			target = { caveX, 0.8, caveZ + 2 },
+			fov = 48,
+			label = "cave",
+			night = true,
+		}
 		return {
 			root = root,
 			shadowRadius = 50,
