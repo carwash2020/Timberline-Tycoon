@@ -165,6 +165,42 @@ return function(t)
 		t.ok(GrabLogic.CanLift(0.5), "a limb flies")
 	end)
 
+	t.test(
+		"a held shop box is carried: lifted whole, pulled at its centre, turned hard enough to stay level",
+		function()
+			-- A big shelf box (BoxSize.Max 3.1 x 4.6 x 3.6) weighs more than the wood cap lifts.
+			local mass = 3.1 * 4.6 * 3.6 * 0.7
+			local radius = math.sqrt(3.1 ^ 2 + 4.6 ^ 2 + 3.6 ^ 2) / 2
+			t.ok(not GrabLogic.CanLift(mass), "the wood pull alone cannot lift it (the cause of the spin)")
+			local wood = GrabLogic.HoldForce(mass, false)
+			t.eq(wood, GrabLogic.Force(mass), "wood keeps the capped pull")
+			local force = GrabLogic.HoldForce(mass, true)
+			t.ok(force > mass * GrabLogic.Gravity, "a box's pull beats its weight")
+			t.eq(force, mass * GrabLogic.Gravity * GrabLogic.BoxLiftMargin)
+			t.eq(GrabLogic.HoldForce(1, true), 400, "a light box keeps the wood pull")
+			t.eq(GrabLogic.HoldForce(0 / 0, true), 0)
+			t.eq(GrabLogic.HoldTorque(force, false, radius), GrabLogic.Torque(force), "wood's torque is unchanged")
+			local torque = GrabLogic.HoldTorque(force, true, radius)
+			t.ok(torque >= force * radius, "a box's turn outweighs the pull at its far corner")
+			t.ok(torque > GrabLogic.Torque(force))
+			t.eq(GrabLogic.HoldTorque(0, true, radius), 0)
+			t.eq(GrabLogic.HoldTorque(force, true, nil), GrabLogic.Torque(force), "no radius: the wood torque")
+			t.ok(GrabLogic.PullsAtCentre(true) and not GrabLogic.PullsAtCentre(false))
+		end
+	)
+
+	t.test("a box is held upright: only its turn about the world's up is kept", function()
+		local tilted = CFrame.Angles(0.4, 1.0, 0.3)
+		local up = GrabLogic.Upright(tilted)
+		t.ok(math.abs(up.UpVector.Y - 1) < 1e-5, "level")
+		local want = Vector3.new(tilted.LookVector.X, 0, tilted.LookVector.Z).Unit
+		t.ok((up.LookVector - want).Magnitude < 1e-5, "same way round")
+		local flat = CFrame.Angles(0, 2, 0)
+		t.ok((GrabLogic.Upright(flat).LookVector - flat.LookVector).Magnitude < 1e-5, "an upright box is unchanged")
+		local onFace = CFrame.Angles(math.rad(90), 0, 0) -- looking straight up or down
+		t.ok(math.abs(GrabLogic.Upright(onFace).UpVector.Y - 1) < 1e-5, "even on its face it comes out level")
+	end)
+
 	t.test("the hold distance stays HoldMin..HoldMax studs from you", function()
 		t.eq({ GameConfig.HoldMin, GameConfig.HoldMax }, { 3, 30 })
 		t.eq(GrabLogic.ClampHold(1), 3)
@@ -416,6 +452,16 @@ return function(t)
 			t.eq(GrabLogic.LockStays(facts({ focused = true })), true)
 		end
 	)
+
+	t.test("DragController holds a shop box with the box rules (centre pull, upright, sized torque)", function()
+		local fs = require("@lune/fs")
+		local drag = fs.readFile("src/StarterPlayer/StarterPlayerScripts/DragController.luau")
+		t.ok(string.find(drag, "GrabLogic.HoldForce(", 1, true), "the pull is the hold force")
+		t.ok(string.find(drag, "GrabLogic.HoldTorque(", 1, true), "the turn is the hold torque")
+		t.ok(string.find(drag, "GrabLogic.PullsAtCentre(isBox)", 1, true), "boxes pull at the centre of mass")
+		t.ok(string.find(drag, "GrabLogic.Upright(part.CFrame)", 1, true), "boxes are held upright")
+		t.eq(string.find(drag, "GrabLogic.Torque(force)", 1, true), nil, "no bare wood torque left")
+	end)
 
 	t.test("the controllers turn with the LEFT stick (Thumbstick1) and leave the camera's right stick alone", function()
 		local fs = require("@lune/fs")
