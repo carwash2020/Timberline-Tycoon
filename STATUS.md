@@ -36,9 +36,12 @@ Preview paths:
 - `previews/v1-g/trees-emberwood-night.png`
 - `previews/v1-g/trees-gloamwood-night.png`
 - `previews/v1-g/trees-lumenwood-night.png`
-- `previews/v1-g/nature-rocks.png`
+- `previews/v1-g/nature-rocks-1.png`
+- `previews/v1-g/nature-rocks-2.png`
 - `previews/v1-g/nature-boulder-close.png`
-- `previews/v1-g/ore-rocks.png`
+- `previews/v1-g/nature-meadow.png`
+- `previews/v1-g/ore-rocks-1.png`
+- `previews/v1-g/ore-rocks-2.png`
 - `previews/v1-g/ore-rocks-cave.png`
 - `previews/v1-g/nature-plants.png`
 - `previews/v1-g/nature-flowers-close.png`
