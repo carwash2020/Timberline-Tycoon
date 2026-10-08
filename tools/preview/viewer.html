@@ -37,10 +37,13 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const scene = JSON.parse(document.getElementById("scene").textContent);
 // Lua's empty tables arrive as {} rather than [].
-for (const k of ["parts", "lights", "texts", "cameras"]) if (!Array.isArray(scene[k])) scene[k] = [];
+for (const k of ["parts", "lights", "texts", "cameras", "meshes"]) if (!Array.isArray(scene[k])) scene[k] = [];
+if (!scene.meshIndex || Array.isArray(scene.meshIndex)) scene.meshIndex = {};
+if (!scene.meshBlobs || Array.isArray(scene.meshBlobs)) scene.meshBlobs = {};
 const L = Object.assign({
   sunDir: [-0.45, 0.7, -0.35], sunColor: "#ffe2b0", sunIntensity: 2.6,
   skyTop: "#8dbbe8", skyBottom: "#f4dcae", ground: "#8a7a5c", hemiIntensity: 1.5, ambient: 0.55,
@@ -89,7 +92,15 @@ const sky = new THREE.ShaderMaterial({
   vertexShader: "varying vec3 p; void main(){ p = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
   fragmentShader: "uniform vec3 top; uniform vec3 bottom; varying vec3 p; void main(){ float t = clamp(p.y*1.6+0.15,0.0,1.0); gl_FragColor = vec4(mix(bottom, top, t),1.0); }",
 });
-world.add(new THREE.Mesh(new THREE.SphereGeometry(6000, 32, 16), sky));
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(6000, 32, 16), sky);
+world.add(skyDome);
+if (scene.background) {
+  world.background = new THREE.Color(scene.background);
+  skyDome.visible = false;
+  world.fog.near = 8000;
+  world.fog.far = 16000;
+  world.fog.color.set(scene.background);
+}
 
 // Roblox's OutdoorAmbient keeps shadows readable; a hemisphere light plus a
 // little flat ambient is the closest cheap match.
@@ -343,6 +354,127 @@ if (scene.terrain) {
   }
 }
 
+// Custom meshes (MeshPart / FileMesh). The export embeds the GLB bytes
+// because a file:// page cannot fetch them. Each id is one node from
+// assets/meshes/manifest.json. The node is centred on its bounds and scaled
+// so that box matches the part Size, which is what a MeshPart does with
+// initialSize. A missing id or a GLB that fails to parse is a magenta box
+// labelled MISSING MESH. Nothing falls back to a part-built stand-in.
+const gltfLoader = new GLTFLoader();
+const gltfCache = new Map();
+function b64ToBuffer(b64) {
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+function paintMaterials(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (!m) continue;
+      // VC_Paint has vertex colours and no metal/rough factors. glTF's
+      // default metalness is 1, which would draw those colours as black.
+      if (m.name === "VC_Paint") { m.metalness = 0; m.roughness = 0.72; }
+      m.side = THREE.DoubleSide;
+      o.castShadow = true;
+      o.receiveShadow = true;
+    }
+  });
+}
+function gltfFor(file) {
+  if (!gltfCache.has(file)) {
+    const b64 = scene.meshBlobs[file];
+    if (!b64) {
+      gltfCache.set(file, Promise.reject(new Error("no bytes for " + file)));
+    } else {
+      const url = URL.createObjectURL(new Blob([b64ToBuffer(b64)], { type: "model/gltf-binary" }));
+      gltfCache.set(file, gltfLoader.loadAsync(url).then((gltf) => {
+        URL.revokeObjectURL(url);
+        paintMaterials(gltf.scene);
+        return gltf;
+      }).catch((err) => { URL.revokeObjectURL(url); throw err; }));
+    }
+  }
+  return gltfCache.get(file);
+}
+function nodeNamed(gltf, name) {
+  let hit = null;
+  gltf.scene.traverse((o) => { if (!hit && o.name === name) hit = o; });
+  return hit;
+}
+function cframeMatrix(p) {
+  const m = new THREE.Matrix4();
+  m.set(p[7], p[8], p[9], p[4], p[10], p[11], p[12], p[5], p[13], p[14], p[15], p[6], 0, 0, 0, 1);
+  return m;
+}
+function missingMesh(id, p) {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff00ff })));
+  const w = Math.max(p[1], 1.2);
+  const plate = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, Math.max(0.4, w * 0.22)),
+    new THREE.MeshBasicMaterial({ map: textTexture("MISSING MESH " + id, "#ffffff", "#ff00ff"), side: THREE.DoubleSide })
+  );
+  plate.position.y = 0.72;
+  g.add(plate);
+  const wrap = new THREE.Group();
+  wrap.add(g);
+  wrap.scale.set(Math.max(p[1], 0.05), Math.max(p[2], 0.05), Math.max(p[3], 0.05));
+  const placed = new THREE.Group();
+  placed.matrixAutoUpdate = false;
+  placed.matrix.copy(cframeMatrix(p));
+  placed.add(wrap);
+  world.add(placed);
+  bounds.expandByPoint(new THREE.Vector3(p[4], p[5], p[6]));
+}
+function fittedNode(node, sx, sy, sz) {
+  const clone = node.clone(true);
+  clone.position.set(0, 0, 0);
+  clone.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(clone);
+  if (box.isEmpty()) return null;
+  const size = box.getSize(new THREE.Vector3());
+  clone.position.sub(box.getCenter(new THREE.Vector3()));
+  const holder = new THREE.Group();
+  holder.add(clone);
+  holder.scale.set(sx / Math.max(size.x, 1e-4), sy / Math.max(size.y, 1e-4), sz / Math.max(size.z, 1e-4));
+  return holder;
+}
+async function addMeshes() {
+  const pending = new Map();
+  for (const p of scene.meshes) {
+    if (p[17] >= 0.98) continue;
+    const info = scene.meshIndex[String(p[0])];
+    if (!info || !info.file) continue;
+    if (!pending.has(info.file)) pending.set(info.file, gltfFor(info.file));
+  }
+  await Promise.allSettled([...pending.values()]);
+  for (const p of scene.meshes) {
+    if (p[17] >= 0.98) continue;
+    const id = p[0];
+    const info = scene.meshIndex[String(id)];
+    let placedNode = null;
+    if (info && info.file && pending.get(info.file)) {
+      try {
+        const gltf = await pending.get(info.file);
+        const node = nodeNamed(gltf, info.node);
+        if (node) placedNode = fittedNode(node, Math.max(p[1], 0.01), Math.max(p[2], 0.01), Math.max(p[3], 0.01));
+      } catch (err) {
+        console.error("mesh", id, err);
+      }
+    }
+    if (!placedNode) { missingMesh(id, p); continue; }
+    const placed = new THREE.Group();
+    placed.matrixAutoUpdate = false;
+    placed.matrix.copy(cframeMatrix(p));
+    placed.add(placedNode);
+    world.add(placed);
+    bounds.expandByPoint(new THREE.Vector3(p[4], p[5], p[6]));
+  }
+}
+
 // Fit the shadow camera to the scene.
 const size = bounds.getSize(new THREE.Vector3());
 const center = bounds.getCenter(new THREE.Vector3());
@@ -394,7 +526,9 @@ function setView(i) {
   controls.update();
   useLighting(night);
   useLights(night, camera.position);
-  document.getElementById("hud").textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""} · ${scene.parts.length} parts`;
+  const hud = document.getElementById("hud");
+  if (scene.hud === false) hud.style.display = "none";
+  hud.textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""} · ${scene.parts.length} parts`;
 }
 window.setView = setView;
 window.viewCount = views.length;
@@ -412,6 +546,7 @@ function frame() {
   requestAnimationFrame(frame);
 }
 frame();
+await addMeshes();
 window.__ready = true;
 </script>
 </body>

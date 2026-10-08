@@ -25,6 +25,7 @@ local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
 local WireToolLogic = require(ReplicatedStorage.Shared.WireToolLogic)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
+local LogicPanelUI = require(script.Parent.LogicPanelUI)
 local PromptSwitch = require(script.Parent.PromptSwitch)
 local UITheme = require(script.Parent.UITheme)
 
@@ -47,6 +48,8 @@ local pool: { Part } = {}
 local bar: UITheme.Bar? = nil
 local reticle: Frame? = nil
 local onStop: (() -> ())? = nil
+-- 1..3 while the first-use hint is showing, 4 once this session has seen it.
+local lessonStep = 1
 
 function WireTool.Active(): boolean
 	return active
@@ -145,6 +148,10 @@ local function refreshBar()
 	end
 	local pieces = mine()
 	local text = WireToolLogic.Help(picked, pieces)
+	local lesson = WireToolLogic.Lesson(lessonStep)
+	if lesson then
+		text = lesson .. "  " .. text
+	end
 	if UITheme.Device() == "console" then
 		text ..= "  RT pick · X cut · B done"
 	end
@@ -196,20 +203,58 @@ local function fire(action: WireToolLogic.Action)
 	Net.Remote("Wire"):FireServer(table.unpack(args))
 end
 
+local function blueprintOf(pieces: { WireToolLogic.Piece }, uid: string): string?
+	for _, piece in ipairs(pieces) do
+		if piece.uid == uid then
+			return piece.blueprintId
+		end
+	end
+	return nil
+end
+
+-- Wires the client can see, including "@port" on an input that is not port 1.
+local function detailedWires(wires: { [string]: string }): { WireLogic.Wire }
+	local out: { WireLogic.Wire } = {}
+	for from, text in pairs(wires) do
+		for token in string.gmatch(text, "[^,]+") do
+			local target, portText = string.match(token, "^([^@]+)@(%d+)$")
+			if target and portText then
+				table.insert(out, { from = from, to = target, toPort = tonumber(portText) })
+			else
+				local bare = string.match(token, "^[^@]+")
+				if bare and bare ~= "" then
+					table.insert(out, { from = from, to = bare })
+				end
+			end
+		end
+	end
+	return out
+end
+
 -- A piece was picked (or nothing, for the ground).
 local function pick(uid: string?)
 	local pieces, _, wires = mine()
+	local previous = picked
 	local nextPick, action = WireToolLogic.Tap(picked, uid, pieces)
 	if action and action.op == "link" then
+		local list = detailedWires(wires)
+		local toId = blueprintOf(pieces, action.to)
+		action.toPort = WireToolLogic.NextIn(list, action.to, toId or "")
 		if not (reachOk(pieces, action.from) and reachOk(pieces, action.to)) then
 			HUD.Toast(WireLogic.Message("reach") or "Stand closer to wire that.")
 		else
-			local ok, why = WireLogic.Check(WireToolLogic.WireList(wires), pieces :: any, action.from, action.to)
+			local ok, why = WireLogic.Check(list, pieces :: any, action.from, action.to, WireLogic.Port, action.toPort)
 			if ok then
 				fire(action)
+				lessonStep = WireToolLogic.Advance(lessonStep, "link")
 			else
 				HUD.Toast(WireLogic.Message(why) or "")
 			end
+		end
+	elseif nextPick ~= nil and nextPick ~= previous then
+		local id = blueprintOf(pieces, nextPick)
+		if WireLogic.IsSource(WireLogic.Role(if id then id else "")) then
+			lessonStep = WireToolLogic.Advance(lessonStep, "source")
 		end
 	end
 	picked = nextPick
@@ -270,6 +315,7 @@ function WireTool.Stop()
 		return
 	end
 	active = false
+	lessonStep = WireToolLogic.Advance(lessonStep, "done")
 	picked = nil
 	for _, conn in ipairs(conns) do
 		conn:Disconnect()
@@ -441,6 +487,7 @@ function WireTool.Start()
 	reticle = dot
 
 	screen.Parent = player:WaitForChild("PlayerGui")
+	LogicPanelUI.Start()
 	-- Keep the lines in step with the wires the server reports.
 	task.spawn(function()
 		while true do

@@ -23,6 +23,7 @@ local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local MiningSchema = require(ReplicatedStorage.Shared.Mining.MiningSchema)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 local ProfileSchema = {}
@@ -320,6 +321,9 @@ export type Profile = {
 	activeSlot: number,
 	slotCooldownUntil: number, -- unix time a load or reset is allowed again
 	accountAxes: { string }, -- pass axes (Lux Axe), kept across every slot
+	-- Pick ladder, bombs, lamp, hat and the ore stash. Account-wide, the same
+	-- way PickLevel is one number for the player and not one per slot.
+	mining: MiningSchema.Mining,
 	slots: { any },
 }
 
@@ -426,6 +430,7 @@ local TEMPLATE: Profile = {
 	activeSlot = 1,
 	slotCooldownUntil = 0,
 	accountAxes = {},
+	mining = MiningSchema.Template(),
 	slots = {},
 }
 ProfileSchema.Template = TEMPLATE
@@ -922,6 +927,16 @@ local function applyAccountFields(data: any)
 	data.tipsSeen = booleanMap(data.tipsSeen)
 	data.dayCounter = finiteNumber(data.dayCounter, 0)
 	data.tollPaidUntil = nil
+	-- A copy left inside the active slot is the account's if the profile
+	-- itself has none yet. A second migrate finds the account field and
+	-- leaves it.
+	if data.mining == nil and type(data.slots) == "table" then
+		local active = data.slots[data.activeSlot]
+		if type(active) == "table" and type(active.mining) == "table" then
+			data.mining = active.mining
+		end
+	end
+	data.mining = MiningSchema.Migrate(data.mining)
 end
 
 local function stripAccountFields(slot: any)
@@ -934,6 +949,7 @@ local function stripAccountFields(slot: any)
 	slot.tipsSeen = nil
 	slot.dayCounter = nil
 	slot.tollPaidUntil = nil
+	slot.mining = nil
 end
 
 -- Brings older saves up to date. Call on every load, after ProfileStore's

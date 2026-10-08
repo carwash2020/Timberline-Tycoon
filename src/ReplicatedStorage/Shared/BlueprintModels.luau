@@ -13,6 +13,7 @@ local EditLogic = require(script.Parent.EditLogic)
 local ItemMeshes = require(script.Parent.ItemMeshes)
 local KitPaint = require(script.Parent.KitPaint)
 local KitMeshes = require(script.Parent.KitMeshes)
+local LogicItems = require(script.Parent.LogicItems)
 local PlotData = require(script.Parent.PlotData)
 local TreeArt = require(script.Parent.Art.TreeArt)
 local WoodData = require(script.Parent.WoodData)
@@ -134,6 +135,14 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 		KitMeshes.Dress(model, bp.id, ghost)
 	else
 		ItemMeshes.Attach(model, root, bp.id, ghost)
+	end
+	local applyMeshes = (LogicItems :: any).ApplyMeshes
+	if type(applyMeshes) == "function" then
+		applyMeshes(model, bp.id, ghost)
+	end
+	local dress = (LogicItems :: any).Dress
+	if type(dress) == "function" then
+		dress(model, bp.id)
 	end
 	return model
 end

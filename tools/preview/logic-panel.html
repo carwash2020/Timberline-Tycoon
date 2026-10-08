@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sparkworks settings panel</title>
+<style>
+  /* Colors are UITheme.Colors and the skip, amber and buy styles.
+     The card sits where LogicPanelUI puts it: top centre, then UITheme.ScaleFor. */
+  html, body { margin: 0; height: 100%; background: #6d8d58; overflow: hidden; }
+  body { font-family: "Trebuchet MS", "Arial Rounded MT Bold", sans-serif; }
+  #card {
+    position: absolute;
+    left: 50%;
+    top: calc(16px * var(--s));
+    width: calc(320px * var(--s));
+    height: calc(220px * var(--s));
+    transform: translateX(-50%);
+    background: #F0E1C3; /* Paper */
+    border: calc(2px * var(--s)) solid #583A22; /* Bark */
+    border-radius: calc(12px * var(--s));
+    box-sizing: border-box;
+    color: #3C2814; /* Ink */
+  }
+  .title, .value {
+    position: absolute;
+    left: calc(16px * var(--s));
+    width: calc(288px * var(--s));
+    text-align: center;
+    line-height: 1;
+  }
+  .title {
+    top: calc(18px * var(--s));
+    height: calc(28px * var(--s));
+    font-size: calc(22px * var(--s));
+    font-weight: 700;
+  }
+  .value {
+    top: calc(52px * var(--s));
+    height: calc(36px * var(--s));
+    font-family: "Arial Black", "Arial Bold", sans-serif;
+    font-size: calc(28px * var(--s));
+  }
+  .btn {
+    position: absolute;
+    border: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Arial Black", "Arial Bold", sans-serif;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .face {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    border-radius: calc(10px * var(--s));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* skip: PaperDark on Muted, Ink. amber: Amber on AmberEdge, Ink. buy: Green on GreenEdge, Cream. */
+  .minus { background: #A09178; }
+  .minus .face { background: #E2CFAA; color: #3C2814; }
+  .plus { background: #C98A1E; }
+  .plus .face { background: #FFB840; color: #3C2814; }
+  .done { background: #36672D; }
+  .done .face { background: #4C8C40; color: #F5EBD7; }
+  /* Gamepad selection on the first button: 4px ink, 4px amber, a soft amber glow.
+     UITheme.selectionRing. Thickness stays in screen pixels. */
+  .minus.selected {
+    outline: 4px solid #3C2814;
+    outline-offset: 0;
+    box-shadow: 0 0 0 4px #FFB840, 0 0 0 10px rgba(255, 184, 64, 0.45);
+  }
+</style>
+</head>
+<body>
+  <div id="card">
+    <div class="title">Delay</div>
+    <div class="value">2.0 s</div>
+    <button class="btn minus selected" type="button" aria-label="minus"><span class="face">-</span></button>
+    <button class="btn plus" type="button" aria-label="plus"><span class="face">+</span></button>
+    <button class="btn done" type="button"><span class="face">Done</span></button>
+  </div>
+  <script>
+    const w = innerWidth, h = innerHeight;
+    const short = Math.min(w, h);
+    const compact = short > 0 && short < 500;
+    const scale = compact
+      ? Math.min(0.85, Math.max(0.7, short / 480))
+      : Math.max(1, h / 864);
+    document.documentElement.style.setProperty("--s", String(scale));
+    const s = scale;
+    function place(el, x, y, width, height, faceH, textMax) {
+      el.style.left = (x * s) + "px";
+      el.style.top = (y * s) + "px";
+      el.style.width = (width * s) + "px";
+      el.style.height = ((height + 3) * s) + "px";
+      el.style.borderRadius = (10 * s) + "px";
+      const face = el.querySelector(".face");
+      face.style.height = (faceH * s) + "px";
+      // TextScaled, capped the way UITheme.Button caps it (UITextSizeConstraint).
+      face.style.fontSize = (Math.min(faceH * 0.72, textMax) * s) + "px";
+    }
+    const rowW = 288;
+    const gap = 8;
+    const bw = 96;
+    const rowX = 16 + (rowW - (bw * 2 + gap)) / 2;
+    place(document.querySelector(".minus"), rowX, 100, bw, 48, 48, 22);
+    place(document.querySelector(".plus"), rowX + bw + gap, 100, bw, 48, 48, 22);
+    place(document.querySelector(".done"), 20, 156, 280, 44, 44, 16);
+    document.title = "ready";
+  </script>
+</body>
+</html>

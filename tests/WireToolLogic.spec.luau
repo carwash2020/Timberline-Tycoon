@@ -73,7 +73,7 @@ return function(t)
 	t.test("lines are budgeted: never more than MaxLines parts", function()
 		local many = { piece("s", "SparkSwitch", 0, 0) }
 		local targets = {}
-		for i = 1, 100 do
+		for i = 1, Logic.MaxLines + 20 do
 			table.insert(many, piece("l" .. i, "SparkLamp", i % 10, i))
 			table.insert(targets, "l" .. i)
 		end
@@ -146,5 +146,27 @@ return function(t)
 		local plot = fs.readFile("src/StarterPlayer/StarterPlayerScripts/PlotUI.luau")
 		t.ok(string.find(plot, "WireTool.SetBuilding(on)", 1, true), "build mode drives the tool")
 		t.ok(string.find(plot, 'text = "WIRE"', 1, true), "a WIRE button on the build bar")
+		t.ok(string.find(tool, "LogicPanelUI.Start", 1, true), "the settings panel starts with the tool")
+	end)
+
+	t.test("the first wiring session teaches three steps, then stays done", function()
+		t.eq(Logic.Lesson(1), "Pick an output")
+		t.eq(Logic.Lesson(2), "Pick an input")
+		t.eq(Logic.Lesson(3), "Done: flip it")
+		t.eq(Logic.Lesson(4), nil)
+		t.eq(Logic.Advance(1, "source"), 2)
+		t.eq(Logic.Advance(2, "link"), 3)
+		t.eq(Logic.Advance(3, "done"), 4)
+		t.eq(Logic.Advance(4, "source"), 4)
+		t.eq(Logic.Advance(1, "done"), 1, "leaving early does not skip the lesson")
+	end)
+
+	t.test("a gate's second wire lands on the free input, then further wires share port 1", function()
+		local wires = { { from = "sw", to = "gate" } }
+		t.eq(Logic.NextIn(wires, "gate", "GateAnd"), 2)
+		t.eq(Logic.NextIn({}, "gate", "GateAnd"), 1)
+		local both = { { from = "sw", to = "gate" }, { from = "sw2", to = "gate", toPort = 2 } }
+		t.eq(Logic.NextIn(both, "gate", "GateAnd"), 1)
+		t.eq(Logic.NextIn({}, "lamp", "SparkLamp"), 1)
 	end)
 end
