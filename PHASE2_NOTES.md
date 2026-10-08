@@ -2778,6 +2778,28 @@ A read-through of the join flow, boxes and store, owner hub and paid items, mill
 
 Left alone, for Connor to decide: a log hand-dropped at a sawmill or planer that is busy waits; after `AutomationLogic.HandWindow` (4 s) untouched it counts as belt-fed, so rare or figured wood hand-fed behind another job is refused ("rare") and the throughput cap applies. Picking it up and dropping it again resets the clock.
 
+## NPCs turn to face you while you talk, and every NPC speaks in the dialogue box (branch `claude/npc-talk-lock`, 8 October 2026)
+
+Connor's playtest: "Dale the NPC doesn't have our new chat box system and when you talk to NPCs they should lock on you until the chat goes away."
+
+- **Dale and the other keepers.** Reading the code, Dale was already routed to the box like Tink and Hazel (`DialogueService` -> `DialogueUI`), but a keeper's plain hello was a single line (the shop's "Trucks are on the board..."), while everyone else gives a greeting plus a line of their own. A keeper's hello is now the same multi-line press-to-continue talk: their greeting, the shop's line, one of their own lines (`DialogueFlow.KeeperExtras`, `DialogueFlow.ServerLines`; offers and replies stay one short card with Yes / No). If Dale still shows only a small bubble in Studio, that is the walk-up chatter (`NPCDialogue.AutoBubbles`, left on by Connor's decision); tell Claude.
+- **Still on the old one-off path, now in the box:** Old Hank (with a plot, or the Land Office "come up to the counter" line, were server toasts: `PlotService.Speak`) and the Hermit's "too far to hear you" (was a toast). Murph, Millie, Gus, Rosa, Pip, Bram, Old Tolly and Cap'n Moss already used the box (generic client talk); Tink, Hazel, Dale and the Hermit's quest lines already came through the server's box.
+- **Lock on.** `NPCTalkService` (server) records who is talking to each NPC: set by the Talk prompt (in reach), ended by the box closing (new `"end"` intent on the Dialogue remote, rate limited, names an NPC id), or by itself when the player walks 30+ studs off, dies, leaves, the NPC is removed or lies down, or a box is left up past its 90 s timeout. While anyone is talking the NPC carries the attribute `TalkWith` (the UserId to face). Rules in `Shared/TalkLock` (specs `TalkLock.spec`, `NPCTalkService.spec`): the most recent talker wins, the nearer on a tie, the NPC lets go only when nobody is talking.
+- **Visual only.** NPC poses were already client-driven (standing NPCs turn toward you on each screen; walkers follow the shared clock), so the server only publishes the attribute. `NPCController` turns the body toward the partner at any distance (yaw about Y at the usual turn rate, head following), keeps all idle, work and wave animations running, and a walker holds where it stands while its partner talks (no sliding). When the attribute goes away it turns back to its normal facing; a walker eases back onto the clock like after any lag. This screen's own open box counts at once, before the attribute arrives.
+
+### Studio checks (Connor), talk lock
+- [ ] Talk to Dale at the Dealership: a box with "Hey hey!" (or another greeting), then the shop line, then one of his own lines, a press each; B or the last press closes it. Same for Tink and Hazel.
+- [ ] While the box is open Dale turns to face you (smooth, no tipping) even if you shuffle to either side, and keeps his idle (wiping his brow) going. Close the box: he turns back to the way he was standing within a second or two.
+- [ ] Do it with Millie, Gus (stand 10 studs off) and Murph: same turn, same return.
+- [ ] A walker (Rosa, Pip or Bram): talk to one mid-stroll. She stops where she stands and faces you; close the box and she resumes (she may step quickly back onto her route if you talked for a while).
+- [ ] Walk away mid-talk (past about 24 studs): the box closes and the NPC goes back to normal. Same if you die or reset mid-talk, or leave the game.
+- [ ] Two players on one NPC (Studio "Start Server" with 2 players): the NPC faces whoever pressed Talk last; the first player closes their box and it turns to the second; when both have closed it returns to normal.
+- [ ] Dale at night (shop closed): he is lying down, talking shows his sleepy line, and he does not stand up or turn.
+- [ ] Say Yes or No on a Dealership offer: Dale answers in a box and keeps facing you until you close that one too.
+- [ ] Old Hank with a plot: "You've got your plot, partner..." appears in the box (no toast). Without a plot he still opens the plot picker. The Hermit from afar says "too far to hear you" in the box.
+- [ ] Output shows no errors from `NPCTalkService`.
+
+Not verifiable without Studio: the exact feel of the turn and the walker's resume, and that a Talk press from the Xbox pad reaches the server prompt the same way (the existing Talk path).
 
 ## Vehicle meshes (branch `claude/vehicle-models`)
 

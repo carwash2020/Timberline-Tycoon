@@ -235,11 +235,56 @@ function DialogueFlow.ShouldClose(check: Check): string?
 	return nil
 end
 
--- Whether an NPC's lines come from the server (a keeper's counter talk and
--- the Hermit's quest), which DialogueService sends to the box itself; the
--- client builds no conversation for them.
+-- Whether an NPC's lines come from the server (a keeper's counter talk, the
+-- Hermit's quest, Old Hank's land office), which the server sends to the box
+-- itself; the client builds no conversation for them.
 function DialogueFlow.ServerSpoken(shop: string?, id: string): boolean
-	return shop ~= nil or id == "Hermit"
+	return shop ~= nil or id == "Hermit" or id == "OldHank"
+end
+
+-- A keeper's own words around the shop's plain hello: one of their
+-- greetings and one of their lines, picked by two rolls in [0, 1). Either is
+-- nil when they have none. The keeper's talk then reads like anyone's:
+-- greeting, the shop's line, a line of their own.
+function DialogueFlow.KeeperExtras(
+	greetings: { string }?,
+	lines: { string }?,
+	rollGreeting: number,
+	rollLine: number
+): (string?, string?)
+	local function pick(list: { string }?, roll: number): string?
+		if list == nil or #list == 0 then
+			return nil
+		end
+		local index = math.clamp(math.floor(roll * #list) + 1, 1, #list)
+		return list[index]
+	end
+	return pick(greetings, rollGreeting), pick(lines, rollLine)
+end
+
+-- The lines of a server payload (DialogueService), in order: an optional
+-- intro, the text, then any more. Anything that is not a string is dropped.
+-- An offer (a Yes / No) is its text alone.
+function DialogueFlow.ServerLines(payload: any): { string }
+	local out: { string } = {}
+	if type(payload) ~= "table" or type(payload.text) ~= "string" then
+		return out
+	end
+	if payload.choice == true then
+		return { payload.text }
+	end
+	if type(payload.intro) == "string" then
+		table.insert(out, payload.intro)
+	end
+	table.insert(out, payload.text)
+	if type(payload.more) == "table" then
+		for _, line in ipairs(payload.more) do
+			if type(line) == "string" then
+				table.insert(out, line)
+			end
+		end
+	end
+	return out
 end
 
 return DialogueFlow

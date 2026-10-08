@@ -9,10 +9,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CounterLogic = require(ReplicatedStorage.Shared.CounterLogic)
 local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
+local DialogueFlow = require(ReplicatedStorage.Shared.DialogueFlow)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local BoxService = require(script.Parent.BoxService)
+local NPCTalkService = require(script.Parent.NPCTalkService)
 local RateLimiter = require(script.Parent.RateLimiter)
 
 local DialogueService = {}
@@ -30,6 +32,11 @@ local offeredTo: { [number]: string? } = {}
 local hooked: { [Model]: boolean } = {}
 
 DialogueService.Last = nil :: any
+
+-- A number in [0, 1) for the keeper's greeting and line (the specs replace it).
+function DialogueService.Roll(): number
+	return math.random()
+end
 
 local function profileOf(player: Player): any
 	local ok, service = pcall(function()
@@ -64,6 +71,15 @@ function DialogueService.Say(player: Player, line: string, shop: string, rec: an
 	})
 	local card = DialogueData.Card(line)
 	local keeper = NPCData.ForShop(shop)
+	-- A plain hello is a conversation like any townsperson's: their greeting,
+	-- what the shop says, and one line of their own, a press for each. An
+	-- offer, or a reply to one, stays one short card.
+	local intro: string? = nil
+	local more: string? = nil
+	if line == "greet" and keeper then
+		intro, more =
+			DialogueFlow.KeeperExtras(keeper.greetings, keeper.lines, DialogueService.Roll(), DialogueService.Roll())
+	end
 	local payload = {
 		line = line,
 		text = text,
@@ -71,6 +87,8 @@ function DialogueService.Say(player: Player, line: string, shop: string, rec: an
 		-- nothing else from it: the id only picks a name tag).
 		speaker = if keeper then keeper.id else nil,
 		boxUid = if rec then rec.uid else nil,
+		intro = intro,
+		more = if more then { more } else nil,
 		choice = card.choice,
 		noLabel = card.noLabel,
 		-- The Robux shelf's yes: which pass or pack to ask Roblox about. The
@@ -85,6 +103,11 @@ function DialogueService.Say(player: Player, line: string, shop: string, rec: an
 	local event = remote :: any
 	if event ~= nil and type(event.FireClient) == "function" then
 		event:FireClient(player, payload)
+	end
+	-- The box on their screen is a talk with the keeper (a reply after a
+	-- Yes or No included): the keeper faces them until it is closed.
+	if keeper then
+		NPCTalkService.BeginById(player, keeper.id)
 	end
 end
 
@@ -226,6 +249,14 @@ function DialogueService.Init(remoteEvent: RemoteEvent?)
 	bound = true
 	remote = remoteEvent
 	remoteEvent.OnServerEvent:Connect(function(player: Player, action: unknown, a: unknown, b: unknown)
+		-- The box closed on that player's screen: the NPC lets them go (it also
+		-- does by itself when they walk off, go down or leave).
+		if action == "end" then
+			if type(a) == "string" and RateLimiter.Allow(player, "TalkEnd") then
+				NPCTalkService.End(player, a)
+			end
+			return
+		end
 		-- B15: a remote "open" must name a real shop (the keeper's prompt
 		-- is the usual way in), so a made-up id is never stored.
 		if

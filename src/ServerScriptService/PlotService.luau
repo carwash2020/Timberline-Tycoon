@@ -81,6 +81,8 @@ local BUILD_REACH = 40 -- studs past your plot's edge you can still build from
 local LAND_OFFICE_RANGE = 12 -- studs from the Land Office counter; its prompt uses the same distance
 local UNDO_SECONDS = 60 -- selling something this soon after placing it refunds it all
 PlotService.UndoSeconds = UNDO_SECONDS
+-- GameServer sets this: Old Hank's replies as the dialogue box (else a toast).
+PlotService.Speak = nil :: ((Player, string) -> ())?
 
 type Slot = {
 	index: number,
@@ -904,6 +906,17 @@ local SALESMAN_OFFERS: { [string]: (Player) -> () } = {
 -- Talking to Old Hank (his Talk prompt, or the counter's, both end up in
 -- the same place). Rate-limited like the other prompts' handlers; the
 -- client names nothing, so there is no price or offer to spoof.
+-- What Old Hank says back: the dialogue box when GameServer has wired it
+-- (PlotService.Speak), a toast otherwise (the specs).
+local function salesmanSay(player: Player, text: string)
+	local speak = PlotService.Speak
+	if speak then
+		speak(player, text)
+	else
+		notify(player, text)
+	end
+end
+
 local function onSalesmanTalk(player: Player)
 	if not RateLimiter.Allow(player, "PlotSalesman") then
 		return
@@ -918,11 +931,11 @@ local function onSalesmanTalk(player: Player)
 	})
 	local offer = choice.offer
 	if not offer then
-		notify(player, choice.line)
+		salesmanSay(player, choice.line)
 		return
 	end
 	if not nearOffice(player) then
-		notify(player, PlotSalesmanData.FarLine)
+		salesmanSay(player, PlotSalesmanData.FarLine)
 		return
 	end
 	local handler = SALESMAN_OFFERS[offer.id]

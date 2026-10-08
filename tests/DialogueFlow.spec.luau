@@ -140,12 +140,13 @@ return function(t)
 		t.eq(DialogueFlow.Key("anything else"), "E")
 	end)
 
-	t.test("keepers and the Hermit speak from the server; everyone else is built here", function()
+	t.test("keepers, the Hermit and Old Hank speak from the server; everyone else is built here", function()
 		t.eq(DialogueFlow.ServerSpoken("ToolShed", "Tink"), true)
 		t.eq(DialogueFlow.ServerSpoken(nil, "Hermit"), true)
+		t.eq(DialogueFlow.ServerSpoken(nil, "OldHank"), true)
 		t.eq(DialogueFlow.ServerSpoken(nil, "Millie"), false)
 		for _, npc in ipairs(NPCData.All()) do
-			local expected = npc.shop ~= nil or npc.id == "Hermit"
+			local expected = npc.shop ~= nil or npc.id == "Hermit" or npc.id == "OldHank"
 			t.eq(DialogueFlow.ServerSpoken(npc.shop, npc.id), expected, npc.id)
 		end
 		for _, id in ipairs({ "Tink", "Hazel", "Dale" }) do
@@ -156,6 +157,43 @@ return function(t)
 		t.eq(NPCData.ForShop("Dealership").id, "Dale")
 		t.eq(NPCData.ForShop("Nowhere"), nil)
 		t.eq(NPCData.ForShop(nil), nil)
+	end)
+
+	t.test("a keeper's hello is their greeting, the shop's line and a line of their own", function()
+		local dale = NPCData.Get("Dale")
+		local greeting, line = DialogueFlow.KeeperExtras(dale.greetings, dale.lines, 0, 0)
+		t.eq(greeting, dale.greetings[1])
+		t.eq(line, dale.lines[1])
+		greeting, line = DialogueFlow.KeeperExtras(dale.greetings, dale.lines, 0.999, 0.999)
+		t.eq(greeting, dale.greetings[#dale.greetings], "the top of the roll is the last entry")
+		t.eq(line, dale.lines[#dale.lines])
+		greeting, line = DialogueFlow.KeeperExtras(dale.greetings, dale.lines, 1, -1)
+		t.ok(greeting ~= nil and line ~= nil, "a roll outside [0, 1) never indexes past the list")
+		t.eq({ DialogueFlow.KeeperExtras({}, nil, 0.5, 0.5) }, {}, "no words, no extras")
+		for _, id in ipairs({ "Tink", "Hazel", "Dale" }) do
+			local keeper = NPCData.Get(id)
+			t.ok(#keeper.greetings > 0 and #keeper.lines > 0, id .. " has words to say")
+		end
+	end)
+
+	t.test("a server payload is paged intro, text, more; an offer is its text alone", function()
+		local lines = DialogueFlow.ServerLines({
+			text = "Trucks are on the board.",
+			intro = "Hey hey!",
+			more = { "Take the corners slow." },
+		})
+		t.eq(lines, { "Hey hey!", "Trucks are on the board.", "Take the corners slow." })
+		local state = DialogueFlow.New("Dale", "Dale", "Truck dealer", DialogueFlow.Pages(lines, 100))
+		t.eq(#state.pages, 3, "a press for each")
+		t.eq(DialogueFlow.ServerLines({ text = "Pay $5?", choice = true, intro = "Hi", more = { "x" } }), { "Pay $5?" })
+		t.eq(DialogueFlow.ServerLines({ text = "Just this." }), { "Just this." })
+		t.eq(
+			DialogueFlow.ServerLines({ text = "T", intro = 5, more = { 1, "ok", false } }),
+			{ "T", "ok" },
+			"only text is trusted"
+		)
+		t.eq(DialogueFlow.ServerLines({ intro = "no text" }), {})
+		t.eq(DialogueFlow.ServerLines(nil), {})
 	end)
 
 	t.test("DialogueUI: a press continues, the last closes, Yes and No still go to the server", function()
