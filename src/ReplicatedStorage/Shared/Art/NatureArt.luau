@@ -2,10 +2,12 @@
 -- NatureArt: the rocks, plants and cave dressing built on the client
 -- (AmbientLife). Part-built, so Lane H can swap meshes later. Every part
 -- is decoration: anchored, no collision, no query, no touch, no shadow.
--- A rock is one of six families, 6 parts, tilted 8 to 20 degrees and sunk
--- 20 to 30 percent. No block is taller than 1.5 times its width. An ore
--- rock is that body plus 2 or 3 vein wedges, 8 parts at most. Plants and
--- cave pieces are 2 to 6. A PointLight never casts shadows.
+-- A rock is one of six families, 7 parts (8 for a pebble cluster), tilted
+-- 8 to 20 degrees and sunk 20 to 30 percent. Meadow moss and a snow cap
+-- are two thin wedges on the crown, at most 0.3 studs proud. No block is
+-- taller than 1.5 times its width. An ore rock is the body plus 2 or 3
+-- vein wedges, 8 parts at most. Plants and cave pieces are 2 to 6. A
+-- PointLight never casts shadows.
 
 local CollectionService = game:GetService("CollectionService")
 
@@ -25,12 +27,12 @@ NatureArt.NeedleDisc = hex("#6B5A3A")
 
 -- Part counts the scatter budget uses. Keep these equal to what Build makes.
 NatureArt.Parts = {
-	Boulder = 6,
-	CrackedBoulder = 6,
-	Spire = 6,
-	Slab = 6,
-	PebbleCluster = 6,
-	Outcrop = 6,
+	Boulder = 7,
+	CrackedBoulder = 7,
+	Spire = 7,
+	Slab = 7,
+	PebbleCluster = 8,
+	Outcrop = 7,
 	Bush = 4,
 	Fern = 3,
 	Flowers = 5,
@@ -143,7 +145,7 @@ local LOOKS: { [string]: RockLook } = {
 		stone = hex("#7A7368"),
 		dark = hex("#544E48"),
 		light = hex("#91897C"),
-		cap = hex("#3E7A34"),
+		cap = hex("#667552"),
 		stoneMat = ROCK,
 		bandMat = SLATE,
 		capMat = Enum.Material.Grass,
@@ -210,7 +212,8 @@ local function palette(look: string?): RockLook
 	return LOOKS[name] or LOOKS.meadow
 end
 
--- Five-part body. Build adds one accent. OreRock adds veins instead.
+-- Body only. Build adds two crown patches and one accent. OreRock adds
+-- veins instead of the patches, so a cave host does not wear moss.
 local function boulderBody(parent: Model, s: number, look: RockLook)
 	ball(parent, "Core", 2.3 * s, CFrame.new(0, 0.82 * s, 0), look.stone, look.stoneMat)
 	ball(parent, "Shoulder", 1.35 * s, CFrame.new(0.78 * s, 0.5 * s, 0.28 * s), look.dark, look.stoneMat)
@@ -229,14 +232,6 @@ local function boulderBody(parent: Model, s: number, look: RockLook)
 		CFrame.new(0.05 * s, 0.62 * s, 0.82 * s) * CFrame.Angles(0.2, 0.15, 0),
 		look.dark,
 		look.bandMat
-	)
-	part(
-		parent,
-		"Cap",
-		Vector3.new(1.55, 0.22, 1.15) * s,
-		CFrame.new(0.02 * s, 1.72 * s, 0) * CFrame.Angles(0.18, 0.3, 0),
-		look.cap,
-		look.capMat
 	)
 end
 
@@ -258,14 +253,6 @@ local function crackedBody(parent: Model, s: number, look: RockLook)
 		CFrame.new(-0.2 * s, 0.7 * s, 0.55 * s) * CFrame.Angles(0.25, -0.3, 0),
 		look.light,
 		LIME
-	)
-	part(
-		parent,
-		"Cap",
-		Vector3.new(1.15, 0.18, 0.85) * s,
-		CFrame.new(-0.35 * s, 1.28 * s, 0.02 * s) * CFrame.Angles(0.22, 0.15, 0),
-		look.cap,
-		look.capMat
 	)
 end
 
@@ -296,14 +283,6 @@ local function spireBody(parent: Model, s: number, look: RockLook)
 		look.dark,
 		look.bandMat
 	)
-	part(
-		parent,
-		"Cap",
-		Vector3.new(0.92, 0.16, 0.74) * s,
-		CFrame.new(-0.04 * s, 2.16 * s, 0.02 * s),
-		look.cap,
-		look.capMat
-	)
 end
 
 local function slabBody(parent: Model, s: number, look: RockLook)
@@ -332,14 +311,6 @@ local function slabBody(parent: Model, s: number, look: RockLook)
 		look.dark,
 		look.bandMat
 	)
-	part(
-		parent,
-		"Cap",
-		Vector3.new(2.2, 0.14, 1.35) * s,
-		CFrame.new(-0.05 * s, 0.58 * s, 0.02 * s) * CFrame.Angles(0.08, -0.15, 0),
-		look.cap,
-		look.capMat
-	)
 end
 
 local function pebbleBody(parent: Model, s: number, look: RockLook)
@@ -366,14 +337,6 @@ local function outcropBody(parent: Model, s: number, look: RockLook)
 		CFrame.new(-0.3 * s, 0.42 * s, 0.1 * s) * CFrame.Angles(0.15, -0.4, 0),
 		look.dark,
 		look.stoneMat
-	)
-	part(
-		parent,
-		"Moss",
-		Vector3.new(1.5, 0.12, 0.9) * s,
-		CFrame.new(0.1 * s, 0.72 * s, 0.05 * s) * CFrame.Angles(0.12, 0.2, 0),
-		look.cap,
-		look.capMat
 	)
 	corner(
 		parent,
@@ -545,6 +508,65 @@ local function faceCf(origin: Vector3, normal: Vector3, reach: number): CFrame
 	local back = right:Cross(n).Unit
 	return CFrame.fromMatrix(center, right, n, back)
 end
+
+-- A crown patch is 0.2 studs thick and set 0.08 studs into the stone, so
+-- about 0.02 studs stands proud before the tilt. The corners of a wedge
+-- this small stay inside 0.3 studs of the rock.
+local CAP_THICK = 0.2
+local CAP_INSET = 0.08
+
+local function crownPatch(
+	parent: Model,
+	s: number,
+	look: RockLook,
+	x: number,
+	y: number,
+	z: number,
+	nx: number,
+	ny: number,
+	nz: number,
+	wide: number,
+	deep: number
+)
+	local origin = Vector3.new(x, y, z) * s
+	wedge(
+		parent,
+		"Cap",
+		Vector3.new(wide * s, CAP_THICK, deep * s),
+		faceCf(origin, Vector3.new(nx, ny, nz), -CAP_INSET),
+		look.cap,
+		look.capMat
+	)
+end
+
+-- Two patches per family, on the high curve. Coordinates are the surface
+-- in the same unscaled units as the body.
+local CROWNS: { [string]: (Model, number, RockLook) -> () } = {
+	Boulder = function(parent, s, look)
+		crownPatch(parent, s, look, 0.52, 1.74, 0.26, 0.45, 0.80, 0.22, 0.70, 0.44)
+		crownPatch(parent, s, look, -0.36, 1.78, -0.30, -0.34, 0.86, -0.26, 0.62, 0.40)
+	end,
+	CrackedBoulder = function(parent, s, look)
+		crownPatch(parent, s, look, -0.48, 1.47, 0.18, 0.02, 0.92, 0.22, 0.58, 0.38)
+		crownPatch(parent, s, look, 0.72, 1.16, 0.22, 0.28, 0.84, 0.22, 0.52, 0.36)
+	end,
+	Spire = function(parent, s, look)
+		crownPatch(parent, s, look, -0.02, 2.05, 0.10, 0.18, 0.92, 0.16, 0.48, 0.34)
+		crownPatch(parent, s, look, -0.16, 2.02, -0.08, -0.22, 0.90, -0.12, 0.42, 0.32)
+	end,
+	Slab = function(parent, s, look)
+		crownPatch(parent, s, look, 0.15, 0.64, -0.22, 0.12, 0.94, -0.18, 0.70, 0.40)
+		crownPatch(parent, s, look, -0.35, 0.42, 0.15, -0.08, 0.96, 0.16, 0.62, 0.36)
+	end,
+	PebbleCluster = function(parent, s, look)
+		crownPatch(parent, s, look, 0.16, 0.82, 0.10, 0.28, 0.88, 0.18, 0.40, 0.30)
+		crownPatch(parent, s, look, -0.12, 0.78, -0.14, -0.22, 0.90, -0.24, 0.36, 0.28)
+	end,
+	Outcrop = function(parent, s, look)
+		crownPatch(parent, s, look, -0.15, 0.78, 0.12, -0.10, 0.92, 0.18, 0.62, 0.38)
+		crownPatch(parent, s, look, 0.28, 0.70, -0.08, 0.22, 0.88, -0.16, 0.50, 0.34)
+	end,
+}
 
 type VeinSite = { origin: Vector3, normal: Vector3, reach: number }
 
@@ -787,6 +809,10 @@ function NatureArt.Build(kind: string, seed: number, sizeName: string?, look: st
 	if body then
 		local rockLook = palette(look)
 		body(m, s, rockLook)
+		local crown = CROWNS[kind]
+		if crown then
+			crown(m, s, rockLook)
+		end
 		local accent = ACCENTS[kind]
 		if accent then
 			accent(m, s, rockLook)

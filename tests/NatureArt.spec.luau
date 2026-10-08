@@ -189,6 +189,67 @@ return function(t)
 		end
 	end)
 
+	t.test("moss and snow are thin crown patches, at most 0.3 studs proud", function()
+		local function capsOf(model)
+			local list = {}
+			for _, p in ipairs(blockParts(model)) do
+				if p.Name == "Cap" then
+					table.insert(list, p)
+				end
+			end
+			return list
+		end
+		local function proudOf(cap, body)
+			local c0, c1, c2, c3, c4, c5 = worldBox(cap)
+			local b0, b1, b2, b3, b4, b5 = math.huge, math.huge, math.huge, -math.huge, -math.huge, -math.huge
+			for _, host in ipairs(body) do
+				local x0, y0, z0, x1, y1, z1 = worldBox(host)
+				b0 = math.min(b0, x0)
+				b1 = math.min(b1, y0)
+				b2 = math.min(b2, z0)
+				b3 = math.max(b3, x1)
+				b4 = math.max(b4, y1)
+				b5 = math.max(b5, z1)
+			end
+			return math.max(b0 - c0, c3 - b3, b1 - c1, c4 - b4, b2 - c2, c5 - b5)
+		end
+		for _, shape in ipairs(NatureArt.RockShapes) do
+			for _, sizeName in ipairs(NatureArt.Sizes) do
+				for _, look in ipairs({ "meadow", "snow" }) do
+					local model = NatureArt.Build(shape, 5, sizeName, look)
+					local caps = capsOf(model)
+					t.ok(#caps == 2 or #caps == 3, shape .. " " .. look .. " caps " .. #caps)
+					local body = {}
+					for _, p in ipairs(blockParts(model)) do
+						if p.Name ~= "Cap" then
+							table.insert(body, p)
+						end
+					end
+					for _, cap in ipairs(caps) do
+						local wedge = cap.ClassName == "WedgePart"
+						local ball = cap.ClassName == "Part" and cap.Shape == Enum.PartType.Ball
+						t.ok(wedge or ball, shape .. " patch is a wedge or a ball")
+						if look == "meadow" then
+							local moss = cap.Material == Enum.Material.Grass or cap.Material == Enum.Material.LeafyGrass
+							t.ok(moss, "moss is grass")
+						else
+							t.eq(cap.Material, Enum.Material.Snow, "snow cap")
+						end
+						local hit = false
+						for _, host in ipairs(body) do
+							if overlaps(cap, host) then
+								hit = true
+							end
+						end
+						t.ok(hit, shape .. " " .. sizeName .. " patch hugs the stone")
+						local proud = proudOf(cap, body)
+						t.ok(proud <= 0.3 + 1e-3, shape .. " " .. sizeName .. " proud " .. proud)
+					end
+				end
+			end
+		end
+	end)
+
 	t.test("rain streaks are thin parts and a shelter skips the middle", function()
 		local blobs = NatureArt.RainField("blobs", "high", false)
 		local streaks = NatureArt.RainField("streaks", "high", false)

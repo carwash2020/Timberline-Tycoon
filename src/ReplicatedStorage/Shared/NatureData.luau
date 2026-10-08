@@ -68,12 +68,12 @@ NatureData.Menu = {
 
 -- Must match NatureArt.Parts. The spec checks both.
 NatureData.PartCost = {
-	Boulder = 6,
-	CrackedBoulder = 6,
-	Spire = 6,
-	Slab = 6,
-	PebbleCluster = 6,
-	Outcrop = 6,
+	Boulder = 7,
+	CrackedBoulder = 7,
+	Spire = 7,
+	Slab = 7,
+	PebbleCluster = 8,
+	Outcrop = 7,
 	Bush = 4,
 	Fern = 3,
 	Flowers = 5,
