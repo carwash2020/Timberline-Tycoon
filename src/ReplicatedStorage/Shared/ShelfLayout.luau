@@ -14,8 +14,25 @@
 -- on its own step.
 
 local BoxSize = require(script.Parent.BoxSize)
+local Kit = require(script.Parent.Art.Kit)
 
 local ShelfLayout = {}
+
+-- The stepped display unit. These match StoreStock and BoxSize; the spec
+-- asserts that, so a shop lane and a unit built here stay the same numbers.
+-- 8 wide, 3 deep, three boards, each row RowStep higher, the top at ShelfTop.
+ShelfLayout.Wide = 8
+ShelfLayout.Deep = 3
+ShelfLayout.Rows = 3
+ShelfLayout.TableTop = 3.9
+ShelfLayout.ShelfTop = 3.2
+ShelfLayout.RowStep = 0.22
+ShelfLayout.PlinthHeight = 0.3
+ShelfLayout.BoardThick = 0.2
+ShelfLayout.BoardDepth = 1
+ShelfLayout.PostSize = Vector3.new(0.4, 3.6, 0.4)
+ShelfLayout.KickSize = Vector3.new(8, 0.3, 0.2)
+ShelfLayout.RailSize = Vector3.new(8, 0.25, 0.08)
 
 export type Lane = {
 	name: string,
@@ -166,6 +183,56 @@ function ShelfLayout.Apart(a: Spot, b: Spot): boolean
 		return math.abs(a.x - b.x) - (a.w + b.w) / 2 >= BoxSize.Gap - 1e-6
 	end
 	return math.abs(a.z - b.z) - (a.d + b.d) / 2 >= BoxSize.RowGap - 1e-6
+end
+
+-- One 8 by 3 stepped unit: four posts, three boards, a kick plate, a name
+-- rail on each board. Feet at y = 0, the front of the unit at z = 0.
+-- ShopInterior.SteppedUnit is the shop's own build (lane C); this is the
+-- unit those shelves should adopt.
+function ShelfLayout.Build(): Model
+	local model = Kit.model("Shelf")
+	local timber = Kit.hex("#7A5230") -- TimberBrown
+	local honey = Kit.hex("#C49A63") -- PlankHoney
+	local iron = Kit.hex("#2B2B2E") -- IronBlack
+	local cream = Kit.hex("#F3E7C9") -- SignCream
+	local post = ShelfLayout.PostSize
+	local wide, deep = ShelfLayout.Wide, ShelfLayout.Deep
+	for _, x in ipairs({ -1, 1 }) do
+		for _, z in ipairs({ 0, 1 }) do
+			Kit.part(
+				model,
+				"Post",
+				post,
+				CFrame.new(x * (wide / 2 - post.X / 2), post.Y / 2, z * (deep - post.Z) + post.Z / 2),
+				timber,
+				Enum.Material.Wood
+			)
+		end
+	end
+	for row = 1, ShelfLayout.Rows do
+		local top = ShelfLayout.ShelfTop - (ShelfLayout.Rows - row) * ShelfLayout.RowStep
+		local z = (row - 0.5) * ShelfLayout.BoardDepth
+		Kit.part(
+			model,
+			"Board",
+			Vector3.new(wide, ShelfLayout.BoardThick, ShelfLayout.BoardDepth),
+			CFrame.new(0, top - ShelfLayout.BoardThick / 2, z),
+			honey,
+			Enum.Material.WoodPlanks
+		)
+		local rail = ShelfLayout.RailSize
+		Kit.part(
+			model,
+			"Rail",
+			rail,
+			CFrame.new(0, top - rail.Y / 2, z - ShelfLayout.BoardDepth / 2 - rail.Z / 2),
+			cream,
+			Enum.Material.SmoothPlastic
+		)
+	end
+	local kick = ShelfLayout.KickSize
+	Kit.part(model, "Kick", kick, CFrame.new(0, kick.Y / 2, kick.Z / 2), iron, Enum.Material.Metal)
+	return model
 end
 
 return ShelfLayout

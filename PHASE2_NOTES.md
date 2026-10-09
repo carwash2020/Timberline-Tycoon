@@ -1,5 +1,35 @@
 # Phase 2+ build notes
 
+## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
+
+Done on this branch, not on main. Rebased onto main at `f96b62c`. The store board is not in this PR (lane P owns the redesign). Box and hover renders live in `previews/v1-d/` (listed in STATUS.md). Axe, temper and shelf pictures were part-built and are gone until `phase-2/v1-preview-meshes` can draw the real meshes.
+
+Axes (uploaded meshes replace the part-built axe when they load; the Hermit's Maul has no mesh and stays part-built):
+
+1. PC, Play mode. In the command bar run `print(require(game.ReplicatedStorage.Shared.Art.MeshKit).Stats())`. `loaded` is greater than 0 and the axe ids are not in `failedIds`. Equip Rusty, then each rung, then the Lux Axe. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat. The Hermit's Maul is still the part-built wedge (a heavy head, a flat poll, rope on the haft). It has no custom mesh yet.
+2. Phone emulator. The same equip, swing and drop. Drop is a long press on the hotbar. No new button, and nothing sits on the thumbstick or the jump button.
+3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
+
+Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Keen, Heavy or Prosperous until lane A2 wires it. Keen is the speed temper (sky blue wind). Heavy is the damage temper (a white edge sheen). Prosperous stays coin gold. The neon edge, the wind streaks and the white sheen sit on the front face of the head mesh, not inside it. With no mesh they use the part-built head. Stats do not move.
+
+Boxes (the window crate; shell stays at 9 parts, a full box at 42):
+
+4. PC. Buy or spawn a boxed axe and a boxed truck. The box has a wood body, a glass front, a 0.1 accent band and a small brass plate under the name, clear of the letters. No price, no decal, no billboard on the box. The item shows through the glass. Good: it matches `previews/v1-d/boxes-after-axe.png` and `boxes-after-sawmill.png`. A truck box still appears (the shell did not grow, so the 42-part cap still holds).
+5. Phone emulator, Lower quality. The same boxes. The copies of the item inside are gone and the glass is tinted. The shell, the band and the plate stay. Nothing new sits on the thumbstick or the jump button.
+6. Xbox. Look at a box on a shelf. The tag hangs on it. No control is bound to ButtonR2.
+
+Shelves (the unit is `ShelfLayout.Build`; the shop on screen still uses lane C's `ShopInterior.SteppedUnit` until C copies it):
+
+7. The unit is three boards stepping up (tops 3.2, 2.98, 2.76), four timber posts, a dark kick, three cream rails. Feet on the floor, front of the unit at the front. In Studio the Tool Shed shelves will not change until lane C adopts this unit. Gaps stay 1.5 across and 2.5 between rows. No shelf picture in this PR.
+
+Hover tag (the price line only; the words do not change):
+
+8. PC. With enough cash, look at a priced shelf item. The price line is gold (`#F2C14E`). Spend down or look at something you cannot afford: the line is red (`#D9534F`). A free item (price 0) is gold. Closed, already owned, out of stock, and a Robux line stay the old cream. One price, never two numbers.
+9. Phone emulator. The same colours. The tag does not cover the thumbstick or the jump button. Touch targets stay about 44×44 and 8px apart.
+10. Xbox. The same colours inside the existing look ranges (gamepad 12, touch 6). No new ButtonR2 bind.
+
+Awaiting Connor: a Blender mesh for the Hermit's Maul (it stays part-built until that exists), a hand 25–30% up the haft (it stays at 0.75), a Lux haft of 4.0 in play (it stays 3.5), and four bevel parts on the box corners (they are not parts).
+
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).
 
@@ -57,6 +87,7 @@ What's here, each with its own checklist below:
 16. **Sparkworks logic sandbox** (8 October 2026, branch `phase-2/v1-s-sparkworks`): wires, gates, timers, the settings panel, the demo board
 
 13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
+15. **V1 nature looks** (8 October 2026, branch `phase-2/v1-g-nature`): first renders of trees, rocks, plants, cave dressing, critters and rain. Not placed in the world yet.
 
 Where the redesign changed something an older section describes (the
 world layout, the trucks' looks, chop range, the Sky Bin), the redesign's
@@ -278,6 +309,24 @@ and Land Office from the lot, 6 from the lot, 7 and 8 top down, 9 aerial,
    send the `[Load] ready for play` and `forest planted` lines.
 8. If a tree looks wrong (on a path, on a shop floor, in a queue), send its
    position: each site is one line in `TownTreeData.Sites`.
+
+## V1 nature looks (8 October 2026, branch `phase-2/v1-g-nature`)
+
+The PNGs under `previews/v1-g/` (listed in STATUS.md) are the looks to review. Trees there are the live choppable section trees. Rain blobs are the old puff; rain streaks are what the weather controller now emits.
+
+Studio checks (PC, the phone emulator, and Xbox). Good looks like this:
+
+1. Chop, fell, and watch a stump and a regrow. Same swing and the same logs as before.
+2. In rain, the drops are thin slanted streaks in the world, not soft blobs stuck to the screen. On Lower quality there are fewer, shorter streaks.
+3. Step into a shop, under a bridge, into a truck cab, and into the cave, the tunnel and the grotto. Rain, splashes and the rain sound fade within about a second. They come back within about a second of stepping outside. Prompts and the controller cursor still work in the rain.
+4. Stand in steady rain for a minute. The air hazes a little and stays there; the sky does not fade to white. When the rain stops, or you step under a roof, the haze goes back to the clear-weather sky.
+5. Rocks read as six shapes (round boulder, cracked boulder, stacked standing stone, slab, pebble cluster, mossy outcrop), tilted and partly in the ground. Meadow rocks have moss, snow rocks a white cap, the shore is sandstone, the volcano is dark basalt, the gloam is blue-grey, caves are wet dark stone. Plants and critters are not on roads, plot pads, shop floors or the gondola path. Ducks sit on water. A gull is on the coast. A snow fox is on the snow. A sky moth glows on the isles at night.
+6. Lower quality stays smooth. A lanternwood's pods still read in a dark cave (neon, no extra light on a phone). Cave glow lights do not cast shadows.
+7. Rock meshes (the uploaded Blender rocks): on the open grass, a rock is a real faceted stone with a green moss cap, not a ball. Walk round a few in the same meadow and you see two shapes of each kind (A and B). Moss or snow sits on the top of the stone, never floating above it or sunk inside it. Rocks are 0.62x, 1x and 1.45x, and the cap scales with them.
+8. Ore rocks (once the mine uses them): coal, copper, iron, silver, gold and opal each show two seams of ore across a stone (opal's stone is mossy). Heartstone has red crystals and a red glow. The seams are visible from the front of the rock.
+9. The mine mouth (needs Lane B's placement call, see the PR's cross-lane requests): a stone arch with a timber frame, two lanterns and MINE letters; its opening faces out of the hill, the tunnel runs into it, you can walk in, and you cannot walk through the rock around it.
+10. Open the Output window and play: no `[NatureArt] ... mesh is missing` or `[MeshKit] ... did not load` lines for rocks, ore rocks or the mine mouth.
+11. Phone (667x375): rocks and the mine mouth look the same at Lower quality; no frame-rate drop near a rock-heavy meadow.
 
 ## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
 

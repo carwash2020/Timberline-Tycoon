@@ -260,21 +260,54 @@ function useLights(night, at) {
 }
 
 // Text on SurfaceGuis (signs) and BillboardGuis (name tags).
-function textTexture(text, color, bg) {
-  const c = document.createElement("canvas"); c.width = 512; c.height = 256;
+// The canvas matches the face, and words wrap. fillText's maxWidth argument
+// squashes glyphs sideways, so it is not used.
+function wrapLines(ctx, text, maxW) {
+  const out = [];
+  for (const para of String(text).split("\n")) {
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) { out.push(""); continue; }
+    let line = words[0];
+    for (let i = 1; i < words.length; i++) {
+      const trial = line + " " + words[i];
+      if (ctx.measureText(trial).width <= maxW) line = trial;
+      else { out.push(line); line = words[i]; }
+    }
+    out.push(line);
+  }
+  return out;
+}
+function textTexture(text, color, bg, planeW, planeH) {
+  const aspect = Math.max(planeW, 0.05) / Math.max(planeH, 0.05);
+  let ch = 512;
+  let cw = Math.round(ch * aspect);
+  if (cw > 2048) { cw = 2048; ch = Math.max(64, Math.round(cw / aspect)); }
+  if (cw < 64) { cw = 64; ch = Math.max(64, Math.round(cw / aspect)); }
+  const c = document.createElement("canvas"); c.width = cw; c.height = ch;
   const x = c.getContext("2d");
-  if (bg) { x.fillStyle = bg; x.fillRect(0, 0, 512, 256); }
+  if (bg) { x.fillStyle = bg; x.fillRect(0, 0, cw, ch); }
   x.fillStyle = color; x.textAlign = "center"; x.textBaseline = "middle";
-  const lines = String(text).split("\n");
-  const size = Math.min(110, 230 / lines.length);
-  x.font = `bold ${size}px system-ui, sans-serif`;
-  lines.forEach((ln, i) => x.fillText(ln, 256, 128 + (i - (lines.length - 1) / 2) * size * 1.05, 490));
+  const maxW = cw * 0.88;
+  const maxH = ch * 0.88;
+  let lo = 8, hi = Math.max(8, Math.floor(maxH)), best = 12, bestLines = [String(text)];
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    x.font = `bold ${mid}px system-ui, sans-serif`;
+    const lines = wrapLines(x, text, maxW);
+    const tooWide = lines.some((ln) => x.measureText(ln).width > maxW + 1);
+    if (!tooWide && lines.length * mid * 1.15 <= maxH) { best = mid; bestLines = lines; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  x.font = `bold ${best}px system-ui, sans-serif`;
+  const step = best * 1.15;
+  const top = ch / 2 - ((bestLines.length - 1) * step) / 2;
+  bestLines.forEach((ln, i) => x.fillText(ln, cw / 2, top + i * step));
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 for (const t of (scene.texts || [])) {
   // [kind, w, h, x,y,z, r00..r22, text, color]
   const geom = new THREE.PlaneGeometry(t[1], t[2]);
-  const mat = new THREE.MeshBasicMaterial({ map: textTexture(t[15], "#" + t[16]), transparent: true, side: THREE.DoubleSide, depthWrite: false });
+  const mat = new THREE.MeshBasicMaterial({ map: textTexture(t[15], "#" + t[16], null, t[1], t[2]), transparent: true, side: THREE.DoubleSide, depthWrite: false });
   const mesh = new THREE.Mesh(geom, mat);
   m4.set(t[6], t[7], t[8], t[3], t[9], t[10], t[11], t[4], t[12], t[13], t[14], t[5], 0, 0, 0, 1);
   mesh.applyMatrix4(m4);
@@ -409,6 +442,23 @@ function fittedNode(node, sx, sy, sz) {
   holder.scale.set(sx / Math.max(size.x, 1e-4), sy / Math.max(size.y, 1e-4), sz / Math.max(size.z, 1e-4));
   return holder;
 }
+// Opt-in (manifest "tint": true): the GLB's vertex colours are greyscale
+// shading and the game sets MeshPart.Color, so multiply by that colour. The
+// materials are shared between placements, so each one gets its own copy.
+function tintMaterials(root, hex) {
+  const tint = new THREE.Color("#" + hex);
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const own = mats.map((m) => {
+      if (!m) return m;
+      const c = m.clone();
+      c.color = (m.color ? m.color.clone() : new THREE.Color(1, 1, 1)).multiply(tint);
+      return c;
+    });
+    o.material = Array.isArray(o.material) ? own : own[0];
+  });
+}
 async function addMeshes() {
   const pending = new Map();
   for (const p of scene.meshes) {
@@ -428,6 +478,7 @@ async function addMeshes() {
         const gltf = await pending.get(info.file);
         const node = nodeNamed(gltf, info.node);
         if (node) placedNode = fittedNode(node, Math.max(p[1], 0.01), Math.max(p[2], 0.01), Math.max(p[3], 0.01));
+        if (placedNode && info.tint) tintMaterials(placedNode, p[16]);
       } catch (err) {
         console.error("mesh", id, err);
       }
@@ -495,7 +546,7 @@ function setView(i) {
   useLights(night, camera.position);
   const hud = document.getElementById("hud");
   if (scene.hud === false) hud.style.display = "none";
-  hud.textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""} · ${scene.parts.length} parts`;
+  hud.textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""}${v.own != null ? " · rock " + v.own + " parts" : ""} · full view ${scene.parts.length + scene.meshes.length} parts`;
 }
 window.setView = setView;
 window.viewCount = views.length;

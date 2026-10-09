@@ -673,4 +673,87 @@ function CritterArt.Splash(): Model
 	return model
 end
 
+---------------------------------------------------------------------------
+-- Coast, snow and the isles (still client-only, still under 12 parts)
+---------------------------------------------------------------------------
+
+-- A gull is a songbird at 1.4 scale, white and grey, for the coast.
+function CritterArt.Gull(seed: number): Model
+	local model = CritterArt.Bird(seed, 1.4, true)
+	model.Name = "Gull"
+	model:SetAttribute("Critter", "Gull")
+	local white = hex("#F4F1EA")
+	local grey = hex("#8E98A4")
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			if d.Name == "Beak" then
+				d.Color = hex("#E0A030")
+			elseif d.Name == "WingL" or d.Name == "WingR" or d.Name == "Tail" then
+				d.Color = grey
+			elseif string.sub(d.Name, 1, 3) ~= "Eye" then
+				d.Color = white
+			end
+		end
+	end
+	return model
+end
+
+-- A snow fox, low to the ground, white with a dark nose and ear tips.
+function CritterArt.SnowFox(seed: number): Model
+	local rng = Kit.rng(seed)
+	local model = critter("SnowFox")
+	local coat = hex("#F7F4EE")
+	local tip = hex("#2E2A28")
+	blob(model, "Body", Vector3.new(0.7, 0.55, 1.35), CFrame.new(0, 0.55, 0), Kit.vary(coat, rng, 0.03))
+	local hinge = Vector3.new(0, 0.7, -0.55)
+	anim(blob(model, "Head", Vector3.new(0.42, 0.38, 0.5), CFrame.new(0, 0.78, -0.7), coat), "Head", hinge)
+	anim(bead(model, "Nose", 0.1, Vector3.new(0, 0.72, -0.96), tip), "Head", hinge)
+	for _, side in ipairs({ -1, 1 }) do
+		local ear = blob(
+			model,
+			if side < 0 then "EarL" else "EarR",
+			Vector3.new(0.12, 0.28, 0.16),
+			CFrame.new(side * 0.12, 1.05, -0.62),
+			coat
+		)
+		anim(ear, "Head", hinge)
+		anim(
+			bead(model, if side < 0 then "EyeL" else "EyeR", 0.07, Vector3.new(side * 0.12, 0.84, -0.88), tip),
+			"Head",
+			hinge
+		)
+		block(model, "Leg", Vector3.new(0.1, 0.32, 0.1), CFrame.new(side * 0.18, 0.16, -0.35), coat)
+		block(model, "Leg", Vector3.new(0.1, 0.32, 0.1), CFrame.new(side * 0.18, 0.16, 0.4), coat)
+	end
+	local tail = blob(model, "Tail", Vector3.new(0.28, 0.28, 0.55), CFrame.new(0, 0.7, 0.85), coat)
+	anim(tail, "Tail", Vector3.new(0, 0.6, 0.55))
+	return model
+end
+
+-- A pale moth for the isles. One neon body, no shadow on the light.
+function CritterArt.SkyMoth(seed: number): Model
+	local rng = Kit.rng(seed)
+	local model = critter("SkyMoth")
+	local pale = Kit.vary(hex("#FFF4C2"), rng, 0.04)
+	local body = bead(model, "Body", 0.28, Vector3.zero, pale, Enum.Material.Neon)
+	local light = Instance.new("PointLight")
+	light.Name = "Glow"
+	light.Color = pale
+	light.Range = 6
+	light.Brightness = 0.6
+	light.Shadows = false
+	light.Parent = body
+	for _, side in ipairs({ -1, 1 }) do
+		local name = if side < 0 then "WingL" else "WingR"
+		local hinge = Vector3.new(side * 0.12, 0, 0)
+		local wing = block(model, name, Vector3.new(0.7, 0.05, 0.42), CFrame.new(side * 0.48, 0.02, 0), hex("#F7E7A8"))
+		wing.Transparency = 0.25
+		anim(wing, name, hinge)
+	end
+	for _, side in ipairs({ -1, 1 }) do
+		block(model, "Antenna", Vector3.new(0.04, 0.22, 0.04), CFrame.new(side * 0.06, 0.2, -0.12), hex("#FFE89A"))
+	end
+	return model
+end
+
 return CritterArt
