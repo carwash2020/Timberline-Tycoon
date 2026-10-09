@@ -1,29 +1,108 @@
 # Runs ./scripts/check.sh (formatting, lint, strict types, unit tests, and
-# the ECONOMY.md check) on every push and pull request, with the tool
-# versions pinned in rokit.toml. A red X on a commit means something here
-# failed: open the run to see which step.
+# the ECONOMY.md check) on every pull request and every push to main, with
+# the tool versions pinned in rokit.toml. A red X on a commit means something
+# here failed: open the run to see which job and step.
+#
+# Speed: the unit tests are split across 4 runners that run at the same time
+# (TEST_SHARD, see tests/run.luau), and the lint/type/economy checks run in
+# their own job. A newer push to a pull request cancels the older run. Runs
+# on main are never cancelled. The final "checks" job is green only when
+# every other job passed.
 name: Checks
 
 on:
   push:
+    branches: [main]
   pull_request:
 
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
-  checks:
+  lint:
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      # Only the tool binaries are cached, never ~/.rokit/auth.toml (the token).
+      - name: Cache Rokit tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.rokit/bin
+            ~/.rokit/tool-storage
+          key: rokit-v2-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
+
       - name: Install Rokit and the pinned tools
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The install script reads GITHUB_PAT. Without it, five jobs starting
+          # at once can hit GitHub's anonymous API limit (HTTP 403).
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          if [ ! -x "$HOME/.rokit/bin/rokit" ]; then
+            curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          fi
           export PATH="$HOME/.rokit/bin:$PATH"
           echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
           # The Actions token avoids GitHub's anonymous download rate limit.
           rokit authenticate github --token "$GITHUB_TOKEN" --skip-verify
           rokit install --no-trust-check
 
-      - name: Checks
-        run: ./scripts/check.sh
+      - name: Format, lint, types, economy
+        run: ./scripts/check.sh --lint-only
+
+  tests:
+    name: tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the tool binaries are cached, never ~/.rokit/auth.toml (the token).
+      - name: Cache Rokit tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.rokit/bin
+            ~/.rokit/tool-storage
+          key: rokit-v2-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
+
+      - name: Install Rokit and the pinned tools
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The install script reads GITHUB_PAT. Without it, five jobs starting
+          # at once can hit GitHub's anonymous API limit (HTTP 403).
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -x "$HOME/.rokit/bin/rokit" ]; then
+            curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          fi
+          export PATH="$HOME/.rokit/bin:$PATH"
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+          # The Actions token avoids GitHub's anonymous download rate limit.
+          rokit authenticate github --token "$GITHUB_TOKEN" --skip-verify
+          rokit install --no-trust-check
+
+      - name: Unit tests (shard ${{ matrix.shard }} of 4)
+        env:
+          TEST_SHARD: ${{ matrix.shard }}/4
+        run: ./scripts/check.sh --tests-only
+
+  # Single status to look at (and to require in branch protection later).
+  checks:
+    name: checks
+    if: always()
+    needs: [lint, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All jobs passed
+        run: |
+          echo "lint: ${{ needs.lint.result }}, tests: ${{ needs.tests.result }}"
+          test "${{ needs.lint.result }}" = success
+          test "${{ needs.tests.result }}" = success

@@ -1926,4 +1926,306 @@ function PropArt.FillerTree(kind: string, variant: number): Model
 	return model
 end
 
+-- A small staged prop for a keeper or a vista. Each one has a StandSpot
+-- and stays between 10 and 30 parts. Built at the origin, front -Z.
+-- Fishing posts reach below y = 0, into the water under the dock.
+function PropArt.Scene(kind: string): Model
+	local model = Kit.model(kind)
+	local TIMBER = hex("#7A5230")
+	local HONEY = hex("#C49A63")
+	local CLIFF = hex("#7E766C")
+	local function stand(part: BasePart)
+		local att = Instance.new("Attachment")
+		att.Name = "StandSpot"
+		att.Parent = part
+	end
+	local function decor(part: BasePart): BasePart
+		return Kit.decor(part, false)
+	end
+	-- Cylinder from a to b. Kit.cylinder runs along X; Lune's lookAt
+	-- disagrees with Roblox, so the axis is built here.
+	local function span(name: string, a: Vector3, b: Vector3, dia: number, color: Color3, mat: Enum.Material?)
+		local delta = b - a
+		local look = delta.Unit
+		local up = if math.abs(look.Y) > 0.99 then Vector3.xAxis else Vector3.yAxis
+		local right = look:Cross(up).Unit
+		local cf = CFrame.fromMatrix((a + b) / 2, right, right:Cross(look), -look) * CFrame.Angles(0, math.pi / 2, 0)
+		decor(Kit.cylinder(model, name, delta.Magnitude, dia, cf, color, mat or Enum.Material.Wood))
+	end
+	if kind == "fishing" then
+		local water = decor(
+			Kit.part(
+				model,
+				"Water",
+				Vector3.new(12, 0.3, 14),
+				CFrame.new(0, 0.12, -4),
+				hex("#3D8FB8"),
+				Enum.Material.SmoothPlastic
+			)
+		)
+		water.Transparency = 0.12
+		decor(
+			Kit.part(
+				model,
+				"Shore",
+				Vector3.new(8, 0.55, 4.5),
+				CFrame.new(0, 0.28, 2.6),
+				hex("#D8C69A"),
+				Enum.Material.Sand
+			)
+		)
+		local deck = decor(
+			Kit.part(
+				model,
+				"Deck",
+				Vector3.new(1.4, 0.18, 11),
+				CFrame.new(-0.75, 1.15, -3.2),
+				hex("#8C6239"),
+				Enum.Material.WoodPlanks
+			)
+		)
+		decor(
+			Kit.part(
+				model,
+				"Deck",
+				Vector3.new(1.4, 0.18, 11),
+				CFrame.new(0.75, 1.15, -3.2),
+				HONEY,
+				Enum.Material.WoodPlanks
+			)
+		)
+		-- Posts run from the deck down into the pond (the bank sits about
+		-- 3 studs over the water). The preview's water plane is higher.
+		for _, spot in ipairs({
+			Vector3.new(-1.35, -4, -7.6),
+			Vector3.new(1.35, -4, -7.6),
+			Vector3.new(-1.35, -4, -1.2),
+			Vector3.new(1.35, -4, -1.2),
+		}) do
+			decor(Kit.post(model, "Pile", spot, 5.15, 0.38, TIMBER, Enum.Material.Wood))
+		end
+		decor(Kit.post(model, "Holder", Vector3.new(-0.15, 1.2, -8.2), 0.7, 0.16, TIMBER))
+		local fishingRod = decor(
+			Kit.part(
+				model,
+				"Rod",
+				Vector3.new(0.1, 3.4, 0.1),
+				CFrame.new(-0.15, 2.5, -8.5) * CFrame.Angles(math.rad(35), 0, 0.2),
+				TIMBER
+			)
+		)
+		fishingRod.Material = Enum.Material.Wood
+		decor(
+			Kit.part(
+				model,
+				"Bucket",
+				Vector3.new(0.7, 0.6, 0.7),
+				CFrame.new(0.9, 1.55, -1.4),
+				hex("#4A4F57"),
+				Enum.Material.Metal
+			)
+		)
+		decor(
+			Kit.part(
+				model,
+				"Crate",
+				Vector3.new(0.9, 0.7, 0.9),
+				CFrame.new(-0.85, 1.6, 0.4),
+				hex("#9C8466"),
+				Enum.Material.Wood
+			)
+		)
+		stand(deck)
+	elseif kind == "campfire" then
+		local stone: BasePart? = nil
+		for i = 1, 6 do
+			local a = i / 6 * math.pi * 2
+			local placed = decor(
+				Kit.part(
+					model,
+					"Stone",
+					Vector3.new(0.75, 0.42, 0.55),
+					CFrame.new(math.cos(a) * 1.55, 0.2, math.sin(a) * 1.55) * CFrame.Angles(0, -a, 0.08),
+					CLIFF,
+					Enum.Material.Slate
+				)
+			)
+			stone = placed
+		end
+		for i = 1, 3 do
+			local a = i / 3 * math.pi * 2
+			span(
+				"FireLog",
+				Vector3.new(math.cos(a) * 1.05, 0.2, math.sin(a) * 1.05),
+				Vector3.new(math.cos(a + 2.2) * 0.15, 2.05, math.sin(a + 2.2) * 0.15),
+				0.28,
+				TIMBER,
+				Enum.Material.Wood
+			)
+		end
+		local flameColors = { hex("#FF7A1A"), hex("#FFD24A"), hex("#FF6A1E") }
+		local glow: BasePart? = nil
+		for i = 1, 3 do
+			local tongue = decor(
+				Kit.wedge(
+					model,
+					"Flame",
+					Vector3.new(0.55, 1.35 - (i - 1) * 0.28, 0.4),
+					CFrame.new(0, 0.85 + (i - 1) * 0.15, 0) * CFrame.Angles(math.rad(-75), i * 2.1, 0),
+					flameColors[i],
+					Enum.Material.Neon
+				)
+			)
+			glow = tongue
+		end
+		local light = Instance.new("PointLight")
+		light.Color = hex("#FF7A1A")
+		light.Range = 12
+		light.Brightness = 1.5
+		light.Shadows = false
+		if glow then
+			light.Parent = glow
+		end
+		for i = 1, 3 do
+			local a = i / 3 * math.pi * 2 + 0.5
+			span(
+				"Tripod",
+				Vector3.new(math.cos(a) * 1.35, 0.05, math.sin(a) * 1.35),
+				Vector3.new(0, 3.25, 0),
+				0.1,
+				HONEY,
+				Enum.Material.Wood
+			)
+		end
+		decor(
+			Kit.cylinder(
+				model,
+				"Pot",
+				0.5,
+				0.62,
+				CFrame.new(0, 2.45, 0) * CFrame.Angles(0, 0, math.pi / 2),
+				hex("#4A4F57"),
+				Enum.Material.Metal
+			)
+		)
+		decor(
+			Kit.cylinder(
+				model,
+				"Seat",
+				2.3,
+				0.5,
+				CFrame.new(-2.35, 0.28, 0.15) * CFrame.Angles(0, 0.35, 0),
+				TIMBER,
+				Enum.Material.Wood
+			)
+		)
+		decor(
+			Kit.cylinder(
+				model,
+				"Seat",
+				2.3,
+				0.5,
+				CFrame.new(2.35, 0.28, -0.1) * CFrame.Angles(0, -0.3, 0),
+				TIMBER,
+				Enum.Material.Wood
+			)
+		)
+		if stone then
+			stand(stone)
+		end
+	elseif kind == "lookout" then
+		decor(Kit.part(model, "Rock", Vector3.new(7, 1.5, 5.2), CFrame.new(0, 0.7, 0.2), CLIFF, Enum.Material.Slate))
+		decor(
+			Kit.part(
+				model,
+				"Rock",
+				Vector3.new(3.2, 0.9, 2.4),
+				CFrame.new(1.8, 0.4, 1.6) * CFrame.Angles(0, 0.4, 0),
+				hex("#8C877E"),
+				Enum.Material.Slate
+			)
+		)
+		local corners = {
+			Vector3.new(-2.6, 0, -1.8),
+			Vector3.new(2.6, 0, -1.8),
+			Vector3.new(-2.6, 0, 1.8),
+			Vector3.new(2.6, 0, 1.8),
+		}
+		for _, corner in ipairs(corners) do
+			decor(Kit.post(model, "Post", corner, 10.2, 0.32, TIMBER, Enum.Material.Wood))
+		end
+		local deck = decor(
+			Kit.part(model, "Deck", Vector3.new(5.6, 0.28, 4), CFrame.new(0, 9, 0), HONEY, Enum.Material.WoodPlanks)
+		)
+		decor(Kit.part(model, "Rail", Vector3.new(5.4, 0.16, 0.14), CFrame.new(0, 10, 1.8), TIMBER))
+		decor(Kit.part(model, "Rail", Vector3.new(0.14, 0.16, 3.6), CFrame.new(-2.6, 10, 0), TIMBER))
+		decor(Kit.part(model, "Rail", Vector3.new(0.14, 0.16, 3.6), CFrame.new(2.6, 10, 0), TIMBER))
+		decor(Kit.part(model, "Rail", Vector3.new(5.4, 0.14, 0.12), CFrame.new(0, 9.55, -1.8), HONEY))
+		span("Ladder", Vector3.new(-0.4, 0.2, 2.5), Vector3.new(-0.4, 9, 2.15), 0.14, TIMBER, Enum.Material.Wood)
+		span("Ladder", Vector3.new(0.4, 0.2, 2.5), Vector3.new(0.4, 9, 2.15), 0.14, TIMBER, Enum.Material.Wood)
+		for step = 1, 5 do
+			local t = step / 6
+			local y = 0.2 + (9 - 0.2) * t
+			local z = 2.5 + (2.15 - 2.5) * t
+			decor(Kit.part(model, "Rung", Vector3.new(0.8, 0.08, 0.12), CFrame.new(0, y, z), HONEY))
+		end
+		decor(Kit.post(model, "ScopePost", Vector3.new(0.5, 9.15, -1.15), 0.7, 0.16, TIMBER))
+		decor(
+			Kit.cylinder(
+				model,
+				"Telescope",
+				1.5,
+				0.28,
+				CFrame.new(0.5, 10.05, -1.35) * CFrame.Angles(0.15, -math.pi / 2, 0),
+				hex("#F2C14E"),
+				Enum.Material.Metal
+			)
+		)
+		stand(deck)
+	elseif kind == "bench" then
+		local seat = decor(
+			Kit.part(model, "Seat", Vector3.new(4.2, 0.2, 1.25), CFrame.new(0, 1.55, 0), HONEY, Enum.Material.Wood)
+		)
+		decor(
+			Kit.part(model, "Back", Vector3.new(4.2, 0.7, 0.14), CFrame.new(0, 2.15, 0.55), HONEY, Enum.Material.Wood)
+		)
+		decor(
+			Kit.part(model, "Back", Vector3.new(4.2, 0.16, 0.14), CFrame.new(0, 2.7, 0.55), TIMBER, Enum.Material.Wood)
+		)
+		decor(Kit.part(model, "Arm", Vector3.new(0.16, 0.12, 1.15), CFrame.new(-1.95, 2.05, 0.05), TIMBER))
+		decor(Kit.part(model, "Arm", Vector3.new(0.16, 0.12, 1.15), CFrame.new(1.95, 2.05, 0.05), TIMBER))
+		for _, x in ipairs({ -1.7, 1.7 }) do
+			decor(Kit.part(model, "Leg", Vector3.new(0.22, 1.55, 0.22), CFrame.new(x, 0.78, -0.4), TIMBER))
+			decor(Kit.part(model, "Leg", Vector3.new(0.22, 2.7, 0.22), CFrame.new(x, 1.35, 0.55), TIMBER))
+		end
+		decor(Kit.part(model, "Stretcher", Vector3.new(3.2, 0.12, 0.12), CFrame.new(0, 0.4, -0.4), TIMBER))
+		stand(seat)
+	end
+	-- The walkable bits collide. Flames, the rod, the pot and the
+	-- telescope stay looks, so a player can stand on the dock, the
+	-- lookout and the bench.
+	local solidNames = {
+		Deck = true,
+		Pile = true,
+		Stone = true,
+		Seat = true,
+		FireLog = true,
+		Post = true,
+		Rail = true,
+		Ladder = true,
+		Rung = true,
+		Rock = true,
+		Back = true,
+		Arm = true,
+		Leg = true,
+		Stretcher = true,
+	}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and solidNames[d.Name] then
+			Kit.solid(d)
+		end
+	end
+	return model
+end
+
 return PropArt
