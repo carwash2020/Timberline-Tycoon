@@ -2,6 +2,28 @@
 
 > **Newer than this file's merge notes: read AGENT_HANDOFF.md first.** Every branch below marked "not merged" is merged (main is at #116 as of 8 October 2026).
 
+Last updated 8 October 2026 (Lane D axe, box, shelf and hover remake, branch `phase-2/v1-d-axes-displays`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+
+## Lane D — axes, boxes, shelves, displays (done)
+
+Branch `phase-2/v1-d-axes-displays`, rebased onto main at `f96b62c` (A1). Connor reviews each render before this merges. Paths below are the pictures to open.
+
+Axes, temper colours, the stepped shelf unit, window boxes and hover price colours are on this branch. The store board is not: `StoreBoard` and its spec match main, and the board scene and pictures are gone. Lane P owns a full board redesign. This branch does not type Robux prices onto the board. The shop's shelves on screen are still `ShopInterior.SteppedUnit` (lane C). `ShelfLayout.Build` is the unit those shelves should copy. Economy numbers did not move in this lane.
+
+Keen is the speed temper (sky blue wind, `#6FB7E8`). Heavy is the damage temper (white edge sheen, `#FFFFFF`). Prosperous stays coin gold (`#F2C14E`). `TemperLook` covers exactly the prefixes `TemperLogic` exports. The neon edge, Keen's streaks and Heavy's sheen sit on the front face of `MeshHead` (its Size and CFrame after MeshKit places it). With no mesh, they use the part-built head. The Hermit's Maul has no uploaded mesh. It stays the part-built wedge (head 0.9×2.4×1.7, a flat poll, rope on the haft). It needs a Blender mesh. Do not invent one.
+
+Part-built axe, temper and shelf pictures are not in this PR. Connor rejected them. Reshoot after `phase-2/v1-preview-meshes` is on main. The box and hover pictures are still here:
+
+- `previews/v1-d/boxes-before-lineup.png` — five window boxes before the remake.
+- `previews/v1-d/boxes-before-axe.png`
+- `previews/v1-d/boxes-before-sawmill.png`
+- `previews/v1-d/boxes-after-lineup.png` — the same boxes after: 0.1 accent band and a brass plate, no price.
+- `previews/v1-d/boxes-after-axe.png`
+- `previews/v1-d/boxes-after-sawmill.png`
+- `previews/v1-d/hover-colours.png` — gold when you can pay, red when you cannot, cream when the line is not a cash price.
+
+Awaiting Connor: the Hermit's Maul is part-built and needs a Blender mesh. The hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and cash prices are unchanged.
+
 Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 ## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
 

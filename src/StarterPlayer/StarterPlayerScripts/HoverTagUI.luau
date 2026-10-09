@@ -402,18 +402,11 @@ local function show(key: string)
 			local cashAttr = player:GetAttribute("Cash")
 			local cash = if type(cashAttr) == "number" then cashAttr else 0
 			local price = if state == "price" and spec.robux == nil then HoverTag.Price(spec, facts.loop) else nil
-			local toneOf = (HoverTag :: any).PriceTone
-			if type(toneOf) == "function" then
-				local tone = toneOf(state, price, cash, spec.robux ~= nil)
-				local gold = (HoverTag :: any).CoinGold
-				local red = (HoverTag :: any).StopRed
-				lineLabel.TextColor3 = if tone == "gold" and typeof(gold) == "Color3"
-					then gold
-					elseif tone == "red" and typeof(red) == "Color3" then red
-					else C.Cream
-			else
-				lineLabel.TextColor3 = if state == "price" then C.Amber else C.Cream
-			end
+			local tone = HoverTag.PriceTone(state, price, cash, spec.robux ~= nil)
+			lineLabel.TextColor3 = if tone == "gold"
+				then HoverTag.CoinGold
+				elseif tone == "red" then HoverTag.StopRed
+				else C.Cream
 		end
 	end
 	if shownKey ~= key then

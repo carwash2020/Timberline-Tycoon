@@ -8,9 +8,21 @@ return function(t)
 	local roblox = t.roblox
 	local Vector3 = roblox.Vector3
 	local AxeArt = t.load("ReplicatedStorage/Shared/Art/AxeArt")
+	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
 	local ItemCatalog = t.shared("ItemCatalog")
 
 	local MAX_PARTS = 40
+
+	local function near(a, b)
+		return math.abs(a - b) < 1e-3
+	end
+
+	local function nearHex(color, hex)
+		local want = roblox.Color3.fromHex(hex)
+		return math.abs(color.R - want.R) < 0.01
+			and math.abs(color.G - want.G) < 0.01
+			and math.abs(color.B - want.B) < 0.01
+	end
 
 	local function parts(model)
 		local out = {}
@@ -152,98 +164,45 @@ return function(t)
 		end)
 	end)
 
-	-- ACT-08: Starfall's crescent reads as one unbroken band with one
-	-- unbroken glowing rim, on a deep indigo haft, with Neon only on the rim.
-	t.test("Starfall: a continuous crescent and rim, an indigo haft, Neon only on the rim", function()
+	t.test("the haft is 0.26 by the gameplay length by 0.32, the grip 0.31 x 0.95 x 0.37", function()
+		local AxeModels = t.load("ReplicatedStorage/Shared/Art/AxeModels")
+		each(function(def)
+			local m = AxeArt.Build(def)
+			local handle = m.PrimaryPart
+			t.ok(near(handle.Size.X, 0.26), def.id .. " haft width")
+			t.ok(near(handle.Size.Z, 0.32), def.id .. " haft depth")
+			t.ok(near(handle.Size.Y, AxeModels.GameplayLength(def.id)), def.id .. " haft length")
+			local grip = m:FindFirstChild("Grip")
+			t.ok(near(grip.Size.X, 0.31) and near(grip.Size.Y, 0.95) and near(grip.Size.Z, 0.37), def.id .. " grip")
+		end)
+	end)
+
+	-- Starfall: a cream haft, a star-tipped head in front of a smaller one,
+	-- pale neon, a spark. The front head reaches further than the back.
+	t.test("Starfall: a cream haft, a star-tipped double head, a pale neon spark", function()
 		local def = ItemCatalog.Axes.StarfallAxe
 		local m = AxeArt.Build(def)
-		local haft = m.PrimaryPart.Color
-		t.ok(
-			math.abs(haft.R * 255 - 0x2B) < 0.5
-				and math.abs(haft.G * 255 - 0x3A) < 0.5
-				and math.abs(haft.B * 255 - 0x6B) < 0.5,
-			"the haft is deep indigo #2B3A6B"
-		)
-		local rims, band, middles = {}, {}, {}
+		t.ok(nearHex(m.PrimaryPart.Color, "#F2E6C8"), "the haft is cream #F2E6C8")
+		local star, back = false, false
+		local starZ, backZ = 0, 0
 		for _, p in ipairs(parts(m)) do
-			if p.Name == "Rim" then
-				table.insert(rims, p)
-			elseif p.Material.Name == "Neon" then
-				t.ok(false, "Starfall " .. p.Name .. " is Neon (only the rim glows)")
-			end
-			if p.Name == "Crescent" or p.Name == "Horn" then
-				table.insert(band, p)
-			end
-			if p.Name == "Crescent" then
-				table.insert(middles, p)
+			if p.Name == "Star" then
+				star = true
+				starZ = math.max(starZ, p.Size.Z)
+				t.eq(p.Material.Name, "Neon", "the star is Neon")
+				t.ok(nearHex(p.Color, "#BFD8FF"), "pale blue head")
+			elseif p.Name == "StarBack" then
+				back = true
+				backZ = math.max(backZ, p.Size.Z)
 			end
 		end
-		t.ok(#rims >= 3 and #middles == 3, "a rim and three crescent segments")
-		-- The arc's centre: the circle (in the side view, y and z) through the
-		-- three middle segments.
-		local function yz(p)
-			local at = p.CFrame.Position
-			return at.Y, at.Z
-		end
-		local ay, az = yz(middles[1])
-		local by, bz = yz(middles[2])
-		local cy, cz = yz(middles[3])
-		local d = 2 * (ay * (bz - cz) + by * (cz - az) + cy * (az - bz))
-		local a2, b2, c2 = ay * ay + az * az, by * by + bz * bz, cy * cy + cz * cz
-		local oy = (a2 * (bz - cz) + b2 * (cz - az) + c2 * (az - bz)) / d
-		local oz = (a2 * (cy - by) + b2 * (ay - cy) + c2 * (by - ay)) / d
-		local radius = math.sqrt((ay - oy) ^ 2 + (az - oz) ^ 2)
-		local function angleOf(p)
-			local y, z = yz(p)
-			return math.atan2(y - oy, oz - z)
-		end
-		local function radiusOf(p)
-			local y, z = yz(p)
-			return math.sqrt((y - oy) ^ 2 + (z - oz) ^ 2)
-		end
-		local function isIn(p, y, z)
-			local l = p.CFrame:Inverse() * Vector3.new(0, y, z)
-			local h = p.Size / 2 + Vector3.new(1e-3, 1e-3, 1e-3)
-			return math.abs(l.X) <= h.X and math.abs(l.Y) <= h.Y and math.abs(l.Z) <= h.Z
-		end
-		-- Two neighbouring pieces join when some point on the line halfway
-		-- between them (in angle), between radii r0 and r1, is inside both.
-		local function joined(a, b, r0, r1)
-			local mid = (angleOf(a) + angleOf(b)) / 2
-			for i = 0, 200 do
-				local r = r0 + (r1 - r0) * i / 200
-				local y, z = oy + r * math.sin(mid), oz - r * math.cos(mid)
-				if isIn(a, y, z) and isIn(b, y, z) then
-					return true
-				end
-			end
-			return false
-		end
-		local function byAngle(list)
-			table.sort(list, function(a, b)
-				return angleOf(a) < angleOf(b)
-			end)
-			return list
-		end
-		byAngle(rims)
-		byAngle(band)
-		t.ok(#band == #rims, "a rim piece on every crescent piece")
-		-- The rim: every joint closes, so it glows as one unbroken curve.
-		for i = 1, #rims - 1 do
-			local r = radiusOf(rims[i])
-			t.ok(
-				joined(rims[i], rims[i + 1], r - 0.2, r + 0.2),
-				string.format("a gap in the rim at %.0f degrees", math.deg(angleOf(rims[i])))
-			)
-		end
-		-- The band: every joint closes right out to its outer edge (no notch
-		-- under the rim), the horns' joints included.
-		for i = 1, #band - 1 do
-			t.ok(
-				joined(band[i], band[i + 1], radius + 0.12, radius + 0.4),
-				string.format("a gap in the crescent at %.0f degrees", math.deg(angleOf(band[i])))
-			)
-		end
+		t.ok(star and back, "a front star and a back star")
+		t.ok(starZ > backZ + 0.05, "the front head is the larger one")
+		local spark = m:FindFirstChild("Spark", true)
+		t.ok(spark and spark:IsA("ParticleEmitter"), "named Spark")
+		t.ok(m:FindFirstChildWhichIsA("PointLight", true) ~= nil, "a spark light")
+		local lo, hi = bounds(m)
+		t.ok(-lo.Z > hi.Z + 0.1, "the front head reaches past the back one")
 	end)
 
 	t.test("an axe without a design still gets a Handle (the generic look)", function()
@@ -260,31 +219,174 @@ return function(t)
 		t.ok(AxeArt.Grip(def), "a grip")
 	end)
 
-	t.test("the Lux Axe: black haft, gold and diamond, a Glint, within the part budget", function()
+	t.test("the Lux Axe: a gold haft, a readable bit, a fan behind it, the 3.5 gameplay haft", function()
 		local def = ItemCatalog.GetAxe("LuxAxe")
 		t.ok(AxeArt.Designed("LuxAxe"))
 		local m = AxeArt.Build(def)
 		t.eq(m.PrimaryPart.Name, "Handle")
+		t.eq(m.PrimaryPart.Size.Y, 3.5, "the gameplay haft, not the 4.0 design length")
 		t.ok(#parts(m) <= MAX_PARTS, "part budget")
 		local lo, hi = bounds(m)
 		t.ok(math.abs(lo.Y) < 0.05, "foot on the ground")
 		t.ok(hi.Y - lo.Y >= 2.8 and hi.Y - lo.Y <= 4.4, "a sensible height")
 		t.ok(lo.Z < -0.5, "blade toward -Z")
-		local handle = m.PrimaryPart
-		t.ok(handle.Color.R < 0.15 and handle.Color.G < 0.15 and handle.Color.B < 0.15, "black haft")
-		local glint = m:FindFirstChild("Glint", true)
-		t.ok(glint and glint:IsA("ParticleEmitter"), "named Glint")
-		t.ok(m:FindFirstChildWhichIsA("PointLight", true) ~= nil, "a glint light")
-		local gold, diamond = false, false
+		t.ok(nearHex(m.PrimaryPart.Color, "#F2D36B"), "gold haft")
+		local fan = false
+		local bladeY = 0
 		for _, p in ipairs(parts(m)) do
-			if p.Color.G > 0.6 and p.Color.R > 0.7 and p.Color.B < 0.5 then
-				gold = true
-			end
-			if p.Name == "Diamond" or (p.Material == roblox.Enum.Material.Neon and p.Color.B > 0.9) then
-				diamond = true
+			if p.Name == "Fan" then
+				fan = true
+				t.ok(nearHex(p.Color, "#F2D36B"), "gold fan")
+			elseif p.Name == "Blade" then
+				bladeY += p.Size.Y
 			end
 		end
-		t.ok(gold, "gold")
-		t.ok(diamond, "diamond")
+		t.ok(fan, "a fan behind the head")
+		t.ok(bladeY >= 1.4, "an axe head, not only a glow")
+		local glint = m:FindFirstChild("Glint", true)
+		t.ok(glint and glint:IsA("ParticleEmitter"), "named Glint")
+		local light = m:FindFirstChildWhichIsA("PointLight", true)
+		t.ok(light ~= nil, "a glint light")
+		t.ok(light.Range <= 4, "the glow stays on the head")
+	end)
+
+	t.test("the Hermit's Maul is a heavy wedge, twice a Steel blade, and it does not glow", function()
+		local AxeModels = t.load("ReplicatedStorage/Shared/Art/AxeModels")
+		t.ok(AxeArt.Designed("HermitsMaul"))
+		local m = AxeArt.Build(ItemCatalog.GetAxe("HermitsMaul"))
+		local steel = AxeModels.Look("SteelAxe")
+		local spanY, thick, heads = 0, 0, 0
+		for _, p in ipairs(parts(m)) do
+			if p.Name == "Head" then
+				heads += 1
+				spanY += p.Size.Y
+				thick = math.max(thick, p.Size.X)
+			end
+		end
+		t.ok(heads >= 2, "a wedge, not one box")
+		local blade = math.max(steel.head.Y, steel.head.Z)
+		t.ok(spanY + 1e-3 >= blade * 2, string.format("head %.2f vs twice a Steel blade %.2f", spanY, blade * 2))
+		t.ok(thick < 1.15, "thin enough to lie flat")
+		t.ok(m:FindFirstChild("Poll") ~= nil, "a hammer poll")
+		t.ok(m:FindFirstChild("Rope") ~= nil, "rope wrap")
+		t.eq(m:FindFirstChildWhichIsA("PointLight", true), nil)
+		-- Lying down, the thick head is the height. It has to stay low.
+		local dropped = AxeArt.Dropped(ItemCatalog.GetAxe("HermitsMaul"))
+		local dlo, dhi = bounds(dropped)
+		t.ok(dhi.Y - dlo.Y < 1.2, string.format("maul stands %.2f tall", dhi.Y - dlo.Y))
+	end)
+
+	t.test("a temper dresses the axe, and a nil prefix changes nothing", function()
+		local def = ItemCatalog.GetAxe("SteelAxe")
+		local m = AxeArt.Build(def)
+		local before = #parts(m)
+		AxeArt.ApplyTemper(m, nil, 3)
+		t.eq(#parts(m), before, "nil prefix adds nothing")
+		t.eq(m:FindFirstChild("TemperTrim", true), nil)
+		AxeArt.ApplyTemper(m, "", 1)
+		t.eq(m:FindFirstChild("TemperTrim", true), nil)
+		AxeArt.ApplyTemper(m, "Bogus", 2)
+		t.eq(m:FindFirstChild("TemperTrim", true), nil)
+
+		AxeArt.ApplyTemper(m, "Keen", 1)
+		local trim = m:FindFirstChild("TemperTrim")
+		t.ok(trim and trim:IsA("BasePart"), "tier 1 trim")
+		t.ok(nearHex(trim.Color, "#6FB7E8"), "SkyBlue speed trim")
+		t.eq(m:FindFirstChild("TemperEdge", true), nil, "tier 1 has no edge")
+		t.eq(m:FindFirstChild("TemperFx", true), nil, "tier 1 has no particle")
+		local weld = trim:FindFirstChild("Weld")
+		t.ok(weld and weld.Part0 == m.PrimaryPart and weld.Part1 == trim, "trim welded to the Handle")
+
+		AxeArt.ApplyTemper(m, "Heavy", 2)
+		local trims = 0
+		for _, d in ipairs(m:GetDescendants()) do
+			if d.Name == "TemperTrim" then
+				trims += 1
+			end
+		end
+		t.eq(trims, 1, "applying again replaces the trim")
+		local edge = m:FindFirstChild("TemperEdge")
+		t.ok(edge and edge.Material.Name == "Neon", "tier 2 neon edge")
+		t.ok(nearHex(edge.Color, "#FFFFFF"), "white sheen")
+		t.eq(m:FindFirstChild("TemperFx", true), nil)
+
+		AxeArt.ApplyTemper(m, "Prosperous", 3)
+		local fx = m:FindFirstChild("TemperFx", true)
+		t.ok(fx and fx:IsA("ParticleEmitter"), "tier 3 particle")
+		t.eq(fx.Rate, 3)
+		t.eq(fx:GetAttribute("Kind"), "Sparkle")
+		local goldTrim = m:FindFirstChild("TemperTrim")
+		t.ok(nearHex(goldTrim.Color, "#F2C14E"), "CoinGold")
+		t.ok(#parts(m) <= MAX_PARTS, "a temper stays inside the part budget")
+
+		-- A nil prefix does not strip a temper that is already there.
+		AxeArt.ApplyTemper(m, nil, 1)
+		t.ok(m:FindFirstChild("TemperTrim") ~= nil, "nil leaves the temper")
+	end)
+
+	local function frontOf(part)
+		local minZ = math.huge
+		local half = part.Size / 2
+		for _, x in ipairs({ -1, 1 }) do
+			for _, y in ipairs({ -1, 1 }) do
+				for _, z in ipairs({ -1, 1 }) do
+					local p = part.CFrame * Vector3.new(half.X * x, half.Y * y, half.Z * z)
+					minZ = math.min(minZ, p.Z)
+				end
+			end
+		end
+		return minZ
+	end
+
+	t.test("the temper edge sits on the head mesh, or the part head when no mesh loaded", function()
+		local maul = AxeArt.Build(ItemCatalog.GetAxe("HermitsMaul"))
+		t.eq(maul:FindFirstChild("MeshHead", true), nil, "the maul has no mesh")
+		AxeArt.ApplyTemper(maul, "Heavy", 2)
+		local partEdge = maul:FindFirstChild("TemperEdge")
+		local partFront = math.huge
+		for _, d in ipairs(maul:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == "Head" then
+				partFront = math.min(partFront, frontOf(d))
+			end
+		end
+		t.ok(partEdge and partEdge:IsA("BasePart"), "part-built edge")
+		t.ok(
+			math.abs(partEdge.CFrame.Position.Z - (partFront - partEdge.Size.Z / 2)) < 1e-3,
+			"on the part head's front face"
+		)
+
+		MeshKit.Reset()
+		MeshKit.Override = function(_id, name, size)
+			local part = roblox.Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			return part
+		end
+		local ok, err = pcall(function()
+			local steel = AxeArt.Build(ItemCatalog.GetAxe("SteelAxe"))
+			local mesh = steel:FindFirstChild("MeshHead")
+			t.ok(mesh and mesh:IsA("BasePart"), "head mesh")
+			AxeArt.ApplyTemper(steel, "Keen", 3)
+			local edge = steel:FindFirstChild("TemperEdge")
+			local wantZ = mesh.CFrame.Position.Z - mesh.Size.Z / 2 - edge.Size.Z / 2
+			t.ok(math.abs(edge.CFrame.Position.Z - wantZ) < 1e-3, "just clear of the mesh face, not inside it")
+			t.ok(math.abs(edge.CFrame.Position.Y - mesh.CFrame.Position.Y) < 1e-3, "centred on the mesh head")
+			t.ok(edge.CFrame.Position.Z < mesh.CFrame.Position.Z - mesh.Size.Z / 2, "outside the mesh")
+			local wind = steel:FindFirstChild("TemperFx", true)
+			t.eq(wind.Parent, edge, "Keen streaks come off the edge")
+			t.eq(wind:GetAttribute("Kind"), "Wind")
+			AxeArt.ApplyTemper(steel, "Heavy", 3)
+			local sheen = steel:FindFirstChild("TemperFx", true)
+			t.eq(sheen.Parent, steel:FindFirstChild("TemperEdge"), "Heavy sheen comes off the edge")
+			t.eq(sheen:GetAttribute("Kind"), "Sheen")
+			AxeArt.ApplyTemper(steel, "Prosperous", 3)
+			local spark = steel:FindFirstChild("TemperFx", true)
+			t.eq(spark.Parent.Name, "TemperTrim", "Prosperous sparkles stay on the collar")
+		end)
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		if not ok then
+			error(err, 0)
+		end
 	end)
 end

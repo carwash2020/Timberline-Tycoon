@@ -1,5 +1,35 @@
 # Phase 2+ build notes
 
+## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
+
+Done on this branch, not on main. Rebased onto main at `f96b62c`. The store board is not in this PR (lane P owns the redesign). Box and hover renders live in `previews/v1-d/` (listed in STATUS.md). Axe, temper and shelf pictures were part-built and are gone until `phase-2/v1-preview-meshes` can draw the real meshes.
+
+Axes (uploaded meshes replace the part-built axe when they load; the Hermit's Maul has no mesh and stays part-built):
+
+1. PC, Play mode. In the command bar run `print(require(game.ReplicatedStorage.Shared.Art.MeshKit).Stats())`. `loaded` is greater than 0 and the axe ids are not in `failedIds`. Equip Rusty, then each rung, then the Lux Axe. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat. The Hermit's Maul is still the part-built wedge (a heavy head, a flat poll, rope on the haft). It has no custom mesh yet.
+2. Phone emulator. The same equip, swing and drop. Drop is a long press on the hotbar. No new button, and nothing sits on the thumbstick or the jump button.
+3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
+
+Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Keen, Heavy or Prosperous until lane A2 wires it. Keen is the speed temper (sky blue wind). Heavy is the damage temper (a white edge sheen). Prosperous stays coin gold. The neon edge, the wind streaks and the white sheen sit on the front face of the head mesh, not inside it. With no mesh they use the part-built head. Stats do not move.
+
+Boxes (the window crate; shell stays at 9 parts, a full box at 42):
+
+4. PC. Buy or spawn a boxed axe and a boxed truck. The box has a wood body, a glass front, a 0.1 accent band and a small brass plate under the name, clear of the letters. No price, no decal, no billboard on the box. The item shows through the glass. Good: it matches `previews/v1-d/boxes-after-axe.png` and `boxes-after-sawmill.png`. A truck box still appears (the shell did not grow, so the 42-part cap still holds).
+5. Phone emulator, Lower quality. The same boxes. The copies of the item inside are gone and the glass is tinted. The shell, the band and the plate stay. Nothing new sits on the thumbstick or the jump button.
+6. Xbox. Look at a box on a shelf. The tag hangs on it. No control is bound to ButtonR2.
+
+Shelves (the unit is `ShelfLayout.Build`; the shop on screen still uses lane C's `ShopInterior.SteppedUnit` until C copies it):
+
+7. The unit is three boards stepping up (tops 3.2, 2.98, 2.76), four timber posts, a dark kick, three cream rails. Feet on the floor, front of the unit at the front. In Studio the Tool Shed shelves will not change until lane C adopts this unit. Gaps stay 1.5 across and 2.5 between rows. No shelf picture in this PR.
+
+Hover tag (the price line only; the words do not change):
+
+8. PC. With enough cash, look at a priced shelf item. The price line is gold (`#F2C14E`). Spend down or look at something you cannot afford: the line is red (`#D9534F`). A free item (price 0) is gold. Closed, already owned, out of stock, and a Robux line stay the old cream. One price, never two numbers.
+9. Phone emulator. The same colours. The tag does not cover the thumbstick or the jump button. Touch targets stay about 44×44 and 8px apart.
+10. Xbox. The same colours inside the existing look ranges (gamepad 12, touch 6). No new ButtonR2 bind.
+
+Awaiting Connor: a Blender mesh for the Hermit's Maul (it stays part-built until that exists), a hand 25–30% up the haft (it stays at 0.75), a Lux haft of 4.0 in play (it stays 3.5), and four bevel parts on the box corners (they are not parts).
+
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).
 

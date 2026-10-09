@@ -448,4 +448,51 @@ return function(t)
 			)
 		end
 	)
+
+	t.test("the accent band is 0.1 deep and a brass plate sits on it, with no price", function()
+		local model, body = dressed("Axe", "SteelAxe", { name = "Steel Axe" })
+		local strip = model:FindFirstChild("Strip")
+		t.ok(math.abs(strip.Size.Z - 0.1) < 1e-3, "the band is 0.1 deep")
+		t.ok(model:FindFirstChild("Base").Size.X > body.Size.X + 0.15, "the foot flange is the accent too")
+		local logo = model:FindFirstChild("Logo")
+		t.ok(logo, "a logo plate")
+		t.ok(math.abs(logo.Size.X - 0.6) < 1e-3 and math.abs(logo.Size.Y - 0.3) < 1e-3, "0.6 by 0.3")
+		t.eq(logo:FindFirstChildWhichIsA("SurfaceGui"), nil, "the plate prints nothing")
+		local shell = 0
+		for _, p in ipairs(parts(model)) do
+			if p.Name ~= "Contents" and (p.Parent == model) then
+				shell += 1
+			end
+		end
+		t.ok(shell <= BoxLogic.ShellPartCap, "shell " .. shell)
+	end)
+
+	t.test("the brass plate sits under the name and the two rects do not overlap", function()
+		local function span(part)
+			local c, s = part.CFrame.Position, part.Size
+			return c.X - s.X / 2, c.X + s.X / 2, c.Y - s.Y / 2, c.Y + s.Y / 2
+		end
+		local cases = {
+			{ "Axe", "SteelAxe", "Steel Axe" },
+			{ "Sawmill", "Millmaster100", "Millmaster 100" },
+			{ "Gear", "Lantern", "Lantern" },
+			{ "Truck", "Rustbucket", "Rustbucket" },
+		}
+		for _, row in ipairs(cases) do
+			local model = dressed(row[1], row[2], { name = row[3] })
+			local strip = model:FindFirstChild("Strip")
+			local logo = model:FindFirstChild("Logo")
+			local label = strip:FindFirstChildWhichIsA("SurfaceGui"):FindFirstChild("Name")
+			local pad = label:FindFirstChildWhichIsA("UIPadding")
+			local x0, x1, y0, y1 = span(strip)
+			local lx0 = x0 + (x1 - x0) * pad.PaddingLeft.Scale
+			local lx1 = x1 - (x1 - x0) * pad.PaddingRight.Scale
+			local ly0 = y0 + (y1 - y0) * pad.PaddingBottom.Scale
+			local ly1 = y1 - (y1 - y0) * pad.PaddingTop.Scale
+			local px0, px1, py0, py1 = span(logo)
+			local overlaps = px0 < lx1 - 1e-4 and px1 > lx0 + 1e-4 and py0 < ly1 - 1e-4 and py1 > ly0 + 1e-4
+			t.ok(not overlaps, row[3] .. " plate covers the name")
+			t.ok(py1 <= y0 + 1e-3, row[3] .. " plate is below the band")
+		end
+	end)
 end
