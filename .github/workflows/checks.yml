@@ -26,11 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Only the tool binaries are cached, never ~/.rokit/auth.toml (the token).
       - name: Cache Rokit tools
         uses: actions/cache@v4
         with:
-          path: ~/.rokit
-          key: rokit-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
+          path: |
+            ~/.rokit/bin
+            ~/.rokit/tool-storage
+          key: rokit-v2-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
 
       - name: Install Rokit and the pinned tools
         env:
@@ -61,11 +64,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Only the tool binaries are cached, never ~/.rokit/auth.toml (the token).
       - name: Cache Rokit tools
         uses: actions/cache@v4
         with:
-          path: ~/.rokit
-          key: rokit-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
+          path: |
+            ~/.rokit/bin
+            ~/.rokit/tool-storage
+          key: rokit-v2-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
 
       - name: Install Rokit and the pinned tools
         env:
