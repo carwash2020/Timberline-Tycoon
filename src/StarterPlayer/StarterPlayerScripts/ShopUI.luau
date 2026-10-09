@@ -2,7 +2,8 @@
 -- ShopUI: the shop screen, for both shops.
 --   * Tool Shed ("Browse axes"): the whole axe ladder. The next axe can be
 --     bought, owned ones bought again (for a collection), later ones show
---     as locked, and the Starfall Axe as forged. Each row says the axe's
+--     as locked. The Starfall Axe is not here: it is forged at the Sky
+--     Forge (ForgeUI), with the relics, tempering and the weekly order. Each row says the axe's
 --     damage and the toughest woods it fells.
 --   * Dealership ("Browse trucks"): every truck with its bed size and top
 --     speed, then the trailers. Buy a truck, or switch to one you own (it
@@ -156,7 +157,10 @@ local AXES: Shop = {
 	ids = function()
 		local ids = {}
 		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
-			table.insert(ids, axe.id)
+			-- Forge axes live in ForgeUI (the Sky Forge), not the shop.
+			if not axe.forge then
+				table.insert(ids, axe.id)
+			end
 		end
 		local extra = {}
 		for _, axe in pairs(ItemCatalog.Axes) do
@@ -390,7 +394,7 @@ local function blueprintView(id: string): RowView
 		name = name,
 		own = if have then "· owned" else nil,
 		detail = "Place it on your plot, as many times as you like.",
-		color = Color3.fromHex("#A4693E"),
+		color = C.AmberDeep, -- the blueprint swatch: a UITheme name, not a hex
 		dim = false,
 		button = button,
 		state = state,
@@ -542,10 +546,14 @@ local function buildRow(parent: Instance, shop: Shop, id: string, order: number)
 	UITheme.stroke(swatch, C.Ink, 3)
 	local shade = Instance.new("UIGradient")
 	shade.Rotation = 90
+	-- The swatch's shade is the button shine's (UITheme.Skin), upside down:
+	-- full colour, then ShineGrey at the foot.
+	local grey = UITheme.Skin.ShineGrey
+	local full = Color3.new(1, 1, 1) -- white: a gradient multiplies, so this is "no tint", not a colour
 	shade.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-		ColorSequenceKeypoint.new(0.85, Color3.new(1, 1, 1)),
-		ColorSequenceKeypoint.new(1, Color3.new(0.82, 0.82, 0.82)),
+		ColorSequenceKeypoint.new(0, full),
+		ColorSequenceKeypoint.new(1 - UITheme.Skin.ShineFrom, full),
+		ColorSequenceKeypoint.new(1, Color3.new(grey, grey, grey)),
 	})
 	shade.Parent = swatch
 	swatch.Parent = frame
