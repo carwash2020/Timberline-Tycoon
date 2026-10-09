@@ -3293,3 +3293,18 @@ Connor: "If we have the pop up chats you can remove the floating chat bubbles."
 - [ ] Press Talk on each NPC (Millie, Tink, Hazel, Dale, Gus, Rosa, Pip, Bram, Old Hank, Old Tolly, Cap'n Moss, the Hermit): the box opens, the NPC turns to you and gestures, and prompts work afterwards. Hear the murmur as it opens.
 - [ ] Ferry and toll: the Board / Pay toll prompts show the price; Cap'n Moss and Old Tolly mention it when talked to.
 - [ ] Talk to a keeper after closing time: the box opens with their sleep line.
+
+## V1 Blender asset registry (Lane H, branch `phase-2/v1-h-blender-assets`, 8 October 2026)
+
+Registry and docs only. Nothing in game changes: every registry id that would load is 0, so the new `blender` group in `MeshManifest` is empty.
+
+Checks without Studio:
+- `lune run tests/run BlenderAssets` (registry rows, files, tris, ids) and `lune run tests/run MeshPreload`.
+- `python3 tools/blender/check.py` (every GLB in `assets/meshes` against the import limits). CI has no Blender or Python step; run it by hand before adding GLBs.
+- `python3 tools/blender/registry.py` regenerates `BlenderAssets.luau` and `assets/UPLOAD_LIST.md` (then `stylua src/ReplicatedStorage/Shared/Art/BlenderAssets.luau`). The output must not change on a rerun.
+
+Studio checks (PC, phone emulator 667x375, Xbox):
+1. Play. The Output build check line (`[MapBuilder] build check:` and the MeshKit line) shows the same mesh count as before this PR. Good: no new `[MeshKit]` warning.
+2. Walk the town, a plot and the forest. Good: buildings, NPCs, axes, trees and the plot kit look exactly as before.
+3. Phone (667x375) and Xbox: same as 1 and 2. Nothing in this PR touches input or UI.
+
