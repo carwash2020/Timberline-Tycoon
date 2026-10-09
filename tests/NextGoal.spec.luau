@@ -20,7 +20,7 @@ return function(t)
 			goal.text,
 			string.format("Buy the %s (%s)", steel.displayName, FieldGuide.CashText(ShopLogic.Price(steel, 2)))
 		)
-		t.eq(ShopLogic.Price(steel, 2), 120)
+		t.eq(ShopLogic.Price(steel, 2), 110)
 		local hardened = ItemCatalog.AxeLadder()[3]
 		local nextUp = NextGoal.Pick(2, 2, foundNone(), 0)
 		t.ok(string.find(nextUp.text, hardened.displayName, 1, true) ~= nil)

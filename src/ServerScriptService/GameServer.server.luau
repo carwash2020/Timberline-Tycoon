@@ -901,6 +901,7 @@ if CoreLoop.V2() then
 					lux = saved.l == true,
 					mill = saved.m,
 					board = saved.d,
+					temper = saved.t,
 					createdAt = os.clock() - GameConfig.PickupGraceSec + math.max(0, graceSec),
 				})
 			end
@@ -1122,6 +1123,11 @@ BootReport.StartStubs({
 		end,
 	},
 })
+
+safely("V1Boot", function()
+	local V1Boot = require(script.Parent.V1Boot)
+	V1Boot.Start(safely, remote)
+end)
 
 -- The pose only. Damage stays on Chop / ChopTree / MineNode, which still
 -- arm the next swing when they arrive (setSwingDue is unchanged). SwingLen

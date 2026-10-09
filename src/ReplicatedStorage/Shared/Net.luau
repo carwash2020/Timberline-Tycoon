@@ -67,6 +67,14 @@ Net.RemoteNames = {
 	"BoardData", -- server -> client: (payload) the top rows and your own (LeaderboardLogic.ParsePayload)
 	"PaintTruck", -- client -> server: (truckId, color) Paint Shop; the server clamps it
 	"NewsSeen", -- client -> server: () the player closed What's new; stored as onboarding["News:V1"]
+	"SkyQuest", -- client -> server: the Sky Pass quest
+	"ForgeAction", -- client -> server: a forge order
+	"ForgeOpen", -- client -> server: open the forge
+	"SaveNow", -- client -> server: write the save now
+	"PaintAllType", -- client -> server: paint every placed piece of one type
+	"LogicSet", -- client -> server: a logic link on the plot
+	"MineAction", -- client -> server: (op: string, id: string?, n: number?) Lane M owns the handler
+	"CraftAction", -- client -> server: (recipeId: string) Lane M owns the handler
 }
 
 local folder: Folder? = nil

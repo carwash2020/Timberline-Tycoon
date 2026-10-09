@@ -1,18 +1,16 @@
 --!strict
--- WireLogic: the rules for wiring a switch to a lamp or a door on a plot
--- (LogicItems, LogicService). Pure, so the server decides and tests run it.
+-- WireLogic: the rules for wiring a plot (LogicItems, LogicService).
+-- Pure, so the server decides and tests run it.
 --
--- A wire joins one switch to one target. Targets are a Spark Lamp or a
--- Door. A switch can feed several targets and a target can have several
--- switches (it follows any switch that is on). Wires are saved as
--- { from = switchUid, to = targetUid } in profile.plot.wires. A switch's
--- position is saved as its uid in profile.plot.switches while it is on
--- (a switch missing from the list is off), so it keeps its place when the
--- plot rebuilds.
+-- A wire joins one output port to one input port. Several wires may land
+-- on the same input; that input is on when any of them is (OR). Saved
+-- wires stay { from, to } and grow fromPort / toPort only when the port
+-- is not 1, so an old save still loads. A latch that is on is its uid in
+-- profile.plot.switches. Tunable times live in profile.plot.logic.
 
 local WireLogic = {}
 
-export type Wire = { from: string, to: string }
+export type Wire = { from: string, to: string, fromPort: number?, toPort: number? }
 
 export type Item = {
 	uid: string,
@@ -23,40 +21,205 @@ export type Item = {
 	fill: { units: number }?,
 }
 
-WireLogic.Reach = 30 -- studs from the player to each end of a wire
-WireLogic.Span = 32 -- studs from the switch to its target, along the ground
-WireLogic.MaxWires = 40 -- per plot
-WireLogic.MaxPerSwitch = 6
-WireLogic.FlipCooldown = 0.5 -- seconds between flips of one switch
-WireLogic.MaxSwitches = 40 -- uids kept in plot.switches
-WireLogic.Port = 1 -- the only port a piece has; the Wire remote carries it
-
-local ROLES: { [string]: string } = {
-	SparkSwitch = "switch",
-	SparkLamp = "lamp",
-	Door = "door",
+export type Spec = {
+	role: string,
+	outs: { number },
+	ins: { number },
+	latch: boolean?,
+	pulse: number?,
+	sense: boolean?,
+	clock: boolean?,
+	delay: boolean?,
+	sustain: boolean?,
+	op: string?,
+	sink: boolean?,
+	setting: string?,
+	min: number?,
+	max: number?,
+	step: number?,
+	default: number?,
 }
 
--- "switch", "lamp", "door", or nil for a piece that cannot be wired.
+WireLogic.Reach = 30 -- studs from the player to each end of a wire
+WireLogic.Span = 32 -- studs from an output to its input, along the ground
+WireLogic.MaxWires = 160 -- per plot (PROPOSAL)
+WireLogic.MaxItems = 80 -- logic pieces per plot (PROPOSAL); a Door is not one
+WireLogic.MaxPerSwitch = 6
+WireLogic.FlipCooldown = 0.5 -- seconds between flips of one latch
+WireLogic.MaxSwitches = 80 -- latch uids kept in plot.switches
+WireLogic.Port = 1 -- the first port; the Wire remote carries port numbers
+
+local SPECS: { [string]: Spec } = {
+	SparkSwitch = { role = "switch", outs = { 1 }, ins = {}, latch = true },
+	Lever = { role = "lever", outs = { 1 }, ins = {}, latch = true },
+	Button = { role = "button", outs = { 1 }, ins = {}, pulse = 1 },
+	PressurePlate = { role = "plate", outs = { 1 }, ins = {}, sense = true },
+	GateAnd = { role = "gate", outs = { 1 }, ins = { 1, 2 }, op = "and" },
+	GateOr = { role = "gate", outs = { 1 }, ins = { 1, 2 }, op = "or" },
+	GateXor = { role = "gate", outs = { 1 }, ins = { 1, 2 }, op = "xor" },
+	GateNot = { role = "invert", outs = { 1 }, ins = { 1 }, op = "not" },
+	Delay = {
+		role = "delay",
+		outs = { 1 },
+		ins = { 1 },
+		delay = true,
+		setting = "delay",
+		min = 0.1,
+		max = 10,
+		step = 0.1,
+		default = 1,
+	},
+	Sustain = {
+		role = "sustain",
+		outs = { 1 },
+		ins = { 1 },
+		sustain = true,
+		setting = "hold",
+		min = 0.1,
+		max = 10,
+		step = 0.1,
+		default = 1,
+	},
+	Clock = {
+		role = "clock",
+		outs = { 1 },
+		ins = {},
+		clock = true,
+		setting = "period",
+		min = 0.5,
+		max = 30,
+		step = 0.5,
+		default = 2,
+	},
+	SparkLamp = { role = "lamp", outs = {}, ins = { 1 }, sink = true },
+	GlowWire = { role = "glow", outs = {}, ins = { 1 }, sink = true },
+	Hatch = { role = "hatch", outs = {}, ins = { 1 }, sink = true },
+	Door = { role = "door", outs = {}, ins = { 1 }, sink = true },
+}
+
+local SOURCE_ROLE: { [string]: boolean } = {
+	switch = true,
+	button = true,
+	lever = true,
+	plate = true,
+	gate = true,
+	invert = true,
+	delay = true,
+	sustain = true,
+	clock = true,
+}
+
+local TARGET_ROLE: { [string]: boolean } = {
+	lamp = true,
+	door = true,
+	gate = true,
+	invert = true,
+	delay = true,
+	sustain = true,
+	glow = true,
+	hatch = true,
+}
+
+function WireLogic.Spec(blueprintId: string): Spec?
+	return SPECS[blueprintId]
+end
+
+-- "switch", "lamp", "door", and the sandbox roles, or nil.
 function WireLogic.Role(blueprintId: string): string?
-	return ROLES[blueprintId]
+	local spec = SPECS[blueprintId]
+	return if spec then spec.role else nil
+end
+
+function WireLogic.IsSource(role: string?): boolean
+	return role ~= nil and SOURCE_ROLE[role] == true
 end
 
 function WireLogic.IsTarget(role: string?): boolean
-	return role == "lamp" or role == "door"
+	return role ~= nil and TARGET_ROLE[role] == true
+end
+
+function WireLogic.IsLogicItem(blueprintId: string): boolean
+	return SPECS[blueprintId] ~= nil and blueprintId ~= "Door"
+end
+
+function WireLogic.Latches(blueprintId: string): boolean
+	local spec = SPECS[blueprintId]
+	return spec ~= nil and spec.latch == true
+end
+
+function WireLogic.LogicCount(placed: { Item }): number
+	local n = 0
+	for _, item in ipairs(placed) do
+		if WireLogic.IsLogicItem(item.blueprintId) then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- False when this blueprint would be one logic piece too many.
+function WireLogic.CanPlace(placed: { Item }, blueprintId: string): boolean
+	if not WireLogic.IsLogicItem(blueprintId) then
+		return true
+	end
+	return WireLogic.LogicCount(placed) < WireLogic.MaxItems
+end
+
+local function listed(ports: { number }, port: number): boolean
+	return table.find(ports, port) ~= nil
+end
+
+function WireLogic.HasOut(blueprintId: string, port: number): boolean
+	local spec = SPECS[blueprintId]
+	return spec ~= nil and listed(spec.outs, port)
+end
+
+function WireLogic.HasIn(blueprintId: string, port: number): boolean
+	local spec = SPECS[blueprintId]
+	return spec ~= nil and listed(spec.ins, port)
+end
+
+-- The saved number for a tunable piece, or nil when the key is not its setting
+-- or the number is outside the range. In-range values snap to the step.
+function WireLogic.ClampSetting(blueprintId: string, key: string, value: number): number?
+	local spec = SPECS[blueprintId]
+	if not spec or spec.setting ~= key or spec.min == nil or spec.max == nil or spec.step == nil then
+		return nil
+	end
+	if value ~= value or value == math.huge or value == -math.huge then
+		return nil
+	end
+	if value < spec.min - 1e-6 or value > spec.max + 1e-6 then
+		return nil
+	end
+	local n = math.floor(value / spec.step + 0.5 + 1e-9)
+	local snapped = math.round(n * spec.step * 10) / 10
+	if snapped < spec.min or snapped > spec.max then
+		return nil
+	end
+	return snapped
+end
+
+function WireLogic.DefaultSetting(blueprintId: string): (string?, number?)
+	local spec = SPECS[blueprintId]
+	if not spec or spec.setting == nil or spec.default == nil then
+		return nil, nil
+	end
+	return spec.setting, spec.default
 end
 
 local MESSAGES: { [string]: string } = {
 	bad = "That can't be wired.",
 	missing = "That piece isn't on your plot.",
-	from = "Start a wire at a Wall Switch.",
-	to = "A switch wires to a Spark Lamp or a Door.",
+	from = "Start a wire at an output.",
+	to = "A wire ends at an input.",
 	unfinished = "Finish building that first.",
 	dup = "Those two are already wired.",
 	span = "Too far apart. Keep them within 32 studs.",
 	reach = "Stand closer to wire that.",
-	full = "This plot has all the wires it can hold.",
-	limit = "That switch already feeds six things.",
+	full = "This plot holds 160 wires.",
+	limit = "That output already feeds six things.",
+	items = "This plot holds 80 logic pieces.",
 	none = "Nothing to wire within 32 studs. Place a Spark Lamp or a Door nearby.",
 	cleared = "Wires cleared.",
 	wired = "Wired.",
@@ -70,8 +233,19 @@ local function finite(n: any): boolean
 	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
 end
 
+local function cleanPort(value: any): number?
+	if type(value) ~= "number" or value ~= math.floor(value) or value < 1 or value > 8 then
+		return nil
+	end
+	if value == 1 then
+		return nil
+	end
+	return value
+end
+
 -- Wires from a save: only { from, to } pairs of non-empty strings, no
--- repeats, no loops, at most MaxWires. Anything else is dropped.
+-- repeats, no loops, at most MaxWires. A port other than 1 is kept.
+-- Anything else is dropped.
 function WireLogic.Clean(value: any): { Wire }
 	local out: { Wire } = {}
 	if type(value) ~= "table" then
@@ -82,10 +256,19 @@ function WireLogic.Clean(value: any): { Wire }
 		if type(entry) == "table" then
 			local from, to = entry.from, entry.to
 			if type(from) == "string" and type(to) == "string" and from ~= "" and to ~= "" and from ~= to then
-				local key = from .. ">" .. to
+				local fp = cleanPort(entry.fromPort)
+				local tp = cleanPort(entry.toPort)
+				local key = from .. ":" .. tostring(fp or 1) .. ">" .. to .. ":" .. tostring(tp or 1)
 				if not seen[key] then
 					seen[key] = true
-					table.insert(out, { from = from, to = to })
+					local wire: Wire = { from = from, to = to }
+					if fp then
+						wire.fromPort = fp
+					end
+					if tp then
+						wire.toPort = tp
+					end
+					table.insert(out, wire)
 					if #out >= WireLogic.MaxWires then
 						break
 					end
@@ -96,8 +279,8 @@ function WireLogic.Clean(value: any): { Wire }
 	return out
 end
 
--- Saved switch positions: the uids of the switches that are on. Only
--- non-empty strings, no repeats, at most MaxSwitches.
+-- Saved latch positions: the uids that are on. Only non-empty strings,
+-- no repeats, at most MaxSwitches.
 function WireLogic.CleanSwitches(value: any): { string }
 	local out: { string } = {}
 	if type(value) ~= "table" then
@@ -116,12 +299,10 @@ function WireLogic.CleanSwitches(value: any): { string }
 	return out
 end
 
--- Is this switch saved as on?
 function WireLogic.IsOn(switches: any, uid: string): boolean
 	return type(switches) == "table" and table.find(switches, uid) ~= nil
 end
 
--- `switches` with `uid` set on or off. Returns a new list.
 function WireLogic.SetOn(switches: any, uid: string, on: boolean): { string }
 	local out: { string } = {}
 	for _, have in ipairs(WireLogic.CleanSwitches(switches)) do
@@ -135,7 +316,6 @@ function WireLogic.SetOn(switches: any, uid: string, on: boolean): { string }
 	return out
 end
 
--- The saved positions of switches that are still placed.
 function WireLogic.LiveSwitches(switches: any, placed: { Item }): { string }
 	local out: { string } = {}
 	local byUid: { [string]: Item } = {}
@@ -144,7 +324,7 @@ function WireLogic.LiveSwitches(switches: any, placed: { Item }): { string }
 	end
 	for _, uid in ipairs(WireLogic.CleanSwitches(switches)) do
 		local item = byUid[uid]
-		if item and WireLogic.Role(item.blueprintId) == "switch" then
+		if item and WireLogic.Latches(item.blueprintId) then
 			table.insert(out, uid)
 		end
 	end
@@ -160,8 +340,16 @@ local function find(placed: { Item }, uid: string): Item?
 	return nil
 end
 
--- The wires whose two ends are both placed, the first a switch and the
--- second a target.
+local function portFrom(wire: Wire): number
+	return wire.fromPort or 1
+end
+
+local function portTo(wire: Wire): number
+	return wire.toPort or 1
+end
+
+-- The wires whose two ends are both placed, the first an output and the
+-- second an input, on ports those pieces actually have.
 function WireLogic.Live(wires: { Wire }?, placed: { Item }): { Wire }
 	local out: { Wire } = {}
 	if type(wires) ~= "table" then
@@ -176,8 +364,8 @@ function WireLogic.Live(wires: { Wire }?, placed: { Item }): { Wire }
 		if
 			a
 			and b
-			and WireLogic.Role(a.blueprintId) == "switch"
-			and WireLogic.IsTarget(WireLogic.Role(b.blueprintId))
+			and WireLogic.HasOut(a.blueprintId, portFrom(wire))
+			and WireLogic.HasIn(b.blueprintId, portTo(wire))
 		then
 			table.insert(out, wire)
 		end
@@ -185,13 +373,11 @@ function WireLogic.Live(wires: { Wire }?, placed: { Item }): { Wire }
 	return out
 end
 
--- Ground distance between two placed pieces, in studs.
 function WireLogic.Distance(a: Item, b: Item): number
 	local dx, dz = a.x - b.x, a.z - b.z
 	return math.sqrt(dx * dx + dz * dz)
 end
 
--- True when a player standing at plot-local (px, py, pz) is near `item`.
 function WireLogic.InReach(px: number, py: number, pz: number, item: Item): boolean
 	if not (finite(px) and finite(py) and finite(pz)) then
 		return false
@@ -200,8 +386,19 @@ function WireLogic.InReach(px: number, py: number, pz: number, item: Item): bool
 	return dx * dx + dy * dy + dz * dz <= WireLogic.Reach * WireLogic.Reach
 end
 
--- (true, nil) when `fromUid` may be wired to `toUid`, else (false, reason).
-function WireLogic.Check(wires: { Wire }, placed: { Item }, fromUid: string, toUid: string): (boolean, string?)
+-- (true, nil) when `fromUid` port `fromPort` may be wired to `toUid` port
+-- `toPort`, else (false, reason). Ports default to 1.
+function WireLogic.Check(
+	wires: { Wire },
+	placed: { Item },
+	fromUid: string,
+	toUid: string,
+	fromPort: number?,
+	toPort: number?
+): (boolean, string?)
+	local fp = fromPort or 1
+	local tp = toPort or 1
+	-- A piece does not wire to itself. A loop is two pieces feeding each other.
 	if fromUid == toUid then
 		return false, "bad"
 	end
@@ -209,22 +406,25 @@ function WireLogic.Check(wires: { Wire }, placed: { Item }, fromUid: string, toU
 	if not a or not b then
 		return false, "missing"
 	end
-	if WireLogic.Role(a.blueprintId) ~= "switch" then
+	if not WireLogic.HasOut(a.blueprintId, fp) then
 		return false, "from"
 	end
-	if not WireLogic.IsTarget(WireLogic.Role(b.blueprintId)) then
+	if not WireLogic.HasIn(b.blueprintId, tp) then
 		return false, "to"
 	end
 	if a.fill ~= nil or b.fill ~= nil then
 		return false, "unfinished"
 	end
-	if WireLogic.Distance(a, b) > WireLogic.Span then
+	if WireLogic.LogicCount(placed) > WireLogic.MaxItems then
+		return false, "items"
+	end
+	if fromUid ~= toUid and WireLogic.Distance(a, b) > WireLogic.Span then
 		return false, "span"
 	end
 	local live = WireLogic.Live(wires, placed)
 	local feeds = 0
 	for _, wire in ipairs(live) do
-		if wire.from == fromUid and wire.to == toUid then
+		if wire.from == fromUid and wire.to == toUid and portFrom(wire) == fp and portTo(wire) == tp then
 			return false, "dup"
 		end
 		if wire.from == fromUid then
@@ -240,18 +440,18 @@ function WireLogic.Check(wires: { Wire }, placed: { Item }, fromUid: string, toU
 	return true, nil
 end
 
--- Targets in reach of a switch that it does not feed yet, nearest first
--- (ties by uid, so the order never wobbles).
-function WireLogic.Candidates(wires: { Wire }, placed: { Item }, switchUid: string): { string }
-	local sw = find(placed, switchUid)
+-- Inputs in reach of an output that this port does not feed yet, nearest
+-- first (ties by uid, so the order never wobbles).
+function WireLogic.Candidates(wires: { Wire }, placed: { Item }, sourceUid: string): { string }
+	local src = find(placed, sourceUid)
 	local out: { { uid: string, d: number } } = {}
-	if not sw or WireLogic.Role(sw.blueprintId) ~= "switch" then
+	if not src or not WireLogic.IsSource(WireLogic.Role(src.blueprintId)) then
 		return {}
 	end
 	for _, item in ipairs(placed) do
-		if item.uid ~= switchUid and WireLogic.IsTarget(WireLogic.Role(item.blueprintId)) then
-			if WireLogic.Check(wires, placed, switchUid, item.uid) then
-				table.insert(out, { uid = item.uid, d = WireLogic.Distance(sw, item) })
+		if WireLogic.IsTarget(WireLogic.Role(item.blueprintId)) then
+			if WireLogic.Check(wires, placed, sourceUid, item.uid) then
+				table.insert(out, { uid = item.uid, d = WireLogic.Distance(src, item) })
 			end
 		end
 	end
@@ -268,7 +468,6 @@ function WireLogic.Candidates(wires: { Wire }, placed: { Item }, switchUid: stri
 	return uids
 end
 
--- `wires` without any wire that touches `uid`.
 function WireLogic.Without(wires: { Wire }, uid: string): ({ Wire }, number)
 	local out: { Wire } = {}
 	local cut = 0
@@ -282,8 +481,9 @@ function WireLogic.Without(wires: { Wire }, uid: string): ({ Wire }, number)
 	return out, cut
 end
 
--- Is a lamp or door fed by any live wire, and is any of its switches on?
--- `on` maps a switch uid to true. Returns (fed, powered).
+-- Is a piece fed by any live wire, and is any of those outputs on?
+-- `on` maps a source uid to true. Returns (fed, powered). Port-blind: any
+-- wire into the piece counts, which matches a one-port lamp or door.
 function WireLogic.Power(wires: { Wire }, uid: string, on: { [string]: boolean }): (boolean, boolean)
 	local fed, powered = false, false
 	for _, wire in ipairs(wires) do

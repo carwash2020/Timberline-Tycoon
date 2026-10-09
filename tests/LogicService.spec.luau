@@ -32,6 +32,7 @@ return function(t)
 		local PlotData = loader:shared("PlotData")
 		local BlueprintModels = loader:shared("BlueprintModels")
 		local InputKit = loader:shared("InputKit")
+		local WireLogic = loader:shared("WireLogic")
 
 		local toasts = {}
 		local function newPlayer(userId, at)
@@ -89,7 +90,9 @@ return function(t)
 			return model, ctx
 		end
 		return {
+			loader = loader,
 			Service = LogicService,
+			WireLogic = WireLogic,
 			Doors = loader:server("PlotDoors"),
 			InputKit = InputKit,
 			owner = owner,
@@ -422,5 +425,231 @@ return function(t)
 		s.Service.OnWire(s.owner, "sw", 1, "lamp", 1)
 		t.eq(s.profile.plot.wires, {})
 		t.eq(s.toasts[#s.toasts].text, "Stand closer to wire that.")
+	end)
+
+	t.test("a lever and a button into an AND gate light the lamp only when both are on", function()
+		local s = setup()
+		s.add("lever", "Lever", 0, 0)
+		s.add("button", "Button", 0, 4)
+		s.add("gate", "GateAnd", 4, 2)
+		local lamp = s.add("lamp", "SparkLamp", 8, 2)
+		t.eq({ s.Service.Link(s.owner, "lever", "gate", 1, 1) }, { true, nil })
+		t.eq({ s.Service.Link(s.owner, "button", "gate", 1, 2) }, { true, nil })
+		t.eq({ s.Service.Link(s.owner, "gate", "lamp") }, { true, nil })
+		t.eq(s.profile.plot.wires[2].toPort, 2)
+		t.eq(lamp:GetAttribute("Lit"), false)
+		s.Service.Flip(s.ctx.lever, s.owner)
+		t.eq(lamp:GetAttribute("Lit"), false, "the button is still off, so the AND stays off")
+		s.Service.Press(s.ctx.button, s.owner)
+		t.eq(lamp:GetAttribute("Lit"), true)
+		t.eq(lamp:FindFirstChild("Part2").Material, t.roblox.Enum.Material.Neon)
+	end)
+
+	t.test("LogicSet saves a clamped time and refuses a value outside the range", function()
+		local s = setup()
+		local delay = s.add("delay", "Delay", 0, 0)
+		local set = delay:FindFirstChild("SetPrompt", true)
+		t.ok(set, "a Set prompt")
+		t.eq(set:GetAttribute("LogicKey"), "delay")
+		t.eq(set:GetAttribute("LogicValue"), 1)
+		s.Service.OnLogicSet(s.owner, "delay", "delay", 2)
+		t.eq(s.profile.plot.logic.delay.delay, 2)
+		t.eq(set:GetAttribute("LogicValue"), 2)
+		t.eq(s.toasts[#s.toasts].text, "Delay set to 2 s.")
+		s.Service.OnLogicSet(s.owner, "delay", "delay", 50)
+		t.eq(s.profile.plot.logic.delay.delay, 2, "out of range is ignored")
+		s.Service.OnLogicSet(s.owner, "delay", "nope", 3)
+		t.eq(s.profile.plot.logic.delay.delay, 2)
+		s.Service.OnLogicSet(s.owner, 5, "delay", 2)
+		t.eq(s.profile.plot.logic.delay.delay, 2)
+	end)
+
+	t.test("a plot over the logic cap is told once", function()
+		local s = setup()
+		s.WireLogic.MaxItems = 1
+		s.add("a", "SparkSwitch", 0, 0)
+		s.add("b", "SparkSwitch", 4, 0)
+		local hits = 0
+		for _, toast in ipairs(s.toasts) do
+			if string.find(toast.text, "logic pieces", 1, true) then
+				hits += 1
+			end
+		end
+		t.eq(hits, 1)
+		s.add("c", "SparkSwitch", 8, 0)
+		t.eq(hits, 1, "still the one warning from before the third piece")
+		local again = 0
+		for _, toast in ipairs(s.toasts) do
+			if string.find(toast.text, "logic pieces", 1, true) then
+				again += 1
+			end
+		end
+		t.eq(again, 1, "the cap is said once per plot")
+	end)
+
+	t.test("the showroom demo builds on a DemoBoard and a second call does nothing", function()
+		local s = setup()
+		local board = Instance.new("Part")
+		board.Name = "DemoBoard"
+		board.Size = Vector3.new(20, 10, 1)
+		board.CFrame = CFrame.new(0, 5, 0)
+		s.Service.BuildDemo(board)
+		local demo = board:FindFirstChild("SparkworksDemo")
+		t.ok(demo, "a demo folder")
+		t.ok(demo:FindFirstChild("lever"), "lever")
+		t.ok(demo:FindFirstChild("gate"), "AND")
+		t.ok(demo:FindFirstChild("clock"), "clock")
+		t.ok(demo:FindFirstChild("lamp"), "lamp")
+		t.ok(demo:FindFirstChild("plate"), "plate")
+		t.ok(demo:FindFirstChild("hatch"), "hatch")
+		s.Service.BuildDemo(board)
+		t.eq(#board:GetChildren(), 1, "not built twice")
+	end)
+
+	t.test("a machine registers power and reverse and nothing drives them", function()
+		local s = setup()
+		local calls = { power = 0, reverse = 0 }
+		local target = {
+			power = function(_on)
+				calls.power += 1
+			end,
+			reverse = function(_on)
+				calls.reverse += 1
+			end,
+		}
+		t.eq(s.Service.RegisterTarget("belt", target), true)
+		t.eq(s.Service.Target("belt"), target)
+		t.eq(s.Service.RegisterTarget("", target), false)
+		t.eq(s.Service.RegisterTarget("belt", { power = function() end }), false)
+		t.eq(calls.power, 0)
+		t.eq(calls.reverse, 0)
+		s.add("lamp", "SparkLamp", 0, 0)
+		t.eq(calls.power, 0, "placing a lamp does not drive the machine")
+		t.eq(calls.reverse, 0)
+		local saw = {
+			power = function() end,
+			reverse = function() end,
+		}
+		t.eq(s.Service.RegisterTarget("saw", saw), true)
+		t.eq(s.Service.Target("saw"), saw)
+		s.Service.UnregisterTarget("belt")
+		t.eq(s.Service.Target("belt"), nil)
+		t.eq(s.Service.Target("saw"), saw)
+		s.Service.UnregisterTarget("missing")
+		t.eq(s.Service.Target("saw"), saw)
+	end)
+
+	-- Tick re-entrancy: a Tick that yields inside TimeSlice must not let the
+	-- next Heartbeat's Tick advance the same graphs again.
+	local function tickRig()
+		local s = setup()
+		local PlotData = s.loader:shared("PlotData")
+		local BlueprintModels = s.loader:shared("BlueprintModels")
+		local LogicGraph = s.loader:shared("LogicGraph")
+		local realTick = LogicGraph.Tick
+		local rig = { s = s, calls = {}, failing = {} }
+		LogicGraph.Tick = function(graph, dt)
+			rig.calls[graph] = (rig.calls[graph] or 0) + 1
+			if rig.failing[graph] then
+				error("graph blew up")
+			end
+			return realTick(graph, dt)
+		end
+		-- LogicGraph may be a module shared between Loaders: put Tick back.
+		function rig.restore()
+			LogicGraph.Tick = realTick
+		end
+		s.owner.Parent = {} -- online
+		-- One plot with a lamp on it, attached the way PlotService does.
+		function rig.plot(uid)
+			local items = Instance.new("Folder")
+			items.Parent = Instance.new("Folder")
+			local host = { cframe = CFrame.new(0, 0, 0), items = items }
+			local profile = { plot = { placed = {}, wires = {} }, permissions = {} }
+			local item = { uid = uid, blueprintId = "SparkLamp", x = 0, z = 0, rot = 0 }
+			table.insert(profile.plot.placed, item)
+			local model = BlueprintModels.Build(PlotData.Blueprint("SparkLamp"), false)
+			model.Name = uid
+			model.Parent = items
+			s.Service.Attach({
+				slot = host,
+				model = model,
+				item = item,
+				ownerOf = function()
+					return s.owner, profile
+				end,
+			})
+			s.Service.Refresh(host, profile, s.owner) -- builds the run's graph
+			return host, profile
+		end
+		-- The graphs Tick reached.
+		function rig.seen()
+			local list = {}
+			for g in pairs(rig.calls) do
+				table.insert(list, g)
+			end
+			return list
+		end
+		return rig
+	end
+
+	t.test("a nested Tick while one is running does nothing", function()
+		local rig = tickRig()
+		local Service = rig.s.Service
+		rig.plot("lampA")
+		local nestedRan = false
+		local now = 0
+		Service._setSlice({
+			clock = function()
+				now += 1 -- every step sees the budget spent
+				return now
+			end,
+			wait = function()
+				if not nestedRan then
+					nestedRan = true
+					Service.Tick(0.1)
+				end
+			end,
+		})
+		Service.Tick(0.1)
+		Service._setSlice(nil)
+		rig.restore()
+		t.ok(nestedRan, "the injected wait ran, so the outer Tick did yield")
+		local graphs = rig.seen()
+		t.eq(#graphs, 1)
+		t.eq(rig.calls[graphs[1]], 1, "the outer Tick advanced the graph once; the nested one advanced nothing")
+	end)
+
+	t.test("the Tick flag clears after a graph errors", function()
+		local rig = tickRig()
+		local Service = rig.s.Service
+		rig.plot("lampA")
+		Service.Tick(0.1)
+		local graph = rig.seen()[1]
+		t.ok(graph ~= nil, "the plot's graph ticked")
+		local before = rig.calls[graph]
+		rig.failing[graph] = true
+		Service.Tick(0.1) -- errors inside; nothing escapes
+		t.eq(rig.calls[graph], before + 1, "the failing graph was reached")
+		rig.failing[graph] = nil
+		Service.Tick(0.1)
+		rig.restore()
+		t.eq(rig.calls[graph], before + 2, "the next Tick was not skipped by a stuck flag")
+	end)
+
+	t.test("one plot's graph error does not stop another plot ticking", function()
+		local rig = tickRig()
+		local Service = rig.s.Service
+		rig.plot("lampA")
+		rig.plot("lampB")
+		Service.Tick(0.1)
+		local graphs = rig.seen()
+		t.eq(#graphs, 2, "both plots ticked")
+		rig.failing[graphs[1]] = true
+		local c1, c2 = rig.calls[graphs[1]], rig.calls[graphs[2]]
+		Service.Tick(0.1)
+		rig.restore()
+		t.eq(rig.calls[graphs[1]], c1 + 1, "the failing plot was attempted")
+		t.eq(rig.calls[graphs[2]], c2 + 1, "the healthy plot still advanced in the same Tick")
 	end)
 end

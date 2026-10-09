@@ -99,11 +99,11 @@ export type Tier = {
 
 -- Prices are a first pass for Connor to tune (not in the economy model yet).
 PlotData.Tiers = {
-	{ name = "Campsite", size = 80, priceCash = 0, stone = 0, planks = 0 },
-	{ name = "Homestead", size = 110, priceCash = 2500, stone = 0, planks = 0 },
-	{ name = "Lumber Yard", size = 140, priceCash = 10000, stone = 0, planks = 0 },
-	{ name = "Timber Works", size = 170, priceCash = 30000, stone = 0, planks = 0 },
-	{ name = "Timber Empire", size = 200, priceCash = 60000, stone = 0, planks = 0 },
+	{ name = "Campsite", size = 80, priceCash = GameConfig.PlotTierPrices[1], stone = 0, planks = 0 },
+	{ name = "Homestead", size = 110, priceCash = GameConfig.PlotTierPrices[2], stone = 0, planks = 0 },
+	{ name = "Lumber Yard", size = 140, priceCash = GameConfig.PlotTierPrices[3], stone = 0, planks = 0 },
+	{ name = "Timber Works", size = 170, priceCash = GameConfig.PlotTierPrices[4], stone = 0, planks = 0 },
+	{ name = "Timber Empire", size = 200, priceCash = GameConfig.PlotTierPrices[5], stone = 0, planks = 0 },
 } :: { Tier }
 
 -- The build platform (Shared/PlotPlatform): a flat dark grey slab, the

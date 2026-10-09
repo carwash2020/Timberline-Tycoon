@@ -15,8 +15,8 @@ local WoodData = {}
 -- Every number is a named constant. TBD (Designer) unless marked Builder.
 WoodData.LanternId = "lanternwood"
 WoodData.LanternBiome = "ferryisle" -- not palmwood's "island"
-WoodData.LanternLogPrice = 6 -- $/u³. TBD (Designer)
-WoodData.LanternPlanPlank = 60 -- plan $/u³, before ScaledPlank. TBD (Designer)
+WoodData.LanternLogPrice = 9 -- $/u³
+WoodData.LanternPlanPlank = 90 -- plan $/u³, before ScaledPlank
 WoodData.LanternHardness = 14 -- v2 damage per u². TBD (Designer)
 WoodData.LanternGrowSec = 1500 -- TBD (Designer)
 WoodData.LanternLifespanMin = 3 -- TBD (Designer)
@@ -308,13 +308,14 @@ local woods: { WoodDef } = {
 
 -- Designer knob (B02). A plank's $/u³ is the plan's price (V2_PLAN §2b)
 -- times PlankScale, and never under PlankFloor times the log price,
--- rounded to a thousandth of a dollar. Scale 0.35 with a 2.5× floor is
--- the nerf that kept a Rickety mill inside the early headlines: the buying
--- path is on milled frostwood from the first sawmill, and the first
--- $1,000 sits about 27 s above its floor, so a higher scale fails
--- `lune run tools/economy --check`. The 32 h full-plot target is the
--- square price (GameConfig.ExpansionPriceStep), not this scale.
-WoodData.PlankScale = 0.35
+-- rounded to a thousandth of a dollar. Scale 0.40 with a 2.5× floor keeps
+-- the Steel Axe on log income (5.4 min): pine planks are still on the
+-- floor, so the Rickety mill does not pay for itself before the axe.
+-- Scale 0.412 does, and Steel slips past 8 min. The coat gate and the
+-- $7,600 expansion step (GameConfig.ExpansionPriceStep) need this scale,
+-- with frostwood's plan price, to hold Cobalt and the full plot inside
+-- their ranges.
+WoodData.PlankScale = 0.40
 WoodData.PlankFloor = 2.5
 
 -- Plan plank $/u³ before the scale (V2_PLAN §2b).
@@ -324,9 +325,9 @@ WoodData.PlanPlank = {
 	pine = 18,
 	maple = 26.4,
 	palmwood = 32,
-	frostwood = 106,
+	frostwood = 120,
 	[WoodData.LanternId] = WoodData.LanternPlanPlank,
-	emberwood = 36,
+	emberwood = 80,
 	phantomwood = 54,
 	lumenwood = 90,
 } :: { [string]: number }
@@ -377,8 +378,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Wood",
 	},
 	pine = {
-		logPrice = 3.2,
-		plankPrice = WoodData.ScaledPlank(3.2, 18),
+		logPrice = 3.6,
+		plankPrice = WoodData.ScaledPlank(3.6, 18),
 		hardness = 5.5,
 		growSec = 600,
 		lifespan = { 3, 6 },
@@ -386,8 +387,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Wood",
 	},
 	maple = {
-		logPrice = boosted("maple", 2.8),
-		plankPrice = WoodData.ScaledPlank(boosted("maple", 2.8), boostedPlan("maple", 26.4)),
+		logPrice = boosted("maple", 3.2),
+		plankPrice = WoodData.ScaledPlank(boosted("maple", 3.2), boostedPlan("maple", 26.4)),
 		hardness = 6,
 		growSec = 1140,
 		lifespan = { 3, 6 },
@@ -405,7 +406,10 @@ local V2: { [string]: WoodV2 } = {
 	},
 	frostwood = {
 		logPrice = boosted("frostwood", 9),
-		plankPrice = WoodData.ScaledPlank(boosted("frostwood", 9), boostedPlan("frostwood", 106)),
+		plankPrice = WoodData.ScaledPlank(
+			boosted("frostwood", 9),
+			boostedPlan("frostwood", WoodData.PlanPlank.frostwood)
+		),
 		hardness = 10,
 		growSec = 360,
 		lifespan = { 3, 6 },
@@ -425,8 +429,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Wood",
 	},
 	emberwood = {
-		logPrice = boosted("emberwood", 5.7),
-		plankPrice = WoodData.ScaledPlank(boosted("emberwood", 5.7), boostedPlan("emberwood", 36)),
+		logPrice = boosted("emberwood", 9),
+		plankPrice = WoodData.ScaledPlank(boosted("emberwood", 9), boostedPlan("emberwood", 80)),
 		hardness = 11,
 		growSec = 1020,
 		lifespan = { 3, 6 },

@@ -18,6 +18,7 @@ export type Piece = FillLogic.Offer & {
 	lux: boolean?,
 	mill: number?,
 	board: number?,
+	temper: number?,
 }
 
 export type Api = {
@@ -69,6 +70,7 @@ function PlotFill.Apply(item: PlotLogic.Placed, piece: Piece, ownerId: number, a
 			lux = piece.lux,
 			mill = piece.mill,
 			board = piece.board,
+			temper = piece.temper,
 		})
 		if spawned == nil then
 			busyWood[piece.uid] = nil
