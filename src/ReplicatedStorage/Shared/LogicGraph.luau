@@ -34,6 +34,9 @@ type Node = {
 	latch: boolean,
 	pulse: number,
 	sense: boolean,
+	reads: boolean, -- keeps a level for each input port (sinks, the Wood Detector)
+	ins: { number },
+	levels: { [number]: boolean },
 	setting: number,
 	out: boolean,
 	level: boolean,
@@ -161,10 +164,23 @@ local function eval(graph: Graph, node: Node)
 			node.hold = node.setting
 			setOut(graph, node, true)
 		end
-	elseif node.sink then
-		local level = readIn(graph, node.uid, 1)
+	elseif node.reads then
+		local moved = false
+		for _, port in ipairs(node.ins) do
+			local value = readIn(graph, node.uid, port)
+			if node.levels[port] ~= value then
+				node.levels[port] = value
+				if port ~= 1 then
+					moved = true
+				end
+			end
+		end
+		local level = node.levels[1] == true
 		if level ~= node.level then
 			node.level = level
+			moved = true
+		end
+		if moved then
 			addChanged(graph, node)
 		end
 	end
@@ -266,6 +282,9 @@ local function makeNode(item: Placed, settings: Settings): Node?
 		latch = spec.latch == true,
 		pulse = spec.pulse or 0,
 		sense = spec.sense == true,
+		reads = spec.sink == true or spec.reads == true,
+		ins = spec.ins,
+		levels = {},
 		setting = setting,
 		out = false,
 		level = false,
@@ -284,7 +303,7 @@ end
 local function seed(graph: Graph)
 	for _, uid in ipairs(graph.order) do
 		local node = graph.nodes[uid]
-		if node and (node.op ~= nil or node.sink or node.delay or node.sustain) then
+		if node and (node.op ~= nil or node.sink or node.reads or node.delay or node.sustain) then
 			enqueue(graph, uid)
 		end
 	end
@@ -307,8 +326,20 @@ function LogicGraph.Build(placed: { Placed }, wires: { Wire }?, settings: Settin
 	}
 	local bag = settings or {}
 	local count = 0
+	-- A belt, sawmill or planer is a node only when a wire touches it, so an
+	-- unwired line costs the graph nothing (Lane W).
+	local touched: { [string]: boolean } = {}
+	if type(wires) == "table" then
+		for _, wire in ipairs(wires) do
+			touched[wire.from] = true
+			touched[wire.to] = true
+		end
+	end
 	for _, item in ipairs(placed) do
 		if WireLogic.IsLogicItem(item.blueprintId) and count >= WireLogic.MaxItems then
+			continue
+		end
+		if not touched[item.uid] and WireLogic.IsMachine(item.blueprintId) then
 			continue
 		end
 		local node = makeNode(item, bag)
@@ -433,6 +464,27 @@ function LogicGraph.On(graph: Graph, uid: string): boolean
 		return node.level
 	end
 	return node.out
+end
+
+-- The level on one input port of a piece that reads its inputs (false when
+-- the piece is not in the graph).
+function LogicGraph.Level(graph: Graph, uid: string, port: number): boolean
+	local node = graph.nodes[uid]
+	return node ~= nil and node.levels[port] == true
+end
+
+-- Whether any wire lands on this input port.
+function LogicGraph.Wired(graph: Graph, uid: string, port: number): boolean
+	local edges = graph.into[uid]
+	if not edges then
+		return false
+	end
+	for _, edge in ipairs(edges) do
+		if edge.tp == port then
+			return true
+		end
+	end
+	return false
 end
 
 function LogicGraph.Overloaded(graph: Graph, uid: string): boolean

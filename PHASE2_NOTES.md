@@ -1,5 +1,24 @@
 # Phase 2+ build notes
 
+## Lane W: practical automation (8 October 2026, branch `phase-2/v1-w-automation`)
+
+What changed: `AutomationLogic` (ports, power and reverse rules, detector filter, sweeper pick, laser reach), `WireLogic` (belts, mills and planers are wire targets; detector and laser are sources; machines never count toward the logic cap), `LogicGraph` (per-port levels, machine nodes only when wired), `LogicService` (targets, Reverse/Flip/Filter prompts, sweeper, detector, laser), `BeltService` (signed speed), `SawmillService` / `PlanerService` (pause while unpowered), `MachineArt` (TLD-1 deck, Switch Belt, Tilted Belt, Belt Support, Wood Detector), `ItemCatalog`, `LogicItems`, `SparkworksStock`, `ProfileSchema` (keeps `reversed`/`flip` only as `true` on pieces that have them), `RateLimiter` (BeltReverse 2, BeltFlip 2, DetectorFilter 3). Cross-lane: `ItemBox` scales only ToolShed belts in its Belt group.
+
+Studio checks (PC, phone, Xbox):
+
+1. Old plot: load a save with belts and mills and no wires. Everything runs as before.
+2. Place a SparkSwitch and a straight belt, wire switch to belt port 1. Switch off: belt stops. On: runs. Wire a second switch to port 2: on reverses the belt.
+3. Wire a switch to a sawmill. Start a cut, switch off mid-cut: the log stops and stays held. Switch on: the cut finishes once, the same planks.
+4. Reverse a belt with its prompt (E / ButtonX / tap). A visitor gets "Only the plot's owner can change that belt." Rejoin: the belt is still reversed.
+5. Switch Belt: Flip prompt (F / ButtonY / tap) moves the paddle to the other side; logs leave on the other exit. Wire port 1: switch on swaps the side.
+6. Tilted Belt from a ground belt onto a straight belt on two Belt Supports: logs climb and carry on.
+7. Wood Detector: Filter prompt steps Any wood, Oak, Birch ... back to Any wood. Wire it to a lamp: lamp lights while a matching log is under the arch.
+8. Wood Sweeper beside a belt, wired from a detector: a matching log is pushed off sideways. Held pieces, other players' wood, players and trucks are never pushed.
+9. Laser Emitter facing a Laser Receiver across a belt: thin blue beam. A log breaks it (wired lamp lights); a wall or a player does not.
+10. Phone 667x375 and Xbox: every prompt reachable, no ButtonR2 binding added.
+
+Previews: `previews/v1-w/v1-w-automation-1..4.png` (sorting line; tilted belt onto supports; sweeper down and laser; switch belt placed and flipped with a detector).
+
 ## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
 
 Done on this branch, not on main. Rebased onto main at `f96b62c`. The store board is not in this PR (lane P owns the redesign). Box and hover renders live in `previews/v1-d/` (listed in STATUS.md). Axe, temper and shelf pictures were part-built and are gone until `phase-2/v1-preview-meshes` can draw the real meshes.

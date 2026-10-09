@@ -74,6 +74,7 @@ type Job = {
 	consumed: boolean,
 	next: number,
 	nextAt: number,
+	pausedAt: number?, -- Lane W: power went off mid-cut at this time
 }
 
 type Context = {
@@ -438,7 +439,7 @@ local function poll(c: Context, now: number)
 	local inside: { [Model]: boolean } = {}
 	local blocked: { [Model]: boolean } = {}
 	for _, mill in ipairs(c.mills()) do
-		if jobs[mill] or mill.Parent == nil then
+		if jobs[mill] or mill.Parent == nil or not AutomationLogic.MachinePowered(mill:GetAttribute("PowerIn")) then
 			continue
 		end
 		local intake = mill:FindFirstChild("Intake")
@@ -522,6 +523,22 @@ local function stepJobs(c: Context, now: number)
 			jobs[mill] = nil
 			continue
 		end
+		-- Lane W: power off pauses the cut where it is (the log stays held,
+		-- nothing is lost or made twice) and the clock resumes with power.
+		if not AutomationLogic.MachinePowered(mill:GetAttribute("PowerIn")) then
+			if job.pausedAt == nil then
+				job.pausedAt = now
+			end
+			if not job.consumed and job.piece.root.Parent ~= nil then
+				job.piece.root.AssemblyLinearVelocity = Vector3.zero
+			end
+			continue
+		elseif job.pausedAt ~= nil then
+			local shift = AutomationLogic.PauseShift(job.pausedAt, now)
+			job.start += shift
+			job.nextAt += shift
+			job.pausedAt = nil
+		end
 		if not job.consumed then
 			local piece = job.piece
 			if piece.dead or piece.model.Parent == nil or piece.root.Parent == nil then
@@ -556,7 +573,7 @@ function SawmillService.Tick()
 	end
 	local now = c.now()
 	for _, mill in ipairs(c.mills()) do
-		MachineArt.AimBelt(mill)
+		MachineArt.AimBelt(mill, if AutomationLogic.MachinePowered(mill:GetAttribute("PowerIn")) then nil else 0)
 	end
 	poll(c, now)
 	stepJobs(c, now)

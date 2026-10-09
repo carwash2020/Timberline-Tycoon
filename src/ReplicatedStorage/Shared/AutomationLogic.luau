@@ -27,6 +27,7 @@ local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlanerLogic = require(script.Parent.PlanerLogic)
 local PlotData = require(script.Parent.PlotData)
+local WoodData = require(script.Parent.WoodData)
 
 local AutomationLogic = {}
 
@@ -130,6 +131,7 @@ function AutomationLogic.Blueprint(id: string): PlotData.Blueprint?
 	if not machine or not def then
 		return nil
 	end
+	local height = AutomationLogic.BoxHeight(def)
 	return {
 		id = machine.id,
 		displayName = machine.displayName,
@@ -139,8 +141,8 @@ function AutomationLogic.Blueprint(id: string): PlotData.Blueprint?
 		footprint = Vector2.new(def.width, def.depth),
 		boxes = {
 			{
-				size = Vector3.new(def.width, 1.2, def.depth),
-				offset = Vector3.new(0, 0.6, 0),
+				size = Vector3.new(def.width, height, def.depth),
+				offset = Vector3.new(0, height / 2, 0),
 				color = machine.color,
 				material = "Wood",
 			},
@@ -150,12 +152,280 @@ function AutomationLogic.Blueprint(id: string): PlotData.Blueprint?
 end
 
 function AutomationLogic.Note(shape: string): string
+	if shape == "switch" then
+		return "Sends wood out the left or the right. A wire picks the side."
+	elseif shape == "tilted" then
+		return "Carries wood up one step. Set the next belt on a Belt Support."
+	elseif shape == "support" then
+		return "Holds a belt one step up, level with a Tilted Belt's top."
+	elseif shape == "detector" then
+		return "A short belt that sends a signal when wood passes. Pick a wood to watch."
+	end
 	if shape == "turn" then
 		return "Carries wood round a corner. Wood moves at the belt's speed."
 	elseif shape == "funnel" then
 		return "A wide mouth that narrows to a belt. Feed a mill from it."
 	end
 	return "Carries logs and planks along. Line it up with a mill's mouth."
+end
+
+-- The placement box height. A Belt Support is exactly one LIFT (2.0) tall,
+-- so a belt set on it (y = 2.0) sits flush with a Tilted Belt's top end.
+function AutomationLogic.BoxHeight(def: Def): number
+	if def.shape == "support" then
+		return AutomationLogic.Lift
+	elseif def.shape == "tilted" then
+		return 1.2 + (def.rise or AutomationLogic.Lift)
+	end
+	return 1.2
+end
+
+---------------------------------------------------------------------------
+-- Lane W: belts and machines on wires (practical automation)
+--
+-- Ports (WireLogic reads these):
+--   * every belt with a deck: 1 power, 2 reverse.
+--   * Switch Belt: 1 side, 2 power, 3 reverse (a wire on 1 sends wood the
+--     other way; the side is what a wire is for on this piece).
+--   * sawmills and planers: 1 power.
+--   * an unwired port runs as before: powered, forward, the default side.
+-- The saved switches on the piece itself (item.reversed, item.flip) are
+-- the owner's Reverse and Flip prompts. A wire on the reverse port flips
+-- whatever the saved direction is.
+---------------------------------------------------------------------------
+
+AutomationLogic.Lift = 2.0 -- TLD-1 LIFT: Tilted Belt rise and Belt Support saddle
+AutomationLogic.DeckTop = 0.72 -- TLD-1 deck top
+AutomationLogic.PlateWidth = 6.0 -- TLD-1 base plate
+AutomationLogic.Channel = 5.0 -- TLD-1 clear channel between the rails
+AutomationLogic.RollerPitch = 1.0 -- TLD-1 roller pitch
+
+export type Ports = { power: number?, reverse: number?, side: number? }
+
+local NO_PORTS: Ports = {}
+local BELT_PORTS: Ports = { power = 1, reverse = 2 }
+local SWITCH_PORTS: Ports = { side = 1, power = 2, reverse = 3 }
+local MACHINE_PORTS: Ports = { power = 1 }
+
+-- Which input port does what on this piece. Empty for anything else.
+function AutomationLogic.Ports(id: unknown): Ports
+	if type(id) ~= "string" then
+		return NO_PORTS
+	end
+	local _, def = AutomationLogic.Get(id)
+	if def then
+		if def.shape == "support" then
+			return NO_PORTS
+		elseif def.shape == "switch" then
+			return SWITCH_PORTS
+		end
+		return BELT_PORTS
+	end
+	if ItemCatalog.GetSawmill(id) or PlanerLogic.IsPlaner(id) then
+		return MACHINE_PORTS
+	end
+	return NO_PORTS
+end
+
+-- The input port numbers this piece has, low to high.
+function AutomationLogic.InPorts(id: unknown): { number }
+	local ports = AutomationLogic.Ports(id)
+	local out: { number } = {}
+	for _, port in ipairs({ ports.power, ports.reverse, ports.side }) do
+		if port then
+			table.insert(out, port)
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+-- A wire target: belts with a deck, sawmills and planers.
+function AutomationLogic.IsWireTarget(id: unknown): boolean
+	return #AutomationLogic.InPorts(id) > 0
+end
+
+-- The owner's Reverse prompt is on every belt with a deck.
+function AutomationLogic.CanReverse(id: unknown): boolean
+	return AutomationLogic.Ports(id).reverse ~= nil
+end
+
+-- Flip mirrors the Switch Belt's diverter (GAD: no second texture). A turn
+-- belt needs no flip: turned a quarter and reversed, it is the left turn.
+function AutomationLogic.CanFlip(id: unknown): boolean
+	local _, def = AutomationLogic.Get(id)
+	return def ~= nil and def.shape == "switch"
+end
+
+-- Power: an unwired power port runs as it always did.
+function AutomationLogic.Powered(wired: boolean, level: boolean): boolean
+	return not wired or level
+end
+
+-- Direction: the owner's saved Reverse, flipped again while a wired
+-- reverse input is on.
+function AutomationLogic.Reversed(saved: boolean, wired: boolean, level: boolean): boolean
+	local wireOn = wired and level
+	return saved ~= wireOn
+end
+
+-- Switch Belt side: +1 sends wood to +X (the diverter as built), -1 to -X.
+-- Flip mirrors the default; a wired side input that is on sends it the
+-- other way.
+function AutomationLogic.SwitchSide(flip: boolean, wired: boolean, level: boolean): number
+	local side = if flip then -1 else 1
+	if wired and level then
+		side = -side
+	end
+	return side
+end
+
+-- The signed belt speed: 0 when off, negative when reversed.
+function AutomationLogic.SignedSpeed(base: number, powered: boolean, reversed: boolean): number
+	if not powered or base <= 0 then
+		return 0
+	end
+	return if reversed then -base else base
+end
+
+-- A sawmill or planer runs unless a wire has turned its power off
+-- (PowerIn is false only then; a machine nobody wired never has it).
+function AutomationLogic.MachinePowered(powerIn: unknown): boolean
+	return powerIn ~= false
+end
+
+-- Seconds a paused job's clock moves on when power returns.
+function AutomationLogic.PauseShift(pausedAt: number, now: number): number
+	if pausedAt ~= pausedAt or now ~= now then
+		return 0
+	end
+	return math.max(0, now - pausedAt)
+end
+
+AutomationLogic.ReverseLine = "Belt reversed."
+AutomationLogic.ForwardLine = "Belt runs forward."
+AutomationLogic.FlipLine = "Switch flipped."
+AutomationLogic.OwnerOnlyLine = "Only the plot's owner can change that belt."
+
+---------------------------------------------------------------------------
+-- Wood Detector filter. The index is a place in WoodData.All(), which is
+-- append-only (a spec pins today's list), so a saved filter never shifts
+-- to another wood. 0 watches every wood.
+---------------------------------------------------------------------------
+
+function AutomationLogic.FilterWoods(): { string }
+	local out: { string } = {}
+	for _, def in ipairs(WoodData.All()) do
+		table.insert(out, def.id)
+	end
+	return out
+end
+
+function AutomationLogic.CleanFilter(value: unknown): number
+	if type(value) ~= "number" or value ~= value or value ~= math.floor(value) then
+		return 0
+	end
+	if value < 0 or value > #WoodData.All() then
+		return 0
+	end
+	return value
+end
+
+function AutomationLogic.NextFilter(value: unknown): number
+	local current = AutomationLogic.CleanFilter(value)
+	local nextValue = current + 1
+	if nextValue > #WoodData.All() then
+		return 0
+	end
+	return nextValue
+end
+
+function AutomationLogic.FilterMatches(filter: unknown, woodId: unknown): boolean
+	local index = AutomationLogic.CleanFilter(filter)
+	if index == 0 then
+		return true
+	end
+	local def = WoodData.All()[index]
+	return def ~= nil and def.id == woodId
+end
+
+function AutomationLogic.FilterName(filter: unknown): string
+	local index = AutomationLogic.CleanFilter(filter)
+	if index == 0 then
+		return "Any wood"
+	end
+	local def = WoodData.All()[index]
+	return if def then def.displayName else "Any wood"
+end
+
+---------------------------------------------------------------------------
+-- Wood Sweeper: a wire pulse pushes wood off the belt beside it.
+---------------------------------------------------------------------------
+
+AutomationLogic.SweepMax = 10 -- pieces one pulse may push (QA W5)
+AutomationLogic.SweepSpeed = 14 -- studs/s, sideways
+AutomationLogic.SweepLand = 5 -- studs: where a pushed piece is checked to land
+AutomationLogic.SweepCooldown = 0.5 -- seconds between pulses that push
+
+export type SweepCandidate = {
+	key: any,
+	held: boolean, -- HeldBy someone (QA W5: never moved)
+	wood: boolean, -- a Wood piece (players and vehicles are never candidates)
+	ownerId: number,
+	landsOnPlot: boolean, -- would still be on its owner's plot after the push
+}
+
+-- Which pieces one pulse pushes: loose wood of the plot owner (or nobody's),
+-- not held, that lands on the plot. At most SweepMax, in the order given.
+function AutomationLogic.SweepPick(candidates: { SweepCandidate }, plotOwnerId: number): { any }
+	local out: { any } = {}
+	for _, c in ipairs(candidates) do
+		if #out >= AutomationLogic.SweepMax then
+			break
+		end
+		local ownerOk = c.ownerId == plotOwnerId or c.ownerId == 0
+		if c.wood and not c.held and ownerOk and c.landsOnPlot then
+			table.insert(out, c.key)
+		end
+	end
+	return out
+end
+
+---------------------------------------------------------------------------
+-- Laser pair: an emitter finds the receiver facing it on its own axis.
+---------------------------------------------------------------------------
+
+AutomationLogic.LaserRange = 40 -- studs, emitter port to receiver port
+AutomationLogic.LaserAxisSlack = 1.0 -- studs off the emitter's axis
+AutomationLogic.MaxLaserPairs = 8 -- emitters that run per plot (PROPOSAL; QA W10)
+AutomationLogic.LaserHz = 5 -- server raycasts a second per emitter
+AutomationLogic.BeamPortY = 1.92 -- TLD-1 BeamPort height
+AutomationLogic.BeamPortZ = 0.72 -- emitter lens, local +Z
+AutomationLogic.ReceiverPortZ = -0.64 -- receiver dish, local -Z
+
+-- Distance along the emitter's beam to the receiver's port, or nil when the
+-- receiver is not on the axis, faces the wrong way, or is out of range.
+-- Directions are unit vectors in world space; ports are world positions.
+function AutomationLogic.LaserReach(
+	emitterPort: Vector3,
+	emitterDir: Vector3,
+	receiverPort: Vector3,
+	receiverDir: Vector3
+): number?
+	local delta = receiverPort - emitterPort
+	local along = delta:Dot(emitterDir)
+	if along <= 0.05 or along > AutomationLogic.LaserRange then
+		return nil
+	end
+	local off = (delta - emitterDir * along).Magnitude
+	if off > AutomationLogic.LaserAxisSlack then
+		return nil
+	end
+	-- The receiver's dish faces back along the beam.
+	if receiverDir:Dot(emitterDir) > -0.7 then
+		return nil
+	end
+	return along
 end
 
 ---------------------------------------------------------------------------

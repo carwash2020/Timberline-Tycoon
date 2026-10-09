@@ -733,4 +733,91 @@ return function(t)
 		r.mill:Destroy()
 		Sawmill._reset()
 	end)
+
+	t.test("Lane W: power off mid-cut pauses the log and resumes with power, nothing lost or made twice", function()
+		Sawmill._reset()
+		local mill = MachineArt.Build("SawmillRickety", false)
+		mill.Parent = Instance.new("Folder")
+		local intake = mill:FindFirstChild("Intake")
+		local size = V3.new(2, 9, 2)
+		local model, part = logPart(size, intake.CFrame)
+		model.Parent = Instance.new("Folder")
+		local volume = Sell.VolumeU3(size.X, size.Y, size.Z)
+		local piece = {
+			model = model,
+			root = part,
+			kind = "log",
+			woodId = "oak",
+			parts = { [1] = part },
+			nodes = { [1] = { parent = nil, children = {} } },
+			volume = volume,
+			ownerId = 7,
+			verdictOk = true,
+		}
+		local spawned = {}
+		local removed = 0
+		local now = 0
+		Sawmill._use({
+			notify = function() end,
+			now = function()
+				return now
+			end,
+			partsIn = function()
+				return { part }
+			end,
+			pieceOf = function()
+				return piece
+			end,
+			mills = function()
+				return { mill }
+			end,
+			release = function() end,
+			remove = function(p)
+				removed += 1
+				p.dead = true
+			end,
+			spawn = function(info)
+				table.insert(spawned, info)
+				return nil
+			end,
+			moved = function() end,
+		})
+		-- Unpowered mill never takes a log.
+		mill:SetAttribute("PowerIn", false)
+		now = Sawmill.Settle + 1
+		Sawmill.Tick()
+		t.eq(piece.selling, nil, "an unpowered mill does not take the log")
+		mill:SetAttribute("PowerIn", nil)
+		Sawmill.Tick()
+		now += Sawmill.Settle
+		Sawmill.Tick()
+		t.eq(piece.selling, true, "power on: it takes the log once it rests")
+		now += Logic.ProcessSeconds(volume) / 3
+		Sawmill.Tick()
+		mill:SetAttribute("PowerIn", false)
+		Sawmill.Tick()
+		local held = part.CFrame.Position
+		now += Logic.ProcessSeconds(volume) * 5
+		Sawmill.Tick()
+		t.eq(#spawned, 0, "no planks while unpowered")
+		t.eq(removed, 0, "the log is not lost")
+		t.ok((part.CFrame.Position - held).Magnitude < 1e-4, "the log holds still")
+		mill:SetAttribute("PowerIn", true)
+		Sawmill.Tick()
+		t.eq(#spawned, 0, "the clock resumes, it does not jump ahead")
+		local expect = Logic.Cut(
+			volume,
+			Logic.DefaultSettings(Catalog.GetSawmill("SawmillRickety")),
+			Catalog.GetSawmill("SawmillRickety")
+		)
+		now += Logic.ProcessSeconds(volume)
+		for _ = 1, #expect + 2 do
+			Sawmill.Tick()
+			now += Sawmill.PlankGap
+		end
+		t.eq(removed, 1, "the log is used once")
+		t.eq(#spawned, #expect, "the same planks as an unbroken cut")
+		mill:Destroy()
+		Sawmill._reset()
+	end)
 end
