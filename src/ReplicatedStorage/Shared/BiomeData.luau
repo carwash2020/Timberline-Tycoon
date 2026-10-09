@@ -61,12 +61,13 @@ export type Hazard = {
 
 -- Ferry Island. The disc matches WorldLayout.Island; this module does not
 -- require WorldLayout (that require would cycle). A spec locks the two.
--- Centres are the V1 ring map (MAP_V1.md). haulStuds and FerryHaulStuds
--- stay until the road lengths are measured after A1 merges.
+-- Centres are the V1 ring map (MAP_V1.md). haulStuds are the ring map's
+-- drives from the sawmill (Oct 8, ring map), each within 20% of the
+-- straight line the spec checks.
 BiomeData.FerryCenterX = 930
-BiomeData.FerryCenterZ = -50
+BiomeData.FerryCenterZ = -140
 BiomeData.FerryRadius = 55
-BiomeData.FerryHaulStuds = 1644 -- sawmill (0, 110) is about 1644 studs away
+BiomeData.FerryHaulStuds = 990 -- sawmill (0, 110) is about 963 studs away
 BiomeData.PalmCount = 30
 BiomeData.LanternwoodCount = 6
 BiomeData.FerrySand = "#E4C98A"
@@ -76,7 +77,7 @@ local biomes: { BiomeDef } = {
 		id = "starter",
 		displayName = "Starter Forest",
 		access = "truck",
-		haulStuds = 190,
+		haulStuds = 260,
 		area = { x = 0, z = -180, radius = 100 }, -- south of spawn
 		ground = { color = "#64B838", material = "Grass" },
 		trees = { oak = 70, birch = 26 },
@@ -85,7 +86,7 @@ local biomes: { BiomeDef } = {
 		id = "hills",
 		displayName = "The Hills",
 		access = "truck",
-		haulStuds = 400,
+		haulStuds = 420,
 		area = { x = -500, z = 110, radius = 150 }, -- west
 		ground = { color = "#529E30", material = "LeafyGrass" },
 		trees = { pine = 80, maple = 50 },
@@ -94,7 +95,7 @@ local biomes: { BiomeDef } = {
 		id = "snow",
 		displayName = "Snowfields",
 		access = "truck",
-		haulStuds = 1200,
+		haulStuds = 650,
 		slowdown = { amount = 0.15, removedBy = "InsulatedCoat" },
 		exposure = { gear = "InsulatedCoat", dps = 4, graceSec = 8 },
 		area = { x = 0, z = 720, radius = 115 }, -- the peak, inside the ring
@@ -105,7 +106,7 @@ local biomes: { BiomeDef } = {
 		id = "volcano",
 		displayName = "The Volcano",
 		access = "truck",
-		haulStuds = 1600,
+		haulStuds = 700,
 		requiresGear = "HeatBoots",
 		hazards = { "lava", "ash storms" },
 		exposure = { gear = "HeatBoots", dps = 6, graceSec = 6 },

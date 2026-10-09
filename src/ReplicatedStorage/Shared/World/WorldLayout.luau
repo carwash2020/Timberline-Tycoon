@@ -690,7 +690,7 @@ WorldLayout.Pools = {
 WorldLayout.Coast = { shoreX = 780, beachWidth = 70, northZ = 420 }
 
 -- An island offshore (the palmwood teaser; boats come after V1).
-WorldLayout.Island = { x = 930, z = -50, radius = 55, height = 9 }
+WorldLayout.Island = { x = 930, z = -140, radius = 55, height = 9 }
 
 -- W2. The north strip is a rectangle past the square, not a larger world.
 -- Every tune is named so a playtest can move it without hunting literals.

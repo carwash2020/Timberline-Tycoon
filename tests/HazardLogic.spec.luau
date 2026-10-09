@@ -26,7 +26,7 @@ return function(t)
 		t.eq(HazardLogic.SeaZone(0, -(edge - 10)), "warn")
 		t.eq(HazardLogic.SeaZone(edge + 5, 0), "sea")
 		-- The strip to the north is not sea.
-		t.eq(HazardLogic.SeaZone(0, 1700), "safe")
+		t.eq(HazardLogic.SeaZone(0, 970), "safe") -- the folded strip on the ring map
 	end)
 
 	t.test("no damage in the grace period, then 15 every 1.5 s", function()

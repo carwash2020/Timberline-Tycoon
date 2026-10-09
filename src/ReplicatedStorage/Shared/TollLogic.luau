@@ -22,6 +22,9 @@ TollLogic.PromptRange = 12
 -- pushed truck or a body pulled out of the gorge is not left inside it.
 function TollLogic.Landing(): Vector3
 	local y = TerrainGen.HeightAt(WorldLayout.TollPushX, WorldLayout.TollPushZ) + WorldLayout.TollClearance
+	-- Snapped to 1/1024 stud, so a landing reached by adding a delta to a
+	-- CFrame (GateService) lands on exactly this point in 32-bit floats.
+	y = math.round(y * 1024) / 1024
 	return Vector3.new(WorldLayout.TollPushX, y, WorldLayout.TollPushZ)
 end
 

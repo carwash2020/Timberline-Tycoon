@@ -204,7 +204,7 @@ return function(t)
 		t.eq(s.profile.areasVisited.cave, true)
 		t.eq(s.profile.areasVisited.toll, true)
 		-- The volcano cave is not the secret cave, so standing there skips it.
-		stand(s.player, 1010, 40, 1110)
+		stand(s.player, 450, 40, 500) -- the volcano disc on the ring map (was 1010, 1110)
 		s.BadgeService.Poll(s.player)
 		t.eq(s.profile.badgesAwarded.AreaVolcano, true)
 		t.eq(s.calls, {})
