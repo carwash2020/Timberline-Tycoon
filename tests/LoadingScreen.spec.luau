@@ -20,9 +20,9 @@ return function(t)
 	local PALETTE = {
 		Ink = UITheme.Colors.Ink,
 		Cream = UITheme.Colors.Cream,
-		Paper = UITheme.Colors.Muted,
-		Bark = UITheme.Colors.Panel,
-		Amber = UITheme.Colors.Amber,
+		Paper = UITheme.Colors.Paper,
+		PaperDark = UITheme.Colors.PaperDark,
+		Bark = UITheme.Colors.Bark,
 	}
 
 	-- A UIGradient multiplies its parent's colour (it doesn't replace it),
@@ -83,35 +83,32 @@ return function(t)
 				snap.maxWidth = d.MaxSize.X
 			end
 		end
+		-- GAD round 3: one plaque (Bark edge, Paper face) on an Ink backdrop.
 		local backdrop = gui:FindFirstChild("Backdrop")
-		snap.hasScene = backdrop ~= nil and backdrop:FindFirstChild("Scene") ~= nil
-		local cardBody = backdrop and backdrop:FindFirstChild("TextInset")
-		cardBody = cardBody and cardBody:FindFirstChild("Content")
-		snap.hasProgress = cardBody ~= nil and cardBody:FindFirstChild("Progress") ~= nil
-		if backdrop then
-			-- The rendered top and bottom edges (Rotation 90 runs the
-			-- gradient's first keypoint along the top).
-			local g = gradientOf(backdrop)
-			local base = backdrop.BackgroundColor3
-			if g then
-				local keys = g.Color.Keypoints
-				snap.backdropRotation = g.Rotation
-				snap.backdropTop = times(base, keys[1].Value)
-				snap.backdropBottom = times(base, keys[#keys].Value)
-			else
-				snap.backdropTop = base
-				snap.backdropBottom = base
+		local plaque = backdrop and backdrop:FindFirstChild("Plaque")
+		snap.hasPlaque = plaque ~= nil
+		snap.backdropColor = backdrop and backdrop.BackgroundColor3
+		snap.backdropTransparency = backdrop and backdrop.BackgroundTransparency
+		snap.plaqueCount = 0
+		for _, child in ipairs(backdrop and backdrop:GetChildren() or {}) do
+			snap.plaqueCount += 1
+		end
+		if plaque then
+			snap.plaqueAnchor = plaque.AnchorPoint
+			snap.plaquePosition = plaque.Position
+			snap.plaqueSize = plaque.Size
+			local face = plaque:FindFirstChild("Face")
+			local pad = face and face:FindFirstChildOfClass("UIPadding")
+			snap.padding = pad and pad.PaddingTop.Offset
+			local fit = face and face:FindFirstChild("Tip") and face.Tip:FindFirstChildOfClass("UITextSizeConstraint")
+			snap.tipMin = fit and fit.MinTextSize
+			snap.buttons = 0
+			for _, d in ipairs(gui:GetDescendants()) do
+				if d:IsA("TextButton") or d:IsA("ImageButton") then
+					snap.buttons += 1
+				end
 			end
 		end
-		snap.backdropTransparency = backdrop and backdrop.BackgroundTransparency
-		local inset = backdrop and backdrop:FindFirstChild("TextInset")
-		local content = inset and inset:FindFirstChild("Content")
-		local fraction = (inset and inset.Size.X.Scale or 1) * (content and content.Size.X.Scale or 0)
-		snap.contentWidth = { Scale = fraction }
-		snap.insetX = inset and inset.Position.X.Scale
-		snap.insetY = inset and inset.Position.Y.Scale
-		snap.insetW = inset and inset.Size.X.Scale
-		snap.insetH = inset and inset.Size.Y.Scale
 		return snap
 	end
 
@@ -190,7 +187,7 @@ return function(t)
 			local gui = card()
 			local frame = { at = s.now, shown = gui ~= nil }
 			if gui then
-				local tip = gui.Backdrop.TextInset.Content.Tip
+				local tip = gui.Backdrop.Plaque.Face.Tip
 				frame.tip = tip.Text
 				frame.tipTransparency = tip.TextTransparency
 				frame.backdropTransparency = gui.Backdrop.BackgroundTransparency
@@ -278,21 +275,25 @@ return function(t)
 		t.eq(snap.ignoreInset, true)
 		t.eq(snap.displayOrder, 100)
 		t.eq(snap.resetOnSpawn, false)
-		t.eq(snap.backdropTransparency, 0, "opaque from the first frame")
+		t.ok(
+			math.abs(snap.backdropTransparency - 0.45) < 1e-6,
+			"the Ink backdrop is 45% transparent from the first frame"
+		)
 		t.eq(snap.labels.Title.text, "Timberline Tycoon")
-		t.eq(snap.labels.Title.font, UITheme.Fonts.Title)
+		t.eq(snap.labels.Title.font, Enum.Font.FredokaOne, "GAD round 3: the card title is FredokaOne")
 	end)
 
-	t.test("renders only the inlined palette: Cream title on a Bark-to-Ink backdrop", function()
+	t.test("renders only the inlined palette: Ink title on one Paper plaque, an Ink 45% backdrop", function()
 		local snap = run({ character = 1, profile = 1 }).removedDefault.card
-		t.ok(same(snap.labels.Title.color, PALETTE.Cream), "title is Cream")
-		-- As it shows on screen (base x gradient), not the raw properties.
-		t.eq(snap.backdropRotation, 90, "the gradient runs top to bottom")
-		t.ok(same(snap.backdropTop, PALETTE.Bark), "backdrop shows Bark along the top")
-		t.ok(same(snap.backdropBottom, PALETTE.Ink), "and Ink along the bottom")
-		t.ok(snap.hasScene, "a scene behind the card")
-		t.ok(snap.hasProgress, "a progress bar")
-		t.ok(#snap.colors >= 5)
+		t.ok(same(snap.labels.Title.color, PALETTE.Ink), "title is Ink")
+		t.ok(same(snap.labels.Tip.color, PALETTE.Bark), "the tip is Bark")
+		t.eq(snap.labels.Title.font, Enum.Font.FredokaOne, "title is FredokaOne")
+		t.eq(snap.labels.Tip.font, Enum.Font.GothamMedium, "the tip is GothamMedium")
+		t.ok(same(snap.backdropColor, PALETTE.Ink), "the backdrop is Ink")
+		t.ok(snap.hasPlaque and snap.plaqueCount == 1, "one plaque, nothing else on the backdrop")
+		t.eq(snap.buttons, 0, "no buttons")
+		t.eq(snap.padding, 16, "16 px padding")
+		t.eq(snap.tipMin, 14, "the tip never shrinks under 14")
 		for _, c in ipairs(snap.colors) do
 			local named = false
 			for _, p in pairs(PALETTE) do
@@ -300,8 +301,19 @@ return function(t)
 					named = true
 				end
 			end
-			t.ok(named, "colour " .. c:ToHex() .. " is one of Ink, Cream, Paper, Bark, Amber")
+			t.ok(named, "colour " .. c:ToHex() .. " is one of Ink, Cream, Paper, PaperDark, Bark")
 		end
+	end)
+
+	t.test("the plaque sits at (0.5, 0.45), 132 high, min(280, 72% of the width) wide", function()
+		local snap = run({ character = 1, profile = 1 }).removedDefault.card
+		t.eq({ snap.plaqueAnchor.X, snap.plaqueAnchor.Y }, { 0.5, 0.5 })
+		t.eq({ snap.plaquePosition.X.Scale, snap.plaquePosition.X.Offset }, { 0.5, 0 })
+		t.ok(math.abs(snap.plaquePosition.Y.Scale - 0.45) < 1e-6 and snap.plaquePosition.Y.Offset == 0, "y 0.45")
+		t.eq(snap.plaqueSize.Y.Offset, 132)
+		t.eq(snap.plaqueSize.X.Offset, 280, "280 on an iPhone SE")
+		local narrow = run({ viewport = Vector2.new(320, 568), character = 1, profile = 1 }).removedDefault.card
+		t.eq(narrow.plaqueSize.X.Offset, math.floor(0.72 * 320), "72% of a narrow screen")
 	end)
 
 	t.test("text is 14 px or more and fits an iPhone SE in landscape at scale 1", function()
@@ -312,14 +324,11 @@ return function(t)
 			count += 1
 			t.ok(label.size >= 14, name .. " is at least 14 px")
 		end
-		t.ok(count >= 3, "title, kicker and tip")
-		t.ok(snap.labels.Tip.size >= 18, "the tip reads at a glance")
-		t.ok(math.min(snap.contentWidth.Scale * 667, snap.maxWidth) <= 667 - 32, "a margin each side")
+		t.ok(count >= 2, "title and tip")
+		t.eq(snap.labels.Title.size, 20)
+		t.eq(snap.labels.Tip.size, 14)
+		t.ok(snap.plaqueSize.X.Offset <= 667 - 32, "a margin each side")
 		t.eq(snap.ignoreInset, true, "the backdrop stays full-bleed")
-		t.ok(math.abs(snap.insetX - 0.05) < 1e-4, "inset x")
-		t.ok(math.abs(snap.insetY - 0.05) < 1e-4, "inset y")
-		t.ok(math.abs(snap.insetW - 0.9) < 1e-4, "inset w")
-		t.ok(math.abs(snap.insetH - 0.9) < 1e-4, "inset h")
 	end)
 
 	t.test("bigger screens scale it up, but never past their edges", function()
@@ -336,9 +345,9 @@ return function(t)
 			local snap = run({ viewport = v, character = 1, profile = 1 }).removedDefault.card
 			local label = string.format("%dx%d", v.X, v.Y)
 			t.ok(snap.scale >= 1 and snap.scale <= 1.8, label .. " scale " .. snap.scale)
-			local width = math.min(snap.contentWidth.Scale * v.X, snap.maxWidth) * snap.scale
-			t.ok(width <= v.X * 0.9 + 1e-6, label .. " content is " .. width .. " wide")
-			t.ok(48 * snap.scale <= v.Y * 0.3, label .. " title height")
+			local width = snap.plaqueSize.X.Offset * snap.scale
+			t.ok(width <= v.X * 0.72 + 1e-6, label .. " the plaque is " .. width .. " wide")
+			t.ok(132 * snap.scale <= v.Y * 0.6, label .. " plaque height")
 		end
 		local big = run({ viewport = Vector2.new(1920, 1080), character = 1, profile = 1 }).removedDefault.card
 		t.ok(big.scale > 1.5, "a monitor gets bigger text")

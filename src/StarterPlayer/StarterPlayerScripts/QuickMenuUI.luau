@@ -76,6 +76,26 @@ end
 -- BUTTONS when there is at least one HUD button to walk.
 local function destinations(): { HudNav.Entry }
 	local list = HudNav.Entries()
+	-- A phone's SAVES and Send truck home live in MENU, not the column.
+	local extra = HUD.MenuRows()
+	if #extra > 0 then
+		local plain: { QuickMenuLogic.Entry } = {}
+		local byId: { [string]: HudNav.Entry } = {}
+		for _, entry in ipairs(list) do
+			byId[entry.id] = entry
+			table.insert(plain, { id = entry.id, label = entry.label })
+		end
+		for _, entry in ipairs(extra) do
+			if byId[entry.id] == nil then
+				byId[entry.id] = entry
+				table.insert(plain, { id = entry.id, label = entry.label })
+			end
+		end
+		list = {}
+		for _, sorted in ipairs(QuickMenuLogic.Sort(plain)) do
+			table.insert(list, byId[sorted.id])
+		end
+	end
 	local anyButton = HudNav.First() ~= nil
 	if anyButton then
 		table.insert(list, {
@@ -117,7 +137,8 @@ local function build(entries: { HudNav.Entry }): GuiObject?
 	local availH = math.max(view.Y - 2 * PAD - TITLE_H - FOOTER_H - 120, 120)
 	local layout = QuickMenuLogic.Layout(#entries, availW, availH)
 	holder.Size = UDim2.fromOffset(layout.gridW, layout.gridH)
-	outer.Size = UDim2.fromOffset(layout.gridW + 2 * PAD, layout.gridH + 2 * PAD + TITLE_H + FOOTER_H + 6)
+	outer.Size =
+		UDim2.fromOffset(layout.gridW + 2 * PAD, layout.gridH + 2 * PAD + TITLE_H + FOOTER_H + 6 + UITheme.PlateDrop)
 	local faces: { GuiObject } = {}
 	for i, entry in ipairs(entries) do
 		local rect = layout.rects[i]
@@ -128,7 +149,6 @@ local function build(entries: { HudNav.Entry }): GuiObject?
 			size = Vector2.new(rect.w, rect.h - UITheme.ButtonDrop),
 			style = style,
 			textSize = 20,
-			radius = UITheme.Radius,
 		})
 		button.root.Position = UDim2.fromOffset(rect.x, rect.y)
 		button.root.Parent = holder
@@ -286,16 +306,18 @@ local function buildPanel()
 	end)
 	dim.Parent = screen
 
-	local shell = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, false)
+	-- The code-built Panel (Paper face, Bark stroke and drop edge). Its content
+	-- sits PAD (18, more than the Panel's 12) in, placed by hand below.
+	local shell = UITheme.Plate("Panel")
+	UITheme.padding(shell.face, 0, 0, 0, 0)
 	shell.outer.Name = "Panel"
 	shell.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	shell.outer.Position = UDim2.fromScale(0.5, 0.5)
 	shell.outer.Size = UDim2.fromOffset(480, 300)
-	UITheme.stroke(shell.outer, C.AmberEdge, UITheme.Stroke)
 	shell.outer.Parent = screen
 	panel = shell.outer
 
-	local title = UITheme.label(shell.face, QuickMenuLogic.Title, F.Heading, 26, C.Cream)
+	local title = UITheme.label(shell.face, QuickMenuLogic.Title, F.Heading, 26, C.Ink)
 	title.Name = "Title"
 	title.Position = UDim2.fromOffset(PAD, 10)
 	title.Size = UDim2.new(1, -2 * PAD, 0, TITLE_H)
@@ -310,7 +332,7 @@ local function buildPanel()
 	holder.Parent = shell.face
 	gridHolder = holder
 
-	local footer = UITheme.label(shell.face, QuickMenuLogic.Footer, F.Bold, 16, C.Muted)
+	local footer = UITheme.label(shell.face, QuickMenuLogic.Footer, F.Bold, 16, C.Bark)
 	footer.Name = "Footer"
 	footer.AnchorPoint = Vector2.new(0, 1)
 	footer.Position = UDim2.new(0, PAD, 1, -(PAD / 2 + 3))
@@ -342,10 +364,14 @@ function QuickMenuUI.Start()
 		order = -10,
 		glyph = QuickMenuLogic.OpenGamepad,
 		tile = false,
+		icon = "Menu",
 		onPress = QuickMenuUI.Toggle,
 	})
+	-- On a gamepad (the View glyph) and on a phone (the menu icon: it holds
+	-- SAVES, Send truck home and the rest) it shows; with a mouse it does not.
 	local function showSide()
-		side.root.Visible = HudRules.PadGlyphs(UITheme.Device())
+		local device = UITheme.Device()
+		side.root.Visible = HudRules.PadGlyphs(device) or device == "phone"
 	end
 	showSide()
 	UserInputService.LastInputTypeChanged:Connect(showSide)

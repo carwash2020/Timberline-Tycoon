@@ -589,6 +589,7 @@ function PlotUI.Start()
 		text = "HAMMER",
 		style = "buy",
 		order = 1,
+		icon = "Hammer",
 		onPress = HammerController.Equip,
 	})
 

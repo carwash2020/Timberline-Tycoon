@@ -320,6 +320,7 @@ function SaveSlotUI.Start()
 		text = "SAVES",
 		style = "bark",
 		order = 0,
+		phoneMenu = true,
 		onPress = function()
 			local p = panel
 			setOpen(not (p ~= nil and p.Visible))

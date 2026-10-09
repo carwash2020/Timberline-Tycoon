@@ -20,6 +20,7 @@ local F = UITheme.Fonts
 
 local CLOSE_ACTION = "NewsClose"
 local SEEN_ATTR = "NewsV1Seen"
+local CLOSE_GAP = 8 -- Close's margin to the strip's top and right edges, in screen px at scale 1 (placeCard recomputes it)
 
 local player = Players.LocalPlayer
 local panel: Frame? = nil
@@ -191,17 +192,15 @@ function NewsUI.Start()
 	scrim.Selectable = false
 	scrim.Parent = gui
 
-	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, false)
+	-- The code-built Panel: Paper face, Bark stroke and drop edge, grows with its rows.
+	local card = UITheme.Plate("Panel", true)
 	card.outer.Name = "WhatsNew"
 	card.outer.Visible = false
 	card.outer.Active = true
-	card.outer.AutomaticSize = Enum.AutomaticSize.Y
-	card.face.AutomaticSize = Enum.AutomaticSize.Y
-	card.face.Size = UDim2.fromScale(1, 0)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(640, 2000)
 	limit.Parent = card.outer
-	UITheme.padding(card.face, 8, 10, 8, 10)
+	UITheme.padding(card.face, 12, 12, 12, 12)
 	UITheme.list(card.face, 4)
 	card.outer.Parent = gui
 	panel = card.outer
@@ -226,7 +225,7 @@ function NewsUI.Start()
 	wash.Parent = hero
 	local word = UITheme.label(hero, "TIMBERLINE", F.Title, 22, C.Cream)
 	word.Name = "Logo"
-	word.Size = UDim2.new(1, -16, 0, 26)
+	word.Size = UDim2.new(1, -(UITheme.Size.Tap + 3 * CLOSE_GAP), 0, 26)
 	word.Position = UDim2.fromOffset(10, 8)
 	word.TextXAlignment = Enum.TextXAlignment.Left
 	local wordStroke = Instance.new("UIStroke")
@@ -235,7 +234,7 @@ function NewsUI.Start()
 	wordStroke.Parent = word
 	local title = UITheme.label(hero, "WHAT'S NEW IN V1", F.Title, 16, C.Cream)
 	title.Name = "Title"
-	title.Size = UDim2.new(1, -16, 0, 20)
+	title.Size = UDim2.new(1, -(UITheme.Size.Tap + 3 * CLOSE_GAP), 0, 20)
 	title.Position = UDim2.fromOffset(10, 36)
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	hero.Parent = card.face
@@ -251,12 +250,12 @@ function NewsUI.Start()
 		row.Size = UDim2.new(1, 0, 0, 44)
 		row.Parent = card.face
 		icon(row, entry.icon, 36)
-		local line = UITheme.label(row, entry.line, F.Body, 18, C.Cream)
+		local line = UITheme.label(row, entry.line, F.Body, 18, C.Ink)
 		line.Name = "Headline"
 		line.Position = UDim2.fromOffset(44, 2)
 		line.Size = UDim2.new(1, -44, 0, 20)
 		line.TextTruncate = Enum.TextTruncate.AtEnd
-		local detail = UITheme.label(row, entry.detail, F.Body, 15, C.Muted)
+		local detail = UITheme.label(row, entry.detail, F.Body, 15, C.Bark)
 		detail.Name = "Detail"
 		detail.Position = UDim2.fromOffset(44, 22)
 		detail.Size = UDim2.new(1, -44, 0, 18)
@@ -266,22 +265,20 @@ function NewsUI.Start()
 		table.insert(details, detail)
 	end
 
-	local closeRow = Instance.new("Frame")
-	closeRow.Name = "CloseRow"
-	closeRow.LayoutOrder = 20
-	closeRow.BackgroundTransparency = 1
-	closeRow.Size = UDim2.new(1, 0, 0, UITheme.Size.Tap)
-	closeRow.Parent = card.face
+	-- Close is a 44 x 44 square (an X) at the top right of the title strip,
+	-- 8 px from the strip's top and right edges and 8 px above the first row
+	-- (the strip is 8 + 44 + 8 tall), so it never overlaps the title or a row.
 	local close = UITheme.Button({
 		name = "Close",
-		text = "CLOSE",
-		size = Vector2.new(140, UITheme.Size.Tap),
+		text = "X",
+		size = Vector2.new(UITheme.Size.Tap, UITheme.Size.Tap),
 		style = "primary",
-		textSize = 16,
+		textSize = 22,
 	})
-	close.root.AnchorPoint = Vector2.new(0.5, 0)
-	close.root.Position = UDim2.fromScale(0.5, 0)
-	close.root.Parent = closeRow
+	close.root.AnchorPoint = Vector2.new(1, 0)
+	close.root.Position = UDim2.new(1, -CLOSE_GAP, 0, CLOSE_GAP)
+	close.root.ZIndex = 2
+	close.root.Parent = hero
 
 	-- On a short screen the card is only as tall as its rows. Its bottom
 	-- sits above the jump box (70px, top-left 95 from the right and 90 up)
@@ -301,6 +298,8 @@ function NewsUI.Start()
 		local pad = card.face:FindFirstChildOfClass("UIPadding")
 		local list = card.face:FindFirstChildOfClass("UIListLayout")
 		local tap = UITheme.Size.Tap
+		-- 8 screen px in offsets.
+		local margin = math.ceil(8 / scale)
 		if compact then
 			tap = math.ceil(UITheme.Size.Tap / scale)
 			if pad then
@@ -312,10 +311,11 @@ function NewsUI.Start()
 			if list then
 				list.Padding = UDim.new(0, 1)
 			end
-			hero.Size = UDim2.new(1, 0, 0, 26)
+			-- 8 + 44 + 8 screen px tall: Close and its margins.
+			hero.Size = UDim2.new(1, 0, 0, tap + 2 * margin)
 			word.TextSize = 18
-			word.Position = UDim2.fromOffset(8, 3)
-			word.Size = UDim2.new(1, -12, 0, 20)
+			word.Position = UDim2.new(0, 8, 0.5, -10)
+			word.Size = UDim2.new(1, -(tap + 3 * margin), 0, 20)
 			title.Visible = false
 			for i, row in ipairs(rows) do
 				row.Size = UDim2.new(1, 0, 0, 36)
@@ -328,10 +328,10 @@ function NewsUI.Start()
 			end
 		else
 			if pad then
-				pad.PaddingTop = UDim.new(0, 8)
-				pad.PaddingBottom = UDim.new(0, 8)
-				pad.PaddingLeft = UDim.new(0, 10)
-				pad.PaddingRight = UDim.new(0, 10)
+				pad.PaddingTop = UDim.new(0, 12)
+				pad.PaddingBottom = UDim.new(0, 12)
+				pad.PaddingLeft = UDim.new(0, 12)
+				pad.PaddingRight = UDim.new(0, 12)
 			end
 			if list then
 				list.Padding = UDim.new(0, 4)
@@ -339,7 +339,8 @@ function NewsUI.Start()
 			hero.Size = UDim2.new(1, 0, 0, 88)
 			word.TextSize = 22
 			word.Position = UDim2.fromOffset(10, 8)
-			word.Size = UDim2.new(1, -16, 0, 26)
+			word.Size = UDim2.new(1, -(tap + 3 * margin), 0, 26)
+			title.Size = UDim2.new(1, -(tap + 3 * margin), 0, 20)
 			title.Visible = true
 			for i, row in ipairs(rows) do
 				row.Size = UDim2.new(1, 0, 0, 44)
@@ -351,13 +352,14 @@ function NewsUI.Start()
 				sub.Size = UDim2.new(1, -48, 0, 18)
 			end
 		end
-		closeRow.Size = UDim2.new(1, 0, 0, tap)
-		close.root.Size = UDim2.fromOffset(140, tap)
+		-- Close: tap x tap (44 x 44 on screen) and its drop edge, `margin` in from the strip's top and right.
+		close.root.Position = UDim2.new(1, -margin, 0, margin)
+		close.root.Size = UDim2.fromOffset(tap, tap + UITheme.ButtonDrop)
 		if compact then
-			local margin = 8
-			local left = vp.X * 0.4 + margin
-			local right = vp.X - margin
-			local bottom = vp.Y - 90 - margin
+			local edge = 8
+			local left = vp.X * 0.4 + edge
+			local right = vp.X - edge
+			local bottom = vp.Y - 90 - edge
 			card.outer.AnchorPoint = Vector2.new(0.5, 1)
 			card.outer.Position = UDim2.fromOffset(((left + right) / 2 - origin.X) / scale, (bottom - origin.Y) / scale)
 			card.outer.Size = UDim2.fromOffset(math.max(180, (right - left) / scale), 0)

@@ -440,6 +440,7 @@ function StoreUI.Start()
 		text = "Sell here",
 		style = "buy",
 		order = 2,
+		icon = "SellHere",
 		onPress = function()
 			Net.Remote("UseInstantDelivery"):FireServer()
 		end,

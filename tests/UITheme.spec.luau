@@ -518,7 +518,7 @@ return function(t)
 		t.eq(UITheme.Radius, 8)
 		t.eq(UITheme.Stroke, 2)
 		t.eq(UITheme.Ring, 4)
-		t.eq(UITheme.ButtonDrop, 0)
+		t.eq(UITheme.ButtonDrop, 3)
 	end)
 
 	t.test("every button style rests on its fill and carries the selection ring", function()

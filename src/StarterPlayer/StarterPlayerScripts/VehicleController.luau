@@ -227,6 +227,7 @@ local function buildButton()
 		text = "Send truck home",
 		style = "blue",
 		order = 4,
+		phoneMenu = true,
 		key = Enum.KeyCode.ButtonY,
 		onPress = function()
 			Net.Remote("CallTruck"):FireServer()

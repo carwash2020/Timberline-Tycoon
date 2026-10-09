@@ -1785,6 +1785,7 @@ local function build()
 		text = "OWNER",
 		style = "bark",
 		order = 0,
+		phoneMenu = true,
 		onPress = toggle,
 	})
 	side.root.Visible = false

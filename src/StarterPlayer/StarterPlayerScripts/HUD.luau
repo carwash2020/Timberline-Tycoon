@@ -90,6 +90,7 @@ local GamepadNav = require(script.Parent.GamepadNav)
 local HudLayout = require(script.Parent.HudLayout)
 local HudNav = require(script.Parent.HudNav)
 local HudRules = require(script.Parent.HudRules)
+local UIArt = require(script.Parent.UIArt)
 local UITheme = require(script.Parent.UITheme)
 
 local HUD = {}
@@ -142,6 +143,13 @@ type Side = {
 	hint: Enum.KeyCode?, -- a button that opens it elsewhere (the quick menu's): only its glyph shows
 	glyph: GuiObject?,
 	onPress: () -> (),
+	name: string,
+	text: string, -- its label off a phone (and the quick menu's tile text)
+	baseStyle: string,
+	icon: string?, -- a UITheme.HudIcons name: on a phone the button is an icon, IconButton square
+	phoneMenu: boolean?, -- on a phone it leaves the column: a row in the quick menu instead
+	image: ImageLabel?,
+	imageStatus: string?, -- UIArt's load result for the icon ("Failure" shows the text)
 }
 
 local cashFace: ImageLabel? = nil
@@ -189,6 +197,8 @@ local nearPad = false -- your truck by the sell pad (HintLogic.NearPad)
 local sideGui: ScreenGui? = nil
 local sideColumn: Frame? = nil -- a zero-size corner the side buttons stack up and left from
 local sides: { Side } = {}
+local sideStash: Frame? = nil -- a hidden frame: a phone's menu-only buttons live here (not in the column)
+local menuFace: GuiObject? = nil -- the MENU button's face (where the quick menu's rows hand the selection back)
 local arrangeQueued = false
 local jumpButton: GuiObject? = nil -- a phone's jump button (Roblox's touch controls), once there is one
 local shelf: Frame? = nil -- the corner's two lines
@@ -1242,20 +1252,45 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	if device == "console" then
 		width, height = GamepadNavLogic.PadSize(width, height) -- big enough for a stick to land on
 	end
+	-- On a phone a button with an icon is a 44 x 44 square showing that icon
+	-- (its short text only while the image has no id or failed to load).
+	local look = UITheme.SideLook(phone, side.icon, side.imageStatus, side.text, side.baseStyle)
+	local iconSide = look.square
+	if iconSide then
+		width, height = UITheme.IconButton, UITheme.IconButton
+	end
 	side.button.root.Size = UDim2.fromOffset(width, height + UITheme.ButtonDrop)
+	side.button.face.Text = look.text
+	side.button:SetStyle(look.style)
+	local image = side.image
+	if image then
+		image.Visible = look.showImage
+	end
 	side.button.face.TextSize = spec.text
 	local fit = side.button.face:FindFirstChildOfClass("UITextSizeConstraint")
 	if fit then
 		fit.MaxTextSize = spec.text
-		fit.MinTextSize = if phone then UITheme.Size.ButtonMinText else 8
+		fit.MinTextSize = if iconSide then 10 elseif phone then UITheme.Size.ButtonMinText else 8
 	end
 	local pad = side.button.face:FindFirstChildOfClass("UIPadding")
 	if pad then
 		local iconPad = if side.button.face:FindFirstChild("Mark") then 28 else 0
-		pad.PaddingLeft = UDim.new(0, (if console then 36 else 6) + iconPad)
+		local left = if iconSide then 2 else (if console then 36 else 6) + iconPad
+		pad.PaddingLeft = UDim.new(0, left)
+		pad.PaddingRight = UDim.new(0, if iconSide then 2 else 6)
+	end
+	local mark = side.button.face:FindFirstChild("Mark")
+	if mark and mark:IsA("GuiObject") then
+		mark.Visible = not iconSide
 	end
 	if side.glyph then
 		side.glyph.Visible = console
+	end
+	-- A phone's menu-only buttons (SAVES, Send truck home) sit in a hidden
+	-- frame; the quick menu lists them (HUD.MenuRows). Anywhere else: the column.
+	local home: Instance? = if phone and side.phoneMenu then sideStash else sideColumn
+	if home and side.button.root.Parent ~= home then
+		side.button.root.Parent = home
 	end
 end
 
@@ -1302,7 +1337,7 @@ local function arrangeSide()
 
 	local shown: { Frame } = {}
 	for _, side in ipairs(sides) do
-		if side.button.root.Visible then
+		if side.button.root.Visible and side.button.root.Parent == column then
 			table.insert(shown, side.button.root)
 		end
 	end
@@ -1310,8 +1345,17 @@ local function arrangeSide()
 		return a.LayoutOrder < b.LayoutOrder
 	end)
 	local sizes: { Vector2 } = {}
+	-- The boxes are the faces (the drop edge hangs 3 px below each one, inside
+	-- the gap), so faces sit SIDE_GAP apart.
+	local total = 0
 	for i, root in ipairs(shown) do
-		sizes[i] = Vector2.new(root.Size.X.Offset, root.Size.Y.Offset)
+		sizes[i] = Vector2.new(root.Size.X.Offset, root.Size.Y.Offset - UITheme.ButtonDrop)
+		total += sizes[i].Y + SIDE_GAP
+	end
+	-- On a phone the column never wraps to a second one: it is at most
+	-- MENU, HAMMER, Sell here (and OWNER for the owner).
+	if UITheme.IsPhone() then
+		room = math.max(room, total)
 	end
 	local spots = HudLayout.Stack(sizes, room, SIDE_GAP)
 	-- Columns that spill left mustn't reach the bars at the bottom centre
@@ -1325,7 +1369,7 @@ local function arrangeSide()
 	}
 	spots = HudLayout.LiftClear(spots, sizes, spot, band, spot.Y - room, SIDE_GAP)
 	for i, root in ipairs(shown) do
-		root.Position = UDim2.fromOffset(-spots[i].X, -spots[i].Y)
+		root.Position = UDim2.fromOffset(-spots[i].X, -spots[i].Y + UITheme.ButtonDrop)
 	end
 end
 
@@ -1371,6 +1415,8 @@ export type SideOptions = {
 	key: Enum.KeyCode?, -- the gamepad button that presses it
 	glyph: Enum.KeyCode?, -- a button that does the same, bound elsewhere: shows its glyph only
 	tile: boolean?, -- false: no tile for it in the quick menu (the menu's own button)
+	icon: string?, -- a UITheme.HudIcons name ("Menu", "Hammer", "SellHere"): on a phone the button is that icon, 44 x 44
+	phoneMenu: boolean?, -- on a phone it leaves the column and is a row in the quick menu (SAVES, Send truck home)
 	onPress: () -> (),
 }
 
@@ -1387,12 +1433,27 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 		size = spec.size or Vector2.new(110, 40),
 		style = opts.style,
 		textSize = spec.text,
-		radius = 12,
 	})
 	button.root.LayoutOrder = opts.order
 	button.root.AnchorPoint = Vector2.new(1, 1) -- placed by arrangeSide
 	button.root.Visible = false
 	sideMark(button.face, opts.name)
+	local image: ImageLabel? = nil
+	local imageId = if opts.icon then UITheme.HudIconImage(opts.icon) else nil
+	if imageId then
+		local picture = Instance.new("ImageLabel")
+		picture.Name = "Icon"
+		picture.AnchorPoint = Vector2.new(0.5, 0.5)
+		picture.Position = UDim2.fromScale(0.5, 0.5)
+		picture.Size = UDim2.fromOffset(UITheme.IconSize, UITheme.IconSize)
+		picture.BackgroundTransparency = 1
+		picture.BorderSizePixel = 0
+		picture.Image = imageId
+		picture.ZIndex = button.face.ZIndex + 1
+		picture.Visible = false -- layoutSide shows it on a phone
+		picture.Parent = button.face
+		image = picture
+	end
 	if not column then
 		warn(string.format("[HUD] no side column (HUD.Start didn't finish): skipping the %s button", opts.name))
 		return button
@@ -1408,15 +1469,42 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	end
 	button.root.Parent = column
 	button.face.Activated:Connect(opts.onPress)
-	local side: Side = { button = button, key = opts.key, hint = opts.glyph, glyph = glyph, onPress = opts.onPress }
+	local side: Side = {
+		button = button,
+		key = opts.key,
+		hint = opts.glyph,
+		glyph = glyph,
+		onPress = opts.onPress,
+		name = opts.name,
+		text = opts.text,
+		baseStyle = opts.style,
+		icon = opts.icon,
+		phoneMenu = opts.phoneMenu,
+		image = image,
+		imageStatus = nil,
+	}
 	table.insert(sides, side)
+	if opts.name == "Menu" then
+		menuFace = button.face
+	end
+	if imageId then
+		-- A failed load leaves the short text instead of a blank button.
+		UIArt.Listen(imageId, function(result: UIArt.LoadStatus)
+			side.imageStatus = result
+			if result == "Failure" then
+				layoutSide(side, UITheme.Device())
+				queueArrange()
+			end
+		end)
+	end
 	-- A gamepad walks the HUD's buttons (HudNav) and the quick menu lists it.
 	local tile = opts.tile ~= false
 	HudNav.Add(button.face, {
 		id = QuickMenuLogic.IdFor(opts.name),
 		labelOf = if tile
 			then function(): string
-				return QuickMenuLogic.Label(button.face.Text)
+				-- An icon button's face is blank or a short fallback: the tile reads its full text.
+				return QuickMenuLogic.Label(if side.icon ~= nil then side.text else button.face.Text)
 			end
 			else nil,
 		press = if tile then opts.onPress else nil,
@@ -1972,6 +2060,34 @@ local function watchJump(playerGui: Instance)
 	end
 end
 
+-- On a phone the buttons that moved into MENU (SAVES, Send truck home, OWNER)
+-- as quick-menu rows, in the quick menu's order. They are not in the column,
+-- so HudNav does not list them; their own press runs when picked, and the
+-- selection returns to the MENU button.
+function HUD.MenuRows(): { HudNav.Entry }
+	local rows: { HudNav.Entry } = {}
+	if not UITheme.IsPhone() then
+		return rows
+	end
+	local plain: { QuickMenuLogic.Entry } = {}
+	local byId: { [string]: HudNav.Entry } = {}
+	for _, side in ipairs(sides) do
+		local back = menuFace
+		if side.phoneMenu and side.button.root.Visible and back then
+			local id = QuickMenuLogic.IdFor(side.name)
+			local label = QuickMenuLogic.Label(side.button.face.Text)
+			if label ~= "" then
+				byId[id] = { id = id, label = label, press = side.onPress, obj = back }
+				table.insert(plain, { id = id, label = label })
+			end
+		end
+	end
+	for _, sorted in ipairs(QuickMenuLogic.Sort(plain)) do
+		table.insert(rows, byId[sorted.id])
+	end
+	return rows
+end
+
 local function buildSideColumn(playerGui: Instance)
 	-- Its own screen, under the shop panel's scrim (which blocks HUD taps)
 	-- and the corner's popups, and measured from the true screen centre:
@@ -1984,6 +2100,13 @@ local function buildSideColumn(playerGui: Instance)
 	column.Size = UDim2.new() -- arrangeSide moves it and stacks the buttons up and left of it
 	column.BackgroundTransparency = 1
 	column.Parent = gui
+	local stash = Instance.new("Frame")
+	stash.Name = "MenuOnly"
+	stash.Visible = false
+	stash.BackgroundTransparency = 1
+	stash.Size = UDim2.new()
+	stash.Parent = gui
+	sideStash = stash
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueArrange)
 	gui:GetPropertyChangedSignal("AbsolutePosition"):Connect(queueArrange) -- the safe area's insets arriving
 	gui.Parent = playerGui

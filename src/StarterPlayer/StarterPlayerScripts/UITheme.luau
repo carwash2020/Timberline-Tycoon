@@ -54,8 +54,9 @@ UITheme.Colors = {
 	-- The timber palette. Owned screens read these by name.
 	Panel = Color3.fromHex("#2A1F17"),
 	PanelAlt = Color3.fromHex("#1E1B18"),
-	Cream = Color3.fromHex("#F3E7C9"),
+	Cream = Color3.fromHex("#F5EBD7"),
 	Muted = Color3.fromHex("#CDBFA3"),
+	MutedStroke = Color3.fromHex("#A09178"), -- the starter button's 2 px outline (GAD round 3)
 	Amber = Color3.fromHex("#F2C14E"),
 	AmberEdge = Color3.fromHex("#C9A24A"),
 	Confirm = Color3.fromHex("#4CC36A"),
@@ -70,10 +71,10 @@ UITheme.Colors = {
 	Selection = Color3.fromHex("#FFF4C2"),
 	-- Older names, kept as light or dark so screens this pass does not
 	-- own stay readable (a light card still gets dark ink).
-	Ink = Color3.fromHex("#1E1B18"),
-	Paper = Color3.fromHex("#F3E7C9"),
-	PaperDark = Color3.fromHex("#E4D2AE"),
-	Bark = Color3.fromHex("#3E2E22"),
+	Ink = Color3.fromHex("#3C2814"),
+	Paper = Color3.fromHex("#F0E1C3"),
+	PaperDark = Color3.fromHex("#E2CFAA"),
+	Bark = Color3.fromHex("#583A22"),
 	Green = Color3.fromHex("#2F8A48"),
 	GreenEdge = Color3.fromHex("#1E5C30"),
 	Blue = Color3.fromHex("#6E5420"),
@@ -89,6 +90,19 @@ UITheme.Colors = {
 }
 local C = UITheme.Colors
 
+-- The Sparkworks gate strips (Shared/LogicItems.Accent) keep their own
+-- colours, which are not part of the UI palette above. They are theme tokens
+-- all the same, so LogicItems.spec can find each one here.
+UITheme.LogicAccent = {
+	GateAnd = Color3.fromHex("#4C8C40"),
+	GateOr = Color3.fromHex("#FFB840"),
+	GateXor = Color3.fromHex("#2F6DB5"),
+	GateNot = Color3.fromHex("#C0503A"),
+	Delay = Color3.fromHex("#8FD3F2"),
+	Sustain = Color3.fromHex("#D08F1F"),
+	Clock = Color3.fromHex("#BFE8FF"),
+}
+
 UITheme.Fonts = {
 	Title = Enum.Font.GothamBold, -- titles, names, cash
 	Button = Enum.Font.GothamBold,
@@ -103,7 +117,25 @@ UITheme.Radius = 8
 UITheme.ChipRadius = 6
 UITheme.Stroke = 2
 UITheme.Ring = 4 -- the gamepad selection outline, in px
-UITheme.ButtonDrop = 0 -- the old 3px drop edge is the stroke now
+UITheme.ButtonRadius = 10 -- GAD round 3: buttons 10, plaques and panels 12
+UITheme.ButtonDrop = 3 -- the button's drop edge in its edge colour; pressed, the face drops onto it
+UITheme.PlateRadius = 12
+UITheme.PlateDrop = 4 -- a plaque's or panel's Bark drop edge (a frame behind the face, not a shadow image)
+UITheme.PlateInset = { Plaque = 4, Panel = 12 } :: { [string]: number } -- content inset
+
+-- The phone HUD's icon buttons (IconButton px square, the face; the icon is
+-- IconSize px, about 8 px of padding). These are IMAGE ids (not Decal ids) of
+-- assets/ui/icons/{menu,hammer,sell-here}.png, uploaded 2026-10-08 and
+-- Approved. ImageLabel.Image = "rbxassetid://" .. id. An id of 0 (or an image
+-- that fails to load) leaves the short text label instead.
+UITheme.HudIcons = {
+	Menu = 76852120099119,
+	Hammer = 129127727779001,
+	SellHere = 96932580819074,
+} :: { [string]: number }
+UITheme.IconButton = 44
+UITheme.IconSize = 28
+UITheme.IconFallbackText = { Menu = "MENU", Hammer = "BUILD", SellHere = "SELL" } :: { [string]: string }
 
 -- Tiled texture image ids (rbxassetid://...). Empty = flat colour.
 UITheme.Textures = {
@@ -122,7 +154,7 @@ UITheme.Styles = {
 	muted = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
 	buy = { fill = C.Confirm, edge = C.ConfirmEdge, ink = C.ConfirmInk },
 	cant = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
-	starter = { fill = C.PanelAlt, edge = nil, ink = C.Cream, outline = C.Amber },
+	starter = { fill = C.PanelAlt, edge = nil, ink = C.Cream, outline = C.MutedStroke },
 	locked = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
 	forged = { fill = C.PanelAlt, edge = C.AmberEdge, ink = C.Amber },
 	full = { fill = C.Panel, edge = C.AmberEdge, ink = C.Cream },
@@ -132,6 +164,9 @@ UITheme.Styles = {
 	blue = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
 	amber = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
 	skip = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
+	-- The phone HUD's Hammer and Sell here icons are Cream. The bright buy
+	-- green gives them only 1.8:1; this deeper green gives 3.6:1.
+	iconGreen = { fill = C.Green, edge = C.GreenEdge, ink = C.Cream },
 } :: { [string]: Style }
 
 ---------------------------------------------------------------------------
@@ -163,6 +198,49 @@ function UITheme.IsPhone(): boolean
 	return UserInputService.TouchEnabled
 		and not UserInputService.KeyboardEnabled
 		and (camera == nil or camera.ViewportSize.Y < 600)
+end
+
+-- The content id of a HUD icon ("rbxassetid://..."), or nil while its id is 0.
+function UITheme.HudIconImage(name: string): string?
+	local id = UITheme.HudIcons[name]
+	if id == nil or id == 0 then
+		return nil
+	end
+	return "rbxassetid://" .. tostring(id)
+end
+
+-- Whether a phone button draws the real icon image: it has an id (not 0)
+-- and that image has not failed to load. Otherwise it shows its short text.
+function UITheme.ShowsIcon(name: string?, loadStatus: string?): boolean
+	if name == nil then
+		return false
+	end
+	return UITheme.HudIconImage(name) ~= nil and loadStatus ~= "Failure"
+end
+
+export type SideLook = {
+	square: boolean, -- a phone icon button: IconButton x IconButton
+	showImage: boolean, -- draw the icon image (else the text)
+	text: string,
+	style: string,
+}
+
+-- How a HUD side button looks. On a phone a button with an icon is a 44 x 44
+-- square showing that icon on its own (Menu on amber, the rest on the deeper
+-- green, which the Cream icons need for contrast), and its short text only
+-- while the image has no id or failed to load. Anywhere else, and for a button
+-- with no icon, it is the text button it always was.
+function UITheme.SideLook(phone: boolean, icon: string?, loadStatus: string?, text: string, style: string): SideLook
+	if not phone or icon == nil then
+		return { square = false, showImage = false, text = text, style = style }
+	end
+	local showImage = UITheme.ShowsIcon(icon, loadStatus)
+	return {
+		square = true,
+		showImage = showImage,
+		text = if showImage then "" else UITheme.IconFallbackText[icon] or "",
+		style = if icon == "Menu" then style else "iconGreen",
+	}
 end
 
 -- Shorter side under this (px) is a small window. A handheld scales down
@@ -862,6 +940,51 @@ function UITheme.Card(
 end
 
 ---------------------------------------------------------------------------
+-- Plaques and panels (GAD round 3, code-built)
+---------------------------------------------------------------------------
+
+-- The base panel style: a Paper face, corner 12, a 2 px Bark stroke, a 4 px
+-- Bark drop edge (a Bark frame behind the face, 4 px lower; no shadow image),
+-- and a Cream-to-Paper-to-PaperDark gradient. `kind` "Plaque" insets its
+-- content 4, "Panel" 12. Size and place `outer` (its height includes the
+-- 4 px edge); put content in `face`. With `auto` the card grows down to its
+-- content (Size gives the width). This draws from frames only, so it never
+-- waits on an image.
+function UITheme.Plate(kind: "Plaque" | "Panel", auto: boolean?): Card
+	local outer = Instance.new("Frame")
+	outer.Name = kind
+	outer.BackgroundColor3 = C.Bark
+	outer.BorderSizePixel = 0
+	UITheme.corner(outer, UITheme.PlateRadius)
+	local face = Instance.new("ImageLabel")
+	face.Name = "Face"
+	face.Size = UDim2.new(1, 0, 1, -UITheme.PlateDrop)
+	face.BackgroundColor3 = Color3.new(1, 1, 1) -- a gradient multiplies this, so white shows the keypoints as they are
+	face.BorderSizePixel = 0
+	face.Image = ""
+	UITheme.corner(face, UITheme.PlateRadius)
+	UITheme.stroke(face, C.Bark, UITheme.Stroke)
+	local shade = Instance.new("UIGradient")
+	shade.Rotation = 90
+	shade.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, C.Cream),
+		ColorSequenceKeypoint.new(0.18, C.Paper),
+		ColorSequenceKeypoint.new(1, C.PaperDark),
+	})
+	shade.Parent = face
+	local inset = UITheme.PlateInset[kind] or 4
+	UITheme.padding(face, inset, inset, inset, inset)
+	if auto then
+		face.Size = UDim2.fromScale(1, 0)
+		face.AutomaticSize = Enum.AutomaticSize.Y
+		outer.AutomaticSize = Enum.AutomaticSize.Y
+		UITheme.padding(outer, 0, 0, UITheme.PlateDrop, 0)
+	end
+	face.Parent = outer
+	return { outer = outer, face = face }
+end
+
+---------------------------------------------------------------------------
 -- The click
 ---------------------------------------------------------------------------
 
@@ -916,7 +1039,7 @@ export type ButtonOptions = {
 local selectionRing: () -> Frame
 
 function UITheme.Button(opts: ButtonOptions): Button
-	local radius = opts.radius or UITheme.Radius
+	local radius = opts.radius or UITheme.ButtonRadius
 	local drop = UITheme.ButtonDrop
 	local root = Instance.new("Frame")
 	root.Name = opts.name or opts.text
@@ -941,7 +1064,19 @@ function UITheme.Button(opts: ButtonOptions): Button
 	fit.MinTextSize = if UITheme.IsPhone() then S.ButtonMinText else 8
 	fit.Parent = face
 	UITheme.padding(face, 0, 6, 0, 6)
-	local edge = UITheme.stroke(face, C.AmberEdge, UITheme.Stroke)
+	-- A 2 px stroke only on the starter style (its outline); every other
+	-- style has the drop edge instead.
+	local edge = UITheme.stroke(face, C.MutedStroke, UITheme.Stroke)
+	-- The shine: white at the top, 0.9 grey from 12% down.
+	local shine = Instance.new("UIGradient")
+	shine.Name = "Shine"
+	shine.Rotation = 90
+	shine.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(0.12, Color3.new(0.9, 0.9, 0.9)),
+		ColorSequenceKeypoint.new(1, Color3.new(0.9, 0.9, 0.9)),
+	})
+	shine.Parent = face
 	face.Parent = root
 
 	local pressed, hovered = false, false
@@ -958,13 +1093,15 @@ function UITheme.Button(opts: ButtonOptions): Button
 		end
 		face.BackgroundColor3 = fill
 		face.TextColor3 = style.ink
-		local rim = style.edge or style.outline
-		edge.Enabled = rim ~= nil
-		edge.Color = rim or C.AmberEdge
+		edge.Enabled = style.outline ~= nil
+		edge.Color = style.outline or C.MutedStroke
 		edge.Thickness = UITheme.Stroke
 		if drop > 0 then
-			root.BackgroundColor3 = style.edge or style.fill
-			root.BackgroundTransparency = if style.edge and not pressed then 0 else 1
+			-- The drop edge is the style's edge colour (a style with none
+			-- gets its fill, darkened). Pressed, the face drops onto it:
+			-- 3 px down, the edge hidden; there is no second image.
+			root.BackgroundColor3 = style.edge or brighten(style.fill, -0.35)
+			root.BackgroundTransparency = if pressed then 1 else 0
 			face.Position = UDim2.fromOffset(0, if pressed then drop else 0)
 		end
 	end
