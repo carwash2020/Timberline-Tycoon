@@ -1,6 +1,12 @@
 --!nocheck
 -- Test runner. From the repo root:   lune run tests/run
 -- Optional filter:                   lune run tests/run Shop
+-- One shard of N (CI splits the tests across runners this way):
+--                                     TEST_SHARD=2/4 lune run tests/run
+--   Specs are dealt out slowest first, each to the shard with the least
+--   work so far, so every shard takes about the same time. The split is
+--   deterministic, every spec lands in exactly one shard, and with no
+--   TEST_SHARD set every spec runs.
 --
 -- Runs every tests/*.spec.luau. A spec file returns a function that gets a
 -- `t` with:
@@ -24,6 +30,46 @@ assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tests/run
 local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
 
 local filter = process.args[1]
+
+-- Rough CI seconds for the slow specs, used only to balance TEST_SHARD.
+-- Any spec not listed counts as 1 second. Stale numbers only make the shards
+-- uneven; they never skip or repeat a spec. Refresh from a CI log if one
+-- shard starts taking much longer than the others.
+local SLOW_SPECS: { [string]: number } = {
+	["AetherServiceV2.spec.luau"] = 6,
+	["BoxService.spec.luau"] = 5,
+	["DailyService.spec.luau"] = 20,
+	["DecorCover.spec.luau"] = 13,
+	["DriveMath.spec.luau"] = 24,
+	["Forest.spec.luau"] = 25,
+	["ForestFiller.spec.luau"] = 47,
+	["ForestService.spec.luau"] = 12,
+	["ForestServiceV2.spec.luau"] = 3,
+	["LandscapeStyle.spec.luau"] = 17,
+	["LogicService.spec.luau"] = 3,
+	["MapBuilder.spec.luau"] = 66,
+	["MonetizationService.spec.luau"] = 6,
+	["NPCService.spec.luau"] = 3,
+	["Phase12World.spec.luau"] = 7,
+	["PlanPause.spec.luau"] = 14,
+	["PlotLogic.spec.luau"] = 6,
+	["PlotPlatform.spec.luau"] = 5,
+	["PlotService.spec.luau"] = 32,
+	["ProfileSchema.spec.luau"] = 7,
+	["QualityBudgets.spec.luau"] = 8,
+	["QuestService.spec.luau"] = 5,
+	["RegionLogic.spec.luau"] = 6,
+	["SectionTrees.spec.luau"] = 21,
+	["ShopService.spec.luau"] = 10,
+	["TerrainFit.spec.luau"] = 6,
+	["TownMesh.spec.luau"] = 16,
+	["TownTrees.spec.luau"] = 22,
+	["TreeArtSections.spec.luau"] = 16,
+	["TreeFill.spec.luau"] = 79,
+	["TreeGen.spec.luau"] = 38,
+	["TruckArt.spec.luau"] = 3,
+	["WorldPlan.spec.luau"] = 69,
+}
 
 local function show(value: any): string
 	if type(value) == "string" then
@@ -73,8 +119,46 @@ for _, file in ipairs(fs.readDir("tests")) do
 end
 table.sort(specs)
 
+local shardSpec = process.env.TEST_SHARD
+local inShard: { [string]: boolean }? = nil
+if shardSpec and shardSpec ~= "" then
+	local index, count = string.match(shardSpec, "^(%d+)/(%d+)$")
+	local shardIndex, shardCount = tonumber(index), tonumber(count)
+	if not shardIndex or not shardCount or shardCount < 1 or shardIndex < 1 or shardIndex > shardCount then
+		print(string.format("TEST_SHARD must look like 2/4 (shard 1..N of N), got %q", shardSpec))
+		process.exit(1)
+	end
+	local bySlowest = table.clone(specs)
+	table.sort(bySlowest, function(a, b)
+		local wa, wb = SLOW_SPECS[a] or 1, SLOW_SPECS[b] or 1
+		if wa ~= wb then
+			return wa > wb
+		end
+		return a < b
+	end)
+	local loads = table.create(shardCount, 0)
+	local mine = {}
+	for _, file in ipairs(bySlowest) do
+		local best = 1
+		for k = 2, shardCount do
+			if loads[k] < loads[best] then
+				best = k
+			end
+		end
+		loads[best] += SLOW_SPECS[file] or 1
+		if best == shardIndex then
+			mine[file] = true
+		end
+	end
+	inShard = mine
+	print(string.format("Shard %d/%d", shardIndex, shardCount))
+end
+
 for _, file in ipairs(specs) do
 	if filter and not string.find(file, filter, 1, true) then
+		continue
+	end
+	if inShard and not inShard[file] then
 		continue
 	end
 	local shared = Loader.new()

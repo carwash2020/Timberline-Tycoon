@@ -15,6 +15,7 @@ return function(t)
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 	local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
 	local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
+	local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
 	local IsleArt = t.load("ReplicatedStorage/Shared/Art/IsleArt")
 	local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
 	local BiomeData = t.shared("BiomeData")
@@ -128,6 +129,11 @@ return function(t)
 		)
 		for _, spot in ipairs(town.shops) do
 			add(spot.kind, "shop", BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe, spot.kind)
+		end
+		for _, spot in ipairs(town.scenes) do
+			local label = spot.kind .. " scene"
+			local model = if spot.kind == "forge" then BuildingArt.SkyForgeCourt() else PropArt.Scene(spot.kind)
+			add(label, "scene", model, spot.cframe)
 		end
 		local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
 		add("dealership lot", "lot", DealershipLot.Build(), town.displayLot)
@@ -1199,6 +1205,11 @@ return function(t)
 			)
 		end
 		table.insert(buildings, { "GondolaStation", placed(BuildingArt.GondolaStation(), town.gondola) })
+		for _, spot in ipairs(town.scenes) do
+			if spot.kind == "forge" then
+				table.insert(buildings, { "SkyForgeCourt", placed(BuildingArt.SkyForgeCourt(), spot.cframe) })
+			end
+		end
 		for _, b in ipairs(buildings) do
 			local name, model = b[1], b[2]
 			local bad = {}

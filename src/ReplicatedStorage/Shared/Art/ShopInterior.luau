@@ -37,8 +37,6 @@ local TABLE_TOP = hex("#C69C6D")
 local TIMBER = hex("#5A3E26")
 local IRON = hex("#3B3634")
 local PAPER = hex("#F4ECD8")
-local GOLD = hex("#E3B73C")
-local GOLD_INK = hex("#6B4A12")
 local TRIM = hex("#F2E7CF")
 local RUNNER = hex("#9A3D2E")
 local RUNNER_EDGE = hex("#E3C98A")
@@ -287,13 +285,6 @@ local function plant(parent: Instance, x: number, y: number, z: number, scale: n
 	)
 end
 
-local function stool(parent: Instance, x: number, y: number, z: number)
-	Kit.decor(Kit.post(parent, "StoolSeat", V3(x, y + 1.5, z), 0.3, 1.5, TABLE_TOP, MAT.Wood), false)
-	for _, d in ipairs({ { -0.45, -0.45 }, { 0.45, -0.45 }, { -0.45, 0.45 }, { 0.45, 0.45 } }) do
-		dBox(parent, "StoolLeg", V3(0.18, 1.5, 0.18), CF(x + d[1], y + 0.75, z + d[2]), TIMBER)
-	end
-end
-
 local function crateStack(parent: Instance, x: number, y: number, z: number, n: number, rng: Kit.Rng)
 	for i = 1, n do
 		local c = Kit.vary(TABLE_TOP, rng, 0.05)
@@ -322,66 +313,6 @@ local function trashCan(parent: Instance, x: number, y: number, z: number)
 	Kit.decor(Kit.post(parent, "TrashLid", V3(x, y + 1.9, z), 0.15, 1.5, TIMBER, MAT.Metal), false)
 end
 
--- A row of three coat hooks on a board on the wall. `facing` is +1 for a wall at +X
--- (the hooks stand out toward -X), -1 for -X, 0 for the back wall (+Z), whose hooks
--- stand out toward -Z.
-local function wallBoard(
-	parent: Instance,
-	name: string,
-	cx: number,
-	cy: number,
-	cz: number,
-	w: number,
-	h: number,
-	onZ: boolean,
-	color: Color3
-)
-	local size = if onZ then V3(w, h, 0.2) else V3(0.2, h, w)
-	return dBox(parent, name, size, CF(cx, cy, cz), color, MAT.Wood)
-end
-
--- A paper poster or notice (looks only), text on the face toward the room.
-local function poster(
-	parent: Instance,
-	cx: number,
-	cy: number,
-	cz: number,
-	w: number,
-	h: number,
-	onZ: boolean,
-	text: string,
-	face: Enum.NormalId,
-	color: Color3
-)
-	local p = wallBoard(parent, "Poster", cx, cy, cz, w, h, onZ, color)
-	Kit.signText(p, text, TIMBER, { face }, Enum.Font.FredokaOne, 0.2)
-	return p
-end
-
--- Rope coils and a lantern or two hung from a beam (hanging goods).
-local function hangGoods(parent: Instance, x: number, z: number, y: number, kind: number)
-	dBox(parent, "GoodsChain", V3(0.08, 1.4, 0.08), CF(x, y + 0.7, z), IRON, MAT.Metal)
-	if kind == 1 then
-		Kit.decor(
-			Kit.cylinder(
-				parent,
-				"RopeCoil",
-				0.5,
-				1.5,
-				CF(x, y - 0.2, z) * CFrame.Angles(0, 0, math.pi / 2),
-				hex("#C9B27A"),
-				MAT.Fabric
-			),
-			false
-		)
-	elseif kind == 2 then
-		Kit.lantern(parent, CF(x, y - 0.3, z), 0.8)
-	else
-		dBox(parent, "HangTool", V3(0.2, 1.6, 0.2), CF(x, y - 0.4, z), TIMBER)
-		dBox(parent, "HangToolHead", V3(0.9, 0.5, 0.25), CF(x + 0.3, y - 1.0, z), hex("#A7ADB4"), MAT.Metal)
-	end
-end
-
 -- (No price plaques on the tables and shelves: a box's one price is on its
 -- own label, BoxArt. A plaque on the aisle face could only ever speak for the
 -- box nearest the aisle, and two boxes side by side drew theirs on top of each
@@ -395,40 +326,13 @@ end
 -- and two jars on the counter top, and a stool behind it for the keeper. Read
 -- from the real Counter part (it may be anywhere in the shop). Looks only.
 local function counterDetail(model: Model, frame: Frame)
+	-- The shell's counter already carries the bell, the till and the ledger.
+	-- Keeping this call checks the counter is the one the shell built.
 	local counter = model:FindFirstChild("Counter")
-	if not counter or not counter:IsA("BasePart") then
+	if counter and counter:IsA("BasePart") and frame.ceilY > frame.floorTop then
 		return
 	end
-	local c = counter.CFrame.Position
-	local top = c.Y + counter.Size.Y / 2 + 0.3 -- over the counter-top board
-	local brass = hex("#C9A24A")
-	-- A bell: a base and a dome.
-	Kit.decor(Kit.post(model, "CounterBellBase", V3(c.X - 0.5, top, c.Z - 0.55), 0.12, 0.9, brass, MAT.Metal), false)
-	Kit.decor(Kit.ball(model, "CounterBell", 0.7, CF(c.X - 0.5, top + 0.3, c.Z - 0.55), brass, MAT.Metal), false)
-	-- A balance scale: base, post, beam, two pans.
-	local sx = c.X - 3.5
-	dBox(model, "ScaleBase", V3(1.3, 0.18, 0.8), CF(sx, top + 0.09, c.Z + 0.1), IRON, MAT.Metal)
-	dBox(model, "ScalePost", V3(0.12, 1.5, 0.12), CF(sx, top + 0.9, c.Z + 0.1), IRON, MAT.Metal)
-	dBox(model, "ScaleBeam", V3(1.9, 0.1, 0.1), CF(sx, top + 1.6, c.Z + 0.1), brass, MAT.Metal)
-	for _, s in ipairs({ -1, 1 }) do
-		Kit.decor(
-			Kit.post(model, "ScalePan", V3(sx + s * 0.85, top + 1.0, c.Z + 0.1), 0.1, 0.8, brass, MAT.Metal),
-			false
-		)
-	end
-	-- A receipt spike and two jars.
-	dBox(model, "ReceiptSpike", V3(0.07, 0.9, 0.07), CF(c.X + 1.4, top + 0.55, c.Z - 0.5), IRON, MAT.Metal)
-	dBox(model, "ReceiptBase", V3(0.5, 0.1, 0.5), CF(c.X + 1.4, top + 0.05, c.Z - 0.5), TIMBER)
-	for i = 1, 2 do
-		local jz = c.Z - 0.6 + (i - 1) * 1.1
-		local jar = Kit.post(model, "CounterJar", V3(c.X + 3.2, top, jz), 1.2, 0.9, hex("#BFD9E6"), MAT.Glass)
-		jar.Transparency = 0.4
-		Kit.decor(jar, false)
-		local lid = if i == 1 then hex("#C8402F") else TIMBER
-		Kit.decor(Kit.post(model, "JarLid", V3(c.X + 3.2, top + 1.2, jz), 0.15, 0.95, lid, MAT.Metal), false)
-	end
-	-- The keeper's stool, behind the counter.
-	stool(model, c.X + 3.4, frame.floorTop, c.Z + counter.Size.Z / 2 + 1.7)
+	return
 end
 
 -- A door to the back room on a wall (looks only; nothing opens): `onZ` for the
@@ -488,7 +392,7 @@ local function axeRack(model: Model, frame: Frame)
 	local pitch = RACK_BLOCK + ShopInterior.RackGap
 	local width = (#axes - 1) * pitch + RACK_BLOCK + 1.4
 	local wallZ = frame.halfD
-	dBox(model, "AxeRack", V3(width, RACK_PANEL_H, 0.3), CF(0, RACK_PANEL_Y, wallZ - 0.2), TABLE)
+	dBox(model, "Pegboard", V3(width, RACK_PANEL_H, 0.3), CF(0, RACK_PANEL_Y, wallZ - 0.2), TABLE)
 	for _, y in ipairs({ RACK_PANEL_Y - RACK_PANEL_H / 2, RACK_PANEL_Y + RACK_PANEL_H / 2 }) do
 		dBox(model, "AxeRackRail", V3(width + 0.3, 0.35, 0.5), CF(0, y, wallZ - 0.4), TIMBER)
 	end
@@ -524,13 +428,47 @@ local function axeRack(model: Model, frame: Frame)
 		art:PivotTo(CF(x + RACK_AXE_SHIFT, stepY + len / 2, wallZ - 1.3) * CFrame.Angles(0, math.pi / 2, 0))
 		art.Name = "RackAxe"
 		art:SetAttribute("ItemId", axe.id)
+		-- Two parts each (haft + the blade, the piece furthest to -X). A full
+		-- AxeArt model is ~20 parts and eight of them do not fit a 250-part shop.
+		local pivot = art:GetPivot()
+		local primary = art.PrimaryPart
+		local blade: BasePart? = nil
+		local bladeX = math.huge
+		for _, d in ipairs(art:GetDescendants()) do
+			if d:IsA("BasePart") and d ~= primary then
+				local xObj = pivot:PointToObjectSpace(d.CFrame.Position).X
+				if xObj < bladeX then
+					bladeX = xObj
+					blade = d
+				end
+			end
+		end
+		local keep: { [Instance]: boolean } = {}
+		if primary then
+			keep[primary] = true
+		end
+		if blade then
+			keep[blade] = true
+		end
+		local drop: { Instance } = {}
+		for _, d in ipairs(art:GetDescendants()) do
+			if
+				(d:IsA("BasePart") and not keep[d])
+				or d:IsA("JointInstance")
+				or d:IsA("Light")
+				or d:IsA("ParticleEmitter")
+				or d:IsA("Fire")
+				or d:IsA("Smoke")
+			then
+				table.insert(drop, d)
+			end
+		end
+		for _, d in ipairs(drop) do
+			d:Destroy()
+		end
 		for _, d in ipairs(art:GetDescendants()) do
 			if d:IsA("BasePart") then
 				Kit.decor(d, false)
-			elseif d:IsA("Weld") or d:IsA("Light") or d:IsA("ParticleEmitter") or d:IsA("Fire") or d:IsA("Smoke") then
-				-- (A hanging axe is a display: no glow lights or sparks, which the
-				-- client would pay for at every rack.)
-				d:Destroy()
 			end
 		end
 		art.Parent = model
@@ -558,43 +496,50 @@ local function axeRack(model: Model, frame: Frame)
 	end
 end
 
+-- The Tool Shed's Robux table, and nothing else. A later purchases lane
+-- replaces this one function. Same table as the cash shelves, gold top,
+-- along the back wall behind the counter. Its boxes are the gold boxes.
+local function buildRobuxTable(model: Model, floorTop: number)
+	local GOLD = hex("#E3B73C")
+	local GOLD_INK = hex("#6B4A12")
+	local entries = RobuxShelf.List()
+	if #entries == 0 then
+		return
+	end
+	local width = RobuxShelf.RowWidth()
+	local cz = RobuxShelf.TableZ
+	local depth = RobuxShelf.TableDepth
+	furniture(
+		model,
+		"GoldTable",
+		-width / 2,
+		width / 2,
+		cz - depth / 2,
+		cz + depth / 2,
+		floorTop,
+		RobuxShelf.TableTop,
+		TIMBER,
+		GOLD
+	)
+	-- The name on a board across the table's front (a hanging sign here
+	-- would hide the axes on the rack behind).
+	local board = dBox(
+		model,
+		"RobuxSign",
+		V3(math.max(8.4, width - 1), 1.1, 0.12),
+		CF(0, RobuxShelf.TableTop - 0.9, cz - depth / 2 - 0.1),
+		GOLD,
+		MAT.SmoothPlastic
+	)
+	Kit.signText(board, "ROBUX SHELF", GOLD_INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+end
+
 local function toolShed(model: Model, frame: Frame)
 	local rng = Kit.rng(2604)
 	-- The middle of each table (the lamps and the hanging signs are over it).
 	local LANE_MIDDLE = 11.05
 	ShopInterior.SteppedUnit(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
-	-- The Robux table: the same table as the cash shelves with a gold top, along
-	-- the back wall behind the counter and its keeper. Its boxes are the gold
-	-- boxes, one label each (its name; the R$ price shows when you aim).
-	local entries = RobuxShelf.List()
-	if #entries > 0 then
-		local width = RobuxShelf.RowWidth()
-		local cz = RobuxShelf.TableZ
-		local depth = RobuxShelf.TableDepth
-		furniture(
-			model,
-			"GoldTable",
-			-width / 2,
-			width / 2,
-			cz - depth / 2,
-			cz + depth / 2,
-			frame.floorTop,
-			RobuxShelf.TableTop,
-			TIMBER,
-			GOLD
-		)
-		-- The gold shelf's name on a board across the table's front (a hanging
-		-- sign here would hide the axes on the rack behind).
-		local board = dBox(
-			model,
-			"RobuxSign",
-			V3(math.max(8.4, width - 1), 1.1, 0.12),
-			CF(0, RobuxShelf.TableTop - 0.9, cz - depth / 2 - 0.1),
-			GOLD,
-			MAT.SmoothPlastic
-		)
-		Kit.signText(board, "ROBUX SHELF", GOLD_INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	end
+	buildRobuxTable(model, frame.floorTop)
 	axeRack(model, frame)
 	counterDetail(model, frame)
 	backDoor(model, frame, frame.halfW - 0.3, 19, false, 1)
@@ -604,35 +549,11 @@ local function toolShed(model: Model, frame: Frame)
 	floorBorder(model, frame, 0.7, hex("#5A3E26"), MAT.Wood)
 	runner(model, frame, 2.6, -frame.halfD + 1.4, 11.2)
 	local y = frame.ceilY
-	for _, z in ipairs({ -17.5, -5.5, 6.5, 17 }) do
-		beam(model, y - 0.45, z, 2 * frame.halfW - 0.6)
-	end
-	for _, z in ipairs({ -17.5, -5.5, 6.5 }) do
-		for _, x in ipairs({ -LANE_MIDDLE, LANE_MIDDLE }) do
-			lamp(model, x, y - 3.1, z, y - 0.9)
-		end
-	end
-	lamp(model, 0, y - 3.1, 17, y - 0.9)
+	beam(model, y - 0.45, 0, 2 * frame.halfW - 0.6)
+	lamp(model, -LANE_MIDDLE, y - 3.1, -5.5, y - 0.9)
+	lamp(model, LANE_MIDDLE, y - 3.1, 6.5, y - 0.9)
 	hangSign(model, -LANE_MIDDLE, y - 3.7, -19.7, 7.8, 1.6, y - 0.9, "AXES", hex("#8E3B2B"), PAPER)
 	hangSign(model, LANE_MIDDLE, y - 3.7, -19.7, 7.8, 1.6, y - 0.9, "SAWMILLS & MACHINES", hex("#3E4A62"), PAPER)
-	-- Hanging goods on the beams: rope coils, lanterns, a row of tools.
-	for i, x in ipairs({ -3.4, 0, 3.4 }) do
-		hangGoods(model, x, -5.5, y - 1.6, i)
-		hangGoods(model, x + 1.2, 6.5, y - 1.6, (i % 3) + 1)
-	end
-	-- Walls: a pegboard of tools, a notice, a coat-hook board, a stool and
-	-- stacked crates by the door, a plant, a bin.
-	local hw = frame.halfW
-	wallBoard(model, "Pegboard", -hw + 0.3, 7.4, -9, 7, 4, false, TABLE)
-	for i = 1, 5 do
-		hangGoods(model, -hw + 0.7, -9 + (i - 3) * 1.3, 8.8, i % 3 + 1)
-	end
-	poster(model, hw - 0.25, 7.6, -12, 4.2, 3, false, "BUY AN AXE\nCHOP A TREE", Enum.NormalId.Left, PAPER)
-	wallBoard(model, "CoatHooks", hw - 0.25, 7, 9, 5, 0.5, false, TIMBER)
-	crateStack(model, hw - 2, frame.floorTop, -20.4, 3, rng)
-	plant(model, -hw + 1.2, frame.floorTop, -20.6, 1.1)
-	trashCan(model, hw - 1, frame.floorTop, 10)
-	stool(model, 7.2, frame.floorTop, 17.2)
 end
 
 ---------------------------------------------------------------------------
@@ -668,54 +589,16 @@ local function hearth(model: Model, frame: Frame)
 	floorBorder(model, frame, 0.8, hex("#4E7A3E"), MAT.Wood)
 	runner(model, frame, 3.6, -frame.halfD + 1.6, 12)
 	local y = frame.ceilY
-	for _, z in ipairs({ -14.25, -5.25, 3.75, 12.5 }) do
-		beam(model, y - 0.45, z, 2 * frame.halfW - 0.6)
-	end
-	for _, z in ipairs({ -14.25, 3.75 }) do
-		for _, x in ipairs({ -19, -10, 10, 19 }) do
-			lamp(model, x, y - 3.4, z, y - 0.9)
-		end
-	end
-	lamp(model, 0, y - 3.4, 12.5, y - 0.9)
-	hangSign(model, -20.6, y - 3.4, -19.05, 6.4, 1.5, y - 0.9, "GEAR", hex("#2E8B7A"), PAPER)
-	hangSign(model, -10.2, y - 3.4, -19.05, 6.4, 1.5, y - 0.9, "PLANS", hex("#3B6FB6"), PAPER)
-	hangSign(model, 10.2, y - 3.4, -19.05, 6.4, 1.5, y - 0.9, "BLUEPRINTS", hex("#3B6FB6"), PAPER)
-	hangSign(model, 20.6, y - 3.4, -19.05, 6.4, 1.5, y - 0.9, "LAMPS", hex("#8E5BB5"), PAPER)
-	-- Hanging goods, a rug at the entrance, plants, a stool for the keeper,
-	-- a bin, coat hooks and notices.
-	for i, x in ipairs({ -6, 0, 6 }) do
-		hangGoods(model, x, -5.25, y - 1.6, i)
-		hangGoods(model, x, 3.75, y - 1.6, (i % 3) + 1)
-	end
-	local hw = frame.halfW
-	dBox(model, "Rug", V3(8, 0.06, 5), CF(0, frame.floorTop + LAYER3, -frame.halfD + 4.5), hex("#2F6B5C"), MAT.Fabric)
-	plant(model, -6.2, frame.floorTop, -frame.halfD + 1.6, 1.3)
-	plant(model, 6.2, frame.floorTop, -frame.halfD + 1.6, 1.3)
-	plant(model, -hw + 1.2, frame.floorTop, 16, 1.2)
-	stool(model, 5.4, frame.floorTop, 18.4)
-	trashCan(model, hw - 1, frame.floorTop, 16.5)
-	wallBoard(model, "CoatHooks", -hw + 0.25, 7.2, -17, 5, 0.5, false, TIMBER)
-	poster(model, hw - 0.25, 7.6, -17, 4.2, 3, false, "SALE\nTODAY", Enum.NormalId.Left, PAPER)
-	crateStack(model, hw - 2.2, frame.floorTop, -frame.halfD + 1.8, 3, rng)
+	beam(model, y - 0.45, 0, 2 * frame.halfW - 0.6)
+	lamp(model, -10, y - 3.4, -5.25, y - 0.9)
+	lamp(model, 10, y - 3.4, 3.75, y - 0.9)
+	hangSign(model, -10.2, y - 3.4, -19.05, 6.4, 1.5, y - 0.9, "GEAR", hex("#2E8B7A"), PAPER)
+	hangSign(model, 10.2, y - 3.4, -19.05, 6.4, 1.5, y - 0.9, "LAMPS", hex("#8E5BB5"), PAPER)
 end
 
 ---------------------------------------------------------------------------
 -- The Dealership showroom
 ---------------------------------------------------------------------------
-
-local function bayLight(parent: Instance, x: number, y: number, z: number)
-	dBox(parent, "BayLightCan", V3(1.2, 0.9, 1.2), CF(x, y, z), IRON, MAT.Metal)
-	local lens = dBox(parent, "BayLightLens", V3(0.9, 0.1, 0.9), CF(x, y - 0.5, z), hex("#E4D6BC"), MAT.SmoothPlastic)
-	local spot = Instance.new("SpotLight")
-	spot.Face = Enum.NormalId.Bottom
-	spot.Angle = 70
-	spot.Range = ShowroomLight.SpotRange
-	spot.Brightness = ShowroomLight.SpotBrightness
-	spot.Color = Color3.fromRGB(255, 240, 215)
-	spot.Shadows = false
-	spot.Parent = lens
-	dBox(parent, "BayLightRod", V3(0.12, 14.8 - y, 0.12), CF(x, (14.8 + y) / 2, z), IRON, MAT.Metal)
-end
 
 local function banner(parent: Instance, x: number, y: number, z: number, color: Color3, text: string)
 	dBox(parent, "BannerRod", V3(2.6, 0.18, 0.18), CF(x, y + 2.7, z), IRON, MAT.Metal)
@@ -838,9 +721,18 @@ local function dealership(model: Model, frame: Frame, west: number, east: number
 			x += 28
 		end
 	end
-	-- A spot over every bay.
-	for _, bay in ipairs(bays) do
-		bayLight(model, bay.x, ceil - 2.4, bay.z)
+	-- Three low display plinths. The strip lights already cover the hall,
+	-- so these only add a capped lantern each (not another can and rod).
+	for i = 1, math.min(3, #bays) do
+		local bay = bays[i]
+		local plinth =
+			dBox(model, "DisplayPlinth", V3(6, 0.5, 4), CF(bay.x, fy + 0.25, bay.z), hex("#D9D3C7"), MAT.Marble)
+		local glow = Instance.new("PointLight")
+		glow.Brightness = ShowroomLight.LanternBrightness
+		glow.Range = ShowroomLight.LanternRange
+		glow.Shadows = false
+		glow.Color = Color3.fromRGB(255, 236, 205)
+		glow.Parent = plinth
 	end
 	hangSign(model, lobbyCx, ceil - 3.6, zf + 5, 9, 1.7, ceil - 0.9, "SHOWROOM", hex("#2F6DB5"), PAPER)
 	-- Lobby: banners, brochure racks, reception chairs and a low table, plants.

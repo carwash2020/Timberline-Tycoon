@@ -2,6 +2,7 @@
 
 > **Newer than this file's merge notes: read AGENT_HANDOFF.md first.** Every branch below marked "not merged" is merged (main is at #116 as of 8 October 2026).
 
+Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 ## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
 
 Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the best wood the player can already reach (`MINING.md`). The Lux Pickaxe is not for sale. `profile.mining` is account-wide, like the pick level.
@@ -102,6 +103,63 @@ Preview paths:
 - `previews/v1-g/rain-low-after-streaks.png`
 - `previews/v1-g/rain-shop-inside.png`
 - `previews/v1-g/rain-shop-outside.png`
+## Lane C previews (branch `phase-2/v1-c-buildings`)
+
+Connor (8 October 2026): every design is rendered as soon as it exists, before merge, so he can see it and send tweaks. Renders live in `previews/v1-c/` (the `preview/` folder stays gitignored). Studio checklist: PHASE2_NOTES.md, "V1 buildings, shops, props and palette". Economy headlines are unchanged (no price, recipe, or walk-time edit).
+
+Part counts, whole model, Lune (shop cap 250, including the interior):
+
+| Model | Before | After |
+| --- | --- | --- |
+| Tool Shed | 626 | 241 |
+| Hearth and Home | 311 | 195 |
+| Dealership | 245 | 215 |
+| Sawmill | 398 | 402 |
+| Gate kiosk | — | 7 |
+| Odds and Ends | — | 37 |
+| Sparkworks | — | 20 |
+| Sky Market | — | 10 |
+| Sky turnstile | — | 4 |
+| Plot map | — | 3 |
+| Arrival arch | — | 4 |
+| Land Office (art only) | — | 8 |
+| Sky forge court | — | 23 |
+
+Round 1 framing (8 October 2026). `town-overview.png` is one elevated three-quarter of a grouped street (the per-building fronts are unchanged). The four scene shots are three-quarter views from about 25 studs, each prop about half the frame. The DAILY JOBS board is wider, with the posts on its edges, so the words clear the posts. The Tool Shed gold table is unchanged.
+
+Round 2 (8 October 2026). The sky forge court uses the street palette: honey plank walls, a weathered-timber furnace with thick timber and honey bands, and a stone chimney. Darker slate photographed as a missing material on the shadowed street face. The four scene props are rebuilt, 10 to 30 parts each: a teepee fire with a tripod pot and log seats, a dock on water with posts, a rod, a bucket and a crate, a lookout platform about 9 studs up with a ladder and a coin telescope, and a park bench with a back and arms. `mill-foreman.png` is unchanged.
+
+Round 3 (8 October 2026). Those five are in the live town (`WorldPlan.Town().scenes`, built by MapBuilder into `TownScenes`). Lane B's map has not merged, so the spots are the current town layout. The sky forge court is on the south-west meadow at (-112, -20), front toward the mill, on `SkyForgeFloor`. The lookout is just west of it at (-136, -20), telescope toward town. The park bench is at (-84, 56) and the campfire at (-72, 56), on the green south of MainStreet. The fishing dock is on the Starter Forest pond's north bank (pond centre 78, -182), posts down into the water; MapBuilder drops the preview water sheet. The town-overview aerial reshoot waits on `phase-2/v1-preview-meshes` (the exporter still drops MeshParts, so the Blender shops still read as boxes).
+
+Paths:
+- `previews/v1-c/sawmill-front.png`
+- `previews/v1-c/toolshed-front.png`
+- `previews/v1-c/hearth-front.png`
+- `previews/v1-c/dealership-front.png`
+- `previews/v1-c/floor-toolshed.png`
+- `previews/v1-c/floor-hearth.png`
+- `previews/v1-c/floor-dealership.png`
+- `previews/v1-c/weigh-house.png`
+- `previews/v1-c/gate-kiosk.png`
+- `previews/v1-c/odds-and-ends.png`
+- `previews/v1-c/sparkworks.png`
+- `previews/v1-c/sky-market.png`
+- `previews/v1-c/sky-turnstile.png`
+- `previews/v1-c/plot-map.png`
+- `previews/v1-c/arrival-arch.png`
+- `previews/v1-c/land-office.png`
+- `previews/v1-c/sky-forge-court.png`
+- `previews/v1-c/campfire.png`
+- `previews/v1-c/fence.png`
+- `previews/v1-c/lamp-post.png`
+- `previews/v1-c/scene-fishing.png`
+- `previews/v1-c/scene-campfire.png`
+- `previews/v1-c/scene-lookout.png`
+- `previews/v1-c/scene-bench.png`
+- `previews/v1-c/machine-sawmill.png`
+- `previews/v1-c/mill-foreman.png`
+
+Foreman stand for Lane E. `MillForemanSpot` is an anchored, transparent, non-colliding part on the sawmill, west of the office door, facing the road (-Z). With the mill at `WorldPlan.Town().sawmill` (`CFrame.new(0, 0, 116.5)`), the spot's world CFrame is `CFrame.new(-26.025, 0.15, 97.45)` (look -Z). In the scaled model, before that placement, it is `CFrame.new(-26.025, 0.15, -19.05)`. The DAILY JOBS board stands just west of it, wide enough that the words sit between the posts with padding on both sides. The office lumber, barrel and crates moved behind the cabin so the stand has 6 studs of clear ground.
 
 ## Who and how
 

@@ -25,6 +25,7 @@ return function(t)
 	local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
 	local TreeFill = t.load("ReplicatedStorage/Shared/World/TreeFill")
 	local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
+	local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
 	local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
 	local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
 
@@ -341,6 +342,10 @@ return function(t)
 		add("sell station", BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad)
 		for _, spot in ipairs(town.shops) do
 			add(spot.kind, BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
+		end
+		for _, spot in ipairs(town.scenes) do
+			local model = if spot.kind == "forge" then BuildingArt.SkyForgeCourt() else PropArt.Scene(spot.kind)
+			add(spot.kind .. " scene", model, spot.cframe)
 		end
 		add("dealership lot", DealershipLot.Build(), town.displayLot)
 		for _, g in ipairs(town.greenery) do
