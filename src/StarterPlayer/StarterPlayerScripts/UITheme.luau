@@ -99,6 +99,19 @@ UITheme.Fonts = {
 }
 
 -- Shared shape. A chip (a small pill) uses ChipRadius.
+-- The logic-gate face strips (LogicItems.Accent) are plot parts, not screen
+-- colours. The round-3 palette dropped these hexes, so they live here to keep
+-- the gate look and LogicItems.spec pinned to one named list.
+UITheme.GateAccents = {
+	GateAnd = Color3.fromHex("#4C8C40"),
+	GateOr = Color3.fromHex("#FFB840"),
+	GateXor = Color3.fromHex("#2F6DB5"),
+	GateNot = Color3.fromHex("#C0503A"),
+	Delay = Color3.fromHex("#8FD3F2"),
+	Sustain = Color3.fromHex("#D08F1F"),
+	Clock = Color3.fromHex("#BFE8FF"),
+}
+
 UITheme.Radius = 8
 UITheme.ChipRadius = 6
 UITheme.Stroke = 2
