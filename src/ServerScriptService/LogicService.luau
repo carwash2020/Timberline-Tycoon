@@ -434,9 +434,9 @@ local function setDetectorLamp(model: Model, on: boolean)
 	model:SetAttribute("Detecting", on)
 end
 
--- The arm (Part3) and head (Part4) swing about the post top (local
--- (0, 1.82, 0)) from upright to across the belt on local +X.
-local SWEEP_PIVOT = CFrame.new(0, 1.82 - 0.1, 0) -- relative to Root (y 0.1)
+-- The arm (Part3) and head (Part4) drop from upright to a push bar lying
+-- along the belt (AutomationLogic.SweepPose), against the wood's side; the
+-- push rod (Part5) swings level and holds it to the post (SweepRodPose).
 local function poseSweeper(model: Model, down: boolean)
 	local root = named(model, "Root")
 	if not root then
@@ -447,14 +447,20 @@ local function poseSweeper(model: Model, down: boolean)
 		if p then
 			local rest = restOf(p, root)
 			if down then
-				p.CFrame = root.CFrame * SWEEP_PIVOT * CFrame.Angles(0, 0, -math.pi / 2) * SWEEP_PIVOT:Inverse() * rest
+				p.CFrame = root.CFrame * AutomationLogic.SweepPose() * rest
 			else
 				p.CFrame = root.CFrame * rest
 			end
 		end
 	end
+	local rod = named(model, "Part5")
+	if rod then
+		local rest = restOf(rod, root)
+		rod.CFrame = root.CFrame * (if down then AutomationLogic.SweepRodPose() else rest)
+	end
 	model:SetAttribute("Swept", down)
 end
+LogicService._poseSweeper = poseSweeper
 
 local function woodModelOf(part: Instance): Model?
 	local node: Instance? = part
@@ -668,9 +674,9 @@ function LogicService._laserBroken(run: Run, emitter: Model): boolean
 		return false
 	end
 	local endPoint = ePort + eDir * dist
-	drawBeam(emitter, ePort, endPoint)
 	local folder = woodFolder()
 	if folder == nil then
+		drawBeam(emitter, ePort, endPoint)
 		return false
 	end
 	local ok, hit = pcall(function()
@@ -679,7 +685,11 @@ function LogicService._laserBroken(run: Run, emitter: Model): boolean
 		params.FilterDescendantsInstances = { folder }
 		return workspace:Raycast(ePort, eDir * dist, params)
 	end)
-	return ok and hit ~= nil
+	local broken = ok and hit ~= nil
+	-- A broken beam stops on the wood's face; it is never drawn through it.
+	local stop = if broken and hit then (hit :: RaycastResult).Position else endPoint
+	drawBeam(emitter, ePort, stop)
+	return broken
 end
 
 -- Drop the targets of this plot's pieces that are gone (sold, or a stale

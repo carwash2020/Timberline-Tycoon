@@ -20,7 +20,7 @@ return {
 		Kit.part(
 			root,
 			"Ground",
-			V3.new(200, 1, 160),
+			V3.new(320, 1, 320),
 			CF.new(0, -0.5, 0),
 			C3.fromRGB(196, 176, 140),
 			Enum.Material.Grass
@@ -46,19 +46,24 @@ return {
 		end
 		local oak = C3.fromRGB(176, 128, 82)
 		local birch = C3.fromRGB(226, 214, 190)
+		-- A 2 x 2 x 4 log resting on a deck top (0.72): centre 1.72 up.
 		local function log(cf, color)
-			Kit.part(root, "Log", V3.new(1.1, 1.1, 4), cf, color, Enum.Material.Wood)
+			Kit.part(root, "Log", V3.new(2, 2, 4), cf, color, Enum.Material.Wood)
 		end
-		-- The arm swung down across the belt, the pose LogicService sets.
+		-- The arm dropped onto the wood and the rod swung level: LogicService's pose.
+		local Automation = ctx.shared("AutomationLogic")
 		local function sweepDown(model)
 			local base = model:FindFirstChild("Root") or model.PrimaryPart
-			local pivot = CF.new(0, 1.72, 0)
 			for _, name in ipairs({ "Part3", "Part4" }) do
 				local p = model:FindFirstChild(name, true)
 				if p and base then
 					local rest = base.CFrame:ToObjectSpace(p.CFrame)
-					p.CFrame = base.CFrame * pivot * CF.Angles(0, 0, -math.pi / 2) * pivot:Inverse() * rest
+					p.CFrame = base.CFrame * Automation.SweepPose() * rest
 				end
+			end
+			local rod = model:FindFirstChild("Part5", true)
+			if rod and base then
+				rod.CFrame = base.CFrame * Automation.SweepRodPose()
 			end
 		end
 		local function beam(emitter, receiver)
@@ -90,46 +95,49 @@ return {
 		local e1 = item("LaserEmitter", CF.new(-4.5, 0, -6) * face)
 		local r1 = item("LaserReceiver", CF.new(4.5, 0, -6) * face)
 		beam(e1, r1)
-		item("WoodSweeper", CF.new(-4, 0, 13))
+		item("WoodSweeper", CF.new(-3, 0, 13))
 		item("SparkSwitch", CF.new(-6, 0, 6))
-		log(CF.new(0, 1.3, -2), oak)
-		log(CF.new(0, 1.3, 13), birch)
-		log(CF.new(-9, 1.3, 20) * face, oak)
+		log(CF.new(0, 1.72, 1.5), oak)
+		log(CF.new(0, 1.72, 13), birch)
+		log(CF.new(-10, 1.72, 20) * face, oak)
 
 		-- View 2: up a Tilted Belt onto Belt Supports.
-		belt("ConveyorStraight", CF.new(50, 0, 0))
-		belt("TiltedBelt", CF.new(50, 0, 8))
-		belt("BeltSupport", CF.new(50, 0, 13))
-		belt("BeltSupport", CF.new(50, 0, 19))
-		belt("ConveyorStraight", CF.new(50, 2, 16))
-		log(CF.new(50, 3.3, 16), birch)
+		belt("ConveyorStraight", CF.new(100, 0, 0))
+		belt("TiltedBelt", CF.new(100, 0, 8))
+		belt("BeltSupport", CF.new(100, 0, 13))
+		belt("BeltSupport", CF.new(100, 0, 19))
+		belt("ConveyorStraight", CF.new(100, 2, 16))
+		log(CF.new(100, 3.72, 16), birch)
 
-		-- View 3: sweeper down, laser close.
-		belt("ConveyorStraight", CF.new(-50, 0, 0))
-		local sw = item("WoodSweeper", CF.new(-54, 0, 0))
+		-- View 3: the sweeper's bar against a log's side; a laser pair across
+		-- the deck clear of the log, the belt walls and the sweeper.
+		belt("ConveyorStraight", CF.new(-100, 0, 0))
+		local sw = item("WoodSweeper", CF.new(-103, 0, -1.5))
 		sweepDown(sw)
-		log(CF.new(-50, 1.3, 2.4), oak)
-		local e2 = item("LaserEmitter", CF.new(-54.5, 0, -6) * face)
-		local r2 = item("LaserReceiver", CF.new(-45.5, 0, -6) * face)
+		-- Snug beside the belt (3 off its centre). The bar's face is at
+		-- x = -103 + SweepReach + 0.16; the log rests on it.
+		log(CF.new(-103 + Automation.SweepReach + 0.16 + 1, 1.72, 1.2), oak)
+		local e2 = item("LaserEmitter", CF.new(-107, 0, -3.3) * face)
+		local r2 = item("LaserReceiver", CF.new(-93, 0, -3.3) * face)
 		beam(e2, r2)
 
 		-- View 4: Switch Belt as placed and flipped, a detector.
-		belt("SwitchBelt", CF.new(-20, 0, 50))
-		belt("SwitchBelt", CF.new(0, 0, 50), { Flip = true })
-		belt("WoodDetector", CF.new(20, 0, 50))
+		belt("SwitchBelt", CF.new(-20, 0, -100))
+		belt("SwitchBelt", CF.new(0, 0, -100), { Flip = true })
+		belt("WoodDetector", CF.new(20, 0, -100))
 
 		local function cam(cx, cy, cz, tx, ty, tz, label)
 			return { pos = { cx, cy, cz }, target = { tx, ty, tz }, label = label }
 		end
 		return {
 			root = root,
-			shadowRadius = 120,
+			shadowRadius = 400,
 			fov = 40,
 			cameras = {
 				cam(30, 28, -26, 0, 1, 8, "a sorting line"),
-				cam(68, 10, 4, 50, 1.5, 12, "tilted belt onto supports"),
-				cam(-40, 8, -14, -50, 1.5, -2, "sweeper down, laser beam"),
-				cam(0, 42, 8, 0, 1, 50, "switch belt placed and flipped, detector"),
+				cam(116, 14, 0, 100, 1.5, 11, "tilted belt onto supports"),
+				cam(-115, 13, 9, -100, 1.4, -0.8, "sweeper on a log, laser beam"),
+				cam(0, 42, -58, 0, 1, -100, "switch belt placed and flipped, detector"),
 			},
 		}
 	end,

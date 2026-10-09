@@ -297,4 +297,122 @@ return function(t)
 		s.Service.Sync(s.host, s.profile, s.owner)
 		t.eq(s.Service.Target("belt"), nil)
 	end)
+
+	-- World-space bounds of a part (all eight corners).
+	local function bounds(p)
+		local cf, sz = p.CFrame, p.Size
+		local lo = { math.huge, math.huge, math.huge }
+		local hi = { -math.huge, -math.huge, -math.huge }
+		for _, dx in ipairs({ -1, 1 }) do
+			for _, dy in ipairs({ -1, 1 }) do
+				for _, dz in ipairs({ -1, 1 }) do
+					local w = cf * Vector3.new(dx * sz.X / 2, dy * sz.Y / 2, dz * sz.Z / 2)
+					lo = { math.min(lo[1], w.X), math.min(lo[2], w.Y), math.min(lo[3], w.Z) }
+					hi = { math.max(hi[1], w.X), math.max(hi[2], w.Y), math.max(hi[3], w.Z) }
+				end
+			end
+		end
+		return lo, hi
+	end
+
+	t.test("TLD-1 line pieces stay inside their footprint, ports at deck top 0.72 (+ rise)", function()
+		local s = setup()
+		local Catalog = s.loader:shared("ItemCatalog")
+		for _, id in ipairs({ "SwitchBelt", "TiltedBelt", "BeltSupport", "WoodDetector" }) do
+			local def = Catalog.GetMachine(id).belt
+			local model = s.MachineArt.BuildBelt(id, false)
+			for _, p in ipairs(model:GetDescendants()) do
+				if p:IsA("BasePart") and p.Name ~= "Gate" then
+					local lo, hi = bounds(p)
+					t.ok(
+						lo[3] >= -def.depth / 2 - 1e-3 and hi[3] <= def.depth / 2 + 1e-3,
+						id .. " " .. p.Name .. " inside the footprint along the run"
+					)
+					t.ok(lo[2] >= -1e-3, id .. " " .. p.Name .. " not under the ground")
+				end
+			end
+		end
+		-- Tilted Belt: the low port face is deck top 0.72, the high one 0.72 + rise,
+		-- both flat (a straight belt or a belt on supports butts on flush).
+		local tilted = s.MachineArt.BuildBelt("TiltedBelt", false)
+		local lowTop, highTop
+		for _, p in ipairs(tilted:GetDescendants()) do
+			if p.Name == "Conveyor" then
+				local lo, hi = bounds(p)
+				if lo[3] <= -4 + 1e-3 then
+					lowTop = hi[2]
+					t.ok(math.abs(lo[2] - (hi[2] - 0.32)) < 1e-3, "the low lip is flat")
+				end
+				if hi[3] >= 4 - 1e-3 then
+					highTop = hi[2]
+				end
+			end
+		end
+		-- The pitched run's parts close both seams with the lips: each reaches
+		-- past the seam at either end (no gap down to the ground) and sits
+		-- centred on the run.
+		local seam = 4 - s.Automation.TiltLip
+		local pitched = {}
+		for _, p in ipairs(tilted:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name ~= "Roller" and math.abs(p.CFrame.LookVector.Y) > 0.1 then
+				local lo, hi = bounds(p)
+				pitched[p.Name] = true
+				t.ok(lo[3] <= -seam + 1e-3 and hi[3] >= seam - 1e-3, "pitched " .. p.Name .. " spans both seams")
+			end
+		end
+		for _, name in ipairs({ "Plate", "Pan", "GuardRail", "RailCap", "Conveyor" }) do
+			t.ok(pitched[name], "a pitched " .. name)
+		end
+		t.ok(lowTop and math.abs(lowTop - s.Automation.DeckTop) < 1e-3, "low port at 0.72")
+		t.ok(highTop and math.abs(highTop - (s.Automation.DeckTop + s.Automation.Lift)) < 1e-3, "high port at 2.72")
+		t.eq(s.Automation.Lift, 2.0, "a Belt Support saddle is the same 2.0")
+	end)
+	t.test("Wood Sweeper down: the bar is held by the rod, rests on the wood's side, clears the guard rail", function()
+		local s = setup()
+		local A = s.Automation
+		local PlotData = s.loader:shared("PlotData")
+		local BlueprintModels = s.loader:shared("BlueprintModels")
+		local sweeper = BlueprintModels.Build(PlotData.Blueprint("WoodSweeper"), false)
+		-- Snug beside a straight belt: the sweeper's centre 3 studs off the belt's.
+		sweeper:PivotTo(CFrame.new(-3, 0, 0))
+		s.Service._poseSweeper(sweeper, true)
+		t.eq(sweeper:GetAttribute("Swept"), true, "posed down")
+		local belt = s.MachineArt.BuildBelt("ConveyorStraight", false)
+		local part = {}
+		for _, p in ipairs(sweeper:GetDescendants()) do
+			if p:IsA("BasePart") then
+				part[p.Name] = { bounds(p) }
+			end
+		end
+		local post, arm, head, rod = part.Part2, part.Part3, part.Part4, part.Part5
+		t.ok(rod and arm and head and post, "post, arm, head and rod are all there")
+		-- The rod runs from inside the post to inside the arm: nothing floats.
+		t.ok(rod[1][1] <= post[2][1] and rod[2][1] >= arm[1][1], "the rod joins the post to the arm")
+		t.ok(rod[1][3] >= arm[1][3] and rod[2][3] <= arm[2][3], "the rod meets the arm along its length")
+		t.ok(rod[1][2] >= arm[1][2] - 1e-3 and rod[2][2] <= arm[2][2] + 1e-3, "the rod is level with the arm")
+		-- A 2-wide log centred on the deck with its face on the bar.
+		local logLo = arm[2][1]
+		t.ok(logLo > -1.5 and logLo + 2 < 1.5, "the bar's face leaves room for a log on the deck")
+		-- Nothing of the sweeper passes through the near guard rail or the deck.
+		for _, p in ipairs(belt:GetDescendants()) do
+			if p:IsA("BasePart") and (p.Name == "GuardRail" or p.Name == "Conveyor") then
+				local lo, hi = bounds(p)
+				for name, b in pairs(part) do
+					if name ~= "Root" and name ~= "Part1" then
+						local overlap = b[1][1] < hi[1] - 1e-3
+							and b[2][1] > lo[1] + 1e-3
+							and b[1][2] < hi[2] - 1e-3
+							and b[2][2] > lo[2] + 1e-3
+							and b[1][3] < hi[3] - 1e-3
+							and b[2][3] > lo[3] + 1e-3
+						t.ok(not overlap, name .. " clear of the belt's " .. p.Name)
+					end
+				end
+			end
+		end
+		s.Service._poseSweeper(sweeper, false)
+		local up = { bounds(sweeper:FindFirstChild("Part5")) }
+		t.ok(math.abs(up[1][2] - post[2][2]) < 0.02, "parked, the rod stands on the post top")
+		t.eq(A.SweepReach, 1.9, "reach pinned")
+	end)
 end

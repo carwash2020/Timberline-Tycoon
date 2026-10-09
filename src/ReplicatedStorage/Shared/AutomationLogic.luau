@@ -199,6 +199,7 @@ AutomationLogic.DeckTop = 0.72 -- TLD-1 deck top
 AutomationLogic.PlateWidth = 6.0 -- TLD-1 base plate
 AutomationLogic.Channel = 5.0 -- TLD-1 clear channel between the rails
 AutomationLogic.RollerPitch = 1.0 -- TLD-1 roller pitch
+AutomationLogic.TiltLip = 0.75 -- flat deck at each end of a Tilted Belt, so its port faces are vertical
 
 export type Ports = { power: number?, reverse: number?, side: number? }
 
@@ -366,6 +367,29 @@ AutomationLogic.SweepMax = 10 -- pieces one pulse may push (QA W5)
 AutomationLogic.SweepSpeed = 14 -- studs/s, sideways
 AutomationLogic.SweepLand = 5 -- studs: where a pushed piece is checked to land
 AutomationLogic.SweepCooldown = 0.5 -- seconds between pulses that push
+AutomationLogic.SweepPivotY = 1.72 -- arm pivot above the Root part's centre (post top 1.82)
+-- Studs the push bar reaches across toward local +X. A sweeper standing snug
+-- beside a belt (centre 3 studs off the belt's) puts the bar 0.16 short of
+-- the belt's middle: over the deck, inside the guard rail.
+AutomationLogic.SweepReach = 1.9
+
+-- Where the arm sits when it pushes, relative to the sweeper's Root part:
+-- dropped from upright to lie along the belt (local +Z), carried SweepReach
+-- across so the bar rests on the wood's side at log height. Shared by
+-- LogicService and the preview so the render is the game's pose.
+function AutomationLogic.SweepPose(): CFrame
+	local pivot = CFrame.new(0, AutomationLogic.SweepPivotY, 0)
+	return pivot * CFrame.new(AutomationLogic.SweepReach, 0, 0) * CFrame.Angles(math.pi / 2, 0, 0) * pivot:Inverse()
+end
+
+-- Where the push rod sits when the arm is down, relative to the Root part:
+-- level at the pivot, from the post's centre across to the arm's centre,
+-- so the bar is held, never floating. The rod's length is SweepReach.
+AutomationLogic.SweepRodZ = 0.5 -- along the belt: just past the post, under the arm
+function AutomationLogic.SweepRodPose(): CFrame
+	return CFrame.new(AutomationLogic.SweepReach / 2, AutomationLogic.SweepPivotY, AutomationLogic.SweepRodZ)
+		* CFrame.Angles(0, 0, math.pi / 2)
+end
 
 export type SweepCandidate = {
 	key: any,

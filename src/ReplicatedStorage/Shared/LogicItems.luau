@@ -378,14 +378,17 @@ local items: { Item } = {
 		gated = true,
 		tier = 1,
 		footprint = V2(2, 2),
-		-- Box 3 is the timber arm and box 4 the iron head. The arm is parked
-		-- upright, like a crossing gate, and LogicService swings it down
-		-- across the belt (local +X) on a pulse, then back up.
+		-- Box 3 is the timber arm, box 4 the iron head and box 5 the iron push
+		-- rod. Both bars are parked upright, like a crossing gate; on a pulse
+		-- LogicService drops the arm to lie along the belt and swings the rod
+		-- level, from the post across to the arm (AutomationLogic.SweepPose
+		-- and SweepRodPose), then back up.
 		boxes = {
 			{ size = V3(1.6, 0.3, 1.6), offset = V3(0, 0.15, 0), color = "#2B2B2E", material = "Metal" },
 			{ size = V3(0.5, 1.75, 0.5), offset = V3(0, 1.17, 0), color = "#2B2B2E", material = "Metal" },
 			{ size = V3(0.32, 6.0, 0.3), offset = V3(0, 4.97, 0), color = "#7A5230", material = "Wood" },
 			{ size = V3(0.62, 0.5, 0.9), offset = V3(0, 8.12, 0), color = "#2B2B2E", material = "Metal" },
+			{ size = V3(0.18, 1.9, 0.18), offset = V3(0, 2.995, -0.25), color = "#2B2B2E", material = "Metal" },
 		},
 		note = "Stand it beside a belt. A wire pulse sweeps the wood off",
 	},

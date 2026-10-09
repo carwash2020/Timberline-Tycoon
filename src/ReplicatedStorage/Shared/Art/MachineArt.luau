@@ -1272,6 +1272,12 @@ type DeckOptions = {
 	alongX: boolean?, -- rollers and the run go along X instead of Z
 	cross: boolean?, -- the collider follows the model's Side (Switch Belt)
 	width: number?, -- plate width across the run (default 6.0)
+	rollers: boolean?, -- false leaves the rollers off (a short flat lip)
+	collars: { number }?, -- which ends get brass port collars (-1, 1); default both
+	-- A pitched run's tan(pitch). Each part slides along the run so its own
+	-- centre line meets the vertical seams with the flat lips (not only the
+	-- deck top), and grows by height * shear so no corner leaves a notch.
+	shear: number?,
 }
 
 -- One straight run of deck, `length` along the frame's +Z (or +X with
@@ -1283,14 +1289,20 @@ local function deck(model: Model, frame: CFrame, length: number, preview: boolea
 	local function sized(across: number, height: number, along: number): Vector3
 		return if alongX then Vector3.new(along, height, across) else Vector3.new(across, height, along)
 	end
+	local shear = if alongX then 0 else (o.shear or 0)
 	local function at(across: number, y: number, along: number): CFrame
-		return frame * (if alongX then CFrame.new(along, y, across) else CFrame.new(across, y, along))
+		local a = along + (y - DECK_TOP) * shear
+		return frame * (if alongX then CFrame.new(a, y, across) else CFrame.new(across, y, a))
+	end
+	local function len(height: number): number
+		return length + height * shear
 	end
 	local plate = part(
 		model,
 		"Plate",
-		sized(plateW, PLATE_T, length),
-		at(0, PLATE_T / 2, 0),
+		sized(plateW, PLATE_T, len(PLATE_T)),
+		-- (Pitched, the plate rides 0.05 up so its low corner stays above ground.)
+		at(0, PLATE_T / 2 + (if shear ~= 0 then 0.05 else 0), 0),
 		TLD.plate,
 		Enum.Material.Concrete,
 		preview,
@@ -1300,9 +1312,9 @@ local function deck(model: Model, frame: CFrame, length: number, preview: boolea
 		touchless(plate)
 	end
 	local pan =
-		part(model, "Pan", sized(CHANNEL, 0.1, length), at(0, 0.33, 0), TLD.pan, Enum.Material.Metal, preview, false)
+		part(model, "Pan", sized(CHANNEL, 0.1, len(0.1)), at(0, 0.33, 0), TLD.pan, Enum.Material.Metal, preview, false)
 	pan.CastShadow = false
-	local n = math.max(1, math.floor(length / AutomationLogic.RollerPitch + 1e-6))
+	local n = if o.rollers == false then 0 else math.max(1, math.floor(length / AutomationLogic.RollerPitch + 1e-6))
 	for i = 0, n - 1 do
 		local along = -length / 2 + 0.5 + i * AutomationLogic.RollerPitch
 		local cf = at(0, 0.5, along) * (if alongX then CFrame.Angles(0, math.pi / 2, 0) else CFrame.identity)
@@ -1320,7 +1332,7 @@ local function deck(model: Model, frame: CFrame, length: number, preview: boolea
 			local r = part(
 				model,
 				"GuardRail",
-				sized(0.4, RAIL_TOP - PLATE_T, length),
+				sized(0.4, RAIL_TOP - PLATE_T, len(RAIL_TOP - PLATE_T)),
 				at(sideX * RAIL_X, (RAIL_TOP + PLATE_T) / 2, 0),
 				TLD.rail,
 				Enum.Material.Metal,
@@ -1333,7 +1345,7 @@ local function deck(model: Model, frame: CFrame, length: number, preview: boolea
 			local cap = part(
 				model,
 				"RailCap",
-				sized(0.44, 0.06, length),
+				sized(0.44, 0.06, len(0.06)),
 				at(sideX * RAIL_X, RAIL_TOP + 0.03, 0),
 				TLD.cap,
 				Enum.Material.Metal,
@@ -1341,7 +1353,8 @@ local function deck(model: Model, frame: CFrame, length: number, preview: boolea
 				false
 			)
 			cap.CastShadow = false
-			for _, endZ in ipairs({ -1, 1 }) do
+			local collarEnds: { number } = o.collars or { -1, 1 }
+			for _, endZ: number in ipairs(collarEnds) do
 				local collar = part(
 					model,
 					"PortCollar",
@@ -1360,7 +1373,7 @@ local function deck(model: Model, frame: CFrame, length: number, preview: boolea
 	local band = part(
 		model,
 		"Conveyor",
-		Vector3.new(CHANNEL, 0.32, length),
+		Vector3.new(CHANNEL, 0.32, len(0.32)),
 		at(0, DECK_TOP - 0.16, 0) * CFrame.Angles(0, if alongX then -math.pi / 2 else math.pi, 0),
 		BELT,
 		Enum.Material.Metal,
@@ -1463,19 +1476,48 @@ local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: b
 		gate.CastShadow = true
 		MachineArt.SetSwitchSide(model, 1)
 	elseif def.shape == "tilted" then
+		-- A flat lip at each port face (deck top 0.72 at the low end, 0.72 +
+		-- rise at the high end, vertical end faces flush with the footprint)
+		-- and the pitched run between them. A pitched run alone would poke
+		-- its end faces past the footprint into the next belt.
 		local rise = def.rise or AutomationLogic.Lift
 		local run = def.depth
-		local theta = math.atan2(rise, run)
+		local lip = AutomationLogic.TiltLip
+		local slopeRun = run - 2 * lip
+		local theta = math.atan2(rise, slopeRun)
 		local up = Vector3.new(0, math.cos(theta), -math.sin(theta))
 		local forward = Vector3.new(0, math.sin(theta), math.cos(theta))
 		local mid = (DECK_TOP + DECK_TOP + rise) / 2
 		local pos = Vector3.new(0, mid, 0) - up * DECK_TOP
 		local frame = CFrame.fromMatrix(pos, Vector3.new(1, 0, 0), up, forward)
-		deck(model, frame, run / math.cos(theta), preview)
-		-- Trestle: timber posts under the plate at the high end and the middle.
-		for _, z in ipairs({ 0.5, run / 2 - 0.6 }) do
-			local s = (z - pos.Z) / forward.Z
-			local bottom = (frame * CFrame.new(0, 0, s)).Position.Y
+		deck(model, frame, slopeRun / math.cos(theta), preview, { collars = {}, shear = math.tan(theta) })
+		local low = origin * CFrame.new(0, 0, -run / 2 + lip / 2)
+		local high = origin * CFrame.new(0, rise, run / 2 - lip / 2)
+		deck(model, low, lip, preview, { rollers = false, collars = { -1 } })
+		deck(model, high, lip, preview, { rollers = false, collars = { 1 } })
+		-- An iron rail clamp over each seam where the pitched rails meet the
+		-- lips' rails, so the joint reads as one rail with no lip or step.
+		for _, seam in ipairs({ { z = -slopeRun / 2, y = 0 }, { z = slopeRun / 2, y = rise } }) do
+			for _, sx in ipairs({ -1, 1 }) do
+				local clamp = part(
+					model,
+					"RailClamp",
+					Vector3.new(0.52, RAIL_TOP - PLATE_T + 0.22, 0.3),
+					CFrame.new(sx * RAIL_X, seam.y + (RAIL_TOP + PLATE_T) / 2 + 0.03, seam.z),
+					TLD.cap,
+					Enum.Material.Metal,
+					preview,
+					false
+				)
+				clamp.CastShadow = false
+			end
+		end
+		-- Trestle: timber posts under the plate, the high lip and the middle.
+		for _, z in ipairs({ 0, run / 2 - lip / 2 }) do
+			-- The pitched plate's underside at z (it runs through `pos`).
+			-- (The post reaches the high edge of its top, so it never shows a gap.)
+			-- (+ the pitched plate's 0.05 lift, measured upright.)
+			local bottom = if z == 0 then pos.Y - math.tan(theta) * (pos.Z - 0.25) + 0.05 / math.cos(theta) else rise
 			if bottom > 0.2 then
 				for _, sx in ipairs({ -1, 1 }) do
 					lookPart(
