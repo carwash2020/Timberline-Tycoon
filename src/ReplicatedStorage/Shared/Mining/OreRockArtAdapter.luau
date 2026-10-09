@@ -133,7 +133,8 @@ local function findLive(): any
 	local sharedFolder = ReplicatedStorage:FindFirstChild("Shared")
 	local art = sharedFolder and sharedFolder:FindFirstChild("Art")
 	local mod = art and art:FindFirstChild("NatureArt")
-	if mod == nil or not mod:IsA("ModuleScript") then
+	-- Under Lune the loader hands back plain tables, not Instances: no live art.
+	if mod == nil or typeof(mod) ~= "Instance" or not mod:IsA("ModuleScript") then
 		return nil
 	end
 	local ok, result = pcall(require, mod)
