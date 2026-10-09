@@ -4,6 +4,29 @@
 
 - **V1 UI round 3** (branch `phase-2/v1-u-ui`, PR #124, 9 October 2026): the GAD final skins as `UITheme` tokens and code (`UITheme.Plate`: Paper plaque and panel with a Bark stroke and a 4 px drop edge; buttons with corner 10, a 3 px drop edge, a shine, pressed onto the edge, a stroke only on the starter style; the loading card is one plaque over an Ink 45% backdrop), the phone HUD (MENU, HAMMER and Sell here as 44 x 44 icon buttons in one column; SAVES, Send truck home and OWNER are rows in MENU, phone only) and the three icons (`UITheme.HudIcons` Image ids 76852120099119, 129127727779001, 96932580819074; PNGs in `assets/ui/icons/`). What's New has a 44 x 44 Close at the top right of its title strip. Previews (drawn by `tools/preview/v1u_round3.py`, real icon PNGs): `previews/v1-u/r3-hud-phone-667x375.png`, `previews/v1-u/r3-quickmenu-phone-667x375.png`, `previews/v1-u/r3-loading-667x375.png`, `previews/v1-u/r3-news-phone-667x375.png`, `previews/v1-u/r3-hud-pc-1920x1080.png`, `previews/v1-u/r3-loading-1920x1080.png`, `previews/v1-u/r3-skins-pc-1920x1080.png`, `previews/v1-u/r3-theme-sheet-667x375.png`, `previews/v1-u/r3-theme-sheet-1920x1080.png`. Specs: `tests/PhoneHud.spec.luau` (new); `LoadingScreen.spec` and `UITheme.spec` moved only for the new design (title font FredokaOne, backdrop 0.45, one plaque, `ButtonDrop` 3). Studio checks: PHASE2_NOTES.md "V1 UI round 3".
 - **V1 UI redesign** (branch `phase-2/v1-u-ui`, 8 October 2026): mockups `previews/v1-u/loading-667x375.png`, `previews/v1-u/loading-1920x1080.png` (sunset scene, the wordmark, a progress bar, one tip), `previews/v1-u/hud-667x375.png`, `previews/v1-u/hud-1920x1080.png` (in-context HUD: cash, Field Guide with its book icon, side buttons with saves/hammer/truck icons, a selection ring, a dark hint pill, and on the phone Roblox's thumbstick ring plus the jump button, with the hotbar clear of the stick), `previews/v1-u/hud-buttons-667x375.png`, `previews/v1-u/hud-buttons-1920x1080.png` (button styles only), `previews/v1-u/owner-menu-667x375.png`, `previews/v1-u/owner-menu-1920x1080.png`, `previews/v1-u/theme-sheet-667x375.png`, `previews/v1-u/theme-sheet-1920x1080.png` (Danger fill `#B23B30`; cream on danger is 4.80:1), `previews/v1-u/news-667x375.png`, `previews/v1-u/news-1920x1080.png` (the card is as tall as its rows, with a sunset wordmark; each headline has a muted second line; Close is centred, 44px on the phone, and clear of the jump box and the thumbstick). Live UI uses the same tokens (walnut, cream, amber, confirm, danger, muted; GothamBold and Gotham; radius 8; 2px stroke; 4px selection ring). Loading tips rotate one at a time from `ReplicatedFirst/LoadingTips`. What's new is seven headlines plus a short second line in `NewsLogic.Entries` (island map with the Bayou and Red Mesa, mining, blueprints, Foreman Rook's jobs, axe tempering, Sparkworks, the gondola sky island). It shows once after the tutorial (`onboarding["News:V1"]`, no new save field), and from Settings. On a short screen the card, including Close, sits right of the thumbstick and above the jump box. Owner menu, quick menu, Settings and What's new select their first button on open; B closes; none of them binds the right trigger. **Lane E:** `DailyUI` stays in the client module list, but the client does not start it, so there is no DailyUI startup warning. Lane E (Foreman) replaces that module. Studio checks: PHASE2_NOTES.md "V1 UI".
+Last updated 8 October 2026 (Lane D axe, box, shelf and hover remake, branch `phase-2/v1-d-axes-displays`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+
+## Lane D — axes, boxes, shelves, displays (done)
+
+Branch `phase-2/v1-d-axes-displays`, rebased onto main at `f96b62c` (A1). Connor reviews each render before this merges. Paths below are the pictures to open.
+
+Axes, temper colours, the stepped shelf unit, window boxes and hover price colours are on this branch. The store board is not: `StoreBoard` and its spec match main, and the board scene and pictures are gone. Lane P owns a full board redesign. This branch does not type Robux prices onto the board. The shop's shelves on screen are still `ShopInterior.SteppedUnit` (lane C). `ShelfLayout.Build` is the unit those shelves should copy. Economy numbers did not move in this lane.
+
+Keen is the speed temper (sky blue wind, `#6FB7E8`). Heavy is the damage temper (white edge sheen, `#FFFFFF`). Prosperous stays coin gold (`#F2C14E`). `TemperLook` covers exactly the prefixes `TemperLogic` exports. The neon edge, Keen's streaks and Heavy's sheen sit on the front face of `MeshHead` (its Size and CFrame after MeshKit places it). With no mesh, they use the part-built head. The Hermit's Maul has no uploaded mesh. It stays the part-built wedge (head 0.9×2.4×1.7, a flat poll, rope on the haft). It needs a Blender mesh. Do not invent one.
+
+Part-built axe, temper and shelf pictures are not in this PR. Connor rejected them. Reshoot after `phase-2/v1-preview-meshes` is on main. The box and hover pictures are still here:
+
+- `previews/v1-d/boxes-before-lineup.png` — five window boxes before the remake.
+- `previews/v1-d/boxes-before-axe.png`
+- `previews/v1-d/boxes-before-sawmill.png`
+- `previews/v1-d/boxes-after-lineup.png` — the same boxes after: 0.1 accent band and a brass plate, no price.
+- `previews/v1-d/boxes-after-axe.png`
+- `previews/v1-d/boxes-after-sawmill.png`
+- `previews/v1-d/hover-colours.png` — gold when you can pay, red when you cannot, cream when the line is not a cash price.
+
+Awaiting Connor: the Hermit's Maul is part-built and needs a Blender mesh. The hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and cash prices are unchanged.
+
+Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 ## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
 
 Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the best wood the player can already reach (`MINING.md`). The Lux Pickaxe is not for sale. `profile.mining` is account-wide, like the pick level.
@@ -28,6 +51,139 @@ Last updated 7 October 2026 (dialogue box branch on top of main at #95), after P
 - **No floating speech bubbles (`claude/remove-bubbles`, 8 October 2026, not merged):** Connor: with the pop-up dialogue box, remove the floating chat bubbles. Gone: the wave hello, idle chatter, Murph's first-tip bubble, and every NPC's bubble code (`NPCController`, `NPCDialogue.AutoBubbles` and the Bubble* helpers, `TextAnchor.CardPx`/`Side`). Kept: name tags (wall-safe through `TextAnchor`), the Talk prompt, the box, the wave and talking gestures (the talking gesture now plays while the box is open), the murmur sound (plays as the box opens). Murph's three onboarding tips now open in the box the first time a new player talks to him on step one (`QuestUI`). Ferry fare, toll fee and shop prices still arrive through the prompts' own text (`Board ($x)`, `Pay toll ($x)`), the keepers' box lines and the toasts. Studio checklist in PHASE2_NOTES.md.
 - **Hotfix `claude/fix-shop-talk-buy` (8 October 2026, not merged):** Talk and Buy prompts went dead after #107-#111 (the global prompt switch was saved and restored by four scripts that overlap); now `PromptGate` / `PromptSwitch` hold it by name. Open until Connor confirms on Xbox: see PHASE2_NOTES.md "Hotfix: Talk and Buy prompts". Output tags to send back: `[Talk]`, `[PromptSwitch]`, `[Drag]`.
 - **Preview meshes (`phase-2/v1-preview-meshes`):** the model preview draws the uploaded GLBs in `assets/meshes` (axes, trucks, trees, buildings, kit). A mesh id with no file is a magenta MISSING MESH box, never a silent part-built stand-in.
+
+## Lane G: V1 nature looks (branch `phase-2/v1-g-nature`, not merged)
+
+First renders are in `previews/v1-g/` so Connor can mark them up before this merges. Trees in those shots are the live section trees (`TreeArt.FromSkeleton`). Rocks, plants, cave dressing, the gull, the snow fox and the sky moth are new part-built models. Rain shots are parts, because the preview tool does not draw particles: blobs are the old puff, streaks are the remake.
+
+The client now places those pieces. `AmbientLife` reads zones from `NatureData` (`ScatterZones` when Lane B has merged it, otherwise `WorldPlan`, plus `UndergroundData` rooms). Cave dressing shares `MaxDecor`, stays at or under 120 parts per cave, and uses at most 6 unshadowed lights (2 on low, 4 on medium, 6 on high). Surface nature parts near the camera stay within 560 / 320 / 148. Critters also stop at 320 / 240 / 120 parts, and still at `MaxCritters`. Walkers stay off a road's edge by more than 4 studs. Filler trees come from `TreeArt.FillerTree` (same part counts as before). Rain is a thin streak (`Size` 0.05, `Squash` 9, slanted) plus ground splashes, both inside the old 560 budget: about 198 live particles on high, 139 on medium, 99 on low. A raycast plus cave, tunnel and grotto zones fades rain and the rain sound under shelter. The wet-air haze is `RainFog`: WeatherController only publishes a 0–1 wetness, and LightingController adds it once to its own fog target (`+0.08` density, `+1.1` haze at full storm). Steady rain no longer stacks fog until the sky goes white. No cash change and no tree-volume change. Palm section trees stay at 3 coconuts.
+
+Rocks are six families (`Boulder`, `CrackedBoulder`, `Spire`, `Slab`, `PebbleCluster`, `Outcrop`), three sizes, each tilted 8–20° and sunk 20–30%. No block is taller than 1.5× its width (a spire is stacked offset courses). A built rock is 7 parts, 8 for a pebble cluster. Meadow moss and the snow cap are two thin wedges on the crown (Grass `#667552`, or Snow), at most 0.3 studs proud. Other biomes use the same patches in their own stone. `NatureArt.OreRock(shape, size, oreColor, oreMaterial, glow, oreId?)` is a contrasting host plus 2 vein wedges, each about a fifth of the face it sits on, 8 parts or fewer, tagged `OreRockArt`. `OreId` stays `""` unless the caller passes an ore id. That id reads `OreData` (vein color, material, glow; no prices) and wins over the color arguments. A dark ore (coal) sits on light grey; a bright ore sits on dark stone. Neon and a shadowless PointLight are added only when the ore glows: a pale vein (opal) gets a dim light, a saturated one (heartstone) shines. Ore rocks are not scattered yet.
+
+`RockModels` holds the uploaded Blender rocks (ids pasted 2026-10-08): six kinds, each with an A and a B variant, and six slots per variant (`MeshHost`, `MeshVein1`, `MeshVein2`, `MeshMoss`, `MeshSnow`, `MeshGlow`) with Blender sizes, per-piece `offset` and a `hostCentre`. `NatureArt` puts MeshHost at `hostCentre * scale` and every other piece at `MeshHost.CFrame * CFrame.new(offset * scale)`, before `settle()` tilts and sinks the whole model, so caps and veins sit on the stone. Scatter rocks pick A or B from their seed (same seed, same variant). `RockModels.KindFor(shape)` maps Lane M's ore shapes (boulder, split, standing, slab, mossy, pebbles) to a kind and variant (`mossy` is Boulder B plus a MeshMoss cap); capitalised kind names pass through, anything else is Boulder A, logged once. `NatureArt.CaveMouth()` builds the mine mouth from the uploaded Body, Frame, Glow and Collision (Collision is the invisible collider, Body does not collide, Glow is Neon with a PointLight range 14), or a part-built frame when an id is 0 or a load fails. `RockModels.Scenery` also holds RubbleBoulders and RubbleTunnel with their uploaded ids (not built yet, Lane M). A missing id or failed load keeps the part build and logs once per shape, variant and slot. `NatureArt.BuildFlat` is Build without the tilt, for specs and previews. The preview manifest (`assets/meshes/manifest.json`, with `"tint": true`) now lists the 84 rock and scenery ids, with their GLBs under `assets/meshes/rocks/`.
+
+The preview renderer multiplies a mesh by its part colour only when the manifest entry says `"tint": true` (the rock vertex colours are greyscale shading, so without it the rocks draw white); `tools/preview/viewer.html` and `export.luau` carry that opt-in and nothing else changed there. A mossy ore rock's moss cap uses the meadow cap green, not the ore host's grey, so it reads as moss.
+
+`src/ReplicatedStorage/MeshTemplates/<meshId>.model.json` now exists for all 84 rock, cave and rubble ids (the same MeshPart format as the other templates), so MeshKit finds each piece in Studio and no rock falls back. `tests/RockModels.spec` checks that every id `RockModels.MeshIds()` returns has a template, and `tests/NatureArt.spec` builds every kind, variant, look, size, ore shape and the cave mouth and asserts no `MeshFallback` attribute and no "mesh is missing" warning. The fallback code stays for an id of 0 or a missing template.
+
+Cave mouth placement is not wired here: B's `UndergroundData.MineMouth` does not exist on this branch (see the PR's cross-lane requests).
+
+**Awaiting Connor:** palm section trees stay at 3 coconuts, because that count is a shape field and changing it would move the economy volumes. Say if any rock, plant, critter or rain streak below should change before it is placed.
+
+Rock and ore previews are one model per frame: a 3/4 camera about 25° up, the rock about 55% of the frame height, name on a ground plaque turned 180° about Y so it reads from the camera. Boulder carries the meadow moss, cracked boulder the snow cap. Each ore vein is turned toward the camera. The cave shot is the same eight rocks, preview-lit (mean brightness about 44%) with heartstone the bright one. The meadow shot is from 12 studs up, 30° down, over a 60×60 patch with grass, flowers, small rocks, a rabbit and a deer. Nothing in those scene files changes the game.
+
+Preview paths:
+
+- `previews/v1-g/cave-mouth.png` (real meshes)
+- `previews/v1-g/ore-host.png`, `ore-coal.png`, `ore-copper.png`, `ore-iron.png`, `ore-silver.png`, `ore-gold.png`, `ore-opal.png`, `ore-heartstone.png`, `ore-rocks-cave.png` (reshot with the real Blender rocks, Lane M's ore shapes; opal is the mossy Boulder B)
+- `previews/v1-g/rock-boulder.png`, `rock-crackedboulder.png`, `rock-spire.png`, `rock-slab.png`, `rock-pebblecluster.png`, `rock-outcrop.png` (reshot with the real Blender rocks)
+- `previews/v1-g/trees-lineup.png`
+- `previews/v1-g/trees-oak.png`
+- `previews/v1-g/trees-birch.png`
+- `previews/v1-g/trees-pine.png`
+- `previews/v1-g/trees-maple.png`
+- `previews/v1-g/trees-palm.png`
+- `previews/v1-g/trees-frostwood.png`
+- `previews/v1-g/trees-lanternwood.png`
+- `previews/v1-g/trees-emberwood.png`
+- `previews/v1-g/trees-gloamwood.png`
+- `previews/v1-g/trees-lumenwood.png`
+- `previews/v1-g/trees-lanternwood-night.png`
+- `previews/v1-g/trees-emberwood-night.png`
+- `previews/v1-g/trees-gloamwood-night.png`
+- `previews/v1-g/trees-lumenwood-night.png`
+- `previews/v1-g/rock-boulder.png`
+- `previews/v1-g/rock-crackedboulder.png`
+- `previews/v1-g/rock-spire.png`
+- `previews/v1-g/rock-slab.png`
+- `previews/v1-g/rock-pebblecluster.png`
+- `previews/v1-g/rock-outcrop.png`
+- `previews/v1-g/nature-meadow.png`
+- `previews/v1-g/ore-host.png`
+- `previews/v1-g/ore-coal.png`
+- `previews/v1-g/ore-copper.png`
+- `previews/v1-g/ore-iron.png`
+- `previews/v1-g/ore-silver.png`
+- `previews/v1-g/ore-gold.png`
+- `previews/v1-g/ore-opal.png`
+- `previews/v1-g/ore-heartstone.png`
+- `previews/v1-g/ore-rocks-cave.png`
+- `previews/v1-g/nature-plants.png`
+- `previews/v1-g/nature-flowers-close.png`
+- `previews/v1-g/nature-cave.png`
+- `previews/v1-g/nature-glow-fungus.png`
+- `previews/v1-g/nature-mushroom-ring-lantern-pods.png`
+- `previews/v1-g/critters-lineup.png`
+- `previews/v1-g/critters-birds.png`
+- `previews/v1-g/critters-rabbits.png`
+- `previews/v1-g/critters-deer.png`
+- `previews/v1-g/critters-gulls.png`
+- `previews/v1-g/critters-snow-fox.png`
+- `previews/v1-g/critters-sky-moth.png`
+- `previews/v1-g/critters-wisps.png`
+- `previews/v1-g/critters-embers.png`
+- `previews/v1-g/rain-high-before-blobs.png`
+- `previews/v1-g/rain-high-after-streaks.png`
+- `previews/v1-g/rain-low-after-streaks.png`
+- `previews/v1-g/rain-shop-inside.png`
+- `previews/v1-g/rain-shop-outside.png`
+## Lane C previews (branch `phase-2/v1-c-buildings`)
+
+Connor (8 October 2026): every design is rendered as soon as it exists, before merge, so he can see it and send tweaks. Renders live in `previews/v1-c/` (the `preview/` folder stays gitignored). Studio checklist: PHASE2_NOTES.md, "V1 buildings, shops, props and palette". Economy headlines are unchanged (no price, recipe, or walk-time edit).
+
+Part counts, whole model, Lune (shop cap 250, including the interior):
+
+| Model | Before | After |
+| --- | --- | --- |
+| Tool Shed | 626 | 241 |
+| Hearth and Home | 311 | 195 |
+| Dealership | 245 | 215 |
+| Sawmill | 398 | 402 |
+| Gate kiosk | — | 7 |
+| Odds and Ends | — | 37 |
+| Sparkworks | — | 20 |
+| Sky Market | — | 10 |
+| Sky turnstile | — | 4 |
+| Plot map | — | 3 |
+| Arrival arch | — | 4 |
+| Land Office (art only) | — | 8 |
+| Sky forge court | — | 23 |
+
+Round 1 framing (8 October 2026). `town-overview.png` is one elevated three-quarter of a grouped street (the per-building fronts are unchanged). The four scene shots are three-quarter views from about 25 studs, each prop about half the frame. The DAILY JOBS board is wider, with the posts on its edges, so the words clear the posts. The Tool Shed gold table is unchanged.
+
+Round 2 (8 October 2026). The sky forge court uses the street palette: honey plank walls, a weathered-timber furnace with thick timber and honey bands, and a stone chimney. Darker slate photographed as a missing material on the shadowed street face. The four scene props are rebuilt, 10 to 30 parts each: a teepee fire with a tripod pot and log seats, a dock on water with posts, a rod, a bucket and a crate, a lookout platform about 9 studs up with a ladder and a coin telescope, and a park bench with a back and arms. `mill-foreman.png` is unchanged.
+
+Round 3 (8 October 2026). Those five are in the live town (`WorldPlan.Town().scenes`, built by MapBuilder into `TownScenes`). Lane B's map has not merged, so the spots are the current town layout. The sky forge court is on the south-west meadow at (-112, -20), front toward the mill, on `SkyForgeFloor`. The lookout is just west of it at (-136, -20), telescope toward town. The park bench is at (-84, 56) and the campfire at (-72, 56), on the green south of MainStreet. The fishing dock is on the Starter Forest pond's north bank (pond centre 78, -182), posts down into the water; MapBuilder drops the preview water sheet. The town-overview aerial reshoot waits on `phase-2/v1-preview-meshes` (the exporter still drops MeshParts, so the Blender shops still read as boxes).
+
+Paths:
+- `previews/v1-c/sawmill-front.png`
+- `previews/v1-c/toolshed-front.png`
+- `previews/v1-c/hearth-front.png`
+- `previews/v1-c/dealership-front.png`
+- `previews/v1-c/floor-toolshed.png`
+- `previews/v1-c/floor-hearth.png`
+- `previews/v1-c/floor-dealership.png`
+- `previews/v1-c/weigh-house.png`
+- `previews/v1-c/gate-kiosk.png`
+- `previews/v1-c/odds-and-ends.png`
+- `previews/v1-c/sparkworks.png`
+- `previews/v1-c/sky-market.png`
+- `previews/v1-c/sky-turnstile.png`
+- `previews/v1-c/plot-map.png`
+- `previews/v1-c/arrival-arch.png`
+- `previews/v1-c/land-office.png`
+- `previews/v1-c/sky-forge-court.png`
+- `previews/v1-c/campfire.png`
+- `previews/v1-c/fence.png`
+- `previews/v1-c/lamp-post.png`
+- `previews/v1-c/scene-fishing.png`
+- `previews/v1-c/scene-campfire.png`
+- `previews/v1-c/scene-lookout.png`
+- `previews/v1-c/scene-bench.png`
+- `previews/v1-c/machine-sawmill.png`
+- `previews/v1-c/mill-foreman.png`
+
+Foreman stand for Lane E. `MillForemanSpot` is an anchored, transparent, non-colliding part on the sawmill, west of the office door, facing the road (-Z). With the mill at `WorldPlan.Town().sawmill` (`CFrame.new(0, 0, 116.5)`), the spot's world CFrame is `CFrame.new(-26.025, 0.15, 97.45)` (look -Z). In the scaled model, before that placement, it is `CFrame.new(-26.025, 0.15, -19.05)`. The DAILY JOBS board stands just west of it, wide enough that the words sit between the posts with padding on both sides. The office lumber, barrel and crates moved behind the cabin so the stand has 6 studs of clear ground.
 
 ## Who and how
 

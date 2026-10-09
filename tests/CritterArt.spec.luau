@@ -120,4 +120,29 @@ return function(t)
 		t.ok(string.find(rabbit, "dist < 25", 1, true) ~= nil, "it still bolts at 25 studs")
 		t.ok(string.find(rabbit, "findGround(ctx.player, 30, 70, 6)", 1, true) ~= nil, "it spawns 30 to 70 studs out")
 	end)
+
+	local function countParts(model)
+		local n = 0
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				n += 1
+				t.eq(d.CanCollide, false, model.Name .. " " .. d.Name .. " no collide")
+				t.eq(d.CanQuery, false, model.Name .. " no query")
+				t.eq(d.CanTouch, false, model.Name .. " no touch")
+			end
+			if d:IsA("PointLight") then
+				t.eq(d.Shadows, false, "critter light")
+			end
+		end
+		return n
+	end
+
+	t.test("gull, snow fox and sky moth stay under 12 parts", function()
+		t.ok(countParts(CritterArt.Gull(1)) <= 12, "gull")
+		t.ok(countParts(CritterArt.SnowFox(2)) <= 12, "snow fox")
+		t.ok(countParts(CritterArt.SkyMoth(3)) <= 12, "sky moth")
+		t.eq(CritterArt.Gull(1):GetAttribute("Critter"), "Gull")
+		t.eq(CritterArt.SnowFox(1):GetAttribute("Critter"), "SnowFox")
+		t.eq(CritterArt.SkyMoth(1):GetAttribute("Critter"), "SkyMoth")
+	end)
 end

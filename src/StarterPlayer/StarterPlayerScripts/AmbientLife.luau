@@ -32,6 +32,8 @@ local RunService = game:GetService("RunService")
 
 local CritterArt = require(ReplicatedStorage.Shared.Art.CritterArt)
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
+local NatureArt = require(ReplicatedStorage.Shared.Art.NatureArt)
+local NatureData = require(ReplicatedStorage.Shared.NatureData)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
@@ -101,7 +103,15 @@ local POOL_SPARE = 24 -- unused models kept per look
 
 -- One pooled decoration model: its parts and where they sit around its
 -- origin, so placing it is one CFrame per part.
-type Decor = { model: Model, parts: { BasePart }, locals: { CFrame }, key: string }
+type Decor = {
+	model: Model,
+	parts: { BasePart },
+	locals: { CFrame },
+	key: string,
+	natureParts: number?,
+	caveId: string?,
+	lit: boolean?,
+}
 
 type Cell = {
 	key: string,
@@ -206,6 +216,147 @@ local BUILDERS: { [string]: Builder } = {
 
 local decorPools: { [string]: { Decor } } = {}
 local liveDecor = 0
+local liveNatureParts = 0
+local cavePartCount: { [string]: number } = {}
+local caveLightCount: { [string]: number } = {}
+
+local natureZones: { NatureData.Zone }? = nil
+local scatterBlocked: ((number, number) -> boolean)? = nil
+
+local function optionalModule(name: string): any
+	return NatureData.TryModule(ReplicatedStorage.Shared:FindFirstChild(name))
+end
+
+local function zones(): { NatureData.Zone }
+	local cached = natureZones
+	if cached then
+		return cached
+	end
+	local scatter = optionalModule("ScatterZones")
+	local underground = optionalModule("UndergroundData")
+	local scatterZones = if type(scatter) == "table" then scatter.Zones else nil
+	if type(scatter) == "table" and type(scatter.Blocked) == "function" then
+		scatterBlocked = scatter.Blocked
+	end
+	local rooms = if type(underground) == "table" then NatureData.FromRooms(underground.Rooms) else nil
+	local made = NatureData.Assemble(scatterZones, NatureData.FromWorldPlan(WorldPlan), rooms)
+	natureZones = made
+	return made
+end
+
+local function onPaint(x: number, z: number): boolean
+	for _, rect in ipairs(WorldLayout.TownPaint) do
+		if x >= rect.x0 and x <= rect.x1 and z >= rect.z0 and z <= rect.z1 then
+			return true
+		end
+	end
+	for _, rect in ipairs(WorldLayout.TownFloors) do
+		if x >= rect.x0 and x <= rect.x1 and z >= rect.z0 and z <= rect.z1 then
+			return true
+		end
+	end
+	return false
+end
+
+local function groundBlocked(x: number, z: number): boolean
+	if EnvironmentData.DecorBlocked(x, z) then
+		return true
+	end
+	if TerrainGen.RoadClearance(x, z) < NatureData.RoadMargin then
+		return true
+	end
+	if WorldLayout.OnPlotPad(x, z) or WorldLayout.NearPlotPad(x, z, 4) then
+		return true
+	end
+	if onPaint(x, z) then
+		return true
+	end
+	local blocked = scatterBlocked
+	if blocked and blocked(x, z) then
+		return true
+	end
+	return false
+end
+
+local function noteNature(d: Decor, sign: number)
+	local n = d.natureParts
+	if not n then
+		return
+	end
+	liveNatureParts += sign * n
+	local caveId = d.caveId
+	if caveId then
+		cavePartCount[caveId] = math.max(0, (cavePartCount[caveId] or 0) + sign * n)
+		if d.lit then
+			caveLightCount[caveId] = math.max(0, (caveLightCount[caveId] or 0) + sign)
+		end
+	end
+end
+
+local function prepareNature(model: Model, spot: NatureData.Spot): boolean
+	local light = model:FindFirstChild("Glow", true)
+	if not (light and light:IsA("PointLight")) then
+		return false
+	end
+	light.Shadows = false
+	local caveId = spot.caveId
+	if not caveId then
+		return true
+	end
+	local cap = math.min(NatureData.CaveLightCap, QualityBudgets.CaveLightCap(Quality.Budget().Tier))
+	local used = caveLightCount[caveId] or 0
+	if used >= cap then
+		light.Enabled = false
+		return false
+	end
+	return true
+end
+
+local function natureKey(spot: NatureData.Spot): string
+	return "nature/" .. spot.kind .. "/" .. tostring(spot.variant) .. "/" .. (spot.look or "")
+end
+
+local function buildNature(spot: NatureData.Spot): Decor?
+	local sizeName = if spot.variant == 1 then "small" elseif spot.variant == 3 then "large" else "mid"
+	local model = NatureArt.Build(spot.kind, spot.seed, if spot.caveId then nil else sizeName, spot.look)
+	local lit = prepareNature(model, spot)
+	local parts: { BasePart } = {}
+	local locals: { CFrame } = {}
+	local low = Quality.Budget().Tier == "low"
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+			d.CastShadow = if low then false else d.Size.Magnitude > 4
+			table.insert(parts, d)
+			table.insert(locals, d.CFrame)
+		end
+	end
+	return {
+		model = model,
+		parts = parts,
+		locals = locals,
+		key = natureKey(spot),
+		natureParts = spot.parts,
+		caveId = spot.caveId,
+		lit = lit,
+	}
+end
+
+local function acquireNature(spot: NatureData.Spot): Decor?
+	local key = natureKey(spot)
+	local pool = decorPools[key]
+	local d = if pool then table.remove(pool) else nil
+	if not d then
+		d = buildNature(spot)
+	elseif d.model then
+		d.lit = prepareNature(d.model, spot)
+		d.caveId = spot.caveId
+		d.natureParts = spot.parts
+	end
+	return d
+end
 
 local function seedOf(biome: string, index: number, variant: number): number
 	local h = 17
@@ -310,6 +461,7 @@ end
 
 local function unloadCell(cell: Cell)
 	for _, d in ipairs(cell.items) do
+		noteNature(d, -1)
 		releaseDecor(d)
 	end
 	liveDecor -= #cell.items
@@ -336,21 +488,58 @@ local function loadCell(cx: number, cz: number, key: string)
 	end
 	local cell: Cell = { key = key, cx = cx, cz = cz, items = {}, biomes = consulted }
 	local parent = root()
+	local area = zones()
+	local natureLeft = QualityBudgets.NatureParts(Quality.Budget().Tier) - liveNatureParts
+	local natureSpots = NatureData.CellSpots(cx, cz, area, groundBlocked, cavePartCount, math.max(0, natureLeft))
+	type Place = { decor: DecorSpot?, nature: NatureData.Spot? }
+	local jobs: { Place } = {}
+	for _, nspot in ipairs(natureSpots) do
+		if nspot.caveId then
+			table.insert(jobs, { nature = nspot })
+		end
+	end
 	for _, spot in ipairs(spots) do
+		table.insert(jobs, { decor = spot })
+	end
+	for _, nspot in ipairs(natureSpots) do
+		if not nspot.caveId then
+			table.insert(jobs, { nature = nspot })
+		end
+	end
+	for _, job in ipairs(jobs) do
 		if liveDecor >= Quality.Budget().MaxDecor then
 			break
 		end
-		if not nearTree(spot.x, spot.z) and not WorldPlan.FillerTrunkNear(spot.x, spot.z, FILLER_CLEARANCE) then
-			local d = acquireDecor(spot)
-			if d then
-				local at = CFrame.new(spot.x, spot.y, spot.z) * CFrame.Angles(0, spot.yaw, 0)
-				for i, part in ipairs(d.parts) do
-					part.CFrame = at * d.locals[i]
-				end
-				d.model.Parent = parent
-				table.insert(cell.items, d)
-				liveDecor += 1
+		local d: Decor? = nil
+		local at: CFrame? = nil
+		local nspot = job.nature
+		if nspot then
+			local overCave = false
+			if nspot.caveId then
+				overCave = (cavePartCount[nspot.caveId] or 0) + nspot.parts > NatureData.CavePartCap
+			elseif liveNatureParts + nspot.parts > QualityBudgets.NatureParts(Quality.Budget().Tier) then
+				overCave = true
 			end
+			if not overCave and not nearTree(nspot.x, nspot.z) then
+				local y = nspot.y or TerrainGen.HeightAt(nspot.x, nspot.z)
+				d = acquireNature(nspot)
+				at = CFrame.new(nspot.x, y, nspot.z) * CFrame.Angles(0, nspot.yaw, 0)
+			end
+		else
+			local spot = job.decor :: DecorSpot
+			if not nearTree(spot.x, spot.z) and not WorldPlan.FillerTrunkNear(spot.x, spot.z, FILLER_CLEARANCE) then
+				d = acquireDecor(spot)
+				at = CFrame.new(spot.x, spot.y, spot.z) * CFrame.Angles(0, spot.yaw, 0)
+			end
+		end
+		if d and at then
+			for i, part in ipairs(d.parts) do
+				part.CFrame = at * d.locals[i]
+			end
+			d.model.Parent = parent
+			table.insert(cell.items, d)
+			liveDecor += 1
+			noteNature(d, 1)
 		end
 	end
 	cells[key] = cell
@@ -372,7 +561,7 @@ local function scanCells(focus: Vector3)
 			if d <= loadRadius then
 				local key = cellKey(cx, cz)
 				-- Up on the isles the ground is ~650 studs below: skip it.
-				if math.abs(focus.Y - cellGround(cx, cz, key)) < 160 then
+				if NatureData.WatchCell(zones(), cx, cz, focus, cellGround(cx, cz, key)) then
 					local cell: Cell? = cells[key]
 					if cell and dirty[key] then
 						unloadCell(cell)
@@ -396,7 +585,9 @@ local function scanCells(focus: Vector3)
 	for key, cell in pairs(cells) do
 		local mx, mz = (cell.cx + 0.5) * CELL, (cell.cz + 0.5) * CELL
 		local d = math.sqrt((mx - fx) ^ 2 + (mz - fz) ^ 2)
-		if d > unloadRadius or math.abs(focus.Y - cellGround(cell.cx, cell.cz, key)) > 200 then
+		local groundY = cellGround(cell.cx, cell.cz, key)
+		local groundFar = math.abs(focus.Y - groundY) > 200
+		if d > unloadRadius or (groundFar and not NatureData.WatchCell(zones(), cell.cx, cell.cz, focus, groundY)) then
 			unloadCell(cell)
 		end
 	end
@@ -622,7 +813,7 @@ local function walkable(x: number, z: number): boolean
 		and not WorldLayout.InGorge(x, z)
 	return WorldLayout.FlatWeight(x, z) <= 0
 		and TerrainGen.WaterLevelAt(x, z) == nil
-		and TerrainGen.RoadClearance(x, z) > 2
+		and TerrainGen.RoadClearance(x, z) > 4
 		and (inSquare or inStrip)
 end
 
@@ -1117,23 +1308,22 @@ end
 -- Ducks and fish
 ---------------------------------------------------------------------------
 
-local POND = WorldLayout.Pond
-
 local function stepDuck(c: Critter, dt: number, ctx: Ctx): boolean
 	local d = c.data
 	local t = c.age
 	local body = c.bodies[1]
 	local pose = c.poses[1]
-	-- Paddle slowly round the pond, steering away from anyone close.
+	-- Paddle slowly round the nearest water, steering away from anyone close.
 	d.angle += dt * (d.speed :: number) / (d.radius :: number)
-	local center = Vector3.new(POND.x, WorldLayout.LakeLevel - 0.05, POND.z)
+	local center: Vector3 = d.center
+	local pondR: number = d.pondR
 	local pos = center
 		+ Vector3.new(math.cos(d.angle) * d.radius, math.sin(t * 2 + d.angle) * 0.05, math.sin(d.angle) * d.radius)
 	if (flat(pos) - flat(ctx.player)).Magnitude < 7 then
 		-- Someone's close: paddle to the far side of the circle from them.
 		local playerOut = (flat(ctx.player) - flat(center)).Magnitude
 		local push = if playerOut < d.radius then 1 else -1
-		d.radius = math.clamp(d.radius + dt * 2 * push, 3, POND.radius - 4)
+		d.radius = math.clamp(d.radius + dt * 2 * push, 3, pondR - 4)
 	end
 	local heading = Vector3.new(-math.sin(d.angle), 0, math.cos(d.angle)) * math.sign(d.speed)
 	local dipping = math.sin(t * 0.35 + d.angle * 3) > 0.92
@@ -1144,14 +1334,19 @@ local function stepDuck(c: Critter, dt: number, ctx: Ctx): boolean
 	return not c.leaving or (flat(ctx.player) - flat(pos)).Magnitude < 120
 end
 
-local function spawnDuck(_ctx: Ctx): Critter?
+local function spawnDuck(ctx: Ctx): Critter?
+	local water = EnvironmentData.NearestWater(ctx.player.X, ctx.player.Z)
 	local look = math.random(1, 4)
 	local body = acquireBody("Duck" .. (look % 2), function(): Model
 		return CritterArt.Duck(look)
 	end)
-	local c = newCritter("Duck", { body }, Vector3.new(POND.x, WorldLayout.LakeLevel, POND.z), math.huge, stepDuck)
+	local center = Vector3.new(water.X, water.Y, water.Z)
+	local pondR = 18
+	local c = newCritter("Duck", { body }, center, math.huge, stepDuck)
+	c.data.center = center
+	c.data.pondR = pondR
 	c.data.angle = math.random() * TAU
-	c.data.radius = 4 + math.random() * (POND.radius - 9)
+	c.data.radius = 4 + math.random() * (pondR - 9)
 	c.data.speed = (if math.random() < 0.5 then -1 else 1) * (0.8 + math.random() * 0.6)
 	return c
 end
@@ -1365,6 +1560,84 @@ local SPAWNERS: { [string]: (Ctx) -> Critter? } = {
 	EmberSprite = spawnEmber,
 }
 
+local function critterParts(): number
+	local n = 0
+	for _, c in ipairs(critters) do
+		for _, b in ipairs(c.bodies) do
+			n += #b.parts
+		end
+	end
+	return n
+end
+
+local function spawnWalker(
+	ctx: Ctx,
+	kind: string,
+	key: string,
+	build: () -> Model,
+	minR: number,
+	maxR: number
+): Critter?
+	local spot = findGround(ctx.player, minR, maxR, 8)
+	if not spot then
+		return nil
+	end
+	local body = acquireBody(key, build)
+	local c = newCritter(kind, { body }, spot, 70 + math.random() * 50, stepRabbit)
+	return c
+end
+
+local function spawnGull(ctx: Ctx): Critter?
+	local spot = findGround(ctx.player, 20, 60, 6)
+	if not spot then
+		return nil
+	end
+	local body = acquireBody("Gull", function(): Model
+		return CritterArt.Gull(math.random(1, 5))
+	end)
+	local c = newCritter("Gull", { body }, spot, 50 + math.random() * 40, stepPerched)
+	c.data.yaw = math.random() * TAU
+	c.data.nextHop = 1
+	c.data.hopAt = -1
+	return c
+end
+
+local function spawnSnowFox(ctx: Ctx): Critter?
+	local c = spawnWalker(ctx, "SnowFox", "SnowFox", function(): Model
+		return CritterArt.SnowFox(math.random(1, 4))
+	end, 18, 45)
+	if c then
+		local a = math.random() * TAU
+		c.data.dir = Vector3.new(math.cos(a), 0, math.sin(a))
+		c.data.state = "sit"
+		c.data.until_ = 1 + math.random() * 2
+		c.data.hops = 0
+		c.data.hopT = 0
+	end
+	return c
+end
+
+local function spawnSkyMoth(ctx: Ctx): Critter?
+	local spot = findGround(ctx.player, 12, 40, 6)
+	if not spot then
+		return nil
+	end
+	local body = acquireBody("SkyMoth", function(): Model
+		return CritterArt.SkyMoth(math.random(1, 4))
+	end)
+	local anchor = spot + Vector3.new(0, 2.2, 0)
+	local c = newCritter("SkyMoth", { body }, anchor, 40 + math.random() * 30, stepButterfly)
+	c.data.anchor = anchor
+	c.data.phase = math.random() * TAU
+	local a = math.random() * TAU
+	c.data.drift = Vector3.new(math.cos(a), 0, math.sin(a)) * 0.35
+	return c
+end
+
+SPAWNERS.Gull = spawnGull
+SPAWNERS.SnowFox = spawnSnowFox
+SPAWNERS.SkyMoth = spawnSkyMoth
+
 local function releaseCritter(c: Critter)
 	for _, b in ipairs(c.bodies) do
 		releaseBody(b)
@@ -1384,17 +1657,47 @@ local function plan(ctx: Ctx)
 	local env = ctx.env
 	local player = ctx.player
 	local biomeId = env.biomeId
-	local pondDistance = (flat(player) - Vector3.new(POND.x, 0, POND.z)).Magnitude
-	local _, waterDistance, waterKind = EnvironmentData.NearestWater(player.X, player.Z)
-	local wants = EnvironmentData.CritterPlan({
+	local waterPoint, waterDistance, waterKind = EnvironmentData.NearestWater(player.X, player.Z)
+	local planned = EnvironmentData.CritterPlan({
 		biomeId = biomeId,
 		daylight = env.daylight,
 		weather = env.weather,
 		intensity = env.intensity,
 		vitality = vitalityOf(if biomeId == "" then "starter" else biomeId),
-		nearPond = pondDistance < 130 and math.abs(player.Y - WorldLayout.LakeLevel) < 60,
-		nearWater = waterDistance < 60 and waterKind ~= "pond" and math.abs(player.Y - WorldLayout.LakeLevel) < 60,
+		nearPond = waterKind == "pond" and waterDistance < 130 and math.abs(player.Y - waterPoint.Y) < 60,
+		nearWater = waterDistance < 60 and waterKind ~= "pond" and math.abs(player.Y - waterPoint.Y) < 60,
 	})
+	-- Gull, snow fox and sky moth are not in CritterPlan's kind list (Lane B
+	-- owns that module). Copy into a wider list so those extras can be added.
+	local wants: { { kind: string, count: number } } = {}
+	for _, w in ipairs(planned) do
+		local row: { kind: string, count: number } = { kind = w.kind, count = w.count }
+		table.insert(wants, row)
+	end
+	local function bump(kind: string, count: number)
+		for _, w in ipairs(wants) do
+			if w.kind == kind then
+				w.count += count
+				return
+			end
+		end
+		table.insert(wants, { kind = kind, count = count })
+	end
+	local here = zones()
+	if NatureData.Find(here, "shore", player.X, player.Z) or (waterDistance < 70 and waterKind ~= "pond") then
+		bump("Gull", 2)
+	end
+	if biomeId == "snow" or NatureData.Find(here, "snow", player.X, player.Z) then
+		bump("SnowFox", 1)
+		bump("Rabbit", 1)
+		bump("PerchedBird", 1)
+	end
+	if (biomeId == "sky" or NatureData.Find(here, "isle", player.X, player.Z)) and env.daylight < 0.45 then
+		bump("SkyMoth", 2)
+	end
+	if biomeId == "" and Quality.Budget().Tier == "high" then
+		bump("Deer", 1)
+	end
 	-- What's out already, and what's no longer wanted.
 	local wantCount: { [string]: number } = {}
 	for _, w in ipairs(wants) do
@@ -1419,6 +1722,9 @@ local function plan(ctx: Ctx)
 		local cost = EnvironmentData.CritterCost[w.kind] or 1
 		while (have[w.kind] or 0) < w.count and spawned < SPAWNS_PER_PLAN do
 			if spent + cost > Quality.Budget().MaxCritters then
+				return
+			end
+			if critterParts() + 12 > QualityBudgets.CritterPartCap(Quality.Budget().Tier) then
 				return
 			end
 			local spawner = SPAWNERS[w.kind]

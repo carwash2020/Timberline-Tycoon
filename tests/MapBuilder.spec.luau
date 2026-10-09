@@ -1038,6 +1038,61 @@ return function(t)
 		t.ok(grove, "a sign points to the first grove")
 	end)
 
+	t.test("the forge, dock, campfire, lookout and bench stand in the built town", function()
+		local s = build()
+		t.eq(s.warnings, {})
+		local folder = s.map:FindFirstChild("TownScenes")
+		t.ok(folder and folder:IsA("Folder"), "TownScenes")
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local town = WorldPlan.Town()
+		local names = {
+			forge = "SkyForgeCourt",
+			fishing = "fishing",
+			campfire = "campfire",
+			lookout = "lookout",
+			bench = "bench",
+		}
+		t.eq(#folder:GetChildren(), 5, "the five scenes")
+		for _, spot in ipairs(town.scenes) do
+			local model = folder:FindFirstChild(names[spot.kind])
+			t.ok(model and model:IsA("Model"), names[spot.kind] .. " is built")
+			local lo, hi
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") then
+					local p = d.CFrame.Position
+					lo = if lo then lo:Min(p) else p
+					hi = if hi then hi:Max(p) else p
+				end
+			end
+			local at = spot.cframe.Position
+			t.ok(
+				at.X >= lo.X - 1 and at.X <= hi.X + 1 and at.Z >= lo.Z - 1 and at.Z <= hi.Z + 1,
+				names[spot.kind] .. " stands on its spot"
+			)
+		end
+		local dock = folder:FindFirstChild("fishing")
+		t.ok(
+			dock:FindFirstChild("Deck", true) and dock:FindFirstChild("Pile", true) and dock:FindFirstChild("Rod", true)
+		)
+		t.eq(dock:FindFirstChild("Water"), nil, "the pond is the water under the dock")
+		local forge = folder:FindFirstChild("SkyForgeCourt")
+		t.ok(
+			forge:FindFirstChild("Anvil", true)
+				and forge:FindFirstChild("OrderBoard", true)
+				and forge:FindFirstChild("RelicGem", true)
+		)
+		t.ok(folder:FindFirstChild("lookout"):FindFirstChild("Telescope", true), "the lookout's telescope")
+		t.ok(folder:FindFirstChild("bench"):FindFirstChild("Back", true), "the bench's back")
+		t.ok(folder:FindFirstChild("campfire"):FindFirstChild("Pot", true), "the campfire's pot")
+		local tagged = false
+		for _, d in ipairs(folder:FindFirstChild("campfire"):GetDescendants()) do
+			if d.Name == "Flame" then
+				tagged = tagged or d:HasTag("Flame")
+			end
+		end
+		t.ok(tagged, "the campfire's flame is tagged for TownFX")
+	end)
+
 	t.test("an erroring landmark plan fails its own step alone: the other landmarks, SellArea, spawning", function()
 		local s = build({
 			worldPlan = {

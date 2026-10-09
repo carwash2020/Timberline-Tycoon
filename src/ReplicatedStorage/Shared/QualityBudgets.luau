@@ -238,6 +238,62 @@ function QualityBudgets.GlowLightCap(tier: string): number
 	return QualityBudgets.GlowLights.high
 end
 
+-- Client nature parts (rocks, plants, cave dressing) near the camera.
+-- These sit inside AmbientLife's MaxDecor model cap; they are not a second stack.
+QualityBudgets.NatureMax = table.freeze({
+	high = 560,
+	medium = 320,
+	low = 148,
+} :: { [string]: number })
+
+function QualityBudgets.NatureParts(tier: string): number
+	local n = QualityBudgets.NatureMax[tier]
+	if type(n) == "number" then
+		return n
+	end
+	return QualityBudgets.NatureMax.high
+end
+
+-- Animated critter parts near the player. AmbientLife also stops at MaxCritters.
+QualityBudgets.MaxCritterParts = table.freeze({
+	high = 320,
+	medium = 240,
+	low = 120,
+} :: { [string]: number })
+
+function QualityBudgets.CritterPartCap(tier: string): number
+	local n = QualityBudgets.MaxCritterParts[tier]
+	if type(n) == "number" then
+		return n
+	end
+	return QualityBudgets.MaxCritterParts.high
+end
+
+-- Rain streaks and ground splashes. Live particles are about rate * mid lifetime,
+-- then multiplied by WeatherRate (1 / 0.7 / 0.5). High stays under MaxDecor (560).
+QualityBudgets.RainStreakRate = 400
+QualityBudgets.RainSplashRate = 80
+
+function QualityBudgets.RainLive(tier: string): number
+	local scale = if tier == "low" then 0.5 elseif tier == "medium" then 0.7 else 1
+	local streaks = QualityBudgets.RainStreakRate * scale * ((0.35 + 0.55) / 2)
+	local splashes = QualityBudgets.RainSplashRate * scale * ((0.18 + 0.28) / 2)
+	return streaks + splashes
+end
+
+-- PointLights inside one cave. Never more than 6, and never with shadows.
+QualityBudgets.CaveLights = table.freeze({
+	low = 2,
+	medium = 4,
+	high = 6,
+} :: { [string]: number })
+
+function QualityBudgets.CaveLightCap(tier: string): number
+	local n = QualityBudgets.CaveLights[tier]
+	local cap = if type(n) == "number" then n else 6
+	return math.min(cap, 6)
+end
+
 -- Particles named Glint (the Lux Axe) per second. Low turns them off.
 function QualityBudgets.GlintRate(tier: string): number
 	if tier == "high" then

@@ -1,5 +1,35 @@
 # Phase 2+ build notes
 
+## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
+
+Done on this branch, not on main. Rebased onto main at `f96b62c`. The store board is not in this PR (lane P owns the redesign). Box and hover renders live in `previews/v1-d/` (listed in STATUS.md). Axe, temper and shelf pictures were part-built and are gone until `phase-2/v1-preview-meshes` can draw the real meshes.
+
+Axes (uploaded meshes replace the part-built axe when they load; the Hermit's Maul has no mesh and stays part-built):
+
+1. PC, Play mode. In the command bar run `print(require(game.ReplicatedStorage.Shared.Art.MeshKit).Stats())`. `loaded` is greater than 0 and the axe ids are not in `failedIds`. Equip Rusty, then each rung, then the Lux Axe. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat. The Hermit's Maul is still the part-built wedge (a heavy head, a flat poll, rope on the haft). It has no custom mesh yet.
+2. Phone emulator. The same equip, swing and drop. Drop is a long press on the hotbar. No new button, and nothing sits on the thumbstick or the jump button.
+3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
+
+Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Keen, Heavy or Prosperous until lane A2 wires it. Keen is the speed temper (sky blue wind). Heavy is the damage temper (a white edge sheen). Prosperous stays coin gold. The neon edge, the wind streaks and the white sheen sit on the front face of the head mesh, not inside it. With no mesh they use the part-built head. Stats do not move.
+
+Boxes (the window crate; shell stays at 9 parts, a full box at 42):
+
+4. PC. Buy or spawn a boxed axe and a boxed truck. The box has a wood body, a glass front, a 0.1 accent band and a small brass plate under the name, clear of the letters. No price, no decal, no billboard on the box. The item shows through the glass. Good: it matches `previews/v1-d/boxes-after-axe.png` and `boxes-after-sawmill.png`. A truck box still appears (the shell did not grow, so the 42-part cap still holds).
+5. Phone emulator, Lower quality. The same boxes. The copies of the item inside are gone and the glass is tinted. The shell, the band and the plate stay. Nothing new sits on the thumbstick or the jump button.
+6. Xbox. Look at a box on a shelf. The tag hangs on it. No control is bound to ButtonR2.
+
+Shelves (the unit is `ShelfLayout.Build`; the shop on screen still uses lane C's `ShopInterior.SteppedUnit` until C copies it):
+
+7. The unit is three boards stepping up (tops 3.2, 2.98, 2.76), four timber posts, a dark kick, three cream rails. Feet on the floor, front of the unit at the front. In Studio the Tool Shed shelves will not change until lane C adopts this unit. Gaps stay 1.5 across and 2.5 between rows. No shelf picture in this PR.
+
+Hover tag (the price line only; the words do not change):
+
+8. PC. With enough cash, look at a priced shelf item. The price line is gold (`#F2C14E`). Spend down or look at something you cannot afford: the line is red (`#D9534F`). A free item (price 0) is gold. Closed, already owned, out of stock, and a Robux line stay the old cream. One price, never two numbers.
+9. Phone emulator. The same colours. The tag does not cover the thumbstick or the jump button. Touch targets stay about 44×44 and 8px apart.
+10. Xbox. The same colours inside the existing look ranges (gamepad 12, touch 6). No new ButtonR2 bind.
+
+Awaiting Connor: a Blender mesh for the Hermit's Maul (it stays part-built until that exists), a hand 25–30% up the haft (it stays at 0.75), a Lux haft of 4.0 in play (it stays 3.5), and four bevel parts on the box corners (they are not parts).
+
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).
 
@@ -72,9 +102,11 @@ What's here, each with its own checklist below:
 
 14. **Trees in the spawn area** (8 October 2026, branch `claude/spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
 
+15. **V1 buildings, shops, props and palette** (8 October 2026, branch `phase-2/v1-c-buildings`): one style for the town buildings, shops at 250 parts or fewer, new small buildings, renders in `previews/v1-c/`
 16. **Sparkworks logic sandbox** (8 October 2026, branch `phase-2/v1-s-sparkworks`): wires, gates, timers, the settings panel, the demo board
 
 13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
+15. **V1 nature looks** (8 October 2026, branch `phase-2/v1-g-nature`): first renders of trees, rocks, plants, cave dressing, critters and rain. Not placed in the world yet.
 
 Where the redesign changed something an older section describes (the
 world layout, the trucks' looks, chop range, the Sky Bin), the redesign's
@@ -84,6 +116,31 @@ Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
 
+## V1 buildings, shops, props and palette (8 October 2026, branch `phase-2/v1-c-buildings`)
+
+One upgraded look for the town buildings. Shops keep the pinned footprints (Tool Shed half-depth 15 and half-width 11.9, Hearth 16.5 by 14.5, Dealership hall x 181 to 336). The axe rack is still a stepped shelf with a tier-colour block per axe; each rack axe is a two-part silhouette so the whole Tool Shed stays at or under 250 parts. Prices are not printed on the models. The live Land Office in the world is still `PlotService`'s own model (this lane only adds `BuildingArt.LandOffice`, with no price on the sign). Renders for Connor: every path under `previews/v1-c/` listed in STATUS.md.
+
+**PC**
+
+- Walk the spawn road to the sawmill, the Tool Shed, Hearth and Home, and the Dealership. Each reads as the same timber-and-slate style: stone-coloured base, honey plank walls, a roof, a porch, a lit sign.
+- Sawmill office: the foreman stand is the invisible pad west of the office door, facing the road. The chalkboard beside it reads DAILY JOBS, with the posts at the edges of the board and the words clear of them. Nothing solid within 6 studs of the pad. The lumber pile, barrel and crates are behind the cabin.
+- Tool Shed: blue sign (#3A6FD8). Step in. The counter top is at the same height as before. The axe rack is on the back wall, blades to the left, stepped, one colour block per axe. Buy an axe; the box still comes off the shelf.
+- Hearth and Home: green sign (#2F5D3A). The porch posts stand just inside the front wall (the pad starts at the wall; posts outside it sat on grass).
+- Dealership: red sign (#D9534F). The showroom walkway is clear. The three nearest bays have a low plinth and a dim lamp. The porch lantern is no brighter than the showroom lamps.
+- Weigh House: red metal roof, a round scale on the side. No new price text.
+- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage (the live office is still PlotService's).
+- The sky forge court, the pond dock, the campfire, the lookout and the park bench are in the built town (`TownScenes`). Walk south-west across the meadow: the forge court is at (-112, -20), front toward the mill, stone floor, anvil, ORDERS board, four relic sockets. The lookout just west of it (-136, -20) has a ladder you can climb and a telescope aimed at town. On the green south of the main street, west of the well: a park bench at (-84, 56) and a teepee campfire at (-72, 56) with a pot. South of town, the fishing dock stands on the pond's north bank (pond at 78, -182): planks, posts in the water, a rod, a bucket and a crate. No second sheet of water.
+
+**Phone emulator**
+
+- Same walk. Shops should stay readable and not hitch when you enter (Tool Shed 241 parts, Hearth and Home 195, Dealership 215, sawmill 402).
+- Signs stay readable at the door. Windows and the porch lantern are the only small lights on the shop fronts.
+
+**Xbox**
+
+- Same walk with the stick. Door prompts still appear in range. Talk to the keeper; the counter does not block the prompt. Aim at an axe on the rack: the hover tag still shows the name and price (nothing on the model itself).
+
+Good: one family of colours, no dollar signs on buildings, doors and counters where they were, rack still stepped. Bad: a shop over 250 parts, a price painted on a sign, the Tool Shed rack missing a sold axe, grass under the Hearth porch, or the Dealership porch lamp brighter than the showroom.
 ## Sparkworks logic sandbox (8 October 2026, branch `phase-2/v1-s-sparkworks`)
 
 Connor wants Sparkworks in V1, and he wants to see the pieces before they merge. Renders (names only, no prices on the models): `previews/v1-s/pieces-1.png` through `previews/v1-s/pieces-4.png` (at most four pieces, 3/4 at 30 degrees, the group about 70% of the width, name on a ground plaque), `previews/v1-s/wired.png` (lever and button into AND into a lamp, unlit beside lit, right-angle wires), `previews/v1-s/settings-panel-phone.png` (667x375) and `previews/v1-s/settings-panel-desktop.png` (1920x1080, the selection ring on minus). Panel colors are UITheme's. `SparkworksTheme.Layer = 16` is local until Lane U adds it.
@@ -271,6 +328,24 @@ and Land Office from the lot, 6 from the lot, 7 and 8 top down, 9 aerial,
    send the `[Load] ready for play` and `forest planted` lines.
 8. If a tree looks wrong (on a path, on a shop floor, in a queue), send its
    position: each site is one line in `TownTreeData.Sites`.
+
+## V1 nature looks (8 October 2026, branch `phase-2/v1-g-nature`)
+
+The PNGs under `previews/v1-g/` (listed in STATUS.md) are the looks to review. Trees there are the live choppable section trees. Rain blobs are the old puff; rain streaks are what the weather controller now emits.
+
+Studio checks (PC, the phone emulator, and Xbox). Good looks like this:
+
+1. Chop, fell, and watch a stump and a regrow. Same swing and the same logs as before.
+2. In rain, the drops are thin slanted streaks in the world, not soft blobs stuck to the screen. On Lower quality there are fewer, shorter streaks.
+3. Step into a shop, under a bridge, into a truck cab, and into the cave, the tunnel and the grotto. Rain, splashes and the rain sound fade within about a second. They come back within about a second of stepping outside. Prompts and the controller cursor still work in the rain.
+4. Stand in steady rain for a minute. The air hazes a little and stays there; the sky does not fade to white. When the rain stops, or you step under a roof, the haze goes back to the clear-weather sky.
+5. Rocks read as six shapes (round boulder, cracked boulder, stacked standing stone, slab, pebble cluster, mossy outcrop), tilted and partly in the ground. Meadow rocks have moss, snow rocks a white cap, the shore is sandstone, the volcano is dark basalt, the gloam is blue-grey, caves are wet dark stone. Plants and critters are not on roads, plot pads, shop floors or the gondola path. Ducks sit on water. A gull is on the coast. A snow fox is on the snow. A sky moth glows on the isles at night.
+6. Lower quality stays smooth. A lanternwood's pods still read in a dark cave (neon, no extra light on a phone). Cave glow lights do not cast shadows.
+7. Rock meshes (the uploaded Blender rocks): on the open grass, a rock is a real faceted stone with a green moss cap, not a ball. Walk round a few in the same meadow and you see two shapes of each kind (A and B). Moss or snow sits on the top of the stone, never floating above it or sunk inside it. Rocks are 0.62x, 1x and 1.45x, and the cap scales with them.
+8. Ore rocks (once the mine uses them): coal, copper, iron, silver, gold and opal each show two seams of ore across a stone (opal's stone is mossy). Heartstone has red crystals and a red glow. The seams are visible from the front of the rock.
+9. The mine mouth (needs Lane B's placement call, see the PR's cross-lane requests): a stone arch with a timber frame, two lanterns and MINE letters; its opening faces out of the hill, the tunnel runs into it, you can walk in, and you cannot walk through the rock around it.
+10. Open the Output window and play: no `[NatureArt] ... mesh is missing` or `[MeshKit] ... did not load` lines for rocks, ore rocks or the mine mouth.
+11. Phone (667x375): rocks and the mine mouth look the same at Lower quality; no frame-rate drop near a rock-heavy meadow.
 
 ## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
 

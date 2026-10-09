@@ -17,7 +17,29 @@ return function(t)
 	pcall(t.roblox.implementProperty, "Tool", "Activated", signal)
 	pcall(t.roblox.implementProperty, "Tool", "Equipped", signal)
 	pcall(t.roblox.implementProperty, "Tool", "Unequipped", signal)
-	pcall(t.roblox.implementProperty, "ProximityPrompt", "Triggered", signal)
+	-- Lune's ProximityPrompt has no Triggered signal, and only the first spec
+	-- to add one wins. Share the per-prompt signals other specs fire through
+	-- (_G.__promptTriggered), so the result doesn't depend on spec order.
+	local triggered = _G.__promptTriggered or setmetatable({}, { __mode = "k" })
+	_G.__promptTriggered = triggered
+	pcall(t.roblox.implementProperty, "ProximityPrompt", "Triggered", function(self)
+		local s = triggered[self]
+		if not s then
+			local list = {}
+			s = { list = list }
+			function s:Connect(fn)
+				table.insert(list, fn)
+				return { Disconnect = function() end }
+			end
+			function s:Fire(...)
+				for _, fn in ipairs(list) do
+					fn(...)
+				end
+			end
+			triggered[self] = s
+		end
+		return s
+	end)
 
 	local function place(part, pos)
 		part.CFrame = CFrame.new(pos)

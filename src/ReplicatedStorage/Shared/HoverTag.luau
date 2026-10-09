@@ -198,6 +198,28 @@ export type State = "closed" | "owned" | "soldOut" | "price"
 HoverTag.OwnedLine = "You already own this"
 HoverTag.SoldOutLine = "Out of stock"
 
+-- The price line's colour. CoinGold when the player can pay, StopRed when
+-- they cannot. FREE (price 0) is affordable. A Robux line is not a cash
+-- price, and Closed / owned / out of stock stay plain (the UI's cream).
+HoverTag.CoinGold = Color3.fromHex("#F2C14E")
+HoverTag.StopRed = Color3.fromHex("#D9534F")
+
+export type Tone = "gold" | "red" | "plain"
+
+-- `state` is a string on purpose. StateOf's four returns widen to plain
+-- strings at the module boundary, and that widened union does not match
+-- the State alias from outside this file.
+function HoverTag.PriceTone(state: string, price: number?, cash: number?, robux: boolean?): Tone
+	if state ~= "price" or robux == true or price == nil then
+		return "plain"
+	end
+	local have = if type(cash) == "number" then cash else 0
+	if have >= price then
+		return "gold"
+	end
+	return "red"
+end
+
 function HoverTag.StateOf(spec: Spec, facts: Facts): State
 	if spec.shop ~= nil and not ShopHoursLogic.IsOpen(spec.shop, facts.hour) then
 		return "closed"
