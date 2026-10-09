@@ -47,6 +47,7 @@ local OPEN_PRIORITY = Enum.ContextActionPriority.High.Value + 200
 local CLOSE_PRIORITY = Enum.ContextActionPriority.High.Value + 201
 local BACK_PRIORITY = Enum.ContextActionPriority.High.Value + 10
 
+local PHONE_FOOTER = "Tap one  ·  tap outside to close" -- QuickMenuLogic.Footer names the pad's buttons
 local PAD = 18 -- UI px inside the panel
 local TITLE_H = 34
 local FOOTER_H = 24
@@ -76,6 +77,27 @@ end
 -- BUTTONS when there is at least one HUD button to walk.
 local function destinations(): { HudNav.Entry }
 	local list = HudNav.Entries()
+	-- On a phone SAVES, Send truck home and the owner's button live in here
+	-- instead of in the HUD column. Sorted in with the rest.
+	local folded = HUD.FoldedEntries()
+	if #folded > 0 then
+		local byId: { [string]: HudNav.Entry } = {}
+		local plain: { QuickMenuLogic.Entry } = {}
+		for _, entry in ipairs(list) do
+			byId[entry.id] = entry
+			table.insert(plain, { id = entry.id, label = entry.label })
+		end
+		for _, entry in ipairs(folded) do
+			if byId[entry.id] == nil then
+				byId[entry.id] = entry
+				table.insert(plain, { id = entry.id, label = entry.label })
+			end
+		end
+		list = {}
+		for _, sorted in ipairs(QuickMenuLogic.Sort(plain)) do
+			table.insert(list, byId[sorted.id])
+		end
+	end
 	local anyButton = HudNav.First() ~= nil
 	if anyButton then
 		table.insert(list, {
@@ -128,7 +150,6 @@ local function build(entries: { HudNav.Entry }): GuiObject?
 			size = Vector2.new(rect.w, rect.h - UITheme.ButtonDrop),
 			style = style,
 			textSize = 20,
-			radius = UITheme.Radius,
 		})
 		button.root.Position = UDim2.fromOffset(rect.x, rect.y)
 		button.root.Parent = holder
@@ -310,7 +331,13 @@ local function buildPanel()
 	holder.Parent = shell.face
 	gridHolder = holder
 
-	local footer = UITheme.label(shell.face, QuickMenuLogic.Footer, F.Bold, 16, C.Muted)
+	local footer = UITheme.label(
+		shell.face,
+		if UITheme.IsPhone() then PHONE_FOOTER else QuickMenuLogic.Footer,
+		F.Bold,
+		16,
+		C.Muted
+	)
 	footer.Name = "Footer"
 	footer.AnchorPoint = Vector2.new(0, 1)
 	footer.Position = UDim2.new(0, PAD, 1, -(PAD / 2 + 3))
@@ -345,10 +372,13 @@ function QuickMenuUI.Start()
 		onPress = QuickMenuUI.Toggle,
 	})
 	local function showSide()
-		side.root.Visible = HudRules.PadGlyphs(UITheme.Device())
+		-- On a phone it is the first of the three icon buttons, and the way in
+		-- to SAVES and Send truck home.
+		side.root.Visible = HudRules.PadGlyphs(UITheme.Device()) or UITheme.IsPhone()
 	end
 	showSide()
 	UserInputService.LastInputTypeChanged:Connect(showSide)
+	UITheme.WatchLayout(showSide)
 
 	GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(syncBack)
 	syncBack()

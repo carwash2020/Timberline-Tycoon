@@ -20,6 +20,7 @@ local F = UITheme.Fonts
 
 local CLOSE_ACTION = "NewsClose"
 local SEEN_ATTR = "NewsV1Seen"
+local CLOSE_GAP = 8 -- between the last row and the Close button
 
 local player = Players.LocalPlayer
 local panel: Frame? = nil
@@ -270,17 +271,19 @@ function NewsUI.Start()
 	closeRow.Name = "CloseRow"
 	closeRow.LayoutOrder = 20
 	closeRow.BackgroundTransparency = 1
-	closeRow.Size = UDim2.new(1, 0, 0, UITheme.Size.Tap)
+	closeRow.Size = UDim2.new(1, 0, 0, CLOSE_GAP + UITheme.Size.Tap + UITheme.ButtonDrop)
 	closeRow.Parent = card.face
+	-- A 44 x 44 square (its X), 8 px under the last row, with the card's own
+	-- padding below it, so it never touches the title or a row.
 	local close = UITheme.Button({
 		name = "Close",
-		text = "CLOSE",
-		size = Vector2.new(140, UITheme.Size.Tap),
+		text = "X",
+		size = Vector2.new(UITheme.Size.Tap, UITheme.Size.Tap),
 		style = "primary",
-		textSize = 16,
+		textSize = 20,
 	})
 	close.root.AnchorPoint = Vector2.new(0.5, 0)
-	close.root.Position = UDim2.fromScale(0.5, 0)
+	close.root.Position = UDim2.new(0.5, 0, 0, CLOSE_GAP)
 	close.root.Parent = closeRow
 
 	-- On a short screen the card is only as tall as its rows. Its bottom
@@ -318,7 +321,7 @@ function NewsUI.Start()
 			word.Size = UDim2.new(1, -12, 0, 20)
 			title.Visible = false
 			for i, row in ipairs(rows) do
-				row.Size = UDim2.new(1, 0, 0, 36)
+				row.Size = UDim2.new(1, 0, 0, 34) -- headline 18 + detail 16
 				local line = headlines[i]
 				local sub = details[i]
 				line.Position = UDim2.fromOffset(44, 0)
@@ -351,8 +354,8 @@ function NewsUI.Start()
 				sub.Size = UDim2.new(1, -48, 0, 18)
 			end
 		end
-		closeRow.Size = UDim2.new(1, 0, 0, tap)
-		close.root.Size = UDim2.fromOffset(140, tap)
+		closeRow.Size = UDim2.new(1, 0, 0, CLOSE_GAP + tap + UITheme.ButtonDrop)
+		close.root.Size = UDim2.fromOffset(tap, tap + UITheme.ButtonDrop)
 		if compact then
 			local margin = 8
 			local left = vp.X * 0.4 + margin
