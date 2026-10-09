@@ -23,6 +23,7 @@
 --   kit      the building kit's meshes (a player's own plot)
 
 local AxeModels = require(script.Parent.AxeModels)
+local RockModels = require(script.Parent.RockModels)
 local ItemMeshData = require(script.Parent.Parent.ItemMeshData)
 local KitMeshData = require(script.Parent.Parent.KitMeshData)
 local TownModels = require(script.Parent.TownModels)
@@ -111,6 +112,11 @@ function MeshManifest.Groups(town: boolean?): { Group }
 	end)
 	add("trees", function(out)
 		for _, id in ipairs(TreeModels.MeshIds()) do
+			table.insert(out, { id = id, hull = false })
+		end
+	end)
+	add("rocks", function(out)
+		for _, id in ipairs(RockModels.MeshIds()) do
 			table.insert(out, { id = id, hull = false })
 		end
 	end)

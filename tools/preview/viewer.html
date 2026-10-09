@@ -409,6 +409,23 @@ function fittedNode(node, sx, sy, sz) {
   holder.scale.set(sx / Math.max(size.x, 1e-4), sy / Math.max(size.y, 1e-4), sz / Math.max(size.z, 1e-4));
   return holder;
 }
+// Opt-in (manifest "tint": true): the GLB's vertex colours are greyscale
+// shading and the game sets MeshPart.Color, so multiply by that colour. The
+// materials are shared between placements, so each one gets its own copy.
+function tintMaterials(root, hex) {
+  const tint = new THREE.Color("#" + hex);
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const own = mats.map((m) => {
+      if (!m) return m;
+      const c = m.clone();
+      c.color = (m.color ? m.color.clone() : new THREE.Color(1, 1, 1)).multiply(tint);
+      return c;
+    });
+    o.material = Array.isArray(o.material) ? own : own[0];
+  });
+}
 async function addMeshes() {
   const pending = new Map();
   for (const p of scene.meshes) {
@@ -428,6 +445,7 @@ async function addMeshes() {
         const gltf = await pending.get(info.file);
         const node = nodeNamed(gltf, info.node);
         if (node) placedNode = fittedNode(node, Math.max(p[1], 0.01), Math.max(p[2], 0.01), Math.max(p[3], 0.01));
+        if (placedNode && info.tint) tintMaterials(placedNode, p[16]);
       } catch (err) {
         console.error("mesh", id, err);
       }
@@ -495,7 +513,7 @@ function setView(i) {
   useLights(night, camera.position);
   const hud = document.getElementById("hud");
   if (scene.hud === false) hud.style.display = "none";
-  hud.textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""} · ${scene.parts.length} parts`;
+  hud.textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""}${v.own != null ? " · rock " + v.own + " parts" : ""} · full view ${scene.parts.length + scene.meshes.length} parts`;
 }
 window.setView = setView;
 window.viewCount = views.length;

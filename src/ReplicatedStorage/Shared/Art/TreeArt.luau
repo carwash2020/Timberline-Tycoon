@@ -441,7 +441,7 @@ builders.birch = function(model, def, pal, H, F, rng)
 	trunk(model, def, H, D)
 	rootFlares(model, def.trunkColor, D, 3, rng)
 	local marks = pal.accent or Color3.new(0.15, 0.15, 0.15)
-	for _ = 1, 8 do
+	for _ = 1, 6 do
 		local a = rng:range(0, math.pi * 2)
 		local y = rng:range(0.8, H * 0.95)
 		Kit.decor(
@@ -700,7 +700,7 @@ builders.emberwood = function(model, def, pal, H, F, rng)
 	crown[1].Color = glow
 	glowLight(crown[2], glow, 18, 1.6)
 	if lit then
-		particles(lit, hex("#FFB050"), 3, 1.5, 2.5, 0.25)
+		particles(lit, hex("#FFB050"), 2, 1.5, 2.5, 0.25)
 	end
 end
 
@@ -815,7 +815,7 @@ builders.lumenwood = function(model, def, pal, H, F, rng)
 	upper[1].Material = Enum.Material.Neon
 	upper[1].Color = glow
 	glowLight(upper[2], glow, 22, 1.8)
-	particles(lower[1], glow, 4, 0.8, 1.2, 0.35)
+	particles(lower[1], glow, 8, 0.8, 1.2, 0.35)
 end
 
 -- Lanternwood's v1 silhouette.
@@ -1373,6 +1373,9 @@ local function coneDress(
 		elseif woodId == "pine" and i == 1 then
 			p.Color = light
 			p:SetAttribute("Signature", TreeArt.Signatures.pine)
+		elseif woodId == "pine" and i == 2 and d.size.X > 14 then
+			-- A brown needle disc on the wide bottom tier. Not the signature facet.
+			p.Color = Kit.hex("#6B5A3A")
 		end
 		asDress(p, d.section)
 		table.insert(made, p)
@@ -1787,6 +1790,99 @@ function TreeArt.GrowingSapling(def: WoodDef, seed: number, growth: number): Mod
 		if d:IsA("BasePart") then
 			Kit.decor(d, false)
 		end
+	end
+	return model
+end
+
+-- Far forest trees. Same part counts as PropArt.FillerTree (ForestFiller.spec
+-- compares those counts): conifer and snowpine 5, birch and dead 3, broadleaf
+-- and maple 4. Decoration only.
+local FILLER_KINDS = { broad = true, birch = true, maple = true, conifer = true, snowpine = true, dead = true }
+
+function TreeArt.FillerTree(kind: string, variant: number): Model
+	if not FILLER_KINDS[kind] then
+		kind = "broad"
+	end
+	local model = Kit.model("FillerTree")
+	local seed = 9001 + variant * 131
+	for i = 1, #kind do
+		seed += string.byte(kind, i) * i * 17
+	end
+	local rng = Kit.rng(seed)
+	local yaw = rng:range(0, math.pi * 2)
+	local function block(name: string, size: Vector3, cf: CFrame, color: Color3)
+		Kit.decor(Kit.part(model, name, size, cf, color, Enum.Material.SmoothPlastic), false)
+	end
+	local trunkColor = Kit.hex("#5E4130")
+	local leaf = Kit.hex("#4E8E3E")
+	if kind == "birch" then
+		trunkColor = Kit.hex("#DCD6C8")
+		leaf = Kit.hex("#A6CE5C")
+	elseif kind == "maple" then
+		trunkColor = Kit.hex("#5A3E2C")
+		leaf = Kit.hex("#D88F2C")
+	elseif kind == "conifer" or kind == "snowpine" then
+		trunkColor = Kit.hex("#5A4030")
+		leaf = Kit.hex("#2F7A3D")
+	elseif kind == "dead" then
+		trunkColor = Kit.hex("#6F6258")
+		leaf = Kit.hex("#6F6258")
+	end
+	local function fillerTrunk(w: number, h: number)
+		block(
+			"FillerTrunk",
+			Vector3.new(w, h + 1.5, w),
+			CFrame.new(0, (h - 1.5) / 2, 0) * CFrame.Angles(0, yaw, 0),
+			trunkColor
+		)
+	end
+	if kind == "conifer" or kind == "snowpine" then
+		local h = rng:range(7, 9)
+		fillerTrunk(rng:range(1, 1.25), h)
+		local w = rng:range(9, 10.5)
+		local y = h - 1
+		for t = 1, 4 do
+			local tw = w * (1 - (t - 1) * 0.24)
+			local th = if t == 4 then 4 else 3.6
+			local snowy = kind == "snowpine" and t >= 3
+			local color = if snowy then Kit.hex("#E3ECF1") else leaf
+			if t == 1 then
+				color = Kit.hex("#6B5A3A")
+			end
+			block(
+				"FillerCrown",
+				Vector3.new(tw, th, tw),
+				CFrame.new(0, y + th / 2, 0) * CFrame.Angles(0, yaw + t * math.pi / 4, 0),
+				color
+			)
+			y += th * 0.92
+		end
+	elseif kind == "dead" then
+		local h = rng:range(9, 12)
+		fillerTrunk(rng:range(1, 1.3), h)
+		for i = 1, 2 do
+			local a = yaw + i * math.pi * 0.9
+			local len = rng:range(3.5, 5)
+			local at = Vector3.new(math.cos(a) * len * 0.3, h * (0.55 + i * 0.15), math.sin(a) * len * 0.3)
+			block(
+				"FillerBranch",
+				Vector3.new(0.5, len, 0.5),
+				CFrame.new(at) * CFrame.Angles(0, -a, 0) * CFrame.Angles(0, 0, math.rad(rng:range(40, 55))),
+				leaf
+			)
+		end
+	elseif kind == "birch" then
+		local h = rng:range(10, 12)
+		fillerTrunk(rng:range(0.8, 1), h)
+		block("FillerCrown", Vector3.new(7, 8, 7), CFrame.new(0, h + 1, 0), leaf)
+		block("FillerCrown", Vector3.new(5, 5.5, 5), CFrame.new(0.6, h + 5.5, -0.4), Kit.hex("#BCD96B"))
+	else
+		local h = rng:range(8, 10)
+		fillerTrunk(rng:range(1.3, 1.6), h)
+		local w = rng:range(10, 12)
+		block("FillerCrown", Vector3.new(w, w * 0.65, w), CFrame.new(0, h + 2.5, 0), leaf)
+		block("FillerCrown", Vector3.new(w * 0.62, w * 0.5, w * 0.62), CFrame.new(1.2, h + 6.2, 0), leaf)
+		block("FillerCrown", Vector3.new(w * 0.5, w * 0.4, w * 0.5), CFrame.new(-w * 0.3, h + 2, 0.4), leaf)
 	end
 	return model
 end

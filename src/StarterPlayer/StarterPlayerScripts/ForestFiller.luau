@@ -32,6 +32,7 @@ local RunService = game:GetService("RunService")
 
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
+local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
@@ -86,7 +87,11 @@ local function makeLooks()
 	for _, kind in ipairs(PropArt.FillerKinds) do
 		local list: { Look } = {}
 		for variant = 1, PropArt.FillerVariants do
-			local model = PropArt.FillerTree(kind, variant)
+			local model = TreeArt.FillerTree(kind, variant)
+			if #model:GetChildren() == 0 then
+				model:Destroy()
+				model = PropArt.FillerTree(kind, variant)
+			end
 			local parts: { PartSpec } = {}
 			local lo, hi, reach = math.huge, -math.huge, 0
 			for _, d in ipairs(model:GetDescendants()) do
