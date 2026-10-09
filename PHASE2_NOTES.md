@@ -1,5 +1,20 @@
 # Phase 2+ build notes
 
+## Lane F: building and blueprints (8 October 2026, branch `phase-2/v1-f-base-systems`)
+
+What changed: `KitPieces` (CopperTrim4, SandWall4, SandFloor4, SandArch8, locked), `PlotData` (Blueprint gains `slabUnits`, `ingots`, `locked`; a 0-wood kit piece uses its own fee), new `BuildCost`, `SlabData`, `SnapLogic`, `PlotLogic.CanEdit`, `PlotService.CanEdit` (in `hostFor` and the door prompt), `BlueprintBook` (locked rows, `UnlockStage`), `BlueprintPlacer` (ghost snaps). Preview meshes for the four pieces in `assets/meshes/kit/backlog/` (preview manifest only).
+
+Studio checks (PC, phone, Xbox):
+
+1. The four new pieces are gated plans, so a new player's hammer list does not show them. If one is learned (owner tools), its row reads "Soon" with "Coming soon: building with slabs and ingots", and pressing it only shows that line, no ghost.
+2. Place a Short Wall, then aim a second one near its end. The ghost jumps so the ends meet (green). Turn it a quarter and aim at the end: an L corner joins.
+3. Place a Foundation, then aim a wall onto it: the ghost sits on top (2 studs up). Raise and lower still work after that.
+4. Build a Tall Wall, aim a Small Floor at its top: it sits at 10. Raise above it by more than a stud: it stays where you raised it.
+5. A friend with Build permission can place, move and paint; with Destroy can sell; without, they are refused with the usual line. Your own doors open for you; a friend needs Interact.
+6. Nothing else about placing old pieces changes (prices, fill, undo).
+
+Previews: `previews/v1-f/kit-lineup.png`, `house-2storey.png`, `snap-ghost.png`, `v1-pieces.png`. No UI changed apart from the locked rows, so the phone and Xbox placer, book and save panel shots are for the next slice.
+
 ## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
 
 Done on this branch, not on main. Rebased onto main at `f96b62c`. The store board is not in this PR (lane P owns the redesign). Box and hover renders live in `previews/v1-d/` (listed in STATUS.md). Axe, temper and shelf pictures were part-built and are gone until `phase-2/v1-preview-meshes` can draw the real meshes.

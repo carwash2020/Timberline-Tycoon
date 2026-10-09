@@ -33,6 +33,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
+local SnapLogic = require(ReplicatedStorage.Shared.SnapLogic)
 local PlotPlatform = require(ReplicatedStorage.Shared.PlotPlatform)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -299,7 +300,22 @@ local function update(s: State)
 	local point = aimPoint(s)
 	if point then
 		local p = plotCFrame:PointToObjectSpace(point)
-		s.x, s.z = PlotLogic.Snap(p.X), PlotLogic.Snap(p.Z)
+		local nx, nz = PlotLogic.Snap(p.X), PlotLogic.Snap(p.Z)
+		if s.bp.kit == true then
+			-- Lane F: wall ends join; moving onto a floor sits the base on
+			-- its top (raise and lower still work after that).
+			local placed: { PlotLogic.Placed } = {}
+			for _, item in ipairs(BlueprintPlacer.MyPlaced()) do
+				if item.uid ~= s.options.moveUid then
+					table.insert(placed, item)
+				end
+			end
+			nx, nz = SnapLogic.SnapEnds(s.bp, nx, nz, s.rot, placed)
+			if nx ~= s.x or nz ~= s.z then
+				s.y = SnapLogic.BaseY(nx, nz, s.y, placed)
+			end
+		end
+		s.x, s.z = nx, nz
 	end
 	BlueprintModels.Place(s.ghost, plotCFrame, s.x, s.z, s.rot, s.y)
 	local ok, why = PlotLogic.Check(

@@ -35,8 +35,13 @@ return function(t)
 
 	t.test("H-Buy: every kit piece is pay on place at 4 cash a wood unit", function()
 		local seen = 0
+		local laneF = { CopperTrim4 = true, SandWall4 = true, SandFloor4 = true, SandArch8 = true }
 		for _, piece in ipairs(PlotData.Blueprints) do
-			if piece.kit then
+			if piece.kit and laneF[piece.id] then
+				-- Lane F slab and ingot pieces: their own fee, locked until the
+				-- fill takes slabs and ingots (BuildCost.spec covers them).
+				t.ok(type(piece.locked) == "string", piece.id .. " locked")
+			elseif piece.kit then
 				seen += 1
 				-- Only the glass plan is sold (ModernKit): it still pays the kit fee.
 				t.eq(piece.unlock, if piece.family then true else nil, piece.id .. " store unlock")

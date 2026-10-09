@@ -302,7 +302,7 @@ end
 -- May this id be placed?
 ---------------------------------------------------------------------------
 
-export type Reason = "notOwned" | "store" | "toolShed"
+export type Reason = "notOwned" | "store" | "toolShed" | "locked"
 
 -- `owned`: in the book. `stocked`: boxes of this id held (machines).
 -- `boxed`: ShopLogic.ShelfMenusHidden(), which PlotLogic.Source reads.
@@ -311,6 +311,9 @@ function BlueprintBook.Allowed(id: string, owned: boolean, stocked: number, boxe
 	local bp = PlotLogic.Blueprint(id)
 	if not bp then
 		return false, "notOwned"
+	end
+	if type(bp.locked) == "string" then
+		return false, "locked" -- Lane F: never placeable until unlocked in code
 	end
 	if stocked > 0 then
 		return true, nil
@@ -327,6 +330,9 @@ end
 
 function BlueprintBook.Message(reason: string?, bp: PlotData.Blueprint?): string
 	local name = if bp then bp.displayName else "piece"
+	if reason == "locked" then
+		return if bp and bp.locked then bp.locked else "Coming soon."
+	end
 	if reason == "store" then
 		local key = if bp then BlueprintBook.KeyOf(bp.id) else nil
 		if key then
@@ -396,6 +402,56 @@ function BlueprintBook.Entries(book: Book, stock: Stock): { Entry }
 		return a.bp.displayName < b.bp.displayName
 	end)
 	return out
+end
+
+---------------------------------------------------------------------------
+-- Lane F: stage unlocks (PROPOSAL, Awaiting Connor). Which V1 stage
+-- (S0..S8 in the V1 plan) teaches a gated plan. Not wired yet: it waits
+-- on Lane P's StageOf.Current(profile). Starter plans stay as Migrate builds
+-- them; rolled blueprints still teach any plan.
+---------------------------------------------------------------------------
+
+local UNLOCK_STAGE: { [string]: number } = {
+	-- walls, floors, flat roof
+	Wall4 = 1,
+	Wall12 = 1,
+	Floor4 = 1,
+	Foundation8 = 1,
+	FlatRoof8 = 1,
+	-- tall walls, sloped roofs, ramp, door and window walls
+	TallWall4 = 2,
+	TallWall8 = 2,
+	HalfWall8 = 2,
+	SlopedRoof8 = 2,
+	RoofCorner = 2,
+	RoofRidge8 = 2,
+	Ramp8 = 2,
+	DoorWall8 = 2,
+	WindowWall8 = 2,
+	-- railings, beams, posts
+	Railing8 = 3,
+	Beam8 = 3,
+	Post = 3,
+	FenceGate4 = 3,
+	-- sandstone (Red Mesa opens at S4), then copper
+	SandWall4 = 4,
+	SandFloor4 = 4,
+	SandArch8 = 4,
+	CopperTrim4 = 5,
+}
+
+-- The stage number that unlocks this plan, or nil when no stage does.
+function BlueprintBook.UnlockStage(id: string): number?
+	return UNLOCK_STAGE[id]
+end
+
+-- "Unlocks at S4" for a locked row, or nil.
+function BlueprintBook.UnlockText(id: string): string?
+	local stage = UNLOCK_STAGE[id]
+	if stage == nil then
+		return nil
+	end
+	return string.format("Unlocks at stage %d", stage)
 end
 
 function BlueprintBook.NextFilter(filter: string): string
@@ -478,6 +534,12 @@ function BlueprintBook.Row(entry: Entry, ctx: Context): Row
 		row.detail ..= " · needs " .. tierName
 		row.button, row.state, row.ready = tierName, "locked", false
 		row.message = string.format("Raise your plot size to %s first. You do that in LAND.", tierName)
+		return row
+	end
+	if type(bp.locked) == "string" then
+		row.detail ..= " · " .. bp.locked
+		row.button, row.state, row.ready = "Soon", "locked", false
+		row.message = bp.locked
 		return row
 	end
 	if bp.note then

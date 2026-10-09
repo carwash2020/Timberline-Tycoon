@@ -27,6 +27,21 @@ Part-built axe, temper and shelf pictures are not in this PR. Connor rejected th
 Awaiting Connor: the Hermit's Maul is part-built and needs a Blender mesh. The hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and cash prices are unchanged.
 
 Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+## Lane F: building and blueprints (8 October 2026, branch `phase-2/v1-f-base-systems`)
+
+Not on main. First slice of job 10. Previews in `previews/v1-f/` (kit-lineup, house-2storey, snap-ghost, v1-pieces). Done: four V1 pieces (Copper Trim, Sandstone Wall, Sandstone Floor, Sandstone Arch) sized to the uploaded meshes, shown in the book but **locked** ("Coming soon") until the fill takes slabs and ingots; `BuildCost.Of` (all 24 old pieces pinned unchanged); `SlabData` (4 x 2 x 2 slab, $0, 24 loose); `SnapLogic` (wall ends join within 1 stud, base sits on the floor / foundation / tall wall top) wired into the BlueprintPlacer ghost, server checks unchanged; `PlotLogic.CanEdit` + `PlotService.CanEdit`, used by `hostFor` and the door prompt; `BlueprintBook.UnlockStage` table (PROPOSAL, not wired until Lane P's StageOf lands).
+
+Not done yet (next F slices): fill with slabs and ingots (step 2), CanEdit at the other lanes' call sites, PlacedCap and SaveSize (step 6, needs A1), undo refunds of slabs and ingots (7), PlaceControls (8), furniture GrantPiece (9), Save now, LooseSave unload, free-piece blueprints, paint all, recall fee, shop stock, strandedLoad (tasks 10-17). F also waits on Lane P (job 09) merging first.
+
+**Awaiting Connor**
+
+- Sandstone and copper costs (PROPOSALS): Copper Trim $4 + 1 Copper ingot; Sandstone Wall $8 + 2 slabs; Sandstone Floor $8 + 2 slabs; Sandstone Arch $16 + 4 slabs.
+- Stage unlock table (PROPOSAL): walls, floors, flat roof S1; tall walls, sloped roofs, ramp, door and window walls S2; railings, beams, posts, gate S3; sandstone S4; copper S5.
+- Colours: GAD palette still PENDING, so sandstone `#C8643C` Sandstone and copper `#B87333` Metal (brief defaults).
+- Worst case kit parts: WindowWall8 has 4 boxes, so 400 of them is 1,600 parts, over the Builder's 1,200. The new pieces are 3 boxes or fewer.
+
+Studio checks: PHASE2_NOTES.md, "Lane F: building and blueprints".
+
 ## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
 
 Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the best wood the player can already reach (`MINING.md`). The Lux Pickaxe is not for sale. `profile.mining` is account-wide, like the pick level.

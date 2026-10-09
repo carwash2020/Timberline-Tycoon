@@ -534,8 +534,7 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 			if not ownerProfile then
 				return
 			end
-			local allowed = who.UserId == hostOwner.UserId
-				or PermissionLogic.Allows(ownerProfile.permissions, who.UserId, "interact")
+			local allowed = PlotLogic.CanEdit(ownerProfile.permissions, who.UserId, hostOwner.UserId, "interact")
 			if not allowed then
 				notify(who, "The owner hasn't let you use that.")
 				return
@@ -1001,7 +1000,7 @@ local function hostFor(player: Player, flag: string): (Slot?, Profile?, Player?,
 		if owner and owner ~= player then
 			local profile = ProfileService.GetProfile(owner)
 			if profile and actorOn(player, slot, profile) then
-				if PermissionLogic.Allows(profile.permissions, player.UserId, flag) then
+				if PlotLogic.CanEdit(profile.permissions, player.UserId, owner.UserId, flag) then
 					return slot, profile, owner, false
 				end
 				denied = true
@@ -1009,6 +1008,23 @@ local function hostFor(player: Player, flag: string): (Slot?, Profile?, Player?,
 		end
 	end
 	return nil, nil, nil, denied
+end
+
+-- Lane F: one edit-rights check. The owner always; anyone else needs the
+-- flag in the owner's permissions. flag: "build" | "destroy" | "interact" |
+-- "paint" | "grab". Other lanes call this instead of PermissionLogic.
+function PlotService.CanEdit(player: Player?, owner: Player?, flag: string): boolean
+	if not player or not owner then
+		return false
+	end
+	if player == owner then
+		return true
+	end
+	local profile = ProfileService.GetProfile(owner)
+	if not profile then
+		return false
+	end
+	return PlotLogic.CanEdit(profile.permissions, player.UserId, owner.UserId, flag)
 end
 
 local function onlinePlayers(): { Player }

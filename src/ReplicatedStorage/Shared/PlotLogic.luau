@@ -12,11 +12,32 @@ local SawmillLogic = require(script.Parent.SawmillLogic)
 local SkyBinLogic = require(script.Parent.SkyBinLogic)
 local PlanerLogic = require(script.Parent.PlanerLogic)
 local AutomationLogic = require(script.Parent.AutomationLogic)
+local PermissionLogic = require(script.Parent.PermissionLogic)
 local WorldLayout = require(script.Parent.World.WorldLayout)
 
 type Blueprint = PlotData.Blueprint
 
 local PlotLogic = {}
+
+-- Lane F: who may edit a plot. The owner always; anyone else needs the
+-- flag in the owner's permissions ("build", "destroy", "interact",
+-- "paint", "grab"). Paint has no flag of its own: it needs "build", as the
+-- paint tool always has. PlotService.CanEdit is the live twin.
+function PlotLogic.CanEdit(permissions: any, actorId: number, ownerId: number, flag: string): boolean
+	if type(actorId) ~= "number" or type(ownerId) ~= "number" then
+		return false
+	end
+	if actorId == ownerId and ownerId ~= 0 then
+		return true
+	end
+	if flag == "paint" then
+		flag = "build"
+	end
+	if type(flag) ~= "string" or not PermissionLogic.IsFlag(flag) then
+		return false
+	end
+	return PermissionLogic.Allows(permissions, actorId, flag)
+end
 
 export type Placed = {
 	uid: string,
