@@ -1,8 +1,9 @@
 --!strict
 -- SecretService: the server notices a player standing in a secret.
 -- No client remote. Pay once per slot through EconomyService.
--- V1Boot lists this module and calls Init (an alias of V1Init). MapBuilder
--- also calls V1Init; a second call does nothing.
+-- MapBuilder calls V1Init after the underground is built; a second call
+-- does nothing. V1Boot lists the name but calls only Init or Start, so it
+-- does not start a second loop.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -58,8 +59,5 @@ function SecretService.V1Init()
 		end
 	end)
 end
-
--- V1Boot.Start calls Init or Start, not V1Init.
-SecretService.Init = SecretService.V1Init
 
 return SecretService
