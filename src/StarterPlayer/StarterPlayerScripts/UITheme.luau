@@ -90,19 +90,6 @@ UITheme.Colors = {
 }
 local C = UITheme.Colors
 
--- The Sparkworks gate strips (Shared/LogicItems.Accent) keep their own
--- colours, which are not part of the UI palette above. They are theme tokens
--- all the same, so LogicItems.spec can find each one here.
-UITheme.LogicAccent = {
-	GateAnd = Color3.fromHex("#4C8C40"),
-	GateOr = Color3.fromHex("#FFB840"),
-	GateXor = Color3.fromHex("#2F6DB5"),
-	GateNot = Color3.fromHex("#C0503A"),
-	Delay = Color3.fromHex("#8FD3F2"),
-	Sustain = Color3.fromHex("#D08F1F"),
-	Clock = Color3.fromHex("#BFE8FF"),
-}
-
 UITheme.Fonts = {
 	Title = Enum.Font.GothamBold, -- titles, names, cash
 	Button = Enum.Font.GothamBold,
