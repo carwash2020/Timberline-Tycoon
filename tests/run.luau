@@ -1,6 +1,12 @@
 --!nocheck
 -- Test runner. From the repo root:   lune run tests/run
 -- Optional filter:                   lune run tests/run Shop
+-- One shard of N (CI splits the tests across runners this way):
+--                                     TEST_SHARD=2/4 lune run tests/run
+--   Specs are dealt out largest file first, each to the shard with the least
+--   bytes so far, so every shard gets a similar amount of work. The split is
+--   deterministic, every spec lands in exactly one shard, and with no
+--   TEST_SHARD set every spec runs.
 --
 -- Runs every tests/*.spec.luau. A spec file returns a function that gets a
 -- `t` with:
@@ -73,8 +79,49 @@ for _, file in ipairs(fs.readDir("tests")) do
 end
 table.sort(specs)
 
+local shardSpec = process.env.TEST_SHARD
+local inShard: { [string]: boolean }? = nil
+if shardSpec and shardSpec ~= "" then
+	local index, count = string.match(shardSpec, "^(%d+)/(%d+)$")
+	local shardIndex, shardCount = tonumber(index), tonumber(count)
+	if not shardIndex or not shardCount or shardCount < 1 or shardIndex < 1 or shardIndex > shardCount then
+		print(string.format("TEST_SHARD must look like 2/4 (shard 1..N of N), got %q", shardSpec))
+		process.exit(1)
+	end
+	local sizes = {}
+	for _, file in ipairs(specs) do
+		sizes[file] = #fs.readFile("tests/" .. file)
+	end
+	local bySize = table.clone(specs)
+	table.sort(bySize, function(a, b)
+		if sizes[a] ~= sizes[b] then
+			return sizes[a] > sizes[b]
+		end
+		return a < b
+	end)
+	local loads = table.create(shardCount, 0)
+	local mine = {}
+	for _, file in ipairs(bySize) do
+		local best = 1
+		for k = 2, shardCount do
+			if loads[k] < loads[best] then
+				best = k
+			end
+		end
+		loads[best] += sizes[file]
+		if best == shardIndex then
+			mine[file] = true
+		end
+	end
+	inShard = mine
+	print(string.format("Shard %d/%d", shardIndex, shardCount))
+end
+
 for _, file in ipairs(specs) do
 	if filter and not string.find(file, filter, 1, true) then
+		continue
+	end
+	if inShard and not inShard[file] then
 		continue
 	end
 	local shared = Loader.new()
