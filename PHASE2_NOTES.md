@@ -60,6 +60,26 @@ Studio checks:
 - Phone (667x375 landscape): the same panels fit. What's new Close is 44px tall, centred, and not under the jump button or in the thumbstick zone. The side buttons are 44px tall, carry a saves, hammer or truck icon, and sit above the jump button. The hotbar starts to the right of the thumbstick. Field Guide reads GUIDE. The chop hint sits on a dark pill. Compare with `hud-667x375.png` and `news-667x375.png`.
 - Xbox: open each panel above. The cream ring is on the first button immediately. D-pad and the left stick reach every button. A activates. B closes and returns to the HUD button that opened it. RT still swings the axe and does not change owner-menu tabs.
 
+## V1 UI round 3 (lane U, branch `phase-2/v1-u-ui-r3`)
+
+The Game Art Director's final skins, the phone HUD column and the real icons. Previews are in `previews/v1-u/r3-*.png` (hand-built from the UITheme values and the real icon PNGs in `assets/ui/icons/`; Liberation Sans stands in for Gotham and Fredoka).
+
+- **Tokens:** `UITheme.Skin` holds Paper `#F0E1C3`, PaperDark `#E2CFAA`, Cream `#F5EBD7`, Bark `#583A22`, Ink `#3C2814`, Muted `#A09178` and the plaque numbers. The older `UITheme.Colors` names keep their values, so screens that read them do not move.
+- **Plaque and Panel:** `UITheme.Plaque()` (inset 4) and `UITheme.Panel()` (inset 12) are built from frames: a Paper face (corner 12, 2 px Bark stroke, Cream 0 / Paper 0.18 / PaperDark 1 gradient at 90) on a 4 px Bark drop edge. No image, no shadow object. The cash plaque, prompt cards and tutorial cards still use the uploaded UIArt skins (so `UIArt.spec` stays pinned).
+- **Buttons:** corner 10, a 3 px drop edge in the style's edge colour, the shine (white at 0, 0.9 grey from 0.12), a 2 px Muted stroke only on `starter`. Pressed, the face drops 3 px onto the edge. The edge adds 3 px to a button's height (`UITheme.ButtonDrop = 3`; callers already added it).
+- **Loading card:** one plaque at (0.5, 0.45), `min(280, 72% of the width)` by 132, 16 px padding, over Ink at 45% transparency. FredokaOne 20 Ink title, one GothamMedium 14 Bark line (never smaller). No scene, no progress bar, no buttons. Same 30 s timeout.
+- **Phone HUD (touch, no keyboard, under 600 tall):** the side column is MENU, HAMMER and Sell here as 44 x 44 icon buttons, one column, faces 8 px apart. MENU is shown on a phone and opens the quick menu; SAVES, Send truck home and (for the owner) OWNER are tiles in it. The rules are `Shared/PhoneHud`; the look is `HUD.SideButton`. The icons are `UITheme.HudIcons` (Image ids Menu 76852120099119, Hammer 129127727779001, SellHere 96932580819074), 28 x 28 in the face. If an id is 0 or the image fails to load, the button shows MENU, BUILD or SELL.
+- **What's New:** Close is a 44 x 44 square (an X), 8 px under the last row.
+
+Studio checks:
+1. PC: the loading card is one cream plaque (a darker brown edge under it) near the upper middle, over the dimmed game, with "Timberline Tycoon" and one tip; it fades once you are in. Buttons everywhere have a small darker edge under them; press one and the face sinks onto it. `starter`-style buttons have a thin grey-brown outline.
+2. PC: the HUD layout is the same as before (Field Guide, cash, STORE, SAVES, Send truck home); nothing moved except the new button edges.
+3. Phone (Studio device emulator, 667x375): the right-hand column is three square buttons, MENU (bars on amber), then the hammer and the coin (cream icons on dark green) when they apply. Each is a real picture, not text. They are 8 px apart, in one column, with no second column. Tap the hammer: it takes the hammer out. Tap the coin near the sell pad: it sells.
+4. Phone: tap MENU. The quick menu opens with SAVES, STORE, BADGES and so on, plus SEND TRUCK HOME when your truck is away (and OWNER if you are the owner). Tap SAVES: the saves panel opens. Tap outside the menu: it closes.
+5. Phone: the loading card is 280 wide, centred a little above the middle; What's New (Settings, WHAT'S NEW) shows a square X Close under the last line, not touching the jump button or the thumbstick area.
+6. Xbox (controller or emulator): the HUD column keeps the wide buttons (MENU with the View glyph, SAVES, Send truck home). Press View: the quick menu lists SAVES and SEND TRUCK HOME, A opens them, B closes. RT still swings the axe.
+7. If an icon shows letters (MENU, BUILD, SELL) instead of a picture, the image id did not load in your Studio session; tell Claude which one.
+
 What's here, each with its own checklist below:
 
 15. **V1 economy core** (8 October 2026, branch `phase-2/v1-a1-economy-core`): climate damage, the Prosperous stamp, prices, and the save contract

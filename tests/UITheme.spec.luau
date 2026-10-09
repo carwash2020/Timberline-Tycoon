@@ -518,7 +518,73 @@ return function(t)
 		t.eq(UITheme.Radius, 8)
 		t.eq(UITheme.Stroke, 2)
 		t.eq(UITheme.Ring, 4)
-		t.eq(UITheme.ButtonDrop, 0)
+		-- Round 3 (GAD): buttons carry a 3 px drop edge and a corner of 10.
+		t.eq(UITheme.ButtonDrop, 3)
+		t.eq(UITheme.ButtonRadius, 10)
+	end)
+
+	-- Round 3: the GAD skin tokens, verbatim, and the contrast of what sits on them.
+	t.test("the GAD skin tokens are verbatim and their text pairs clear the contrast bars", function()
+		local UITheme = theme({})
+		local K, C = UITheme.Skin, UITheme.Colors
+		t.eq(K.Paper:ToHex(), "F0E1C3")
+		t.eq(K.PaperDark:ToHex(), "E2CFAA")
+		t.eq(K.Cream:ToHex(), "F5EBD7")
+		t.eq(K.Bark:ToHex(), "583A22")
+		t.eq(K.Ink:ToHex(), "3C2814")
+		t.eq(K.Muted:ToHex(), "A09178")
+		t.eq({ K.PlaqueCorner, K.PlaqueStroke, K.PlaqueDrop, K.PlaqueInset, K.PanelInset }, { 12, 2, 4, 4, 12 })
+		t.eq({ K.GradientPaperAt, K.ShineFrom, K.ShineGrey, K.StarterStroke }, { 0.18, 0.12, 0.9, 2 })
+		local function lin(c)
+			return if c <= 0.04045 then c / 12.92 else ((c + 0.055) / 1.055) ^ 2.4
+		end
+		local function lum(color)
+			return 0.2126 * lin(color.R) + 0.7152 * lin(color.G) + 0.0722 * lin(color.B)
+		end
+		local function ratio(a, b)
+			local hi, lo = lum(a), lum(b)
+			if hi < lo then
+				hi, lo = lo, hi
+			end
+			return (hi + 0.05) / (lo + 0.05)
+		end
+		-- Body text on the plaque, across its whole gradient.
+		for _, ground in ipairs({ K.Cream, K.Paper, K.PaperDark }) do
+			t.ok(ratio(K.Ink, ground) >= 4.5, "Ink on " .. ground:ToHex())
+			t.ok(ratio(K.Bark, ground) >= 4.5, "Bark on " .. ground:ToHex())
+		end
+		-- Button labels and the phone icons on their fills.
+		t.ok(ratio(K.Cream, C.Green) >= 3, "Cream on the deep green")
+		t.ok(ratio(K.Ink, C.Amber) >= 3, "Ink on amber")
+		t.ok(ratio(C.ConfirmInk, C.Amber) >= 3, "the amber style's ink on amber")
+		t.eq(UITheme.Styles.iconGreen.ink, C.Cream)
+		t.eq(UITheme.Styles.iconGreen.fill, C.Green)
+		t.eq(UITheme.Styles.starter.outline, K.Muted, "the starter style is the one with a Muted stroke")
+		for name, style in pairs(UITheme.Styles) do
+			if name ~= "starter" then
+				t.eq(style.outline, nil, name .. " has no stroke")
+			end
+		end
+	end)
+
+	-- Round 3: the three phone HUD icons ship as the real Image ids.
+	t.test("the HUD icons are the uploaded Image ids, never 0", function()
+		local UITheme = theme({})
+		t.eq(UITheme.HudIcons.Menu, 76852120099119)
+		t.eq(UITheme.HudIcons.Hammer, 129127727779001)
+		t.eq(UITheme.HudIcons.SellHere, 96932580819074)
+		t.eq(UITheme.HudIconImage("Menu"), "rbxassetid://76852120099119")
+		t.eq(UITheme.HudIconImage("Hammer"), "rbxassetid://129127727779001")
+		t.eq(UITheme.HudIconImage("SellHere"), "rbxassetid://96932580819074")
+		t.eq(UITheme.HudIconImage("Nothing"), nil)
+		UITheme.HudIcons.Menu = 0
+		t.eq(UITheme.HudIconImage("Menu"), nil, "an id of 0 gives no image, so the short text shows")
+		t.eq(UITheme.Size.Icon, 44)
+		t.eq(UITheme.Size.IconGlyph, 28)
+		local fs = require("@lune/fs")
+		for _, file in ipairs({ "menu", "hammer", "sell-here" }) do
+			t.ok(fs.isFile("assets/ui/icons/" .. file .. ".png"), file .. ".png is committed for previews")
+		end
 	end)
 
 	t.test("every button style rests on its fill and carries the selection ring", function()
