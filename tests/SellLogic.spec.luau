@@ -228,4 +228,15 @@ return function(t)
 			"the bin pays t"
 		)
 	end)
+	t.test("P6: the free stack clamps to 3.0; Lux 1.1 and 2x Cash apply after; all three 6.6x", function()
+		local plain = SellLogic.PieceValue("oak", "plank", 100)
+		-- Full free stack: mill 2 x board 1.8 x Prosperous III 1.10 = 3.96 -> 3.0.
+		local free = SellLogic.PieceValue("oak", "plank", 100, nil, 1, false, 2, 1.8, 1.10)
+		t.ok(math.abs(free / plain - 3.0) < 1e-9, "free only = 3.0x")
+		local withLux = SellLogic.PieceValue("oak", "plank", 100, nil, 1, true, 2, 1.8, 1.10)
+		t.ok(math.abs(withLux / plain - 3.3) < 1e-9, "Lux 1.1 is not clamped")
+		local pay = SellLogic.Payout(withLux, 2)
+		t.ok(math.abs(pay - math.floor(plain * 6.6 + 0.5)) <= 1, "all three = 6.6x: " .. pay)
+		t.eq(SellLogic.Payout(free, 2), SellLogic.Payout(free * 2, 1), "2x Cash on the sale total, after the clamp")
+	end)
 end

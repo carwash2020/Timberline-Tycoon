@@ -1064,4 +1064,21 @@ function AetherService.InitV2(deps: V2Deps)
 	end
 end
 
+-- V1 end game (A2): the Sky Forge's ForgeAction and ForgeOpen handlers,
+-- tempering, relics and the weekly order live in SkyForgeService (this
+-- file is already long); V1Init binds them. Required here at call time:
+-- SkyForgeService requires this module for the Starfall forge.
+function AetherService.V1Init(ctx: { remotes: { [string]: Instance }?, notify: ((Player, string) -> ())? }?)
+	local forge = require(script.Parent.SkyForgeService) :: any
+	forge.V1Init(ctx)
+end
+
+-- Opens the Sky Forge window for `player` (Old Bram's talk, Lane E): fires
+-- ForgeOpen with the server's view. Works anywhere; actions still need the
+-- anvil in range.
+function AetherService.OpenForge(player: Player)
+	local forge = require(script.Parent.SkyForgeService) :: any
+	forge.Open(player)
+end
+
 return AetherService

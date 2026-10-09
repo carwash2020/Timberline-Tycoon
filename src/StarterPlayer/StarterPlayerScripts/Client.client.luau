@@ -42,6 +42,7 @@ local MODULES = {
 	"FieldGuideUI",
 	"ForestFiller",
 	"ForestUI",
+	"ForgeUI",
 	"GamepadNav",
 	"GondolaController",
 	"HUD",
