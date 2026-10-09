@@ -27,6 +27,7 @@ local AutomationLogic = require(script.Parent.Parent.AutomationLogic)
 local PlanerLogic = require(script.Parent.Parent.PlanerLogic)
 local BuildingArt = require(script.Parent.BuildingArt)
 local Kit = require(script.Parent.Kit)
+local Palette = require(script.Parent.Palette)
 local SawmillLogic = require(script.Parent.Parent.SawmillLogic)
 local SkyBinLogic = require(script.Parent.Parent.SkyBinLogic)
 local Util = require(script.Parent.Parent.Util)
@@ -37,8 +38,8 @@ local MachineArt = {}
 local MILL_GROUP = "Mill"
 local BELT_GROUP = "MillBelt"
 
-local WOOD = Kit.hex("#6B4423")
-local WOOD_DARK = Kit.hex("#3C2A1E")
+local WOOD = Palette.TimberBrown
+local WOOD_DARK = Kit.shade(Palette.TimberBrown, -0.35)
 local BLADE = Kit.hex("#D5D8DC")
 local PANEL = Kit.hex("#2C241C")
 local BELT = Kit.hex("#3A342F")
@@ -178,14 +179,14 @@ local ROOF_MATERIAL = {
 	Enum.Material.DiamondPlate,
 } :: { Enum.Material }
 local ROOF_COLOR = {
-	Kit.hex("#8B5A2B"),
-	Kit.hex("#6B4423"),
-	Kit.hex("#7A8F8A"),
-	Kit.hex("#5E7380"),
-	Kit.hex("#3E4A62"),
+	Palette.BarnRed,
+	Palette.TimberBrown,
+	Palette.WeatheredPlank,
+	Palette.RoofSlate,
+	Palette.PineTrim,
 } :: { Color3 }
-local BRASS = Kit.hex("#B08A3A")
-local IRON = Kit.hex("#3A3A3A")
+local BRASS = Palette.Brass
+local IRON = Palette.IronBlack
 
 local function lookPart(
 	model: Model,

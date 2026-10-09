@@ -172,8 +172,8 @@ local function shopSpecific(model: Model, spec: Spec)
 	local fz = spec.frontZ
 	local d = spec.doorHalf
 	if spec.kind == "HearthAndHome" then
-		for _, x in ipairs({ -20, -13.5, 13.5, 20 }) do
-			window(model, spec, x, 6.8, 3.6, 4.4, true)
+		for _, x in ipairs({ -16, 16 }) do
+			window(model, spec, x, 6.8, 3.6, 4.4, false)
 		end
 		awning(model, spec, 11.9, 4.2, hex("#3E6A3A"), hex("#F2E7CF"))
 		planter(model, -10.3, gy, fz - 1.8)
@@ -184,14 +184,11 @@ local function shopSpecific(model: Model, spec: Spec)
 		crate(model, hw - 4.4, gy, fz - 1.4, 1.7)
 		chimney(model, -16, 8, spec.roofTop - 0.2, 5)
 	elseif spec.kind == "ToolShed" then
-		for _, x in ipairs({ -11, 11 }) do
-			window(model, spec, x, 6.2, 3.6, 3.6, false)
-		end
 		-- (The grindstone and the chopping block stand out front, and the door
 		-- header carries the hours board, so the yard has no planters or sandwich
 		-- board; the barrel and the crate stand by the west wall.)
-		barrel(model, -hw - 1.6, gy, fz + 6)
-		crate(model, -hw - 1.6, gy, fz + 8.6, 1.7)
+		barrel(model, -hw + 4.2, gy, fz - 2.4)
+		crate(model, hw - 4.2, gy, fz - 2.6, 1.7)
 		chimney(model, -6, 6, spec.roofTop - 2.4, 5)
 	else
 		-- The showroom: a canopy over the lobby door, planters, a bench and a
@@ -203,7 +200,8 @@ local function shopSpecific(model: Model, spec: Spec)
 		bench(model, c + d + 9, gy, fz - 1.4)
 		sandwichBoard(model, c + d + 15, gy, fz - 2.4, "Dealership")
 		box(model, "FlagPole", V3(0.25, 11, 0.25), CF(c + d + 21, gy + 5.5, fz - 1.4), IRON, MAT.Metal)
-		box(model, "FlagCloth", V3(3.2, 2, 0.1), CF(c + d + 22.7, gy + 9.8, fz - 1.4), hex("#2F6DB5"), MAT.Fabric)
+		box(model, "FlagCloth", V3(3.2, 2, 0.1), CF(c + d + 22.7, gy + 9.8, fz - 1.4), spec.accent, MAT.Fabric)
+		box(model, "FlagLine", V3(6, 0.08, 0.08), CF(c + d + 24, gy + 10.6, fz - 1.4), IRON, MAT.Metal)
 		for _, x in ipairs({ c + 40, c + 90 }) do
 			box(
 				model,

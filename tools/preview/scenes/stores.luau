@@ -142,7 +142,7 @@ return {
 			return model
 		end
 
-		shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44), 0, 0)
+		shop("ToolShed", "TOOL SHED", C3.fromRGB(58, 111, 216), 0, 0)
 		walker(0, -12)
 		walker(-1.5, 14)
 		table.insert(cameras, { pos = { 0, 100, -34 }, target = { 0, 0, 2 }, label = "1 Tool Shed from above" })
@@ -151,7 +151,7 @@ return {
 			{ pos = { 0, 9, -36 }, target = { 0, 4, 14 }, label = "2 Tool Shed from the door", fov = 80 }
 		)
 
-		shop("HearthAndHome", "GENERAL STORE", C3.fromRGB(122, 90, 60), 90, 0)
+		shop("HearthAndHome", "GENERAL STORE", C3.fromRGB(47, 93, 58), 90, 0)
 		walker(90, -12)
 		table.insert(cameras, { pos = { 90, 92, -30 }, target = { 90, 0, 2 }, label = "3 Hearth & Home from above" })
 		table.insert(
@@ -159,7 +159,7 @@ return {
 			{ pos = { 90, 8, -34 }, target = { 90, 5, 16 }, label = "4 Hearth & Home from the door", fov = 85 }
 		)
 
-		shop("Dealership", "DEALERSHIP", C3.fromRGB(47, 109, 181), 240, 0)
+		shop("Dealership", "DEALERSHIP", C3.fromRGB(217, 83, 79), 240, 0)
 		table.insert(
 			cameras,
 			{ pos = { 240, 200, -22 }, target = { 240, 0, 0 }, label = "5 Dealership from above", fov = 65 }

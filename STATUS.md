@@ -3,6 +3,7 @@
 > **Newer than this file's merge notes: read AGENT_HANDOFF.md first.** Every branch below marked "not merged" is merged (main is at #116 as of 8 October 2026).
 
 - **V1 UI redesign** (branch `phase-2/v1-u-ui`, 8 October 2026): mockups `previews/v1-u/loading-667x375.png`, `previews/v1-u/loading-1920x1080.png` (sunset scene, the wordmark, a progress bar, one tip), `previews/v1-u/hud-667x375.png`, `previews/v1-u/hud-1920x1080.png` (in-context HUD: cash, Field Guide with its book icon, side buttons with saves/hammer/truck icons, a selection ring, a dark hint pill, and on the phone Roblox's thumbstick ring plus the jump button, with the hotbar clear of the stick), `previews/v1-u/hud-buttons-667x375.png`, `previews/v1-u/hud-buttons-1920x1080.png` (button styles only), `previews/v1-u/owner-menu-667x375.png`, `previews/v1-u/owner-menu-1920x1080.png`, `previews/v1-u/theme-sheet-667x375.png`, `previews/v1-u/theme-sheet-1920x1080.png` (Danger fill `#B23B30`; cream on danger is 4.80:1), `previews/v1-u/news-667x375.png`, `previews/v1-u/news-1920x1080.png` (the card is as tall as its rows, with a sunset wordmark; each headline has a muted second line; Close is centred, 44px on the phone, and clear of the jump box and the thumbstick). Live UI uses the same tokens (walnut, cream, amber, confirm, danger, muted; GothamBold and Gotham; radius 8; 2px stroke; 4px selection ring). Loading tips rotate one at a time from `ReplicatedFirst/LoadingTips`. What's new is seven headlines plus a short second line in `NewsLogic.Entries` (island map with the Bayou and Red Mesa, mining, blueprints, Foreman Rook's jobs, axe tempering, Sparkworks, the gondola sky island). It shows once after the tutorial (`onboarding["News:V1"]`, no new save field), and from Settings. On a short screen the card, including Close, sits right of the thumbstick and above the jump box. Owner menu, quick menu, Settings and What's new select their first button on open; B closes; none of them binds the right trigger. **Lane E:** `DailyUI` stays in the client module list, but the client does not start it, so there is no DailyUI startup warning. Lane E (Foreman) replaces that module. Studio checks: PHASE2_NOTES.md "V1 UI".
+Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 ## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
 
 Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the best wood the player can already reach (`MINING.md`). The Lux Pickaxe is not for sale. `profile.mining` is account-wide, like the pick level.
@@ -27,6 +28,64 @@ Last updated 7 October 2026 (dialogue box branch on top of main at #95), after P
 - **No floating speech bubbles (`claude/remove-bubbles`, 8 October 2026, not merged):** Connor: with the pop-up dialogue box, remove the floating chat bubbles. Gone: the wave hello, idle chatter, Murph's first-tip bubble, and every NPC's bubble code (`NPCController`, `NPCDialogue.AutoBubbles` and the Bubble* helpers, `TextAnchor.CardPx`/`Side`). Kept: name tags (wall-safe through `TextAnchor`), the Talk prompt, the box, the wave and talking gestures (the talking gesture now plays while the box is open), the murmur sound (plays as the box opens). Murph's three onboarding tips now open in the box the first time a new player talks to him on step one (`QuestUI`). Ferry fare, toll fee and shop prices still arrive through the prompts' own text (`Board ($x)`, `Pay toll ($x)`), the keepers' box lines and the toasts. Studio checklist in PHASE2_NOTES.md.
 - **Hotfix `claude/fix-shop-talk-buy` (8 October 2026, not merged):** Talk and Buy prompts went dead after #107-#111 (the global prompt switch was saved and restored by four scripts that overlap); now `PromptGate` / `PromptSwitch` hold it by name. Open until Connor confirms on Xbox: see PHASE2_NOTES.md "Hotfix: Talk and Buy prompts". Output tags to send back: `[Talk]`, `[PromptSwitch]`, `[Drag]`.
 - **Preview meshes (`phase-2/v1-preview-meshes`):** the model preview draws the uploaded GLBs in `assets/meshes` (axes, trucks, trees, buildings, kit). A mesh id with no file is a magenta MISSING MESH box, never a silent part-built stand-in.
+
+## Lane C previews (branch `phase-2/v1-c-buildings`)
+
+Connor (8 October 2026): every design is rendered as soon as it exists, before merge, so he can see it and send tweaks. Renders live in `previews/v1-c/` (the `preview/` folder stays gitignored). Studio checklist: PHASE2_NOTES.md, "V1 buildings, shops, props and palette". Economy headlines are unchanged (no price, recipe, or walk-time edit).
+
+Part counts, whole model, Lune (shop cap 250, including the interior):
+
+| Model | Before | After |
+| --- | --- | --- |
+| Tool Shed | 626 | 241 |
+| Hearth and Home | 311 | 195 |
+| Dealership | 245 | 215 |
+| Sawmill | 398 | 402 |
+| Gate kiosk | — | 7 |
+| Odds and Ends | — | 37 |
+| Sparkworks | — | 20 |
+| Sky Market | — | 10 |
+| Sky turnstile | — | 4 |
+| Plot map | — | 3 |
+| Arrival arch | — | 4 |
+| Land Office (art only) | — | 8 |
+| Sky forge court | — | 23 |
+
+Round 1 framing (8 October 2026). `town-overview.png` is one elevated three-quarter of a grouped street (the per-building fronts are unchanged). The four scene shots are three-quarter views from about 25 studs, each prop about half the frame. The DAILY JOBS board is wider, with the posts on its edges, so the words clear the posts. The Tool Shed gold table is unchanged.
+
+Round 2 (8 October 2026). The sky forge court uses the street palette: honey plank walls, a weathered-timber furnace with thick timber and honey bands, and a stone chimney. Darker slate photographed as a missing material on the shadowed street face. The four scene props are rebuilt, 10 to 30 parts each: a teepee fire with a tripod pot and log seats, a dock on water with posts, a rod, a bucket and a crate, a lookout platform about 9 studs up with a ladder and a coin telescope, and a park bench with a back and arms. `mill-foreman.png` is unchanged.
+
+Round 3 (8 October 2026). Those five are in the live town (`WorldPlan.Town().scenes`, built by MapBuilder into `TownScenes`). Lane B's map has not merged, so the spots are the current town layout. The sky forge court is on the south-west meadow at (-112, -20), front toward the mill, on `SkyForgeFloor`. The lookout is just west of it at (-136, -20), telescope toward town. The park bench is at (-84, 56) and the campfire at (-72, 56), on the green south of MainStreet. The fishing dock is on the Starter Forest pond's north bank (pond centre 78, -182), posts down into the water; MapBuilder drops the preview water sheet. The town-overview aerial reshoot waits on `phase-2/v1-preview-meshes` (the exporter still drops MeshParts, so the Blender shops still read as boxes).
+
+Paths:
+- `previews/v1-c/sawmill-front.png`
+- `previews/v1-c/toolshed-front.png`
+- `previews/v1-c/hearth-front.png`
+- `previews/v1-c/dealership-front.png`
+- `previews/v1-c/floor-toolshed.png`
+- `previews/v1-c/floor-hearth.png`
+- `previews/v1-c/floor-dealership.png`
+- `previews/v1-c/weigh-house.png`
+- `previews/v1-c/gate-kiosk.png`
+- `previews/v1-c/odds-and-ends.png`
+- `previews/v1-c/sparkworks.png`
+- `previews/v1-c/sky-market.png`
+- `previews/v1-c/sky-turnstile.png`
+- `previews/v1-c/plot-map.png`
+- `previews/v1-c/arrival-arch.png`
+- `previews/v1-c/land-office.png`
+- `previews/v1-c/sky-forge-court.png`
+- `previews/v1-c/campfire.png`
+- `previews/v1-c/fence.png`
+- `previews/v1-c/lamp-post.png`
+- `previews/v1-c/scene-fishing.png`
+- `previews/v1-c/scene-campfire.png`
+- `previews/v1-c/scene-lookout.png`
+- `previews/v1-c/scene-bench.png`
+- `previews/v1-c/machine-sawmill.png`
+- `previews/v1-c/mill-foreman.png`
+
+Foreman stand for Lane E. `MillForemanSpot` is an anchored, transparent, non-colliding part on the sawmill, west of the office door, facing the road (-Z). With the mill at `WorldPlan.Town().sawmill` (`CFrame.new(0, 0, 116.5)`), the spot's world CFrame is `CFrame.new(-26.025, 0.15, 97.45)` (look -Z). In the scaled model, before that placement, it is `CFrame.new(-26.025, 0.15, -19.05)`. The DAILY JOBS board stands just west of it, wide enough that the words sit between the posts with padding on both sides. The office lumber, barrel and crates moved behind the cabin so the stand has 6 studs of clear ground.
 
 ## Who and how
 
