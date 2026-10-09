@@ -1,8 +1,8 @@
 --!strict
 -- SecretService: the server notices a player standing in a secret.
 -- No client remote. Pay once per slot through EconomyService.
--- A1 adds this name to V1Boot and the secrets field. Until then MapBuilder
--- calls V1Init, and a second call does nothing.
+-- V1Boot lists this module and calls Init (an alias of V1Init). MapBuilder
+-- also calls V1Init; a second call does nothing.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,12 +48,18 @@ function SecretService.V1Init()
 	task.spawn(function()
 		while started do
 			task.wait(2)
-			local ok, err = pcall(sweep)
+			local ok, err = pcall(function(): any
+				sweep()
+				return nil
+			end)
 			if not ok then
 				warn("[SecretService] " .. tostring(err))
 			end
 		end
 	end)
 end
+
+-- V1Boot.Start calls Init or Start, not V1Init.
+SecretService.Init = SecretService.V1Init
 
 return SecretService
