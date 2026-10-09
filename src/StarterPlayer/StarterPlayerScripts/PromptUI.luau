@@ -139,7 +139,7 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 		billboard.SizeOffset = Vector2.new(prompt.UIOffset.X / WIDTH, prompt.UIOffset.Y / HEIGHT)
 	end
 
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true, "Panel")
+	local card = UITheme.Card(C.Paper, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true, "Panel")
 	if studs then
 		card.outer.AnchorPoint = Vector2.new(0.5, 1)
 		card.outer.Position = UDim2.fromScale(0.5, 0.5)
@@ -155,7 +155,7 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 
 	-- The key cap (or TAP on a touch screen).
 	local cap =
-		UITheme.Card(if touch then C.Amber else C.Paper, if touch then C.AmberEdge else C.Muted, 3, 10, false, "Button")
+		UITheme.Card(if touch then C.Amber else C.Paper, C.AmberEdge, UITheme.Stroke, UITheme.Radius, false, "Button")
 	cap.outer.Name = "Key"
 	cap.outer.LayoutOrder = 1
 	cap.outer.Size = UDim2.fromOffset(40, 43)
@@ -168,7 +168,7 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	fill.Size = UDim2.fromScale(1, 0)
 	fill.BackgroundColor3 = C.Amber
 	fill.BorderSizePixel = 0
-	UITheme.corner(fill, 10)
+	UITheme.corner(fill, UITheme.Radius)
 	fill.Parent = cap.face
 	if gamepad then
 		local glyph = UITheme.Glyph(prompt.GamepadKeyCode, 30)
@@ -177,8 +177,13 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 		glyph.ZIndex = 2
 		glyph.Parent = cap.face
 	else
-		local letter =
-			UITheme.label(cap.face, if touch then "TAP" else keyName(prompt.KeyboardKeyCode), F.Heading, 22, C.Ink)
+		local letter = UITheme.label(
+			cap.face,
+			if touch then "TAP" else keyName(prompt.KeyboardKeyCode),
+			F.Heading,
+			22,
+			if touch then C.ConfirmInk else C.Ink
+		)
 		letter.Size = UDim2.fromScale(1, 1)
 		letter.TextXAlignment = Enum.TextXAlignment.Center
 		letter.ZIndex = 2

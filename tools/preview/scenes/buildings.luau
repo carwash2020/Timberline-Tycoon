@@ -34,7 +34,7 @@ return {
 		-- them (BuildingArt.Scale, TWN-13).
 		place(BuildingArt.Sawmill(), -22, 0, "Sawmill", -27, { -39, 27, -69, 12 })
 		place(
-			BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44)),
+			BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(58, 111, 216)),
 			35,
 			0,
 			"ToolShed",
@@ -42,7 +42,7 @@ return {
 			{ -19.5, 13.5, -39, 7.5 }
 		)
 		place(
-			BuildingArt.Shop("Dealership", "DEALERSHIP", C3.fromRGB(47, 109, 181)),
+			BuildingArt.Shop("Dealership", "DEALERSHIP", C3.fromRGB(217, 83, 79)),
 			73,
 			0,
 			"Dealership",
@@ -50,7 +50,7 @@ return {
 			{ 19.5, 13.5, -39, 7.5 }
 		)
 		place(
-			BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", C3.fromRGB(122, 90, 60)),
+			BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", C3.fromRGB(47, 93, 58)),
 			111,
 			0,
 			"HearthAndHome",

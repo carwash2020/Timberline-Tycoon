@@ -65,12 +65,21 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	TollPay = 1, -- pay the toll
 	FerryBoard = 1, -- board the ferry
 	Blast = 1, -- set a blasting charge (BlastService's prompt; not a remote)
-	SlotAction = 2, -- load or reset a save slot (the confirm is a second call)
+	SlotAction = 2, -- load, reset, or save a slot (the confirm is a second call)
 	PlotSalesman = 2, -- Old Hank's Talk prompt (PlotService; a prompt, not a remote)
 	HermitTalk = 2, -- the Hermit's Talk prompt (HermitService; a prompt, not a remote)
 	SecretPress = 2, -- a carving or the cave box prompt (HermitService)
 	BoardRequest = 2, -- the Leaderboard tab; the service also answers one per player per 10 s
 	PaintTruck = 1, -- Paint Shop: one request a second; the palette rule also waits 2s
+	NewsSeen = 2, -- What's new closed (NewsService); a second press in the same second is dropped
+	SkyQuest = 2,
+	ForgeAction = 4,
+	ForgeOpen = 2,
+	SaveNow = 1,
+	PaintAllType = 4,
+	LogicSet = 4,
+	MineAction = 8, -- Lane M: a mining intent, about 8 a second
+	CraftAction = 2, -- Lane M: a craft intent, about 2 a second
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic

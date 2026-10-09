@@ -47,6 +47,7 @@ local OPEN_PRIORITY = Enum.ContextActionPriority.High.Value + 200
 local CLOSE_PRIORITY = Enum.ContextActionPriority.High.Value + 201
 local BACK_PRIORITY = Enum.ContextActionPriority.High.Value + 10
 
+local PHONE_FOOTER = "Tap one  ·  tap outside to close" -- QuickMenuLogic.Footer names the pad's buttons
 local PAD = 18 -- UI px inside the panel
 local TITLE_H = 34
 local FOOTER_H = 24
@@ -76,6 +77,27 @@ end
 -- BUTTONS when there is at least one HUD button to walk.
 local function destinations(): { HudNav.Entry }
 	local list = HudNav.Entries()
+	-- On a phone SAVES, Send truck home and the owner's button live in here
+	-- instead of in the HUD column. Sorted in with the rest.
+	local folded = HUD.FoldedEntries()
+	if #folded > 0 then
+		local byId: { [string]: HudNav.Entry } = {}
+		local plain: { QuickMenuLogic.Entry } = {}
+		for _, entry in ipairs(list) do
+			byId[entry.id] = entry
+			table.insert(plain, { id = entry.id, label = entry.label })
+		end
+		for _, entry in ipairs(folded) do
+			if byId[entry.id] == nil then
+				byId[entry.id] = entry
+				table.insert(plain, { id = entry.id, label = entry.label })
+			end
+		end
+		list = {}
+		for _, sorted in ipairs(QuickMenuLogic.Sort(plain)) do
+			table.insert(list, byId[sorted.id])
+		end
+	end
 	local anyButton = HudNav.First() ~= nil
 	if anyButton then
 		table.insert(list, {
@@ -125,10 +147,9 @@ local function build(entries: { HudNav.Entry }): GuiObject?
 		local button = UITheme.Button({
 			name = entry.id,
 			text = entry.label,
-			size = Vector2.new(rect.w, rect.h - 3),
+			size = Vector2.new(rect.w, rect.h - UITheme.ButtonDrop),
 			style = style,
 			textSize = 20,
-			radius = 14,
 		})
 		button.root.Position = UDim2.fromOffset(rect.x, rect.y)
 		button.root.Parent = holder
@@ -275,7 +296,7 @@ local function buildPanel()
 	local dim = Instance.new("TextButton")
 	dim.Name = "Scrim"
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = C.Ink
+	dim.BackgroundColor3 = C.PanelAlt
 	dim.BackgroundTransparency = 0.5
 	dim.AutoButtonColor = false
 	dim.Text = ""
@@ -286,16 +307,16 @@ local function buildPanel()
 	end)
 	dim.Parent = screen
 
-	local shell = UITheme.Card(C.Paper, C.Bark, 4, 18, false)
+	local shell = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, false)
 	shell.outer.Name = "Panel"
 	shell.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	shell.outer.Position = UDim2.fromScale(0.5, 0.5)
 	shell.outer.Size = UDim2.fromOffset(480, 300)
-	UITheme.stroke(shell.outer, C.Bark, 3)
+	UITheme.stroke(shell.outer, C.AmberEdge, UITheme.Stroke)
 	shell.outer.Parent = screen
 	panel = shell.outer
 
-	local title = UITheme.label(shell.face, QuickMenuLogic.Title, F.Heading, 26, C.Bark)
+	local title = UITheme.label(shell.face, QuickMenuLogic.Title, F.Heading, 26, C.Cream)
 	title.Name = "Title"
 	title.Position = UDim2.fromOffset(PAD, 10)
 	title.Size = UDim2.new(1, -2 * PAD, 0, TITLE_H)
@@ -310,7 +331,13 @@ local function buildPanel()
 	holder.Parent = shell.face
 	gridHolder = holder
 
-	local footer = UITheme.label(shell.face, QuickMenuLogic.Footer, F.Bold, 16, C.Bark)
+	local footer = UITheme.label(
+		shell.face,
+		if UITheme.IsPhone() then PHONE_FOOTER else QuickMenuLogic.Footer,
+		F.Bold,
+		16,
+		C.Muted
+	)
 	footer.Name = "Footer"
 	footer.AnchorPoint = Vector2.new(0, 1)
 	footer.Position = UDim2.new(0, PAD, 1, -(PAD / 2 + 3))
@@ -345,10 +372,13 @@ function QuickMenuUI.Start()
 		onPress = QuickMenuUI.Toggle,
 	})
 	local function showSide()
-		side.root.Visible = HudRules.PadGlyphs(UITheme.Device())
+		-- On a phone it is the first of the three icon buttons, and the way in
+		-- to SAVES and Send truck home.
+		side.root.Visible = HudRules.PadGlyphs(UITheme.Device()) or UITheme.IsPhone()
 	end
 	showSide()
 	UserInputService.LastInputTypeChanged:Connect(showSide)
+	UITheme.WatchLayout(showSide)
 
 	GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(syncBack)
 	syncBack()

@@ -90,7 +90,10 @@ TownMarkers.Markers = {
 		chip = Color3.fromRGB(122, 90, 60),
 		-- East of the name sign, over the roof's low east edge, so the
 		-- board and its lamps don't eat the chip, and it stays on a phone.
-		offset = Vector3.new(21, 32, -29.3), -- the counter is at the back wall; over the front roof, east of the name board
+		-- One stud higher than the roof line so the chip clears GONDOLA
+		-- from the spawn at eye level (they meet by a fraction of a pixel
+		-- at 32).
+		offset = Vector3.new(21, 33, -29.3), -- the counter is at the back wall; over the front roof, east of the name board
 	},
 	{
 		name = "Gondola",
@@ -363,7 +366,7 @@ function TownMarkers.Build(marker: Marker, phone: boolean): BillboardGui
 		label.Size = UDim2.fromScale(1 - across(PAD + CHIP + PAD + PAD), CHIP)
 		label.TextXAlignment = Enum.TextXAlignment.Left
 	end
-	label.Font = Enum.Font.FredokaOne -- the world signs' face (Kit.signText)
+	label.Font = UITheme.Fonts.Heading
 	label.Text = marker.text
 	label.TextColor3 = C.Cream
 	label.TextScaled = true

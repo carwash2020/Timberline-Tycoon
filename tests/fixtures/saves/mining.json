@@ -1,0 +1,12 @@
+{
+  "v": 0,
+  "picks": { "RustyPick": true, "SteelPick": true, "Nope": true },
+  "pick": "SteelPick",
+  "bombs": 3.9,
+  "ropes": -2,
+  "lamp": true,
+  "hardhat": false,
+  "crafted": { "HeartstoneTurnIn": 1, "zero": 0 },
+  "stash": [],
+  "starterGiven": true
+}

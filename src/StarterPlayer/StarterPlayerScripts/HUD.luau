@@ -83,6 +83,7 @@ local LoadStages = require(ReplicatedStorage.Shared.LoadStages)
 local Net = require(ReplicatedStorage.Shared.Net)
 local GamepadNavLogic = require(ReplicatedStorage.Shared.GamepadNavLogic)
 local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
+local PhoneHud = require(ReplicatedStorage.Shared.PhoneHud)
 local QuickMenuLogic = require(ReplicatedStorage.Shared.QuickMenuLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -90,6 +91,7 @@ local GamepadNav = require(script.Parent.GamepadNav)
 local HudLayout = require(script.Parent.HudLayout)
 local HudNav = require(script.Parent.HudNav)
 local HudRules = require(script.Parent.HudRules)
+local UIArt = require(script.Parent.UIArt)
 local UITheme = require(script.Parent.UITheme)
 
 local HUD = {}
@@ -137,7 +139,14 @@ type Chip = {
 }
 
 type Side = {
+	name: string,
+	text: string, -- the label (the quick menu's tile, and the button's text off a phone)
+	baseStyle: string,
 	button: UITheme.Button,
+	icon: PhoneHud.Icon?, -- on a phone it shows as this icon
+	image: ImageLabel?,
+	fallback: TextLabel?, -- the short text, only when the image is missing or failed
+	imageFailed: boolean,
 	key: Enum.KeyCode?,
 	hint: Enum.KeyCode?, -- a button that opens it elsewhere (the quick menu's): only its glyph shows
 	glyph: GuiObject?,
@@ -188,6 +197,7 @@ local axeOut = false -- an axe tool in the character
 local nearPad = false -- your truck by the sell pad (HintLogic.NearPad)
 local sideGui: ScreenGui? = nil
 local sideColumn: Frame? = nil -- a zero-size corner the side buttons stack up and left from
+local foldHolder: Frame? = nil -- hidden: the buttons that live inside MENU on a phone
 local sides: { Side } = {}
 local arrangeQueued = false
 local jumpButton: GuiObject? = nil -- a phone's jump button (Roblox's touch controls), once there is one
@@ -240,7 +250,7 @@ local function popDelta(delta: number)
 	end
 	local gain = delta > 0
 	local text = (if gain then "+" else "-") .. Util.formatCash(math.abs(delta))
-	local pop = UITheme.label(spot, text, F.Heading, if gain then 24 else 20, if gain then C.Money else C.Ink)
+	local pop = UITheme.label(spot, text, F.Heading, if gain then 24 else 20, if gain then C.Amber else C.Ink)
 	pop.Name = "CashPop"
 	pop.AnchorPoint = Vector2.new(1, 0.5)
 	pop.AutomaticSize = Enum.AutomaticSize.XY
@@ -248,7 +258,7 @@ local function popDelta(delta: number)
 	pop.TextXAlignment = Enum.TextXAlignment.Right
 	local start = UDim2.fromOffset(-4, 0)
 	pop.Position = start
-	local stroke = UITheme.stroke(pop, C.Cream, 2)
+	local stroke = UITheme.stroke(pop, if gain then C.Ink else C.Cream, 2)
 	local rise = TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	TweenService:Create(pop, rise, { Position = start + UDim2.fromOffset(0, if gain then -16 else 16) }):Play()
 	local fade = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.In, 0, false, 0.75)
@@ -559,15 +569,15 @@ local function presentToast(message: string, seconds: number?, id: number?)
 		removeToast(toasts[#toasts])
 	end
 	toastOrder += 1
-	local card = UITheme.Card(C.Paper, C.Ink, 2, 16, true)
+	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true)
 	card.outer.Name = "Toast"
 	card.outer.LayoutOrder = -toastOrder -- newest on top
 	local limit = Instance.new("UISizeConstraint")
 	limit.MinSize = Vector2.new(0, 34)
 	limit.Parent = card.outer
-	local stroke = UITheme.stroke(card.face, C.Bark, 2)
+	local stroke = UITheme.stroke(card.face, C.AmberEdge, UITheme.Stroke)
 	UITheme.padding(card.face, 7, 14, 7, 14)
-	local label = UITheme.label(card.face, "", F.Bold, UITheme.Sized("Toast").text, C.Ink)
+	local label = UITheme.label(card.face, "", F.Bold, UITheme.Sized("Toast").text, C.Cream)
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.TextWrapped = true
@@ -1181,6 +1191,55 @@ local function promptOn(key: Enum.KeyCode): boolean
 	return false
 end
 
+-- A small mark on the left of Saves, Hammer and the truck button. Same
+-- shapes everywhere; the colour is that button's ink so it stays readable
+-- on walnut, green and amber.
+local function sideMark(face: TextButton, name: string)
+	local kind = if name == "Saves"
+		then "saves"
+		elseif name == "Hammer" then "hammer"
+		elseif name == "CallTruck" then "truck"
+		else nil
+	if kind == nil then
+		return
+	end
+	-- paint() has already set the label colour
+	local ink = face.TextColor3
+	local mark = Instance.new("Frame")
+	mark.Name = "Mark"
+	mark.AnchorPoint = Vector2.new(0, 0.5)
+	mark.Position = UDim2.new(0, 8, 0.5, 0)
+	mark.Size = UDim2.fromOffset(18, 18)
+	mark.BackgroundTransparency = 1
+	mark.BorderSizePixel = 0
+	mark.ZIndex = face.ZIndex + 1
+	mark.Active = false
+	local function bit(w: number, h: number, x: number, y: number, rot: number?): Frame
+		local part = Instance.new("Frame")
+		part.Size = UDim2.fromOffset(w, h)
+		part.Position = UDim2.fromOffset(x, y)
+		part.Rotation = rot or 0
+		part.BackgroundColor3 = ink
+		part.BorderSizePixel = 0
+		part.ZIndex = mark.ZIndex
+		part.Parent = mark
+		UITheme.corner(part, 2)
+		return part
+	end
+	if kind == "saves" then
+		bit(14, 10, 2, 4)
+		bit(6, 3, 6, 2)
+	elseif kind == "hammer" then
+		bit(12, 3, 3, 8, -40)
+		bit(7, 5, 10, 2, -40)
+	else
+		bit(14, 6, 2, 8)
+		bit(4, 4, 3, 12)
+		bit(4, 4, 11, 12)
+	end
+	mark.Parent = face
+end
+
 -- A side button's size for the device (UITheme.Sized: on a phone 116 x 44,
 -- a fingertip tall, its label 15 and never under 12; on a gamepad wider,
 -- for the glyph).
@@ -1193,7 +1252,33 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	if device == "console" then
 		width, height = GamepadNavLogic.PadSize(width, height) -- big enough for a stick to land on
 	end
-	side.button.root.Size = UDim2.fromOffset(width, height + 3)
+	-- On a phone MENU, HAMMER and Sell here are 44 x 44 icon buttons.
+	local asIcon = phone and side.icon ~= nil
+	if asIcon then
+		width, height = UITheme.Size.Icon, UITheme.Size.Icon
+	end
+	side.button.root.Size = UDim2.fromOffset(width, height + UITheme.ButtonDrop)
+	local styleName = side.baseStyle
+	if asIcon then
+		styleName = PhoneHud.IconStyle[side.name] or side.baseStyle
+	end
+	side.button:SetStyle(styleName)
+	side.button.face.TextTransparency = if asIcon then 1 else 0
+	local mark = side.button.face:FindFirstChild("Mark")
+	if mark and mark:IsA("GuiObject") then
+		mark.Visible = not asIcon
+	end
+	local image, fallback = side.image, side.fallback
+	if image then
+		image.Visible = asIcon and not side.imageFailed and image.Image ~= ""
+	end
+	if fallback then
+		fallback.Visible = asIcon and (side.imageFailed or (image ~= nil and image.Image == ""))
+		local style = UITheme.Styles[styleName]
+		if style then
+			fallback.TextColor3 = style.ink
+		end
+	end
 	side.button.face.TextSize = spec.text
 	local fit = side.button.face:FindFirstChildOfClass("UITextSizeConstraint")
 	if fit then
@@ -1202,10 +1287,34 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	end
 	local pad = side.button.face:FindFirstChildOfClass("UIPadding")
 	if pad then
-		pad.PaddingLeft = UDim.new(0, if console then 36 else 6)
+		local iconPad = if side.button.face:FindFirstChild("Mark") and not asIcon then 28 else 0
+		pad.PaddingLeft = UDim.new(0, (if console then 36 else 6) + iconPad)
+		if asIcon then
+			pad.PaddingLeft = UDim.new(0, 0)
+			pad.PaddingRight = UDim.new(0, 0)
+		else
+			pad.PaddingRight = UDim.new(0, 6)
+		end
 	end
 	if side.glyph then
-		side.glyph.Visible = console
+		side.glyph.Visible = console and not asIcon
+	end
+end
+
+-- Puts each side button where it belongs now: in the column, or (on a phone,
+-- for SAVES, Send truck home and the owner's button) in the hidden holder,
+-- reached through MENU.
+local function syncFolds()
+	local column, holder = sideColumn, foldHolder
+	if not column or not holder then
+		return
+	end
+	local phone = UITheme.IsPhone()
+	for _, side in ipairs(sides) do
+		local want = if phone and PhoneHud.IsFolded(side.name) then holder else column
+		if side.button.root.Parent ~= want then
+			side.button.root.Parent = want
+		end
 	end
 end
 
@@ -1250,9 +1359,11 @@ local function arrangeSide()
 	-- From the right edge, so it stays put if the screen resizes first.
 	column.Position = UDim2.new(1, spot.X - screen.X, 0, spot.Y)
 
+	syncFolds()
+	local phone = UITheme.IsPhone()
 	local shown: { Frame } = {}
 	for _, side in ipairs(sides) do
-		if side.button.root.Visible then
+		if side.button.root.Visible and side.button.root.Parent == column then
 			table.insert(shown, side.button.root)
 		end
 	end
@@ -1263,7 +1374,9 @@ local function arrangeSide()
 	for i, root in ipairs(shown) do
 		sizes[i] = Vector2.new(root.Size.X.Offset, root.Size.Y.Offset)
 	end
-	local spots = HudLayout.Stack(sizes, room, SIDE_GAP)
+	-- On a phone the icon faces are 8 px apart (each root also holds its edge).
+	local gap = if phone then PhoneHud.StackGap(UITheme.ButtonDrop) else SIDE_GAP
+	local spots = HudLayout.Stack(sizes, room, gap)
 	-- Columns that spill left mustn't reach the bars at the bottom centre
 	-- (build mode, placing): lift such a column above them if there's room.
 	-- The bars' screens share this one's safe area left, right and below.
@@ -1273,7 +1386,7 @@ local function arrangeSide()
 		top = screen.Y - (UITheme.Bottom() + 38) - BAR_HEIGHT,
 		bottom = screen.Y,
 	}
-	spots = HudLayout.LiftClear(spots, sizes, spot, band, spot.Y - room, SIDE_GAP)
+	spots = HudLayout.LiftClear(spots, sizes, spot, band, spot.Y - room, gap)
 	for i, root in ipairs(shown) do
 		root.Position = UDim2.fromOffset(-spots[i].X, -spots[i].Y)
 	end
@@ -1337,11 +1450,11 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 		size = spec.size or Vector2.new(110, 40),
 		style = opts.style,
 		textSize = spec.text,
-		radius = 12,
 	})
 	button.root.LayoutOrder = opts.order
 	button.root.AnchorPoint = Vector2.new(1, 1) -- placed by arrangeSide
 	button.root.Visible = false
+	sideMark(button.face, opts.name)
 	if not column then
 		warn(string.format("[HUD] no side column (HUD.Start didn't finish): skipping the %s button", opts.name))
 		return button
@@ -1357,7 +1470,68 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	end
 	button.root.Parent = column
 	button.face.Activated:Connect(opts.onPress)
-	local side: Side = { button = button, key = opts.key, hint = opts.glyph, glyph = glyph, onPress = opts.onPress }
+	-- Phone icon: the real image, centred 28 x 28 in the 44 x 44 face (8 px of
+	-- padding), and the short text behind it for a missing or failed image.
+	local iconInfo = PhoneHud.IconFor(opts.name)
+	local image: ImageLabel? = nil
+	local fallback: TextLabel? = nil
+	if iconInfo then
+		local img = Instance.new("ImageLabel")
+		img.Name = "Icon"
+		img.AnchorPoint = Vector2.new(0.5, 0.5)
+		img.Position = UDim2.fromScale(0.5, 0.5)
+		img.Size = UDim2.fromOffset(UITheme.Size.Icon - 16, UITheme.Size.Icon - 16)
+		img.BackgroundTransparency = 1
+		img.BorderSizePixel = 0
+		img.ScaleType = Enum.ScaleType.Fit
+		img.Active = false
+		img.ZIndex = button.face.ZIndex + 1
+		img.Visible = false
+		img.Image = UITheme.HudIconImage(iconInfo.key) or ""
+		img.Parent = button.face
+		image = img
+		local text = Instance.new("TextLabel")
+		text.Name = "IconText"
+		text.AnchorPoint = Vector2.new(0.5, 0.5)
+		text.Position = UDim2.fromScale(0.5, 0.5)
+		text.Size = UDim2.new(1, -4, 1, -8)
+		text.BackgroundTransparency = 1
+		text.Font = F.Button
+		text.TextScaled = true
+		text.Text = iconInfo.text
+		text.TextColor3 = C.Cream
+		text.Active = false
+		text.ZIndex = button.face.ZIndex + 1
+		text.Visible = false
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = UITheme.Size.TextBody
+		fit.MinTextSize = 11
+		fit.Parent = text
+		text.Parent = button.face
+		fallback = text
+	end
+	local side: Side = {
+		name = opts.name,
+		text = opts.text,
+		baseStyle = opts.style,
+		button = button,
+		icon = iconInfo,
+		image = image,
+		fallback = fallback,
+		imageFailed = false,
+		key = opts.key,
+		hint = opts.glyph,
+		glyph = glyph,
+		onPress = opts.onPress,
+	}
+	if image and image.Image ~= "" then
+		UIArt.Listen(image.Image, function(result: UIArt.LoadStatus)
+			if result == "Failure" then
+				side.imageFailed = true
+				layoutSide(side, UITheme.Device())
+			end
+		end)
+	end
 	table.insert(sides, side)
 	-- A gamepad walks the HUD's buttons (HudNav) and the quick menu lists it.
 	local tile = opts.tile ~= false
@@ -1365,7 +1539,7 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 		id = QuickMenuLogic.IdFor(opts.name),
 		labelOf = if tile
 			then function(): string
-				return QuickMenuLogic.Label(button.face.Text)
+				return QuickMenuLogic.Label(if iconInfo then opts.text else button.face.Text)
 			end
 			else nil,
 		press = if tile then opts.onPress else nil,
@@ -1375,6 +1549,29 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	button.root:GetPropertyChangedSignal("Visible"):Connect(queueArrange)
 	queueArrange()
 	return button
+end
+
+export type FoldedEntry = { id: string, label: string, press: () -> (), obj: GuiObject }
+
+-- On a phone: the side buttons that live inside MENU and are showing now
+-- (SAVES, Send truck home, the owner's). The quick menu lists them as tiles
+-- after HudNav's. Empty off a phone, where they stay in the column.
+function HUD.FoldedEntries(): { FoldedEntry }
+	local found: { FoldedEntry } = {}
+	if not UITheme.IsPhone() then
+		return found
+	end
+	for _, side in ipairs(sides) do
+		if PhoneHud.IsFolded(side.name) and side.button.root.Visible then
+			table.insert(found, {
+				id = QuickMenuLogic.IdFor(side.name),
+				label = QuickMenuLogic.Label(side.button.face.Text),
+				press = side.onPress,
+				obj = side.button.face :: GuiObject,
+			})
+		end
+	end
+	return found
 end
 
 -- Whether you're sitting in a seat (driving your truck).
@@ -1419,6 +1616,11 @@ local function syncPad()
 end
 
 function HUD.PadShortcut(key: Enum.KeyCode, available: () -> boolean, onPress: () -> ())
+	-- The Daily Goals pill used the up direction. That button is gone; ignore
+	-- the bind so the pill's script can stay until its own lane removes it.
+	if key.Name == "DPadUp" then
+		return
+	end
 	local took = false -- this press's Begin was ours: so is its End
 	local function handle(_name: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 		if state ~= Enum.UserInputState.Begin then
@@ -1605,7 +1807,7 @@ local function buildCash(playerGui: Instance)
 	safeArea = probe
 
 	local border = UITheme.SkinInset("Plaque")
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true, "Plaque")
+	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true, "Plaque")
 	card.outer.Name = "CashPlaque"
 	card.outer.LayoutOrder = 10
 	-- The top-right row (HUD.TopRow): [pops][other buttons][plaque].
@@ -1805,7 +2007,7 @@ local function buildHint(row: Frame)
 	hint.AutomaticSize = Enum.AutomaticSize.X
 	hint.Size = UDim2.fromOffset(0, ROW_HEIGHT)
 	hint.BackgroundColor3 = C.Ink
-	hint.BackgroundTransparency = 0.2
+	hint.BackgroundTransparency = 0 -- solid, so cream stays 4.5:1 on grass and sky
 	hint.TextXAlignment = Enum.TextXAlignment.Center
 	hint.TextTruncate = Enum.TextTruncate.AtEnd
 	UITheme.corner(hint, ROW_HEIGHT / 2)
@@ -1931,6 +2133,13 @@ local function buildSideColumn(playerGui: Instance)
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueArrange)
 	gui:GetPropertyChangedSignal("AbsolutePosition"):Connect(queueArrange) -- the safe area's insets arriving
 	gui.Parent = playerGui
+	local folded = Instance.new("Frame")
+	folded.Name = "InsideMenu"
+	folded.Visible = false
+	folded.BackgroundTransparency = 1
+	folded.Size = UDim2.new()
+	folded.Parent = gui
+	foldHolder = folded
 	sideGui, sideColumn = gui, column
 	task.spawn(watchJump, playerGui)
 	queueArrange()

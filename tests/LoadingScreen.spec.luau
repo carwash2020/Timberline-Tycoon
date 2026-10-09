@@ -8,12 +8,21 @@ return function(t)
 	local Enum = roblox.Enum
 
 	local FRAME = 1 / 60
-	local PALETTE = { -- UITheme's, inlined in the script
-		Ink = Color3.fromHex("#3C2814"),
-		Cream = Color3.fromHex("#F5EBD7"),
-		Paper = Color3.fromHex("#F0E1C3"),
-		Bark = Color3.fromHex("#583A22"),
-		Amber = Color3.fromHex("#FFB840"),
+	-- The card copies these tokens (ReplicatedFirst cannot require UITheme).
+	local UITheme = t.loader({
+		services = {
+			GuiService = {},
+			Players = { LocalPlayer = {} },
+			TextChatService = {},
+			UserInputService = {},
+		},
+	}):load("StarterPlayer/StarterPlayerScripts/UITheme")
+	local PALETTE = {
+		Ink = UITheme.Skin.Ink,
+		Bark = UITheme.Skin.Bark,
+		Cream = UITheme.Skin.Cream,
+		Paper = UITheme.Skin.Paper,
+		PaperDark = UITheme.Skin.PaperDark,
 	}
 
 	-- A UIGradient multiplies its parent's colour (it doesn't replace it),
@@ -52,6 +61,10 @@ return function(t)
 				}
 				table.insert(snap.colors, d.TextColor3)
 			elseif d:IsA("Frame") then
+				-- The landscape behind the card uses its own colours.
+				if d.Name == "Scene" or d:FindFirstAncestor("Scene") then
+					continue
+				end
 				if d.BackgroundTransparency < 1 then
 					local g = gradientOf(d)
 					if g then
@@ -71,30 +84,34 @@ return function(t)
 			end
 		end
 		local backdrop = gui:FindFirstChild("Backdrop")
-		if backdrop then
-			-- The rendered top and bottom edges (Rotation 90 runs the
-			-- gradient's first keypoint along the top).
-			local g = gradientOf(backdrop)
-			local base = backdrop.BackgroundColor3
-			if g then
-				local keys = g.Color.Keypoints
-				snap.backdropRotation = g.Rotation
-				snap.backdropTop = times(base, keys[1].Value)
-				snap.backdropBottom = times(base, keys[#keys].Value)
-			else
-				snap.backdropTop = base
-				snap.backdropBottom = base
+		snap.hasScene = backdrop ~= nil and backdrop:FindFirstChild("Scene") ~= nil
+		snap.hasProgress = false
+		snap.buttons = 0
+		for _, d in ipairs(gui:GetDescendants()) do
+			if d:IsA("GuiButton") then
+				snap.buttons += 1
 			end
 		end
 		snap.backdropTransparency = backdrop and backdrop.BackgroundTransparency
-		local inset = backdrop and backdrop:FindFirstChild("TextInset")
-		local content = inset and inset:FindFirstChild("Content")
-		local fraction = (inset and inset.Size.X.Scale or 1) * (content and content.Size.X.Scale or 0)
-		snap.contentWidth = { Scale = fraction }
-		snap.insetX = inset and inset.Position.X.Scale
-		snap.insetY = inset and inset.Position.Y.Scale
-		snap.insetW = inset and inset.Size.X.Scale
-		snap.insetH = inset and inset.Size.Y.Scale
+		snap.backdropColor = backdrop and backdrop.BackgroundColor3
+		local plaque = backdrop and backdrop:FindFirstChild("Plaque")
+		local face = plaque and plaque:FindFirstChild("Face")
+		snap.plaque = plaque
+				and {
+					anchor = plaque.AnchorPoint,
+					position = plaque.Position,
+					width = plaque.Size.X.Offset,
+					height = plaque.Size.Y.Offset,
+					cornerRadius = face and face:FindFirstChildOfClass("UICorner").CornerRadius.Offset,
+					strokeThickness = face and face:FindFirstChildOfClass("UIStroke").Thickness,
+					strokeColor = face and face:FindFirstChildOfClass("UIStroke").Color,
+					padding = face and face:FindFirstChildOfClass("UIPadding").PaddingLeft.Offset,
+					edgeColor = plaque:FindFirstChild("Edge") and plaque.Edge.BackgroundColor3,
+					edgeDrop = plaque:FindFirstChild("Edge") and plaque.Edge.Position.Y.Offset,
+					gradientRotation = face and gradientOf(face) and gradientOf(face).Rotation,
+					gradient = face and gradientOf(face) and gradientOf(face).Color.Keypoints,
+				}
+			or nil
 		return snap
 	end
 
@@ -173,7 +190,7 @@ return function(t)
 			local gui = card()
 			local frame = { at = s.now, shown = gui ~= nil }
 			if gui then
-				local tip = gui.Backdrop.TextInset.Content.Tip
+				local tip = gui.Backdrop.Plaque.Face.Tip
 				frame.tip = tip.Text
 				frame.tipTransparency = tip.TextTransparency
 				frame.backdropTransparency = gui.Backdrop.BackgroundTransparency
@@ -261,55 +278,92 @@ return function(t)
 		t.eq(snap.ignoreInset, true)
 		t.eq(snap.displayOrder, 100)
 		t.eq(snap.resetOnSpawn, false)
-		t.eq(snap.backdropTransparency, 0, "opaque from the first frame")
+		t.ok(math.abs(snap.backdropTransparency - 0.45) < 1e-4, "Ink at 45% transparency from the first frame")
 		t.eq(snap.labels.Title.text, "Timberline Tycoon")
-		t.eq(snap.labels.Title.font, Enum.Font.FredokaOne)
+		t.eq(snap.labels.Title.font, roblox.Enum.Font.FredokaOne, "the GAD title face")
 	end)
 
-	t.test("renders only the inlined palette: Cream title on a Bark-to-Ink backdrop", function()
+	t.test("one plaque on an Ink backdrop: the GAD skin, no scene, no buttons, no progress bar", function()
 		local snap = run({ character = 1, profile = 1 }).removedDefault.card
-		t.ok(same(snap.labels.Title.color, PALETTE.Cream), "title is Cream")
-		-- As it shows on screen (base x gradient), not the raw properties.
-		t.eq(snap.backdropRotation, 90, "the gradient runs top to bottom")
-		t.ok(same(snap.backdropTop, PALETTE.Bark), "backdrop shows Bark along the top")
-		t.ok(same(snap.backdropBottom, PALETTE.Ink), "and Ink along the bottom")
-		t.ok(#snap.colors >= 5)
+		t.ok(same(snap.labels.Title.color, PALETTE.Ink), "title is Ink")
+		t.eq(snap.labels.Title.size, 20)
+		t.eq(snap.labels.Title.font, roblox.Enum.Font.FredokaOne)
+		t.ok(same(snap.labels.Tip.color, PALETTE.Bark), "the tip is Bark")
+		t.eq(snap.labels.Tip.size, 14)
+		t.eq(snap.labels.Tip.font, roblox.Enum.Font.GothamMedium)
+		t.ok(same(snap.backdropColor, PALETTE.Ink), "backdrop is Ink")
+		t.ok(not snap.hasScene, "not a flat scene")
+		t.ok(not snap.hasProgress, "no progress bar")
+		t.eq(snap.buttons, 0, "no buttons")
+		local p = snap.plaque
+		t.ok(p, "a plaque")
+		t.eq({ p.anchor.X, p.anchor.Y }, { 0.5, 0.5 })
+		t.eq({ p.position.X.Scale, p.position.X.Offset, p.position.Y.Offset }, { 0.5, 0, 0 })
+		t.ok(math.abs(p.position.Y.Scale - 0.45) < 1e-4, "at 0.45 down")
+		t.eq(p.height, 132)
+		t.eq(p.cornerRadius, 12)
+		t.eq(p.strokeThickness, 2)
+		t.ok(same(p.strokeColor, PALETTE.Bark), "a 2 px Bark stroke")
+		t.ok(same(p.edgeColor, PALETTE.Bark), "a Bark drop edge")
+		t.eq(p.edgeDrop, 4, "4 px down")
+		t.eq(p.padding, 16)
+		t.eq(p.gradientRotation, 90)
+		t.eq(#p.gradient, 3)
+		t.ok(same(times(Color3.new(1, 1, 1), p.gradient[1].Value), PALETTE.Cream), "Cream at the top")
+		t.ok(math.abs(p.gradient[2].Time - 0.18) < 1e-4)
+		t.ok(same(p.gradient[2].Value, PALETTE.Paper), "Paper at 0.18")
+		t.ok(same(p.gradient[3].Value, PALETTE.PaperDark), "PaperDark at the bottom")
 		for _, c in ipairs(snap.colors) do
 			local named = false
-			for _, p in pairs(PALETTE) do
-				if same(c, p) then
+			for _, named_ in pairs(PALETTE) do
+				if same(c, named_) then
 					named = true
 				end
 			end
-			t.ok(named, "colour " .. c:ToHex() .. " is one of Ink, Cream, Paper, Bark, Amber")
+			t.ok(named, "colour " .. c:ToHex() .. " is one of Ink, Bark, Cream, Paper, PaperDark")
 		end
 	end)
 
-	t.test("text is 14 px or more and fits an iPhone SE in landscape at scale 1", function()
+	t.test("the copied palette matches UITheme.Skin", function()
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/ReplicatedFirst/LoadingScreen.client.luau")
+		for name, color in pairs({
+			INK = PALETTE.Ink,
+			BARK = PALETTE.Bark,
+			CREAM = PALETTE.Cream,
+			PAPER = PALETTE.Paper,
+			PAPER_DARK = PALETTE.PaperDark,
+		}) do
+			t.ok(
+				string.find(
+					source,
+					"local " .. name .. ' = Color3.fromHex("#' .. color:ToHex():upper() .. '")',
+					1,
+					true
+				),
+				name .. " is copied from UITheme.Skin"
+			)
+		end
+	end)
+
+	t.test("at 667x375 the plaque is 280 wide (72% of the screen allows 480), text 14 or more", function()
 		local snap = run({ character = 1, profile = 1 }).removedDefault.card
 		t.eq(snap.scale, 1)
-		local count = 0
+		t.eq(snap.plaque.width, math.min(280, 0.72 * 667))
+		t.eq(snap.plaque.width, 280)
 		for name, label in pairs(snap.labels) do
-			count += 1
 			t.ok(label.size >= 14, name .. " is at least 14 px")
 		end
-		t.ok(count >= 3, "title, kicker and tip")
-		t.ok(snap.labels.Tip.size >= 18, "the tip reads at a glance")
-		t.ok(math.min(snap.contentWidth.Scale * 667, snap.maxWidth) <= 667 - 32, "a margin each side")
 		t.eq(snap.ignoreInset, true, "the backdrop stays full-bleed")
-		t.ok(math.abs(snap.insetX - 0.05) < 1e-4, "inset x")
-		t.ok(math.abs(snap.insetY - 0.05) < 1e-4, "inset y")
-		t.ok(math.abs(snap.insetW - 0.9) < 1e-4, "inset w")
-		t.ok(math.abs(snap.insetH - 0.9) < 1e-4, "inset h")
 	end)
 
-	t.test("bigger screens scale it up, but never past their edges", function()
+	t.test("the plaque is min(280, 72% of the width) on every screen, and never wider than it", function()
 		local screens = {
 			Vector2.new(667, 375), -- iPhone SE, landscape
 			Vector2.new(844, 390), -- iPhone 14, landscape
 			Vector2.new(375, 667), -- a phone held upright
+			Vector2.new(320, 568), -- a narrow one: 72% of it is under 280
 			Vector2.new(1024, 768), -- iPad
-			Vector2.new(1366, 768),
 			Vector2.new(1920, 1080),
 			Vector2.new(3840, 2160),
 		}
@@ -317,15 +371,23 @@ return function(t)
 			local snap = run({ viewport = v, character = 1, profile = 1 }).removedDefault.card
 			local label = string.format("%dx%d", v.X, v.Y)
 			t.ok(snap.scale >= 1 and snap.scale <= 1.8, label .. " scale " .. snap.scale)
-			local width = math.min(snap.contentWidth.Scale * v.X, snap.maxWidth) * snap.scale
-			t.ok(width <= v.X * 0.9 + 1e-6, label .. " content is " .. width .. " wide")
-			t.ok(48 * snap.scale <= v.Y * 0.3, label .. " title height")
+			local wide = snap.plaque.width * snap.scale
+			t.ok(wide <= 0.72 * v.X + 1e-6, label .. " plaque is " .. wide .. " wide")
+			if snap.scale == 1 then
+				t.ok(math.abs(snap.plaque.width - math.min(280, 0.72 * v.X)) <= 1, label)
+			end
+			t.ok(snap.plaque.height * snap.scale <= v.Y * 0.5, label .. " height")
 		end
 		local big = run({ viewport = Vector2.new(1920, 1080), character = 1, profile = 1 }).removedDefault.card
-		t.ok(big.scale > 1.5, "a monitor gets bigger text")
+		t.ok(big.scale > 1.5, "a monitor gets a bigger card")
 	end)
 
-	t.test("4 to 6 short tips about chopping, hauling, selling and figures, rotating", function()
+	t.test("tips rotate from LoadingTips, with no repeat inside the wait", function()
+		local Tips = t.load("ReplicatedFirst/LoadingTips")
+		local known = {}
+		for _, line in ipairs(Tips.Lines) do
+			known[line] = true
+		end
 		local s = run({}) -- never ready: the full 30 s
 		local seen, order = {}, {}
 		local changes, last = 0, nil
@@ -341,15 +403,12 @@ return function(t)
 				end
 			end
 		end
-		t.ok(#order >= 4 and #order <= 6, #order .. " different tips")
-		t.ok(changes <= 7, "a tip stays up for seconds, not frames")
-		local all = string.lower(table.concat(order, " "))
-		for _, word in ipairs({ "tree", "truck", "sell", "figured" }) do
-			t.ok(string.find(all, word, 1, true), "a tip mentions " .. word)
-		end
+		t.ok(#order >= 4, #order .. " different tips")
+		t.ok(#order < #Tips.Lines, "the wait is shorter than one full cycle")
+		t.ok(changes <= 8, "a tip stays up for seconds, not frames")
 		for _, tip in ipairs(order) do
-			-- ~60 characters a line at 18 px in 560 px: two lines at most.
-			t.ok(#tip <= 100, "short enough for two lines: " .. tip)
+			t.ok(known[tip], "shown tip is in the module: " .. tip)
+			t.ok(#tip <= Tips.MaxLength, "short enough for a phone: " .. tip)
 		end
 	end)
 

@@ -53,6 +53,10 @@ export type Goal = {
 	reward: number,
 	wood: string?, -- sellWood and sellWoodVolume only
 	done: boolean,
+	-- False until the Sawmill Foreman pays this goal (Lane E). Missing on an
+	-- old goal: ProfileSchema.Migrate sets it to `done`, so a goal the old
+	-- loop already paid is not paid again.
+	paid: boolean?,
 }
 
 -- Sizes by axe tier (profile.bestAxeTier; 1 = Rusty Axe ... 9 = Starfall).

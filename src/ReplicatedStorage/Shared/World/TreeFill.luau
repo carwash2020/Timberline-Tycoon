@@ -12,6 +12,7 @@ local ForestLogic = require(script.Parent.Parent.ForestLogic)
 local GameConfig = require(script.Parent.Parent.GameConfig)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local PlotData = require(script.Parent.Parent.PlotData)
+local TownTreeData = require(script.Parent.Parent.TownTreeData)
 local TerrainGen = require(script.Parent.TerrainGen)
 local WorldLayout = require(script.Parent.WorldLayout)
 
@@ -545,6 +546,11 @@ function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
 		table.insert(out, spot)
 		table.insert(taken, spot.position)
 	end
+	-- And last of all, the trees in and round the town (its own rng too).
+	for _, spot in ipairs(TreeFill.TownRings(taken, pause)) do
+		table.insert(out, spot)
+		table.insert(taken, spot.position)
+	end
 	return out
 end
 
@@ -729,6 +735,226 @@ function TreeFill.PlotRings(taken: { Vector3 }, pause: (() -> ())?): { Spot }
 					end
 				end
 				left -= placed
+			end
+		end
+	end
+	return out
+end
+
+---------------------------------------------------------------------------
+-- Town trees: choppable trees in and round the spawn area
+---------------------------------------------------------------------------
+
+-- Connor (8 October 2026): "we need more choppable trees in the spawn area
+-- too, near the pad, by the dealership ... it's a lumberjack game". A site
+-- (TownTreeData.Sites) is a small disc: a cluster of ordinary felling trees
+-- of the region's woods, biome 'wild', and the regrow zone "town:<site>"
+-- with a cap of the cluster's size. They are not in BiomeData's counts (the
+-- economy model is unchanged). The town sits inside the phone discs (QUIET
+-- does not apply), so TownTreeData's tier counts are its budget.
+-- Trees keep off every road, path, floor, building, the parking lot and its
+-- pull-outs, the sell area, the spawn lane, shop doors, the Land Office
+-- queue, the gondola's lane, the ornamental greenery, the props, lamps,
+-- signs and fences, the townsfolk's walks, plots, and steep or wet ground.
+-- The same test (TownGround) picks a regrow spot, so a felled tree never
+-- grows back onto any of those either.
+
+type Disc = { x: number, z: number, r: number, name: string }
+type TownObs = { rects: { TownTreeData.Rect }, discs: { Disc }, lanes: { TownTreeData.Lane } }
+
+local townObs: TownObs? = nil
+
+local function grown(r: TownTreeData.Rect, m: number): TownTreeData.Rect
+	return { name = r.name, x0 = r.x0 - m, z0 = r.z0 - m, x1 = r.x1 + m, z1 = r.z1 + m }
+end
+
+local function townObstacles(): TownObs
+	local cached = townObs
+	if cached then
+		return cached
+	end
+	local M = TownTreeData.Margin
+	local rects: { TownTreeData.Rect } = {}
+	local discs: { Disc } = {}
+	local lanes: { TownTreeData.Lane } = {}
+	for _, r in ipairs(TownTreeData.Empty) do
+		table.insert(rects, r)
+	end
+	for _, r in ipairs(TownTreeData.Buildings) do
+		table.insert(rects, grown(r, M.building))
+	end
+	table.insert(rects, grown(TownTreeData.Camp, M.camp))
+	table.insert(rects, grown(TownTreeData.ParkingLot, M.lot))
+	table.insert(rects, grown(TownTreeData.PullOut, M.pullout))
+	for _, pad in ipairs({ WorldLayout.DealershipLoadingPad, WorldLayout.ToolShedLoadingPad }) do
+		table.insert(
+			rects,
+			grown({ name = "LoadingPad", x0 = pad.x0, z0 = pad.z0, x1 = pad.x1, z1 = pad.z1 }, M.loading)
+		)
+	end
+	for _, p in ipairs(WorldLayout.TownPaint) do
+		table.insert(rects, grown({ name = p.name, x0 = p.x0, z0 = p.z0, x1 = p.x1, z1 = p.z1 }, M.paint))
+	end
+	for _, p in ipairs(WorldLayout.TownFloors) do
+		table.insert(rects, grown({ name = p.name, x0 = p.x0, z0 = p.z0, x1 = p.x1, z1 = p.z1 }, M.floor))
+	end
+
+	local town = world().Town() :: any
+	for _, cf in ipairs(town.lamps) do
+		table.insert(discs, { x = cf.X, z = cf.Z, r = M.lamp, name = "lamp" })
+	end
+	for _, prop in ipairs(town.props) do
+		table.insert(discs, { x = prop.cframe.X, z = prop.cframe.Z, r = M.prop, name = "prop " .. prop.name })
+	end
+	for _, sign in ipairs(town.signs) do
+		table.insert(discs, { x = sign.cframe.X, z = sign.cframe.Z, r = M.sign, name = "sign" })
+	end
+	for _, fence in ipairs(town.fences) do
+		table.insert(discs, { x = fence.cframe.X, z = fence.cframe.Z, r = fence.length / 2 + M.fence, name = "fence" })
+	end
+	for _, g in ipairs(town.greenery) do
+		local r = M.greenery
+		if g.kind ~= "tree" then
+			r = g.size / 2 + 5
+		end
+		table.insert(discs, { x = g.cframe.X, z = g.cframe.Z, r = r, name = "greenery " .. g.kind })
+	end
+
+	for _, lane in ipairs(TownTreeData.Lanes) do
+		table.insert(lanes, lane)
+	end
+	for _, walk in ipairs(TownTreeData.Walks) do
+		local points = walk.points
+		local n = #points
+		for i = 1, n do
+			local a, b = points[i], points[i % n + 1]
+			table.insert(
+				lanes,
+				{ name = "walk " .. walk.id, ax = a[1], az = a[2], bx = b[1], bz = b[2], half = M.walk }
+			)
+		end
+	end
+	-- The gondola leaves the town station toward the isles.
+	local sky = BiomeData.Get("sky")
+	local area = if sky then sky.area else nil
+	if area then
+		local from = Vector2.new(TownTreeData.GondolaStation.x, TownTreeData.GondolaStation.z)
+		local dir = (Vector2.new(area.x, area.z) - from).Unit
+		local to = from + dir * TownTreeData.GondolaLaneLength
+		table.insert(
+			lanes,
+			{ name = "gondola", ax = from.X, az = from.Y, bx = to.X, bz = to.Y, half = TownTreeData.GondolaLaneHalf }
+		)
+	end
+	local built: TownObs = { rects = rects, discs = discs, lanes = lanes }
+	townObs = built
+	return built
+end
+
+-- The name of what a town tree at (x, z) would stand in the way of, or nil.
+function TreeFill.TownBlocker(x: number, z: number): string?
+	local obs = townObstacles()
+	for _, r in ipairs(obs.rects) do
+		if x > r.x0 and x < r.x1 and z > r.z0 and z < r.z1 then
+			return r.name
+		end
+	end
+	for _, d in ipairs(obs.discs) do
+		if within(x, z, d.x, d.z, d.r) then
+			return d.name
+		end
+	end
+	local p = Vector2.new(x, z)
+	for _, lane in ipairs(obs.lanes) do
+		local d = WorldLayout.SegmentDistance(p, Vector2.new(lane.ax, lane.az), Vector2.new(lane.bx, lane.bz))
+		if d < lane.half then
+			return lane.name
+		end
+	end
+	return nil
+end
+
+-- What stops a town tree standing at (x, z), or nil: everything above, the
+-- general tree rules except the flat-town exclusion (GoodGround), and gentle,
+-- dry ground clear of the roads.
+function TreeFill.TownWhy(x: number, z: number): string?
+	local blocker = TreeFill.TownBlocker(x, z)
+	if blocker then
+		return blocker
+	end
+	if WorldLayout.TreeBlocked(x, z) then
+		return "tree-blocked ground"
+	elseif not plotClear(x, z, TownTreeData.Margin.plot) then
+		return "plot"
+	elseif not obstacleClear(x, z) then
+		return "boulder or road sign"
+	elseif not clusterClear(x, z) then
+		return "boulder cluster"
+	elseif not sceneryClear(x, z) then
+		return "scenery"
+	elseif not landmarkClear(x, z, 6) then
+		return "landmark"
+	elseif not yardsClear(x, z) then
+		return "loading pad or plot square"
+	elseif TerrainGen.RoadClearance(x, z) < TownTreeData.Margin.road then
+		return "road"
+	elseif TerrainGen.WaterLevelAt(x, z) ~= nil then
+		return "water"
+	elseif TerrainGen.SlopeAt(x, z) >= 0.5 then
+		return "steep ground"
+	end
+	return nil
+end
+
+function TreeFill.TownGround(x: number, z: number): boolean
+	return TreeFill.TownWhy(x, z) == nil
+end
+
+-- The ground test for a tree of `zone`: a town zone ("town:...") uses
+-- TownGround; every other zone the general one.
+function TreeFill.GroundFor(zone: TreeZone?, x: number, z: number): boolean
+	if zone and string.sub(zone.id, 1, 5) == "town:" then
+		return TreeFill.TownGround(x, z)
+	end
+	return TreeFill.Ground(x, z)
+end
+
+-- The town's trees: for each site of `tier` (default: the shipped tier), up
+-- to `want` trunks scattered in its disc, a TownTreeData.Gap apart and on
+-- TownGround. Deterministic: each site has its own rng from its id, so a
+-- site's trees do not depend on which other sites a tier plants. Returns them
+-- without touching `taken`.
+function TreeFill.TownRings(taken: { Vector3 }, pause: (() -> ())?, tier: string?): { Spot }
+	local out: { Spot } = {}
+	local mine: { Vector3 } = {}
+	for _, site in ipairs(TownTreeData.SitesFor(tier or TownTreeData.ShippedTier)) do
+		local rng = Kit.rng(hashString("town ring " .. site.id))
+		local zone: TreeZone = {
+			id = "town:" .. site.id,
+			cx = site.cx,
+			cz = site.cz,
+			radius = site.radius,
+			cap = site.want,
+		}
+		local woods = woodsNear(Vector2.new(site.cx, site.cz))
+		local tries, placed = 0, 0
+		while placed < site.want and tries < site.want * 60 do
+			tries += 1
+			if pause then
+				pause()
+			end
+			local a = rng:range(0, math.pi * 2)
+			local rr = math.sqrt(rng:next()) * site.radius
+			local x, z = site.cx + math.cos(a) * rr, site.cz + math.sin(a) * rr
+			if
+				not takenNear(taken, x, z, TownTreeData.Gap)
+				and not takenNear(mine, x, z, TownTreeData.Gap)
+				and TreeFill.TownGround(x, z)
+			then
+				local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+				table.insert(mine, p)
+				table.insert(out, { woodId = rng:pick(woods), position = p, biome = "wild", zone = zone })
+				placed += 1
 			end
 		end
 	end

@@ -73,6 +73,7 @@ local GrowLogic = require(ReplicatedStorage.Shared.GrowLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
+local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local TreeGen = require(ReplicatedStorage.Shared.TreeGen)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
@@ -958,6 +959,27 @@ end
 -- Section `sid` of a standing tree is cut through at `h`: everything above
 -- the cut is one loose piece; through a trunk section the tree is felled.
 -- Returns the piece and, for a felling, who it counts for.
+-- The Prosperous stamp for the axe this player has equipped, or 1. Read
+-- here, on the server, when the piece is cut free. A later axe swap does
+-- not rewrite a piece that already exists.
+local function prosperOf(player: Player): number
+	local ok, service = pcall(function(): any
+		return require(script.Parent.ProfileService)
+	end)
+	if not ok or type(service) ~= "table" or type(service.GetProfile) ~= "function" then
+		return 1
+	end
+	local profile = service.GetProfile(player)
+	if type(profile) ~= "table" or type(profile.temper) ~= "table" then
+		return 1
+	end
+	local uid = profile.equippedAxe
+	if type(uid) ~= "string" then
+		return 1
+	end
+	return TemperLogic.Multiplier(profile.temper[uid])
+end
+
 local function split(
 	rec: TreeRecord,
 	player: Player,
@@ -1071,6 +1093,7 @@ local function split(
 		ownerId = ownerId,
 		boost = boost,
 		lux = luxSwing == true,
+		temper = prosperOf(owner),
 		treeUid = rec.uid,
 		elder = rec.elder,
 		fall = { cutter = player, dir = dir, felled = felled, pivot = pivot },
@@ -1383,7 +1406,7 @@ local function pickSpot(rec: TreeRecord): Vector3?
 		if dx * dx + dz * dz < TREE_GAP * TREE_GAP then
 			return false
 		end
-		if not TreeFill.Ground(px, pz) then
+		if not TreeFill.GroundFor(zone, px, pz) then
 			return false
 		end
 		return not liveBaseNear(rec, px, pz)

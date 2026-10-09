@@ -313,6 +313,49 @@ return function(t)
 		end
 	)
 
+	t.test("the stepped unit matches the shop's numbers", function()
+		t.eq(ShelfLayout.TableTop, StoreStock.TableTop)
+		t.eq(ShelfLayout.ShelfTop, StoreStock.ShelfTop)
+		t.eq(ShelfLayout.RowStep, StoreStock.RowStep)
+		t.eq(ShelfLayout.PlinthHeight, StoreStock.PlinthHeight)
+		t.eq(BoxSize.Gap, 1.5)
+		t.eq(BoxSize.RowGap, 2.5)
+		t.eq(ShelfLayout.Wide, 8)
+		t.eq(ShelfLayout.Deep, 3)
+		t.eq(ShelfLayout.Rows, 3)
+		local model = ShelfLayout.Build()
+		local boards, posts, rails, kicks = {}, {}, {}, {}
+		for _, p in ipairs(model:GetChildren()) do
+			if p.Name == "Board" then
+				table.insert(boards, p)
+			elseif p.Name == "Post" then
+				table.insert(posts, p)
+			elseif p.Name == "Rail" then
+				table.insert(rails, p)
+			elseif p.Name == "Kick" then
+				table.insert(kicks, p)
+			end
+		end
+		t.eq(#boards, 3)
+		t.eq(#posts, 4)
+		t.eq(#rails, 3)
+		t.eq(#kicks, 1)
+		table.sort(boards, function(a, b)
+			return a.CFrame.Position.Z < b.CFrame.Position.Z
+		end)
+		for i, board in ipairs(boards) do
+			local top = board.CFrame.Position.Y + board.Size.Y / 2
+			local want = ShelfLayout.ShelfTop - (ShelfLayout.Rows - i) * ShelfLayout.RowStep
+			t.ok(math.abs(top - want) < 1e-3, string.format("board %d top %.2f", i, top))
+			t.ok(math.abs(board.Size.X - 8) < 1e-3 and math.abs(board.Size.Z - 1) < 1e-3, "8 by 1 board")
+		end
+		for _, post in ipairs(posts) do
+			t.ok(math.abs(post.Size.X - 0.4) < 1e-3 and math.abs(post.Size.Y - 3.6) < 1e-3, "post size")
+			t.ok(math.abs(post.CFrame.Position.Y - post.Size.Y / 2) < 1e-3, "post stands on y = 0")
+		end
+		t.ok(math.abs(kicks[1].Size.Y - ShelfLayout.PlinthHeight) < 1e-3, "kick plate is the plinth height")
+	end)
+
 	t.test("the tallest box stays under the hanging lamps", function()
 		-- The Tool Shed's lamps hang their lanterns to 10.4 studs; the General Store's from 14.4.
 		local limit = { ToolShed = 10.2, HearthAndHome = 12 }

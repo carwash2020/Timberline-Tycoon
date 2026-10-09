@@ -460,6 +460,34 @@ step("4. The town", function()
 		townStation = station("GondolaTown", town.gondola)
 	end)
 
+	-- The sky forge court, the pond dock, the green's campfire and park
+	-- bench, and the meadow lookout (WorldPlan.Town().scenes). The dock's
+	-- preview water sheet is dropped: the pond is the water.
+	step("4. The scenes", function()
+		local folder = Instance.new("Folder")
+		folder.Name = "TownScenes"
+		folder.Parent = map
+		for _, spot in ipairs(town.scenes) do
+			local model = if spot.kind == "forge" then BuildingArt.SkyForgeCourt() else PropArt.Scene(spot.kind)
+			if spot.kind == "fishing" then
+				local sheet = model:FindFirstChild("Water")
+				if sheet then
+					sheet:Destroy()
+				end
+				place(atomic(model), spot.cframe, folder)
+			else
+				standOnGround(place(atomic(model), spot.cframe, folder), true)
+			end
+			if spot.kind == "campfire" then
+				for _, part in ipairs(model:GetDescendants()) do
+					if part.Name == "Flame" and part:IsA("BasePart") then
+						CollectionService:AddTag(part, "Flame")
+					end
+				end
+			end
+		end
+	end)
+
 	-- Murph's camp by the spawn (Murph himself is NPCService's).
 	step("4. Murph's camp", function()
 		local camp = place(atomic(BuildingArt.Campsite()), town.campsite)

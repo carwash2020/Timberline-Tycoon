@@ -22,8 +22,13 @@
 -- times a second; nothing here allocates per frame.
 
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local NatureData = require(ReplicatedStorage.Shared.NatureData)
+local RainFog = require(ReplicatedStorage.Shared.RainFog)
+local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 
 local IS_STUDIO = RunService:IsStudio()
 local SoundService = game:GetService("SoundService")
@@ -106,20 +111,43 @@ local function buildEmitters(sky: Part, ground: Part, around: Part)
 		NumberSequenceKeypoint.new(0.1, 0.45),
 		NumberSequenceKeypoint.new(1, 0.55),
 	})
-	rain.Size = NumberSequence.new(0.42)
-	rain.Squash = NumberSequence.new(3)
+	-- Narrow streak: the smoke puff stretched by Squash, not a new texture.
+	rain.Size = NumberSequence.new(0.05)
+	rain.Squash = NumberSequence.new(9)
 	rain.Orientation = Enum.ParticleOrientation.VelocityParallel
 	rain.LightInfluence = 0.85
 	rain.LightEmission = 0.1
-	rain.Lifetime = NumberRange.new(0.9, 1.1)
-	rain.Speed = NumberRange.new(85, 100)
+	rain.Lifetime = NumberRange.new(0.35, 0.55)
+	rain.Speed = NumberRange.new(70, 90)
 	rain.SpreadAngle = Vector2.new(2, 2)
-	rain.Acceleration = Vector3.new(0, -30, 0)
+	rain.Acceleration = Vector3.new(14, -48, 0)
 	rain.Drag = 0.15
 	rain.WindAffectsDrag = true
 	rain.EmissionDirection = Enum.NormalId.Bottom
 	rain.Parent = sky
-	channel("Rain", rain, 560)
+	channel("Rain", rain, QualityBudgets.RainStreakRate)
+
+	-- Splashes near the player, from the same budget as the streaks.
+	local splash = Instance.new("ParticleEmitter")
+	splash.Texture = TEX_SMOKE
+	splash.Color = ColorSequence.new(Color3.fromRGB(210, 222, 236))
+	splash.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	splash.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.08),
+		NumberSequenceKeypoint.new(1, 0.28),
+	})
+	splash.Lifetime = NumberRange.new(0.18, 0.28)
+	splash.Speed = NumberRange.new(2, 5)
+	splash.SpreadAngle = Vector2.new(70, 70)
+	splash.EmissionDirection = Enum.NormalId.Top
+	splash.LightInfluence = 0.6
+	splash.Rate = 0
+	splash.Enabled = false
+	splash.Parent = ground
+	channel("RainSplash", splash, QualityBudgets.RainSplashRate)
 
 	-- Snow: soft flakes drifting with the wind.
 	local snow = Instance.new("ParticleEmitter")
@@ -260,12 +288,54 @@ local function targets(env: LightingController.Environment): { [string]: number 
 	return t
 end
 
+-- 1 in the open, 0 under a roof, in a cave, the tunnel or the grotto.
+local rainCover = 1
+local shelterZones: { NatureData.Zone }? = nil
+
+local function shelterZonesNow(): { NatureData.Zone }
+	local cached = shelterZones
+	if cached then
+		return cached
+	end
+	local scatter = NatureData.TryModule(ReplicatedStorage.Shared:FindFirstChild("ScatterZones"))
+	local under = NatureData.TryModule(ReplicatedStorage.Shared:FindFirstChild("UndergroundData"))
+	local rooms = if type(under) == "table" then NatureData.FromRooms(under.Rooms) else nil
+	local rows = if type(scatter) == "table" then scatter.Zones else nil
+	local made = NatureData.Assemble(rows, NatureData.FromWorldPlan(WorldPlan), rooms)
+	shelterZones = made
+	return made
+end
+
+local function ceilingAbove(pos: Vector3): boolean
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true
+	local ignore: { Instance } = { folder() }
+	local player = Players.LocalPlayer
+	local char = if player then player.Character else nil
+	if char then
+		table.insert(ignore, char)
+	end
+	params.FilterDescendantsInstances = ignore
+	return workspace:Raycast(pos, Vector3.new(0, 80, 0), params) ~= nil
+end
+
+local function updateShelter(pos: Vector3, dt: number)
+	local dry = NatureData.Sheltered(shelterZonesNow(), pos.X, pos.Y, pos.Z, ceilingAbove(pos))
+	local target = if dry then 0 else 1
+	local alpha = 1 - math.exp(-dt / 1.6)
+	rainCover += (target - rainCover) * alpha
+end
+
 local function updateRates(env: LightingController.Environment, dt: number)
 	local want = targets(env)
 	local alpha = 1 - math.exp(-dt / RATE_EASE)
 	local scale = Quality.Budget().WeatherRate -- half the particles on low quality (the rain loop follows `current`)
+	local rainWant = want.Rain or 0
 	for name, ch in pairs(channels) do
-		ch.target = (want[name] or 0) * ch.maxRate
+		local amount = if name == "RainSplash" then rainWant else (want[name] or 0)
+		local cover = if name == "Rain" or name == "RainSplash" then rainCover else 1
+		ch.target = amount * ch.maxRate * cover
 		ch.current += (ch.target - ch.current) * alpha
 		if ch.target == 0 and ch.current < 0.5 then
 			ch.current = 0
@@ -523,13 +593,22 @@ type Aurora = {
 local aurora: Aurora? = nil
 
 local function buildAurora(): Aurora?
+	local snowZone: NatureData.Zone? = nil
+	for _, zone in ipairs(shelterZonesNow()) do
+		if zone.kind == "snow" then
+			snowZone = zone
+			break
+		end
+	end
 	local snow = BiomeData.Get("snow")
 	local area = if snow then snow.area else nil
-	if not area then
+	local ax = if snowZone then snowZone.center.X elseif area then area.x else nil
+	local az = if snowZone then snowZone.center.Y elseif area then area.z else nil
+	if ax == nil or az == nil then
 		return nil
 	end
-	local ground = TerrainGen.HeightAt(area.x, area.z)
-	local center = Vector3.new(area.x, ground + 380, area.z + 120)
+	local ground = TerrainGen.HeightAt(ax, az)
+	local center = Vector3.new(ax, ground + 380, az + 120)
 	local terrain = workspace.Terrain
 	local bottoms, tops, beams = {}, {}, {}
 	for i = 1, AURORA_SEGMENTS do
@@ -825,23 +904,21 @@ function WeatherController.Start()
 	local sinceBoxes = 0
 	RunService.RenderStepped:Connect(function(dt: number)
 		sinceBoxes += dt
-		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceBoxes) then
-			return
+		if QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceBoxes) then
+			sinceBoxes = 0
+			-- The boxes follow the camera (one CFrame each time this runs).
+			local camera = workspace.CurrentCamera
+			if camera then
+				local cf = camera.CFrame
+				local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
+				local ahead = if look.Magnitude > 0.01 then look.Unit * 25 else Vector3.zero
+				local pos = cf.Position
+				sky.CFrame = CFrame.new(pos + ahead + Vector3.new(0, 42, 0))
+				ground.CFrame = CFrame.new(pos + ahead - Vector3.new(0, 8, 0))
+				around.CFrame = CFrame.new(pos)
+				placeRainbow()
+			end
 		end
-		sinceBoxes = 0
-		-- The boxes follow the camera (one CFrame each time this runs).
-		local camera = workspace.CurrentCamera
-		if not camera then
-			return
-		end
-		local cf = camera.CFrame
-		local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
-		local ahead = if look.Magnitude > 0.01 then look.Unit * 25 else Vector3.zero
-		local pos = cf.Position
-		sky.CFrame = CFrame.new(pos + ahead + Vector3.new(0, 42, 0))
-		ground.CFrame = CFrame.new(pos + ahead - Vector3.new(0, 8, 0))
-		around.CFrame = CFrame.new(pos)
-		placeRainbow()
 	end)
 
 	local sinceCosmetic = 0
@@ -859,6 +936,13 @@ function WeatherController.Start()
 		local elapsed = sinceRates
 		sinceRates = 0
 		local env = LightingController.Environment()
+		local camera = workspace.CurrentCamera
+		if camera then
+			updateShelter(camera.CFrame.Position, elapsed)
+		end
+		-- LightingController folds this into its fog target. Do not write Atmosphere here.
+		local rain = (targets(env).Rain or 0) * rainCover
+		RainFog.SetWet(rain)
 		updateRates(env, elapsed)
 		updateMapEmitters()
 		updateRainSound(elapsed)

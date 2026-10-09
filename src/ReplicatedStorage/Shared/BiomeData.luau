@@ -31,6 +31,9 @@ export type BiomeDef = {
 	skyBinVolume: number?, -- u³ (the v2 loop, V2_PLAN.md §5)
 	chuteWalkStuds: number?, -- from the trees to the chute
 	hazards: { string }?,
+	-- Cold or heat outside a special column. The gear removes it. The meter
+	-- fills over graceSec, then damage is dps. The crater's lava is separate.
+	exposure: { gear: string, dps: number, graceSec: number }?,
 	-- In the world: a circle around (x, z), radius in studs, and for the
 	-- sky only a floor height `y` (below it you're on the ground under the
 	-- isles); nil = not built yet. Ground is the patch colour (hex) and
@@ -48,6 +51,12 @@ export type Rules = {
 	burning: boolean, -- taking heat damage
 	canChop: boolean, -- has the gear this biome's trees need
 	needs: string?, -- the gear id missing, if any
+}
+
+export type Hazard = {
+	kind: string,
+	dps: number,
+	graceSec: number,
 }
 
 -- Ferry Island. The disc matches WorldLayout.Island; this module does not
@@ -87,6 +96,7 @@ local biomes: { BiomeDef } = {
 		access = "truck",
 		haulStuds = 1200,
 		slowdown = { amount = 0.15, removedBy = "InsulatedCoat" },
+		exposure = { gear = "InsulatedCoat", dps = 4, graceSec = 8 },
 		area = { x = 0, z = 720, radius = 115 }, -- the peak, inside the ring
 		ground = { color = "#E8F0F5", material = "Snow" },
 		trees = { frostwood = 70 },
@@ -98,6 +108,7 @@ local biomes: { BiomeDef } = {
 		haulStuds = 1600,
 		requiresGear = "HeatBoots",
 		hazards = { "lava", "ash storms" },
+		exposure = { gear = "HeatBoots", dps = 6, graceSec = 6 },
 		area = { x = 450, z = 500, radius = 125 }, -- north-east, past the tunnel
 		ground = { color = "#2B2522", material = "Basalt" },
 		trees = { emberwood = 60 },
@@ -204,6 +215,35 @@ function BiomeData.Rules(biome: BiomeDef?, gear: { [string]: boolean }): Rules
 		rules.burning = biome.hazards ~= nil and table.find(biome.hazards, "lava") ~= nil
 	end
 	return rules
+end
+
+-- Built from a plain string so the id stays `string`. Comparing `biome.id`
+-- to "volcano" refines it to a singleton union, and a table literal will
+-- not accept that union where Hazard.kind is string.
+local function climateHazard(kind: string, dps: number, graceSec: number): Hazard
+	return {
+		kind = kind,
+		dps = dps,
+		graceSec = graceSec,
+	}
+end
+
+-- The climate hazard at `biome` for a player who owns `gear`, or nil when
+-- the gear removes it or the biome has none. `outsideCrater` is false in
+-- the volcano's lava column, where the old burn applies instead.
+function BiomeData.Exposure(biome: BiomeDef?, gear: { [string]: boolean }, outsideCrater: boolean?): Hazard?
+	if biome == nil then
+		return nil
+	end
+	local exposure = biome.exposure
+	if exposure == nil or gear[exposure.gear] then
+		return nil
+	end
+	local kind = biome.id
+	if kind == "volcano" and outsideCrater == false then
+		return nil
+	end
+	return climateHazard(kind, exposure.dps, exposure.graceSec)
 end
 
 return BiomeData

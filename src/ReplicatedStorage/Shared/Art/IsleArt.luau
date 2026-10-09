@@ -59,7 +59,7 @@ local CORE = hex("#6A4C33")
 local ROOT = hex("#6E4F34")
 local LEAVES = { hex("#D6E486"), hex("#C2D86A"), hex("#E8EA9C"), hex("#B2CF5E"), hex("#E2DC7E") }
 local GOLD = hex("#FFE7A0")
-local GRASS_TOP = hex("#B2D46A")
+local GRASS_TOP = hex("#6A9A5A")
 local TURF = { hex("#9CC45A"), hex("#A8CC60"), hex("#8FB852") }
 local SOIL = { hex("#8B6643"), hex("#7C5939"), hex("#96714C") }
 local TIERS = {
@@ -932,9 +932,9 @@ function IsleArt.Isle(radius: number, seed: number, options: IsleOptions?): Mode
 		local p2 = p1 + Vector3.new(rng:range(-1.5, 1.5), -root.len * 0.45, rng:range(-1.5, 1.5))
 		local vine = i == 2 or i == 4
 		local name = if vine then "IsleVine" else "IsleRoot"
-		local color = if vine then hex("#6E9E48") else hex("#6B4A30")
-		Kit.decor(rod(model, name, root.at, p1, if vine then 0.5 else 1.3, color, Enum.Material.Wood), false)
-		Kit.decor(rod(model, name, p1, p2, if vine then 0.4 else 0.8, color, Enum.Material.Wood), false)
+		local color = if vine then hex("#6E9E48") else hex("#4A3826")
+		Kit.decor(rod(model, name, root.at, p1, if vine then 0.5 else 0.3, color, Enum.Material.Wood), false)
+		Kit.decor(rod(model, name, p1, p2, if vine then 0.4 else 0.3, color, Enum.Material.Wood), false)
 	end
 
 	-- Glowing crystals on the underside: two clusters.

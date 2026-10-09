@@ -1,5 +1,35 @@
 # Phase 2+ build notes
 
+## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
+
+Done on this branch, not on main. Rebased onto main at `f96b62c`. The store board is not in this PR (lane P owns the redesign). Box and hover renders live in `previews/v1-d/` (listed in STATUS.md). Axe, temper and shelf pictures were part-built and are gone until `phase-2/v1-preview-meshes` can draw the real meshes.
+
+Axes (uploaded meshes replace the part-built axe when they load; the Hermit's Maul has no mesh and stays part-built):
+
+1. PC, Play mode. In the command bar run `print(require(game.ReplicatedStorage.Shared.Art.MeshKit).Stats())`. `loaded` is greater than 0 and the axe ids are not in `failedIds`. Equip Rusty, then each rung, then the Lux Axe. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat. The Hermit's Maul is still the part-built wedge (a heavy head, a flat poll, rope on the haft). It has no custom mesh yet.
+2. Phone emulator. The same equip, swing and drop. Drop is a long press on the hotbar. No new button, and nothing sits on the thumbstick or the jump button.
+3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
+
+Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Keen, Heavy or Prosperous until lane A2 wires it. Keen is the speed temper (sky blue wind). Heavy is the damage temper (a white edge sheen). Prosperous stays coin gold. The neon edge, the wind streaks and the white sheen sit on the front face of the head mesh, not inside it. With no mesh they use the part-built head. Stats do not move.
+
+Boxes (the window crate; shell stays at 9 parts, a full box at 42):
+
+4. PC. Buy or spawn a boxed axe and a boxed truck. The box has a wood body, a glass front, a 0.1 accent band and a small brass plate under the name, clear of the letters. No price, no decal, no billboard on the box. The item shows through the glass. Good: it matches `previews/v1-d/boxes-after-axe.png` and `boxes-after-sawmill.png`. A truck box still appears (the shell did not grow, so the 42-part cap still holds).
+5. Phone emulator, Lower quality. The same boxes. The copies of the item inside are gone and the glass is tinted. The shell, the band and the plate stay. Nothing new sits on the thumbstick or the jump button.
+6. Xbox. Look at a box on a shelf. The tag hangs on it. No control is bound to ButtonR2.
+
+Shelves (the unit is `ShelfLayout.Build`; the shop on screen still uses lane C's `ShopInterior.SteppedUnit` until C copies it):
+
+7. The unit is three boards stepping up (tops 3.2, 2.98, 2.76), four timber posts, a dark kick, three cream rails. Feet on the floor, front of the unit at the front. In Studio the Tool Shed shelves will not change until lane C adopts this unit. Gaps stay 1.5 across and 2.5 between rows. No shelf picture in this PR.
+
+Hover tag (the price line only; the words do not change):
+
+8. PC. With enough cash, look at a priced shelf item. The price line is gold (`#F2C14E`). Spend down or look at something you cannot afford: the line is red (`#D9534F`). A free item (price 0) is gold. Closed, already owned, out of stock, and a Robux line stay the old cream. One price, never two numbers.
+9. Phone emulator. The same colours. The tag does not cover the thumbstick or the jump button. Touch targets stay about 44×44 and 8px apart.
+10. Xbox. The same colours inside the existing look ranges (gamepad 12, touch 6). No new ButtonR2 bind.
+
+Awaiting Connor: a Blender mesh for the Hermit's Maul (it stays part-built until that exists), a hand 25–30% up the haft (it stays at 0.75), a Lux haft of 4.0 in play (it stays 3.5), and four bevel parts on the box corners (they are not parts).
+
 ## V1 map remake (Lane B, 8 October 2026)
 
 The plan is `MAP_V1.md`. The labelled top-down picture is `previews/v1-b/00-overview.png`. The sell station stays at the sawmill plus (53, 1), middle (53, 111); trucks still back straight north off MainStreet. Bayou is reserved at (−760, −700), radius 140, a flat basin sunk 7 studs, reached by BayouRoad. Red Mesa is reserved at (590, −790), radius 115, flat at the base height, reached by MesaRoad. Each road ends in a 32-radius junction and a signpost. Lane R fills both after this merges. The Lanternwood grotto was not moved: it stays at (−240, −420), about 416 studs from the Bayou edge. After the new map is published, restart every server.
@@ -13,7 +43,54 @@ Everything after the Phase 1 vertical slice. It's all on `main` now
 passes (formatter, linter, strict types against the Roblox API, 351 unit
 tests, ECONOMY.md current); GitHub runs it on every push.
 
+## V1 UI (lane U, branch `phase-2/v1-u-ui`)
+
+Mockups (phone 667x375 and PC 1920x1080): `previews/v1-u/loading-667x375.png`, `previews/v1-u/loading-1920x1080.png`, `previews/v1-u/hud-667x375.png`, `previews/v1-u/hud-1920x1080.png`, `previews/v1-u/hud-buttons-667x375.png`, `previews/v1-u/hud-buttons-1920x1080.png`, `previews/v1-u/owner-menu-667x375.png`, `previews/v1-u/owner-menu-1920x1080.png`, `previews/v1-u/theme-sheet-667x375.png`, `previews/v1-u/theme-sheet-1920x1080.png`, `previews/v1-u/news-667x375.png`, `previews/v1-u/news-1920x1080.png`.
+
+Look: walnut panels, cream text, amber prices and edges, green confirm, danger fill `#B23B30` (cream on it is 4.80:1), muted locked. GothamBold for titles and buttons, Gotham for body. Radius 8, stroke 2, selection ring #FFF4C2 at 4px. Uploaded UIArt skins (cash plaque, prompts) still cover the flat colours once those images load; until then the flat theme shows, and that is what the previews draw (those image ids are not readable from this machine). Side-button marks and the What's new icons are frames, the same shapes as in the game; they have no asset id. The loading card sits on a sunset scene and shows the wordmark, a progress bar and one tip at a time. `hud-667x375.png` and `hud-1920x1080.png` are the in-context HUD (cash, Field Guide labelled with its book icon, side buttons with a saves, hammer or truck mark, one selection ring, and the hint on a solid ink pill). On the phone the thumbstick is Roblox's dark ring and knob, the jump button is the round button, and the hotbar starts to the right of the stick zone. `hud-buttons-*.png` is only the style row.
+
+What's new in V1: seven headlines, each with a short muted second line, in `NewsLogic.Entries` (the island map with the Bayou and Red Mesa, the cave and ore, blueprints, Foreman Rook's daily jobs, axe tempering, Sparkworks logic pieces, the gondola sky island). Once per save after the tutorial, stored as `onboarding["News:V1"]` (no new save field). Settings has WHAT'S NEW. Close or B skips it. The card is only as tall as those rows, with a sunset wordmark on top. On a short screen it sits to the right of the thumbstick and above the jump box. Close is centred on the card and 44px tall on the phone.
+
+Lane E: `DailyUI` remains in the client module list, but the client does not call `DailyUI.Start`. Starting it warned, because the Daily Goals button size was removed. Foreman replaces that module. Output should not contain `[Client] DailyUI failed to start`.
+
+Controller, first selected button:
+- Owner menu: PLAYERS tab
+- Quick menu: first tile
+- Settings: GAME tab
+- What's new: Close
+
+B closes those panels. None of them binds ButtonR2 (RT still chops and places, as before).
+
+Studio checks:
+- PC: the loading card sits on the sunset scene, shows the title, a progress bar and one tip, then the next tip, with no repeat until the list ends. The HUD matches `hud-1920x1080.png` (cash, FIELD GUIDE with a book icon, SAVES and Send truck home with their icons, the hint on a dark pill). Owner menu (if you are the owner) is walnut with a cream title. Settings, WHAT'S NEW: a sunset wordmark, seven headlines each with a muted second line, Close centred at the bottom of a card that is only as tall as that list. Cash still reads. Output has no DailyUI startup warning.
+- Phone (667x375 landscape): the same panels fit. What's new Close is 44px tall, centred, and not under the jump button or in the thumbstick zone. The side buttons are 44px tall, carry a saves, hammer or truck icon, and sit above the jump button. The hotbar starts to the right of the thumbstick. Field Guide reads GUIDE. The chop hint sits on a dark pill. Compare with `hud-667x375.png` and `news-667x375.png`.
+- Xbox: open each panel above. The cream ring is on the first button immediately. D-pad and the left stick reach every button. A activates. B closes and returns to the HUD button that opened it. RT still swings the axe and does not change owner-menu tabs.
+
+## V1 UI round 3 (lane U, branch `phase-2/v1-u-ui-r3`)
+
+The Game Art Director's final skins, the phone HUD column and the real icons. Previews are in `previews/v1-u/r3-*.png` (hand-built from the UITheme values and the real icon PNGs in `assets/ui/icons/`; Liberation Sans stands in for Gotham and Fredoka).
+
+- **Tokens:** `UITheme.Skin` holds Paper `#F0E1C3`, PaperDark `#E2CFAA`, Cream `#F5EBD7`, Bark `#583A22`, Ink `#3C2814`, Muted `#A09178` and the plaque numbers. The older `UITheme.Colors` names keep their values, so screens that read them do not move.
+- **Plaque and Panel:** `UITheme.Plaque()` (inset 4) and `UITheme.Panel()` (inset 12) are built from frames: a Paper face (corner 12, 2 px Bark stroke, Cream 0 / Paper 0.18 / PaperDark 1 gradient at 90) on a 4 px Bark drop edge. No image, no shadow object. The cash plaque, prompt cards and tutorial cards still use the uploaded UIArt skins (so `UIArt.spec` stays pinned).
+- **Buttons:** corner 10, a 3 px drop edge in the style's edge colour, the shine (white at 0, 0.9 grey from 0.12), a 2 px Muted stroke only on `starter`. Pressed, the face drops 3 px onto the edge. The edge adds 3 px to a button's height (`UITheme.ButtonDrop = 3`; callers already added it).
+- **Loading card:** one plaque at (0.5, 0.45), `min(280, 72% of the width)` by 132, 16 px padding, over Ink at 45% transparency. FredokaOne 20 Ink title, one GothamMedium 14 Bark line (never smaller). No scene, no progress bar, no buttons. Same 30 s timeout.
+- **Phone HUD (touch, no keyboard, under 600 tall):** the side column is MENU, HAMMER and Sell here as 44 x 44 icon buttons, one column, faces 8 px apart. MENU is shown on a phone and opens the quick menu; SAVES, Send truck home and (for the owner) OWNER are tiles in it. The rules are `Shared/PhoneHud`; the look is `HUD.SideButton`. The icons are `UITheme.HudIcons` (Image ids Menu 76852120099119, Hammer 129127727779001, SellHere 96932580819074), 28 x 28 in the face. If an id is 0 or the image fails to load, the button shows MENU, BUILD or SELL.
+- **What's New:** Close is a 44 x 44 square (an X), 8 px under the last row.
+
+Studio checks:
+1. PC: the loading card is one cream plaque (a darker brown edge under it) near the upper middle, over the dimmed game, with "Timberline Tycoon" and one tip; it fades once you are in. Buttons everywhere have a small darker edge under them; press one and the face sinks onto it. `starter`-style buttons have a thin grey-brown outline.
+2. PC: the HUD layout is the same as before (Field Guide, cash, STORE, SAVES, Send truck home); nothing moved except the new button edges.
+3. Phone (Studio device emulator, 667x375): the right-hand column is three square buttons, MENU (bars on amber), then the hammer and the coin (cream icons on dark green) when they apply. Each is a real picture, not text. They are 8 px apart, in one column, with no second column. Tap the hammer: it takes the hammer out. Tap the coin near the sell pad: it sells.
+4. Phone: tap MENU. The quick menu opens with SAVES, STORE, BADGES and so on, plus SEND TRUCK HOME when your truck is away (and OWNER if you are the owner). Tap SAVES: the saves panel opens. Tap outside the menu: it closes.
+5. Phone: the loading card is 280 wide, centred a little above the middle; What's New (Settings, WHAT'S NEW) shows a square X Close under the last line, not touching the jump button or the thumbstick area.
+6. Xbox (controller or emulator): the HUD column keeps the wide buttons (MENU with the View glyph, SAVES, Send truck home). Press View: the quick menu lists SAVES and SEND TRUCK HOME, A opens them, B closes. RT still swings the axe.
+7. If an icon shows letters (MENU, BUILD, SELL) instead of a picture, the image id did not load in your Studio session; tell Claude which one.
+
 What's here, each with its own checklist below:
+
+15. **V1 economy core** (8 October 2026, branch `phase-2/v1-a1-economy-core`): climate damage, the Prosperous stamp, prices, and the save contract
+
+
 1. **The redesign (October 2026):** every model rebuilt, the world on
    terrain, a living environment, the Living Forest twist, feel and fixes
 2. **Axe shop**: the Tool Shed
@@ -28,7 +105,15 @@ What's here, each with its own checklist below:
 11. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
 12. **The new look**: every screen restyled from the Claude Design UI spec
 
+15. **Mining and crafting** (8 October 2026, branch `phase-2/v1-m-mining`): ore rocks, picks, bombs, the smelting furnace, the craft bench
+
+14. **Trees in the spawn area** (8 October 2026, branch `claude/spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
+
+15. **V1 buildings, shops, props and palette** (8 October 2026, branch `phase-2/v1-c-buildings`): one style for the town buildings, shops at 250 parts or fewer, new small buildings, renders in `previews/v1-c/`
+16. **Sparkworks logic sandbox** (8 October 2026, branch `phase-2/v1-s-sparkworks`): wires, gates, timers, the settings panel, the demo board
+
 13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
+15. **V1 nature looks** (8 October 2026, branch `phase-2/v1-g-nature`): first renders of trees, rocks, plants, cave dressing, critters and rain. Not placed in the world yet.
 
 Where the redesign changed something an older section describes (the
 world layout, the trucks' looks, chop range, the Sky Bin), the redesign's
@@ -37,6 +122,237 @@ section wins.
 Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
+
+## V1 buildings, shops, props and palette (8 October 2026, branch `phase-2/v1-c-buildings`)
+
+One upgraded look for the town buildings. Shops keep the pinned footprints (Tool Shed half-depth 15 and half-width 11.9, Hearth 16.5 by 14.5, Dealership hall x 181 to 336). The axe rack is still a stepped shelf with a tier-colour block per axe; each rack axe is a two-part silhouette so the whole Tool Shed stays at or under 250 parts. Prices are not printed on the models. The live Land Office in the world is still `PlotService`'s own model (this lane only adds `BuildingArt.LandOffice`, with no price on the sign). Renders for Connor: every path under `previews/v1-c/` listed in STATUS.md.
+
+**PC**
+
+- Walk the spawn road to the sawmill, the Tool Shed, Hearth and Home, and the Dealership. Each reads as the same timber-and-slate style: stone-coloured base, honey plank walls, a roof, a porch, a lit sign.
+- Sawmill office: the foreman stand is the invisible pad west of the office door, facing the road. The chalkboard beside it reads DAILY JOBS, with the posts at the edges of the board and the words clear of them. Nothing solid within 6 studs of the pad. The lumber pile, barrel and crates are behind the cabin.
+- Tool Shed: blue sign (#3A6FD8). Step in. The counter top is at the same height as before. The axe rack is on the back wall, blades to the left, stepped, one colour block per axe. Buy an axe; the box still comes off the shelf.
+- Hearth and Home: green sign (#2F5D3A). The porch posts stand just inside the front wall (the pad starts at the wall; posts outside it sat on grass).
+- Dealership: red sign (#D9534F). The showroom walkway is clear. The three nearest bays have a low plinth and a dim lamp. The porch lantern is no brighter than the showroom lamps.
+- Weigh House: red metal roof, a round scale on the side. No new price text.
+- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage (the live office is still PlotService's).
+- The sky forge court, the pond dock, the campfire, the lookout and the park bench are in the built town (`TownScenes`). Walk south-west across the meadow: the forge court is at (-112, -20), front toward the mill, stone floor, anvil, ORDERS board, four relic sockets. The lookout just west of it (-136, -20) has a ladder you can climb and a telescope aimed at town. On the green south of the main street, west of the well: a park bench at (-84, 56) and a teepee campfire at (-72, 56) with a pot. South of town, the fishing dock stands on the pond's north bank (pond at 78, -182): planks, posts in the water, a rod, a bucket and a crate. No second sheet of water.
+
+**Phone emulator**
+
+- Same walk. Shops should stay readable and not hitch when you enter (Tool Shed 241 parts, Hearth and Home 195, Dealership 215, sawmill 402).
+- Signs stay readable at the door. Windows and the porch lantern are the only small lights on the shop fronts.
+
+**Xbox**
+
+- Same walk with the stick. Door prompts still appear in range. Talk to the keeper; the counter does not block the prompt. Aim at an axe on the rack: the hover tag still shows the name and price (nothing on the model itself).
+
+Good: one family of colours, no dollar signs on buildings, doors and counters where they were, rack still stepped. Bad: a shop over 250 parts, a price painted on a sign, the Tool Shed rack missing a sold axe, grass under the Hearth porch, or the Dealership porch lamp brighter than the showroom.
+## Sparkworks logic sandbox (8 October 2026, branch `phase-2/v1-s-sparkworks`)
+
+Connor wants Sparkworks in V1, and he wants to see the pieces before they merge. Renders (names only, no prices on the models): `previews/v1-s/pieces-1.png` through `previews/v1-s/pieces-4.png` (at most four pieces, 3/4 at 30 degrees, the group about 70% of the width, name on a ground plaque), `previews/v1-s/wired.png` (lever and button into AND into a lamp, unlit beside lit, right-angle wires), `previews/v1-s/settings-panel-phone.png` (667x375) and `previews/v1-s/settings-panel-desktop.png` (1920x1080, the selection ring on minus). Panel colors are UITheme's. `SparkworksTheme.Layer = 16` is local until Lane U adds it.
+
+What shipped: Button $320, Lever $520, Pressure Plate $640, Wall Switch $100, AND/OR/XOR $260, NOT $200, Delay $520, Sustain $520, Clock $902, Spark Lamp $150, Glow Wire $720, Hatch $830. A Door you already own can be wired. Bought once, then placed free. The Wall Switch and Spark Lamp stay on Hearth & Home until Lane F stocks Sparkworks from `SparkworksStock` (anyone who already owns one keeps it). Laser, Detector and Wood Detector are not in this pass (V1.1).
+
+Caps (proposals): 80 logic pieces and 160 wires on a plot. A looping circuit stops at 200 evaluations and the piece reads Overloaded. The graph ticks only while the owner is online and the plot is loaded. Delay, Sustain and Clock remember their setting in `plot.logic`. Clocks and in-flight delays start again on rejoin (the phase is not saved).
+
+Lane K's meshes: each piece looks for a model of its id under `MeshTemplates`, with slots Body, Indicator, Moving and LabelFace. A missing model keeps the part build and logs once. Indicator is the lamp or LED. Moving is the lever, the button cap, the hatch door or the plate top. The gate label sits on LabelFace. Lane W can call `LogicService.RegisterTarget(uid, { power, reverse })` for a belt, a sawmill or a planer. Those inputs are stored and not driven yet.
+
+`V1Boot.Start` receives the remote table from GameServer and calls `LogicService.V1Init`, so `LogicSet` has a listener before anyone opens the settings panel. The settings panel sits at the top centre, clear of the thumbstick and the jump button. Minus, plus and Done work by tap, click, and the d-pad or arrow keys. B closes it. The wire tool and the panel bind gamepad keys only while they are open.
+
+### Studio checks
+
+1. **PC.** Place a Lever and a Button, wire them into the two inputs of an AND gate, and wire the gate to a Spark Lamp. The lamp lights only when both are on. The button lets go after about a second. The lever stays. Good: the lamp goes dark when either input drops.
+2. **PC.** Wire a Clock to a Spark Lamp. Use Set, then plus and minus. The lamp blinks once per the number you set. Leave and rejoin, and swap save slots: the number is the same. The clock starts off again. Good: one number in the panel, in seconds.
+3. **PC.** Wire a Pressure Plate to a Hatch. Stand on the plate: the hatch opens. Step off: it shuts. Drop a piece of wood on the plate: it opens again.
+4. **PC.** Wire three NOT gates in a ring. Each piece shows Overloaded. The server stays smooth.
+5. **PC.** Leave the server. Lamps and clocks stop. Rejoin: levers and settings match what you saved.
+6. **Phone emulator.** The wire tool: tap an output, tap an input. The settings panel: tap minus, plus and Done. Nothing sits on the thumbstick or the jump button. The first wiring session shows "Pick an output", then "Pick an input", then "Done: flip it", once.
+7. **Xbox.** Wire tool: RT picks, X cuts, B leaves. Settings panel: the stick moves between minus and plus, A presses, B closes. The d-pad is not used (it stays the HUD shortcuts). After both are closed, chopping with RT still swings the axe.
+8. **Demo board.** If Sparkworks has a part named DemoBoard, a lever feeds an AND, a clock feeds a lamp, and a plate feeds a hatch, with no save. If the building is not in the world, nothing errors.
+9. **Gates.** AND, OR, XOR, NOT, Delay, Sustain and Clock each show a cream label on the dark top (AND, OR, XOR, NOT, DLY, HOLD, CLK) and a different coloured strip. You can tell them apart without opening the shop. Until Lane K's meshes are in the place, Output logs `[LogicItems] <id> has no MeshTemplates model; keeping the part build` once per piece and the parts stay.
+
+## V1 economy core (8 October 2026, branch `phase-2/v1-a1-economy-core`)
+
+Not seen in Studio. The model (ECONOMY.md) is 68 s / 5.4 min / 17.9 min / 66.3 min / 33.5 h. Lane B, after this merges, edits only BiomeData haul distances and possibly `GameConfig.ExpansionPriceStep`, then reruns `lune run tools/economy`.
+
+**Snow and the volcano.** Stand in the Snowfields with no coat. The player attribute `Exposure` climbs from 0 to 1 over 8 seconds and `ClimateKind` is `snow`; health does not drop until the meter is full, then about 4 per second. Sit in a vehicle seat: `Exposure` stops where it is. Step back to the forest, equip the Insulated Coat, or respawn: `Exposure` goes to 0 and the damage stops. On the volcano, outside the crater, the same meter fills over 6 seconds and then health drops about 6 per second; Heat Boots clear it. Inside the crater the old lava burn stays (5 per second) and `ClimateKind` stays empty.
+
+**Prosperous (`t`).** Fell with an axe whose temper is Prosperous I, II or III. The log's attribute `t` is 1.04, 1.07 or 1.10. Run it through a sawmill and a planer: the plank still has that `t`. Load it, unload it, leave and rejoin: `t` is still there. Sell it. A log pays its price times `t`. A plank pays its price times min(3, mill bonus × board bonus × `t`). An axe with no Prosperous temper has no `t`. Truck paint is unchanged.
+
+**Prices and the pass.** The Tool Shed shows the Steel Axe at $110 and the Cobalt Axe at $2,500. The Sky Pass is not on a shelf. With under $5, recalling a truck is free; with $5 or more it is the usual fee (5%, at least $5), and Tow Service is still free. A new plot's expansion squares use the $7,600 step.
+
+**Saves.** A brand-new profile's `worldVersion` is 1. Nothing here moves a parked truck; that waits until the map's version goes to 2. An old save keeps its cash, axes, trucks, placed pieces and the sections on its truck and on the ground. The shop prices that moved are the Steel Axe ($110, was $120), the Cobalt Axe ($2,500, was $3,000), frostwood planks (plan 120, plank scale 0.40) and the expansion step ($7,600, was $3,050). There is no trade window.
+
+## Mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
+
+Not played in Studio yet. The furnace pad is the flat 30×24 at world (48, 0, −110). The mine mouth fallback is (150, 0, −150). If lane B's tagged `MineAnchor` / `Rubble` parts are in the place, those win and the fallback anchors are not used. One chamber of nodes spawns per tier (8 / 5 / 4), even if more anchors exist.
+
+Picks are Tools, not shop axes. Swing with the tool button (mouse click, a phone tap, the gamepad's tool button). There is no extra ButtonR2 bind. The ore label is the existing hover tag (`HoverTag` / `HoverTagUI`), not a second billboard. The server writes `PickLevel` on the player (best owned pick). The rock only stores the required level (`HoverNeed`).
+
+### PC
+
+1. Walk to the pad. You should see SmeltingFurnace, a Prospector stall (the sign says PROSPECTOR, no price on the model) and a craft bench. E on the stall opens the shop. E on the bench opens Craft.
+2. The first shop visit puts a Rusty Pick in the backpack and sets `PickLevel` to 1. Equip it. The chip at the top right reads `Rusty Pick · Lv 1`. Unequip it away from the mine and the chip hides.
+3. Aim at an Iron rock within 60 studs. One tag, on that rock only. The name is Iron in the rust vein colour. The second line is `Needs Iron Pick` in red (`UITheme` Danger). Buy the Copper Pick ($450, one price). With `PickLevel` 2 the same rock reads `Iron Pick` in cream, with no Needs line. Coal (need 1) never says Needs for a Rusty Pick. No `$` and no `R$` on an ore tag.
+4. Move the mouse off the rock. The tag hides in about a third of a second. Move from a shop box to a rock: the tag waits about 0.08s before it switches. Shop and log tags still show their own prices.
+5. Click a Coal rock. One click, one swing, then a cooldown. The last hit spawns one chunk. A second click in the same moment does not spawn a second chunk. The chunk has a Pick up prompt. Carry it into the Ore Chute on the stall. Cash goes up once, by the chunk's stored value ($6), and the chunk is gone. The wood sell pad does not pay for ore.
+6. With the Rusty Pick, click an Iron rock. A toast says `Needs an Iron Pick` and the swing does not start a cooldown (a Coal rock beside it still swings at once).
+7. Buy a Bomb for $220 (the same number as dynamite). Short cash buys nothing. Equip it, stand within 8 studs of a rubble wall, click once. A spark shows for 3 seconds, then the wall's parts hide for everyone for 10 minutes. About 20 seconds before it reseals, dust appears. Crawl out (E) moves you toward the mine mouth, not deeper. If the wall reseals while you are just past its far face (within about 6 studs), Crawl out still works. Two clicks in the same moment spend one bomb.
+8. Put a Copper chunk in SmeltIntake. With coal, one coal covers four chunks; without it, each chunk costs $2, once. About 3 seconds later one ingot appears and the chunk is gone. Leaving it there does not charge again. The same chunk cannot also be paid by the chute.
+9. Craft bench: one row per recipe (icon, name, cost line, a 44×44 Craft button). Copper Lamp Post and Gold-banded Chest say Soon. B and Esc close the shop and the bench. You have to be within 12 studs of the bench, and the ingots and chunks have to be within 12 studs of it too. A stranger's log, even a closer one, is not yours.
+10. Obsidian Pick: Heartstone is too hard for a Steel Pick, so the turn-in is 5 Timber Opal ingots (Opal is hardness 4) plus $50,000, at the stall. Four ingots are refused and stay in the world. Five are consumed, then the pick can be bought. The save still calls that turn-in `HeartstoneTurnIn`. `mining` on the profile is account-wide: a slot swap does not move the picks.
+
+### Phone emulator (667×375)
+
+1. The chip, the shop and the craft list sit in the top half, at least 12px from the edges, and the panel is at most 60% of the screen height. They do not cover the bottom-left thumbstick (left 40% of the bottom half) or the jump button (bottom right).
+2. One row per item, 8px apart, in a scrolling list. The name is 16px (18px on a tall screen), not stretched. The cost is 14px under the name. Buy and Craft buttons are at least 44×44.
+3. Tap a rock, or stand within 6 studs of one in front of you. The tag shows for about 4 seconds and is readable. One tap on the equipped pick is one swing.
+4. In a cave, count PointLights: the lamp (only while equipped, range 12, shadows off) plus at most 4 glowing nodes, 6 or fewer in total, shadows off. Each ore rock is 8 parts or fewer. Live ore chunks on you stop at 40 (a toast names the one that did not fit).
+
+### Xbox
+
+1. With a pick equipped, aim the screen centre at a rock within 12 studs. The tag shows with no extra button, and it does not cover the swing or a target ring.
+2. The tool button swings once per press. ButtonR2 is not bound by mining.
+3. X on the Shop and Craft prompts opens the panel. The stick stays inside it. B closes it.
+4. Crawl out works on X while your character is inside a sealed wall. A too-weak rock shows the Needs line and does not arm a swing.
+
+Good: the five wood headline times in ECONOMY.md are unchanged (68 s, 7.9 min, 13.7 min, 51.4 min, 30.5 h). Mining ratios are in MINING.md (Hills 0.43 of Pine $17,136, Snow 0.57 of Frostwood $28,677, Gloam 0.67 of that same Frostwood). Steel or Lux at Gloam is about $10.7k/h. Obsidian is about $19.1k/h.
+
+## Trees in the spawn area (8 October 2026, branch `claude/spawn-trees`)
+
+Connor: "We need more choppable trees in the spawn area too, near the pad, by
+the dealership. All over, it's a lumberjack game." The town used to have no
+choppable tree at all: its pines, birches and maples are ornamental (in a
+stone ring, `WorldPlan.Town().greenery`), and the real forest starts 190+
+studs south. Now 54 real felling trees stand in and round it.
+
+**What they are.** Ordinary section trees (`SectionTrees`): the same chopping,
+the stump stays, the tree grows back. Woods follow the region
+(`TreeFill.woodsNear`: oak and birch round the town, pine, maple and oak on
+the Hills side), biome 'wild'. Each cluster is a small disc and its own regrow
+zone `town:<site>` with a cap of its size (radius 16 at most), like the plot
+rings. They are **not in BiomeData's counts**, so the economy model does not
+see them: `lune run tools/economy` and `tools/economy1` are unchanged and
+ECONOMY.md / ECONOMY_V1.md were not regenerated.
+
+**Where (54 trees, 16 clusters; `Shared/TownTreeData.Sites` has each centre).**
+
+| Where | Trees | Sites |
+|---|---|---|
+| South-west of the spawn pad, west of the Forest Path (45 to 95 studs from the pad, in sight down the path) | 7 | padSW1, padSW3 |
+| Round the showroom hall and Land Office: the strip west of the hall past the Land Office and loading pad, two in front of the hall at its east end, behind it, east of it | 20 | strip1, strip2, forecourt, back1, back2, east1 |
+| The town's west edge, by the Tool Shed, the General Store and the Hills Road | 10 | west1, west2, west4 |
+| North: behind the sawmill, along the Snow Road, north of the General Store and the gondola station | 14 | mill, north1, north2, snowE |
+| South of the plot road, east of the lot | 3 | roadS |
+
+Woods: oak 27, birch 15, maple 6, pine 6. The Medium and High tiers add 20 and
+31 more trees (see below); they are not planted. No tree stands in front of the
+showroom's door or along its forecourt west of x 290: the lighthouse lamp has to
+stay in view from the pad (WorldPlan.spec keeps every trunk 10 studs off that
+line, and it runs along the front of the hall), and the Land Office, its queue,
+the door path and the loading pad take the rest of the west wall.
+
+**The layout rules** (`TreeFill.TownBlocker` / `TownWhy` / `TownGround`, the
+numbers in `TownTreeData`). A town tree never stands: in the sell area
+(x -60 to 60, z 80 to 140, hard empty); in the spawn lane (x -18 to 18, z 8 to
+100) or within 22 of the pad; within 11 studs of a road's edge (every road,
+including the Hills, Snow, Mill and Lot Loop roads and the homestead lanes);
+within 7 of a TownPaint rect (street, plaza, paths, spawn walk, mill yard) or a
+town floor; within 9 of a building (Tool Shed, General Store, showroom hall,
+mill, sell station, gondola station, Land Office) or 14 of Murph's camp; within
+12 of the parking lot or 8 of its pull-out lanes, 12 of a loading pad; within 12
+of a shop door (and a clear apron in front of each door); in the Land Office queue; under the gondola's first 280 studs
+(22 either side); within 11 of the line from the spawn pad to the lighthouse lamp; within 7 of a townsperson's walk or 11 of where one stands;
+within 11 of an ornamental tree, 9 of a prop, 12 of a sign, 6 of a lamp; within
+30 of a plot; on water or ground steeper than 0.5; on a boulder cluster, scenery
+piece or landmark's disc. Trunks keep 12 studs apart (the forest's gap is 10)
+and from every other tree, so a player or a truck passes between them.
+
+**Regrow.** A "town:" zone's regrow spot is picked with `TreeFill.GroundFor`,
+which is `TownGround` for a town zone and the old `Ground` for every other: the
+general rule refuses the whole flat town (`GoodGround`), so without it a felled
+town tree would never grow back. The same rules apply, so a tree never grows
+back onto a road, a path, a door or the sell area. `SectionTrees.pickSpot`
+calls it; nothing else about growing changed.
+
+**Quality tiers.** `TownTreeData.Tiers` are `QualityBudgets`' names: low 54
+trees, medium 74, high 85 (`Count`, held under `Budget` 60 / 90 / 100 by
+spec). Trees are shared by every player on a server, so one list ships:
+`ShippedTier = "low"`, a phone's. Medium and High are the same sites in
+priority order plus more; `TreeFill.TownRings(taken, pause, tier)` plants any
+of them and the spec pins that a lower tier's trees are exactly a subset of a
+higher one's. Changing the shipped tier is one word (and a look at the phone
+discs below). A fuller town only for Higher players would need a per-player
+(client) tree layer, which is not built.
+
+**Phone budget.** The three phone discs (640 studs round the spawn, the meadow
+and the pines) were held to 1.7x the first trees in trees and parts. The fill
+still is (the test now leaves the town's trees out of that); with the town's 54:
+spawn 189 trees -> 314 with the fill (1.66x) -> 368 with the town (1.95x), and 7454 parts -> 12490 -> 14512 (1.95x), the
+meadow 1.91x and the pines 1.78x, held under `TownTreeData.PhoneDiscMax` = 2.0.
+Each tree is about 43 Instances (the section tree), so the town adds about 2,300.
+
+**Load time** (Lune, same machine, three runs each; Roblox is slower, so use the
+ratio). `WorldPlan.Trees()`: 1,225 trees in 8.7 / 8.8 / 9.0 s before, 1,279 in
+8.7 / 8.9 / 8.8 s after. The town planner itself is about 40 ms warm (60 to 85 ms with
+the obstacle tables built). The work stays inside the deferred forest planter
+(`MapBuilder` `forestPlanter`, after the sell area, 12 ms slices, nearest the
+sawmill first), so nothing was added before "world ready for players" and the
+town's trees plant first. No new mesh, wood or budget: no change to
+MeshKit.Preload, the section-tree builder or the WindSway budgets (nearest 16 /
+24 / 32 trees). The `[Load] forest planned: N sites in X s` and `forest planted`
+lines in Output show it in Studio; N goes up by 54.
+
+**Look.** `bash tools/preview/shoot.sh spawn-trees [view]` (new scene: the town
+plus every tree in x -300..520, z -140..380 as they plant at boot). Before
+`preview/spawn-trees-before-N.png`, after `preview/spawn-trees-N.png` (gitignored,
+render again to see them): 1 from the spawn pad, 2 the pad looking south down the
+Forest Path, 3 the pad from the west, 4 the dealership door, 5 the dealership
+and Land Office from the lot, 6 from the lot, 7 and 8 top down, 9 aerial,
+10 the General Store. The window held 98 trees before and 154 after.
+
+**Studio checks (Connor).**
+1. Join. Stand on the spawn pad: the walk north to the mill, the sell area and
+   the plaza are as before (no new tree in the lane, none by the sell pad).
+2. Turn round and walk south down the Forest Path: choppable trees now line its
+   west side, 45 to 95 studs from the pad. Chop one: the same swing, fall and
+   stump as the forest. After a few minutes it grows back nearby (inside the
+   cluster, never on the path).
+3. Walk to the Dealership: trees west of the hall past the Land Office counter
+   (55 to 70 studs from its door), one or two in front of the hall's east end, more
+   behind it and to its east. The door, its path and the forecourt stay open. You can walk to the door and the Land Office counter and the loading pad
+   with room to spare; a truck can drive the forecourt path and pull in.
+4. Drive a rig out of the lot (north to the street and south to the Lot Loop),
+   along the Mill Road and the Snow Road: no trunk in the way, trees stand back
+   from the road edge. Rosa, Pip and Bram still walk their loops.
+5. Stand in the gondola station queue and ride: no trunk or crown touches the
+   cabin or its cable on the way out of town.
+6. Fell every tree in a cluster and wait: each grows back after its wood's
+   respawn time (45 s for oak to 3 minutes, with the 0.7 to 1.3 roll), never past the
+   cluster's count.
+7. A phone (Lower quality): the town looks fuller and still plays smoothly;
+   send the `[Load] ready for play` and `forest planted` lines.
+8. If a tree looks wrong (on a path, on a shop floor, in a queue), send its
+   position: each site is one line in `TownTreeData.Sites`.
+
+## V1 nature looks (8 October 2026, branch `phase-2/v1-g-nature`)
+
+The PNGs under `previews/v1-g/` (listed in STATUS.md) are the looks to review. Trees there are the live choppable section trees. Rain blobs are the old puff; rain streaks are what the weather controller now emits.
+
+Studio checks (PC, the phone emulator, and Xbox). Good looks like this:
+
+1. Chop, fell, and watch a stump and a regrow. Same swing and the same logs as before.
+2. In rain, the drops are thin slanted streaks in the world, not soft blobs stuck to the screen. On Lower quality there are fewer, shorter streaks.
+3. Step into a shop, under a bridge, into a truck cab, and into the cave, the tunnel and the grotto. Rain, splashes and the rain sound fade within about a second. They come back within about a second of stepping outside. Prompts and the controller cursor still work in the rain.
+4. Stand in steady rain for a minute. The air hazes a little and stays there; the sky does not fade to white. When the rain stops, or you step under a roof, the haze goes back to the clear-weather sky.
+5. Rocks read as six shapes (round boulder, cracked boulder, stacked standing stone, slab, pebble cluster, mossy outcrop), tilted and partly in the ground. Meadow rocks have moss, snow rocks a white cap, the shore is sandstone, the volcano is dark basalt, the gloam is blue-grey, caves are wet dark stone. Plants and critters are not on roads, plot pads, shop floors or the gondola path. Ducks sit on water. A gull is on the coast. A snow fox is on the snow. A sky moth glows on the isles at night.
+6. Lower quality stays smooth. A lanternwood's pods still read in a dark cave (neon, no extra light on a phone). Cave glow lights do not cast shadows.
+7. Rock meshes (the uploaded Blender rocks): on the open grass, a rock is a real faceted stone with a green moss cap, not a ball. Walk round a few in the same meadow and you see two shapes of each kind (A and B). Moss or snow sits on the top of the stone, never floating above it or sunk inside it. Rocks are 0.62x, 1x and 1.45x, and the cap scales with them.
+8. Ore rocks (once the mine uses them): coal, copper, iron, silver, gold and opal each show two seams of ore across a stone (opal's stone is mossy). Heartstone has red crystals and a red glow. The seams are visible from the front of the rock.
+9. The mine mouth (needs Lane B's placement call, see the PR's cross-lane requests): a stone arch with a timber frame, two lanterns and MINE letters; its opening faces out of the hill, the tunnel runs into it, you can walk in, and you cannot walk through the rock around it.
+10. Open the Output window and play: no `[NatureArt] ... mesh is missing` or `[MeshKit] ... did not load` lines for rocks, ore rocks or the mine mouth.
+11. Phone (667x375): rocks and the mine mouth look the same at Lower quality; no frame-rate drop near a rock-heavy meadow.
 
 ## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
 

@@ -1452,6 +1452,11 @@ export type ShopSpot = { kind: string, title: string, accent: Color3, cframe: CF
 -- at `cframe` (on the ground, turned).
 export type Greenery = { kind: string, woodId: string?, cframe: CFrame, size: number, seed: number }
 
+export type SceneSpot = {
+	kind: string, -- "forge" | "fishing" | "campfire" | "lookout" | "bench"
+	cframe: CFrame,
+}
+
 export type Town = {
 	spawn: Vector3,
 	spawnFacing: CFrame, -- the SpawnLocation's CFrame: at `spawn`, its front toward the sawmill
@@ -1473,6 +1478,9 @@ export type Town = {
 	pathRounds: { CFrame },
 	-- Open display lot: trucks and trailers for sale, north of the plot road.
 	displayLot: CFrame,
+	-- The buildings and props Connor was shown, on the town layout (Lane B's
+	-- map has not merged, so these use the town we already have).
+	scenes: { SceneSpot },
 }
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
@@ -1796,6 +1804,26 @@ function WorldPlan.Town(): Town
 		})
 	end
 
+	-- The five models shown in the town previews, on this town (Lane B has not
+	-- merged). The sky forge court sits on the south-west meadow, its front
+	-- (-Z) turned north toward the mill, on SkyForgeFloor. The lookout stands
+	-- just west of it, telescope toward town. The park bench and the campfire
+	-- sit on the green south of MainStreet, west of the well's benches. The
+	-- fishing dock stands on the Starter Forest pond's north bank, its -Z
+	-- out over the water; the deck's underside (1.06 above the model's
+	-- origin, PropArt.Scene) rests on that bank so the posts reach the pond.
+	local pond = WorldLayout.Pond
+	local bankX, bankZ = pond.x, pond.z + pond.radius + 3
+	local bankY = TerrainGen.HeightAt(bankX, bankZ)
+	local DECK_BOTTOM = 1.06
+	local scenes: { SceneSpot } = {
+		{ kind = "forge", cframe = at(-112, -20, math.pi) },
+		{ kind = "lookout", cframe = at(-136, -20, math.pi) },
+		{ kind = "bench", cframe = at(-84, 56, math.pi) },
+		{ kind = "campfire", cframe = at(-72, 56, math.pi) },
+		{ kind = "fishing", cframe = CFrame.new(bankX, bankY - DECK_BOTTOM, bankZ) },
+	}
+
 	-- A character spawns facing its SpawnLocation's front (LookVector), so
 	-- turn the pad's front (-Z) half a turn to +Z: the sawmill is due north
 	-- of the spawn, framed by the walk's two lamps. (Angles, not
@@ -1852,6 +1880,7 @@ function WorldPlan.Town(): Town
 		signs = signs,
 		greenery = greenery,
 		pathRounds = pathRounds,
+		scenes = scenes,
 		-- Open display lot on the lawn north of the plot road. Trucks face
 		-- -Z, toward that road. The corner is the zone in WorldLayout.
 		displayLot = CFrame.new(

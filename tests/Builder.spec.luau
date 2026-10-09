@@ -811,11 +811,10 @@ return function(t)
 	t.test("the five economy headlines are the ones already published", function()
 		local report = fs.readFile("ECONOMY.md")
 		t.ok(string.find(report, "68 s", 1, true) ~= nil)
-		t.ok(string.find(report, "7.9 min", 1, true) ~= nil)
-		t.ok(string.find(report, "13.7 min", 1, true) ~= nil)
-		t.ok(string.find(report, "51.4 min", 1, true) ~= nil)
-		-- The price ladder (axes) moved the headlines to these.
-		-- The other four headlines stay.
-		t.ok(string.find(report, "30.5 h", 1, true) ~= nil)
+		t.ok(string.find(report, "5.4 min", 1, true) ~= nil)
+		t.ok(string.find(report, "17.9 min", 1, true) ~= nil)
+		t.ok(string.find(report, "66.3 min", 1, true) ~= nil)
+		-- Coat gate, modelled mill and planer bonuses, and the $7,600 step.
+		t.ok(string.find(report, "33.5 h", 1, true) ~= nil)
 	end)
 end

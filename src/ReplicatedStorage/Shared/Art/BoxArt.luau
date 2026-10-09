@@ -54,11 +54,11 @@ BoxArt.DefaultCategory = BoxLook.Default
 -- Proportions of the box, in studs.
 BoxArt.Layout = {
 	wall = 0.18, -- thickness of the dark walls
-	edge = 0.03, -- the base's flange past the box, all round
+	edge = 0.1, -- the base's flange past the box: the accent band, all round
 	pane = 0.05, -- thickness of a glass pane
 	proud = 0.03, -- how far a window stands off the walls (and the box): no coplanar faces
 	stripH = 0.5, -- height of the name strip (it sits in the top margin)
-	stripProud = 0.09, -- how far the strip stands off the front
+	stripProud = 0.1, -- the accent band, 0.1 deep off the front
 	tierH = 0.3, -- height of the tier line on the base's front
 	glassTransparency = 0.5,
 	glassColor = Color3.fromRGB(150, 192, 212),
@@ -277,6 +277,26 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 		)
 	)
 	write(strip, Enum.NormalId.Front, spec.name, ink, Enum.Font.FredokaOne)
+
+	-- A brass plate under the name band, on the left. It used to sit on
+	-- the band and covered the name. This is the one spare shell part
+	-- (BoxLogic.ShellPartCap is 9, and the body plus the walls, windows
+	-- and strip already use 8). Four 0.1 corner bevels would need that
+	-- cap raised, so they are not separate parts.
+	local logoT = 0.05
+	local logoH = 0.3
+	local gap = 0.06
+	local stripFront = -(D / 2 + L.stripProud)
+	local stripBottom = H / 2 - L.stripH
+	add(plate(
+		parent,
+		body,
+		"Logo",
+		Vector3.new(0.6, logoH, logoT),
+		Vector3.new(-W / 2 + 0.55, stripBottom - gap - logoH / 2, stripFront - 0.02 - logoT / 2),
+		Color3.fromHex("#C9A24A"), -- Brass
+		Enum.Material.Metal
+	))
 
 	-- The item itself, scaled to fit with the margin, standing on the floor.
 	local contents = Instance.new("Model")

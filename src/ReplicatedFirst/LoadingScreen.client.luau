@@ -4,8 +4,10 @@
 -- ReplicatedFirst runs this before anything else replicates, so it can't
 -- use UITheme or Shared (they aren't here yet): the colours and fonts are
 -- inlined, and it builds its own GUI.
---   * Puts a full-screen card in PlayerGui: the title, a tip that changes
---     every few seconds, and three pulsing dots. Only then does it remove
+--   * Puts one Plaque (Paper face, a Bark drop edge, the Game Art
+--     Director's round-3 skin) in PlayerGui, centred at (0.5, 0.45), over an
+--     Ink backdrop at 45% transparency: the title and one tip that changes
+--     every few seconds. No buttons, no scene. Only then does it remove
 --     Roblox's default loading screen, so there's no gap between the two.
 --   * Fades out once the LocalPlayer has a Character, the save is in (the
 --     "ProfileLoaded" attribute GameServer sets) and the game has loaded,
@@ -16,11 +18,14 @@
 --   * It sits over every game screen (DisplayOrder 100). The HUD's own
 --     "Loading your save..." card (DisplayOrder 10) is under it, and shows
 --     only if the save is still loading when this card gives up.
---   * Sized for an iPhone SE in landscape (667x375) at scale 1, text at
---     14 px or more; bigger screens scale it up (scaleFor).
+--   * The plaque is min(280, 72% of the screen width) wide and 132 tall, with
+--     16 px of padding, at 667x375 scale 1, text at 14 px or more; bigger
+--     screens scale it up (scaleFor).
 
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
+
+local LoadingTips = require(script.Parent.LoadingTips)
 
 local MAX_SECONDS = 30 -- the card never stays up longer than this
 local FADE_SECONDS = 0.6
@@ -31,24 +36,22 @@ local PLAYERGUI_WAIT = 5 -- seconds per WaitForChild try (a timeout, so no infin
 local PLAYERGUI_TRIES = 6
 local PLAYER_WAIT = 10 -- seconds to wait for Players.LocalPlayer, should it not be set yet
 
--- UITheme's palette (UITheme isn't loaded yet).
+-- UITheme.Skin's values (UITheme isn't loaded yet, so they are copied; the
+-- spec checks they match).
 local INK = Color3.fromHex("#3C2814")
+local BARK = Color3.fromHex("#583A22")
 local CREAM = Color3.fromHex("#F5EBD7")
 local PAPER = Color3.fromHex("#F0E1C3")
-local BARK = Color3.fromHex("#583A22")
-local AMBER = Color3.fromHex("#FFB840")
+local PAPER_DARK = Color3.fromHex("#E2CFAA")
+
+local PLAQUE_WIDTH = 280 -- px at scale 1, at most
+local PLAQUE_WIDTH_SHARE = 0.72 -- of the screen's width, at most
+local PLAQUE_HEIGHT = 132
+local PLAQUE_DROP = 4 -- the Bark edge under the face
+local PLAQUE_PAD = 16
+local BACKDROP_ALPHA = 0.45
 
 local TITLE = "Timberline Tycoon"
--- Inlined like the colours (ReplicatedFirst runs before Shared arrives).
--- The v2 loop's (GameConfig.CoreLoop 2): cut anywhere, drag, carry loose.
-local TIPS = {
-	"Swing low on a trunk and keep hitting the same spot. Watch the notch grow until it falls.",
-	"Put your axe away, then click and hold a log to drag it onto your truck's bed.",
-	"Back your truck onto the green pad by the sawmill: the wood sells itself, by volume.",
-	"A felled tree grows back somewhere else in its stand, smaller at first.",
-	"Odd-looking bark can hide figured wood. The sawmill pays extra for it.",
-	"Elders are giants. Anyone who chops a share of one is paid when it falls.",
-}
 
 local started = os.clock()
 local player = Players.LocalPlayer
@@ -104,102 +107,91 @@ local function build(): Card
 	screen.ResetOnSpawn = false
 	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
+	-- Ink at 45% transparency over the game, not a flat scene.
 	local backdrop = Instance.new("Frame")
 	backdrop.Name = "Backdrop"
 	backdrop.Size = UDim2.fromScale(1, 1)
-	-- White, because a UIGradient multiplies its parent's colour rather
-	-- than replacing it (UITheme's button shine relies on that too): white
-	-- x Bark..Ink shows Bark..Ink. A Bark base would show Bark x Bark,
-	-- close to black.
-	backdrop.BackgroundColor3 = Color3.new(1, 1, 1)
+	backdrop.BackgroundColor3 = INK
+	backdrop.BackgroundTransparency = BACKDROP_ALPHA
 	backdrop.BorderSizePixel = 0
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(BARK, INK)
-	gradient.Rotation = 90 -- Bark at the top, Ink at the bottom
-	gradient.Parent = backdrop
 	backdrop.Parent = screen
 
-	-- The backdrop stays full-bleed. The words sit inside a 5% margin.
-	local inset = Instance.new("Frame")
-	inset.Name = "TextInset"
-	inset.BackgroundTransparency = 1
-	inset.Position = UDim2.fromScale(0.05, 0.05)
-	inset.Size = UDim2.fromScale(0.9, 0.9)
-	inset.Parent = backdrop
-
-	local content = Instance.new("Frame")
-	content.Name = "Content"
-	content.AnchorPoint = Vector2.new(0.5, 0.5)
-	content.Position = UDim2.fromScale(0.5, 0.5)
-	content.Size = UDim2.fromScale(1, 0)
-	content.AutomaticSize = Enum.AutomaticSize.Y
-	content.BackgroundTransparency = 1
-	local maxSize = Instance.new("UISizeConstraint")
-	maxSize.MaxSize = Vector2.new(560, math.huge)
-	maxSize.Parent = content
+	-- The plaque: a Bark edge PLAQUE_DROP lower, under a Paper face.
+	local plaque = Instance.new("Frame")
+	plaque.Name = "Plaque"
+	plaque.AnchorPoint = Vector2.new(0.5, 0.5)
+	plaque.Position = UDim2.fromScale(0.5, 0.45)
+	plaque.Size = UDim2.fromOffset(PLAQUE_WIDTH, PLAQUE_HEIGHT)
+	plaque.BackgroundTransparency = 1
+	plaque.BorderSizePixel = 0
 	local scale = Instance.new("UIScale")
-	scale.Parent = content
+	scale.Parent = plaque
+	plaque.Parent = backdrop
+
+	local edge = Instance.new("Frame")
+	edge.Name = "Edge"
+	edge.Size = UDim2.new(1, 0, 1, -PLAQUE_DROP)
+	edge.Position = UDim2.fromOffset(0, PLAQUE_DROP)
+	edge.BackgroundColor3 = BARK
+	edge.BorderSizePixel = 0
+	corner(edge, UDim.new(0, 12))
+	edge.Parent = plaque
+
+	-- White, because a UIGradient multiplies its parent's colour rather
+	-- than replacing it: white x Cream..PaperDark shows Cream..PaperDark.
+	local face = Instance.new("Frame")
+	face.Name = "Face"
+	face.Size = UDim2.new(1, 0, 1, -PLAQUE_DROP)
+	face.BackgroundColor3 = Color3.new(1, 1, 1)
+	face.BorderSizePixel = 0
+	face.ZIndex = 2
+	corner(face, UDim.new(0, 12))
+	local faceStroke = Instance.new("UIStroke")
+	faceStroke.Color = BARK
+	faceStroke.Thickness = 2
+	faceStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	faceStroke.Parent = face
+	local gradient = Instance.new("UIGradient")
+	gradient.Rotation = 90
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, CREAM),
+		ColorSequenceKeypoint.new(0.18, PAPER),
+		ColorSequenceKeypoint.new(1, PAPER_DARK),
+	})
+	gradient.Parent = face
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, PLAQUE_PAD)
+	pad.PaddingBottom = UDim.new(0, PLAQUE_PAD)
+	pad.PaddingLeft = UDim.new(0, PLAQUE_PAD)
+	pad.PaddingRight = UDim.new(0, PLAQUE_PAD)
+	pad.Parent = face
 	local list = Instance.new("UIListLayout")
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	list.Padding = UDim.new(0, 10)
-	list.Parent = content
-	content.Parent = inset
+	list.Padding = UDim.new(0, 8)
+	list.Parent = face
+	face.Parent = plaque
 
-	local title = textLabel(content, "Title", TITLE, Enum.Font.FredokaOne, 40, CREAM)
+	local title = textLabel(face, "Title", TITLE, Enum.Font.FredokaOne, 20, INK)
 	title.LayoutOrder = 1
-	title.Size = UDim2.new(1, 0, 0, 48)
-	local titleStroke = Instance.new("UIStroke")
-	titleStroke.Color = INK
-	titleStroke.Thickness = 3
-	titleStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-	titleStroke.Parent = title
+	title.Size = UDim2.new(1, 0, 0, 26)
+	title.ZIndex = 3
 
-	local divider = Instance.new("Frame")
-	divider.Name = "Divider"
-	divider.LayoutOrder = 2
-	divider.Size = UDim2.fromOffset(96, 4)
-	divider.BackgroundColor3 = AMBER
-	divider.BorderSizePixel = 0
-	corner(divider, UDim.new(0, 2))
-	divider.Parent = content
-
-	local kicker = textLabel(content, "Kicker", "TIP", Enum.Font.GothamBlack, 14, AMBER)
-	kicker.LayoutOrder = 3
-	kicker.Size = UDim2.new(1, 0, 0, 18)
-
-	local tip = textLabel(content, "Tip", "", Enum.Font.GothamMedium, 18, PAPER)
-	tip.LayoutOrder = 4
-	-- Room for two lines whatever the tip, so the card doesn't hop as the
-	-- tips change (AutomaticSize treats Size as a minimum: a third line,
-	-- on a narrow screen, still fits).
-	tip.Size = UDim2.new(1, 0, 0, 46)
-	tip.AutomaticSize = Enum.AutomaticSize.Y
+	-- One GothamMedium line of 14 (never smaller). Two lines fit the card
+	-- for the longest tip, so it doesn't hop as the tips change.
+	local tip = textLabel(face, "Tip", "", Enum.Font.GothamMedium, 14, BARK)
+	tip.LayoutOrder = 2
+	tip.Size = UDim2.new(1, 0, 1, -34)
 	tip.TextWrapped = true
 	tip.TextYAlignment = Enum.TextYAlignment.Top
+	tip.ZIndex = 3
+	local tipFit = Instance.new("UITextSizeConstraint")
+	tipFit.MinTextSize = 14
+	tipFit.MaxTextSize = 14
+	tipFit.Parent = tip
 
-	local dotRow = Instance.new("Frame")
-	dotRow.Name = "Dots"
-	dotRow.LayoutOrder = 5
-	dotRow.Size = UDim2.fromOffset(44, 18)
-	dotRow.BackgroundTransparency = 1
-	dotRow.Parent = content
-	local dots: { Frame } = {}
-	for i = 1, 3 do
-		local dot = Instance.new("Frame")
-		dot.Name = "Dot" .. i
-		dot.AnchorPoint = Vector2.new(0, 1)
-		dot.Position = UDim2.new(0, (i - 1) * 17, 1, 0)
-		dot.Size = UDim2.fromOffset(10, 10)
-		dot.BackgroundColor3 = AMBER
-		dot.BorderSizePixel = 0
-		corner(dot, UDim.new(0.5, 0))
-		dot.Parent = dotRow
-		dots[i] = dot
-	end
-
-	-- A random first tip, so a rejoin doesn't start on the same one.
-	local firstTip = math.random(#TIPS)
+	-- Shuffled once, then again only after every line has been shown.
+	local cycle = LoadingTips.Begin(math.random)
 
 	local function draw(elapsed: number, fade: number)
 		local function mix(base: number): number
@@ -207,28 +199,28 @@ local function build(): Card
 		end
 		local camera = workspace.CurrentCamera
 		if camera then
-			local s = scaleFor(camera.ViewportSize)
+			local viewport = camera.ViewportSize
+			local s = scaleFor(viewport)
 			if scale.Scale ~= s then
 				scale.Scale = s
 			end
+			-- min(280, 72% of the width), in the plaque's own (scaled) px.
+			local width = math.min(PLAQUE_WIDTH, PLAQUE_WIDTH_SHARE * viewport.X / s)
+			plaque.Size = UDim2.fromOffset(width, PLAQUE_HEIGHT)
 		end
 		local slot = math.floor(elapsed / TIP_SECONDS)
-		local text = TIPS[(firstTip - 1 + slot) % #TIPS + 1]
+		local text = LoadingTips.LineAt(cycle, slot)
 		if tip.Text ~= text then
 			tip.Text = text
 		end
 		local into = elapsed - slot * TIP_SECONDS
 		local tipHidden = math.clamp(1 - math.min(into, TIP_SECONDS - into) / TIP_FADE, 0, 1)
-		backdrop.BackgroundTransparency = mix(0)
+		backdrop.BackgroundTransparency = mix(BACKDROP_ALPHA)
+		edge.BackgroundTransparency = mix(0)
+		face.BackgroundTransparency = mix(0)
+		faceStroke.Transparency = mix(0)
 		title.TextTransparency = mix(0)
-		titleStroke.Transparency = mix(0)
-		divider.BackgroundTransparency = mix(0)
-		kicker.TextTransparency = mix(0)
 		tip.TextTransparency = mix(tipHidden)
-		for i, dot in ipairs(dots) do
-			local pulse = 0.5 + 0.5 * math.sin(elapsed * 5 - i * 0.9)
-			dot.BackgroundTransparency = mix(0.7 - 0.6 * pulse)
-		end
 	end
 
 	draw(0, 0)

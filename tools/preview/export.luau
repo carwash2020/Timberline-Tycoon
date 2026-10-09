@@ -10,6 +10,12 @@
 -- lights, sign text and terrain) to preview/<scene>.html. Open it in any
 -- browser. `node tools/preview/render.mjs` turns those into PNG screenshots.
 --
+-- MeshParts and FileMeshes are not dropped. assets/meshes/manifest.json
+-- (tools/preview/build_mesh_manifest.py) maps each mesh id to a GLB node.
+-- The export embeds those GLBs and tells MeshKit the id is available, so
+-- art that deletes its part-built stand-in when a mesh loads does that here
+-- too. A missing id is still written, and the viewer draws it magenta.
+--
 -- It also lints the art: parts placed with .Position instead of .CFrame
 -- (the preview can't tell which was set last, so art code uses CFrame only),
 -- and part counts per scene, so the phone budget stays visible.
@@ -44,6 +50,133 @@ for _, file in ipairs(fs.readDir("tools/preview/scenes")) do
 end
 
 local Vector3, CFrame = roblox.Vector3, roblox.CFrame
+
+local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+local function base64(data: string): string
+	local parts = table.create(math.ceil(#data / 3))
+	local n = #data
+	local i = 1
+	local out = 1
+	while i <= n do
+		local a = string.byte(data, i)
+		local b = if i + 1 <= n then string.byte(data, i + 1) else nil
+		local c = if i + 2 <= n then string.byte(data, i + 2) else nil
+		local triple = bit32.lshift(a, 16) + bit32.lshift(b or 0, 8) + (c or 0)
+		local c1 = bit32.rshift(triple, 18)
+		local c2 = bit32.band(bit32.rshift(triple, 12), 63)
+		local c3 = bit32.band(bit32.rshift(triple, 6), 63)
+		local c4 = bit32.band(triple, 63)
+		parts[out] = string.sub(B64, c1 + 1, c1 + 1)
+			.. string.sub(B64, c2 + 1, c2 + 1)
+			.. (if b then string.sub(B64, c3 + 1, c3 + 1) else "=")
+			.. (if c then string.sub(B64, c4 + 1, c4 + 1) else "=")
+		out += 1
+		i += 3
+	end
+	return table.concat(parts)
+end
+
+local manifest = {}
+local meshBlobs: { [string]: string } = {}
+if fs.isFile("assets/meshes/manifest.json") then
+	local ok, decoded = pcall(function()
+		return serde.decode("json", fs.readFile("assets/meshes/manifest.json"))
+	end)
+	if ok and type(decoded) == "table" then
+		manifest = decoded
+	else
+		print("  warning: assets/meshes/manifest.json did not parse")
+	end
+end
+
+local function numericId(value): number?
+	if type(value) == "number" and value == value and value > 0 then
+		return value
+	end
+	if type(value) == "string" then
+		local n = tonumber(string.match(value, "%d+"))
+		if n and n > 0 then
+			return n
+		end
+	end
+	return nil
+end
+
+local function blobFor(file: string): string?
+	local cached = meshBlobs[file]
+	if cached then
+		return cached
+	end
+	local path = "assets/meshes/" .. file
+	if not fs.isFile(path) then
+		return nil
+	end
+	local encoded = base64(fs.readFile(path))
+	meshBlobs[file] = encoded
+	return encoded
+end
+
+-- MeshKit has no AssetService under Lune, so Create returns nil and the art
+-- keeps its part-built stand-in. Reporting every manifest id as available
+-- makes that stand-in get deleted, which is what the game does once the mesh
+-- loads. An id that is not in the manifest still fails, and the parts stay.
+local function installMeshOverride(loader)
+	local MeshKit = loader:load("ReplicatedStorage/Shared/Art/MeshKit")
+	MeshKit.Reset()
+	MeshKit.Override = function(meshId, name, size)
+		if type(manifest[tostring(meshId)]) ~= "table" then
+			return nil
+		end
+		local part = roblox.Instance.new("MeshPart")
+		part.Name = name
+		part.Size = size
+		part:SetAttribute("MeshId", tostring(meshId))
+		return part
+	end
+end
+
+local function meshDraw(inst): (number?, Vector3?)
+	if inst.ClassName == "MeshPart" then
+		local id = numericId(inst:GetAttribute("MeshId"))
+		if not id then
+			local ok, mid = pcall(function()
+				return (inst :: any).MeshId
+			end)
+			if ok then
+				id = numericId(mid)
+			end
+		end
+		return id or 0, inst.Size
+	end
+	local mesh = inst:FindFirstChildOfClass("SpecialMesh")
+	if mesh and mesh.MeshType.Name == "FileMesh" then
+		local id = nil
+		local ok, mid = pcall(function()
+			return mesh.MeshId
+		end)
+		if ok then
+			id = numericId(mid)
+		end
+		return id or 0, inst.Size * mesh.Scale
+	end
+	return nil, nil
+end
+
+-- The gameplay Handle stays in the model (the tool needs it) after the
+-- part-built head is deleted. It is a plain block inside the mesh haft, so
+-- the preview does not draw it on top of the mesh.
+local function coveredHandle(inst): boolean
+	if inst.Name ~= "Handle" then
+		return false
+	end
+	local parent = inst.Parent
+	if not parent then
+		return false
+	end
+	local mesh = parent:FindFirstChild("MeshHandle")
+	return mesh ~= nil and mesh:GetAttribute("VisualMesh") == true
+end
 
 local SHAPES = { "Block", "Wedge", "CornerWedge", "Cylinder", "Ball", "Sphere" }
 local SHAPE_INDEX = {}
@@ -124,6 +257,7 @@ end
 
 local function export(name: string, def)
 	local loader = Loader.new()
+	installMeshOverride(loader)
 	local built = def.build({
 		loader = loader,
 		shared = function(n)
@@ -139,7 +273,8 @@ local function export(name: string, def)
 	})
 	local root = built.root
 
-	local parts, lights, texts = {}, {}, {}
+	local parts, lights, texts, meshes = {}, {}, {}, {}
+	local meshIndex = {}
 	local materials, materialIndex = {}, {}
 	local counts, warnings = {}, {}
 	local positionWarned = 0
@@ -166,6 +301,44 @@ local function export(name: string, def)
 				if positionWarned <= 5 then
 					table.insert(warnings, "set .Position (use .CFrame): " .. inst:GetFullName())
 				end
+			end
+			if coveredHandle(inst) then
+				continue
+			end
+			local meshId, meshSize = meshDraw(inst)
+			if meshId then
+				local c = cframeList(inst.CFrame)
+				table.insert(meshes, {
+					meshId,
+					round(meshSize.X, 3),
+					round(meshSize.Y, 3),
+					round(meshSize.Z, 3),
+					c[1],
+					c[2],
+					c[3],
+					c[4],
+					c[5],
+					c[6],
+					c[7],
+					c[8],
+					c[9],
+					c[10],
+					c[11],
+					c[12],
+					hex(inst.Color),
+					round(inst.Transparency, 2),
+				})
+				local info = manifest[tostring(meshId)]
+				if type(info) == "table" and type(info.file) == "string" then
+					meshIndex[tostring(meshId)] = {
+						file = info.file,
+						node = info.node,
+						initialSize = info.initialSize,
+						tint = info.tint,
+					}
+					blobFor(info.file)
+				end
+				continue
 			end
 			local shape, size = shapeOf(inst)
 			if shape then
@@ -281,17 +454,29 @@ local function export(name: string, def)
 		table.insert(warnings, string.format("... and %d more parts placed with .Position", positionWarned - 5))
 	end
 
+	local sceneBlobs = {}
+	for _, info in pairs(meshIndex) do
+		local blob = meshBlobs[info.file]
+		if blob then
+			sceneBlobs[info.file] = blob
+		end
+	end
 	local scene = {
 		name = name,
 		shapes = SHAPES,
 		materials = materials,
 		parts = parts,
+		meshes = meshes,
+		meshIndex = meshIndex,
+		meshBlobs = sceneBlobs,
 		lights = lights,
 		texts = texts,
 		cameras = built.cameras,
 		lighting = built.lighting,
 		fov = built.fov,
 		shadowRadius = built.shadowRadius,
+		background = built.background,
+		hud = built.hud,
 	}
 
 	local t = built.terrain
@@ -347,10 +532,11 @@ local function export(name: string, def)
 	table.sort(classes)
 	print(
 		string.format(
-			"preview/%s.html  %d parts (%s), %d lights%s",
+			"preview/%s.html  %d parts (%s), %d meshes, %d lights%s",
 			name,
 			total,
 			table.concat(classes, ", "),
+			#meshes,
 			#lights,
 			if built.terrain then ", terrain" else ""
 		)

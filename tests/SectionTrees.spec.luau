@@ -1254,6 +1254,37 @@ return function(t)
 		t.eq(rec.regrowAt, s.now + s.Trees.RetrySec)
 	end)
 
+	t.test("a felled town tree grows back on the town's ground, even inside the flat town", function()
+		-- Behind the sawmill is inside the flat town, where the forest's ground
+		-- rule (WorldPlan.GoodGround) never lets a tree grow. A "town:" zone
+		-- (TreeFill.TownRings) asks the town's ground instead, so the stump is
+		-- not a dead end; the same disc under another name still finds nothing.
+		local function felled(zoneId)
+			local s = setup()
+			local n = 0
+			s.Trees._roll = function()
+				n += 1
+				return (n * 0.2371) % 1
+			end
+			local zone = { id = zoneId, cx = 30, cz = 158, radius = 16, cap = 1 }
+			local rec = s.tree("oak", Vector3.new(30, 0, 158), { seed = 5, zone = zone, cap = 1 })
+			local p = s.player(1, Vector3.new(34, 3, 158))
+			s.clearSite(p, rec)
+			t.ok(rec.slot, zoneId .. ": felled")
+			s.now += s.WoodData.Get("oak").respawnSec * 1.4
+			s.Trees.GrowTick(s.now)
+			return s, rec, zone
+		end
+		local s, rec, zone = felled("town:mill")
+		local TreeFill = s.loader:load("ReplicatedStorage/Shared/World/TreeFill")
+		t.ok(not rec.slot and rec.model ~= nil, "it grew back")
+		t.ok(TreeFill.GroundFor(zone, rec.base.X, rec.base.Z), "on the town's ground")
+		t.ok(math.sqrt((rec.base.X - 30) ^ 2 + (rec.base.Z - 158) ^ 2) <= 16 + 1e-6, "inside its zone")
+		t.ok(s.Trees.GetTree(rec.uid) == rec)
+		local _, stuck = felled("mill")
+		t.ok(stuck.slot, "the same disc as an ordinary zone has no legal spot in the flat town")
+	end)
+
 	t.test("rooted trees over the cap hold a regrow for RetrySec", function()
 		local s = setup()
 		s.Trees._roll = function()

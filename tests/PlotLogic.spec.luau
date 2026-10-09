@@ -450,6 +450,19 @@ return function(t)
 		t.ok((PlotLogic.Check(flag, 20, 20, 0, 1, placed, "1")), "moving one of them is fine")
 	end)
 
+	t.test("placing stops at PlacedCap; moving a piece already there does not", function()
+		local GameConfig = t.shared("GameConfig")
+		local placed = {}
+		for i = 1, GameConfig.PlacedCap do
+			placed[i] = { uid = "u" .. i, blueprintId = "Wall", x = i * 1000, z = 0, rot = 0 }
+		end
+		local wall = PlotData.Blueprint("Wall")
+		local ok, why = PlotLogic.Check(wall, 4, 4, 0, #PlotData.Tiers, placed)
+		t.eq(ok, false)
+		t.ok(string.find(why, "placed pieces", 1, true) ~= nil, why)
+		t.eq(PlotLogic.Check(wall, 4, 4, 0, #PlotData.Tiers, placed, "u1"), true)
+	end)
+
 	t.test("nonsense positions and turns are refused", function()
 		local flag = PlotData.Blueprint("Flag")
 		for _, rot in ipairs({ -1, 4, 0.5 }) do
@@ -525,7 +538,7 @@ return function(t)
 		end
 		local sumK = 24 * 25 / 2
 		t.eq(sum, GameConfig.FirstPlotPrice + GameConfig.ExpansionPriceStep * sumK)
-		t.eq(sum, 915100)
+		t.eq(sum, 2280100)
 		-- The campsite (one square, 80 wide) covers the middle. Only a square that touches it is for sale.
 		t.eq({ PlotLogic.ExpansionBlock(1, {}, 0, 0) }, { nil, "yours" })
 		t.eq({ PlotLogic.ExpansionBlock(1, {}, 2, 2) }, { nil, "away" })

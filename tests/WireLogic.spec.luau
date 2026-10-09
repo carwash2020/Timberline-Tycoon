@@ -53,14 +53,36 @@ return function(t)
 		table.insert(p, item("extra", "SparkLamp", 2, 4))
 		t.eq({ WireLogic.Check(wires, p, "sw", "extra") }, { false, "limit" })
 
+		-- Doors are not logic pieces, so this fills the wire cap without the item cap.
 		local big, bigWires = {}, {}
-		for i = 1, WireLogic.MaxWires do
+		local switches = math.ceil(WireLogic.MaxWires / WireLogic.MaxPerSwitch)
+		for i = 1, switches do
 			table.insert(big, item("s" .. i, "SparkSwitch", 0, 0))
-			table.insert(big, item("t" .. i, "SparkLamp", 1, 0))
-			table.insert(bigWires, { from = "s" .. i, to = "t" .. i })
+		end
+		local source = 1
+		for n = 1, WireLogic.MaxWires do
+			table.insert(big, item("d" .. n, "Door", 1, 0))
+			table.insert(bigWires, { from = "s" .. source, to = "d" .. n })
+			if n % WireLogic.MaxPerSwitch == 0 then
+				source += 1
+			end
 		end
 		table.insert(big, item("s0", "SparkSwitch", 0, 0))
-		t.eq({ WireLogic.Check(bigWires, big, "s0", "t1") }, { false, "full" })
+		t.eq({ WireLogic.Check(bigWires, big, "s0", "d1") }, { false, "full" })
+	end)
+
+	t.test("a plot holds MaxItems logic pieces; a Door does not count", function()
+		local p = {}
+		for i = 1, WireLogic.MaxItems do
+			table.insert(p, item("s" .. i, "SparkSwitch", 0, 0))
+		end
+		table.insert(p, item("door", "Door", 1, 0))
+		t.eq(WireLogic.LogicCount(p), WireLogic.MaxItems)
+		t.eq({ WireLogic.Check({}, p, "s1", "door") }, { true, nil }, "at the cap, wiring still works")
+		table.insert(p, item("over", "SparkLamp", 2, 0))
+		t.eq({ WireLogic.Check({}, p, "s1", "door") }, { false, "items" })
+		t.eq(WireLogic.CanPlace(p, "Button"), false)
+		t.eq(WireLogic.CanPlace(p, "Door"), true)
 	end)
 
 	t.test("Live drops wires to pieces that are gone or the wrong way round", function()
@@ -156,7 +178,7 @@ return function(t)
 		t.eq(WireLogic.CleanSwitches("on"), {})
 		t.eq(WireLogic.CleanSwitches(nil), {})
 		local many = {}
-		for i = 1, 60 do
+		for i = 1, WireLogic.MaxSwitches + 20 do
 			table.insert(many, "s" .. i)
 		end
 		t.eq(#WireLogic.CleanSwitches(many), WireLogic.MaxSwitches)

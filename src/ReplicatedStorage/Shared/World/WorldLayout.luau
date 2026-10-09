@@ -648,6 +648,9 @@ WorldLayout.TownFloors = {
 	-- Gravel like the yard beside it: a truck yard, not a shop floor.
 	{ name = "SellStationFloor", x0 = 31, x1 = 87, z0 = 84, z1 = 139, material = ROAD },
 	{ name = "GondolaStationFloor", x0 = -50.5, x1 = -29, z0 = 139, z1 = 160.5, material = "Ground" },
+	-- The sky forge court on the south-west meadow (WorldPlan.Town().scenes).
+	-- A stud past the walls so grass does not grow through the floor.
+	{ name = "SkyForgeFloor", x0 = -130, x1 = -94, z0 = -36, z1 = -4, material = "Ground" },
 } :: { Paint }
 
 -- The river runs from the pool under the Aether Isles' waterfall, south
