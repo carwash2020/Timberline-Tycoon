@@ -137,7 +137,7 @@ return function(t)
 	-- The tracker, Murph's card under it (a line or so taller at a phone's
 	-- 14 px), the Field Guide button (a fingertip tall on a phone).
 	local TRACKER, SPEECH, GUIDE = 92, 6 + 100, PHONE.FieldGuide.size.Y + EDGE
-	local LINE2, PHONE_LINE2 = DESK.DailyButton.size.Y, PHONE.DailyButton.size.Y -- the corner's second line: its pills
+	local LINE2, PHONE_LINE2 = DESK.Clock.size.Y, PHONE.Clock.size.Y -- the corner's second line: its pills
 	local function widths(...)
 		local sum, n = 0, 0
 		for _, w in ipairs({ ... }) do
@@ -634,8 +634,9 @@ return function(t)
 		t.eq(HudLayout.ShopArea(v(667, 375), 0).top, 8, "no top bar: 8 from the top")
 	end)
 
-	-- GothamBlack's width at `size` px, from above: capitals under 0.75 em,
-	-- digits 0.68, lower case 0.62, a space 0.28, anything else 0.45.
+	-- GothamBold was remeasured against this ceiling and the ceiling was not
+	-- lowered: capitals under 0.75 em, digits 0.68, lower case 0.62, a space
+	-- 0.28, anything else 0.45. A narrower face still fits under these.
 	local function blackWidth(text, size)
 		local em = 0
 		for _, code in utf8.codes(text) do
@@ -652,7 +653,10 @@ return function(t)
 
 	t.test("640 x 360 after the tutorial: the corner's second line stays clear of the Field Guide button", function()
 		local HudRules = t.load("StarterPlayer/StarterPlayerScripts/HudRules")
-		local daily, clock, pouch = PHONE.DailyButton, PHONE.Clock, PHONE.Pouch
+		-- The Daily Goals pill is gone. This is the width it used to take, so
+		-- the "long label reaches the Field Guide" check stays just as tight.
+		local daily = { size = Vector2.new(200, 36), text = 14 }
+		local clock, pouch = PHONE.Clock, PHONE.Pouch
 		-- The clock's longest text fits its pill.
 		t.ok(blackWidth("Night 23:45", clock.text) <= clock.size.X, "the clock fits")
 		-- Line 2: [clock][pouch][Daily Goals], right-aligned at the margin, 7

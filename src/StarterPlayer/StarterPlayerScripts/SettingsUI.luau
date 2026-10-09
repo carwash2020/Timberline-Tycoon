@@ -26,8 +26,10 @@ local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local CameraShake = require(script.Parent.CameraShake)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
+local GamepadNav = require(script.Parent.GamepadNav)
 local HUD = require(script.Parent.HUD)
 local HudNav = require(script.Parent.HudNav)
+local NewsUI = require(script.Parent.NewsUI)
 local LeaderboardUI = require(script.Parent.LeaderboardUI)
 local Quality = require(script.Parent.Quality)
 local UITheme = require(script.Parent.UITheme)
@@ -475,6 +477,11 @@ function SettingsUI.Start()
 	-- Restart save: two presses, like the tutorial reset. The first asks the
 	-- server to arm (SlotAction "arm"), the second sends "reset"; the server
 	-- still checks the cooldown, the arm window and the rate limit.
+	row("whatsNew", "WHAT'S NEW", function()
+		card.outer.Visible = false
+		NewsUI.Open()
+	end)
+
 	restartFace = row("restart", "RESTART SAVE", function()
 		local state = SettingsLogic.RestartRow(
 			player:GetAttribute("ActiveSlot"),
@@ -557,6 +564,10 @@ function SettingsUI.Start()
 				showTab("game")
 			end
 			return
+		end
+		-- GAME is the first button, on every device. B still closes (below).
+		if firstFace then
+			GamepadNav.Focus(firstFace, card.outer)
 		end
 		ContextActionService:BindActionAtPriority(
 			SETTINGS_NAV,

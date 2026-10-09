@@ -37,6 +37,29 @@ Everything after the Phase 1 vertical slice. It's all on `main` now
 passes (formatter, linter, strict types against the Roblox API, 351 unit
 tests, ECONOMY.md current); GitHub runs it on every push.
 
+## V1 UI (lane U, branch `phase-2/v1-u-ui`)
+
+Mockups (phone 667x375 and PC 1920x1080): `previews/v1-u/loading-667x375.png`, `previews/v1-u/loading-1920x1080.png`, `previews/v1-u/hud-667x375.png`, `previews/v1-u/hud-1920x1080.png`, `previews/v1-u/hud-buttons-667x375.png`, `previews/v1-u/hud-buttons-1920x1080.png`, `previews/v1-u/owner-menu-667x375.png`, `previews/v1-u/owner-menu-1920x1080.png`, `previews/v1-u/theme-sheet-667x375.png`, `previews/v1-u/theme-sheet-1920x1080.png`, `previews/v1-u/news-667x375.png`, `previews/v1-u/news-1920x1080.png`.
+
+Look: walnut panels, cream text, amber prices and edges, green confirm, danger fill `#B23B30` (cream on it is 4.80:1), muted locked. GothamBold for titles and buttons, Gotham for body. Radius 8, stroke 2, selection ring #FFF4C2 at 4px. Uploaded UIArt skins (cash plaque, prompts) still cover the flat colours once those images load; until then the flat theme shows, and that is what the previews draw (those image ids are not readable from this machine). Side-button marks and the What's new icons are frames, the same shapes as in the game; they have no asset id. The loading card sits on a sunset scene and shows the wordmark, a progress bar and one tip at a time. `hud-667x375.png` and `hud-1920x1080.png` are the in-context HUD (cash, Field Guide labelled with its book icon, side buttons with a saves, hammer or truck mark, one selection ring, and the hint on a solid ink pill). On the phone the thumbstick is Roblox's dark ring and knob, the jump button is the round button, and the hotbar starts to the right of the stick zone. `hud-buttons-*.png` is only the style row.
+
+What's new in V1: seven headlines, each with a short muted second line, in `NewsLogic.Entries` (the island map with the Bayou and Red Mesa, the cave and ore, blueprints, Foreman Rook's daily jobs, axe tempering, Sparkworks logic pieces, the gondola sky island). Once per save after the tutorial, stored as `onboarding["News:V1"]` (no new save field). Settings has WHAT'S NEW. Close or B skips it. The card is only as tall as those rows, with a sunset wordmark on top. On a short screen it sits to the right of the thumbstick and above the jump box. Close is centred on the card and 44px tall on the phone.
+
+Lane E: `DailyUI` remains in the client module list, but the client does not call `DailyUI.Start`. Starting it warned, because the Daily Goals button size was removed. Foreman replaces that module. Output should not contain `[Client] DailyUI failed to start`.
+
+Controller, first selected button:
+- Owner menu: PLAYERS tab
+- Quick menu: first tile
+- Settings: GAME tab
+- What's new: Close
+
+B closes those panels. None of them binds ButtonR2 (RT still chops and places, as before).
+
+Studio checks:
+- PC: the loading card sits on the sunset scene, shows the title, a progress bar and one tip, then the next tip, with no repeat until the list ends. The HUD matches `hud-1920x1080.png` (cash, FIELD GUIDE with a book icon, SAVES and Send truck home with their icons, the hint on a dark pill). Owner menu (if you are the owner) is walnut with a cream title. Settings, WHAT'S NEW: a sunset wordmark, seven headlines each with a muted second line, Close centred at the bottom of a card that is only as tall as that list. Cash still reads. Output has no DailyUI startup warning.
+- Phone (667x375 landscape): the same panels fit. What's new Close is 44px tall, centred, and not under the jump button or in the thumbstick zone. The side buttons are 44px tall, carry a saves, hammer or truck icon, and sit above the jump button. The hotbar starts to the right of the thumbstick. Field Guide reads GUIDE. The chop hint sits on a dark pill. Compare with `hud-667x375.png` and `news-667x375.png`.
+- Xbox: open each panel above. The cream ring is on the first button immediately. D-pad and the left stick reach every button. A activates. B closes and returns to the HUD button that opened it. RT still swings the axe and does not change owner-menu tabs.
+
 What's here, each with its own checklist below:
 
 15. **V1 economy core** (8 October 2026, branch `phase-2/v1-a1-economy-core`): climate damage, the Prosperous stamp, prices, and the save contract

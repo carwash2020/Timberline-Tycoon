@@ -341,7 +341,7 @@ return function(t)
 		t.eq(phone.label.TextSize, 20)
 		for _, built in ipairs({ desk, phone }) do
 			local label = built.label
-			t.eq(label.Font, Enum.Font.FredokaOne)
+			t.eq(label.Font, built.theme.Fonts.Title)
 			t.eq(label.TextScaled, false)
 			t.eq(label.TextTruncate, Enum.TextTruncate.None)
 			t.eq(label.TextStrokeTransparency, 1)

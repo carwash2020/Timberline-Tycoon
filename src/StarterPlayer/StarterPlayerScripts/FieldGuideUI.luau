@@ -225,12 +225,12 @@ function FieldGuideUI.Start()
 	-- small icon clear of the Roblox menu.
 	local icon = Instance.new("Frame")
 	icon.Name = "Page"
-	icon.AnchorPoint = Vector2.new(0.5, 0.5)
-	icon.Position = UDim2.fromScale(0.5, 0.46)
-	icon.Size = UDim2.fromOffset(16, 18)
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position = UDim2.new(0, 8, 0.5, 0)
+	icon.Size = UDim2.fromOffset(16, 20)
 	icon.BackgroundColor3 = UITheme.Colors.Cream
 	icon.BorderSizePixel = 0
-	icon.Visible = false
+	icon.Visible = true
 	icon.ZIndex = 2
 	UITheme.corner(icon, 2)
 	local spine = Instance.new("Frame")
@@ -240,17 +240,29 @@ function FieldGuideUI.Start()
 	spine.BorderSizePixel = 0
 	spine.ZIndex = 2
 	spine.Parent = icon
+	local rule = Instance.new("Frame")
+	rule.Name = "Rule"
+	rule.Position = UDim2.fromOffset(5, 6)
+	rule.Size = UDim2.fromOffset(8, 2)
+	rule.BackgroundColor3 = UITheme.Colors.Amber
+	rule.BorderSizePixel = 0
+	rule.ZIndex = 2
+	rule.Parent = icon
 	icon.Parent = b.face
 	local function layout()
 		local compact = UITheme.Compact()
-		icon.Visible = compact
+		local pad = b.face:FindFirstChildOfClass("UIPadding")
+		if pad then
+			pad.PaddingLeft = UDim.new(0, 28)
+		end
 		if compact then
-			b:SetText("")
-			b.root.Size = UDim2.fromOffset(40, 43)
+			-- Book icon plus a short label. The words stay, so it is not an empty square.
+			b:SetText("GUIDE")
+			b.root.Size = UDim2.fromOffset(108, UITheme.Size.Tap)
 		else
 			local face = UITheme.Sized("FieldGuide").size or Vector2.new(130, 34)
 			b:SetText("FIELD GUIDE")
-			b.root.Size = UDim2.fromOffset(face.X, face.Y + 3)
+			b.root.Size = UDim2.fromOffset(face.X + 8, face.Y + 3)
 		end
 	end
 	layout()

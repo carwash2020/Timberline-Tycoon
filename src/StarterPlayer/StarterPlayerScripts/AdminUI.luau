@@ -302,7 +302,7 @@ local function paintStatus()
 	local label = statusLabel
 	if label then
 		label.Text = if statusText ~= "" then statusText else currentTab().hint
-		label.TextColor3 = if statusOk == true then C.Money elseif statusOk == false then C.Danger else C.Ink
+		label.TextColor3 = if statusOk == true then C.Money elseif statusOk == false then C.DangerText else C.Cream
 	end
 	local picked = pickedLabel
 	if picked then
@@ -325,9 +325,9 @@ local function paintWho()
 		strip.BackgroundColor3 = if access.tester
 			then C.Danger
 			elseif access.role == "delegate" then C.Bark
-			else C.PaperDark
+			else C.PanelAlt
 		if label then
-			label.TextColor3 = if access.role == "delegate" then C.Cream else C.Ink
+			label.TextColor3 = C.Cream
 		end
 	end
 end
@@ -489,7 +489,7 @@ local function container(height: number?): Frame
 end
 
 local function hintLabel(parent: Instance, text: string): TextLabel
-	local h = UITheme.label(parent, text, UITheme.Fonts.Body, Hub.HintSize(device()), C.Bark)
+	local h = UITheme.label(parent, text, UITheme.Fonts.Body, Hub.HintSize(device()), C.Muted)
 	h.Size = UDim2.fromScale(1, 0)
 	h.AutomaticSize = Enum.AutomaticSize.Y
 	h.TextWrapped = true
@@ -500,7 +500,7 @@ end
 local function section(text: string, hint: string?)
 	local f = container(nil)
 	UITheme.list(f, 2)
-	local t = UITheme.label(f, text, UITheme.Fonts.Heading, 17, C.Ink)
+	local t = UITheme.label(f, text, UITheme.Fonts.Heading, 17, C.Cream)
 	t.Size = UDim2.new(1, 0, 0, 24)
 	t.LayoutOrder = 1
 	if hint then
@@ -542,7 +542,7 @@ local function toolBlock(toolId: string, labelOverride: string?)
 	line.LayoutOrder = 2
 	if why then
 		local reason = hintLabel(f, "Can't yet: " .. why)
-		reason.TextColor3 = C.Danger
+		reason.TextColor3 = C.DangerText
 		reason.LayoutOrder = 3
 	end
 	f.Parent = body
@@ -553,14 +553,14 @@ end
 local function stepper(id: string, caption: string, value: string, onStep: (number) -> ())
 	local f = container(rh())
 	UITheme.list(f, L.Gap, true)
-	local cap = UITheme.label(f, caption, UITheme.Fonts.Black, 15, C.Ink)
+	local cap = UITheme.label(f, caption, UITheme.Fonts.Black, 15, C.Cream)
 	cap.Size = UDim2.new(0, 64, 1, -3)
 	cap.LayoutOrder = 1
 	local left = makeButton(f, id .. "_prev", "‹", "bark", UDim2.fromOffset(L.Chip + 8, rh()), function()
 		onStep(-1)
 	end)
 	left.root.LayoutOrder = 2
-	local v = UITheme.label(f, value, UITheme.Fonts.Heading, 18, C.Ink)
+	local v = UITheme.label(f, value, UITheme.Fonts.Heading, 18, C.Cream)
 	v.Size = UDim2.new(1, -(64 + 2 * (L.Chip + 8) + 3 * L.Gap), 1, -3)
 	v.TextXAlignment = Enum.TextXAlignment.Center
 	v.TextTruncate = Enum.TextTruncate.AtEnd
@@ -628,18 +628,18 @@ local function textBox(id: string, placeholder: string, text: string, onChanged:
 	local box = Instance.new("TextBox")
 	box.Name = id
 	box.Size = UDim2.fromScale(1, 1)
-	box.BackgroundColor3 = C.Cream
+	box.BackgroundColor3 = C.PanelAlt
 	box.BorderSizePixel = 0
 	box.Font = UITheme.Fonts.Body
 	box.TextSize = 16
-	box.TextColor3 = C.Ink
+	box.TextColor3 = C.Cream
 	box.PlaceholderText = placeholder
 	box.PlaceholderColor3 = C.Muted
 	box.Text = text
 	box.ClearTextOnFocus = false
 	box.TextXAlignment = Enum.TextXAlignment.Left
-	UITheme.corner(box, 10)
-	UITheme.stroke(box, C.Bark, 2)
+	UITheme.corner(box, UITheme.Radius)
+	UITheme.stroke(box, C.AmberEdge, UITheme.Stroke)
 	UITheme.padding(box, 0, 10, 0, 10)
 	box.Parent = f
 	register(id, box)
@@ -769,7 +769,7 @@ local function amountSection()
 		if n then "Amount: " .. Util.formatCash(n) else "Not an amount I understand.",
 		UITheme.Fonts.Bold,
 		15,
-		C.Ink
+		C.Cream
 	)
 	label.Size = UDim2.new(1, 0, 0, 22)
 	label.LayoutOrder = nextOrder()
@@ -950,7 +950,7 @@ local function paidDetail(item: PaidItems.Item)
 			.. (if type(row) == "table" and type(row.label) == "string" then row.label else "loading...")
 	)
 	owns.Font = UITheme.Fonts.Bold
-	owns.TextColor3 = if type(row) == "table" and row.owned == true then C.Money else C.Ink
+	owns.TextColor3 = if type(row) == "table" and row.owned == true then C.Money else C.Cream
 	owns.TextSize = 16
 	owns.LayoutOrder = nextOrder()
 	local what = hintLabel(body :: ScrollingFrame, item.description)
@@ -997,7 +997,7 @@ local function paidDetail(item: PaidItems.Item)
 		hintLabel(f, hint).LayoutOrder = 2
 		if why and not armed then
 			local reason = hintLabel(f, "Can't yet: " .. why)
-			reason.TextColor3 = C.Danger
+			reason.TextColor3 = C.DangerText
 			reason.LayoutOrder = 3
 		end
 		f.Parent = body
@@ -1141,7 +1141,8 @@ end
 local function logTab()
 	-- The owner's list: what they did, and what their delegates did.
 	section("LAST ACTIONS", "Newest first. The server also logs each one with both ids in Output.")
-	local audit = UITheme.label(body :: ScrollingFrame, table.concat(state.audit, "\n"), UITheme.Fonts.Body, 14, C.Ink)
+	local audit =
+		UITheme.label(body :: ScrollingFrame, table.concat(state.audit, "\n"), UITheme.Fonts.Body, 14, C.Cream)
 	audit.Size = UDim2.fromScale(1, 0)
 	audit.AutomaticSize = Enum.AutomaticSize.Y
 	audit.TextWrapped = true
@@ -1173,7 +1174,7 @@ local function logTab()
 		for i, line in ipairs(found) do
 			local label = hintLabel(holder, line)
 			label.LayoutOrder = i
-			label.TextColor3 = C.Ink
+			label.TextColor3 = C.Cream
 		end
 	end)
 end
@@ -1192,7 +1193,7 @@ local function delegateRow(i: number, row: { [string]: any })
 		string.format("%s: %s (%s)", tostring(row.name), tostring(row.role), lasts),
 		UITheme.Fonts.Bold,
 		14,
-		C.Ink
+		C.Cream
 	)
 	info.Size = UDim2.new(1, -(130 + L.Gap), 1, -3)
 	info.TextWrapped = true
@@ -1569,10 +1570,9 @@ setOpen = function(on: boolean)
 			stepTab(1)
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, priority, Enum.KeyCode.ButtonR1, Enum.KeyCode.ButtonR2)
-	if UITheme.Device() == "console" then
-		MenuPad.Open(objById[headerRows[2][1] or "close"], p)
-	end
+	end, false, priority, Enum.KeyCode.ButtonR1)
+	-- PLAYERS is the first tab. Selected on every device, so A works at once.
+	MenuPad.Open(objById[headerRows[2][1] or "close"], p)
 end
 
 local function toggle()
@@ -1591,11 +1591,11 @@ local function build()
 	outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	outer.Position = UDim2.fromScale(0.5, 0.5)
 	outer.Size = UDim2.new(1, -16, 1, -16)
-	outer.BackgroundColor3 = C.Paper
+	outer.BackgroundColor3 = C.Panel
 	outer.BorderSizePixel = 0
 	outer.Visible = false
-	UITheme.corner(outer, 14)
-	UITheme.stroke(outer, C.Bark, 3)
+	UITheme.corner(outer, UITheme.Radius)
+	UITheme.stroke(outer, C.AmberEdge, UITheme.Stroke)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(L.PanelMaxW, L.PanelMaxH)
 	limit.Parent = outer
@@ -1615,7 +1615,7 @@ local function build()
 	header.Size = UDim2.new(1, -2 * L.Pad, 0, L.Row)
 	header.Parent = outer
 	UITheme.list(header, L.Gap, true)
-	local title = UITheme.label(header, "OWNER", UITheme.Fonts.Heading, 22, C.Ink)
+	local title = UITheme.label(header, "OWNER", UITheme.Fonts.Heading, 22, C.Cream)
 	title.Size = UDim2.new(0, 104, 1, 0)
 	titleLabel = title
 	title.LayoutOrder = 1
@@ -1627,18 +1627,18 @@ local function build()
 	local search = Instance.new("TextBox")
 	search.Name = "search"
 	search.Size = UDim2.new(1, 0, 0, L.Row)
-	search.BackgroundColor3 = C.Cream
+	search.BackgroundColor3 = C.PanelAlt
 	search.BorderSizePixel = 0
 	search.Font = UITheme.Fonts.Body
 	search.TextSize = 16
-	search.TextColor3 = C.Ink
+	search.TextColor3 = C.Cream
 	search.PlaceholderText = "Find a tool..."
 	search.PlaceholderColor3 = C.Muted
 	search.Text = ""
 	search.ClearTextOnFocus = false
 	search.TextXAlignment = Enum.TextXAlignment.Left
-	UITheme.corner(search, 10)
-	UITheme.stroke(search, C.Bark, 2)
+	UITheme.corner(search, UITheme.Radius)
+	UITheme.stroke(search, C.AmberEdge, UITheme.Stroke)
 	UITheme.padding(search, 0, 10, 0, 10)
 	search.Parent = searchWrap
 	register("search", search)
@@ -1665,13 +1665,13 @@ local function build()
 	who.Name = "Who"
 	who.Position = UDim2.fromOffset(L.Pad, 8 + L.Row + L.Gap)
 	who.Size = UDim2.new(1, -2 * L.Pad, 0, 30)
-	who.BackgroundColor3 = C.PaperDark
+	who.BackgroundColor3 = C.PanelAlt
 	who.BorderSizePixel = 0
-	UITheme.corner(who, 8)
+	UITheme.corner(who, UITheme.Radius)
 	UITheme.padding(who, 0, 10, 0, 10)
 	who.Parent = outer
 	whoStrip = who
-	local whoText = UITheme.label(who, "", UITheme.Fonts.Black, 15, C.Ink)
+	local whoText = UITheme.label(who, "", UITheme.Fonts.Black, 15, C.Cream)
 	whoText.Size = UDim2.fromScale(1, 1)
 	whoText.TextTruncate = Enum.TextTruncate.AtEnd
 	whoLabel = whoText
@@ -1712,15 +1712,15 @@ local function build()
 	footer.AnchorPoint = Vector2.new(0, 1)
 	footer.Position = UDim2.new(0, L.Pad, 1, -8)
 	footer.Size = UDim2.new(1, -2 * L.Pad, 0, 60)
-	footer.BackgroundColor3 = C.PaperDark
+	footer.BackgroundColor3 = C.PanelAlt
 	footer.BorderSizePixel = 0
-	UITheme.corner(footer, 10)
+	UITheme.corner(footer, UITheme.Radius)
 	UITheme.padding(footer, 4, 10, 4, 10)
 	footer.Parent = outer
-	local picked = UITheme.label(footer, "", UITheme.Fonts.Black, 13, C.Bark)
+	local picked = UITheme.label(footer, "", UITheme.Fonts.Black, 13, C.Muted)
 	picked.Size = UDim2.new(1, 0, 0, 16)
 	pickedLabel = picked
-	local status = UITheme.label(footer, "", UITheme.Fonts.Bold, 15, C.Ink)
+	local status = UITheme.label(footer, "", UITheme.Fonts.Bold, 15, C.Cream)
 	status.Position = UDim2.fromOffset(0, 18)
 	status.Size = UDim2.new(1, 0, 1, -18)
 	status.TextWrapped = true
@@ -1826,7 +1826,7 @@ syncHub = function()
 	local title = titleLabel
 	if title then
 		title.Text = if access.role == "delegate" then (if access.tester then "TESTER" else "DELEGATE") else "OWNER"
-		title.TextColor3 = if access.tester then C.Danger else C.Ink
+		title.TextColor3 = if access.tester then C.DangerText else C.Cream
 	end
 	paintWho()
 	if not can then

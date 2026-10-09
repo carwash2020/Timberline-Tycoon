@@ -240,7 +240,7 @@ local function popDelta(delta: number)
 	end
 	local gain = delta > 0
 	local text = (if gain then "+" else "-") .. Util.formatCash(math.abs(delta))
-	local pop = UITheme.label(spot, text, F.Heading, if gain then 24 else 20, if gain then C.Money else C.Ink)
+	local pop = UITheme.label(spot, text, F.Heading, if gain then 24 else 20, if gain then C.Amber else C.Ink)
 	pop.Name = "CashPop"
 	pop.AnchorPoint = Vector2.new(1, 0.5)
 	pop.AutomaticSize = Enum.AutomaticSize.XY
@@ -248,7 +248,7 @@ local function popDelta(delta: number)
 	pop.TextXAlignment = Enum.TextXAlignment.Right
 	local start = UDim2.fromOffset(-4, 0)
 	pop.Position = start
-	local stroke = UITheme.stroke(pop, C.Cream, 2)
+	local stroke = UITheme.stroke(pop, if gain then C.Ink else C.Cream, 2)
 	local rise = TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	TweenService:Create(pop, rise, { Position = start + UDim2.fromOffset(0, if gain then -16 else 16) }):Play()
 	local fade = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.In, 0, false, 0.75)
@@ -559,15 +559,15 @@ local function presentToast(message: string, seconds: number?, id: number?)
 		removeToast(toasts[#toasts])
 	end
 	toastOrder += 1
-	local card = UITheme.Card(C.Paper, C.Ink, 2, 16, true)
+	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true)
 	card.outer.Name = "Toast"
 	card.outer.LayoutOrder = -toastOrder -- newest on top
 	local limit = Instance.new("UISizeConstraint")
 	limit.MinSize = Vector2.new(0, 34)
 	limit.Parent = card.outer
-	local stroke = UITheme.stroke(card.face, C.Bark, 2)
+	local stroke = UITheme.stroke(card.face, C.AmberEdge, UITheme.Stroke)
 	UITheme.padding(card.face, 7, 14, 7, 14)
-	local label = UITheme.label(card.face, "", F.Bold, UITheme.Sized("Toast").text, C.Ink)
+	local label = UITheme.label(card.face, "", F.Bold, UITheme.Sized("Toast").text, C.Cream)
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.TextWrapped = true
@@ -1181,6 +1181,55 @@ local function promptOn(key: Enum.KeyCode): boolean
 	return false
 end
 
+-- A small mark on the left of Saves, Hammer and the truck button. Same
+-- shapes everywhere; the colour is that button's ink so it stays readable
+-- on walnut, green and amber.
+local function sideMark(face: TextButton, name: string)
+	local kind = if name == "Saves"
+		then "saves"
+		elseif name == "Hammer" then "hammer"
+		elseif name == "CallTruck" then "truck"
+		else nil
+	if kind == nil then
+		return
+	end
+	-- paint() has already set the label colour
+	local ink = face.TextColor3
+	local mark = Instance.new("Frame")
+	mark.Name = "Mark"
+	mark.AnchorPoint = Vector2.new(0, 0.5)
+	mark.Position = UDim2.new(0, 8, 0.5, 0)
+	mark.Size = UDim2.fromOffset(18, 18)
+	mark.BackgroundTransparency = 1
+	mark.BorderSizePixel = 0
+	mark.ZIndex = face.ZIndex + 1
+	mark.Active = false
+	local function bit(w: number, h: number, x: number, y: number, rot: number?): Frame
+		local part = Instance.new("Frame")
+		part.Size = UDim2.fromOffset(w, h)
+		part.Position = UDim2.fromOffset(x, y)
+		part.Rotation = rot or 0
+		part.BackgroundColor3 = ink
+		part.BorderSizePixel = 0
+		part.ZIndex = mark.ZIndex
+		part.Parent = mark
+		UITheme.corner(part, 2)
+		return part
+	end
+	if kind == "saves" then
+		bit(14, 10, 2, 4)
+		bit(6, 3, 6, 2)
+	elseif kind == "hammer" then
+		bit(12, 3, 3, 8, -40)
+		bit(7, 5, 10, 2, -40)
+	else
+		bit(14, 6, 2, 8)
+		bit(4, 4, 3, 12)
+		bit(4, 4, 11, 12)
+	end
+	mark.Parent = face
+end
+
 -- A side button's size for the device (UITheme.Sized: on a phone 116 x 44,
 -- a fingertip tall, its label 15 and never under 12; on a gamepad wider,
 -- for the glyph).
@@ -1193,7 +1242,7 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	if device == "console" then
 		width, height = GamepadNavLogic.PadSize(width, height) -- big enough for a stick to land on
 	end
-	side.button.root.Size = UDim2.fromOffset(width, height + 3)
+	side.button.root.Size = UDim2.fromOffset(width, height + UITheme.ButtonDrop)
 	side.button.face.TextSize = spec.text
 	local fit = side.button.face:FindFirstChildOfClass("UITextSizeConstraint")
 	if fit then
@@ -1202,7 +1251,8 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	end
 	local pad = side.button.face:FindFirstChildOfClass("UIPadding")
 	if pad then
-		pad.PaddingLeft = UDim.new(0, if console then 36 else 6)
+		local iconPad = if side.button.face:FindFirstChild("Mark") then 28 else 0
+		pad.PaddingLeft = UDim.new(0, (if console then 36 else 6) + iconPad)
 	end
 	if side.glyph then
 		side.glyph.Visible = console
@@ -1342,6 +1392,7 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	button.root.LayoutOrder = opts.order
 	button.root.AnchorPoint = Vector2.new(1, 1) -- placed by arrangeSide
 	button.root.Visible = false
+	sideMark(button.face, opts.name)
 	if not column then
 		warn(string.format("[HUD] no side column (HUD.Start didn't finish): skipping the %s button", opts.name))
 		return button
@@ -1419,6 +1470,11 @@ local function syncPad()
 end
 
 function HUD.PadShortcut(key: Enum.KeyCode, available: () -> boolean, onPress: () -> ())
+	-- The Daily Goals pill used the up direction. That button is gone; ignore
+	-- the bind so the pill's script can stay until its own lane removes it.
+	if key.Name == "DPadUp" then
+		return
+	end
 	local took = false -- this press's Begin was ours: so is its End
 	local function handle(_name: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 		if state ~= Enum.UserInputState.Begin then
@@ -1605,7 +1661,7 @@ local function buildCash(playerGui: Instance)
 	safeArea = probe
 
 	local border = UITheme.SkinInset("Plaque")
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true, "Plaque")
+	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true, "Plaque")
 	card.outer.Name = "CashPlaque"
 	card.outer.LayoutOrder = 10
 	-- The top-right row (HUD.TopRow): [pops][other buttons][plaque].
@@ -1805,7 +1861,7 @@ local function buildHint(row: Frame)
 	hint.AutomaticSize = Enum.AutomaticSize.X
 	hint.Size = UDim2.fromOffset(0, ROW_HEIGHT)
 	hint.BackgroundColor3 = C.Ink
-	hint.BackgroundTransparency = 0.2
+	hint.BackgroundTransparency = 0 -- solid, so cream stays 4.5:1 on grass and sky
 	hint.TextXAlignment = Enum.TextXAlignment.Center
 	hint.TextTruncate = Enum.TextTruncate.AtEnd
 	UITheme.corner(hint, ROW_HEIGHT / 2)

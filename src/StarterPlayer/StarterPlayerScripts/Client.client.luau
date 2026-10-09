@@ -58,6 +58,7 @@ local MODULES = {
 	"MenuPad",
 	"MiningUI",
 	"NPCController",
+	"NewsUI",
 	"PlotPickerUI",
 	"PlotUI",
 	"PromptSwitch",
@@ -271,12 +272,9 @@ local controllers: { { name: string, get: () -> any } } = {
 			return require(script.Parent.FerryController)
 		end,
 	},
-	{
-		name = "DailyUI",
-		get = function()
-			return require(script.Parent.DailyUI)
-		end,
-	},
+	-- DailyUI stays in MODULES (the file is waited for) but is not started.
+	-- Start calls UITheme.Sized("DailyButton"), and that size is gone, so
+	-- starting it warned in Output. Lane E (Foreman) replaces this module.
 	{
 		name = "DialogueUI",
 		get = function()
@@ -431,6 +429,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "QualityPickerUI", -- the join screen: Lower or Higher quality, once per account
 		get = function()
 			return require(script.Parent.QualityPickerUI)
+		end,
+	},
+	{
+		name = "NewsUI",
+		get = function()
+			return require(script.Parent.NewsUI)
 		end,
 	},
 	{
