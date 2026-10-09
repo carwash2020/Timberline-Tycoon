@@ -391,15 +391,24 @@ end
 -- (BeltService passes 0 while a belt is off; the default is the sawmill's
 -- ConveyorSpeed). A ghost has nothing to push. Safe to call every poll;
 -- placement can turn the machine, and the velocity is in world space.
+-- A negative speed runs the belt backwards (Lane W reverse). A Switch
+-- Belt's cross bands (attribute Cross) run toward the model's Side (+1 is
+-- +X as built, -1 is -X), and the diverter turns to match.
 function MachineArt.AimBelt(model: Model, speed: number?)
 	local v = if speed == nil then GameConfig.ConveyorSpeed else speed
+	local sideAttr = model:GetAttribute("Side")
+	local side = if sideAttr == -1 then -1 else 1
 	for _, d in ipairs(model:GetDescendants()) do
 		if d.Name == "Conveyor" and d:IsA("BasePart") and d.CanCollide then
 			local look = d.CFrame.LookVector
 			if look.Magnitude >= 1e-4 then
-				d.AssemblyLinearVelocity = look.Unit * v
+				local sign = if d:GetAttribute("Cross") == true then side else 1
+				d.AssemblyLinearVelocity = look.Unit * (v * sign)
 			end
 		end
+	end
+	if model:GetAttribute("BeltShape") == "switch" and model:GetAttribute("GateSide") ~= side then
+		MachineArt.SetSwitchSide(model, side)
 	end
 end
 
@@ -1233,6 +1242,417 @@ end
 -- the only other parts. `ghost` is the placement preview.
 local BELT_WOOD = Kit.hex("#6B5B45")
 
+-- TLD-1 line deck (reference LINE-STANDARD.md): a 6.0 wide concrete plate,
+-- a 5.0 channel between steel rails (top 1.32), a dark pan, rollers 0.44
+-- across at 1.0 pitch (the first 0.5 from each port face), deck top 0.72,
+-- brass collars on the rail ends. The Conveyor is the invisible collider
+-- whose top face is the deck top. Colours from the GAD Lane W notes.
+local TLD = {
+	plate = Kit.hex("#B3ABA0"),
+	rail = Kit.hex("#2B2B2E"),
+	cap = Kit.hex("#3E4148"),
+	roller = Kit.hex("#C9CED3"),
+	pan = Kit.hex("#2A2420"),
+	brass = Kit.hex("#C9A24A"),
+	timber = Kit.hex("#7A5230"),
+	cream = Kit.hex("#F3E7C9"),
+	iron = Kit.hex("#2B2B2E"),
+}
+MachineArt.LineColors = TLD
+
+local DECK_TOP = AutomationLogic.DeckTop
+local PLATE_W = AutomationLogic.PlateWidth
+local CHANNEL = AutomationLogic.Channel
+local RAIL_X = CHANNEL / 2 + 0.2 -- 2.7, the rail centre
+local RAIL_TOP = 1.32
+local PLATE_T = 0.16
+
+type DeckOptions = {
+	rails: boolean?, -- false leaves the rails off (the Switch Belt's cross run has its own)
+	alongX: boolean?, -- rollers and the run go along X instead of Z
+	cross: boolean?, -- the collider follows the model's Side (Switch Belt)
+	width: number?, -- plate width across the run (default 6.0)
+	rollers: boolean?, -- false leaves the rollers off (a short flat lip)
+	collars: { number }?, -- which ends get brass port collars (-1, 1); default both
+	-- A pitched run's tan(pitch). Each part slides along the run so its own
+	-- centre line meets the vertical seams with the flat lips (not only the
+	-- deck top), and grows by height * shear so no corner leaves a notch.
+	shear: number?,
+}
+
+-- One straight run of deck, `length` along the frame's +Z (or +X with
+-- alongX), its ground centre at `frame`.
+local function deck(model: Model, frame: CFrame, length: number, preview: boolean, opts: DeckOptions?)
+	local o: DeckOptions = opts or ({} :: DeckOptions)
+	local alongX = o.alongX == true
+	local plateW = o.width or PLATE_W
+	local function sized(across: number, height: number, along: number): Vector3
+		return if alongX then Vector3.new(along, height, across) else Vector3.new(across, height, along)
+	end
+	local shear = if alongX then 0 else (o.shear or 0)
+	local function at(across: number, y: number, along: number): CFrame
+		local a = along + (y - DECK_TOP) * shear
+		return frame * (if alongX then CFrame.new(a, y, across) else CFrame.new(across, y, a))
+	end
+	local function len(height: number): number
+		return length + height * shear
+	end
+	local plate = part(
+		model,
+		"Plate",
+		sized(plateW, PLATE_T, len(PLATE_T)),
+		-- (Pitched, the plate rides 0.05 up so its low corner stays above ground.)
+		at(0, PLATE_T / 2 + (if shear ~= 0 then 0.05 else 0), 0),
+		TLD.plate,
+		Enum.Material.Concrete,
+		preview,
+		true
+	)
+	if not preview then
+		touchless(plate)
+	end
+	local pan =
+		part(model, "Pan", sized(CHANNEL, 0.1, len(0.1)), at(0, 0.33, 0), TLD.pan, Enum.Material.Metal, preview, false)
+	pan.CastShadow = false
+	local n = if o.rollers == false then 0 else math.max(1, math.floor(length / AutomationLogic.RollerPitch + 1e-6))
+	for i = 0, n - 1 do
+		local along = -length / 2 + 0.5 + i * AutomationLogic.RollerPitch
+		local cf = at(0, 0.5, along) * (if alongX then CFrame.Angles(0, math.pi / 2, 0) else CFrame.identity)
+		local roller = Kit.cylinder(model, "Roller", 4.9, 0.44, cf, TLD.roller, Enum.Material.Metal)
+		roller.CanCollide = false
+		roller.CanQuery = false
+		roller.CanTouch = false
+		roller.CastShadow = false
+		if preview then
+			roller.Transparency = 0.45
+		end
+	end
+	if o.rails ~= false then
+		for _, sideX in ipairs({ -1, 1 }) do
+			local r = part(
+				model,
+				"GuardRail",
+				sized(0.4, RAIL_TOP - PLATE_T, len(RAIL_TOP - PLATE_T)),
+				at(sideX * RAIL_X, (RAIL_TOP + PLATE_T) / 2, 0),
+				TLD.rail,
+				Enum.Material.Metal,
+				preview,
+				true
+			)
+			if not preview then
+				touchless(r)
+			end
+			local cap = part(
+				model,
+				"RailCap",
+				sized(0.44, 0.06, len(0.06)),
+				at(sideX * RAIL_X, RAIL_TOP + 0.03, 0),
+				TLD.cap,
+				Enum.Material.Metal,
+				preview,
+				false
+			)
+			cap.CastShadow = false
+			local collarEnds: { number } = o.collars or { -1, 1 }
+			for _, endZ: number in ipairs(collarEnds) do
+				local collar = part(
+					model,
+					"PortCollar",
+					sized(0.48, RAIL_TOP - PLATE_T + 0.04, 0.06),
+					at(sideX * RAIL_X, (RAIL_TOP + PLATE_T) / 2, endZ * (length / 2 - 0.03)),
+					TLD.brass,
+					Enum.Material.Metal,
+					preview,
+					false
+				)
+				collar.CastShadow = false
+			end
+		end
+	end
+	-- The collider: top face on the deck top, flush to both port faces.
+	local band = part(
+		model,
+		"Conveyor",
+		Vector3.new(CHANNEL, 0.32, len(0.32)),
+		at(0, DECK_TOP - 0.16, 0) * CFrame.Angles(0, if alongX then -math.pi / 2 else math.pi, 0),
+		BELT,
+		Enum.Material.Metal,
+		preview,
+		true
+	)
+	band.Transparency = 1
+	if o.cross then
+		band:SetAttribute("Cross", true)
+	end
+	if not preview then
+		inGroup(band, BELT_GROUP)
+	end
+	return band
+end
+
+-- Turns the Switch Belt's brass diverter to throw wood toward `side`
+-- (+1 is +X). Flip mirrors it; there is no second texture.
+function MachineArt.SetSwitchSide(model: Model, side: number)
+	local gate = model:FindFirstChild("Gate")
+	local root = model.PrimaryPart
+	if not gate or not gate:IsA("BasePart") or not root then
+		return
+	end
+	local s = if side == -1 then -1 else 1
+	-- Hinge at the back rail; the paddle runs back toward the infeed on the
+	-- side it throws away from, at 45 degrees.
+	local hinge = CFrame.new(0, DECK_TOP + 0.5, 3.35)
+	local yaw = s * math.rad(45)
+	local local_ = hinge * CFrame.Angles(0, yaw, 0) * CFrame.new(0, 0, -1.4)
+	gate.CFrame = root.CFrame * CFrame.new(0, -0.1, 0) * local_
+	model:SetAttribute("GateSide", s)
+end
+
+-- The Lane W line pieces (TLD-1 footprints): Switch Belt 12 x 8, Tilted
+-- Belt 6 x 8 rising 2.0, Belt Support 6 x 2, Wood Detector 8 x 4.
+local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: boolean)
+	local origin = CFrame.new(0, 0, 0)
+	if def.shape == "switch" then
+		-- Entry run on -Z (z -4 to -1.5), then the cross run (x -6 to 6,
+		-- z -1.5 to 3.5) that carries wood out of whichever side is set.
+		deck(model, origin * CFrame.new(0, 0, -2.75), 2.5, preview)
+		local crossFrame = origin * CFrame.new(0, 0, 1.0)
+		local left =
+			deck(model, crossFrame * CFrame.new(-3, 0, 0), 6, preview, { rails = false, alongX = true, cross = true })
+		local right =
+			deck(model, crossFrame * CFrame.new(3, 0, 0), 6, preview, { rails = false, alongX = true, cross = true })
+		left.Name = "Conveyor"
+		right.Name = "Conveyor"
+		-- A strip of plate behind the cross run, under the back rail.
+		part(
+			model,
+			"Plate",
+			Vector3.new(12, PLATE_T, 0.5),
+			CFrame.new(0, PLATE_T / 2, 3.75),
+			TLD.plate,
+			Enum.Material.Concrete,
+			preview,
+			false
+		)
+		-- Back rail full width; front rails from the channel out to each side.
+		local back = part(
+			model,
+			"GuardRail",
+			Vector3.new(12, RAIL_TOP - PLATE_T, 0.4),
+			CFrame.new(0, (RAIL_TOP + PLATE_T) / 2, 3.7),
+			TLD.rail,
+			Enum.Material.Metal,
+			preview,
+			true
+		)
+		if not preview then
+			touchless(back)
+		end
+		for _, sx in ipairs({ -1, 1 }) do
+			local front = part(
+				model,
+				"GuardRail",
+				Vector3.new(3.1, RAIL_TOP - PLATE_T, 0.4),
+				CFrame.new(sx * 4.45, (RAIL_TOP + PLATE_T) / 2, -1.7),
+				TLD.rail,
+				Enum.Material.Metal,
+				preview,
+				true
+			)
+			if not preview then
+				touchless(front)
+			end
+		end
+		local gate = part(
+			model,
+			"Gate",
+			Vector3.new(0.14, 1.0, 2.8),
+			CFrame.new(),
+			TLD.brass,
+			Enum.Material.Metal,
+			preview,
+			false
+		)
+		gate.CastShadow = true
+		MachineArt.SetSwitchSide(model, 1)
+	elseif def.shape == "tilted" then
+		-- A flat lip at each port face (deck top 0.72 at the low end, 0.72 +
+		-- rise at the high end, vertical end faces flush with the footprint)
+		-- and the pitched run between them. A pitched run alone would poke
+		-- its end faces past the footprint into the next belt.
+		local rise = def.rise or AutomationLogic.Lift
+		local run = def.depth
+		local lip = AutomationLogic.TiltLip
+		local slopeRun = run - 2 * lip
+		local theta = math.atan2(rise, slopeRun)
+		local up = Vector3.new(0, math.cos(theta), -math.sin(theta))
+		local forward = Vector3.new(0, math.sin(theta), math.cos(theta))
+		local mid = (DECK_TOP + DECK_TOP + rise) / 2
+		local pos = Vector3.new(0, mid, 0) - up * DECK_TOP
+		local frame = CFrame.fromMatrix(pos, Vector3.new(1, 0, 0), up, forward)
+		deck(model, frame, slopeRun / math.cos(theta), preview, { collars = {}, shear = math.tan(theta) })
+		local low = origin * CFrame.new(0, 0, -run / 2 + lip / 2)
+		local high = origin * CFrame.new(0, rise, run / 2 - lip / 2)
+		deck(model, low, lip, preview, { rollers = false, collars = { -1 } })
+		deck(model, high, lip, preview, { rollers = false, collars = { 1 } })
+		-- An iron rail clamp over each seam where the pitched rails meet the
+		-- lips' rails, so the joint reads as one rail with no lip or step.
+		for _, seam in ipairs({ { z = -slopeRun / 2, y = 0 }, { z = slopeRun / 2, y = rise } }) do
+			for _, sx in ipairs({ -1, 1 }) do
+				local clamp = part(
+					model,
+					"RailClamp",
+					Vector3.new(0.52, RAIL_TOP - PLATE_T + 0.22, 0.3),
+					CFrame.new(sx * RAIL_X, seam.y + (RAIL_TOP + PLATE_T) / 2 + 0.03, seam.z),
+					TLD.cap,
+					Enum.Material.Metal,
+					preview,
+					false
+				)
+				clamp.CastShadow = false
+			end
+		end
+		-- Trestle: timber posts under the plate, the high lip and the middle.
+		for _, z in ipairs({ 0, run / 2 - lip / 2 }) do
+			-- The pitched plate's underside at z (it runs through `pos`).
+			-- (The post reaches the high edge of its top, so it never shows a gap.)
+			-- (+ the pitched plate's 0.05 lift, measured upright.)
+			local bottom = if z == 0 then pos.Y - math.tan(theta) * (pos.Z - 0.25) + 0.05 / math.cos(theta) else rise
+			if bottom > 0.2 then
+				for _, sx in ipairs({ -1, 1 }) do
+					lookPart(
+						model,
+						"Leg",
+						Vector3.new(0.5, bottom, 0.5),
+						CFrame.new(sx * 2.6, bottom / 2, z),
+						TLD.timber,
+						Enum.Material.Wood,
+						preview
+					)
+				end
+			end
+		end
+	elseif def.shape == "support" then
+		local lift = AutomationLogic.Lift
+		for _, sx in ipairs({ -1, 1 }) do
+			local post = part(
+				model,
+				"Post",
+				Vector3.new(0.6, lift - 0.2, 0.6),
+				CFrame.new(sx * 2.6, (lift - 0.2) / 2, 0),
+				TLD.timber,
+				Enum.Material.Wood,
+				preview,
+				true
+			)
+			if not preview then
+				touchless(post)
+			end
+		end
+		part(
+			model,
+			"Saddle",
+			Vector3.new(PLATE_W, 0.2, 1.06),
+			CFrame.new(0, lift - 0.1, 0),
+			TLD.iron,
+			Enum.Material.Metal,
+			preview,
+			false
+		)
+		local brace = part(
+			model,
+			"Brace",
+			Vector3.new(0.18, 0.18, 1.0),
+			CFrame.new(0, 0, 0),
+			TLD.iron,
+			Enum.Material.Metal,
+			preview,
+			false
+		)
+		local len = math.sqrt(5.2 * 5.2 + 1.4 * 1.4)
+		brace.Size = Vector3.new(len, 0.18, 0.18)
+		brace.CFrame = CFrame.new(0, 1.0, 0) * CFrame.Angles(0, 0, math.atan2(1.4, 5.2))
+	elseif def.shape == "detector" then
+		deck(model, origin, def.depth, preview)
+		-- The arch: iron legs outside the plate, a beam with a brass rim and
+		-- a SignCream face, a small brass filter pip, a lamp under the beam.
+		for _, sx in ipairs({ -1, 1 }) do
+			part(
+				model,
+				"ArchLeg",
+				Vector3.new(0.5, 7.9, 0.6),
+				CFrame.new(sx * 3.55, 3.95, 0),
+				TLD.iron,
+				Enum.Material.Metal,
+				preview,
+				true
+			)
+		end
+		part(
+			model,
+			"ArchBeam",
+			Vector3.new(7.6, 0.55, 0.7),
+			CFrame.new(0, 8.15, 0),
+			TLD.iron,
+			Enum.Material.Metal,
+			preview,
+			true
+		)
+		part(
+			model,
+			"ArchRim",
+			Vector3.new(3.3, 1.5, 0.08),
+			CFrame.new(0, 8.15, -0.39),
+			TLD.brass,
+			Enum.Material.Metal,
+			preview,
+			false
+		)
+		part(
+			model,
+			"Face",
+			Vector3.new(3.0, 1.2, 0.06),
+			CFrame.new(0, 8.15, -0.45),
+			TLD.cream,
+			Enum.Material.SmoothPlastic,
+			preview,
+			false
+		)
+		part(
+			model,
+			"FilterPip",
+			Vector3.new(0.3, 0.3, 0.06),
+			CFrame.new(1.15, 8.15, -0.5),
+			TLD.brass,
+			Enum.Material.Metal,
+			preview,
+			false
+		)
+		part(
+			model,
+			"Lamp",
+			Vector3.new(0.42, 0.3, 0.42),
+			CFrame.new(0, 7.73, 0),
+			TLD.iron,
+			Enum.Material.SmoothPlastic,
+			preview,
+			false
+		)
+		-- Where the detector looks: over the deck, inside the arch.
+		local eye = part(
+			model,
+			"Eye",
+			Vector3.new(CHANNEL, 5, def.depth - 0.4),
+			CFrame.new(0, DECK_TOP + 2.5, 0),
+			TLD.cream,
+			Enum.Material.SmoothPlastic,
+			preview,
+			false
+		)
+		eye.Transparency = 1
+	end
+end
+
 function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
 	local machine, def = AutomationLogic.Get(beltId)
 	if not machine or not def then
@@ -1286,7 +1706,10 @@ function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
 	end
 	local FRONT = math.pi -- LookVector +Z (see MachineArt.Build)
 	local RIGHT = -math.pi / 2 -- LookVector +X
-	if def.shape == "straight" then
+	local line = def.shape == "switch" or def.shape == "tilted" or def.shape == "support" or def.shape == "detector"
+	if line then
+		buildLinePiece(model, def, preview)
+	elseif def.shape == "straight" then
 		local bw = w - 1.0
 		band("Conveyor", Vector3.new(bw, beltH, d - 0.2), Vector3.new(0, beltY, 0), FRONT)
 		for _, side in ipairs({ -1, 1 }) do

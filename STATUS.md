@@ -28,6 +28,19 @@ Part-built axe, temper and shelf pictures are not in this PR. Connor rejected th
 Awaiting Connor: the Hermit's Maul is part-built and needs a Blender mesh. The hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and cash prices are unchanged.
 
 Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+## Lane W: practical automation (8 October 2026, branch `phase-2/v1-w-automation`)
+
+Not on main. Wires from #123 now drive belts and machines. Every belt, sawmill, planer and the new line pieces register `LogicService.RegisterTarget(uid, {power, reverse})`. Ports: belts 1 power, 2 reverse; Switch Belt 1 side, 2 power, 3 reverse; sawmill and planer 1 power. An unwired port keeps the old behaviour, so old plots run as before (no new attributes, no new saved fields). Power off mid-cut pauses the log where it is and the clock resumes with power. Reverse is an owner-only prompt saved as `item.reversed = true`; Switch Belt flip is `item.flip = true`. New pieces: Switch Belt, Tilted Belt (rise 2.0), Belt Support (saddle 2.0), Wood Detector (belt-shaped wire source with a wood filter, saved in `plot.logic[uid].filter`, index pinned to WoodData order), Wood Sweeper (a pulse pushes up to 10 loose plot pieces off the belt), Laser Emitter and Receiver (only wood breaks the beam; `MaxLaserPairs` 8 per plot). Part builds per TLD-1; the uploaded TLD-1 meshes are wired in job 15. Previews: `previews/v1-w/`.
+
+**Awaiting Connor**
+
+- Prices (all PROPOSALS): Switch Belt $150, Tilted Belt $120, Belt Support $40, Wood Detector $200, Wood Sweeper $450, Laser Emitter $380, Laser Receiver $220.
+- The line pieces are sold at Sparkworks (with the sweeper and lasers). Lane F task 16 stocks the Sparkworks counter; until then they show in the Sparkworks list only.
+- `MaxLaserPairs` 8 per plot (proposal).
+- Flip on a Switch Belt is a world prompt (Open key), not a placer key: the placer's Q is Cancel. A placer flip key is a cross-lane request.
+
+Studio checks: PHASE2_NOTES.md, "Lane W: practical automation".
+
 ## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
 
 Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the best wood the player can already reach (`MINING.md`). The Lux Pickaxe is not for sale. `profile.mining` is account-wide, like the pick level.

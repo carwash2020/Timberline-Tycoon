@@ -6,6 +6,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local EventData = require(ReplicatedStorage.Shared.EventData)
@@ -47,6 +48,10 @@ export type PlacedItem = {
 	-- A placed sawmill's cut, in timber units (V2_PLAN.md §7). Other items
 	-- leave it unset.
 	data: { x: number, y: number }?,
+	-- Lane W also saves `reversed = true` on a belt the owner set to run
+	-- backwards and `flip = true` on a mirrored Switch Belt (cleanPlot keeps
+	-- only those). Missing means forward and as built, as in every old save.
+	-- They are left off this type so it stays equal to PlotLogic.Placed.
 }
 
 -- A wire from a switch to a lamp or door, by placed-item uid (WireLogic).
@@ -698,6 +703,14 @@ local function cleanPlot(plot: any)
 			end
 			if item.wood ~= nil and (type(item.wood) ~= "string" or WoodData.Get(item.wood) == nil) then
 				item.wood = nil
+			end
+			-- Lane W: only `true` is saved, and only on a piece that has it.
+			local beltId = item.blueprintId
+			if item.reversed ~= true or not AutomationLogic.CanReverse(beltId) then
+				item.reversed = nil
+			end
+			if item.flip ~= true or not AutomationLogic.CanFlip(beltId) then
+				item.flip = nil
 			end
 			local bp = if type(item.blueprintId) == "string" then PlotData.Blueprint(item.blueprintId) else nil
 			-- Paint is a palette id on a kit piece; anything else (an old save has

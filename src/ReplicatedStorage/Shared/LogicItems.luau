@@ -367,6 +367,65 @@ local items: { Item } = {
 		},
 		note = "A floor door that opens while it is on",
 	},
+	-- Lane W practical automation (GAD 8 Oct: belt family, no new colours).
+	-- Prices are PROPOSALS until Connor confirms them. Mesh slot 0 until the
+	-- TLD-1 meshes are wired (job 15); this is the part build.
+	{
+		id = "WoodSweeper",
+		displayName = "Wood Sweeper",
+		category = "Decor",
+		priceCash = 450, -- PROPOSAL
+		gated = true,
+		tier = 1,
+		footprint = V2(2, 2),
+		-- Box 3 is the timber arm, box 4 the iron head and box 5 the iron push
+		-- rod. Both bars are parked upright, like a crossing gate; on a pulse
+		-- LogicService drops the arm to lie along the belt and swings the rod
+		-- level, from the post across to the arm (AutomationLogic.SweepPose
+		-- and SweepRodPose), then back up.
+		boxes = {
+			{ size = V3(1.6, 0.3, 1.6), offset = V3(0, 0.15, 0), color = "#2B2B2E", material = "Metal" },
+			{ size = V3(0.5, 1.75, 0.5), offset = V3(0, 1.17, 0), color = "#2B2B2E", material = "Metal" },
+			{ size = V3(0.32, 6.0, 0.3), offset = V3(0, 4.97, 0), color = "#7A5230", material = "Wood" },
+			{ size = V3(0.62, 0.5, 0.9), offset = V3(0, 8.12, 0), color = "#2B2B2E", material = "Metal" },
+			{ size = V3(0.18, 1.9, 0.18), offset = V3(0, 2.995, -0.25), color = "#2B2B2E", material = "Metal" },
+		},
+		note = "Stand it beside a belt. A wire pulse sweeps the wood off",
+	},
+	{
+		id = "LaserEmitter",
+		displayName = "Laser Emitter",
+		category = "Decor",
+		priceCash = 380, -- PROPOSAL
+		gated = true,
+		tier = 1,
+		footprint = V2(2, 2),
+		-- Box 4 is the lens on local +Z. The beam is drawn by LogicService.
+		boxes = {
+			{ size = V3(1.1, 0.2, 1.1), offset = V3(0, 0.1, 0), color = "#7A5230", material = "Wood" },
+			{ size = V3(0.3, 1.6, 0.3), offset = V3(0, 1.0, 0), color = "#2B2B2E", material = "Metal" },
+			{ size = V3(0.9, 0.7, 1.1), offset = V3(0, 1.92, 0.05), color = BRASS, material = "Metal" },
+			{ size = V3(0.46, 0.46, 0.1), offset = V3(0, 1.92, 0.65), color = "#2B2B2E", material = "Glass" },
+		},
+		note = "Aim it at a receiver. On while wood breaks the beam",
+	},
+	{
+		id = "LaserReceiver",
+		displayName = "Laser Receiver",
+		category = "Decor",
+		priceCash = 220, -- PROPOSAL
+		gated = true,
+		tier = 1,
+		footprint = V2(2, 2),
+		-- Box 4 is the dish on local -Z, facing the emitter.
+		boxes = {
+			{ size = V3(1.1, 0.2, 1.1), offset = V3(0, 0.1, 0), color = "#7A5230", material = "Wood" },
+			{ size = V3(0.3, 1.6, 0.3), offset = V3(0, 1.0, 0), color = "#2B2B2E", material = "Metal" },
+			{ size = V3(0.9, 0.8, 0.9), offset = V3(0, 1.92, 0), color = BRASS, material = "Metal" },
+			{ size = V3(0.7, 0.7, 0.12), offset = V3(0, 1.92, -0.52), color = "#2B2B2E", material = "Metal" },
+		},
+		note = "Faces a Laser Emitter up to 40 studs away",
+	},
 }
 
 -- Lane K ships one MeshTemplates model per piece id. The named slots are

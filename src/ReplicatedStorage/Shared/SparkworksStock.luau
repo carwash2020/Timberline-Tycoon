@@ -30,6 +30,9 @@ local ORDER: { { id: string, blurb: string } } = {
 	{ id = "SparkLamp", blurb = "Lit until you wire it, then it follows the wire." },
 	{ id = "GlowWire", blurb = "A wire that lights while its input is on." },
 	{ id = "Hatch", blurb = "A floor door that opens while it is on." },
+	{ id = "WoodSweeper", blurb = "Sweeps wood off the belt beside it when its wire pulses." },
+	{ id = "LaserEmitter", blurb = "On while wood breaks its beam. Aim it at a receiver." },
+	{ id = "LaserReceiver", blurb = "Catches a Laser Emitter's beam, up to 40 studs away." },
 }
 
 local byId: { [string]: any } = {}
