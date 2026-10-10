@@ -1902,7 +1902,10 @@ return function(t)
 		for _, spot in ipairs(IsleArt.CloudSpots(WorldPlan.IslesFromRoot(sky), sky.trunkHeight, 99, sky.main.dir)) do
 			-- Ring map: half its size plus 20 from a wall (it was its size plus 100). The
 			-- Lumen isles stand at (680, 280), nearer the east wall than the old sky.
-			t.ok(insideBy((CFrame.new(sky.root) * spot.cframe).Position, spot.size / 2 + 20), "a cloud bank near a wall")
+			t.ok(
+				insideBy((CFrame.new(sky.root) * spot.cframe).Position, spot.size / 2 + 20),
+				"a cloud bank near a wall"
+			)
 		end
 		-- The pieces inside the walls are under the ground (above); the rides
 		-- pass over them with room to spare.
@@ -2371,7 +2374,10 @@ return function(t)
 				-- Ring map: the Skyroot Road's far half runs out along the beach to the
 				-- isles' coast (scenery keeps off the sand), so 40% for it (it was 80%).
 				local want = if name == "SkyrootRoad" then 0.4 else 0.8
-				t.ok(near / checked >= want, string.format("%s: %d of %d points have scenery near", name, near, checked))
+				t.ok(
+					near / checked >= want,
+					string.format("%s: %d of %d points have scenery near", name, near, checked)
+				)
 			end
 		end
 	end)
