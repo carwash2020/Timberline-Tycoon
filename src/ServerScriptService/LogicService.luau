@@ -34,6 +34,7 @@ local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local LogicGraph = require(ReplicatedStorage.Shared.LogicGraph)
+local MachineSkin = require(ReplicatedStorage.Shared.Art.MachineSkin)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
@@ -244,6 +245,11 @@ end
 local function tip(model: Model, blueprintId: string, on: boolean)
 	local moving = named(model, "Moving")
 	local base = named(model, "Root")
+	if moving and base and MachineSkin.PoseAbout(model, moving, on) then
+		-- A Blender lever or switch bat swings about its own hinge.
+		model:SetAttribute("On", on)
+		return
+	end
 	if moving and base then
 		moving.CFrame = base.CFrame * restOf(moving, base) * CFrame.Angles(0, 0, if on then -TIP else TIP)
 		model:SetAttribute("On", on)
@@ -304,7 +310,12 @@ end
 local function poseHatch(model: Model, open: boolean)
 	local moving = named(model, "Moving")
 	local root = named(model, "Root")
-	if moving and root then
+	local hinged = moving ~= nil and MachineSkin.Hinged(moving)
+	if hinged and moving then
+		-- A Blender leaf swings about its hinge; the box leaf below is the
+		-- collider and follows it.
+		MachineSkin.PoseAbout(model, moving, open)
+	elseif moving and root then
 		local shut = root.CFrame * restOf(moving, root)
 		if open then
 			local half = moving.Size.Z / 2
@@ -440,6 +451,13 @@ end
 local function poseSweeper(model: Model, down: boolean)
 	local root = named(model, "Root")
 	if not root then
+		return
+	end
+	local arm = named(model, "Moving")
+	if arm and MachineSkin.Hinged(arm) then
+		-- The Blender sweeper's boom swings about its post.
+		MachineSkin.PoseAbout(model, arm, down)
+		model:SetAttribute("Swept", down)
 		return
 	end
 	for _, name in ipairs({ "Part3", "Part4" }) do

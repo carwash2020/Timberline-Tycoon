@@ -1176,6 +1176,20 @@ return function(t)
 		local court = BuildingArt.SkyForgeCourt()
 		t.ok(find(court, "Anvil"):FindFirstChild("TemperSpot"), "TemperSpot")
 		t.ok(find(court, "OrderBoard"):FindFirstChild("OrderBoard"), "OrderBoard gui")
+		-- The court's name board: text SKY FORGE on the -Z face only (the open side), on the back wall.
+		local nameBoard = find(court, "Sign")
+		t.ok(nameBoard ~= nil, "a Sign board")
+		t.ok(math.abs(nameBoard.Size.X - 6) < 0.01 and math.abs(nameBoard.Size.Y - 1.4) < 0.01, "6 x 1.4")
+		t.ok(nameBoard.CFrame.LookVector:Dot(V3.new(0, 0, -1)) > 0.99, "the board faces -Z")
+		local faces = {}
+		for _, d in ipairs(nameBoard:GetChildren()) do
+			if d:IsA("SurfaceGui") then
+				table.insert(faces, d.Face)
+				t.eq(d:FindFirstChildWhichIsA("TextLabel").Text, "SKY FORGE")
+			end
+		end
+		t.eq(faces, { t.roblox.Enum.NormalId.Front }, "text on the front (-Z) face only")
+		t.ok(nameBoard.CFrame.Position.Z < 11.2 and nameBoard.CFrame.Position.Z > 10.8, "it hangs on the back wall")
 		local keeper = nil
 		for _, d in ipairs(court:GetDescendants()) do
 			if d.Name == "KeeperSpot" then

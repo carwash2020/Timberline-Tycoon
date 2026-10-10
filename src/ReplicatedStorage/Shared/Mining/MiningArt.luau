@@ -2,10 +2,14 @@
 -- MiningArt: part-built ore nodes, chunks, ingots, picks, the bomb, the
 -- smelting furnace, the prospector stall, the craft bench, and the gear.
 -- Ore nodes come from OreRockArtAdapter (G's NatureArt.OreRock when it
--- exists). No mesh ids. The furnace is the sawmill's sibling: timber
+-- exists). The furnace, the stall, the chute and the bench wear their Blender
+-- bodies when those load (Shared/Art/MachineSkin); the parts below are the
+-- gameplay and the fallback look. The furnace is the sawmill's sibling: timber
 -- frame, stone base, gable, lantern, one light.
 
 local Kit = require(script.Parent.Parent.Art.Kit)
+local MachineMeshes = require(script.Parent.Parent.Art.MachineMeshes)
+local MachineSkin = require(script.Parent.Parent.Art.MachineSkin)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local LuxEffect = require(script.Parent.Parent.LuxEffect)
 local OreData = require(script.Parent.OreData)
@@ -434,9 +438,20 @@ local function lantern(model: Model, cf: CFrame, withLight: boolean)
 	end
 end
 
+-- The furnace, on the TLD-1 deck standard (8 x 10, deck stubs in at -Z and
+-- out at +Z, reference LINE-STANDARD.md). Ore comes in over the -Z stub, ingots
+-- leave over the +Z stub. FireMouth stays the gameplay Part (the only glow,
+-- with one PointLight); the mesh has an open recess around it. With the
+-- Blender body (MachineMeshes "SmeltingFurnace") the posts, beams, plinth,
+-- firebox and chimney stay as see-through colliders and the roof, shingles
+-- and lanterns are not built.
+local FURNACE_HIDE = { StoneBase = true, Beam = true, Firebox = true, Chimney = true, StubDeck = true }
+
 function MiningArt.SmeltingFurnace(): Model
 	local model = Instance.new("Model")
 	model.Name = "SmeltingFurnace"
+	local skin = MachineSkin.Prepare("SmeltingFurnace", false)
+	local meshed = skin ~= nil
 	local base =
 		Kit.part(model, "StoneBase", Vector3.new(8, 1.2, 6), CFrame.new(0, 0.6, 0), StoneBase, Enum.Material.Slate)
 	model.PrimaryPart = base
@@ -454,28 +469,36 @@ function MiningArt.SmeltingFurnace(): Model
 	end
 	Kit.part(model, "Beam", Vector3.new(7.6, 0.4, 0.4), CFrame.new(0, 6.1, -2.4), TimberBrown, Enum.Material.Wood)
 	Kit.part(model, "Beam", Vector3.new(7.6, 0.4, 0.4), CFrame.new(0, 6.1, 2.4), TimberBrown, Enum.Material.Wood)
-	local roofL = Kit.wedge(
-		model,
-		"Roof",
-		Vector3.new(8.4, 1.6, 3.4),
-		CFrame.new(0, 6.6, -1.5) * CFrame.Angles(0, math.pi, 0),
-		RoofSlate,
-		Enum.Material.Slate
-	)
-	Kit.decor(roofL, false)
-	local roofR =
-		Kit.wedge(model, "Roof", Vector3.new(8.4, 1.6, 3.4), CFrame.new(0, 6.6, 1.5), RoofSlate, Enum.Material.Slate)
-	Kit.decor(roofR, false)
-	for i = -3, 3 do
-		local shingle = Kit.part(
+	if not meshed then
+		local roofL = Kit.wedge(
 			model,
-			"Shingle",
-			Vector3.new(1.05, 0.12, 3.2),
-			CFrame.new(i * 1.1, 7.15, 0),
-			Color3.fromRGB(58, 62, 70),
+			"Roof",
+			Vector3.new(8.4, 1.6, 3.4),
+			CFrame.new(0, 6.6, -1.5) * CFrame.Angles(0, math.pi, 0),
+			RoofSlate,
 			Enum.Material.Slate
 		)
-		Kit.decor(shingle, false)
+		Kit.decor(roofL, false)
+		local roofR = Kit.wedge(
+			model,
+			"Roof",
+			Vector3.new(8.4, 1.6, 3.4),
+			CFrame.new(0, 6.6, 1.5),
+			RoofSlate,
+			Enum.Material.Slate
+		)
+		Kit.decor(roofR, false)
+		for i = -3, 3 do
+			local shingle = Kit.part(
+				model,
+				"Shingle",
+				Vector3.new(1.05, 0.12, 3.2),
+				CFrame.new(i * 1.1, 7.15, 0),
+				Color3.fromRGB(58, 62, 70),
+				Enum.Material.Slate
+			)
+			Kit.decor(shingle, false)
+		end
 	end
 	Kit.part(model, "Firebox", Vector3.new(3.2, 2.2, 2.4), CFrame.new(0, 2.2, -0.4), StoneBase, Enum.Material.Slate)
 	local mouth = Kit.part(
@@ -488,46 +511,118 @@ function MiningArt.SmeltingFurnace(): Model
 	)
 	Kit.decor(mouth, false)
 	Kit.part(model, "Chimney", Vector3.new(1.1, 2.4, 1.1), CFrame.new(2.2, 7.2, 0.6), StoneBase, Enum.Material.Slate)
+	-- The sensor over the -Z stub: a chunk whose centre is inside it is smelted
+	-- (MiningService). Not a collider: the stub deck under it carries the ore.
 	local intake = Kit.part(
 		model,
 		"SmeltIntake",
-		Vector3.new(3.4, 1.2, 2.6),
-		CFrame.new(0, 1.2, -3.6),
+		Vector3.new(5, 1.6, 2.7),
+		CFrame.new(0, 1.5, -3.65),
 		IronBlack,
 		Enum.Material.DiamondPlate
 	)
+	intake.Transparency = if meshed then 1 else 0.6
+	intake.CanCollide = false
+	intake.CanQuery = false
+	intake.CanTouch = false
+	intake.CastShadow = false
 	intake:SetAttribute("SmeltIntake", true)
 	pcall(function()
 		game:GetService("CollectionService"):AddTag(intake, "SmeltIntake")
 	end)
+	-- The two deck stubs (5.0 wide, top 0.72), flush to the port faces.
+	for _, z in ipairs({ -3.65, 3.65 }) do
+		local stub = Kit.part(
+			model,
+			"StubDeck",
+			Vector3.new(5, 0.32, 2.7),
+			CFrame.new(0, 0.56, z),
+			IronBlack,
+			Enum.Material.Metal
+		)
+		stub.CanTouch = false
+	end
 	local tray = Kit.part(
 		model,
 		"OutputTray",
 		Vector3.new(3.2, 0.3, 2.2),
-		CFrame.new(0, 1.35, 3.4),
+		CFrame.new(0, 1.3, 3.9),
 		PlankHoney,
 		Enum.Material.Wood
 	)
 	Kit.decor(tray, false)
-	lantern(model, CFrame.new(-3.2, 4.6, -2.2), true)
-	lantern(model, CFrame.new(3.2, 4.6, -2.2), false)
+	if meshed then
+		-- One PointLight, Shadows off, on the only glow.
+		local light = Instance.new("PointLight")
+		light.Name = "FurnaceLight"
+		light.Color = LavaGlow
+		light.Range = 14
+		light.Brightness = 0.8
+		light.Shadows = false
+		light.Parent = mouth
+		tray.Transparency = 1
+	else
+		lantern(model, CFrame.new(-3.2, 4.6, -2.2), true)
+		lantern(model, CFrame.new(3.2, 4.6, -2.2), false)
+	end
+	if skin ~= nil then
+		MachineSkin.Commit(model, skin, CFrame.identity, FURNACE_HIDE)
+	end
 	return model
+end
+
+-- The furnace door: closed over the mouth, or ajar as the mesh is modelled
+-- (about its hinge, a quarter turn less than square). No-op on the part build.
+MiningArt.FurnaceDoorAjar = math.rad(55)
+
+function MiningArt.SetFurnaceDoor(model: Model, closed: boolean): boolean
+	local hinge = MachineMeshes.Point("SmeltingFurnace", "DoorHinge")
+	if hinge == nil then
+		return false
+	end
+	return MachineSkin.Swing(model, "FurnaceDoor", hinge, "Y", if closed then -MiningArt.FurnaceDoorAjar else 0)
 end
 
 function MiningArt.Prospector(): Model
 	local model = Instance.new("Model")
 	model.Name = "Prospector"
+	local skin = MachineSkin.Prepare("Prospector", false)
+	local chuteSkin = MachineSkin.Prepare("OreChute", false)
+	local meshed = skin ~= nil
 	local counter =
 		Kit.part(model, "Counter", Vector3.new(6, 1.1, 2.2), CFrame.new(0, 1.1, 0), PlankHoney, Enum.Material.Wood)
 	model.PrimaryPart = counter
 	Kit.part(model, "Post", Vector3.new(0.35, 3.2, 0.35), CFrame.new(-2.6, 2.6, -0.8), TimberBrown, Enum.Material.Wood)
 	Kit.part(model, "Post", Vector3.new(0.35, 3.2, 0.35), CFrame.new(2.6, 2.6, -0.8), TimberBrown, Enum.Material.Wood)
-	local roof =
-		Kit.wedge(model, "Awning", Vector3.new(6.4, 0.5, 2.4), CFrame.new(0, 4.3, -0.6), RoofSlate, Enum.Material.Slate)
-	Kit.decor(roof, false)
-	local sign =
-		Kit.part(model, "Sign", Vector3.new(3.2, 0.9, 0.2), CFrame.new(0, 3.5, -1.5), TimberBrown, Enum.Material.Wood)
+	if not meshed then
+		local roof = Kit.wedge(
+			model,
+			"Awning",
+			Vector3.new(6.4, 0.5, 2.4),
+			CFrame.new(0, 4.3, -0.6),
+			RoofSlate,
+			Enum.Material.Slate
+		)
+		Kit.decor(roof, false)
+	end
+	-- The board's text is a SurfaceGui on the Sign part. Under the mesh the
+	-- part is see-through and stands a hair in front of the mesh's plate.
+	local sign = Kit.part(
+		model,
+		"Sign",
+		Vector3.new(3.2, 0.9, if meshed then 0.04 else 0.2),
+		CFrame.new(0, 3.5, if meshed then -1.72 else -1.5),
+		TimberBrown,
+		Enum.Material.Wood
+	)
 	Kit.signText(sign, "PROSPECTOR", Color3.fromRGB(245, 235, 215), { Enum.NormalId.Front })
+	if meshed then
+		sign.Transparency = 1
+		sign.CanCollide = false
+		sign.CanQuery = false
+		sign.CanTouch = false
+		sign.CastShadow = false
+	end
 	local chute = Kit.part(
 		model,
 		"OreChute",
@@ -536,7 +631,7 @@ function MiningArt.Prospector(): Model
 		IronBlack,
 		Enum.Material.DiamondPlate
 	)
-	chute.Transparency = 0.15
+	chute.Transparency = if chuteSkin ~= nil then 1 else 0.15
 	chute:SetAttribute("OreChute", true)
 	local stand = Kit.part(
 		model,
@@ -547,21 +642,44 @@ function MiningArt.Prospector(): Model
 		Enum.Material.Slate
 	)
 	Kit.decor(stand, false)
+	if skin ~= nil then
+		MachineSkin.Commit(model, skin, CFrame.identity, { Counter = true })
+		stand.Transparency = 1
+	end
+	if chuteSkin ~= nil then
+		-- The hopper and its flap, on the ground under the chute's hit box.
+		for _, piece in ipairs(chuteSkin.parts) do
+			local offset = MachineMeshes.Piece("OreChute", piece.Name)
+			piece.CFrame = CFrame.new(4.2, 0, 0) * CFrame.new(if offset then offset.offset else Vector3.zero)
+			piece.Parent = model
+		end
+	end
 	return model
 end
 
 function MiningArt.CraftBench(): Model
 	local model = Instance.new("Model")
 	model.Name = "CraftBench"
+	local skin = MachineSkin.Prepare("CraftBench", false)
 	local top = Kit.part(model, "Top", Vector3.new(4.2, 0.3, 2), CFrame.new(0, 1.7, 0), PlankHoney, Enum.Material.Wood)
 	model.PrimaryPart = top
 	for _, x in ipairs({ -1.8, 1.8 }) do
 		Kit.part(model, "Leg", Vector3.new(0.28, 1.6, 0.28), CFrame.new(x, 0.8, -0.7), TimberBrown, Enum.Material.Wood)
 		Kit.part(model, "Leg", Vector3.new(0.28, 1.6, 0.28), CFrame.new(x, 0.8, 0.7), TimberBrown, Enum.Material.Wood)
 	end
-	local vise =
-		Kit.part(model, "Vise", Vector3.new(0.4, 0.35, 0.5), CFrame.new(1.5, 2, 0.4), IronBlack, Enum.Material.Metal)
-	Kit.decor(vise, false)
+	if skin == nil then
+		local vise = Kit.part(
+			model,
+			"Vise",
+			Vector3.new(0.4, 0.35, 0.5),
+			CFrame.new(1.5, 2, 0.4),
+			IronBlack,
+			Enum.Material.Metal
+		)
+		Kit.decor(vise, false)
+	else
+		MachineSkin.Commit(model, skin, CFrame.identity, { Top = true })
+	end
 	return model
 end
 
