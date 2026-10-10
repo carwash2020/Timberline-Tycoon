@@ -21,8 +21,11 @@
 --   items    the plot kit's shell and blueprint pieces (PlotService)
 --   trees    section and crown meshes (the forest, the Lumenwood)
 --   kit      the building kit's meshes (a player's own plot)
+--   blender  ids only the Blender registry supplies (BlenderAssets.MeshIds;
+--            empty while its ids are 0, so nothing changes in game)
 
 local AxeModels = require(script.Parent.AxeModels)
+local BlenderAssets = require(script.Parent.BlenderAssets)
 local RockModels = require(script.Parent.RockModels)
 local ItemMeshData = require(script.Parent.Parent.ItemMeshData)
 local KitMeshData = require(script.Parent.Parent.KitMeshData)
@@ -130,6 +133,11 @@ function MeshManifest.Groups(town: boolean?): { Group }
 			for _, def in ipairs(KitMeshData.Pieces[id].meshes) do
 				table.insert(out, { id = def.meshId, hull = def.fidelity == "Hull" })
 			end
+		end
+	end)
+	add("blender", function(out)
+		for _, id in ipairs(BlenderAssets.MeshIds()) do
+			table.insert(out, { id = id, hull = false })
 		end
 	end)
 	return groups

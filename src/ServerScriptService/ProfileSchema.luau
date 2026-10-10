@@ -274,8 +274,8 @@ export type Profile = {
 	ownerGrantLog: { PaidItems.LogEntry },
 	-- Paint Shop colors, per truck id, on this slot. Cosmetic only.
 	truckPaint: { [string]: string },
-	-- The Sky Pass (also called the Gondola Pass): a quest reward, not a shop
-	-- item. Both names are the same flag.
+	-- The Gondola Pass (its old save key is skyPass): a quest reward, not a shop
+	-- item. Both keys are the same flag.
 	gondolaPass: boolean,
 	skyPass: boolean,
 	skyQuest: { [string]: any },

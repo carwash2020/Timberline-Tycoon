@@ -115,7 +115,8 @@ type Slot = {
 	border: Folder,
 	platform: Folder, -- the Land slabs and the ramps (the Pad is the model's PrimaryPart)
 	items: Folder,
-	signLabels: { TextLabel }, -- both faces of the sign
+	signLabels: { TextLabel }, -- the owner's name, both faces of the sign
+	signInfoLabels: { TextLabel }, -- plot number and tier, both faces
 	office: ProximityPrompt, -- Land panel: plot size and expanding onto squares
 	spawn: SpawnLocation,
 	owner: Player?,
@@ -364,15 +365,22 @@ end
 
 local function refreshSign(slot: Slot)
 	local owner = slot.owner
-	local text = string.format("%s\nOPEN PLOT", string.upper(slot.placeName))
+	-- The mesh's post hides the lower third of the board, so the owner's
+	-- name leads and the plot line sits under it (PlotData.SignText).
+	local name = string.upper(slot.placeName)
+	local info = "OPEN PLOT"
 	if owner then
 		local profile = ProfileService.GetProfile(owner)
 		local tier = if profile then PlotData.Tier(profile.plot.tier) else nil
 		local tierName = string.upper(if tier then tier.name else "CAMPSITE")
-		text = string.format("PLOT %d\n%s\n%s", slot.index, tierName, owner.DisplayName)
+		name = owner.DisplayName
+		info = string.format("PLOT %d · %s", slot.index, tierName)
 	end
 	for _, label in ipairs(slot.signLabels) do
-		label.Text = text
+		label.Text = name
+	end
+	for _, label in ipairs(slot.signInfoLabels) do
+		label.Text = info
 	end
 	slot.office.Enabled = owner ~= nil
 end
@@ -413,21 +421,27 @@ local function buildSlot(index: number, center: Vector2, parent: Instance): Slot
 	local board = part("Sign", Vector3.new(8, 3.5, 0.4), cframe, Color3.fromRGB(101, 67, 33), Enum.Material.Wood, model)
 	board.CanCollide = false
 	local labels: { TextLabel } = {}
+	local infoLabels: { TextLabel } = {}
 	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
 		local sg = Instance.new("SurfaceGui")
 		sg.Face = face
 		sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud -- the canvas takes the board's shape
 		sg.PixelsPerStud = 40
 		sg.Parent = board
-		local l = Instance.new("TextLabel")
-		l.Size = UDim2.fromScale(1, 1)
-		l.BackgroundTransparency = 1
-		l.Font = Enum.Font.Fantasy
-		l.TextScaled = true
-		l.TextColor3 = Color3.fromRGB(245, 235, 215)
-		l.Text = ""
-		l.Parent = sg
-		table.insert(labels, l)
+		for _, line in ipairs({ "name", "info" }) do
+			local box = PlotData.SignText[line]
+			local l = Instance.new("TextLabel")
+			l.Name = if line == "name" then "OwnerName" else "PlotLine"
+			l.Position = UDim2.fromScale(0.04, box.top)
+			l.Size = UDim2.fromScale(0.92, box.height)
+			l.BackgroundTransparency = 1
+			l.Font = Enum.Font.Fantasy
+			l.TextScaled = true
+			l.TextColor3 = Color3.fromRGB(245, 235, 215)
+			l.Text = ""
+			l.Parent = sg
+			table.insert(if line == "name" then labels else infoLabels, l)
+		end
 	end
 	local office = Instance.new("ProximityPrompt")
 	office.Name = "LandOffice"
@@ -466,6 +480,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance): Slot
 		platform = platform,
 		items = items,
 		signLabels = labels,
+		signInfoLabels = infoLabels,
 		office = office,
 		spawn = plotSpawn,
 		owner = nil,

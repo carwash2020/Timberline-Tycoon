@@ -1636,6 +1636,35 @@ return function(t)
 		t.eq(profile.plot.placed[1].fill.units, 0, "a log does not fill")
 	end)
 
+	t.test("the sign's text sits above the post, with the owner's name first (the post hid it)", function()
+		local s = setup()
+		local PlotData = s.PlotData
+		local board, text = PlotData.SignBoard, PlotData.SignText
+		for name, box in pairs(text) do
+			t.ok(box.top >= 0 and box.top + box.height <= 1, name .. " is on the board")
+			t.ok(
+				board.height * (1 - box.top - box.height) >= PlotData.SignPostTop,
+				name .. " clears the post that runs up in front of the board"
+			)
+		end
+		t.ok(text.name.top + text.name.height <= text.info.top, "the two lines do not overlap")
+		local ann = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		local names, infos = {}, {}
+		for _, gui in ipairs(s.plot(1):FindFirstChild("Sign"):GetChildren()) do
+			if gui.ClassName == "SurfaceGui" then
+				for _, d in ipairs(gui:GetChildren()) do
+					table.insert(if d.Name == "OwnerName" then names else infos, d)
+				end
+			end
+		end
+		t.eq(#names, 2, "both faces")
+		t.eq(#infos, 2)
+		t.eq(names[1].Text, "Ann")
+		t.ok(string.find(infos[1].Text, "PLOT 1", 1, true) ~= nil, "the plot line says which plot")
+		t.ok(math.abs(names[1].Position.Y.Scale - text.name.top) < 1e-6)
+	end)
+
 	t.test("the land office uses the interact button and opens once the plot is claimed", function()
 		local s = setup()
 		local sign = s.plot(1):FindFirstChild("Sign")
