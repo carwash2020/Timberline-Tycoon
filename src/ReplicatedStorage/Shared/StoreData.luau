@@ -29,15 +29,15 @@ StoreData.CreatorIds = {
 	Passes = {
 		DoubleCash = 2005256811, -- PASTE: Monetization → Passes → 2x Cash → ID
 		LuxAxe = 2005226878, -- PASTE: Monetization → Passes → Lux Axe → ID
-		TowService = 2006186967, -- PASTE: Monetization → Passes → Tow Service → ID
-		TimberClassic = 2006912886, -- PASTE: Monetization → Passes → Timber Classic → ID
-		PaintShop = 2006456926, -- PASTE: Monetization → Passes → Paint Shop → ID
+		TowService = 0, -- off sale; id 2006186967 to paste when Connor says. PASTE: Monetization → Passes → Tow Service → ID
+		TimberClassic = 0, -- off sale; id 2006912886 to paste when Connor says. PASTE: Monetization → Passes → Timber Classic → ID
+		PaintShop = 0, -- off sale; id 2006456926 to paste when Connor says. PASTE: Monetization → Passes → Paint Shop → ID
 	},
 	Products = {
 		Cash1k = 3716312861, -- PASTE: Monetization → Developer Products → Small Cash Pack → ID
 		Cash10k = 3716312899, -- PASTE: Monetization → Developer Products → Large Cash Pack → ID
-		DoubleWood = 3717310556, -- PASTE: Monetization → Developer Products → 2x Wood (48 hours) → ID
-		InstantDelivery = 3717310577, -- PASTE: Monetization → Developer Products → Instant Delivery → ID
+		DoubleWood = 0, -- off sale; id 3717310556 to paste when Connor says. PASTE: Monetization → Developer Products → 2x Wood (48 hours) → ID
+		InstantDelivery = 0, -- off sale; id 3717310577 to paste when Connor says. PASTE: Monetization → Developer Products → Instant Delivery → ID
 	},
 }
 

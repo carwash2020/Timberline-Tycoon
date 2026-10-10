@@ -63,6 +63,17 @@ return function(t)
 		return out
 	end
 
+	-- The items that have a pasted Creator Hub id (the rest are Coming soon).
+	local function onSaleItems()
+		local out = {}
+		for _, entry in ipairs(StoreData.Ordered()) do
+			if StoreData.IsForSale(entry.item.id) then
+				table.insert(out, entry)
+			end
+		end
+		return out
+	end
+
 	t.test("the board has a store prompt, and a card for every item until Roblox says no", function()
 		local model = StoreBoard.Build()
 		local prompt = model:FindFirstChild("StorePrompt", true)
@@ -72,9 +83,10 @@ return function(t)
 		t.eq(prompt.GamepadKeyCode.Name, "ButtonX")
 		t.ok(prompt.GamepadKeyCode.Name ~= "ButtonR2")
 		t.eq(prompt.RequiresLineOfSight, false)
-		t.eq(model:FindFirstChild("ComingSoon", true), nil, "nothing answered no, so no strip")
-		t.eq(#cards(model), #StoreData.Ordered(), "one card per item with an id")
-		for _, entry in ipairs(StoreData.Ordered()) do
+		-- Five items are still at id 0 (off sale), so they sit on the strip.
+		t.ok(model:FindFirstChild("ComingSoon", true), "the unsold items are on the strip")
+		t.eq(#cards(model), #onSaleItems(), "one card per item with an id")
+		for _, entry in ipairs(onSaleItems()) do
 			t.ok(model:FindFirstChild(entry.item.name, true), entry.item.name)
 		end
 	end)
@@ -84,7 +96,7 @@ return function(t)
 			return not (kind == "Pass" and key == "DoubleCash")
 		end
 		local model = StoreBoard.Build(saleCheck)
-		t.eq(#cards(model), #StoreData.Ordered() - 1)
+		t.eq(#cards(model), #onSaleItems() - 1)
 		local name = StoreData.Pass("DoubleCash").name
 		t.eq(model:FindFirstChild(name, true), nil, "no card for it")
 		local strip = model:FindFirstChild("ComingSoon", true)
@@ -99,8 +111,8 @@ return function(t)
 		-- Refilling in place (StoreSaleService on a change) leaves no stale cards.
 		local list = model:FindFirstChild("List", true)
 		StoreBoard.FillPosters(list, nil)
-		t.eq(#cards(model), #StoreData.Ordered())
-		t.eq(model:FindFirstChild("ComingSoon", true), nil)
+		t.eq(#cards(model), #onSaleItems())
+		t.ok(model:FindFirstChild("ComingSoon", true), "the five id-0 items stay on the strip")
 	end)
 
 	t.test("a card is a title, one short line, a pin, an art disc and an R$ pill with no number", function()
@@ -134,7 +146,7 @@ return function(t)
 	t.test("three cards a page; the board turns the page and wraps round", function()
 		local model = StoreBoard.Build()
 		local list = model:FindFirstChild("List", true)
-		local pages = StoreBoard.PageCount(#StoreData.Ordered())
+		local pages = StoreBoard.PageCount(#onSaleItems())
 		t.eq(list:GetAttribute("Pages"), pages)
 		local function shown()
 			local out = {}

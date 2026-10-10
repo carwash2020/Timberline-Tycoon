@@ -10,23 +10,25 @@ minutes of the player opening the store, with no update.
 Where things are: Creator Hub, Creations, Timberline Tycoon, then
 **Monetization ⟩ Passes** or **Monetization ⟩ Developer Products**.
 
-## The nine items (as of 8 Oct 2026)
+## The nine items
+
+Two passes and two cash packs have their ids in `StoreData.CreatorIds`. The other five are still `0` there (off sale in the game, "Coming soon" cards, no crate, no poster) until you say to flip them: then an agent pastes the id from the table into `StoreData.CreatorIds` and nothing else changes. They may already be on sale in Creator Hub; the game does not offer them until the id is pasted.
 
 The id is what `StoreData.CreatorIds` holds. The name and description are
 word for word what the game shows; paste them exactly so the Roblox prompt
 and the game agree (QA G2). Prices are yours (listed for reference only).
 
-| # | Kind | Key | Id | Name | Price you set | State |
+| # | Kind | Key | Id | Name | Price you set | In the game |
 |---|---|---|---|---|---|---|
-| 1 | Pass | DoubleCash | 2005256811 | 2x Cash | 499 | On sale |
-| 2 | Pass | LuxAxe | 2005226878 | Lux Axe | 300 | On sale |
-| 3 | Pass | TowService | 2006186967 | Tow Service | 99 | On sale |
-| 4 | Pass | TimberClassic | 2006912886 | Timber Classic | 199 | On sale |
-| 5 | Pass | PaintShop | 2006456926 | Paint Shop | 149 | On sale |
-| 6 | Product | Cash1k | 3716312861 | Small Cash Pack | 49 | On sale |
-| 7 | Product | Cash10k | 3716312899 | Large Cash Pack | 299 | On sale |
-| 8 | Product | DoubleWood | 3717310556 | 2x Wood (48 hours) | 299 | On sale |
-| 9 | Product | InstantDelivery | 3717310577 | Instant Delivery | 35 | On sale, repeatable |
+| 1 | Pass | DoubleCash | 2005256811 | 2x Cash | 499 | Live |
+| 2 | Pass | LuxAxe | 2005226878 | Lux Axe | 300 | Live |
+| 3 | Pass | TowService | 2006186967 | Tow Service | 99 | Id not pasted (Coming soon) |
+| 4 | Pass | TimberClassic | 2006912886 | Timber Classic | 199 | Id not pasted (Coming soon) |
+| 5 | Pass | PaintShop | 2006456926 | Paint Shop | 149 | Id not pasted (Coming soon) |
+| 6 | Product | Cash1k | 3716312861 | Small Cash Pack | 49 | Live |
+| 7 | Product | Cash10k | 3716312899 | Large Cash Pack | 299 | Live |
+| 8 | Product | DoubleWood | 3717310556 | 2x Wood (48 hours) | 299 | Id not pasted (Coming soon) |
+| 9 | Product | InstantDelivery | 3717310577 | Instant Delivery | 35 | Id not pasted (Coming soon); repeatable |
 
 Descriptions (copy each line exactly):
 
@@ -50,11 +52,10 @@ for that player.
 1. **Edit the two live passes** (2x Cash, Lux Axe): Passes ⟩ the pass ⟩
    **Basic Settings**: check the name, paste the description above, **Save
    Changes**. Leave the price alone unless you mean to change it.
-2. **Edit the three restored passes** (Tow Service, Timber Classic, Paint
-   Shop): same steps. These ids were 0 on main, so anyone who bought one from
-   the Roblox store page before this PR merged gets it the first time they
-   join after the update (the game asks Roblox `UserOwnsGamePassAsync` on
-   join). Don't make new passes for them.
+2. **Edit the three other passes** (Tow Service, Timber Classic, Paint
+   Shop): same steps. Once you paste their ids, anyone who bought one from the Roblox store
+   page gets it the first time they join (the game asks Roblox
+   `UserOwnsGamePassAsync` on join). Don't make new passes for them.
 3. **Rename the four products**: Developer Products ⟩ the product ⟩
    **Configure**: name and description from the table (Cash1k becomes
    "Small Cash Pack", Cash10k "Large Cash Pack", DoubleWood "2x Wood (48
@@ -71,12 +72,20 @@ for that player.
    with the game open on the Store: each price the store, the bulletin
    board and the gold box hover show is the one the tool reports for the
    test region.
-6. **Studio test purchase, all nine** (Studio prompts are free test buys;
+6. **Studio test purchase** (the four live items now; the other five after you paste their ids) (Studio prompts are free test buys;
    in Studio a pass bought this way is granted for that session only, never
    written to your save): open the Store, buy each item, check the toast and
    the effect (see the PR's Studio checks).
 7. **Publish**: File ⟩ Publish to Roblox, then Creator Hub ⟩ the experience
    ⟩ **⋯** ⟩ **Restart Servers for Updates** (only outdated servers).
+
+## Flipping the five on (your call, later)
+
+Paste the id into `StoreData.CreatorIds` (or tell an agent to): Tow Service
+2006186967, Timber Classic 2006912886, Paint Shop 2006456926, 2x Wood
+3717310556, Instant Delivery 3717310577. Prices stay 99 / 199 / 149 / 299 /
+35 as set in Creator Hub. The order QA asked for: Tow Service, then Timber
+Classic, then Paint Shop, each after it is merged, published and tested.
 
 ## Turning something off sale (any time)
 

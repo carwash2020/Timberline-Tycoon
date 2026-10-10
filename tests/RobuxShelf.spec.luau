@@ -47,9 +47,10 @@ return function(t)
 		t.eq(RobuxShelf.Find("Gift", "DoubleCash"), nil)
 		t.eq(RobuxShelf.Get("robux-Pass-DoubleCash").key, "DoubleCash")
 		t.eq(RobuxShelf.Get("toolshed-SteelAxe"), nil)
-		-- Lane P: all nine have real ids now; an item Roblox says isn't for
-		-- sale is refused at the counter (Get/Find) while its box stands.
-		t.eq(#RobuxShelf.List(), 9)
+		-- Lane P: four items have ids (the other five stay at 0, no box); an
+		-- item Roblox says isn't for sale is refused at the counter (Get/Find)
+		-- while its box stands.
+		t.eq(#RobuxShelf.List(), 4)
 		RobuxShelf.SetSaleCheck(function(_, key)
 			return key ~= "DoubleCash"
 		end)

@@ -714,7 +714,7 @@ local function storeShots()
 	}) do
 		local screen = bootStore(view[3], view[4], {
 			tab = view[2],
-			attrs = { Cash = 12400, StoreStage = 3, Pass_TowService = true },
+			attrs = { Cash = 12400, StoreStage = 3, Pass_LuxAxe = true },
 		})
 		local html = screenHtml(screen, view[3], view[4], hud(view[3]), 36)
 		fs.writeFile(string.format("%s/%s-%dx%d.html", OUT, view[1], view[3], view[4]), html)

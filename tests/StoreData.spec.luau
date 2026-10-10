@@ -26,12 +26,13 @@ return function(t)
 		t.eq(StoreData.CreatorIds.Passes.LuxAxe, 2005226878)
 		t.eq(StoreData.CreatorIds.Products.Cash1k, 3716312861)
 		t.eq(StoreData.CreatorIds.Products.Cash10k, 3716312899)
-		-- Lane P: every item has its Creator Hub id now (8 Oct 2026).
-		t.eq(StoreData.CreatorIds.Passes.TowService, 2006186967)
-		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 2006912886)
-		t.eq(StoreData.CreatorIds.Passes.PaintShop, 2006456926)
-		t.eq(StoreData.CreatorIds.Products.DoubleWood, 3717310556)
-		t.eq(StoreData.CreatorIds.Products.InstantDelivery, 3717310577)
+		-- Lane P: these five stay at 0 (off sale, "Coming soon") until Connor
+		-- says to paste their ids (kept in the comments in StoreData).
+		t.eq(StoreData.CreatorIds.Passes.TowService, 0)
+		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 0)
+		t.eq(StoreData.CreatorIds.Passes.PaintShop, 0)
+		t.eq(StoreData.CreatorIds.Products.DoubleWood, 0)
+		t.eq(StoreData.CreatorIds.Products.InstantDelivery, 0)
 		local forSale = 0
 		local seen = {}
 		for _, pass in ipairs(StoreData.Passes) do
@@ -50,12 +51,12 @@ return function(t)
 				seen[product.id] = true
 			end
 		end
-		-- Five passes and four products. Whether each is on sale is Roblox's
-		-- answer (StoreSale), not a 0 here.
-		t.eq(forSale, 9)
+		-- Four ids are pasted (2x Cash, Lux Axe, both cash packs); whether
+		-- each is on sale is still Roblox's answer (StoreSale).
+		t.eq(forSale, 4)
 		t.eq(StoreData.AnyForSale(), true)
-		t.eq(#StoreData.ListedPasses(), 5)
-		t.eq(#StoreData.ListedProducts(), 4)
+		t.eq(#StoreData.ListedPasses(), 2)
+		t.eq(#StoreData.ListedProducts(), 2)
 		t.eq(#StoreData.Ordered(), 9)
 		t.eq(StoreData.ProductById(0), nil, "id 0 never lists a product")
 		t.eq(StoreData.Pass("LuxAxe").image, 0, "Lux Axe image slot left at 0")

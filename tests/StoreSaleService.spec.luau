@@ -35,7 +35,7 @@ return function(t)
 
 	t.test("a round asks about every item once and keeps the yes and no answers", function()
 		local StoreData = t.shared("StoreData")
-		local offId = StoreData.Pass("TowService").id
+		local offId = StoreData.Pass("LuxAxe").id
 		local Service, calls = boot(function(id)
 			return id ~= offId
 		end)
@@ -47,10 +47,11 @@ return function(t)
 		t.eq(Service.IsOnSale("Pass", "DoubleCash"), nil, "unknown before the first round")
 		Service.RefreshAll()
 		t.eq(Service.Ready(), true)
-		t.eq(calls(), 9)
+		t.eq(calls(), 4, "only items with a pasted id are asked about")
 		t.eq(Service.IsOnSale("Pass", "DoubleCash"), true)
-		t.eq(Service.IsOnSale("Pass", "TowService"), false)
-		t.eq(Service.IsOnSale("Product", "InstantDelivery"), true)
+		t.eq(Service.IsOnSale("Pass", "LuxAxe"), false)
+		t.eq(Service.IsOnSale("Product", "Cash1k"), true)
+		t.ok(Service.IsOnSale("Pass", "TowService") ~= true, "id 0 is never on sale")
 		t.eq(changed, 1, "listeners run once per round that changed something")
 		Service.RefreshAll()
 		t.eq(changed, 1, "nothing new, no refill")
