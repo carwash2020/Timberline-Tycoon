@@ -343,7 +343,7 @@ return function(t)
 			t.eq(PlotData.Blueprint(bp.id), bp)
 			t.ok(bp.category == "Buildings" or bp.category == "Decor", bp.id .. " category")
 			t.ok(PlotData.Tier(bp.tier) ~= nil, bp.id .. " tier")
-			t.ok(bp.priceCash > 0, bp.id .. " price")
+			t.ok(bp.priceCash > 0 or bp.granted == true, bp.id .. " price")
 			t.ok(bp.footprint.X <= PlotData.Tiers[1].size and bp.footprint.Y <= PlotData.Tiers[1].size)
 			t.ok(#bp.boxes > 0, bp.id .. " has no parts")
 			for i, box in ipairs(bp.boxes) do

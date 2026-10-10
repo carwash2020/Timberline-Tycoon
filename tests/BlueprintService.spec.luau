@@ -546,6 +546,64 @@ return function(t)
 		t.ok(string.find(s.toasts[#s.toasts].text, "already know", 1, true))
 	end)
 
+	t.test("stage unlocks: SyncStage teaches the plans the stage owes, once, and the book never shrinks", function()
+		local s = setup()
+		s.profile.onboarding = {}
+		s.profile.totalEarned = 0
+		s.profile.plot = { claimed = false }
+		s.profile.blueprintBook = { "Wall4" }
+		-- StageOf.Current never reads below stage 1, so a book with only Wall4
+		-- is owed the stage-1 plans once, and then nothing.
+		t.ok(s.Service.SyncStage(s.player) > 0, "stage 1 owes its plans")
+		t.eq(s.attrs.BuildStage, 1)
+		t.eq(s.Service.SyncStage(s.player), 0, "and a second sync owes nothing")
+		-- Lane E's keys win once they exist: stage 4 is Red Mesa.
+		s.profile.onboarding = { ["Stage:S1"] = true, ["Stage:S2"] = true, ["Stage:S3"] = true, ["Stage:S4"] = true }
+		local learned = s.Service.SyncStage(s.player)
+		t.ok(learned > 0, "plans were learned")
+		t.eq(s.attrs.BuildStage, 4)
+		local book = s.profile.blueprintBook
+		for _, id in ipairs({ "SandWall4", "SandFloor4", "SandArch8" }) do
+			t.ok(table.find(book, id) ~= nil, id .. " learned at stage 4")
+		end
+		t.eq(table.find(book, "CopperTrim4"), nil, "copper waits for stage 5")
+		local told = s.toasts[#s.toasts].text
+		t.ok(string.find(told, "Sandstone Wall", 1, true) ~= nil, told)
+		t.eq(s.Service.SyncStage(s.player), 0, "a second sync changes nothing")
+		local count = #book
+		s.profile.onboarding = {}
+		s.profile.totalEarned = 0
+		s.Service.SyncStage(s.player)
+		t.eq(#s.profile.blueprintBook, count, "going back a stage takes nothing away")
+		s.profile.onboarding = { ["Stage:S5"] = true }
+		s.Service.SyncStage(s.player)
+		t.ok(table.find(s.profile.blueprintBook, "CopperTrim4") ~= nil, "copper at stage 5")
+		t.ok(string.find(s.attrs.Blueprints, "CopperTrim4", 1, true) ~= nil, "published to the client")
+	end)
+
+	t.test("CanEdit: a plan is not left lying on someone else's plot without their say-so", function()
+		local s = setup()
+		local item = s.Service.Grant(s.player, "Shed")
+		local friend = false
+		s.Service.Hooks.ownerAt = function()
+			return s.other
+		end
+		s.Service.Hooks.canEdit = function(_who, owner, flag)
+			t.eq(flag, "build")
+			t.eq(owner, s.other)
+			return friend
+		end
+		s.remotes.DropBlueprint.OnServerEvent.fn(s.player, item.uid)
+		t.eq(#s.world, 0, "refused: nothing lies on their plot")
+		t.eq(#s.profile.blueprintItems, 1, "and the plan is still in the pack")
+		t.ok(string.find(s.toasts[#s.toasts].text, "can't leave things", 1, true) ~= nil)
+		friend = true
+		s.remotes.DropBlueprint.OnServerEvent.fn(s.player, item.uid)
+		t.eq(#s.world, 1, "with Build permission it lies there")
+		s.Service.Hooks.ownerAt = nil
+		s.Service.Hooks.canEdit = nil
+	end)
+
 	t.test("nothing in BlueprintService touches cash", function()
 		local fs = require("@lune/fs")
 		local src = fs.readFile("src/ServerScriptService/BlueprintService.luau")

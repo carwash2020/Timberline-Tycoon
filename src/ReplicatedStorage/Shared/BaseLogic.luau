@@ -16,6 +16,7 @@
 -- or a save swap does not skip it. Loading a base back is never cooled.
 
 local GameConfig = require(script.Parent.GameConfig)
+local LooseSave = require(script.Parent.LooseSave)
 
 local BaseLogic = {}
 
@@ -25,7 +26,9 @@ export type Context = {
 	now: number,
 	hasPad: boolean, -- they stand on a pad this session
 	busy: boolean, -- a claim, expand or earlier unload is in flight
-	looseWood: number, -- their logs and planks lying on the plot, not held, not loaded
+	-- What lies loose on their plot (LooseSave.Found): the unload saves it with
+	-- the base, and refuses only when the save cannot hold it all.
+	loose: LooseSave.Found,
 }
 
 -- The refusal texts, shown as a toast. "bad" is silent.
@@ -34,12 +37,11 @@ BaseLogic.Reasons = {
 	noPlot = "You have no plot to unload.",
 	nopad = "Your base is not on a pad right now.",
 	cooldown = "Give it %d more seconds before unloading again.",
-	wood = "Pick up or sell the loose logs and planks on your plot first. Nothing gets lost, but loose wood can't be saved with the base.",
 	bad = "bad",
 }
 
 BaseLogic.UnloadConfirm =
-	"Unload your base? It is saved with this save, taken off your pad and your pad is freed for others. Nothing is lost or sold. Press LOAD BASE any time to put it on a pad."
+	"Unload your base? It is saved with this save, loose wood and all, taken off your pad, and your pad is freed for others. Nothing is lost or sold. Press LOAD BASE any time to put it back on a pad."
 BaseLogic.UnloadedToast = "Base unloaded and saved. Your pad is free. Use LOAD BASE in the SAVES panel to put it back."
 BaseLogic.LoadedToast = "Pick a pad for your base."
 
@@ -61,9 +63,11 @@ function BaseLogic.CheckUnload(profile: any, ctx: Context): (boolean, string?)
 	if type(untilAt) == "number" and ctx.now < untilAt then
 		return false, string.format(BaseLogic.Reasons.cooldown, math.max(1, math.ceil(untilAt - ctx.now)))
 	end
-	-- Wood that stays behind is the one thing an unload could strand: refuse.
-	if ctx.looseWood > 0 then
-		return false, BaseLogic.Reasons.wood
+	-- Loose wood, slabs and ingots go into the save with the base. Refuse only
+	-- when the save cannot hold them all (with a count): nothing is dropped.
+	local roomOk, roomWhy = LooseSave.Check(ctx.loose)
+	if not roomOk then
+		return false, roomWhy
 	end
 	return true, nil
 end

@@ -100,6 +100,33 @@ Part-built axe, temper and shelf pictures are not in this PR. Connor rejected th
 Awaiting Connor: the Hermit's Maul is part-built and needs a Blender mesh. The hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and cash prices are unchanged.
 
 Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+## Lane F: building and blueprints (10 October 2026, branch `phase-2/v1-f-base-systems`)
+
+Not on main (PR #131, draft). Job 10 is done. Previews in `previews/v1-f/`. What landed:
+
+- The four new pieces (Copper Trim, Sandstone Wall, Floor, Arch) are placeable: the fill takes slabs and ingots (`BuildCost.Of`, atomic take; `BuildMaterials` server side). Unlocked, no free placement.
+- `PlotService.CanEdit` (shared rule `PlotLogic.CanEdit` / `EditRights`) at every edit site: Sawmill, ChopSaw, Paint, Blueprint drop, PlotFill contributions, Vehicle, Logic, Permission. BeltService has no player edit site; its prompts live in LogicService and stay owner-only.
+- 1,200 kit-part cap on NEW placement ("Your plot holds 1200 kit parts at most"); existing builds are never deleted. PlacedCap 320 and `SaveSize` measured: 886,791 -> 950,591 bytes (90.7% of 1 MB; DataStore limit 4 MB).
+- Undo and Take apart refund slabs and ingots (`PlotLogic.SellPlan`).
+- `PlaceControls` (phone, PC, Xbox; no ButtonR2). Furniture and `GrantPiece`: Copper Lamp Post and Gold-banded Chest, CraftData recipes enabled. Save now (30 s cooldown). Unload keeps loose wood (`LooseSave`, `LooseService`). Free-piece blueprints, Paint all of this type (free), recall fee on the button, Sparkworks counter stock (data and buy path), fallen pieces rescued (`FallenLogic`, `strandedLoad` restored), `StageOf` helper wired to `BlueprintBook.UnlockStage`.
+
+**Awaiting Connor** (all PROPOSALS, used as defaults)
+
+- Costs: Copper Trim $4 + 1 Copper ingot; Sandstone Wall $8 + 2 slabs; Sandstone Floor $8 + 2 slabs; Sandstone Arch $16 + 4 slabs.
+- Stage unlocks: walls, floors, flat roof S1; tall walls, sloped roofs, ramp, door and window walls S2; railings, beams, posts, gate S3; sandstone S4; copper S5. Starter pieces are not gated; only the 4 new plans show as locked rows.
+- `StageOf` names and the lifetime-earned fallback lines (100, 1,000, 5,000, 25,000, 100,000, 400,000, 1,000,000, 2,000,000) are guesses until Lane E's stage keys are the only source.
+- Loose-wood save caps 150 pieces / 300 sections; crafted furniture stock cap 20; fall rescue below Y -80; paint is free.
+- "Free" blueprints are marked on owned store unlocks only (not auto-given, which would free store purchases).
+- Odds & Ends is not stocked (no building; the blasting charge is pay-at-boulder). The Sparkworks shop building and counter do not exist on main: stock data and purchase path are done and tested.
+- `mining`, `guideStamps` and `dayCounter` are account-wide in code and specs while the brief says per slot. Left as is.
+- Colours: GAD palette still pending; sandstone `#C8643C`, copper `#B87333`.
+- Furniture meshes are not in the lite pack, so furniture renders part-built (job 17).
+- Worst case: a plot of 400 WindowWall8 is 1,600 parts; the cap now stops placement at 1,200.
+
+Cross-lane edits: MiningService (IngotRoom, ReturnIngot), CraftingService hooks and furniture grant, CraftData enabled, HammerController paint-all row, VehicleController fee label, HintLogic build text, EditLogic, LogicService / PermissionService / VehicleService / ChopSawService rules, WoodService recover hook, PlotUI locked rows. New `BaseBoot.server` binds the new remotes and hooks. The unsharded full Lune run has a GondolaService/GrabService order dependence that is already on main.
+
+Studio checks: PHASE2_NOTES.md, "Lane F: building and blueprints".
+
 ## Lane W: practical automation (8 October 2026, branch `phase-2/v1-w-automation`)
 
 Not on main. Wires from #123 now drive belts and machines. Every belt, sawmill, planer and the new line pieces register `LogicService.RegisterTarget(uid, {power, reverse})`. Ports: belts 1 power, 2 reverse; Switch Belt 1 side, 2 power, 3 reverse; sawmill and planer 1 power. An unwired port keeps the old behaviour, so old plots run as before (no new attributes, no new saved fields). Power off mid-cut pauses the log where it is and the clock resumes with power. Reverse is an owner-only prompt saved as `item.reversed = true`; Switch Belt flip is `item.flip = true`. New pieces: Switch Belt, Tilted Belt (rise 2.0), Belt Support (saddle 2.0), Wood Detector (belt-shaped wire source with a wood filter, saved in `plot.logic[uid].filter`, index pinned to WoodData order), Wood Sweeper (a pulse pushes up to 10 loose plot pieces off the belt), Laser Emitter and Receiver (only wood breaks the beam; `MaxLaserPairs` 8 per plot). Part builds per TLD-1; the uploaded TLD-1 meshes are wired in job 15. Previews: `previews/v1-w/`.
