@@ -13,6 +13,15 @@ Branch `phase-2/v1-p-purchases`. All nine Robux items are wired with their real 
 
 Lane P previews (`previews/v1-p/`, UI laid out from the real Instances, board and crates from the real scene): `store-passes-667x375.png`, `store-passes-1920x1080.png`, `store-products-667x375.png`, `store-products-1920x1080.png`, `store-gamepad-1920x1080.png`, `purchase-flow-states-1920x1080.png`, `bulletin-board-day.png`, `bulletin-board-night.png`, `board-side.png`, `gold-boxes.png`, `gold-box-closeup.png`. The bright block at the counter in `gold-boxes.png` is the shop lamp, not a crate.
 
+## Lane H: Blender asset registry and upload list (branch `phase-2/v1-h-blender-assets`, 8 October 2026)
+
+Code side of Lane H only. Nothing is uploaded, no generator was added (that waits on Connor), and nothing changes in game.
+
+- `Shared/Art/BlenderAssets.luau`: one row per Blender model (169): 143 with their GLB in `assets/meshes` (status `repo`, meshId 0, live ids stay in the module named in `wiredBy`), 19 Lane H items from the uploaded Blender backlog (status `backlog`, wired by job 17's `BacklogModels`), 7 still to model (status `planned`, id 0). `MeshManifest` has a new last group `blender` that preloads `BlenderAssets.MeshIds()`: empty while the ids are 0.
+- `assets/UPLOAD_LIST.md`: the 7 planned models (two cliff faces, shop shelf, shop counter, three temper trims) and every uploaded row. `docs/art/terrain-water.md`, `docs/art/blender-pipeline.md`.
+- `tools/blender/check.py` (import limits on GLBs; all 214 repo GLBs and 217 pack GLBs pass), `registry.py`, `render_tiles.py`, `contact_sheet.py`.
+- Previews (real GLBs, headless Blender): `previews/v1-h/buildings.png`, `shops.png`, `environment.png`, `items.png`, `kit.png` (unpainted base colour; paint tints it in game), `axes.png`, `gear.png`, `plants.png`, `npcs.png`, `trees.png` (crown meshes). Rocks and vehicles are not on a sheet: their GLBs are assembled and tinted by code, so the raw file is not what you see in game (see `previews/v1-g/` and `previews/meshes/truck-real.png`).
+
 ## Lane D — axes, boxes, shelves, displays (done)
 
 Branch `phase-2/v1-d-axes-displays`, rebased onto main at `f96b62c` (A1). Connor reviews each render before this merges. Paths below are the pictures to open.
