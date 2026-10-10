@@ -18,11 +18,19 @@
 --   * The graph is rebuilt on load, restore and any wire change, and
 --     ticked only while the owner is online and the plot is loaded.
 --     Leaving drops the run; the save is what comes back.
+--   * Lane W: belts, sawmills and planers are wire targets (RegisterTarget,
+--     on Attach; dropped on Sync once sold or rebuilt). Ports are in
+--     AutomationLogic.Ports: power and reverse, plus side on a Switch Belt.
+--     An unwired port runs as before. The owner's Reverse prompt (every
+--     belt) and Flip prompt (Switch Belt) save item.reversed / item.flip.
+--     The Wood Detector (a belt) and the Laser Emitter are sensed sources;
+--     the Wood Sweeper pushes loose wood off a belt on a rising input.
 -- PlotService calls Bind once, Attach for each built piece, and Sync after
 -- a piece is sold. V1Boot calls V1Init. GameServer still calls Init(Wire).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local LogicGraph = require(ReplicatedStorage.Shared.LogicGraph)
@@ -57,6 +65,7 @@ type Run = {
 	toldCap: boolean,
 	anyOver: boolean,
 	wires: { WireLogic.Wire },
+	laserTick: number?,
 }
 
 local LEVER_BOX = 3
@@ -80,6 +89,10 @@ local GLOW_ROLE: { [string]: boolean } = {
 }
 
 local hostFn: HostFn? = nil
+-- Set below once the overlap params helper exists (sense and sweep share it).
+local overlapParamsFn: () -> any = function(): any
+	return nil
+end
 local function silent(_player: Player, _text: string) end
 local notify: Notify = silent
 -- Lane W registers a belt, sawmill or planer. power and reverse are the
@@ -90,6 +103,9 @@ export type LogicTarget = {
 }
 
 local targets: { [string]: LogicTarget } = {}
+-- The plot folder a registered belt or machine sits in (Lane W), so Sync
+-- drops only that plot's sold pieces.
+local targetHost: { [string]: Instance } = {}
 local lastFlip: { [string]: number } = {}
 local runs: { [Instance]: Run } = {}
 local hexCache: { [string]: Color3 } = {}
@@ -124,6 +140,7 @@ end
 function LogicService.Reset()
 	table.clear(lastFlip)
 	table.clear(targets)
+	table.clear(targetHost)
 end
 
 local function mayUse(owner: Player, profile: Profile, who: Player, flag: string): boolean
@@ -365,6 +382,331 @@ local function setDoor(
 	return hint
 end
 
+---------------------------------------------------------------------------
+-- Lane W: belts and machines on wires, the sweeper, detector and laser
+---------------------------------------------------------------------------
+
+local function savedSetting(profile: Profile?, uid: string, key: string, default: number): number
+	if profile and type(profile.plot.logic) == "table" then
+		local bag = profile.plot.logic[uid]
+		if type(bag) == "table" and type(bag[key]) == "number" then
+			return bag[key]
+		end
+	end
+	return default
+end
+
+local SKY_BLUE = Color3.fromHex("#6FB7E8")
+local DETECT_ON = Color3.fromHex("#C9A24A")
+local DETECT_OFF = Color3.fromHex("#2B2B2E")
+
+-- What the wires say to one belt or machine: power, reverse and (Switch
+-- Belt) side. An unwired port gives the old behaviour.
+function LogicService._applyMachine(graph: LogicGraph.Graph, item: PlotLogic.Placed, model: Model)
+	local ports = AutomationLogic.Ports(item.blueprintId)
+	local uid = item.uid
+	local function state(port: number?): (boolean, boolean)
+		if port == nil then
+			return false, false
+		end
+		return LogicGraph.Wired(graph, uid, port), LogicGraph.Level(graph, uid, port)
+	end
+	local pw, pl = state(ports.power)
+	local rw, rl = state(ports.reverse)
+	local powered = AutomationLogic.Powered(pw, pl)
+	local wireReverse = rw and rl
+	local target = targets[uid]
+	if target then
+		target.power(powered)
+		target.reverse(wireReverse)
+	end
+	if ports.side then
+		local sw, sl = state(ports.side)
+		model:SetAttribute("WireSide", if sw and sl then true else nil)
+	end
+end
+
+local function setDetectorLamp(model: Model, on: boolean)
+	local lamp = model:FindFirstChild("Lamp")
+	if lamp and lamp:IsA("BasePart") then
+		lamp.Color = if on then DETECT_ON else DETECT_OFF
+	end
+	model:SetAttribute("Detecting", on)
+end
+
+-- The arm (Part3) and head (Part4) drop from upright to a push bar lying
+-- along the belt (AutomationLogic.SweepPose), against the wood's side; the
+-- push rod (Part5) swings level and holds it to the post (SweepRodPose).
+local function poseSweeper(model: Model, down: boolean)
+	local root = named(model, "Root")
+	if not root then
+		return
+	end
+	for _, name in ipairs({ "Part3", "Part4" }) do
+		local p = named(model, name)
+		if p then
+			local rest = restOf(p, root)
+			if down then
+				p.CFrame = root.CFrame * AutomationLogic.SweepPose() * rest
+			else
+				p.CFrame = root.CFrame * rest
+			end
+		end
+	end
+	local rod = named(model, "Part5")
+	if rod then
+		local rest = restOf(rod, root)
+		rod.CFrame = root.CFrame * (if down then AutomationLogic.SweepRodPose() else rest)
+	end
+	model:SetAttribute("Swept", down)
+end
+LogicService._poseSweeper = poseSweeper
+
+local function woodModelOf(part: Instance): Model?
+	local node: Instance? = part
+	for _ = 1, 4 do
+		if node == nil then
+			return nil
+		end
+		if node:IsA("Model") and type(node:GetAttribute("WoodId")) == "string" then
+			return node
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
+local function bodyOf(model: Model): BasePart?
+	local primary = model.PrimaryPart
+	if primary then
+		return primary
+	end
+	return model:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function boxQuery(cf: CFrame, size: Vector3): { Instance }
+	local ok, parts = pcall(function()
+		return workspace:GetPartBoundsInBox(cf, size, overlapParamsFn())
+	end)
+	if ok and type(parts) == "table" then
+		return parts
+	end
+	return {}
+end
+
+-- Wood models in a box, each once.
+local function woodIn(cf: CFrame, size: Vector3): { Model }
+	local out: { Model } = {}
+	local seen: { [Instance]: boolean } = {}
+	for _, part in ipairs(boxQuery(cf, size)) do
+		if typeof(part) == "Instance" then
+			local wood = woodModelOf(part)
+			if wood and not seen[wood] then
+				seen[wood] = true
+				table.insert(out, wood)
+			end
+		end
+	end
+	return out
+end
+
+local function landsOnPlot(run: Run, worldPos: Vector3): boolean
+	local localPos = run.host.cframe:PointToObjectSpace(worldPos)
+	local tier = PlotData.Tier(run.profile.plot.tier) or PlotData.Tiers[1]
+	local rect = { x = localPos.X, z = localPos.Z, w = 0, d = 0 }
+	local squares = run.profile.plot.squares
+	if type(squares) == "table" and #squares > 0 then
+		return PlotLogic.OnLand(rect, tier.size, squares)
+	end
+	return PlotLogic.InBounds(rect, tier.size)
+end
+
+-- One sweep: loose wood on the belt beside the sweeper (its local +X) is
+-- pushed further that way. QA W5: never held wood, never players or
+-- vehicles (only Wood models are looked at), at most SweepMax pieces, and
+-- never off the owner's plot.
+function LogicService._sweep(run: Run, model: Model): number
+	local root = named(model, "Root")
+	if not root then
+		return 0
+	end
+	local now = os.clock()
+	local last = model:GetAttribute("LastSweep")
+	if type(last) == "number" and now - last < AutomationLogic.SweepCooldown then
+		return 0
+	end
+	model:SetAttribute("LastSweep", now)
+	local zone = root.CFrame * CFrame.new(3.75, 2.4, 0)
+	local dir = root.CFrame.RightVector
+	local ownerId = if run.owner then run.owner.UserId else 0
+	local candidates: { AutomationLogic.SweepCandidate } = {}
+	for _, wood in ipairs(woodIn(zone, Vector3.new(6.5, 4.6, 5.5))) do
+		local body = bodyOf(wood)
+		local held = wood:GetAttribute("HeldBy")
+		local owner = wood:GetAttribute("Owner")
+		table.insert(candidates, {
+			key = wood,
+			held = (type(held) == "number" and held ~= 0) or (body ~= nil and body.Anchored),
+			wood = body ~= nil,
+			ownerId = if type(owner) == "number" then owner else 0,
+			landsOnPlot = body ~= nil and landsOnPlot(run, body.Position + dir * AutomationLogic.SweepLand),
+		})
+	end
+	local picked = AutomationLogic.SweepPick(candidates, ownerId)
+	for _, wood in ipairs(picked) do
+		local body = bodyOf(wood :: Model)
+		if body then
+			body.AssemblyLinearVelocity = dir * AutomationLogic.SweepSpeed + Vector3.new(0, 4, 0)
+		end
+	end
+	return #picked
+end
+
+local function sweeperInput(run: Run, item: PlotLogic.Placed, model: Model, on: boolean)
+	local was = model:GetAttribute("Swept") == true
+	if on == was then
+		return
+	end
+	poseSweeper(model, on)
+	if on then
+		LogicService._sweep(run, model)
+	end
+	local _ = item
+end
+
+-- The Wood Detector sees wood over its deck that matches its filter.
+local function detectorSees(run: Run, item: PlotLogic.Placed, model: Model): boolean
+	local eye = named(model, "Eye")
+	if not eye then
+		return false
+	end
+	local filter = savedSetting(run.profile, item.uid, "filter", 0)
+	for _, wood in ipairs(woodIn(eye.CFrame, eye.Size)) do
+		if AutomationLogic.FilterMatches(filter, wood:GetAttribute("WoodId")) then
+			return true
+		end
+	end
+	return false
+end
+
+local function woodFolder(): Instance?
+	local map = workspace:FindFirstChild("TimberlineMap")
+	local found = if map then map:FindFirstChild("Wood") else nil
+	return found or workspace:FindFirstChild("Wood")
+end
+
+local function portOf(model: Model, z: number): (Vector3?, Vector3?)
+	local root = named(model, "Root")
+	if not root then
+		return nil, nil
+	end
+	local cf = root.CFrame * CFrame.new(0, AutomationLogic.BeamPortY - 0.1, z)
+	-- Local +Z is the emitter's lens side (the model's back, LookVector is -Z).
+	return cf.Position, -root.CFrame.LookVector
+end
+
+-- The receiver an emitter's beam reaches, and how far.
+local function partnerOf(run: Run, emitter: Model): (Model?, number?)
+	local ePort, eDir = portOf(emitter, AutomationLogic.BeamPortZ)
+	if not ePort or not eDir then
+		return nil, nil
+	end
+	local best: Model? = nil
+	local bestD = math.huge
+	for _, other in ipairs(run.profile.plot.placed) do
+		if other.blueprintId == "LaserReceiver" then
+			local model = modelOf(run.host, other.uid)
+			if model then
+				local rPort, rDir = portOf(model, AutomationLogic.ReceiverPortZ)
+				if rPort and rDir then
+					-- The receiver's dish is its local -Z: it faces -rDir.
+					local d = AutomationLogic.LaserReach(ePort, eDir, rPort, -rDir)
+					if d and d < bestD then
+						best = model
+						bestD = d
+					end
+				end
+			end
+		end
+	end
+	if best then
+		return best, bestD
+	end
+	return nil, nil
+end
+
+local function drawBeam(emitter: Model, from: Vector3?, to: Vector3?)
+	local beam = emitter:FindFirstChild("Beam")
+	if from == nil or to == nil then
+		if beam then
+			beam:Destroy()
+		end
+		return
+	end
+	local part: Part
+	if beam and beam:IsA("Part") then
+		part = beam
+	else
+		part = Instance.new("Part")
+		part.Name = "Beam"
+		part.Shape = Enum.PartType.Cylinder
+		part.Material = Enum.Material.Neon
+		part.Color = SKY_BLUE
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.CastShadow = false
+		part.Transparency = 0.15
+		part.Parent = emitter
+	end
+	local length = (to - from).Magnitude
+	part.Size = Vector3.new(length, 0.08, 0.08)
+	part.CFrame = CFrame.lookAt((from + to) / 2, to) * CFrame.Angles(0, math.pi / 2, 0)
+end
+
+-- QA W7: only wood breaks the beam. Placed walls and players do not.
+function LogicService._laserBroken(run: Run, emitter: Model): boolean
+	local receiver, dist = partnerOf(run, emitter)
+	local ePort, eDir = portOf(emitter, AutomationLogic.BeamPortZ)
+	if not receiver or not dist or not ePort or not eDir then
+		drawBeam(emitter, nil, nil)
+		return false
+	end
+	local endPoint = ePort + eDir * dist
+	local folder = woodFolder()
+	if folder == nil then
+		drawBeam(emitter, ePort, endPoint)
+		return false
+	end
+	local ok, hit = pcall(function()
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { folder }
+		return workspace:Raycast(ePort, eDir * dist, params)
+	end)
+	local broken = ok and hit ~= nil
+	-- A broken beam stops on the wood's face; it is never drawn through it.
+	local stop = if broken and hit then (hit :: RaycastResult).Position else endPoint
+	drawBeam(emitter, ePort, stop)
+	return broken
+end
+
+-- Drop the targets of this plot's pieces that are gone (sold, or a stale
+-- registration). PlotService calls Sync after a sale.
+local function dropGoneTargets(host: Host, profile: Profile)
+	local live: { [string]: boolean } = {}
+	for _, item in ipairs(profile.plot.placed) do
+		live[item.uid] = true
+	end
+	for uid, folder in pairs(targetHost) do
+		if folder == host.items and not live[uid] then
+			targets[uid] = nil
+			targetHost[uid] = nil
+		end
+	end
+end
+
 local function applyItem(run: Run, item: PlotLogic.Placed, who: Player?): string?
 	local graph = run.graph
 	if not graph then
@@ -386,6 +728,13 @@ local function applyItem(run: Run, item: PlotLogic.Placed, who: Player?): string
 		end
 	elseif role == "hatch" then
 		poseHatch(model, on)
+	elseif role == "belt" or role == "machine" or role == "detector" then
+		LogicService._applyMachine(graph, item, model)
+		if role == "detector" then
+			setDetectorLamp(model, on)
+		end
+	elseif role == "sweeper" then
+		sweeperInput(run, item, model, on)
 	elseif role ~= nil and GLOW_ROLE[role] then
 		setLamp(model, id, on)
 		if role == "button" or role == "plate" then
@@ -505,6 +854,7 @@ function LogicService.Restore(host: Host, profile: Profile, who: Player?)
 end
 
 function LogicService.Sync(host: Host, profile: Profile, who: Player?)
+	dropGoneTargets(host, profile)
 	if type(profile.plot.wires) == "table" then
 		profile.plot.wires = WireLogic.Live(profile.plot.wires, profile.plot.placed)
 	end
@@ -840,14 +1190,158 @@ local function onTriggered(p: ProximityPrompt, handler: (Player) -> ())
 	end
 end
 
-local function savedSetting(profile: Profile?, uid: string, key: string, default: number): number
-	if profile and type(profile.plot.logic) == "table" then
-		local bag = profile.plot.logic[uid]
-		if type(bag) == "table" and type(bag[key]) == "number" then
-			return bag[key]
-		end
+---------------------------------------------------------------------------
+-- Lane W: the owner's belt prompts and target registration
+---------------------------------------------------------------------------
+
+local function ownerCheck(ctx: Context, who: Player, budget: string): (Player?, Profile?)
+	local owner, profile = ctx.ownerOf()
+	if owner == nil or profile == nil then
+		return nil, nil
 	end
-	return default
+	-- QA W8: owner only, rate limited, standing near the piece.
+	if who.UserId ~= owner.UserId then
+		notify(who, AutomationLogic.OwnerOnlyLine)
+		return nil, nil
+	end
+	if not RateLimiter.Allow(who, budget) then
+		return nil, nil
+	end
+	if not near(who, ctx.slot, ctx.item) then
+		notify(who, WireLogic.Message("reach") or "")
+		return nil, nil
+	end
+	return owner, profile
+end
+
+local function reverseText(reversed: boolean): string
+	return if reversed then "Run forward" else "Reverse"
+end
+
+-- The owner's Reverse prompt: saved on the piece (item.reversed).
+function LogicService.Reverse(ctx: Context, who: Player): boolean
+	if not AutomationLogic.CanReverse(ctx.item.blueprintId) then
+		return false
+	end
+	local owner = ownerCheck(ctx, who, "BeltReverse")
+	if not owner then
+		return false
+	end
+	local item = ctx.item :: any
+	local reversed = item.reversed ~= true
+	item.reversed = if reversed then true else nil
+	ctx.model:SetAttribute("Reversed", reversed)
+	local p = ctx.model:FindFirstChild("ReversePrompt", true)
+	if p and p:IsA("ProximityPrompt") then
+		p.ActionText = reverseText(reversed)
+	end
+	notify(who, if reversed then AutomationLogic.ReverseLine else AutomationLogic.ForwardLine)
+	return true
+end
+
+-- The owner's Flip prompt on a Switch Belt: mirrors the diverter (item.flip).
+function LogicService.FlipBelt(ctx: Context, who: Player): boolean
+	if not AutomationLogic.CanFlip(ctx.item.blueprintId) then
+		return false
+	end
+	local owner = ownerCheck(ctx, who, "BeltFlip")
+	if not owner then
+		return false
+	end
+	local item = ctx.item :: any
+	local flip = item.flip ~= true
+	item.flip = if flip then true else nil
+	ctx.model:SetAttribute("Flip", flip)
+	notify(who, AutomationLogic.FlipLine)
+	return true
+end
+
+local function filterObject(filter: number): string
+	return "Wood Detector: " .. AutomationLogic.FilterName(filter)
+end
+
+-- The owner steps a Wood Detector's filter: any wood, then each wood in
+-- WoodData order. Saved in profile.plot.logic[uid].filter.
+function LogicService.StepFilter(ctx: Context, who: Player): number?
+	local _, profile = ownerCheck(ctx, who, "DetectorFilter")
+	if not profile then
+		return nil
+	end
+	if type(profile.plot.logic) ~= "table" then
+		profile.plot.logic = {}
+	end
+	local bag = profile.plot.logic[ctx.item.uid]
+	if type(bag) ~= "table" then
+		bag = {}
+		profile.plot.logic[ctx.item.uid] = bag
+	end
+	local nextFilter = AutomationLogic.NextFilter(bag.filter)
+	bag.filter = if nextFilter == 0 then nil else nextFilter
+	if next(bag) == nil then
+		profile.plot.logic[ctx.item.uid] = nil
+	end
+	ctx.model:SetAttribute("Filter", nextFilter)
+	local p = ctx.model:FindFirstChild("FilterPrompt", true)
+	if p and p:IsA("ProximityPrompt") then
+		p.ObjectText = filterObject(nextFilter)
+	end
+	notify(who, "Watching for: " .. AutomationLogic.FilterName(nextFilter))
+	return nextFilter
+end
+
+local function targetFor(model: Model): LogicTarget
+	return {
+		power = function(on: boolean)
+			-- Only an unpowered piece carries the attribute, so an unwired
+			-- plot looks exactly as it did before Lane W.
+			model:SetAttribute("PowerIn", if on then nil else false)
+		end,
+		reverse = function(on: boolean)
+			model:SetAttribute("WireReverse", if on then true else nil)
+		end,
+	}
+end
+
+function LogicService._attachMachine(ctx: Context)
+	local id = ctx.item.blueprintId
+	local item = ctx.item :: any
+	local model = ctx.model
+	local uid = ctx.item.uid
+	LogicService.RegisterTarget(uid, targetFor(model))
+	targetHost[uid] = ctx.slot.items
+	if AutomationLogic.CanReverse(id) then
+		model:SetAttribute("Reversed", if item.reversed == true then true else nil)
+	end
+	if AutomationLogic.CanFlip(id) then
+		model:SetAttribute("Flip", if item.flip == true then true else nil)
+	end
+	if model:FindFirstChild("ReversePrompt", true) then
+		return -- a rebuilt model keeps its prompts
+	end
+	local host: Instance = model.PrimaryPart or model
+	local object = nameOf(ctx.item)
+	if AutomationLogic.CanReverse(id) then
+		local p = prompt(host, "ReversePrompt", reverseText(item.reversed == true), object, "Interact", 0)
+		onTriggered(p, function(who: Player)
+			LogicService.Reverse(ctx, who)
+		end)
+	end
+	if AutomationLogic.CanFlip(id) then
+		local p = prompt(host, "BeltFlipPrompt", "Flip", object, "Open", 0)
+		onTriggered(p, function(who: Player)
+			LogicService.FlipBelt(ctx, who)
+		end)
+	end
+	local _, def = AutomationLogic.Get(id)
+	if def and def.shape == "detector" then
+		local _, profile = ctx.ownerOf()
+		local filter = AutomationLogic.CleanFilter(savedSetting(profile, uid, "filter", 0))
+		model:SetAttribute("Filter", filter)
+		local p = prompt(host, "FilterPrompt", "Filter", filterObject(filter), "Open", 0)
+		onTriggered(p, function(who: Player)
+			LogicService.StepFilter(ctx, who)
+		end)
+	end
 end
 
 function LogicService.Attach(ctx: Context)
@@ -860,6 +1354,9 @@ function LogicService.Attach(ctx: Context)
 			run.toldCap = true
 			notify(owner, WireLogic.Message("items") or "")
 		end
+	end
+	if WireLogic.IsMachine(id) then
+		LogicService._attachMachine(ctx)
 	end
 	if role == "switch" or role == "lever" then
 		tip(ctx.model, id, profile ~= nil and WireLogic.IsOn(profile.plot.switches, ctx.item.uid))
@@ -934,6 +1431,8 @@ local function overlapParams(): any
 	return plateParams
 end
 
+overlapParamsFn = overlapParams
+
 local function occupied(model: Model): boolean
 	local root = model:FindFirstChild("Root")
 	if not root or not root:IsA("BasePart") then
@@ -978,12 +1477,32 @@ local function sense(run: Run, dt: number)
 		return
 	end
 	run.senseAcc = 0
+	local tick = (run.laserTick or 0) + 1
+	run.laserTick = tick
+	-- Lasers raycast at AutomationLogic.LaserHz, every other 0.1 s step.
+	local laserStep = tick % math.max(1, math.floor(10 / AutomationLogic.LaserHz + 0.5)) == 0
+	local lasers = 0
 	for _, item in ipairs(run.profile.plot.placed) do
 		local spec = WireLogic.Spec(item.blueprintId)
-		if spec and spec.sense then
+		if spec and spec.sense and graph.nodes[item.uid] ~= nil then
 			local model = modelOf(run.host, item.uid)
 			if model then
-				local on = occupied(model)
+				local on: boolean
+				if spec.role == "detector" then
+					on = detectorSees(run, item, model)
+				elseif spec.role == "laser" then
+					lasers += 1
+					if lasers > AutomationLogic.MaxLaserPairs then
+						drawBeam(model, nil, nil)
+						on = false
+					elseif laserStep then
+						on = LogicService._laserBroken(run, model)
+					else
+						on = LogicGraph.On(graph, item.uid)
+					end
+				else
+					on = occupied(model)
+				end
 				if LogicGraph.On(graph, item.uid) ~= on then
 					LogicGraph.Set(graph, item.uid, 1, on)
 					applyReport(run, run.owner)

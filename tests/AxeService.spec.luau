@@ -241,4 +241,20 @@ return function(t)
 			t.eq(only.profile.axes[1].id, "RustyAxe")
 		end
 	)
+	t.test("the axe in hand swings with its temper; the catalog is untouched; no temper is the plain axe", function()
+		local s = setup({ { uid = "steel", id = "SteelAxe" }, { uid = "rusty", id = "RustyAxe" } })
+		local ItemCatalog = t.shared("ItemCatalog")
+		local plain = ItemCatalog.GetAxe("SteelAxe")
+		t.eq(s.AxeService.GetEquippedAxe(s.player), plain, "untempered: the catalog axe")
+		s.profile.temper = { steel = { prefix = "Heavy", tier = 2 } }
+		local hot = s.AxeService.GetEquippedAxe(s.player)
+		t.ok(math.abs(hot.v2.damage - plain.v2.damage * 1.2) < 1e-9, "Heavy II damage")
+		t.eq(hot.temper.prefix, "Heavy")
+		s.profile.temper = { steel = { prefix = "Keen", tier = 1 } }
+		local keen = s.AxeService.GetEquippedAxe(s.player)
+		t.ok(math.abs(keen.v2.cooldown - plain.v2.cooldown * 0.92) < 1e-9, "Keen I cooldown")
+		s.profile.temper = { rusty = { prefix = "Heavy", tier = 3 } }
+		t.eq(s.AxeService.GetEquippedAxe(s.player), plain, "another axe's temper doesn't leak")
+		t.eq(ItemCatalog.GetAxe("SteelAxe").v2.damage, plain.v2.damage)
+	end)
 end

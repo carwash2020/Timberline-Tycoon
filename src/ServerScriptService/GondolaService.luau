@@ -48,11 +48,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
 local GondolaRide = require(ReplicatedStorage.Shared.GondolaRide)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local SkyQuestLogic = require(ReplicatedStorage.Shared.SkyQuestLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local EconomyService = require(script.Parent.EconomyService)
+local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
 
 local GondolaService = {}
@@ -339,6 +342,42 @@ function GondolaService.Init(map: Instance, notifyFn: (Player, string) -> ())
 	end)
 end
 
+-- Whether this ride may set off: up needs the Gondola Pass, down never
+-- does (nobody is stranded on the isles). A refusal toasts why and charges
+-- nothing.
+function GondolaService.MayRide(player: Player, direction: "up" | "down"): boolean
+	local profile = ProfileService.GetProfile(player)
+	local pass = profile ~= nil and ((profile :: any).gondolaPass == true or (profile :: any).skyPass == true)
+	if SkyQuestLogic.CanRide(direction, pass) then
+		return true
+	end
+	notify(player, SkyQuestLogic.RefuseText)
+	return false
+end
+
+-- The gate sign by a station that rides up: the requirement in words
+-- (GateWords; the fare is on the prompt). It stands off the platform's
+-- front-left corner, past the steps, facing the way players walk in, and
+-- collides with nothing.
+GondolaService.GateSignOffset = CFrame.new(-10.5, -0.5, -8.5)
+
+function GondolaService.GateSign(platform: BasePart): Model
+	local sign = BuildingArt.Signpost("SKYROOT GONDOLA\n" .. SkyQuestLogic.GateWords)
+	sign.Name = "GondolaGateSign"
+	-- Built around the origin with its feet at y = 0, so move that frame (a
+	-- bare PivotTo would put the sign's middle there and sink it).
+	sign:PivotTo(platform.CFrame * GondolaService.GateSignOffset * sign:GetPivot())
+	for _, d in ipairs(sign:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+		end
+	end
+	sign.Parent = platform.Parent
+	return sign
+end
+
 function GondolaService._setup(map: Instance)
 	local function station(name: string): BasePart
 		local model = map:WaitForChild(name, 30)
@@ -374,10 +413,10 @@ function GondolaService._setup(map: Instance)
 		local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
 		return root ~= nil and root:IsA("BasePart") and (root.Position - platform.Position).Magnitude <= STATION_RANGE
 	end
-	local function addPrompt(platform: BasePart, action: string, go: (Player) -> ())
+	local function addPrompt(platform: BasePart, action: string, go: (Player) -> (), objectText: string?)
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.ActionText = action .. " (" .. fee .. ")"
-		prompt.ObjectText = "Skyroot Gondola"
+		prompt.ObjectText = objectText or "Skyroot Gondola"
 		prompt.MaxActivationDistance = 10
 		prompt.HoldDuration = 0.5
 		prompt.RequiresLineOfSight = false
@@ -389,12 +428,25 @@ function GondolaService._setup(map: Instance)
 			end
 		end)
 	end
+	-- Up needs the Gondola Pass (Gus's Charter); the words are on the
+	-- prompt, the fare is in its action text.
+	local upText = "Skyroot Gondola · " .. SkyQuestLogic.GateWords
+	for _, platform in ipairs({ town, base }) do
+		local ok, err = pcall(GondolaService.GateSign, platform)
+		if not ok then
+			warn("[GondolaService] gate sign: " .. tostring(err))
+		end
+	end
 	addPrompt(town, "Ride up", function(player)
-		ride(player, townUp, landingOn(top))
-	end)
+		if GondolaService.MayRide(player, "up") then
+			ride(player, townUp, landingOn(top))
+		end
+	end, upText)
 	addPrompt(base, "Ride up", function(player)
-		ride(player, baseUp, landingOn(top))
-	end)
+		if GondolaService.MayRide(player, "up") then
+			ride(player, baseUp, landingOn(top))
+		end
+	end, upText)
 	addPrompt(top, "Ride down", function(player)
 		ride(player, townDown, landingOn(town))
 	end)

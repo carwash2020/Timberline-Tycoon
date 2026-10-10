@@ -1324,4 +1324,39 @@ return function(t)
 		Schema.Migrate(data)
 		t.eq(data.daily, once, "a second migrate leaves it identical")
 	end)
+
+	t.test(
+		"Lane W: a save keeps reversed only on a belt and flip only on a Switch Belt, and old saves gain nothing",
+		function()
+			local Schema, data = fresh()
+			data.plot.placed = {
+				{ uid = "old", blueprintId = "ConveyorStraight", x = 0, z = 0, rot = 0 },
+				{ uid = "rev", blueprintId = "ConveyorStraight", x = 4, z = 0, rot = 0, reversed = true },
+				{
+					uid = "junk",
+					blueprintId = "ConveyorStraight",
+					x = 8,
+					z = 0,
+					rot = 0,
+					reversed = "yes",
+					flip = true,
+				},
+				{ uid = "saw", blueprintId = "SawmillRickety", x = 12, z = 0, rot = 0, reversed = true },
+				{ uid = "sb", blueprintId = "SwitchBelt", x = 20, z = 0, rot = 0, flip = true, reversed = true },
+			}
+			Schema.Migrate(data)
+			local by = {}
+			for _, item in ipairs(data.plot.placed) do
+				by[item.uid] = item
+			end
+			t.eq({ by.old.reversed, by.old.flip }, { nil, nil }, "an old save gains no fields")
+			t.eq(by.rev.reversed, true)
+			t.eq({ by.junk.reversed, by.junk.flip }, { nil, nil })
+			t.eq(by.saw.reversed, nil, "a sawmill never reverses")
+			t.eq({ by.sb.flip, by.sb.reversed }, { true, true })
+			local before = t.shared("Util").deepCopy(data.plot.placed)
+			Schema.Migrate(data)
+			t.eq(data.plot.placed, before, "migrating again changes nothing")
+		end
+	)
 end
