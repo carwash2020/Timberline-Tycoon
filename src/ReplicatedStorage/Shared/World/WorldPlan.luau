@@ -80,6 +80,12 @@ function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxS
 	if dx * dx + dz * dz < (cone.radius * 0.55) ^ 2 then
 		return false
 	end
+	-- The pull-through bays face south: no tree stands in the lanes ahead of
+	-- them down to z -150 (the Starter Forest now reaches up to the lot).
+	local lot = WorldLayout.ParkingLot
+	if x > lot.x0 - 6 and x < lot.x1 + 6 and z < lot.z0 and z > -150 then
+		return false
+	end
 	if TerrainGen.RoadClearance(x, z) < (roadClearance or 6) then
 		return false
 	end
@@ -1613,7 +1619,7 @@ function WorldPlan.Town(): Town
 		{ "Crate", 80, 102, 0.5 }, -- clear of the mill road's east leg
 		{ "Planter", -61, 98 },
 		{ "Planter", -105, 85.5 }, -- (was -103.5, 88: the Tool Shed grew 6.6 wider, its west wall now reaches it)
-		{ "Mailbox", -121, 94, 0 },
+		{ "Mailbox", -121, 99, 0 }, -- ring map: the Hills Road (z 66 to 94) now starts at x -125, so 5 studs off its edge
 		{ "FlowerBox", -97, 85.3, 0 },
 		{ "LogPile", 35.5, 131, 0 }, -- east of the mill, clear of the yard lamp and the sell station
 		{ "LogPile", 35.5, 137, 0.1 },
@@ -1692,12 +1698,10 @@ function WorldPlan.Town(): Town
 	-- the street, the pad or a path (WorldPlan.spec).
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
-		-- Just north of the truck-lot path (the apron ends at z=70 and the
-		-- posts reach about five studs south), past the lot's east rail,
-		-- facing the plot road (M1.5: it stood at (124, 64), then on the
-		-- apron at (148.5, 67)). Clear of that apron, the next headland is
-		-- in sight of the lighthouse (WorldPlan.Lighthouse).
-		{ text = "PLOT DISTRICT\nLand Office: buy a plot\nand build on it", cframe = standing(148.5, 76, 0, 40) },
+		-- Ring map: just north of the East Link (z 66 to 94; the posts reach
+		-- about five studs south), past the lot's east rail, facing town
+		-- (it stood at (148.5, 76), which the link now covers).
+		{ text = "PLOT DISTRICT\nLand Office: buy a plot\nand build on it", cframe = standing(147, 104, 0, 40) },
 		-- The turn off the street's east end, just north of PlazaEastMouth,
 		-- facing back down the path to the truck lot.
 		{ text = "TRUCK LOT", cframe = standing(82, 100, 82, 70) },
@@ -1740,7 +1744,7 @@ function WorldPlan.Town(): Town
 	local greenery: { Greenery } = {}
 	local greenSpots: { { any } } = { -- { kind, x, z, size, woodId? }
 		-- The pine band behind the mill and the gondola (z 140 to 200).
-		{ "tree", -12, 146, 1.22, "pine" },
+		{ "tree", -12, 170, 1.22, "pine" }, -- ring map: clear of the gondola's east run (the bushes beside the station went)
 		{ "tree", 4, 153, 1, "pine" },
 		{ "tree", -2, 169, 1.22, "pine" },
 		{ "tree", 9, 180, 1, "pine" },
@@ -1753,9 +1757,9 @@ function WorldPlan.Town(): Town
 		{ "tree", -134, 150, 1, "pine" },
 		{ "tree", -146, 176, 1.22, "pine" },
 		-- Birch and maple round the edges.
-		{ "tree", -148, 80, 1.22, "maple" },
+		{ "tree", -148, 50, 1.22, "maple" }, -- ring map: off the Hills Road (z 66 to 94)
 		{ "tree", -132, 112, 1, "birch" },
-		{ "tree", -140, 96, 1.22, "birch" },
+		{ "tree", -140, 106, 1.22, "birch" },
 		{ "tree", -146, 128, 1, "maple" },
 		{ "tree", -88, 4, 1, "maple" },
 		{ "tree", -62, 6, 1, "birch" },
@@ -1782,15 +1786,13 @@ function WorldPlan.Town(): Town
 		{ "bush", -6, 143, 2.6 },
 		{ "bush", 10, 142.5, 2.8 },
 		{ "bush", -51.5, 146, 2.8 },
-		{ "bush", -28, 148, 2.6 },
-		{ "bush", -28.5, 154, 2.4 },
 		-- Flower beds: off the plaza's south-west corner, by the spawn walk,
 		-- at the mouths of the Hearth & Home path, by the well. (None where
 		-- the townsfolk walk: NPCData's routes pass 3 studs or more away.)
 		{ "flowers", -108, 54, 2.4 },
 		{ "flowers", -8.4, 44, 2 },
 		{ "flowers", -61.5, 90, 2.2 },
-		{ "flowers", -123, 90, 1.8 },
+		{ "flowers", -123, 102, 1.8 },
 		{ "flowers", -57.5, 46, 2.4 },
 		-- Rocks.
 		{ "rock", -55, 150, 1.8 },

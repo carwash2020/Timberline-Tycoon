@@ -934,7 +934,8 @@ return function(t)
 		end
 		t.ok(caught("bush", -40, 77, "MainStreet"), "a bush on the street is caught")
 		t.ok(caught("tree", 60, 30, "parking lot"), "a tree in the lot is caught")
-		t.ok(caught("tree", -60, 17, "road"), "a tree by the Hills Road is caught")
+		-- Ring map: the Hills Road starts at (-125, 80) and runs west (it came up from the south-west before).
+		t.ok(caught("tree", -140, 80, "road"), "a tree by the Hills Road is caught")
 		t.ok(caught("flowers", 40, -30, "pull-out of slot 3"), "a flower bed in a pull-out is caught")
 		-- Where a tree by the old, smaller lot stood (M1.5), and a bush north
 		-- of the Flatbed's street-side bay (phase 12).

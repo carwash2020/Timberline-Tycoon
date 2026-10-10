@@ -33,10 +33,10 @@ local DealershipLot = {}
 
 -- Southwest corner of the rows' floor (the hall's lobby is west of it), inside
 -- the reserved lawn (WorldLayout.Reserved DealershipLot). The hall's front wall
--- stands at z 96 (outside face), north of the Land Office and its sign, so the
+-- stands at z 100 (outside face; the East Link, z 66 to 94, now runs by it), north of the Land Office and its sign, so the
 -- hall stays clear of them and of the spawn's line to the lighthouse.
 DealershipLot.OriginX = 207
-DealershipLot.OriginZ = 96.8
+DealershipLot.OriginZ = 100.2
 
 -- The hall round the bays (BuildingArt's Dealership): a lobby this wide at
 -- the west end with the counter at the back and the door in front, the rows
