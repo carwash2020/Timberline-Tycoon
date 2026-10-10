@@ -12,6 +12,8 @@
 --     and boards lying about (the Warehouse stand-in): a full plot stops the
 --     line until some is sold or loaded.
 -- The machines' own throughput caps live in SawmillService and PlanerService.
+-- Lane W: LogicService sets PowerIn / WireReverse / WireSide from the wires,
+-- and the owner's Reverse and Flip prompts set Reversed / Flip.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -60,10 +62,21 @@ function BeltService.Tick(): number
 			loose = if online then c.outputs(ownerId) else 0
 			counted[ownerId] = loose
 		end
-		local speed = AutomationLogic.BeltSpeed(online, loose)
+		local base = AutomationLogic.BeltSpeed(online, loose)
+		-- Lane W: PowerIn false (a wire turned it off) stops it; Reversed (the
+		-- owner's prompt) and WireReverse (a wired reverse input) each flip it.
+		-- A belt nobody wired has neither attribute, so it runs as before.
+		local powered = belt:GetAttribute("PowerIn") ~= false
+		local reversed = (belt:GetAttribute("Reversed") == true) ~= (belt:GetAttribute("WireReverse") == true)
+		if belt:GetAttribute("BeltShape") == "switch" then
+			local wireSide = belt:GetAttribute("WireSide") == true
+			local flip = belt:GetAttribute("Flip") == true
+			belt:SetAttribute("Side", AutomationLogic.SwitchSide(flip, wireSide, wireSide))
+		end
+		local speed = AutomationLogic.SignedSpeed(base, powered, reversed)
 		MachineArt.AimBelt(belt, speed)
-		belt:SetAttribute("Running", speed > 0)
-		if speed > 0 then
+		belt:SetAttribute("Running", speed ~= 0)
+		if speed ~= 0 then
 			going += 1
 		end
 	end

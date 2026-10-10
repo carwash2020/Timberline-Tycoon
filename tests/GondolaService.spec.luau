@@ -135,6 +135,7 @@ return function(t)
 			handoverFails = options.handoverFails,
 		}
 		current = w
+		w.profiles = {}
 		w.workspace = Instance.new("Folder")
 		w.workspace.Name = "Workspace"
 		w.heartbeat = signal()
@@ -158,6 +159,12 @@ return function(t)
 				RateLimiter = {
 					Allow = function()
 						return true
+					end,
+				},
+				-- The Gondola Pass (Gus's Charter) is read from the save.
+				ProfileService = {
+					GetProfile = function(player)
+						return w.profiles[player]
 					end,
 				},
 			},
@@ -370,7 +377,7 @@ return function(t)
 	end)
 
 	t.test("a ride: the fee once, the rider seated, the cabin on their device, the ride written on it", function()
-		local w = world()
+		local w = world({})
 		local ann = player("Ann")
 		w.G._ride(ann, townUp, LANDING)
 		t.eq(#w.spent, 1)
@@ -411,7 +418,7 @@ return function(t)
 	end)
 
 	t.test("the server never moves a cabin the rider's device has", function()
-		local w = world()
+		local w = world({})
 		local ann = player("Ann")
 		w.G._ride(ann, townUp, LANDING)
 		local cabin = cabinOf(w, ann)
@@ -427,7 +434,7 @@ return function(t)
 	end)
 
 	t.test("at rideSec the server ends the ride and lands the rider on the platform", function()
-		local w = world()
+		local w = world({})
 		local ann = player("Ann")
 		w.G._ride(ann, townUp, LANDING)
 		local cabin = cabinOf(w, ann)
@@ -449,7 +456,7 @@ return function(t)
 	end)
 
 	t.test("jumping out mid-ride ends it there: no landing, no refund", function()
-		local w = world()
+		local w = world({})
 		local ann = player("Ann")
 		local before = ann.Character.PrimaryPart.CFrame
 		w.G._ride(ann, townUp, LANDING)
@@ -471,7 +478,7 @@ return function(t)
 	end)
 
 	t.test("leaving or dying mid-ride leaves nothing behind", function()
-		local w = world()
+		local w = world({})
 		local ann, ben = player("Ann"), player("Ben")
 		w.G._ride(ann, townUp, LANDING)
 		w.G._ride(ben, townUp, LANDING)
@@ -502,7 +509,7 @@ return function(t)
 	end)
 
 	t.test("no ride while riding, while seated, or without the fare", function()
-		local w = world()
+		local w = world({})
 		local ann = player("Ann")
 		w.G._ride(ann, townUp, LANDING)
 		w.G._ride(ann, townUp, LANDING)
@@ -526,7 +533,7 @@ return function(t)
 	end)
 
 	t.test("two riders at once: a cabin each, and one jumping out leaves the other riding", function()
-		local w = world()
+		local w = world({})
 		local ann, ben = player("Ann"), player("Ben")
 		w.G._ride(ann, townUp, LANDING)
 		w.at(3)
@@ -657,5 +664,53 @@ return function(t)
 		d.C.Start()
 		d.step(GONDOLA.rideSec + 5)
 		t.ok(nearV(mine.PrimaryPart:FindFirstChild("RidePosition").Position, townUp[#townUp]), "held at the end")
+	end)
+	t.test("Gondola gate: no ride up without the Gondola Pass; down always; no fare on a refusal", function()
+		local w = world({})
+		local ann = player("Ann")
+		w.profiles[ann] = { gondolaPass = false, skyPass = false }
+		t.eq(w.G.MayRide(ann, "up"), false, "no pass, no ride up")
+		t.eq(#w.toasts, 1, "one toast")
+		t.eq(w.toasts[1].message, "Gondola Pass needed. Ask Gus about his charter.")
+		t.eq(#w.spent, 0, "nothing charged for a refusal")
+		t.eq(w.G.MayRide(ann, "down"), true, "the ride down is never gated")
+		w.profiles[ann] = { gondolaPass = true }
+		t.eq(w.G.MayRide(ann, "up"), true, "with the pass")
+		w.profiles[ann] = { gondolaPass = false, skyPass = true }
+		t.eq(w.G.MayRide(ann, "up"), true, "skyPass (the old name) counts too")
+		local bob = player("Bob")
+		t.eq(w.G.MayRide(bob, "up"), false, "no save loaded yet: no ride up")
+		t.eq(w.G.MayRide(bob, "down"), true, "but down still works")
+	end)
+
+	t.test("the gate sign stands off the platform, in words, colliding with nothing", function()
+		local w = world({})
+		local platform = Instance.new("Part")
+		platform.Size = Vector3.new(10, 1, 10)
+		platform.CFrame = CFrame.new(100, 20.5, -40)
+		local station = Instance.new("Model")
+		platform.Parent = station
+		station.Parent = w.workspace
+		local sign = w.G.GateSign(platform)
+		t.eq(sign.Parent, station)
+		local found = false
+		for _, d in ipairs(sign:GetDescendants()) do
+			if d:IsA("BasePart") then
+				t.eq(d.CanCollide, false, d.Name .. " doesn't collide")
+				t.eq(d.Anchored, true, d.Name .. " is anchored")
+			end
+			if d:IsA("TextLabel") and string.find(d.Text, "Gondola Pass from Gus", 1, true) then
+				found = true
+			end
+		end
+		t.ok(found, "the requirement is written on the sign")
+		local at = sign:GetPivot().Position
+		local flat = Vector3.new(at.X - 100, 0, at.Z + 40)
+		t.ok(flat.Magnitude > 7.5, "clear of the 10 x 10 platform and its steps")
+		-- Its feet on the ground by the platform (top 21, ground 20): the
+		-- board's middle stands 7 up, not sunk to the sign's own middle.
+		local board = sign:FindFirstChild("Board", true) :: BasePart
+		t.ok(board ~= nil, "the sign has its board")
+		t.ok(math.abs(board.CFrame.Y - 27) < 0.05, "the board stands 7 up from the ground: " .. board.CFrame.Y)
 	end)
 end

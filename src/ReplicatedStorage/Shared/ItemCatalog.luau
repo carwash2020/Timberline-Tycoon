@@ -748,9 +748,10 @@ export type PlanerDef = {
 
 -- One piece of the conveyor kit (V2_PLAN.md §10). Footprint in studs.
 export type BeltDef = {
-	shape: string, -- "straight" | "turn" | "funnel"
+	shape: string, -- "straight" | "turn" | "funnel" | "switch" | "tilted" | "support" | "detector"
 	width: number,
 	depth: number,
+	rise: number?, -- tilted: studs the outfeed end sits above the infeed end (TLD-1 LIFT 2.0)
 }
 
 -- $7,500, replacing the $12,200 placeholder.
@@ -902,6 +903,53 @@ ItemCatalog.Machines = {
 		boxW = 4,
 		boxD = 4,
 		belt = { shape = "funnel", width = 8, depth = 8 },
+	},
+	-- Lane W practical automation (Connor, 8 Oct 2026). TLD-1 footprints
+	-- (reference LINE-STANDARD.md section 4). Prices are PROPOSALS (no
+	-- Designer price yet); Connor confirms them in the W PR.
+	SwitchBelt = {
+		id = "SwitchBelt",
+		displayName = "Switch Belt",
+		priceCash = 150, -- PROPOSAL
+		shop = "Sparkworks", -- stocked with the Sparkworks counter (Lane F task 16)
+		color = "#C9A24A",
+		placeFromBox = true,
+		boxW = 4,
+		boxD = 4,
+		belt = { shape = "switch", width = 12, depth = 8 },
+	},
+	TiltedBelt = {
+		id = "TiltedBelt",
+		displayName = "Tilted Belt",
+		priceCash = 120, -- PROPOSAL
+		shop = "Sparkworks", -- stocked with the Sparkworks counter (Lane F task 16)
+		color = "#6B5B45",
+		placeFromBox = true,
+		boxW = 4,
+		boxD = 4,
+		belt = { shape = "tilted", width = 6, depth = 8, rise = 2 },
+	},
+	BeltSupport = {
+		id = "BeltSupport",
+		displayName = "Belt Support",
+		priceCash = 40, -- PROPOSAL
+		shop = "Sparkworks", -- stocked with the Sparkworks counter (Lane F task 16)
+		color = "#7A5230",
+		placeFromBox = true,
+		boxW = 4,
+		boxD = 4,
+		belt = { shape = "support", width = 6, depth = 2 },
+	},
+	WoodDetector = {
+		id = "WoodDetector",
+		displayName = "Wood Detector",
+		priceCash = 200, -- PROPOSAL
+		shop = "Sparkworks", -- stocked with the Sparkworks counter (Lane F task 16)
+		color = "#F3E7C9",
+		placeFromBox = true,
+		boxW = 4,
+		boxD = 4,
+		belt = { shape = "detector", width = 8, depth = 4 },
 	},
 	SkyBin = {
 		id = "SkyBin",
