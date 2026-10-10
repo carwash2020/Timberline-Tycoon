@@ -6,6 +6,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local NatureArt = require(ReplicatedStorage.Shared.Art.NatureArt)
 local UndergroundData = require(ReplicatedStorage.Shared.World.UndergroundData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 
@@ -140,6 +141,26 @@ function UndergroundBuilder.Build(parent: Instance): Folder
 		light.Shadows = false
 		light.Parent = part
 	end
+	-- The decline's lamps: a few, shadows off, hung from the roof along the
+	-- grade so the way down is lit from the door to the chamber.
+	local rampLamps = Instance.new("Folder")
+	rampLamps.Name = "RampLights"
+	rampLamps.Parent = folder
+	local samples = UndergroundData.RampSamples
+	for i = 1, UndergroundData.Ramp.lights do
+		local at = samples[math.clamp(math.floor(i / (UndergroundData.Ramp.lights + 0.5) * #samples) + 1, 1, #samples)]
+		local cf = CFrame.new(at.x, at.y + UndergroundData.Ramp.height - 2, at.z)
+		local part =
+			Kit.part(rampLamps, "RampLamp", Vector3.new(1, 1, 1), cf, Color3.fromRGB(255, 220, 160), Enum.Material.Neon)
+		part.Anchored = true
+		part.CanCollide = false
+		local light = Instance.new("PointLight")
+		light.Brightness = 0.6
+		light.Range = 26
+		light.Shadows = false
+		light.Color = Color3.fromRGB(255, 214, 140)
+		light.Parent = part
+	end
 	for _, secret in ipairs(UndergroundData.Secrets) do
 		local mark = Kit.part(
 			folder,
@@ -153,7 +174,30 @@ function UndergroundBuilder.Build(parent: Instance): Folder
 		mark.CanCollide = false
 		mark:SetAttribute("SecretId", secret.id)
 	end
+	UndergroundBuilder.PlaceMouth(parent)
 	return folder
+end
+
+-- The mine mouth (NatureArt.CaveMouth, Lane G's model) at UndergroundData.MineMouth.
+-- The model's door faces -Z and its throat runs to +Z, so it is turned half a
+-- circle: the door faces +Z, toward town, and the throat runs to -Z, into the
+-- hill and down the ramp (UndergroundData.Ramp). Its Body does not collide;
+-- its invisible Collision piece is two pillars and a lintel round the doorway.
+-- The pivot sits 0.4 under the ground at the door, so the stone is never
+-- left standing on a ledge.
+function UndergroundBuilder.MouthCFrame(): CFrame
+	local mouth = UndergroundData.MineMouth
+	return CFrame.new(mouth.x, UndergroundData.Ramp.top - 0.4, mouth.z) * CFrame.Angles(0, math.pi, 0)
+end
+
+function UndergroundBuilder.PlaceMouth(parent: Instance): Model
+	local model = NatureArt.CaveMouth()
+	model.Name = "MineMouth"
+	Kit.placeAt(model, UndergroundBuilder.MouthCFrame())
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	model.Parent = parent
+	CollectionService:AddTag(model, "MineMouth")
+	return model
 end
 
 return UndergroundBuilder

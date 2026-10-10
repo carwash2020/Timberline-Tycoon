@@ -13,7 +13,7 @@ export type Value = { pois: { Poi }, perk: string, grade: "A" | "B" | "C" }
 
 local PLACES = {
 	{ name = "Sawmill", x = 0, z = 110 },
-	{ name = "Pond", x = -40, z = -160 },
+	{ name = "Pond", x = 95, z = -125 },
 	{ name = "Lake", x = -700, z = 180 },
 	{ name = "Mine", x = 150, z = -150 },
 	{ name = "Dock", x = 860, z = 160 },

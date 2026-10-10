@@ -137,7 +137,7 @@ return function(t)
 				t.ok(haul > PlotData.NearHaul, home.name .. " is one of the further homes")
 			end
 		end
-		t.ok(nearCount >= 2 and nearCount <= 6, nearCount .. " homes within a short haul, listed first")
+		t.ok(nearCount >= 4 and nearCount <= 6, nearCount .. " homes within a short haul, listed first")
 		local harsh = { snow = true, volcano = true, grove = true }
 		for i, home in ipairs(PlotData.Homes) do
 			local haul = math.sqrt((home.x - saw.X) ^ 2 + (home.z - saw.Z) ^ 2)
@@ -147,12 +147,8 @@ return function(t)
 			local lo, hi = h, h
 			for x = -80, 80, 40 do
 				for z = -80, 80, 40 do
-					-- MAP_V1 puts a pool in the outer yard of several homes
-					-- (the pond, the lake, the cove). The dry shelf stays level.
-					if TerrainGen.WaterLevelAt(home.x + x, home.z + z) == nil then
-						local sample = TerrainGen.HeightAt(home.x + x, home.z + z)
-						lo, hi = math.min(lo, sample), math.max(hi, sample)
-					end
+					local sample = TerrainGen.HeightAt(home.x + x, home.z + z)
+					lo, hi = math.min(lo, sample), math.max(hi, sample)
 				end
 			end
 			t.ok(hi - lo < 1, string.format("%s shelf varies by %.2f", home.name, hi - lo))
@@ -168,8 +164,9 @@ return function(t)
 			for _, biome in ipairs(BiomeData.All()) do
 				local area = biome.area
 				if area and harsh[biome.id] then
+					local dx, dz = home.x - area.x, home.z - area.z
 					t.ok(
-						not circleHitsSquare(area.x, area.z, area.radius, home.x, home.z, MAX),
+						dx * dx + dz * dz > (area.radius + MAX / 2) ^ 2,
 						string.format("%s sits in %s", home.name, biome.id)
 					)
 				end
@@ -188,7 +185,8 @@ return function(t)
 				end
 			end
 		end
-		t.eq(onYard, 53, "saved trees standing on a yard")
+		-- Ring map, Oct 8: 49 (Ash Gate and West Shelf moved, the pools left the yards).
+		t.eq(onYard, 49, "saved trees standing on a yard")
 		local zones = 0
 		for _, zone in ipairs(WorldLayout.FlatZones) do
 			if zone.name == "Plot" then
@@ -244,29 +242,7 @@ return function(t)
 				local dx = math.abs(drive.x - slot.X)
 				local dz = math.abs(drive.z - slot.Y)
 				t.ok(dx <= MAX / 2 and dz <= MAX / 2, "delivery pad sits on the yard")
-				-- MAP_V1's pond and the orchard pool sit on two delivery edges.
-				-- A corner in that water is the pool, not a second shelf.
-				local function dryOrPool(x, z)
-					if TerrainGen.WaterLevelAt(x, z) == nil then
-						return true
-					end
-					local function inPool(pool)
-						return (x - pool.x) ^ 2 + (z - pool.z) ^ 2 <= (pool.radius + 2) ^ 2
-					end
-					if inPool(WorldLayout.Pond) then
-						return true
-					end
-					for _, pool in ipairs(WorldLayout.Pools) do
-						if inPool(pool) then
-							return true
-						end
-					end
-					if inPool(WorldLayout.Lake) then
-						return true
-					end
-					return false
-				end
-				t.ok(dryOrPool(drive.x, drive.z), "delivery pad is dry")
+				t.eq(TerrainGen.WaterLevelAt(drive.x, drive.z), nil, "delivery pad is dry")
 				local halfL, halfW = PlotData.DeliveryLength / 2, PlotData.DeliveryWidth / 2
 				local tx, tz = -drive.uz, drive.ux
 				for _, corner in ipairs({
@@ -276,7 +252,7 @@ return function(t)
 					{ -drive.ux * halfW - tx * halfL, -drive.uz * halfW - tz * halfL },
 				}) do
 					local x, z = drive.x + corner[1], drive.z + corner[2]
-					t.ok(dryOrPool(x, z), "delivery corner is dry")
+					t.eq(TerrainGen.WaterLevelAt(x, z), nil, "delivery corner is dry")
 					t.ok(
 						math.abs(x - slot.X) <= MAX / 2 + 1 and math.abs(z - slot.Y) <= MAX / 2 + 1,
 						"delivery stays on the pad"
@@ -284,19 +260,16 @@ return function(t)
 				end
 			end
 			-- MAP_V1 centres sit about 118 from the ring, so the 200-stud square
-			-- meets that road. The campsite stays clear, except High Meadow:
-			-- it was moved off the volcano and its centre sits on the ring.
+			-- meets that road. The campsite stays clear on every home.
 			local campsite = PlotData.Tiers[1].size
 			for _, road in ipairs(WorldLayout.Roads) do
-				if not (road.name == "RingRoad" and PlotData.Homes[i].id == "high") then
-					local pts = road.points
-					for s = 1, #pts - 1 do
-						local a, b = pts[s], pts[s + 1]
-						t.ok(
-							not hits(slot.X, slot.Y, campsite, a.X, a.Y, b.X, b.Y, road.width),
-							string.format("plot %d overlaps %s", i, road.name)
-						)
-					end
+				local pts = road.points
+				for s = 1, #pts - 1 do
+					local a, b = pts[s], pts[s + 1]
+					t.ok(
+						not hits(slot.X, slot.Y, campsite, a.X, a.Y, b.X, b.Y, road.width),
+						string.format("plot %d overlaps %s", i, road.name)
+					)
 				end
 			end
 		end

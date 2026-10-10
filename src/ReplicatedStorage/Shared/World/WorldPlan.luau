@@ -1150,6 +1150,12 @@ local function sceneryItems(kind: string, base: CFrame, rng: Kit.Rng): { Scenery
 	return items
 end
 
+-- The stretch of the east coast the lighthouse stands on (ring map: south
+-- of the ferry dock, clear of the Lumen isles' disc and the dock road),
+-- and how far it stands back from the water's edge.
+local LIGHTHOUSE_Z = { -440, -180 }
+local LIGHTHOUSE_BACK = 26 -- studs inland from the water's edge
+
 -- Where the lighthouse lamp will stand: the furthest-east headland the
 -- coast offers, set back on the sand. Scenery keeps off the line from the
 -- spawn to it. Not Lighthouse() itself (that reads the scenery).
@@ -1162,7 +1168,7 @@ local function sightOfLamp(): (Vector3, Vector3)
 	local eye = WorldPlan.Town().spawn + Vector3.new(0, 6, 0)
 	local radius = LandmarkArt.LIGHTHOUSE_RADIUS
 	local tips: { { x: number, z: number } } = {}
-	for z = 120, 460, 4 do
+	for z = LIGHTHOUSE_Z[1], LIGHTHOUSE_Z[2], 4 do
 		local coast = WorldLayout.Coast
 		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt do
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
@@ -1179,7 +1185,7 @@ local function sightOfLamp(): (Vector3, Vector3)
 	end)
 	local lamp = Vector3.new(1203, 48, 236)
 	for _, tip in ipairs(tips) do
-		local x, z = tip.x - 26, tip.z
+		local x, z = tip.x - LIGHTHOUSE_BACK, tip.z
 		local lowest = math.huge
 		local dry = true
 		for _, q in ipairs(WorldPlan.SceneryFootprint(x, z, radius)) do
@@ -1690,7 +1696,7 @@ function WorldPlan.Town(): Town
 		-- posts reach about five studs south), past the lot's east rail,
 		-- facing the plot road (M1.5: it stood at (124, 64), then on the
 		-- apron at (148.5, 67)). Clear of that apron, the next headland is
-		-- in sight, so the lighthouse stands at (1203, 236).
+		-- in sight of the lighthouse (WorldPlan.Lighthouse).
 		{ text = "PLOT DISTRICT\nLand Office: buy a plot\nand build on it", cframe = standing(148.5, 76, 0, 40) },
 		-- The turn off the street's east end, just north of PlazaEastMouth,
 		-- facing back down the path to the truck lot.
@@ -2001,6 +2007,9 @@ end
 -- A sign at each region's gate: beside the Snow Road and the Volcano Road
 -- where they cross the cliff ring, and beside the trail into the hollow.
 -- Separate from RoadSigns, which stay at the road's end.
+-- How far from a cliff ring's middle a gate sign may stand along its road.
+local RIM_SIGN_REACH = 60
+
 function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
 	local out: { Sign } = {}
 	local function setDown(flat: CFrame): (CFrame, boolean)
@@ -2030,28 +2039,48 @@ function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
 		end
 		local pts = road.points
 		local mid = (rim.inner + rim.outer) / 2
-		local bestP, bestDir, bestErr = pts[1], (pts[2] - pts[1]).Unit, math.huge
+		-- Every 6 studs along the road, nearest the rim's middle first: the
+		-- sign stands at the first of them (within RIM_SIGN_REACH of the
+		-- rim) with level ground beside the road (a climbing road's verge
+		-- tilts, so the gap itself may not have it).
+		type Stop = { p: Vector2, dir: Vector2, err: number }
+		local stops: { Stop } = {}
 		for i = 1, #pts - 1 do
 			local a, b = pts[i], pts[i + 1]
 			local len = (b - a).Magnitude
 			local steps = math.max(2, math.floor(len / 6))
 			for s = 0, steps do
 				local p = a:Lerp(b, s / steps)
-				local err = math.abs((p - Vector2.new(rim.cx, rim.cz)).Magnitude - mid)
-				if err < bestErr then
-					bestErr = err
-					bestP = p
-					bestDir = (b - a).Unit
+				local out = (p - Vector2.new(rim.cx, rim.cz)).Magnitude - mid
+				local err = math.abs(out)
+				if err <= RIM_SIGN_REACH and out >= -10 then -- at the rim or on its way in
+					table.insert(stops, { p = p, dir = (b - a).Unit, err = err })
 				end
 			end
 		end
-		local side = Vector2.new(-bestDir.Y, bestDir.X)
+		table.sort(stops, function(x: Stop, y: Stop): boolean
+			return x.err < y.err
+		end)
 		local spot: CFrame? = nil
-		for _, s in ipairs({ 1, -1 }) do
-			local at = bestP + side * (s * (road.width / 2 + SIGN_POST + SIGN_CLEAR + 1))
-			local cf, level = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), Vector3.new(bestP.X, 0, bestP.Y)))
-			if level then
-				spot = cf
+		for _, stop in ipairs(stops) do
+			local side = Vector2.new(-stop.dir.Y, stop.dir.X)
+			for _, s in ipairs({ 1, -1 }) do
+				local at = stop.p + side * (s * (road.width / 2 + SIGN_POST + SIGN_CLEAR + 1))
+				local from = Vector3.new(at.X, 0, at.Y)
+				-- Facing the road, or (on a climb, where only the ground
+				-- across the road is level) facing the drivers coming up it.
+				for _, toward in ipairs({ Vector3.new(stop.p.X, 0, stop.p.Y), from - Vector3.new(stop.dir.X, 0, stop.dir.Y) }) do
+					local cf, level = setDown(CFrame.lookAt(from, toward))
+					if level then
+						spot = cf
+						break
+					end
+				end
+				if spot then
+					break
+				end
+			end
+			if spot then
 				break
 			end
 		end
@@ -3983,10 +4012,12 @@ function WorldPlan.Docks(): { Dock }
 	end
 	-- The east coast, facing the Island across the water.
 	local isle = WorldLayout.Island
+	local coast = WorldLayout.Coast
 	found = nil
 	for k = 0, 30 do
 		local z = isle.z + 10 * math.ceil(k / 2) * (if k % 2 == 0 then 1 else -1)
-		for x = 1080, 1400, 1 do
+		-- From the back of the beach out to the skirt: the first water.
+		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt, 1 do
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
 				found = dockAt("coast", Vector2.new(x - 4, z), Vector2.new(1, 0), 26, WorldLayout.SeaLevel)
 				break
@@ -4011,8 +4042,6 @@ end
 -- lowest under its footprint), its door (-Z) toward town; `lamp` is the
 -- lamp's middle.
 export type Lighthouse = { cframe: CFrame, lamp: Vector3 }
-local LIGHTHOUSE_Z = { 120, 460 }
-local LIGHTHOUSE_BACK = 26 -- studs inland from the water's edge
 WorldPlan.LighthouseSeen = Vector3.new(0, 30, 0) -- the spawn sees the tower from here up, not just its lamp
 
 -- How tall each kind of scenery piece stands, with a stud or two to spare

@@ -120,8 +120,148 @@ function UndergroundData.Cave(id: string): Cave?
 	return byCave[id]
 end
 
--- Mouth of the main mine: open, no rubble. 16 x 16.
+-- Mouth of the main mine: open, no rubble. 16 x 16. The cave-mouth model
+-- (NatureArt.CaveMouth) stands here, turned half a circle so its door faces
+-- +Z (toward town) and its throat runs toward -Z, into the hill.
 UndergroundData.MineMouth = { x = 150, z = -150, width = 16, height = 16 }
+
+-- The decline from the mouth down to the upper mine (ring map, Oct 10; it
+-- was a 16 x 16 shaft straight down for 56 studs). A walkable bore 16 wide
+-- and 14 tall: level under the model's arch, then a steady grade round a
+-- bend and a U-turn to the upper chamber's east wall. The grade is gentle
+-- (about 18 degrees) and the ground over it is raised into a hill
+-- (UndergroundData.HillAt) so the bore is roofed, never an open cut.
+UndergroundData.Ramp = {
+	width = 16,
+	height = 14,
+	top = 3.2, -- the ground at the door (TerrainGen.HeightAt(150, -143) is within a stud)
+	doorZ = -143, -- the door's front plane, where the walk-in starts
+	landing = 15, -- level studs from the door, under the arch (the arch is 15 deep)
+	cover = 6, -- studs of rock the hill keeps over the bore's roof
+	step = 2, -- spacing of the air boxes along the bore
+	lights = 5,
+}
+
+local function rampPoints(): { Vector2 }
+	local pts: { Vector2 } = { Vector2.new(150, UndergroundData.Ramp.doorZ) }
+	local function add(x: number, z: number)
+		table.insert(pts, Vector2.new(x, z))
+	end
+	-- Straight back from the door, a right turn (radius 20), a straight run
+	-- east, a U-turn (radius 20) and a straight run west into the chamber.
+	add(150, -166)
+	for a = 195, 270, 15 do
+		local r = math.rad(a)
+		add(170 + 20 * math.cos(r), -166 + 20 * math.sin(r))
+	end
+	add(200, -186)
+	for a = 75, -90, -15 do
+		local r = math.rad(a)
+		add(200 + 20 * math.cos(r), -206 + 20 * math.sin(r))
+	end
+	add(178, -226)
+	return pts
+end
+
+-- The bore's centre line, a sample every `step` studs: { x, z, s (studs from
+-- the door), y (the floor) }.
+export type RampSample = { x: number, z: number, s: number, y: number }
+local rampSamples: { RampSample } = {}
+local rampLength = 0
+do
+	local ramp = UndergroundData.Ramp
+	local pts = rampPoints()
+	local total = 0
+	for i = 1, #pts - 1 do
+		total += (pts[i + 1] - pts[i]).Magnitude
+	end
+	rampLength = total
+	-- The grade runs from the end of the landing to 8 studs before the
+	-- chamber wall's centre line (the last 8 are level, on the chamber floor).
+	local upper = byCave["mine-upper"]
+	local bottom = if upper then upper.floorY else -48
+	local startS = ramp.landing
+	local endS = total - 8
+	local function floorAt(s: number): number
+		if s <= startS then
+			return ramp.top
+		elseif s >= endS then
+			return bottom
+		end
+		return ramp.top + (bottom - ramp.top) * (s - startS) / (endS - startS)
+	end
+	local walked = 0
+	local n = math.floor(total / ramp.step)
+	local seg = 1
+	for k = 0, n do
+		local s = math.min(k * ramp.step, total)
+		while seg < #pts - 1 and walked + (pts[seg + 1] - pts[seg]).Magnitude < s - 1e-6 do
+			walked += (pts[seg + 1] - pts[seg]).Magnitude
+			seg += 1
+		end
+		local a, b = pts[seg], pts[seg + 1]
+		local len = (b - a).Magnitude
+		local p = a:Lerp(b, if len > 0 then math.clamp((s - walked) / len, 0, 1) else 0)
+		table.insert(rampSamples, { x = p.X, z = p.Y, s = s, y = floorAt(s) })
+	end
+end
+UndergroundData.RampSamples = rampSamples
+UndergroundData.RampLength = rampLength
+-- The grade as rise over run (the descent only).
+UndergroundData.RampGrade = (UndergroundData.Ramp.top - rampSamples[#rampSamples].y)
+	/ (rampLength - 8 - UndergroundData.Ramp.landing)
+
+-- The ground the hill gives the bore: at least floor + height + cover over
+-- the centre line, full for 10 studs either side, then falling away 1.3
+-- studs of run per stud of height. TerrainGen takes the larger of this and the country's own height.
+local function smooth(t: number): number
+	t = math.clamp(t, 0, 1)
+	return t * t * (3 - 2 * t)
+end
+function UndergroundData.HillAt(x: number, z: number): number
+	if x < 100 or x > 262 or z > -108 or z < -258 then
+		return 0
+	end
+	local ramp = UndergroundData.Ramp
+	local best = 0
+	for _, p in ipairs(rampSamples) do
+		local need = p.y + ramp.height + ramp.cover
+		if need > 6 then
+			local dx, dz = x - p.x, z - p.z
+			local d2 = dx * dx + dz * dz
+			local reach = 10 + need * 1.3
+			if d2 < reach * reach then
+				local d = math.sqrt(d2)
+				local w = if d <= 10 then 1 else 1 - smooth((d - 10) / (need * 1.3))
+				best = math.max(best, need * w)
+			end
+		end
+	end
+	-- None at or in front of the door's plane, so the ground before the arch
+	-- stays level; the hill rises over the arch's own 8 studs of depth, where
+	-- the model's body stands over it.
+	if z > ramp.doorZ - 8 then
+		best *= smooth((ramp.doorZ - z) / 8)
+	end
+	return best
+end
+
+-- Where the bore's floor is under (x, z): the lowest sample within the
+-- bore's half width, or nil. TerrainBuilder keeps rock under it.
+function UndergroundData.RampFloorAt(x: number, z: number): number?
+	local half = UndergroundData.Ramp.width / 2 + 2
+	if x < 130 or x > 230 or z > -140 or z < -240 then
+		return nil
+	end
+	local best: number? = nil
+	for _, p in ipairs(rampSamples) do
+		local dx, dz = x - p.x, z - p.z
+		if dx * dx + dz * dz <= half * half then
+			best = if best then math.min(best, p.y) else p.y
+		end
+	end
+	return best
+end
 
 UndergroundData.Rubble = {
 	{
@@ -316,6 +456,10 @@ function UndergroundData.LowestFloor(x: number, z: number): number?
 		local floor = WorldLayout.TunnelFloorY
 		best = if best then math.min(best, floor) else floor
 	end
+	local ramp = UndergroundData.RampFloorAt(x, z)
+	if ramp then
+		best = if best then math.min(best, ramp) else ramp
+	end
 	return best
 end
 
@@ -366,8 +510,9 @@ local function snap4(n: number): number
 	return math.max(4, math.floor(n / 4 + 0.5) * 4)
 end
 
--- Air the second pass cuts. Sizes are multiples of 4. Chambers, the
--- passages that hold rubble, the walk-in shafts, and the truck bore.
+-- Air the second pass cuts. Sizes are multiples of 4 (the ramp's boxes are
+-- 16 wide and 14 tall). Chambers, the passages that hold rubble, the mouth's
+-- decline, and the truck bore.
 function UndergroundData.AirBoxes(): { AirBox }
 	local boxes: { AirBox } = {}
 	for _, c in ipairs(UndergroundData.Caves) do
@@ -395,28 +540,17 @@ function UndergroundData.AirBoxes(): { AirBox }
 			kind = "passage",
 		})
 	end
-	local mouth = UndergroundData.MineMouth
-	local upper = byCave["mine-upper"]
-	if upper then
-		local top = 8
-		local bottom = upper.floorY
+	-- The decline from the mouth: one box per sample, its floor on the grade.
+	local ramp = UndergroundData.Ramp
+	for _, p in ipairs(rampSamples) do
 		table.insert(boxes, {
-			x = mouth.x,
-			y = (top + bottom) / 2,
-			z = mouth.z,
-			sx = snap4(mouth.width),
-			sy = snap4(top - bottom),
-			sz = snap4(mouth.width),
-			kind = "mouth",
-		})
-		table.insert(boxes, {
-			x = (mouth.x + upper.x) / 2,
-			y = upper.floorY + 8,
-			z = (mouth.z + upper.z) / 2,
-			sx = snap4(math.abs(upper.x - mouth.x) + 16),
-			sy = 16,
-			sz = snap4(math.abs(upper.z - mouth.z) + 16),
-			kind = "mouth",
+			x = p.x,
+			y = p.y + ramp.height / 2,
+			z = p.z,
+			sx = ramp.width,
+			sy = ramp.height,
+			sz = ramp.width,
+			kind = "ramp",
 		})
 	end
 	local floor = WorldLayout.TunnelFloorY

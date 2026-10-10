@@ -72,7 +72,8 @@ return function(t)
 		end
 		unused(WorldLayout.DealershipLoadingPad, "DealershipLoadingPad")
 		unused(WorldLayout.ToolShedLoadingPad, "ToolShedLoadingPad")
-		t.eq(WorldLayout.DealershipLoadingPad, { x0 = 160, x1 = 174, z0 = 100, z1 = 114 })
+		-- Ring map (Oct 8): z + 2, so it keeps 8 off the East Link.
+		t.eq(WorldLayout.DealershipLoadingPad, { x0 = 160, x1 = 174, z0 = 102, z1 = 116 })
 		t.eq(WorldLayout.ToolShedLoadingPad, { x0 = -88, x1 = -74, z0 = 144, z1 = 158 })
 		local function absent(list)
 			for _, zone in ipairs(list) do
@@ -211,7 +212,7 @@ return function(t)
 		end
 		-- 1.5 studs off every floor, path, street, plaza and yard, and 8
 		-- studs off every road. The dealership pad is west of the showroom hall
-		-- (x 160..174, z 100..114): 4 off DealershipFloor and clear of MillRoad.
+		-- (x 160..174, z 102..116): 4 off DealershipFloor and clear of MillRoad.
 		local sawFloor, sawMill = false, false
 		for _, pad in ipairs(pads) do
 			for _, rect in ipairs(rects) do

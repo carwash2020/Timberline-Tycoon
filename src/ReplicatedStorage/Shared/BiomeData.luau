@@ -65,9 +65,9 @@ export type Hazard = {
 -- drives from the sawmill (Oct 8, ring map), each within 20% of the
 -- straight line the spec checks.
 BiomeData.FerryCenterX = 930
-BiomeData.FerryCenterZ = -140
+BiomeData.FerryCenterZ = -50
 BiomeData.FerryRadius = 55
-BiomeData.FerryHaulStuds = 990 -- sawmill (0, 110) is about 963 studs away
+BiomeData.FerryHaulStuds = 990 -- sawmill (0, 110) is about 944 studs away; the drive is longer
 BiomeData.PalmCount = 30
 BiomeData.LanternwoodCount = 6
 BiomeData.FerrySand = "#E4C98A"

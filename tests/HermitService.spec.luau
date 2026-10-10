@@ -219,12 +219,13 @@ return function(t)
 		end
 		local p = person(0, 0)
 		local edge = WorldLayout.WorldHalf - WorldLayout.DeepSeaEdgeInset
-		t.eq(Hazard.Check(p, edge - 10, 0, 100, 0.5), 0)
+		-- Ring map: along z 300, clear of Ferry Island's shallows at the east edge.
+		t.eq(Hazard.Check(p, edge - 10, 300, 100, 0.5), 0)
 		t.eq(#toasts, 1, "the warning")
-		t.eq(Hazard.Check(p, edge + 5, 0, 100, 0.5), 0)
+		t.eq(Hazard.Check(p, edge + 5, 300, 100, 0.5), 0)
 		t.eq(#toasts, 2, "deep water")
-		t.eq(Hazard.Check(p, edge + 5, 0, 100, 2), 0)
-		t.eq(Hazard.Check(p, edge + 5, 0, 100, 1), 15)
+		t.eq(Hazard.Check(p, edge + 5, 300, 100, 2), 0)
+		t.eq(Hazard.Check(p, edge + 5, 300, 100, 1), 15)
 		Hazard.Forget(p)
 	end)
 

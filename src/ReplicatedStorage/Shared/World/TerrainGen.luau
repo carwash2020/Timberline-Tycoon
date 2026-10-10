@@ -363,6 +363,12 @@ end
 
 -- Rock over a covered cave. Mouths and the grotto skylight stay open.
 local function caveRoof(x: number, z: number, h: number): number
+	-- The mine's hill: rock over the walk-in decline, so its bore is roofed
+	-- (ring map: the mouth is the hill's front, not a hole in flat ground).
+	local hill = UndergroundData.HillAt(x, z)
+	if hill > 0 then
+		h = math.max(h, hill)
+	end
 	local mouth = UndergroundData.MineMouth
 	if (x - mouth.x) ^ 2 + (z - mouth.z) ^ 2 < 24 * 24 then
 		return h
@@ -645,12 +651,24 @@ end
 -- Ground height before a homestead lane is graded. A lane is a ramp from
 -- the shelf to the road it meets: the country under it can bump, and a
 -- truck still climbs at the ramp's slope.
+local LAKE_BASIN = 90
+
 local function groundHeight(x: number, z: number): (number, number?)
 	local low = lowHeight(x, z)
 	local detail = detailHeight(x, z)
 	local rw = roadWeight(x, z)
 	local h = low + detail * (1 - rw)
 	h = landmarks(x, z, h)
+
+	-- Mirror Lake sits in a gentle bowl on the Hills' west slope (ring
+	-- map), so its shore is a walkable bank and its dock a step, not a cliff.
+	local ldx, ldz = x - LAKE.x, z - LAKE.z
+	local lakeEdge = LAKE.radius * 1.15 + 9
+	local ld2 = ldx * ldx + ldz * ldz
+	if ld2 < (lakeEdge + LAKE_BASIN) ^ 2 then
+		local w = 1 - smoothstep((sqrt(ld2) - lakeEdge) / LAKE_BASIN)
+		h = h * (1 - w) + (LAKE_LEVEL + 2.5) * w
+	end
 
 	-- Banks sit just above the water; channels are cut below it.
 	local bed, surface, bank = water(x, z)
@@ -1186,6 +1204,8 @@ end
 -- a little bare earth at the water's edge. The plot district keeps a plain Grass
 -- lawn (its edge dithered into the meadow), and the town's lawn gets the
 -- swaths but no bare patches, so its paths stay the only dirt there.
+local RIVER_LINE = WorldLayout.FastLine(RIVER.points)
+
 local function meadow(x: number, z: number, flat: number, bank: number): string
 	if flat > 0 then
 		local plots = PLOTS
@@ -1203,6 +1223,7 @@ local function meadow(x: number, z: number, flat: number, bank: number): string
 	if bank > 0.15 and noise(x / 6, z / 6, 2.9) > -0.2 then
 		return "Ground" -- damp earth at the water's edge (Mud is the Grove's violet)
 	end
+
 	if noise(x / 80, z / 80, 10.3) > 0.45 and dither(x, z) > -0.1 then
 		return "Ground"
 	end
@@ -1226,9 +1247,12 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 	if surface and h < surface then
 		return if bank > 0.5 then "Sand" else "Mud"
 	end
-	-- Coast and island.
+	-- Coast and island. A homestead on the coast keeps its lawn (the pad
+	-- and PlotLawn round it) down to the water; the beach runs either side.
 	if z < COAST.northZ and x > shoreX(z) - COAST.beachWidth - 6 then
-		return "Sand"
+		if not WorldLayout.NearPlotPad(x, z, PLOT_LAWN) then
+			return "Sand"
+		end
 	end
 	if (x - ISLAND.x) ^ 2 + (z - ISLAND.z) ^ 2 < ISLAND.radius ^ 2 then
 		return if h > 3 then "LeafyGrass" else "Sand"
@@ -1275,6 +1299,17 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 			return "CrackedLava"
 		end
 		return if slope > 0.6 then "Slate" else "Basalt"
+	end
+	-- Mirror Lake's shore and the river's banks are worn earth (whatever the
+	-- biome or a yard's lawn), so the lake dock's and the footbridge's ends
+	-- never rest on bladed grass.
+	local ldx, ldz = x - LAKE.x, z - LAKE.z
+	if ldx * ldx + ldz * ldz < (LAKE.radius * 1.15 + 16) ^ 2 then
+		return "Ground"
+	end
+	local riverReach = RIVER.width / 2 + 12
+	if WorldLayout.FastDistance(RIVER_LINE, x, z, riverReach) < riverReach then
+		return "Ground"
 	end
 	-- The lawn round every homestead: plain Grass for PlotLawn studs past
 	-- the pad (its edge dithered), whatever the biome. Not on a cliff.
