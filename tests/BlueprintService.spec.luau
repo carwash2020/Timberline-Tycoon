@@ -552,8 +552,11 @@ return function(t)
 		s.profile.totalEarned = 0
 		s.profile.plot = { claimed = false }
 		s.profile.blueprintBook = { "Wall4" }
-		t.eq(s.Service.SyncStage(s.player), 0, "stage 0 owes nothing new")
-		t.eq(s.attrs.BuildStage, 0)
+		-- StageOf.Current never reads below stage 1, so a book with only Wall4
+		-- is owed the stage-1 plans once, and then nothing.
+		t.ok(s.Service.SyncStage(s.player) > 0, "stage 1 owes its plans")
+		t.eq(s.attrs.BuildStage, 1)
+		t.eq(s.Service.SyncStage(s.player), 0, "and a second sync owes nothing")
 		-- Lane E's keys win once they exist: stage 4 is Red Mesa.
 		s.profile.onboarding = { ["Stage:S1"] = true, ["Stage:S2"] = true, ["Stage:S3"] = true, ["Stage:S4"] = true }
 		local learned = s.Service.SyncStage(s.player)
