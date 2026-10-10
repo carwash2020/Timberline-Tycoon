@@ -124,6 +124,9 @@ function PieceSize.Units(bp: PlotData.Blueprint, item: Sized?): number
 end
 
 function PieceSize.Fee(bp: PlotData.Blueprint, item: Sized?): number
+	if bp.woodUnits == 0 then
+		return PlotData.Price(bp) -- a slab or ingot piece keeps its own fee at any size
+	end
 	return PieceSize.Units(bp, item) * PlotData.KitCashPerUnit
 end
 

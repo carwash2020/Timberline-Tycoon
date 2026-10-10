@@ -11,6 +11,7 @@ return function(t)
 	local WireLogic = t.shared("WireLogic")
 	local DailyData = t.shared("DailyData")
 	local PlotData = t.shared("PlotData")
+	local FurnitureData = t.shared("FurnitureData")
 	local PaidItems = t.shared("PaidItems")
 	local serde = require("@lune/serde")
 
@@ -82,7 +83,10 @@ return function(t)
 			y = 48,
 			wood = "lanternwood",
 			paint = "darkbrown",
-			fill = { units = 99 },
+			-- Lane F: a ghost can hold planks, sandstone slabs and ingots
+			-- (BuildCost). No piece needs more than 4 slabs or one ingot of one ore, so a
+			-- ghost short of one (3 slabs plus a Copper ingot) is the most one can hold.
+			fill = { units = 99, slabs = 3, ingots = { Copper = 1 } },
 			paid = 99999,
 			len = 48,
 			lenX = 48,
@@ -169,6 +173,15 @@ return function(t)
 				s = sections(1),
 			}
 		end
+		-- Lane F (LooseSave): the unloaded base's loose wood is plot-relative
+		-- (bed "Plot") and may carry two sections a piece (MaxSections 300 over
+		-- 150 pieces); slabs and ingots are small records of their own. The
+		-- worst case is the heaviest of them all, so every record is a wood one.
+		for i = 1, GameConfig.MaxLoosePieces do
+			loose[i].bed = "Plot"
+			loose[i].g = nil
+			loose[i].s = sections(2)
+		end
 		local pads = {}
 		for i, id in ipairs(record.ownedTrucks) do
 			pads[i] = {
@@ -216,7 +229,12 @@ return function(t)
 			plans[i] = { uid = guid(9000 + i), id = "Cabin" }
 		end
 		record.blueprintItems = plans
+		-- Boxed machines, plus the crafted furniture and Sparkworks pieces waiting in
+		-- stock (Lane F: FurnitureData.MaxStock of them).
 		record.sawmillStock = { "SawmillIndustrial", "SawmillIndustrial", "ChopSaw" }
+		for i = 1, FurnitureData.MaxStock do
+			table.insert(record.sawmillStock, if i % 2 == 0 then "CopperLampPost" else "WoodSweeper")
+		end
 		local compendium = {}
 		local materials = {}
 		local forgeLogs = {}
@@ -344,6 +362,7 @@ return function(t)
 		end
 		local json = serde.encode("json", data)
 		local bytes = #json
+		print(string.format("[SaveSize] full three-slot save: %d bytes (%.1f%% of 1 MB)", bytes, bytes / MB * 100))
 		t.ok(bytes <= MB, string.format("encoded %d bytes, over the 1 MB budget", bytes))
 	end)
 end

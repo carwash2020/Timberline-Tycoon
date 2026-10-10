@@ -174,6 +174,10 @@ export type Blueprint = {
 	storePrice: number?, -- a store plan's shelf price when it is not the placing fee (a kit piece's fee is small)
 	gated: boolean?, -- not a starter plan: learned from another plan's `family` (BlueprintBook)
 	family: { string }?, -- a store plan that teaches all of these at once, itself included
+	slabUnits: number?, -- Lane F: sandstone slabs to fill (BuildCost)
+	ingots: { [string]: number }?, -- Lane F: ingots to fill, by ore id (BuildCost)
+	locked: string?, -- Lane F: cannot be placed yet; the book shows this line
+	granted: boolean?, -- Lane F: furniture a craft grants (PlotService.GrantPiece); placed from stock, never sold or learned
 }
 
 -- What placing charges now. A kit piece is KitCashPerUnit per wood unit.
@@ -182,6 +186,9 @@ export type Blueprint = {
 -- sells back at the old rate.
 function PlotData.Price(bp: Blueprint): number
 	if bp.kit == true and type(bp.woodUnits) == "number" then
+		if bp.woodUnits == 0 then
+			return bp.priceCash -- Lane F slab and ingot pieces: their own fee
+		end
 		return bp.woodUnits * PlotData.KitCashPerUnit
 	end
 	if type(bp.woodUnits) == "number" then
@@ -654,6 +661,11 @@ for _, extra in ipairs(require(script.Parent.DecorData) :: { any }) do
 end
 
 for _, extra in ipairs(require(script.Parent.LogicItems) :: { any }) do
+	table.insert(PlotData.Blueprints, extra :: Blueprint)
+end
+
+-- Lane F: the crafted furniture (Copper Lamp Post, Gold-banded Chest).
+for _, extra in ipairs(require(script.Parent.FurnitureData).Pieces :: { any }) do
 	table.insert(PlotData.Blueprints, extra :: Blueprint)
 end
 
