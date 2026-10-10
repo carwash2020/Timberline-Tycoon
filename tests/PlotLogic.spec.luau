@@ -176,7 +176,7 @@ return function(t)
 		-- some of them; those trunks are not moved. The count is locked so a
 		-- later pad move shows up here.
 		local onYard = 0
-		for j = 1, 322 do
+		for j = 1, WorldPlan.FirstTreeCount() do
 			local tree = WorldPlan.Trees()[j]
 			for _, home in ipairs(PlotData.Homes) do
 				local dx, dz = tree.position.X - home.x, tree.position.Z - home.z

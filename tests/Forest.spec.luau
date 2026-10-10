@@ -746,7 +746,17 @@ return function(t)
 	-- FOR-03: more trees to chop where the forest is
 	---------------------------------------------------------------------------
 
-	local BASE = 481 -- the first 322 and the country stands (WorldPlan.spec pins both)
+	-- The first batch and the country stands (WorldPlan.spec pins both). Ring map: counted, not 481.
+	local BASE = WorldPlan.FirstTreeCount()
+		+ #(function()
+			local all = {}
+			for _, stand in ipairs(WorldPlan.CountryStands()) do
+				for _, spot in ipairs(stand.trees) do
+					table.insert(all, spot)
+				end
+			end
+			return all
+		end)()
 	local forestTrees = WorldPlan.ForestTrees()
 
 	-- Which kind of place a forest tree stands in.

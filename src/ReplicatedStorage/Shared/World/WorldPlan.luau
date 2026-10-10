@@ -115,6 +115,12 @@ export type GroveDisc = { cx: number, cz: number, radius: number, count: number 
 local groveDiscs: { GroveDisc } = {}
 local firstTrees: () -> { TreeSpot }
 
+-- How many trees the first batch holds (each biome's, then the wild groves').
+-- It was 322 on the old square; the ring map's own layout fixes the number.
+function WorldPlan.FirstTreeCount(): number
+	return #firstTrees()
+end
+
 function WorldPlan.GroveDiscs(): { GroveDisc }
 	firstTrees()
 	return groveDiscs
@@ -228,6 +234,8 @@ function firstTrees(): { TreeSpot }
 				and not (z < coast.northZ and x > coast.shoreX - coast.beachWidth - 40)
 				and goodGround(x, z, 12, 0.55)
 				and TerrainGen.HeightAt(x, z) < 70
+				-- Ring map: not by the river, whose banks the footbridge needs clear.
+				and WorldLayout.PolylineDistance(Vector2.new(x, z), WorldLayout.River.points) > 90
 			if ok then
 				for _, biome in ipairs(BiomeData.All()) do
 					local area = biome.area

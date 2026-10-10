@@ -193,7 +193,7 @@ return function(t)
 		-- their lanes take the rest. 730 is the live count on that world.
 		t.ok(#trees >= 730, #trees .. " trees")
 		local wet = 0
-		for i = 1, 322 do
+		for i = 1, WorldPlan.FirstTreeCount() do
 			local p = trees[i].position
 			if TerrainGen.WaterLevelAt(p.X, p.Z) ~= nil then
 				wet += 1

@@ -2223,8 +2223,12 @@ return function(t)
 		-- 322 tuned trees + 160 stand trees, then the forest, then the density fill.
 		local trees = WorldPlan.Trees()
 		local forest = WorldPlan.ForestTrees()
-		t.eq(trees[482], forest[1], "the forest still starts after the 481")
-		t.ok(#trees > 481 + #forest, "the density fill is appended after the forest")
+		local base = WorldPlan.FirstTreeCount()
+		for _, stand in ipairs(WorldPlan.CountryStands()) do
+			base += #stand.trees
+		end
+		t.eq(trees[base + 1], forest[1], "the forest still starts after the first batch and the stands")
+		t.ok(#trees > base + #forest, "the density fill is appended after the forest")
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -2403,7 +2407,8 @@ return function(t)
 	-- Country stands (phase 10: more wild trees in the open country)
 	---------------------------------------------------------------------------
 
-	local FIRST = 322 -- the trees every server spawned before the stands
+	-- The trees every server spawns before the stands. Ring map: counted (it was 322 on the old square).
+	local FIRST = WorldPlan.FirstTreeCount()
 	local stands = WorldPlan.CountryStands()
 
 	t.test("the first 322 trees never move: same woods, places and order as before the stands", function()
@@ -2445,8 +2450,10 @@ return function(t)
 		t.eq(trees[i + 1], WorldPlan.ForestTrees()[1], "the forest follows the stands")
 		t.ok(#trees > i + #WorldPlan.ForestTrees(), "the density fill follows the forest")
 		local added = i - FIRST
-		t.ok(added >= 150 and added <= 200, added .. " new trees")
-		t.ok(#stands >= 20, #stands .. " stands")
+		-- Ring map: 60 to 200 new trees in 12 or more stands (it was 150 to 200 in 20 or more):
+		-- the world is 44% of the old area, and the stands keep off the cliff rings and Lane R's pads.
+		t.ok(added >= 60 and added <= 200, added .. " new trees")
+		t.ok(#stands >= 12, #stands .. " stands")
 	end)
 
 	t.test("country stands never move: same woods, places and order as before the forest (FOR-03)", function()
@@ -2454,7 +2461,10 @@ return function(t)
 		-- A fingerprint of the country stands (trees 323 to 482: index, wood,
 		-- biome, x, z). Re-sampled when the shelves moved apart, and again when The Climb moved 55 studs north for the showroom hall (store polish). The first
 		-- 322 were not.
-		local lastStand = 481
+		local lastStand = FIRST
+		for _, stand in ipairs(stands) do
+			lastStand += #stand.trees
+		end
 		local h = 7
 		for i = FIRST + 1, lastStand do
 			local tree = trees[i]
