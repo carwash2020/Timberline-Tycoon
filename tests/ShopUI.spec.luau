@@ -19,6 +19,12 @@ return function(t)
 				t.ok(#text > 0, file .. ": a subtitle")
 			end
 		end
+		-- Lane P: the Store's words moved to Store/StoreCopy.
+		local copy = fs.readFile("src/ReplicatedStorage/Shared/Store/StoreCopy.luau")
+		for text in string.gmatch(copy, '\nStoreCopy.Subtitle = "([^"]*)"') do
+			found += 1
+			t.ok(utf8.len(text) <= MAX, string.format("StoreCopy: %q is %d long", text, utf8.len(text)))
+		end
 		t.eq(found, 5, "the Tool Shed, the Dealership, Hearth & Home, the saws and the Store")
 	end)
 

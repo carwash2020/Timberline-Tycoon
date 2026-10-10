@@ -13,7 +13,7 @@
 local Kit = require(script.Parent.Kit)
 local AxeArt = require(script.Parent.AxeArt)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
-local RobuxShelf = require(script.Parent.Parent.RobuxShelf)
+local RobuxTableArt = require(script.Parent.RobuxTableArt)
 local ShowroomLight = require(script.Parent.Parent.ShowroomLight)
 local StoreStock = require(script.Parent.Parent.StoreStock)
 local HoverTag = require(script.Parent.Parent.HoverTag)
@@ -48,29 +48,6 @@ end
 
 local function dBox(parent: Instance, name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material?): Part
 	return decor(Kit.part(parent, name, size, cf, color, mat or MAT.Wood))
-end
-
--- A table: legs and apron (a body, solid), a top board that overhangs a
--- little, and a trim along its front edge. `topY` is the surface.
-local function furniture(
-	parent: Instance,
-	name: string,
-	x0: number,
-	x1: number,
-	z0: number,
-	z1: number,
-	floorTop: number,
-	topY: number,
-	body: Color3,
-	top: Color3
-)
-	local w, d = x1 - x0, z1 - z0
-	local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
-	local bodyH = topY - floorTop - 0.3
-	Kit.part(parent, name, V3(w - 0.4, bodyH, d - 0.4), CF(cx, floorTop + bodyH / 2, cz), body, MAT.WoodPlanks)
-	local board = Kit.part(parent, name .. "Top", V3(w, 0.3, d), CF(cx, topY - 0.15, cz), top, MAT.Wood)
-	board.CanQuery = false
-	dBox(parent, name .. "Trim", V3(w + 0.1, 0.5, 0.18), CF(cx, topY - 0.5, z0 - 0.04), TIMBER)
 end
 
 -- What one placement covers along z: its box, or the whole row of boxes a
@@ -496,50 +473,12 @@ local function axeRack(model: Model, frame: Frame)
 	end
 end
 
--- The Tool Shed's Robux table, and nothing else. A later purchases lane
--- replaces this one function. Same table as the cash shelves, gold top,
--- along the back wall behind the counter. Its boxes are the gold boxes.
-local function buildRobuxTable(model: Model, floorTop: number)
-	local GOLD = hex("#E3B73C")
-	local GOLD_INK = hex("#6B4A12")
-	local entries = RobuxShelf.List()
-	if #entries == 0 then
-		return
-	end
-	local width = RobuxShelf.RowWidth()
-	local cz = RobuxShelf.TableZ
-	local depth = RobuxShelf.TableDepth
-	furniture(
-		model,
-		"GoldTable",
-		-width / 2,
-		width / 2,
-		cz - depth / 2,
-		cz + depth / 2,
-		floorTop,
-		RobuxShelf.TableTop,
-		TIMBER,
-		GOLD
-	)
-	-- The name on a board across the table's front (a hanging sign here
-	-- would hide the axes on the rack behind).
-	local board = dBox(
-		model,
-		"RobuxSign",
-		V3(math.max(8.4, width - 1), 1.1, 0.12),
-		CF(0, RobuxShelf.TableTop - 0.9, cz - depth / 2 - 0.1),
-		GOLD,
-		MAT.SmoothPlastic
-	)
-	Kit.signText(board, "ROBUX SHELF", GOLD_INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-end
-
 local function toolShed(model: Model, frame: Frame)
 	local rng = Kit.rng(2604)
 	-- The middle of each table (the lamps and the hanging signs are over it).
 	local LANE_MIDDLE = 11.05
 	ShopInterior.SteppedUnit(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
-	buildRobuxTable(model, frame.floorTop)
+	RobuxTableArt.Build(model, frame.floorTop) -- Lane P
 	axeRack(model, frame)
 	counterDetail(model, frame)
 	backDoor(model, frame, frame.halfW - 0.3, 19, false, 1)

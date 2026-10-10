@@ -1,5 +1,44 @@
 # Phase 2+ build notes
 
+## Lane P: purchases redesign (8 October 2026, branch `phase-2/v1-p-purchases`)
+
+Not on main. Covers the store panel, the town bulletin board, the gold boxes on the Tool Shed table, and the passes and products. Four items carry their real ids in `StoreData` (2x Cash, Lux Axe, both cash packs). Tow Service, Timber Classic, Paint Shop, 2x Wood and Instant Delivery stay at id 0 (their ids are in comments beside them) so they show Coming soon until Connor says to flip them. Studio checks below that buy, board or crate those five apply only after the ids are pasted. The game never writes a Robux number. Every price comes from `MarketplaceService:GetProductInfo` on the client (`StorePrices`, retried 2, 4 and 8 s), and the UI shows "R$" until it is known. The server only asks whether an item is for sale (`StoreSaleService`, every 10 minutes and at start). Items Roblox lists as off sale get no card, only a "Coming soon" line. There are no paid boost caps. The Lux Pickaxe stays off. There is no gifting and no trading. Setup steps for Creator Hub are in `STORE_SETUP.md`.
+
+Packs scale with the player's stage (`StageOf`, the best of their axe tier and areas reached). The Small pack pays 15 minutes of income at that stage, at least $1,000. The Large pays two hours, at least $10,000. Both round to $10:
+
+| Stage | Income $/h | Small (Cash1k) | Large (Cash10k) |
+|---|---|---|---|
+| S1 | 2,000 | 1,000 | 10,000 |
+| S2 | 4,900 | 1,230 | 10,000 |
+| S3 | 11,000 | 2,750 | 22,000 |
+| S4 | 24,000 | 6,000 | 48,000 |
+| S5 | 52,000 | 13,000 | 104,000 |
+| S6 | 114,800 | 28,700 | 229,600 |
+| S7 | 160,000 | 40,000 | 320,000 |
+| S8 | 200,000 | 50,000 | 400,000 |
+
+Part counts: the board has 15 parts (cap 16), a gold crate has 11, and the gold table has 7.
+
+### Studio checks (lane P)
+
+**PC (mouse and keyboard)**
+1. Play Solo. Walk to the bulletin board west of the spawn walk. You should see the TIMBERLINE header on two posts, three cream cards with a brass pin, an art disc, a title, a short line and a dark pill. Each pill should show your price ("R$ 499" and so on) within a few seconds; before that it shows only "R$". Every 8 s the board turns to the next three cards, with a dot for each page.
+2. Press E at the board ("Browse Store"). The store panel opens on Passes: TIMBERLINE STORE in FredokaOne, cream cards, and a dark price pill on each card. Click PRODUCTS. The Small and Large Cash Pack cards show "+$n now", and the amount should match your stage (a fresh save shows +$1,000 and +$10,000).
+3. Buy 2x Cash. The Roblox prompt opens with the same price as the pill. If you cancel, nothing changes. If you buy, you get the toast "Thanks! 2x Cash is yours.", the card reads Owned in green, and the board's pill also reads Owned. Stop and Play again. The pass is no longer owned, because a Studio test purchase lasts one session and never writes `profile.passes`. In a live server, Roblox keeps the pass owned on every join.
+4. Repeat step 3 for Lux Axe, Tow Service, Timber Classic and Paint Shop. With Tow, a recall is free. With Timber Classic, the truck is in the Dealership as owned. With Paint Shop, the paint palette opens and the truck takes the colour after a respawn.
+5. Buy a Small Cash Pack, then a Large one. The cash goes up by the "+$n now" amounts. Buy 2x Wood, and the card shows "48h left". Buy Instant Delivery, and the "Sell here" side button appears while there is wood on the truck.
+6. Walk into the Tool Shed. Behind the counter is the gold table with TIMBERLINE STORE on its front. The five passes are in front and the four products on the raised back shelf. Each is an open honey-plank crate with coins showing and a cream name tag. Nothing clips into the axe rack. Hover over a crate, and the tag shows your price, or "Robux item" until it is known. Pick one up and bring it to the counter. The keeper asks, and the Roblox prompt opens.
+7. To test the off-sale path, switch Tow Service off sale in Creator Hub, then start a new server. On the board, Tow leaves the cards and the "Coming soon: Tow Service" strip appears. Its store card reads "Coming soon" with no price. Bringing its crate to the counter gives the toast "That isn't for sale yet." Switch it back on afterwards.
+
+**Phone (emulator at 667x375, then a real phone)**
+8. Use the Device emulator at 667x375 landscape. The store shows three columns, and every pill and tab is a full tap target. The title, tabs and close X are clear of the Roblox top bar. The panel stays inside the safe area, and the scroll bar works by drag.
+9. Tap the board's prompt, and the store opens. Tap PRODUCTS, then a pill, and the prompt opens. Close it with X. The thumbstick and jump work again once the store is closed.
+10. On a real phone, check that the text is readable (store body 14 px or larger) and that the prices are your region's.
+
+**Xbox (controller)**
+11. With a controller connected, walk to the board. The prompt shows ButtonX. Press it, and the store opens with the selection ring on the first Buy pill. Use the D-pad to move between pills, to the tabs (Up), and to the X close button. A on a pill opens the prompt. B closes the store. RT is never bound by the store.
+12. At the Tool Shed counter, the keeper's question works with A and B, and the prompt opens with A.
+
 ## Lane W: practical automation (8 October 2026, branch `phase-2/v1-w-automation`)
 
 What changed: `AutomationLogic` (ports, power and reverse rules, detector filter, sweeper pick, laser reach), `WireLogic` (belts, mills and planers are wire targets; detector and laser are sources; machines never count toward the logic cap), `LogicGraph` (per-port levels, machine nodes only when wired), `LogicService` (targets, Reverse/Flip/Filter prompts, sweeper, detector, laser), `BeltService` (signed speed), `SawmillService` / `PlanerService` (pause while unpowered), `MachineArt` (TLD-1 deck, Switch Belt, Tilted Belt, Belt Support, Wood Detector), `ItemCatalog`, `LogicItems`, `SparkworksStock`, `ProfileSchema` (keeps `reversed`/`flip` only as `true` on pieces that have them), `RateLimiter` (BeltReverse 2, BeltFlip 2, DetectorFilter 3). Cross-lane: `ItemBox` scales only ToolShed belts in its Belt group.
@@ -193,7 +232,7 @@ Not seen in Studio. The model (ECONOMY.md) is 68 s / 5.4 min / 17.9 min / 66.3 m
 
 **Prosperous (`t`).** Fell with an axe whose temper is Prosperous I, II or III. The log's attribute `t` is 1.04, 1.07 or 1.10. Run it through a sawmill and a planer: the plank still has that `t`. Load it, unload it, leave and rejoin: `t` is still there. Sell it. A log pays its price times `t`. A plank pays its price times min(3, mill bonus × board bonus × `t`). An axe with no Prosperous temper has no `t`. Truck paint is unchanged.
 
-**Prices and the pass.** The Tool Shed shows the Steel Axe at $110 and the Cobalt Axe at $2,500. The Sky Pass is not on a shelf. With under $5, recalling a truck is free; with $5 or more it is the usual fee (5%, at least $5), and Tow Service is still free. A new plot's expansion squares use the $7,600 step.
+**Prices and the pass.** The Tool Shed shows the Steel Axe at $110 and the Cobalt Axe at $2,500. The Gondola Pass is not on a shelf. With under $5, recalling a truck is free; with $5 or more it is the usual fee (5%, at least $5), and Tow Service is still free. A new plot's expansion squares use the $7,600 step.
 
 **Saves.** A brand-new profile's `worldVersion` is 1. Nothing here moves a parked truck; that waits until the map's version goes to 2. An old save keeps its cash, axes, trucks, placed pieces and the sections on its truck and on the ground. The shop prices that moved are the Steel Axe ($110, was $120), the Cobalt Axe ($2,500, was $3,000), frostwood planks (plan 120, plank scale 0.40) and the expansion step ($7,600, was $3,050). There is no trade window.
 
@@ -3337,7 +3376,7 @@ Gus's Charter, the Gondola Pass gate, the Sky Forge window (Starfall, relics, Ol
 - `SkyForgeService` (server, new; `AetherService.V1Init` / `OpenForge` start it): "Open the Sky Forge" on the isle Starfall anvil and on the town court anvil (`TemperSpot`), the `ForgeOpen` / `ForgeAction` handlers (range 20 studs, RateLimiter), tempering, relics (once each; their trophies stand by your plot sign and the court's `Socket_<Relic>` gems light for you), and the weekly order (pays $18,000 + 4 Sky Shards once per UTC week from Monday 00:00).
 - `Shared/TemperLogic`: Keen (cooldown -8/-15/-22%), Heavy (damage +10/+20/+30%), Prosperous (sale +4/+7/+10%, stamp `t`, inside BonusCap 3). One family per axe; grades in order; re-tempering a new family replaces it; no random rolls, no Robux. Costs: I $20,000 + 6 Sky Shards + 30 Gloamwood planks; II $50,000 + 10 + 40 Lumenwood; III $120,000 + 16 + 80 Lumenwood. The Lux Axe can't be tempered. `AxeService.GetEquippedAxe` returns the tempered copy.
 - `ForgeUI` (client, new): four tabs; every button 44 px; picking a temper shows "Result", "Costs", "Replaces" and any refusal before Temper is sent. On a phone the window stays right of the thumbstick, left of the HUD column and jump button, under the cash plaque, and the temper choices stack one per line. B / Escape / X close it; the gamepad lands on the first button; you can't walk while it is open. Nothing binds ButtonR2.
-- `EndGameBoot.server.luau` starts the services (V1Boot on main lists only SecretService).
+- `V1Boot` starts the services (it was `EndGameBoot`, folded in): `AetherService.V1Init` (Sky Forge) first, then `SkyQuestService.V1Init` once the town gondola station is built.
 - ShopUI: the forge rows moved to ForgeUI; its last hardcoded colours use UITheme names.
 
 **Previews** (`previews/v1-a2/`, real meshes; the court, isle forge and cabin GLBs are loaded through a preview-only manifest because job 17 wires them in game):
@@ -3376,3 +3415,20 @@ Derived, not read from a GLB (the TLD-1 GLBs were not in my pack): the offsets o
 4. **Logic pieces.** Lever tips both ways about its base, Wall Switch bat, Hatch opens and shuts and you can walk when open, Button and Plate press down, gates show their symbols with no text label, lamps light. Wood Sweeper arm swings on a pulse (direction is a guess).
 5. **Furnace and stall.** FireMouth glows in its recess (one light), ore dropped on the in-stub smelts, stall sign reads PROSPECTOR, chute sells, bench shows its vise. Sky Forge Court: SKY FORGE on the back wall, readable from the open front.
 6. **Phone 667x375 and Xbox.** Same scene; placing a mill ghost shows the see-through mesh; nothing changes in input.
+## End game follow-ups (branch `phase-2/v1-end-game-followups`, 10 October 2026)
+
+Small fixes after the end game PR (#132).
+
+- **Plot sign.** The PlotSign mesh's post runs up in front of the board to about 1.25 studs above the board's bottom edge, and the old three-line text (plot, tier, owner) put the owner's name on the bottom line, behind it. The sign now has two lines above the post: the owner's name (big) and "PLOT 3 · HOMESTEAD" under it (`PlotData.SignText`, fractions of the board's height from its top; `PlotData.SignPostTop` is the post's reach). An open plot shows its place name and "OPEN PLOT". `PlotService.spec` checks both lines clear the post. The preview exporter (`tools/preview/export.luau`) now draws a label that has its own place on a SurfaceGui in its own box, so the two lines show where they sit; `tools/preview/scenes/plot-sign.luau` renders the sign front, back, side, with a long name, and from the street.
+- **Gondola Pass.** "Sky Pass" is gone from every player-facing word, comment and doc. Save keys stay: `profile.gondolaPass` and the old `profile.skyPass` (kept in step by `Migrate`), the `GondolaPass` gear id, the `SkyQuest` remote and `SkyQuestService`.
+- **`BiomeData.Gate(biomeId)`.** `{ needs: string?, words: string }`. Sky: `needs = "GondolaPass"`, `words = "Obsidian Axe + Gondola Pass from Gus"`. Gear-gated biomes name their gear (snow `InsulatedCoat`, volcano `HeatBoots`, grove `Lantern`) with no sign words; an open or unknown biome is `{ needs = nil, words = "" }`. `SkyQuestLogic.GateWords` now reads the sky's words from here, so the sign and the gate cannot drift (spec).
+- **Keen.** The server already shortened the tempered axe's cooldown (`AxeService.GetEquippedAxe` returns `TemperLogic.Apply`), but `CutController` paced the client's swings with the catalog axe, so the swing you felt did not speed up. `AxeService.StampTemper` puts `TemperPrefix` / `TemperTier` on the axe's tool (when it is built, and right after a temper at the anvil), and `CutController` multiplies its swing cooldown by `TemperLogic.CooldownMultiplier` (Keen I, II, III: 0.92, 0.85, 0.78; anything else 1). This is the one `CutController` edit Connor allowed; it is the speed math only, no input or ButtonR2 code.
+- **`EndGameBoot` is gone.** `V1Boot.StartEndGame` starts `AetherService.V1Init` (the Sky Forge) first, then `SkyQuestService.V1Init` once the town gondola station (`TimberlineMap.GondolaTown.Platform`) is built, in its own task so the server start does not wait for the map. Same order and same remotes as before; the Notify remote carries toasts.
+- **Town model check** (part-built town, as the game ships it with `GameConfig.TownMeshes = false`; `tools/preview/scenes/town-pieces.luau` shows each shop, the sawmill and the station on their own ground). Nothing floating, sunk, backwards or misfacing: the Tool Shed, Hearth & Home and Dealership signs stand on their posts with the board inside its frame, facing -Z; the sawmill's sign, roof and crest sit on their posts; the gondola station roof sits on its posts. Not problems: the earlier `town` and `buildings` scene renders put the uploaded town meshes on (the module's default in Lune), and Lune has no model pivots, so lamp glows land on the ground and the Tool Shed and Hearth sign frames look empty with the board offset; the game keeps the mesh switch off. The `buildings` overview scene also overlaps the Dealership hall over the shops (scene layout only). If the switch is turned on (job 17), re-check the shop sign boards against their frames.
+
+### Studio checks (Connor), follow-ups
+1. **Plot sign, PC and phone.** Claim a plot and walk up to its sign from the front and from behind. The owner's name is on the top line, clear of the post, with "PLOT n · TIER" under it. Try a long display name: it shrinks to fit the board.
+2. **Gondola Pass words.** Search the game for "Sky Pass": the inventory item, Gus's talk, the gate sign and the refusal toast all say "Gondola Pass". An old save that had `skyPass` still rides up.
+3. **Keen.** Temper an axe Keen I and chop a tree: the swings come about 8% faster than the same axe before (III about 22%). Keen on one axe does not speed another axe. Swap axes in the hotbar and back. Hold the chop button (PC mouse, phone, Xbox RT is unchanged) to check the pace.
+4. **Boot.** Join: the Sky Forge opens at the anvil, Gus's "Gus's Charter" prompt is on the town station, and the Output has no "[V1Boot]" warnings.
+

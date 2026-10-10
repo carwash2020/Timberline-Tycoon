@@ -1092,7 +1092,8 @@ return function(t)
 		end
 		local robuxSize = loader:shared("BoxSize").Class(RobuxShelf.Class).size
 		for _, place in ipairs(RobuxShelf.Placements()) do
-			sits(shed, { GoldTableTop = true }, place, robuxSize, place.slotId)
+			-- Lane P: passes on the table top, packs on the riser behind.
+			sits(shed, { GoldTableTop = true, GoldRiser = true }, place, robuxSize, place.slotId)
 		end
 		local hearth = BuildingArt.Shop("HearthAndHome", "STORE", C3.fromRGB(122, 90, 60))
 		for _, place in ipairs(StoreStock.Placements("HearthAndHome")) do
@@ -1125,7 +1126,7 @@ return function(t)
 	t.test("the gold table carries the shelf's name, and only the Tool Shed has one", function()
 		local shed = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
 		t.ok(find(shed, "GoldTable") ~= nil)
-		t.ok(texts(shed)["ROBUX SHELF"], "the sign over it says ROBUX SHELF")
+		t.ok(texts(shed)["TIMBERLINE STORE"], "the sign on it says TIMBERLINE STORE (Lane P)")
 		t.eq(find(shed, "GoldTrim"), nil, "no plinth board in front of the table")
 		for _, kind in ipairs({ "Dealership", "HearthAndHome" }) do
 			local other = BuildingArt.Shop(kind, kind, C3.fromRGB(90, 60, 40))

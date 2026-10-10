@@ -424,6 +424,9 @@ function SkyForgeService.Temper(player: Player, uid: unknown, prefix: unknown): 
 	HandInWood.Take(byUid, HandInLogic.PickPlanks(list, player.UserId, cost.woodId, cost.u3), "temper")
 	tempers[uid] = { prefix = prefix, tier = tier }
 	profile.temper = tempers
+	if type(AxeService.StampTemper) == "function" then
+		AxeService.StampTemper(player, uid)
+	end
 	local rec = tempers[uid]
 	local text = string.format("Your axe is now %s: %s.", TemperLogic.Label(rec), TemperLogic.EffectText(prefix, tier))
 	notify(player, text)
