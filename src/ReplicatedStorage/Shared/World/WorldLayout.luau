@@ -669,10 +669,10 @@ WorldLayout.TownFloors = {
 -- it), and fills Mirror Lake between The Climb's and Pine Bend's yards.
 WorldLayout.River = {
 	points = {
-		Vector2.new(-770, 508),
-		Vector2.new(-776, 420),
-		Vector2.new(-772, 350),
-		Vector2.new(-752, 318),
+		Vector2.new(-815, 508),
+		Vector2.new(-821, 420),
+		Vector2.new(-815, 352),
+		Vector2.new(-760, 320),
 	},
 	width = 26,
 	depth = 7,
