@@ -98,7 +98,7 @@ return function(t)
 		end
 		t.eq(BlueprintBook.UnlockStage("SandArch8"), 4)
 		t.eq(BlueprintBook.UnlockStage("CopperTrim4"), 5)
-		t.eq(BlueprintBook.UnlockText("Wall4"), "Unlocks at stage 1")
+		t.eq(BlueprintBook.UnlockText("Wall4"), "Unlocks at Logger")
 		t.eq(BlueprintBook.UnlockText("Nope"), nil)
 	end)
 

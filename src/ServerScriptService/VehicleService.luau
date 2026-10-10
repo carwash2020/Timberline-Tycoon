@@ -89,6 +89,7 @@ local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local FallenLogic = require(ReplicatedStorage.Shared.FallenLogic)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local DealershipLot = require(ReplicatedStorage.Shared.Art.DealershipLot)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
@@ -1445,6 +1446,7 @@ function VehicleService.SpawnTruck(
 		end)
 	end
 	player:SetAttribute("EquippedTruck", def.id)
+	VehicleService.PublishRecallFee(player)
 	return model, dropped
 end
 
@@ -1498,12 +1500,46 @@ end
 
 VehicleService.NoPadText = "Open your truck's box on your plot and place its pad first."
 
+-- Lane F: a truck that fell out of the world (through the ground, or toward
+-- the engine's destroy height) comes back on its own pad, stopped. Returns
+-- whether it was moved. BaseBoot calls this for every player every few seconds.
+function VehicleService.RescueFallen(player: Player): boolean
+	local rec = trucks[player.UserId]
+	if rec == nil or rec.model.Parent == nil then
+		return false
+	end
+	if not FallenLogic.Fell(rec.model:GetPivot().Position.Y) then
+		return false
+	end
+	rec.model:PivotTo(rec.homeCF * CFrame.new(0, 3, 0))
+	local root = rec.model.PrimaryPart
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+	return true
+end
+
+-- What the next recall of the equipped truck costs, for the button to show
+-- (Lane F): 0 while a free spawn is left, with Tow Service, or when the player
+-- has under the minimum fee in their wallet (A1: a recall never strands a
+-- broke player); else ShopLogic.RecallFee. VehicleController reads the
+-- RecallFee attribute.
+function VehicleService.PublishRecallFee(player: Player)
+	local profile = ProfileService.GetProfile(player)
+	local id = if profile then profile.equippedTruck else nil
+	local def = if type(id) == "string" then ItemCatalog.GetTruck(id) else nil
+	local fee = if def then respawnFee(player, def) else 0
+	player:SetAttribute("RecallFee", fee)
+end
+
 -- A spawn happened for this truck's pad: the next one is closer to costing.
 local function noteSpawn(player: Player, truckId: string)
 	local record = padRecordFor(player, truckId)
 	if record then
 		record.presses = (if type(record.presses) == "number" then record.presses else 0) + 1
 	end
+	VehicleService.PublishRecallFee(player)
 end
 
 -- "Send truck home": rebuilds the player's truck on its own spawn pad. The

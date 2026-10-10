@@ -29,6 +29,7 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local Util = require(ReplicatedStorage.Shared.Util)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -79,6 +80,36 @@ function BlueprintService.Publish(player: Player)
 		end
 	end
 	player:SetAttribute("Blueprints", ShopLogic.EncodeSet(ids))
+end
+
+-- Stage unlocks (BlueprintBook.UnlockStage, wired to StageOf.Current): teaches
+-- the book every plan the player's stage owes it and tells them once. The
+-- book never shrinks and nothing is sold for Robux. BaseBoot calls this for
+-- every player a few seconds apart, and a spec calls it directly. Returns
+-- how many plans were learned.
+function BlueprintService.SyncStage(player: Player): number
+	local profile = profileOf(player)
+	if not profile then
+		return 0
+	end
+	local stage = StageOf.Current(profile)
+	player:SetAttribute("BuildStage", stage)
+	local learned = BlueprintBook.SyncStage(profile)
+	if #learned == 0 then
+		return 0
+	end
+	BlueprintService.Publish(player)
+	local names: { string } = {}
+	for _, id in ipairs(learned) do
+		local bp = PlotData.Blueprint(id)
+		if bp and BlueprintBook.IsStarter(bp) == false then
+			table.insert(names, bp.displayName)
+		end
+	end
+	if #names > 0 then
+		notify(player, "New plans in your hammer: " .. table.concat(names, ", ") .. ".")
+	end
+	return #learned
 end
 
 ---------------------------------------------------------------------------

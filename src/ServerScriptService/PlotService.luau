@@ -40,6 +40,8 @@ local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local ChopSawLogic = require(ReplicatedStorage.Shared.ChopSawLogic)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
+local FallenLogic = require(ReplicatedStorage.Shared.FallenLogic)
+local FurnitureData = require(ReplicatedStorage.Shared.FurnitureData)
 local EditRights = require(script.Parent.EditRights)
 local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -1395,7 +1397,7 @@ function PlotService.Place(
 	-- starter plan, a store unlock you learned from its physical blueprint).
 	-- Stock is spent only after the cash check, so a refused place leaves it.
 	local stock = if type(payer.sawmillStock) == "table" then payer.sawmillStock else nil
-	local fromShop = BlueprintBook.IsBoxed(bp.id)
+	local fromShop = BlueprintBook.IsFromStock(bp.id)
 	local stockAt = if fromShop and stock then table.find(stock, bp.id) else nil
 	-- A sawmill, planer or belt comes out of the box you opened (boxUid): one
 	-- use, the box is spent below once everything has passed. An old save may
@@ -1954,6 +1956,22 @@ function PlotService.BindPaintAll(remote: RemoteEvent?)
 	end
 end
 
+-- Where a piece that fell out of the world comes back to: a spot over the
+-- player's own plot, a little different each time so rescues do not stack
+-- (FallenLogic.Offset). nil when they have no pad (a base unloaded).
+local rescues: { [Player]: number } = {}
+
+function PlotService.RecoverSpot(player: Player): CFrame?
+	local slot = slotOf[player]
+	if slot == nil then
+		return nil
+	end
+	local n = ((rescues[player] or 0) % 16) + 1
+	rescues[player] = n
+	local x, y, z = FallenLogic.Offset(n)
+	return slot.cframe * CFrame.new(x, y, z)
+end
+
 -- A base change is running for this player (a claim, an expansion, an
 -- unload or a swap). Save now waits for it.
 function PlotService.IsBusy(player: Player): boolean
@@ -2096,6 +2114,47 @@ function PlotService.Edit(player: Player, request: unknown)
 	end
 	syncEdits(slot, player, before, profile.plot.placed)
 	LogicService.Sync(slot :: any, profile, player)
+end
+
+-- Crafted furniture (Lane M's Copper Lamp Post and Gold-banded Chest recipes):
+-- GrantPiece puts one placeable piece in the player's stock, where it shows in
+-- the hammer's list like a boxed machine and is spent when placed (free). It is
+-- a from-stock entry, not a learned plan, so the book does not grow. Returns
+-- whether it was granted, and why not (a name, or "full"). `source` is a short
+-- label for the log ("craft").
+function PlotService.CanGrant(player: Player, pieceId: unknown): (boolean, string?)
+	if type(pieceId) ~= "string" or not FurnitureData.IsGranted(pieceId) then
+		return false, "unknown"
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return false, "missing"
+	end
+	if type(profile.sawmillStock) == "table" and #profile.sawmillStock >= FurnitureData.MaxStock then
+		return false, "full"
+	end
+	return true, nil
+end
+
+function PlotService.GrantPiece(player: Player, pieceId: unknown, source: unknown): (boolean, string?)
+	local ok, why = PlotService.CanGrant(player, pieceId)
+	if not ok then
+		return false, why
+	end
+	local profile = ProfileService.GetProfile(player) :: Profile
+	if type(profile.sawmillStock) ~= "table" then
+		profile.sawmillStock = {}
+	end
+	table.insert(profile.sawmillStock, pieceId :: string)
+	player:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(profile.sawmillStock))
+	local bp = PlotData.Blueprint(pieceId :: string)
+	if bp then
+		notify(player, string.format("%s is in your hammer's list. Place it on your plot.", bp.displayName))
+	end
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "PieceGranted", if type(source) == "string" then source else "grant")
+	end)
+	return true, nil
 end
 
 function PlotService.Upgrade(player: Player)
@@ -2405,6 +2464,7 @@ function PlotService.PlayerRemoving(player: Player)
 	undoStacks[player] = nil
 	forgetFill(player)
 	expanding[player] = nil
+	rescues[player] = nil
 	-- Leaving with the base on its pad: the loose wood and slabs go into the
 	-- save the same way an unload does (ingots stay with Lane M's own save). If
 	-- the pile is too big to hold, it is left alone and the older ground-load

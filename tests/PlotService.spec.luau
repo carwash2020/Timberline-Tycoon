@@ -2764,4 +2764,73 @@ return function(t)
 		talk.Triggered.fn(ann)
 		t.eq(said[1], t.shared("PlotSalesmanData").OwnsLine)
 	end)
+	-- Lane F: crafted furniture. PlotService.GrantPiece puts one placeable piece
+	-- in stock; it places once for nothing and never enters the book.
+	t.test(
+		"GrantPiece: a crafted piece waits in stock, places free once, is never learned, sells for nothing",
+		function()
+			local s = setup({ cash = 100000 })
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			ann.standOn(1)
+			t.eq({ s.P.GrantPiece(ann, "CopperLampPost", "craft") }, { true, nil })
+			t.eq(profile.sawmillStock, { "CopperLampPost" })
+			t.eq(ann.attrs.SawmillStock, "CopperLampPost", "the client reads the stock")
+			t.eq(table.find(profile.blueprintBook, "CopperLampPost"), nil, "a crafted piece is stock, not a plan")
+			local cash = profile.cash
+			s.P.Place(ann, "CopperLampPost", 4, 4, 0)
+			t.eq(#profile.plot.placed, 1)
+			t.eq(profile.plot.placed[1].blueprintId, "CopperLampPost")
+			t.eq(profile.cash, cash, "placing it is free")
+			t.eq(#profile.sawmillStock, 0, "and spends the piece")
+			t.eq(ann.attrs.SawmillStock, "")
+			s.P.Place(ann, "CopperLampPost", 12, 4, 0)
+			t.eq(#profile.plot.placed, 1, "no second one without another craft")
+			t.ok(string.find(s.lastToast(), "Craft the Copper Lamp Post", 1, true) ~= nil, s.lastToast())
+			s.advance(120) -- past the undo window
+			s.P.Sell(ann, profile.plot.placed[1].uid)
+			t.eq(profile.cash, cash, "furniture a craft made never turns into cash")
+			t.eq(#profile.plot.placed, 0)
+		end
+	)
+
+	t.test("GrantPiece: only the two furniture pieces, and a full stock refuses", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		t.eq({ s.P.GrantPiece(ann, "Wall4", "craft") }, { false, "unknown" })
+		t.eq({ s.P.GrantPiece(ann, "SawmillRickety", "craft") }, { false, "unknown" })
+		t.eq({ s.P.GrantPiece(ann, 5, "craft") }, { false, "unknown" })
+		t.eq({ s.P.GrantPiece(ann, "GoldChest", "craft") }, { true, nil })
+		local max = t.shared("FurnitureData").MaxStock
+		for _ = 2, max do
+			t.eq(s.P.GrantPiece(ann, "GoldChest", "craft"), true)
+		end
+		t.eq({ s.P.GrantPiece(ann, "GoldChest", "craft") }, { false, "full" })
+		t.eq({ s.P.CanGrant(ann, "GoldChest") }, { false, "full" })
+		t.eq(#profile.sawmillStock, max, "nothing was added past the cap")
+	end)
+	-- Lane F: where fallen wood, slabs and trucks come back to.
+	t.test("RecoverSpot: a spot above the owner's own plot, a new one each time, nothing without a pad", function()
+		local s = setup({ cash = 100000 })
+		local ann = s.newPlayer(1, "Ann")
+		t.eq(s.P.RecoverSpot(ann), nil, "no pad, nowhere to come back to")
+		s.claim(ann, 1)
+		local centre = t.roblox.Vector3.new(s.PlotData.Slots[1].X, 0, s.PlotData.Slots[1].Y)
+		local seen = {}
+		for _ = 1, 16 do
+			local cf = s.P.RecoverSpot(ann)
+			t.ok(cf ~= nil)
+			local at = cf.Position
+			t.ok(math.abs(at.X - centre.X) < 30 and math.abs(at.Z - centre.Z) < 30, "over the plot")
+			t.ok(at.Y > 4, "in the air above the platform")
+			seen[string.format("%.1f,%.1f", at.X, at.Z)] = true
+		end
+		local count = 0
+		for _ in pairs(seen) do
+			count += 1
+		end
+		t.eq(count, 16, "sixteen different spots")
+		s.P.BaseAction(ann, "unload")
+		t.eq(s.P.RecoverSpot(ann), nil, "an unloaded base has no pad")
+	end)
 end

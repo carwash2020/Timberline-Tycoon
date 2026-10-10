@@ -97,6 +97,27 @@ function BuildMaterials.Take(uid: string): boolean
 	return true
 end
 
+-- Moves a slab or ingot (found by Of) to `cf`, stopped. False when it is gone.
+function BuildMaterials.MoveTo(uid: string, cf: CFrame): boolean
+	local inst: Instance? = live[uid]
+	if inst == nil or inst.Parent == nil then
+		return false
+	end
+	local root: BasePart? = nil
+	if inst:IsA("BasePart") then
+		inst:PivotTo(cf)
+		root = inst
+	elseif inst:IsA("Model") then
+		inst:PivotTo(cf)
+		root = inst.PrimaryPart
+	end
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+	return true
+end
+
 -- How many more slabs this player may have lying about.
 function BuildMaterials.SlabRoom(userId: number): number
 	local n = 0

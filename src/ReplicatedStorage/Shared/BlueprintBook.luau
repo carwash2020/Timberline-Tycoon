@@ -20,9 +20,12 @@
 --     number of times.
 
 local BuildCost = require(script.Parent.BuildCost)
+local FurnitureData = require(script.Parent.FurnitureData)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlotData = require(script.Parent.PlotData)
 local PlotLogic = require(script.Parent.PlotLogic)
+local StockIds = require(script.Parent.StockIds)
+local StageOf = require(script.Parent.StageOf)
 local Util = require(script.Parent.Util)
 
 local BlueprintBook = {}
@@ -54,7 +57,19 @@ end
 -- A blueprint that could be placed for a fee before blueprints were items
 -- (not a store unlock, not a boxed machine). Everyone starts with these.
 function BlueprintBook.IsStarter(bp: PlotData.Blueprint): boolean
-	return bp.unlock ~= true and bp.gated ~= true and not BlueprintBook.IsBoxed(bp.id)
+	return bp.unlock ~= true and bp.gated ~= true and bp.granted ~= true and not BlueprintBook.IsBoxed(bp.id)
+end
+
+-- Furniture a craft grants (Copper Lamp Post, Gold-banded Chest): placed from
+-- stock like a boxed machine, never learned into the book.
+function BlueprintBook.IsGranted(id: string): boolean
+	return FurnitureData.IsGranted(id)
+end
+
+-- Anything placed from stock and spent when placed: a boxed sawmill or machine,
+-- a crafted piece, or a Sparkworks piece the counter sold (StockIds).
+function BlueprintBook.IsFromStock(id: string): boolean
+	return BlueprintBook.IsBoxed(id) or StockIds.Has(id)
 end
 
 -- The store plan that teaches `id` as part of its `family` (the glass pieces
@@ -87,7 +102,8 @@ function BlueprintBook.IsPlan(id: unknown): boolean
 end
 
 local function known(id: string): boolean
-	return PlotLogic.Blueprint(id) ~= nil
+	-- A granted piece is stock, not a plan: the book never learns it.
+	return PlotLogic.Blueprint(id) ~= nil and not FurnitureData.IsGranted(id)
 end
 
 ---------------------------------------------------------------------------
@@ -207,7 +223,10 @@ function BlueprintBook.Migrate(record: any)
 	end
 	if type(record.sawmillStock) == "table" then
 		for _, id in ipairs(record.sawmillStock) do
-			BlueprintBook.Learn(book, id)
+			-- A crafted or Sparkworks piece in stock is a box, not a learned plan.
+			if not StockIds.Has(id) then
+				BlueprintBook.Learn(book, id)
+			end
 		end
 	end
 	-- A plan that teaches a family gives the whole family, also to a book
@@ -303,7 +322,7 @@ end
 -- May this id be placed?
 ---------------------------------------------------------------------------
 
-export type Reason = "notOwned" | "store" | "toolShed" | "locked"
+export type Reason = "notOwned" | "store" | "toolShed" | "locked" | "grant" | "sparkworks"
 
 -- `owned`: in the book. `stocked`: boxes of this id held (machines).
 -- `boxed`: ShopLogic.ShelfMenusHidden(), which PlotLogic.Source reads.
@@ -319,6 +338,12 @@ function BlueprintBook.Allowed(id: string, owned: boolean, stocked: number, boxe
 	if stocked > 0 then
 		return true, nil
 	end
+	if FurnitureData.IsGranted(id) then
+		return false, "grant" -- crafted at the bench, one at a time
+	end
+	if StockIds.IsLogic(id) and not owned then
+		return false, "sparkworks" -- bought at the Sparkworks counter (or a rolled plan teaches it)
+	end
 	if BlueprintBook.IsBoxed(id) then
 		local source = PlotLogic.Source(bp, 0, false, boxed)
 		return source ~= "toolShed", if source == "toolShed" then "toolShed" else nil
@@ -333,6 +358,12 @@ function BlueprintBook.Message(reason: string?, bp: PlotData.Blueprint?): string
 	local name = if bp then bp.displayName else "piece"
 	if reason == "locked" then
 		return if bp and bp.locked then bp.locked else "Coming soon."
+	end
+	if reason == "sparkworks" then
+		return string.format("Buy the %s at the Sparkworks counter first.", name)
+	end
+	if reason == "grant" then
+		return string.format("Craft the %s at the bench in the mine first.", name)
 	end
 	if reason == "store" then
 		local key = if bp then BlueprintBook.KeyOf(bp.id) else nil
@@ -350,16 +381,47 @@ end
 -- The list
 ---------------------------------------------------------------------------
 
+-- Which stage teaches each plan (Lane F, PROPOSAL, Awaiting Connor).
+local UNLOCK_STAGE: { [string]: number } = {
+	-- walls, floors, flat roof
+	Wall4 = 1,
+	Wall12 = 1,
+	Floor4 = 1,
+	Foundation8 = 1,
+	FlatRoof8 = 1,
+	-- tall walls, sloped roofs, ramp, door and window walls
+	TallWall4 = 2,
+	TallWall8 = 2,
+	HalfWall8 = 2,
+	SlopedRoof8 = 2,
+	RoofCorner = 2,
+	RoofRidge8 = 2,
+	Ramp8 = 2,
+	DoorWall8 = 2,
+	WindowWall8 = 2,
+	-- railings, beams, posts
+	Railing8 = 3,
+	Beam8 = 3,
+	Post = 3,
+	FenceGate4 = 3,
+	-- sandstone (Red Mesa opens at S4), then copper
+	SandWall4 = 4,
+	SandFloor4 = 4,
+	SandArch8 = 4,
+	CopperTrim4 = 5,
+}
+
 export type Entry = {
 	id: string,
 	bp: PlotData.Blueprint,
 	group: string,
 	stock: number, -- boxes held (machines); 0 for a learned plan
+	unlockStage: number?, -- a plan not learned yet: the stage that teaches it (a locked row)
 }
 
 -- Book plus stock, in a fixed order: group, then plot tier, then price,
 -- then name. A boxed machine you hold shows even when it is not in the book.
-function BlueprintBook.Entries(book: Book, stock: Stock): { Entry }
+function BlueprintBook.Entries(book: Book, stock: Stock, showLocked: boolean?): { Entry }
 	local out: { Entry } = {}
 	local seen: { [string]: boolean } = {}
 	local function add(id: string)
@@ -402,57 +464,93 @@ function BlueprintBook.Entries(book: Book, stock: Stock): { Entry }
 		end
 		return a.bp.displayName < b.bp.displayName
 	end)
+	-- Plans a stage will teach, shown after the rest as locked rows so the list
+	-- says what is coming. Only gated plans: a starter is already in the book.
+	if showLocked == true then
+		local locked: { Entry } = {}
+		for _, bp in ipairs(PlotData.Blueprints) do
+			local need = UNLOCK_STAGE[bp.id]
+			if need ~= nil and bp.gated == true and not seen[bp.id] and not BlueprintBook.Has(book, bp.id) then
+				table.insert(
+					locked,
+					{ id = bp.id, bp = bp, group = BlueprintBook.Group(bp), stock = 0, unlockStage = need }
+				)
+			end
+		end
+		table.sort(locked, function(a, b)
+			if a.unlockStage ~= b.unlockStage then
+				return (a.unlockStage :: number) < (b.unlockStage :: number)
+			end
+			return a.bp.displayName < b.bp.displayName
+		end)
+		for _, entry in ipairs(locked) do
+			table.insert(out, entry)
+		end
+	end
 	return out
 end
 
 ---------------------------------------------------------------------------
 -- Lane F: stage unlocks (PROPOSAL, Awaiting Connor). Which V1 stage
--- (S0..S8 in the V1 plan) teaches a gated plan. Not wired yet: it waits
--- on Lane P's StageOf.Current(profile). Starter plans stay as Migrate builds
--- them; rolled blueprints still teach any plan.
+-- (S0..S8 in the V1 plan) teaches a plan. StageOf.Current(profile) says
+-- where a player is (Lane E's "Stage:Sx" keys, else progress), and
+-- LearnStage puts every plan up to that stage in the book. Starter plans
+-- stay as Migrate builds them (a starter is never taken away: the book only
+-- grows); rolled blueprints still teach any plan.
 ---------------------------------------------------------------------------
-
-local UNLOCK_STAGE: { [string]: number } = {
-	-- walls, floors, flat roof
-	Wall4 = 1,
-	Wall12 = 1,
-	Floor4 = 1,
-	Foundation8 = 1,
-	FlatRoof8 = 1,
-	-- tall walls, sloped roofs, ramp, door and window walls
-	TallWall4 = 2,
-	TallWall8 = 2,
-	HalfWall8 = 2,
-	SlopedRoof8 = 2,
-	RoofCorner = 2,
-	RoofRidge8 = 2,
-	Ramp8 = 2,
-	DoorWall8 = 2,
-	WindowWall8 = 2,
-	-- railings, beams, posts
-	Railing8 = 3,
-	Beam8 = 3,
-	Post = 3,
-	FenceGate4 = 3,
-	-- sandstone (Red Mesa opens at S4), then copper
-	SandWall4 = 4,
-	SandFloor4 = 4,
-	SandArch8 = 4,
-	CopperTrim4 = 5,
-}
 
 -- The stage number that unlocks this plan, or nil when no stage does.
 function BlueprintBook.UnlockStage(id: string): number?
 	return UNLOCK_STAGE[id]
 end
 
--- "Unlocks at S4" for a locked row, or nil.
+-- "Unlocks at Red Mesa" for a locked row, or nil.
 function BlueprintBook.UnlockText(id: string): string?
 	local stage = UNLOCK_STAGE[id]
 	if stage == nil then
 		return nil
 	end
-	return string.format("Unlocks at stage %d", stage)
+	return "Unlocks at " .. StageOf.Name(stage)
+end
+
+-- Every plan a player at `stage` is owed, in PlotData's order.
+function BlueprintBook.StageUnlocks(stage: number): Book
+	local out: Book = {}
+	for _, bp in ipairs(PlotData.Blueprints) do
+		local need = UNLOCK_STAGE[bp.id]
+		if need ~= nil and need <= stage then
+			table.insert(out, bp.id)
+		end
+	end
+	return out
+end
+
+-- Teaches the book every plan the stage owes it. Returns the ids it learned
+-- (empty when nothing was new): the book never shrinks, and running it twice
+-- changes nothing.
+function BlueprintBook.LearnStage(book: Book, stage: number): Book
+	local learned: Book = {}
+	if type(stage) ~= "number" or stage ~= stage then
+		return learned
+	end
+	for _, id in ipairs(BlueprintBook.StageUnlocks(stage)) do
+		if BlueprintBook.Learn(book, id) then
+			table.insert(learned, id)
+		end
+	end
+	return learned
+end
+
+-- The same, for a profile or slot record: reads StageOf.Current and teaches
+-- its `blueprintBook`. Returns what was learned.
+function BlueprintBook.SyncStage(record: any): Book
+	if type(record) ~= "table" then
+		return {}
+	end
+	if type(record.blueprintBook) ~= "table" then
+		record.blueprintBook = {}
+	end
+	return BlueprintBook.LearnStage(record.blueprintBook, StageOf.Current(record))
 end
 
 function BlueprintBook.NextFilter(filter: string): string
@@ -483,6 +581,12 @@ end
 function BlueprintBook.NeedsText(bp: PlotData.Blueprint, stock: number?): string
 	if BlueprintBook.IsBoxed(bp.id) then
 		return if (stock or 0) > 0 then "Placed from your box" else "A box from the Tool Shed"
+	end
+	if bp.granted == true then
+		return if (stock or 0) > 0 then "Placed from what you crafted" else "Crafted at the bench"
+	end
+	if StockIds.IsLogic(bp.id) and (stock or 0) > 0 then
+		return "Placed from your box"
 	end
 	if bp.kit == true and BuildCost.NeedsSlabsOrIngots(BuildCost.Of(bp)) then
 		-- Sandstone and copper pieces: what to carry to the ghost, then the fee.
@@ -537,6 +641,14 @@ function BlueprintBook.Row(entry: Entry, ctx: Context): Row
 		message = nil,
 		ready = true,
 	}
+	if entry.unlockStage ~= nil then
+		-- A plan the player has not learned yet: say which stage teaches it.
+		local line = BlueprintBook.UnlockText(bp.id) or "Locked"
+		row.detail ..= " · " .. line
+		row.button, row.state, row.ready = StageOf.Name(entry.unlockStage), "locked", false
+		row.message = line .. "."
+		return row
+	end
 	if bp.tier > ctx.tier then
 		local tierName = if needed then needed.name else "a bigger plot"
 		row.detail ..= " · needs " .. tierName

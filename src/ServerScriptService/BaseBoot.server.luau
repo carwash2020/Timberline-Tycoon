@@ -77,3 +77,81 @@ if blueprints and plots and type(blueprints.Hooks) == "table" then
 	blueprints.Hooks.ownerAt = plots.OwnerAt
 	blueprints.Hooks.canEdit = plots.CanEdit
 end
+
+-- Stage unlocks: every few seconds each player's book is brought up to the
+-- plans their stage owes it (BlueprintService.SyncStage). Cheap: one profile
+-- read per player, and it writes only when a plan is new.
+if blueprints and type(blueprints.SyncStage) == "function" then
+	local Players = game:GetService("Players")
+	task.spawn(function()
+		while true do
+			task.wait(5)
+			for _, player in ipairs(Players:GetPlayers()) do
+				start("BlueprintService.SyncStage", function()
+					blueprints.SyncStage(player)
+				end)
+			end
+		end
+	end)
+end
+
+-- Crafted furniture: the bench grants a placeable piece through PlotService.
+local crafting = service("CraftingService")
+if crafting and plots and type(crafting.Hooks) == "table" then
+	crafting.Hooks.canGrant = plots.CanGrant
+	crafting.Hooks.grant = plots.GrantPiece
+end
+
+-- Fallen pieces (Lane F): owned wood, slabs, ingots and trucks that fall out of
+-- the world come back at their owner's plot (FallenLogic). Wood is caught by
+-- WoodService's own tick through this hook; trucks and loose stone are looked
+-- at every two seconds here.
+local Players = game:GetService("Players")
+local FallenLogic = require(ReplicatedStorage.Shared.FallenLogic)
+local wood = service("WoodService")
+if wood and plots and type(wood.Hooks) == "table" then
+	wood.Hooks.recover = function(piece: any): CFrame?
+		local owner = Players:GetPlayerByUserId(piece.ownerId)
+		if owner == nil then
+			return nil
+		end
+		return plots.RecoverSpot(owner)
+	end
+end
+
+local vehicles = service("VehicleService")
+local materials = service("BuildMaterials")
+local function tell(player: Player, text: string)
+	local notifyRemote = remotesFolder:FindFirstChild("Notify")
+	if notifyRemote and notifyRemote:IsA("RemoteEvent") then
+		notifyRemote:FireClient(player, text)
+	end
+end
+if plots and (vehicles or materials) then
+	task.spawn(function()
+		while true do
+			task.wait(2)
+			for _, player in ipairs(Players:GetPlayers()) do
+				start("rescue fallen", function()
+					if vehicles and type(vehicles.RescueFallen) == "function" and vehicles.RescueFallen(player) then
+						tell(player, FallenLogic.Texts.truck)
+					end
+					if materials and type(materials.Of) == "function" then
+						local moved = false
+						for _, m in ipairs(materials.Of(player.UserId)) do
+							if FallenLogic.Fell(m.position.Y) then
+								local spot = plots.RecoverSpot(player)
+								if spot and materials.MoveTo(m.uid, spot) then
+									moved = true
+								end
+							end
+						end
+						if moved then
+							tell(player, FallenLogic.Texts.stone)
+						end
+					end
+				end)
+			end
+		end
+	end)
+end

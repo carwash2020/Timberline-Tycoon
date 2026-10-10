@@ -8,6 +8,9 @@ return function(t)
 	local fs = require("@lune/fs")
 	local dir = "src/StarterPlayer/StarterPlayerScripts/"
 
+	-- CopperTrim4, SandWall4, SandFloor4, SandArch8: gated plans a stage teaches.
+	local LOCKED = 4
+
 	local function setup(attributes)
 		local player = { attrs = { PlotTier = 1, Cash = 1000, PlotSlot = 1 } }
 		for k, v in pairs(attributes or {}) do
@@ -123,12 +126,17 @@ return function(t)
 		local ids = s.shop.ids()
 		t.eq(ids[1], "#filter")
 		t.eq(ids[2], "#land")
-		t.eq(#ids, 5)
+		-- Lane F: after the book come four locked rows (the sandstone and copper
+		-- plans a stage will teach), so the list says what is coming.
+		t.eq(#ids, 5 + LOCKED)
 		local seen = {}
-		for i = 3, #ids do
+		for i = 3, 5 do
 			seen[ids[i]] = true
 		end
 		t.eq(seen, { Bench = true, Wall = true, Shed = true })
+		for i = 6, #ids do
+			t.ok(s.shop.view(ids[i]).state == "locked", ids[i] .. " is a locked row")
+		end
 		t.eq(s.shop.title, "Blueprints")
 		t.ok(#s.shop.subtitle <= 40, "the subtitle fits two phone lines")
 	end)
@@ -146,7 +154,7 @@ return function(t)
 	t.test("a boxed sawmill shows only while you hold one, with its count", function()
 		local none = setup({ Blueprints = "Wall" })
 		t.eq(none.shop.ids()[3], "Wall")
-		t.eq(#none.shop.ids(), 3)
+		t.eq(#none.shop.ids(), 3 + LOCKED)
 		local held = setup({ Blueprints = "Wall", SawmillStock = "SawmillRickety,SawmillRickety" })
 		local row = held.shop.view("SawmillRickety")
 		t.eq(row.own, "· 2 in stock")
@@ -161,10 +169,14 @@ return function(t)
 		t.eq(s.reopened, { "#filter" }, "the pad's selection stays on the filter")
 		t.eq(s.shop.view("#filter").name, "Showing: Buildings")
 		local ids = s.shop.ids()
-		t.eq(#ids, 2 + 2, "Wall and Shed are Buildings; the Bench is Decor")
+		t.eq(
+			#ids,
+			2 + 2 + (LOCKED - 1),
+			"Wall and Shed are Buildings (and the three locked sandstone rows); the Bench is Decor"
+		)
 		s.shop.view("#filter").onClick()
 		t.eq(s.shop.ids()[3], "Bench")
-		t.eq(#s.shop.ids(), 3)
+		t.eq(#s.shop.ids(), 3 + 1, "Decor: the Bench, and the locked Copper Trim")
 		s.shop.view("#filter").onClick()
 		s.shop.view("#filter").onClick()
 		t.eq(s.shop.view("#filter").name, "Showing: All")

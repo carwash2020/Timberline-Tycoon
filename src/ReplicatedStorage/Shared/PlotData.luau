@@ -177,6 +177,7 @@ export type Blueprint = {
 	slabUnits: number?, -- Lane F: sandstone slabs to fill (BuildCost)
 	ingots: { [string]: number }?, -- Lane F: ingots to fill, by ore id (BuildCost)
 	locked: string?, -- Lane F: cannot be placed yet; the book shows this line
+	granted: boolean?, -- Lane F: furniture a craft grants (PlotService.GrantPiece); placed from stock, never sold or learned
 }
 
 -- What placing charges now. A kit piece is KitCashPerUnit per wood unit.
@@ -660,6 +661,11 @@ for _, extra in ipairs(require(script.Parent.DecorData) :: { any }) do
 end
 
 for _, extra in ipairs(require(script.Parent.LogicItems) :: { any }) do
+	table.insert(PlotData.Blueprints, extra :: Blueprint)
+end
+
+-- Lane F: the crafted furniture (Copper Lamp Post, Gold-banded Chest).
+for _, extra in ipairs(require(script.Parent.FurnitureData).Pieces :: { any }) do
 	table.insert(PlotData.Blueprints, extra :: Blueprint)
 end
 
