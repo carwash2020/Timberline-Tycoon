@@ -1900,7 +1900,9 @@ return function(t)
 			t.ok(insideBy(isle.center, isle.radius + 100), "an isle near a wall")
 		end
 		for _, spot in ipairs(IsleArt.CloudSpots(WorldPlan.IslesFromRoot(sky), sky.trunkHeight, 99, sky.main.dir)) do
-			t.ok(insideBy((CFrame.new(sky.root) * spot.cframe).Position, spot.size + 100), "a cloud bank near a wall")
+			-- Ring map: half its size plus 20 from a wall (it was its size plus 100). The
+			-- Lumen isles stand at (680, 280), nearer the east wall than the old sky.
+			t.ok(insideBy((CFrame.new(sky.root) * spot.cframe).Position, spot.size / 2 + 20), "a cloud bank near a wall")
 		end
 		-- The pieces inside the walls are under the ground (above); the rides
 		-- pass over them with room to spare.
@@ -2069,7 +2071,8 @@ return function(t)
 			-- Its top is most of the real rim's height (the rim's lowest point is
 			-- about 140; the crater's lava pool is under it).
 			local pool = WorldPlan.Crater()
-			t.ok(highest >= 100, "the impostor's top at " .. highest)
+			-- Ring map: 88 (was 100): the crater floor stands at 101, 15 lower than before.
+			t.ok(highest >= 88, "the impostor's top at " .. highest)
 			t.ok(highest < pool.Y - UNDER, "under the crater's floor")
 		end
 	)

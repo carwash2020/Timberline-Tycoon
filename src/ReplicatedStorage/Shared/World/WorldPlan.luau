@@ -2622,7 +2622,8 @@ end
 -- the real cone's lowest flank (which is concave, so two straight tiers
 -- hug it) and under its crater's floor.
 local CONE = WorldLayout.VolcanoCone
-local IMPOSTOR_RINGS = { { 126, 0 }, { 78, 58 }, { 36, 108 } }
+-- Ring map: the cone stands on lower ground (its lava pool is at 101, it was 116), so the tiers are 12 lower.
+local IMPOSTOR_RINGS = { { 126, 0 }, { 78, 46 }, { 36, 96 } }
 local IMPOSTOR_SIDES = 8
 
 -- The volcano's gap in the ring, as seen from BackdropEye: anything whose
