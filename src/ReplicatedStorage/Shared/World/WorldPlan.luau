@@ -2412,6 +2412,9 @@ WorldPlan.BackdropSeaTop = SEA_LEVEL - 0.2 -- just under the terrain's own sea
 -- The town square at eye height: the volcano's gap in the ring is cut for
 -- this eye.
 WorldPlan.BackdropEye = Vector3.new(0, 6, 90)
+-- The seeds of the north, west and south mountain rows (placeRow).
+-- Ring map: the south row is 302 (301 left a 3-degree gap in the skyline at 261 to 263 degrees).
+WorldPlan.BackdropSeeds = { north = 101, west = 201, south = 302 }
 
 local SKIRT_STEP = 4 -- studs between the terrain samples along a wall
 local SKIRT_IN = 2 -- the samples sit this far inside the wall
@@ -3251,9 +3254,9 @@ function WorldPlan.Backdrop(): { BackdropPiece }
 		local saddles = placeRow(out, wall, NEAR_ROW, seed, { u0 = u0, u1 = u1, anchor = anchor })
 		placeRow(out, wall, FAR_ROW, seed + 1, nil, saddles)
 	end
-	ring(north, -2900, 1300, 101)
-	ring(west, -1450, 1450, 201, riverAt)
-	ring(south, -2900, 1200, 301)
+	ring(north, -2900, 1300, WorldPlan.BackdropSeeds.north)
+	ring(west, -1450, 1450, WorldPlan.BackdropSeeds.west, riverAt)
+	ring(south, -2900, 1200, WorldPlan.BackdropSeeds.south)
 
 	-- The sea east of the coast (a part is at most 2,048 studs a side), its
 	-- bed under it, and on south of the south wall from where the coast
