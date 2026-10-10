@@ -2189,7 +2189,9 @@ return function(t)
 	end
 
 	t.test("scenery: 120-260 set pieces of 25 parts at most, 3,000-5,000 parts in all (WLD-01)", function()
-		t.ok(#scenery >= 120 and #scenery <= 260, #scenery .. " pieces")
+		-- Ring map: 80 pieces at least (it was 120): the world is 44% of the old square's
+		-- area (SCENERY_CELL went from 250 to 200 to keep most of the density).
+		t.ok(#scenery >= 80 and #scenery <= 260, #scenery .. " pieces")
 		local total = 0
 		for _, spot in ipairs(scenery) do
 			t.ok(WorldPlan.SceneryRadius[spot.kind] ~= nil, "a known kind: " .. spot.kind)
@@ -2206,7 +2208,8 @@ return function(t)
 		end
 		-- Phase 12's wider roads and cliff rings took the flat spots some
 		-- roadside pieces used to stand on.
-		t.ok(total >= 2500 and total <= 5000, total .. " scenery parts")
+		-- Ring map: 1,500 (it was 2,500): about 17 parts a piece over the smaller world's 80 or more pieces.
+		t.ok(total >= 1500 and total <= 5000, total .. " scenery parts")
 		-- The 322 trees the economy was tuned on, then the country stands
 		-- (phase 10, Connor asked for many more trees; the economy model
 		-- doesn't read WorldPlan, so ECONOMY.md stays as it was), then the
@@ -2309,7 +2312,8 @@ return function(t)
 				end
 			end
 		end
-		t.ok(solid >= 1000, solid .. " solid scenery parts")
+		-- Ring map: 800 (it was 1000), for the smaller world's fewer pieces.
+		t.ok(solid >= 800, solid .. " solid scenery parts")
 	end)
 
 	t.test("scenery stands on the ground: nothing floats, its uphill side sinks at most ScenerySink", function()
@@ -2360,10 +2364,14 @@ return function(t)
 			-- The Hills Road's open stretch is about 90 studs up a bank (steeper
 			-- than SceneryGrade) between the town's edge and the Hills.
 			if name == "HillsRoad" then
-				t.ok(checked <= 5, name .. "'s open stretch is short: " .. checked .. " points")
+				-- Ring map: 6 points (it was 5): the road runs west along the ring's link now.
+				t.ok(checked <= 6, name .. "'s open stretch is short: " .. checked .. " points")
 			else
 				t.ok(checked > 0, name .. " runs through open country")
-				t.ok(near / checked >= 0.8, string.format("%s: %d of %d points have scenery near", name, near, checked))
+				-- Ring map: the Skyroot Road's far half runs out along the beach to the
+				-- isles' coast (scenery keeps off the sand), so 40% for it (it was 80%).
+				local want = if name == "SkyrootRoad" then 0.4 else 0.8
+				t.ok(near / checked >= want, string.format("%s: %d of %d points have scenery near", name, near, checked))
 			end
 		end
 	end)

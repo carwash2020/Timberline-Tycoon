@@ -1105,7 +1105,8 @@ WorldPlan.SceneryRadius = {
 	Windmill = 10,
 	LookoutTower = 5,
 } :: { [string]: number }
-local SCENERY_CELL = 250 -- one group of pieces per cell of open country
+-- Ring map: 200 (it was 250), so the 2000-stud world keeps about the old density.
+local SCENERY_CELL = 200 -- one group of pieces per cell of open country
 local SCENERY_ROAD_STEP = 150 -- and one every this far along the haul roads
 local SCENERY_ROADS = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
 local SCENERY_EDGE = 1150 -- clear of the mountains at the world's edge
