@@ -1126,7 +1126,7 @@ WorldLayout.Forest = {
 	lanes = {
 		-- From the spawn to the lighthouse on the coast's headland
 		-- (WorldPlan.Lighthouse): its lamp stays in sight (Forest.spec).
-		{ name = "LighthouseVista", a = Vector2.new(0, 40), b = Vector2.new(787, -268), half = 45 },
+		{ name = "LighthouseVista", a = Vector2.new(0, 40), b = Vector2.new(780, -240), half = 45 },
 		-- A trail out of the Phantom Grove's ridge gap toward town, so the
 		-- curious still find it.
 		-- Ring map: the grove sits due south of the Starter Forest, so the
