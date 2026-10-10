@@ -399,10 +399,34 @@ function gltfFor(file) {
   }
   return gltfCache.get(file);
 }
+// A rigged GLB (the NPCs) names its bones and its skinned meshes alike, and
+// GLTFLoader renames the later duplicate ("Head" becomes "Head_1"). So
+// prefer the node of that name that holds a mesh, then a renamed duplicate.
+function hasMesh(o) {
+  let found = false;
+  o.traverse((c) => { if (c.isMesh) found = true; });
+  return found;
+}
 function nodeNamed(gltf, name) {
-  let hit = null;
-  gltf.scene.traverse((o) => { if (!hit && o.name === name) hit = o; });
-  return hit;
+  let hit = null, renamed = null, bare = null;
+  const dup = new RegExp("^" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "_\\d+$");
+  gltf.scene.traverse((o) => {
+    if (o.name === name) {
+      if (!hit && hasMesh(o)) hit = o;
+      if (!bare) bare = o;
+    } else if (!renamed && dup.test(o.name) && hasMesh(o)) renamed = o;
+  });
+  return hit || renamed || bare;
+}
+// A skinned mesh cloned away from its skeleton draws with stale bone
+// matrices; its geometry is already the bind pose, so draw it as a plain mesh.
+function unskinned(node) {
+  if (!node.isSkinnedMesh) return node.clone(true);
+  const m = new THREE.Mesh(node.geometry, node.material);
+  m.name = node.name;
+  m.castShadow = node.castShadow;
+  m.receiveShadow = node.receiveShadow;
+  return m;
 }
 function cframeMatrix(p) {
   const m = new THREE.Matrix4();
@@ -430,7 +454,7 @@ function missingMesh(id, p) {
   bounds.expandByPoint(new THREE.Vector3(p[4], p[5], p[6]));
 }
 function fittedNode(node, sx, sy, sz) {
-  const clone = node.clone(true);
+  const clone = unskinned(node);
   clone.position.set(0, 0, 0);
   clone.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(clone);

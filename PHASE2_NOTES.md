@@ -38,6 +38,25 @@ Part counts: the board has 15 parts (cap 16), a gold crate has 11, and the gold 
 **Xbox (controller)**
 11. With a controller connected, walk to the board. The prompt shows ButtonX. Press it, and the store opens with the selection ring on the first Buy pill. Use the D-pad to move between pills, to the tabs (Up), and to the X close button. A on a pill opens the prompt. B closes the store. RT is never bound by the store.
 12. At the Tool Shed counter, the keeper's question works with A and B, and the prompt opens with A.
+## Lane W: practical automation (8 October 2026, branch `phase-2/v1-w-automation`)
+
+
+What changed: `AutomationLogic` (ports, power and reverse rules, detector filter, sweeper pick, laser reach), `WireLogic` (belts, mills and planers are wire targets; detector and laser are sources; machines never count toward the logic cap), `LogicGraph` (per-port levels, machine nodes only when wired), `LogicService` (targets, Reverse/Flip/Filter prompts, sweeper, detector, laser), `BeltService` (signed speed), `SawmillService` / `PlanerService` (pause while unpowered), `MachineArt` (TLD-1 deck, Switch Belt, Tilted Belt, Belt Support, Wood Detector), `ItemCatalog`, `LogicItems`, `SparkworksStock`, `ProfileSchema` (keeps `reversed`/`flip` only as `true` on pieces that have them), `RateLimiter` (BeltReverse 2, BeltFlip 2, DetectorFilter 3). Cross-lane: `ItemBox` scales only ToolShed belts in its Belt group.
+
+Studio checks (PC, phone, Xbox):
+
+1. Old plot: load a save with belts and mills and no wires. Everything runs as before.
+2. Place a SparkSwitch and a straight belt, wire switch to belt port 1. Switch off: belt stops. On: runs. Wire a second switch to port 2: on reverses the belt.
+3. Wire a switch to a sawmill. Start a cut, switch off mid-cut: the log stops and stays held. Switch on: the cut finishes once, the same planks.
+4. Reverse a belt with its prompt (E / ButtonX / tap). A visitor gets "Only the plot's owner can change that belt." Rejoin: the belt is still reversed.
+5. Switch Belt: Flip prompt (F / ButtonY / tap) moves the paddle to the other side; logs leave on the other exit. Wire port 1: switch on swaps the side.
+6. Tilted Belt from a ground belt onto a straight belt on two Belt Supports: logs climb and carry on.
+7. Wood Detector: Filter prompt steps Any wood, Oak, Birch ... back to Any wood. Wire it to a lamp: lamp lights while a matching log is under the arch.
+8. Wood Sweeper beside a belt, wired from a detector: a matching log is pushed off sideways. Held pieces, other players' wood, players and trucks are never pushed.
+9. Laser Emitter facing a Laser Receiver across a belt: thin blue beam. A log breaks it (wired lamp lights); a wall or a player does not.
+10. Phone 667x375 and Xbox: every prompt reachable, no ButtonR2 binding added.
+
+Previews: `previews/v1-w/v1-w-automation-1..4.png` (sorting line; tilted belt onto supports; sweeper down and laser; switch belt placed and flipped with a detector).
 
 ## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
 
@@ -3332,3 +3351,39 @@ Connor: "If we have the pop up chats you can remove the floating chat bubbles."
 - [ ] Press Talk on each NPC (Millie, Tink, Hazel, Dale, Gus, Rosa, Pip, Bram, Old Hank, Old Tolly, Cap'n Moss, the Hermit): the box opens, the NPC turns to you and gestures, and prompts work afterwards. Hear the murmur as it opens.
 - [ ] Ferry and toll: the Board / Pay toll prompts show the price; Cap'n Moss and Old Tolly mention it when talked to.
 - [ ] Talk to a keeper after closing time: the box opens with their sleep line.
+
+## Lane A2: end game (branch `phase-2/v1-a2-end-game`, 8 October 2026)
+
+Gus's Charter, the Gondola Pass gate, the Sky Forge window (Starfall, relics, Old Bram's weekly order, tempering) and tempering in swings and sales. Built off `main` at `ae2c3f9`.
+
+**How it fits together.**
+- `Shared/SkyQuestLogic` (pure): the Designer's steps (own the Obsidian Axe; lay 120 Frostwood, 120 Emberwood, 40 Gloamwood planks by the town station; Gus gives the pass). `SkyQuestService` (server) adds Gus's "Gus's Charter" prompt on the town platform (F / ButtonY, hold 0.3 s), takes the laid planks (used up, pay nothing), saves `profile.skyQuest`, grants `gondolaPass` and the `GondolaPass` gear once, and publishes `SkyQuestStep` / `GondolaPass` attributes. No cash fee.
+- `GondolaService`: Ride up from GondolaTown and GondolaBase checks `gondolaPass` (or the older `skyPass`) and toasts "Gondola Pass needed. Ask Gus about his charter." The ride down is never gated; the $250 fare and the 40 s ride are unchanged. A Signpost by each up station reads "SKYROOT GONDOLA / Obsidian Axe + Gondola Pass from Gus" (no price on the sign; the fare is in the prompt).
+- `SkyForgeService` (server, new; `AetherService.V1Init` / `OpenForge` start it): "Open the Sky Forge" on the isle Starfall anvil and on the town court anvil (`TemperSpot`), the `ForgeOpen` / `ForgeAction` handlers (range 20 studs, RateLimiter), tempering, relics (once each; their trophies stand by your plot sign and the court's `Socket_<Relic>` gems light for you), and the weekly order (pays $18,000 + 4 Sky Shards once per UTC week from Monday 00:00).
+- `Shared/TemperLogic`: Keen (cooldown -8/-15/-22%), Heavy (damage +10/+20/+30%), Prosperous (sale +4/+7/+10%, stamp `t`, inside BonusCap 3). One family per axe; grades in order; re-tempering a new family replaces it; no random rolls, no Robux. Costs: I $20,000 + 6 Sky Shards + 30 Gloamwood planks; II $50,000 + 10 + 40 Lumenwood; III $120,000 + 16 + 80 Lumenwood. The Lux Axe can't be tempered. `AxeService.GetEquippedAxe` returns the tempered copy.
+- `ForgeUI` (client, new): four tabs; every button 44 px; picking a temper shows "Result", "Costs", "Replaces" and any refusal before Temper is sent. On a phone the window stays right of the thumbstick, left of the HUD column and jump button, under the cash plaque, and the temper choices stack one per line. B / Escape / X close it; the gamepad lands on the first button; you can't walk while it is open. Nothing binds ButtonR2.
+- `EndGameBoot.server.luau` starts the services (V1Boot on main lists only SecretService).
+- ShopUI: the forge rows moved to ForgeUI; its last hardcoded colours use UITheme names.
+
+**Previews** (`previews/v1-a2/`, real meshes; the court, isle forge and cabin GLBs are loaded through a preview-only manifest because job 17 wires them in game):
+- `court-bram.png`: the Sky Forge Court (uploaded SkyForgeCourt meshes) with Old Bram.
+- `gondola-gate-gus.png`: the town station (GondolaStation meshes), Gus, and the gate sign.
+- `isle-starfall-forge.png`: the isle Starfall Forge (uploaded meshes).
+- `relic-trophies.png`: four relic trophies by a plot sign (PlotSign mesh).
+- `forge-phone-temper.png`, `forge-phone-confirm.png`, `forge-phone-starfall.png` (667x375), `forge-pc-temper.png`, `forge-pc-confirm.png`, `forge-pc-relics.png`, `forge-pc-order.png` (1280x720): ForgeUI's own instance tree over the court with the round-3 HUD.
+- Remake: `python3 tools/preview/v1_a2_meshes.py`, `PREVIEW_MESHES=preview/a2-meshes.json bash tools/preview/shoot.sh v1-a2-endgame`, then the steps at the top of `tools/preview/v1_a2_ui.py`.
+
+**Renderer fixes in this branch (preview only).** `viewer.html` drew every rigged NPC (Old Bram and others) as magenta boxes: the GLB names its bones and its skinned meshes alike, and the viewer picked the bone. It now picks the node holding the mesh and draws a skinned mesh in its bind pose. In Lune, TownMeshes stands every piece of a multi-piece town model on the ground (no pivots outside Studio), so the station roof and the Signpost board lay in the grass; the A2 scene puts those pieces where the GLB has them (as Studio does when the pivot survives). Needs a Studio look (check 4 below).
+
+### Studio checks (Connor), end game
+1. **Gus's charter, PC.** New save with the Obsidian Axe: walk to the town gondola platform. Gus stands beside it. "Gus's Charter" (F) opens the charter; it says to lay 120 Frostwood planks by the station. Lay some, press F again: the progress moves and those planks vanish, no cash paid. Good: each step shows progress; after the Gloamwood step a toast says you got the Gondola Pass, and it is in your inventory once.
+2. **The gate.** Before the pass, "Ride up" (E) at the town station toasts "Gondola Pass needed. Ask Gus about his charter." and charges nothing. With the pass it charges $250 once and rides 40 s. From the top, "Ride down" always works, pass or not.
+3. **The gate sign.** Off the platform's front-left corner, past the steps: "SKYROOT GONDOLA / Obsidian Axe + Gondola Pass from Gus", readable from the steps, standing on the ground, and you walk through it. No price on it.
+4. **Town meshes in place.** At the station: the roof sits on the posts, the GONDOLA crest on top, and the gate sign's board is between its posts (not in the grass). If any piece lies on the ground, set the workspace attribute `TownMeshes` false and tell us which model.
+5. **The Sky Forge, PC.** On the isle (or the town court anvil), "Open the Sky Forge" (F) opens the window. Starfall shows the recipe and what's missing. Relics shows four rows with their pay. Order shows this week's woods and "New order in ...". Temper lists each axe you own except the Lux Axe.
+6. **Tempering.** With $20,000+, 6 Sky Shards and 30 Gloamwood planks laid by the anvil: Temper, pick Keen I. The card shows Result, Costs (and Replaces when it changes family). Temper: cash, shards and those planks go; the axe now swings faster (watch the swing pace) and the row says "Keen I". Rejoin and switch save slots: it stays.
+7. **Prosperous.** Temper an axe Prosperous I, fell and sell a log: the sale is about 4% more than the same log felled by an untempered axe.
+8. **Relics.** Lay a figured Frostwood log or plank by the anvil with 4 Sky Shards, Relics, Forge on Frost: $22,500 paid once, the Frost gem on the court altar glows for you, and a trophy (a slate stand with a glowing gem) appears beside your plot sign. Rejoin: still there. Forge again: "Done".
+9. **Weekly order.** Lay the order's planks by the anvil, Deliver: they are used up; when complete it pays $18,000 + 4 Sky Shards once. It turns over Monday 00:00 UTC (Sunday 6 PM MT).
+10. **Phone (emulator, 667x375 or a small phone).** Open the forge: the window sits right of the thumbstick and left of the HUD column and jump button, under the cash plaque. Tabs and buttons are easy to tap; the temper choices are one per line; the list scrolls. X closes it.
+11. **Xbox.** The charter prompt shows Y, Ride up shows X. In the forge the selection starts on the first button; the D-pad moves between tabs and buttons; A presses; B closes the window. RT still swings the axe after closing.

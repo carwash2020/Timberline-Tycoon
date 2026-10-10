@@ -17,3 +17,4 @@ sourcemap.json
 roblox.yml
 globalTypes.d.luau
 /preview/
+__pycache__/
