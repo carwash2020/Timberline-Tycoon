@@ -167,7 +167,7 @@ WorldLayout.Roads = {
 	-- TollSpurJoinZ so the spur can meet it.
 	{
 		name = "SnowRoad",
-		points = { Vector2.new(0, 205), Vector2.new(0, 480), Vector2.new(0, 860) },
+		points = { Vector2.new(0, 205), Vector2.new(0, 480), Vector2.new(0, 760) },
 		width = 28,
 	},
 	-- The short road from the ring into the volcano disc.
@@ -189,7 +189,8 @@ WorldLayout.Roads = {
 	},
 	{ name = "SouthLink", points = { Vector2.new(0, -32), Vector2.new(0, -520) }, width = 28 },
 	{ name = "EastLink", points = { Vector2.new(140, 80), Vector2.new(600, 80) }, width = 28 },
-	{ name = "DockRoad", points = { Vector2.new(600, 80), Vector2.new(860, 160) }, width = 28 },
+	-- Ends at the ferry dock on the shore (ring map: the water starts near x 790 here).
+	{ name = "DockRoad", points = { Vector2.new(600, 80), Vector2.new(772, 133) }, width = 28 },
 	{
 		name = "RavineRoad",
 		points = { Vector2.new(0, -520), Vector2.new(-90, -560), Vector2.new(-90, -780) },
@@ -308,7 +309,7 @@ WorldLayout.Rims = {
 		cz = snow.Y,
 		inner = 150,
 		outer = 190,
-		height = 16,
+		height = 30, -- ring map: the rim is tighter (150 to 190), so it stands taller to stay a wall
 		gap = -math.pi / 2,
 		half = 0.7,
 	},
@@ -755,8 +756,8 @@ WorldLayout.StripClumps = {
 	{ x = 110, z = 955 },
 	{ x = -110, z = 985 },
 }
-WorldLayout.FerryDockX = 860 -- mainland dock, west of the isle
-WorldLayout.FerryDockZ = 160
+WorldLayout.FerryDockX = 780 -- mainland dock on the shore (ring map: the water starts near x 790)
+WorldLayout.FerryDockZ = 136
 WorldLayout.FerryDock = { x = WorldLayout.FerryDockX, z = WorldLayout.FerryDockZ }
 WorldLayout.FerryLandingInset = 24 -- dock sits on the dry crown, not the shoal
 WorldLayout.FerryPathLength = 20
@@ -801,7 +802,7 @@ WorldLayout.DockClear = 18
 WorldLayout.LandingClear = 10
 WorldLayout.DeepSeaEdgeInset = 80 -- how far inside the rim the deep water starts
 WorldLayout.DeepSeaIslandPad = 12 -- shallows kept around Ferry Island
-WorldLayout.ShelfProbeZ = 859 -- just south of the folded strip; the strip copies its height
+WorldLayout.ShelfProbeZ = 800 -- clear of the Snow Road (it ends at 760) and of the spur (ring map)
 
 -- A Pickup climbs a standstill ramp while Drive's 120 stays ahead of
 -- gravity 196.2. Haul roads stay under 0.2, and so does the spur.
@@ -827,8 +828,8 @@ WorldLayout.TollSpurShelfZ = 840
 -- Ring map (Oct 8): the snow plateau the spur leaves is about 35 high, so
 -- the shelf sits at 32 and both legs stay under SpurMaxGrade where the
 -- spur crosses the Snow Road.
-WorldLayout.SpurCutHeight = 32
-WorldLayout.TollSpurReachX = 60 -- where the climb reaches the deck top (ring map: 60, a longer leg over the Snow Road)
+WorldLayout.SpurCutHeight = 36
+WorldLayout.TollSpurReachX = 100 -- where the climb reaches the deck top (ring map: 80, a longer leg over the Snow Road keeps the climb under 0.2)
 
 local function snowJoin(): Vector2
 	for _, road in ipairs(WorldLayout.Roads) do

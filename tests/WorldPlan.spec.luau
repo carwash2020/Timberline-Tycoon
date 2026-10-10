@@ -854,10 +854,10 @@ return function(t)
 	-- Every problem a check found, a line each (the first 25).
 	local function report(problems)
 		local lines = {}
-		for i = 1, math.min(#problems, 25) do
+		for i = 1, math.min(#problems, 4000) do
 			table.insert(lines, problems[i])
 		end
-		if #problems > 25 then
+		if #problems > 4000 then
 			table.insert(lines, string.format("... and %d more", #problems - 25))
 		end
 		return string.format("%d problems:\n", #problems) .. table.concat(lines, "\n")

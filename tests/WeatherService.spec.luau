@@ -146,7 +146,9 @@ return function(t)
 					t.ok(math.abs(p.Y - TerrainGen.HeightAt(p.X, p.Z)) < 0.01, "on the terrain")
 				end
 			end
-			t.ok(found > 150, string.format("usually finds ground near (%.0f, %.0f): %d", near.X, near.Z, found))
+			-- Ring map (Oct 10): 140 of 200 (it was 150). East Meadow now sits 380 east of
+			-- town, so its yard takes a little more of the ring round the spawn.
+			t.ok(found > 140, string.format("usually finds ground near (%.0f, %.0f): %d", near.X, near.Z, found))
 		end
 	end)
 

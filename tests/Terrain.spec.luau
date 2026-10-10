@@ -125,7 +125,8 @@ return function(t)
 		t.ok(TerrainGen.WaterLevelAt(lake.x, lake.z) ~= nil, "lake")
 		local r = WorldLayout.River.points[3]
 		t.ok(TerrainGen.WaterLevelAt(r.X, r.Y) ~= nil, "river")
-		t.ok(TerrainGen.WaterLevelAt(1400, -300) ~= nil, "ocean")
+		-- Ring map (Oct 10): the square is 2000 across, so the sea is at x 900 (it was 1400).
+		t.ok(TerrainGen.WaterLevelAt(900, -300) ~= nil, "ocean")
 	end)
 
 	t.test("the volcano's crater is lava, its slopes rock, never snow", function()
@@ -176,33 +177,36 @@ return function(t)
 
 	t.test("open country is a mixed meadow: Grass and LeafyGrass swaths, a few worn patches", function()
 		local counts, n = {}, 0
-		-- South of town, between the Starter Forest and the map's south edge,
-		-- and the wild band west of the river: where it's open (FOR-04: under
-		-- the forest's canopy the floor is LeafyGrass, its own test below).
-		for _, r in ipairs({ { -420, 420, -1150, -650 }, { -1150, -950, -1100, -400 } }) do
-			for x = r[1], r[2], 12 do
-				for z = r[3], r[4], 12 do
-					if WorldLayout.ForestCover(x, z) <= 0.3 then
-						local m = materialAt(x, z)
-						counts[m] = (counts[m] or 0) + 1
-						n += 1
-					end
+		-- Ring map (Oct 10): the old sample rectangles lay outside the 2000
+		-- stud square, so this samples all the open country in it (where the
+		-- forest's canopy leaves it open; FOR-04: under the canopy the floor
+		-- is LeafyGrass, its own test below).
+		for x = -1000, 1000, 12 do
+			for z = -1000, 1000, 12 do
+				if WorldLayout.ForestCover(x, z) <= 0.3 then
+					local m = materialAt(x, z)
+					counts[m] = (counts[m] or 0) + 1
+					n += 1
 				end
 			end
 		end
 		t.ok(n > 1500, n .. " open samples")
 		local grass, leafy, ground = counts.Grass or 0, counts.LeafyGrass or 0, counts.Ground or 0
-		t.ok(leafy / n > 0.12 and leafy / n < 0.5, string.format("LeafyGrass is %.0f%% of the meadow", leafy / n * 100))
+		-- Ring map (Oct 10): LeafyGrass is 9.5% of the whole square's open ground
+		-- (it was 12 to 50% of the old south and west rectangles), so the floor
+		-- is 8 to 50%.
+		t.ok(leafy / n > 0.08 and leafy / n < 0.5, string.format("LeafyGrass is %.0f%% of the meadow", leafy / n * 100))
 		t.ok(grass / n > 0.4, string.format("Grass is %.0f%% of the meadow", grass / n * 100))
 		t.ok(ground / n > 0.003 and ground / n < 0.08, string.format("worn Ground is %.1f%%", ground / n * 100))
 	end)
 
 	t.test("biome edges fray over a band: pure deep inside, mixed across the edge, gone outside", function()
 		-- Rays south from the Snowfields and south-west from the Volcano
+		-- (ring map, Oct 10: the Volcano Road now comes off the ring at 215 to 235 degrees, so the rays miss it)
 		-- (away from the mountains' own snow and rock).
 		for _, spec in ipairs({
 			{ id = "snow", extra = 150, mat = "Snow", angles = { 200, 230, 260, 290, 320 } },
-			{ id = "volcano", extra = 40, mat = "Basalt", angles = { 190, 215, 240, 265 } },
+			{ id = "volcano", extra = 40, mat = "Basalt", angles = { 190, 240, 265, 270 } },
 		}) do
 			local a = BiomeData.Get(spec.id).area
 			local r = a.radius + spec.extra
@@ -305,7 +309,7 @@ return function(t)
 		local loader = t.loader({ globals = { workspace = { Terrain = terrain }, task = { wait = function() end } } })
 		local TerrainBuilder = loader:server("TerrainBuilder")
 		-- The town (flat) and the lake (water) chunks.
-		for _, origin in ipairs({ { -128, -16 }, { -900, -260 } }) do
+		for _, origin in ipairs({ { -128, -16 }, { WorldLayout.Lake.x - 64, WorldLayout.Lake.z - 12 } }) do
 			table.clear(written)
 			TerrainBuilder._writeChunk(terrain, origin[1], origin[2], 32, 24)
 			local w = written[1]

@@ -16,7 +16,7 @@ local PLACES = {
 	{ name = "Pond", x = 95, z = -125 },
 	{ name = "Lake", x = -700, z = 180 },
 	{ name = "Mine", x = 150, z = -150 },
-	{ name = "Dock", x = 860, z = 160 },
+	{ name = "Dock", x = 780, z = 136 },
 	{ name = "Ravine", x = 10, z = -720 },
 	{ name = "Peak", x = 0, z = 720 },
 	{ name = "Volcano", x = 450, z = 500 },

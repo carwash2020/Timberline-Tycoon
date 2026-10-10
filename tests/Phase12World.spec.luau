@@ -124,7 +124,10 @@ return function(t)
 		local snowPass = TerrainGen.HeightAt(snow.x, snow.z - snowR)
 		local snowWall = TerrainGen.HeightAt(snow.x + snowR, snow.z)
 		t.ok(snowWall > snowPass + 8, string.format("snow wall %.1f over the pass %.1f", snowWall, snowPass))
-		t.eq(runs(snow.x, snow.z, snowR, snowPass), 1, "one pass into the Snowfields")
+		-- Ring map (Oct 10): the north strip (the toll crossing, z 860 up) now lies inside
+		-- the cliff ring, so the ring has two low stretches: the road in from the south
+		-- and the toll shelf in the north. It was one.
+		t.eq(runs(snow.x, snow.z, snowR, snowPass), 2, "the Snow Road in, and the toll shelf north")
 		local _, snowMat = TerrainGen.Sample(snow.x + snowR, snow.z)
 		t.eq(snowMat, "Rock", "the snow ring is brown rock")
 

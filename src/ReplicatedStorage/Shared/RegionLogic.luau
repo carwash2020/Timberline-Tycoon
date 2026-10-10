@@ -109,7 +109,12 @@ local function reachDisc(): (number, number, number)
 	if len < 1 then
 		return gx, gz - dist, 46
 	end
-	return gx - dx / len * dist, gz - dz / len * dist, 46
+	-- Ring map (Oct 10): the grove sits 280 studs from the south edge, where the
+	-- mountains rise, so "straight away from town" is a cliff. The Reach is
+	-- round the ridge's east side instead: still behind the ridge, still off
+	-- every road (a quarter turn from the line away from town).
+	local ax, az = -dx / len, -dz / len
+	return gx - az * dist, gz + ax * dist, 46
 end
 
 local function buildRegions(): { RegionDef }
@@ -510,8 +515,9 @@ function RegionLogic.Anchors(): { Anchor }
 			kind = "LookoutTower",
 			region = "starter",
 			-- Just south of the starter disc, in the gap before the forest ring.
-			x = sx + 18,
-			z = sz - 108,
+			-- Ring map (Oct 10): west of Oak Side's yard (it filled x 18 to 218 here).
+			x = sx - 60,
+			z = sz - 150,
 			search = 36,
 			secret = "The railing hides a tin of nails. Murph's, if the rust is his.",
 			text = "SOUTH LOOKOUT",
@@ -555,7 +561,8 @@ function RegionLogic.Anchors(): { Anchor }
 			name = "Skyroot Falls",
 			kind = "Sign",
 			region = "sky",
-			x = river.X + 18,
+			-- Ring map: on the river's west bank, out of Pine Bend's yard blend.
+			x = river.X - 30,
 			z = river.Y - 16,
 			search = 30,
 			text = "SKYROOT FALLS",

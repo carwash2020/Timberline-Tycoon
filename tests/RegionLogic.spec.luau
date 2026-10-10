@@ -163,7 +163,10 @@ return function(t)
 
 	t.test("the ground under the isles is not the sky", function()
 		local sky = BiomeData.Get("sky").area
-		t.eq(here(sky.x, sky.z, 0), nil)
+		-- Ring map (Oct 10): the isles hang over the beach now (the coast is at x 780),
+		-- so the ground below is the Strand, or nothing: never the sky.
+		local below = here(sky.x, sky.z, 0)
+		t.ok(below == nil or below.base ~= "sky", "the ground under the isles is not the sky")
 		t.eq(here(sky.x, sky.z, sky.y).base, "sky")
 	end)
 

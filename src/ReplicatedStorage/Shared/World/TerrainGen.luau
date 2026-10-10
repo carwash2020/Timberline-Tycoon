@@ -1300,8 +1300,13 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 		end
 		return if slope > 0.6 then "Slate" else "Basalt"
 	end
+	-- The lawn round every homestead: plain Grass for PlotLawn studs past
+	-- the pad (its edge dithered), whatever the biome. Not on a cliff.
+	if slope <= 0.6 and WorldLayout.NearPlotPad(x, z, PLOT_LAWN + dither(x, z) * 6) then
+		return "Grass"
+	end
 	-- Mirror Lake's shore and the river's banks are worn earth (whatever the
-	-- biome or a yard's lawn), so the lake dock's and the footbridge's ends
+	-- biome, but a yard's lawn comes first: no landmark stands in a yard), so the lake dock's and the footbridge's ends
 	-- never rest on bladed grass.
 	local ldx, ldz = x - LAKE.x, z - LAKE.z
 	if ldx * ldx + ldz * ldz < (LAKE.radius * 1.15 + 16) ^ 2 then
@@ -1310,11 +1315,6 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 	local riverReach = RIVER.width / 2 + 12
 	if WorldLayout.FastDistance(RIVER_LINE, x, z, riverReach) < riverReach then
 		return "Ground"
-	end
-	-- The lawn round every homestead: plain Grass for PlotLawn studs past
-	-- the pad (its edge dithered), whatever the biome. Not on a cliff.
-	if slope <= 0.6 and WorldLayout.NearPlotPad(x, z, PLOT_LAWN + dither(x, z) * 6) then
-		return "Grass"
 	end
 
 	-- Cliff rings: brown rock round the Snowfields, dark stone round the
