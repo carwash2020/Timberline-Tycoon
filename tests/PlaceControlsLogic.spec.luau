@@ -121,4 +121,29 @@ return function(t)
 		t.eq(Controls.StartsDrag({ x = 10, y = 10 }, ghost), false)
 		t.eq(Controls.StartsDrag({ x = 300, y = 200 }, nil), false, "no ghost on screen")
 	end)
+
+	t.test("the left stick turns the ghost, the camera's right stick is never bound, ButtonR2 is nowhere", function()
+		local fs = require("@lune/fs")
+		local dir = "src/StarterPlayer/StarterPlayerScripts/"
+		local placeSrc = fs.readFile(dir .. "PlaceControls.luau")
+		local placerSrc = fs.readFile(dir .. "BlueprintPlacer.luau")
+		local logicSrc = fs.readFile("src/ReplicatedStorage/Shared/PlaceControlsLogic.luau")
+		-- The stick the placer turns with is the LEFT one (Thumbstick1), with LT held.
+		t.eq(Controls.GamepadExtras.stick, "Thumbstick1")
+		t.ok(string.find(logicSrc, '"Thumbstick1"', 1, true), "the logic names the left stick")
+		t.ok(string.find(placeSrc, "extras.stick", 1, true), "PlaceControls binds it")
+		t.ok(
+			string.find(placeSrc, "GrabLogic.StickWalks(", 1, true)
+				or string.find(placerSrc, "GrabLogic.StickWalks(", 1, true)
+		)
+		-- No source of the placer binds the right stick or the right trigger as an input.
+		for name, src in pairs({ PlaceControls = placeSrc, BlueprintPlacer = placerSrc }) do
+			t.eq(string.find(src, "Thumbstick2", 1, true), nil, name .. " never binds the right stick")
+			t.eq(string.find(src, "KeyCode.ButtonR2", 1, true), nil, name .. " never binds ButtonR2")
+		end
+		for _, keys in pairs(Controls.AllKeys()) do
+			t.ok(keys ~= "Thumbstick2" and keys ~= "ButtonR2", "AllKeys " .. tostring(keys))
+		end
+		t.eq(Controls.Forbidden, { "ButtonR2" })
+	end)
 end

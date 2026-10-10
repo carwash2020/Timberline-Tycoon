@@ -216,14 +216,16 @@ return function(t)
 		t.eq(TutorialData.AlreadyDone(truckStep, 1, false, #data.ownedTrucks > 0), true)
 	end)
 
-	t.test("id 0 stays hidden: 2x Wood and Instant Delivery are not listed", function()
+	t.test("Lane P: every item has an id; Roblox's answer, not a 0, keeps one off the shelves", function()
 		t.eq(StoreData.IsForSale(0), false)
 		for _, product in ipairs(StoreData.ListedProducts()) do
-			t.ok(product.key ~= "DoubleWood" and product.key ~= "InstantDelivery", product.key)
-			t.ok(product.id > 0)
+			t.ok(product.id > 0, product.key)
+			t.eq(product.offSale, "soon", product.key .. " shows Coming soon when off sale")
 		end
 		for _, pass in ipairs(StoreData.ListedPasses()) do
 			t.ok(pass.id > 0, pass.key)
 		end
+		local StoreSale = t.shared("Store/StoreSale")
+		t.eq(StoreSale.CardState(StoreData.Product("DoubleWood"), { robloxForSale = false }), "Soon")
 	end)
 end

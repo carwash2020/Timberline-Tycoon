@@ -34,6 +34,7 @@ local BoxSize = require(script.Parent.Parent.BoxSize)
 local ItemBox = require(script.Parent.Parent.ItemBox)
 local ItemModel = require(script.Parent.ItemModel)
 local Kit = require(script.Parent.Kit)
+local RobuxBoxArt = require(script.Parent.RobuxBoxArt)
 
 local BoxArt = {}
 
@@ -43,7 +44,8 @@ export type Spec = {
 	kind: string, -- the item kind: Axe, Sawmill, Machine, Blueprint, Gear, Cosmetic, Truck, Trailer, Robux
 	itemId: string?, -- the item, for its model and its accent
 	color: Color3?, -- the item's own colour (only a fallback accent)
-	gold: boolean?, -- a Robux box: gold edge, dark gold walls, coins inside
+	gold: boolean?, -- a Robux box: RobuxBoxArt's open crate of coins (Lane P)
+	robuxKey: string?, -- the Robux item's key (its coin pile)
 	side: string?, -- "Left" | "Right": the side facing the aisle gets a window too
 }
 
@@ -142,6 +144,9 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	local size = body.Size
 	local W, H, D = size.X, size.Y, size.Z
 	local gold = spec.gold == true
+	if gold then
+		return RobuxBoxArt.Dress(parent, body, { name = spec.name, key = spec.robuxKey })
+	end
 	local accent = if gold then BoxLook.Gold else BoxLook.Accent(spec.kind, spec.itemId)
 	if spec.itemId == nil and not gold and not BoxLook.Known(spec.kind) and spec.color then
 		accent = spec.color

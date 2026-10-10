@@ -145,7 +145,16 @@ local function productItem(product: StoreData.Product): Item
 	local revocable = false
 	local fallback: Kind = "consumable"
 	if effect == "cash" then
-		how = string.format("Adds %s to their wallet. Needs room under the wallet cap.", fmtCash(product.cash or 0))
+		how = if product.packMinutes
+			then string.format(
+				"Adds %d minutes of wood income at their stage (at least %s). Needs room under the wallet cap.",
+				product.packMinutes,
+				fmtCash(product.cash or 0)
+			)
+			else string.format(
+				"Adds %s to their wallet. Needs room under the wallet cap.",
+				fmtCash(product.cash or 0)
+			)
 		revokeHow = "Cash isn't taken back here. Use TAKE CASH on the Gifts tab."
 	elseif effect == "boost" then
 		fallback = "booster"
@@ -295,7 +304,9 @@ function PaidItems.StateOf(item: Item, profile: any, live: boolean, now: number)
 	return st
 end
 
-export type Wallet = { cash: number, cap: number }
+-- `amount` is what a cash pack adds for this player now (StoreData.PackCash);
+-- without it, the pack's least amount.
+export type Wallet = { cash: number, cap: number, amount: number? }
 
 -- (true, nil) or (false, why) for giving `item` to a player in state `st`.
 function PaidItems.CanGrant(item: Item, st: State, wallet: Wallet?): (boolean, string?)
@@ -308,7 +319,7 @@ function PaidItems.CanGrant(item: Item, st: State, wallet: Wallet?): (boolean, s
 			return false, "They already own " .. item.name .. "."
 		end
 	elseif item.effect == "cash" then
-		if wallet and wallet.cash + (item.cash or 0) > wallet.cap then
+		if wallet and wallet.cash + (wallet.amount or item.cash or 0) > wallet.cap then
 			return false, "Their wallet can't hold that much (the cap is " .. fmtCash(wallet.cap) .. ")."
 		end
 	elseif item.effect == "boost" then

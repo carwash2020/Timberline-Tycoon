@@ -24,7 +24,6 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local RobuxShelf = require(ReplicatedStorage.Shared.RobuxShelf)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
-local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
 local LeaveCommit = require(script.Parent.LeaveCommit)
@@ -336,58 +335,12 @@ end
 
 local onBoxOpen: (Player, unknown) -> ()
 
--- Roblox sets a pass's or pack's price. The server asks once, then the tag
--- over each Robux box says it (until then, only R$).
-local robuxPrices: { [string]: number } = {}
-local robuxAsked: { [string]: boolean } = {}
-
-function BoxService.RobuxPrice(kind: string, key: string): number?
-	return robuxPrices[kind .. ":" .. key]
-end
-
--- A Robux box's price, once Roblox has said it: the hover tag over the box
--- reads it from the box's HoverRobux attribute (nothing is printed on the box).
-local function refreshRobuxTags(kind: string, key: string, price: number)
-	local text = RobuxShelf.Tag(price)
-	for _, rec in pairs(records) do
-		local model = rec.model
-		if model ~= nil and rec.robux ~= nil and rec.robux.kind == kind and rec.robux.key == key then
-			model:SetAttribute("HoverRobux", text)
-		end
-	end
-end
-
-function BoxService.AskRobuxPrice(kind: string, key: string)
-	local cacheKey = kind .. ":" .. key
-	if robuxAsked[cacheKey] then
-		return
-	end
-	robuxAsked[cacheKey] = true
-	local id = 0
-	if kind == "Pass" then
-		local pass = StoreData.Pass(key)
-		id = if pass then pass.id else 0
-	else
-		local product = StoreData.Product(key)
-		id = if product then product.id else 0
-	end
-	if not StoreData.IsForSale(id) then
-		return
-	end
-	-- Not in tests (no Marketplace there) and never a reason to fail a build.
-	pcall(function()
-		task.spawn(function()
-			local ok, info = pcall(function(): any
-				local market = game:GetService("MarketplaceService")
-				local infoType = if kind == "Pass" then Enum.InfoType.GamePass else Enum.InfoType.Product
-				return market:GetProductInfo(id, infoType)
-			end)
-			if ok and type(info) == "table" and type(info.PriceInRobux) == "number" then
-				robuxPrices[cacheKey] = info.PriceInRobux
-				refreshRobuxTags(kind, key, info.PriceInRobux)
-			end
-		end)
-	end)
+-- A Robux box's price is never read on the server (Lane P): regional
+-- pricing gives each player their own. The box carries RobuxKind/RobuxKey
+-- and the hover tag asks the player's own client (StorePrices) for it.
+local function markRobux(model: Model, kind: string, key: string)
+	model:SetAttribute("RobuxKind", kind)
+	model:SetAttribute("RobuxKey", key)
 end
 
 -- The box's prompts (Buy at the counter, Open once it is paid for). The
@@ -538,6 +491,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		itemId = if robux ~= nil then nil else rec.itemId,
 		color = itemColor,
 		gold = robux ~= nil,
+		robuxKey = if robux ~= nil then robux.key else nil,
 		side = if relX ~= nil then BoxArt.AisleSide(relX) else nil,
 	})
 	-- The price shows in a tag when a player aims at the box (Shared/HoverTag),
@@ -549,7 +503,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		itemId = rec.itemId,
 		shop = rec.shop,
 		limited = rec.limited,
-		robux = if robux ~= nil then RobuxShelf.Tag(BoxService.RobuxPrice(robux.kind, robux.key)) else nil,
+		robux = if robux ~= nil then RobuxShelf.Tag(nil) else nil,
 	})
 	model:SetAttribute("ForSale", true)
 	for _, d in ipairs(model:GetDescendants()) do
@@ -558,7 +512,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		end
 	end
 	if robux ~= nil then
-		BoxService.AskRobuxPrice(robux.kind, robux.key)
+		markRobux(model, robux.kind, robux.key)
 	end
 	if opts.parent then
 		model.Parent = opts.parent

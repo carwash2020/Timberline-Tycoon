@@ -32,6 +32,7 @@ local PickaxeData = require(ReplicatedStorage.Shared.Mining.PickaxeData)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local TextAnchor = require(ReplicatedStorage.Shared.TextAnchor)
+local StorePrices = require(script.Parent.StorePrices)
 local UITheme = require(script.Parent.UITheme)
 
 local HoverTagUI = {}
@@ -373,6 +374,12 @@ local function show(key: string)
 		pickLevel = if type(levelAttr) == "number" then levelAttr else 0,
 	}
 	local name, line, oreStyle = HoverTag.Lines(spec, facts)
+	-- A Robux box (Lane P): this player's own price from StorePrices, never
+	-- the server's; "Robux item" until Roblox answers.
+	local robuxKind, robuxKey = root:GetAttribute("RobuxKind"), root:GetAttribute("RobuxKey")
+	if spec.robux ~= nil and type(robuxKind) == "string" and type(robuxKey) == "string" then
+		line = StorePrices.HoverText(robuxKind, robuxKey)
+	end
 	local state = HoverTag.StateOf(spec, facts)
 	oreTag = oreStyle ~= nil
 	g.Size = if oreTag then UDim2.fromOffset(HoverTag.OreWidth, ORE_H) else UDim2.fromOffset(WIDTH, HEIGHT)
