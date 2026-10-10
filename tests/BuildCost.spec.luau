@@ -72,16 +72,19 @@ return function(t)
 		end
 	end)
 
-	t.test("locked pieces cannot be placed and say why", function()
+	t.test("the four V1 pieces are gated plans: not starters, placeable once learned", function()
 		for _, id in ipairs({ "CopperTrim4", "SandWall4", "SandFloor4", "SandArch8" }) do
-			local ok, reason = BlueprintBook.Allowed(id, true, 0, false)
-			t.eq({ ok, reason }, { false, "locked" }, id)
-			t.ok(BlueprintBook.Message(reason, PlotData.Blueprint(id)):find("Coming soon") ~= nil)
+			local bp = PlotData.Blueprint(id)
+			t.eq(bp.locked, nil, id .. " is no longer locked")
+			t.eq(BlueprintBook.IsStarter(bp), false, id .. " is not a starter plan")
+			t.eq({ BlueprintBook.Allowed(id, false, 0, false) }, { false, "notOwned" }, id .. " needs the plan")
+			t.eq({ BlueprintBook.Allowed(id, true, 0, false) }, { true, nil }, id .. " places once learned")
 			local row = BlueprintBook.Row(
-				{ id = id, bp = PlotData.Blueprint(id), group = "Buildings", stock = 0 },
+				{ id = id, bp = bp, group = "Buildings", stock = 0 },
 				{ tier = 9, cash = 1e6, boxed = false }
 			)
-			t.eq({ row.ready, row.state }, { false, "locked" }, id)
+			t.eq({ row.ready, row.state }, { true, "buy" }, id)
+			t.ok(row.detail:find("fee") ~= nil, id .. " row names its fee")
 		end
 		t.eq({ BlueprintBook.Allowed("Wall4", true, 0, false) }, { true, nil }, "an owned plan still places")
 	end)

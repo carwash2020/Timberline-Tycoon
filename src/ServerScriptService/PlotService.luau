@@ -35,6 +35,7 @@ local RunService = game:GetService("RunService")
 
 local BaseLogic = require(ReplicatedStorage.Shared.BaseLogic)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
+local BuildCost = require(ReplicatedStorage.Shared.BuildCost)
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local ChopSawLogic = require(ReplicatedStorage.Shared.ChopSawLogic)
@@ -44,6 +45,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HammerLogic = require(ReplicatedStorage.Shared.HammerLogic)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
+local SlabData = require(ReplicatedStorage.Shared.SlabData)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -175,7 +177,7 @@ end
 
 -- `wood` and `logs` only, and only for a piece this player just released.
 local function tellFill(player: Player, itemUid: string, why: string, text: string, woodUid: string, now: number)
-	if why ~= "wood" and why ~= "logs" then
+	if why ~= "wood" and why ~= "logs" and why ~= "noslab" and why ~= "noingot" then
 		return
 	end
 	if not releasedJustNow(player, woodUid, now) then
@@ -187,6 +189,25 @@ local function tellFill(player: Player, itemUid: string, why: string, text: stri
 		fillTold[key] = now
 		notify(player, text)
 	end
+end
+
+-- Slabs and ingots live in the world as parts (BuildMaterials). It is
+-- loaded when first needed, and a spec swaps it.
+local materialsMod: any = nil
+local materialsTried = false
+
+local function materials(): any
+	if materialsTried then
+		return materialsMod
+	end
+	materialsTried = true
+	local ok, mod = pcall(function(): any
+		return require(script.Parent.BuildMaterials)
+	end)
+	if ok then
+		materialsMod = mod
+	end
+	return materialsMod
 end
 
 ---------------------------------------------------------------------------
@@ -441,7 +462,10 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	if bp.kit then
 		model:SetAttribute("Kit", true)
 		if item.fill then
-			model:SetAttribute("FillUnits", item.fill.units)
+			-- Anything in the ghost (planks, slabs, ingots) locks it, so the
+			-- client reads one number: zero means still empty.
+			model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
+			model:SetAttribute("Needs", BuildCost.MissingText(BuildCost.Missing(bp, item)))
 		end
 		if item.len then
 			model:SetAttribute("Len", item.len)
@@ -1361,7 +1385,7 @@ function PlotService.Place(
 	}
 	if bp.kit then
 		item.paid = price
-		item.fill = { units = 0 }
+		item.fill = BuildCost.NewFill(bp)
 	end
 	table.insert(profile.plot.placed, item)
 	placedAt[item.uid] = os.clock()
@@ -1423,25 +1447,24 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 	tellHammer(slot, player, item)
 end
 
--- What selling gives back: cash, plank units, and which wood those planks are.
--- An unlock bought at the store refunds nothing. Within a minute a finished
--- piece (or an empty kit piece) gives the whole fee back.
-local function sellPlan(item: PlotLogic.Placed, bp: PlotData.Blueprint): (number, number, string?)
-	local plan = PlotLogic.SellPlan(bp, item)
-	if plan.planks > 0 then
-		return 0, plan.planks, plan.wood
-	end
+-- What selling gives back. An unlock bought at the store refunds nothing.
+-- Within a minute of placing it (UndoSeconds) a piece gives the whole fee
+-- back, and a kit piece also gives back every plank, slab and ingot it took
+-- (PlotLogic.SellPlan says what). After that, SellBack; slabs and ingots
+-- only ever come back as slabs and ingots, never as cash.
+local function sellPlan(item: PlotLogic.Placed, bp: PlotData.Blueprint): PlotLogic.SellPlan
 	local at = placedAt[item.uid]
-	if at and os.clock() - at <= UNDO_SECONDS then
-		if bp.kit then
-			return item.paid or PlotData.Price(bp), 0, nil
-		end
-		if bp.unlock then
-			return 0, 0, nil
-		end
-		return bp.priceCash, 0, nil
+	local within = at ~= nil and os.clock() - at <= UNDO_SECONDS
+	if bp.kit then
+		return PlotLogic.SellPlan(bp, item, within)
 	end
-	return plan.cash, 0, nil
+	if within then
+		if bp.unlock then
+			return { cash = 0, planks = 0, wood = nil }
+		end
+		return { cash = bp.priceCash, planks = 0, wood = nil }
+	end
+	return PlotLogic.SellPlan(bp, item)
 end
 
 local woodMod: any = nil
@@ -1476,6 +1499,84 @@ local function givePlanks(player: Player, slot: Slot, item: PlotLogic.Placed, un
 	return spawned ~= nil
 end
 
+local function ingotCount(ingots: { [string]: number }?): number
+	local n = 0
+	if ingots then
+		for _, count in pairs(ingots) do
+			n += count
+		end
+	end
+	return n
+end
+
+-- Can the owner take these slabs and ingots back as parts? A refusal names
+-- how many do not fit; nothing is dropped and nothing is taken.
+local function materialsRoom(owner: Player, plan: PlotLogic.SellPlan): string?
+	local slabs = math.ceil(plan.slabs or 0)
+	local ingots = ingotCount(plan.ingots)
+	if slabs <= 0 and ingots <= 0 then
+		return nil
+	end
+	local mats = materials()
+	if mats == nil then
+		return "Those slabs and ingots have nowhere to go. Try again in a moment."
+	end
+	if slabs > 0 then
+		local room = mats.SlabRoom(owner.UserId)
+		if room < slabs then
+			return string.format(
+				"Pick up or use %d loose slab%s first: %d come back and you can only carry %d.",
+				slabs - room,
+				if slabs - room == 1 then "" else "s",
+				slabs,
+				SlabData.MaxLoose
+			)
+		end
+	end
+	if ingots > 0 then
+		local room = mats.IngotRoom(owner)
+		if room < ingots then
+			return string.format(
+				"Pick up or use %d loose ore piece%s first: %d ingot%s come back.",
+				ingots - room,
+				if ingots - room == 1 then "" else "s",
+				ingots,
+				if ingots == 1 then "" else "s"
+			)
+		end
+	end
+	return nil
+end
+
+-- Puts the slabs and ingots a piece took back in the world beside where it
+-- stood. materialsRoom has already said yes.
+local function giveMaterials(owner: Player, slot: Slot, item: PlotLogic.Placed, plan: PlotLogic.SellPlan)
+	local mats = materials()
+	if mats == nil then
+		return
+	end
+	local base = slot.cframe * CFrame.new(item.x, (item.y or 0) + 2, item.z)
+	local n = 0
+	for _ = 1, math.ceil(plan.slabs or 0) do
+		local col, row = n % 3, n // 3
+		n += 1
+		mats.ReturnSlab(owner.UserId, base * CFrame.new((col - 1) * 4.5, row * 2.2, 3))
+	end
+	local ores: { string } = {}
+	for ore in pairs(plan.ingots or {}) do
+		table.insert(ores, ore)
+	end
+	table.sort(ores)
+	local m = 0
+	for _, ore in ipairs(ores) do
+		for _ = 1, (plan.ingots :: any)[ore] do
+			local col, row = m % 4, m // 4
+			m += 1
+			mats.ReturnIngot(owner, ore, base * CFrame.new((col - 1.5) * 1.8, row * 0.5, -3))
+		end
+	end
+end
+
 -- Pays out a Sky Bin's wood before the bin is sold: true when the bin is
 -- empty or its wood was paid in full (AetherService.PayOutBin; the wallet must
 -- have room for it plus `extra`). A spec swaps it.
@@ -1507,7 +1608,8 @@ function PlotService.Sell(player: Player, uid: unknown)
 		notify(player, SkyBinLogic.OnlyOwnerSellLine)
 		return
 	end
-	local refund, planks, woodId = sellPlan(item, bp)
+	local plan = sellPlan(item, bp)
+	local refund, planks, woodId = plan.cash, plan.planks, plan.wood
 	if refund > 0 and profile.cash + refund > GameConfig.CashCap then
 		notify(
 			player,
@@ -1515,6 +1617,11 @@ function PlotService.Sell(player: Player, uid: unknown)
 				then "Your wallet is too full to sell that. Spend some first."
 				else "The owner's wallet is too full for that."
 		)
+		return
+	end
+	local roomRefusal = materialsRoom(owner, plan)
+	if roomRefusal then
+		notify(player, roomRefusal)
 		return
 	end
 	if planks > 0 and not givePlanks(owner, slot, item, planks, woodId) then
@@ -1538,6 +1645,7 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if model then
 		model:Destroy()
 	end
+	giveMaterials(owner, slot, item, plan)
 	LogicService.Sync(slot :: any, profile, player)
 	if refund > 0 then
 		EconomyService.Refund(owner, refund, "sold " .. bp.displayName, bp.id)
@@ -1546,8 +1654,17 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if bp.unlock and not bp.kit then
 		full = 0
 	end
-	local text = if planks > 0
-		then string.format("Took apart the %s. The planks are on the ground.", bp.displayName)
+	local gaveBack = planks > 0 or (plan.slabs or 0) > 0 or plan.ingots ~= nil
+	local text = if gaveBack and refund > 0
+		then string.format(
+			"Took back the %s: %s refunded, and what went into it is on the ground.",
+			bp.displayName,
+			Util.formatCash(refund)
+		)
+		elseif gaveBack then string.format(
+			"Took apart the %s. What went into it is on the ground.",
+			bp.displayName
+		)
 		elseif refund == full and refund > 0 then string.format(
 			"Took back the %s: %s refunded.",
 			bp.displayName,
@@ -2539,6 +2656,8 @@ function PlotService.FillStep()
 									BlueprintModels.ApplyWood(model, item.wood)
 									BlueprintModels.ApplyPaint(model, item.paint)
 									BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
+									model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
+									model:SetAttribute("Needs", BuildCost.MissingText(BuildCost.Missing(bp, item)))
 								end
 							elseif type(why) == "string" and type(piece.uid) == "string" then
 								local woodName = nil
@@ -2549,6 +2668,44 @@ function PlotService.FillStep()
 								local text = FillLogic.Message(why, bp.displayName, woodName)
 								if text then
 									tellFill(player, item.uid, why, text, piece.uid, now)
+								end
+							end
+						end
+					end
+					-- Sandstone slabs and ingots: the pieces that take them (BuildCost)
+					-- ask for each part within reach. One part fills once.
+					if BuildCost.NeedsSlabsOrIngots(BuildCost.Of(bp)) and item.fill then
+						local mats = materials()
+						if mats and type(mats.Of) == "function" then
+							local matApi = {
+								Take = function(uid: string): boolean
+									return mats.Take(uid) == true
+								end,
+							}
+							for _, m in ipairs(mats.Of(player.UserId)) do
+								if item.fill == nil then
+									break
+								end
+								if FillLogic.InRange((m.position - origin).Magnitude) then
+									local changed, why = PlotFill.ApplyMaterial(item, m, player.UserId, matApi)
+									if changed then
+										local model = slot.items:FindFirstChild(item.uid)
+										if model and model:IsA("Model") then
+											model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
+											model:SetAttribute(
+												"Needs",
+												BuildCost.MissingText(BuildCost.Missing(bp, item))
+											)
+											if type(BlueprintModels.SetFaded) == "function" then
+												BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
+											end
+										end
+									elseif type(why) == "string" then
+										local text = FillLogic.Message(why, bp.displayName, m.ore)
+										if text then
+											tellFill(player, item.uid, why, text, m.uid, now)
+										end
+									end
 								end
 							end
 						end

@@ -14,9 +14,8 @@ local WOOD_LIGHT = "#825A32"
 -- are the brief's defaults (Awaiting Connor).
 local SANDSTONE = "#C8643C"
 local COPPER = "#B87333"
--- Paid in sandstone slabs or ingots, not planks. Until the fill takes slabs
--- and ingots (Lane F step 2) these cannot be placed; the book says why.
-local FILL_PENDING = "Coming soon: building with slabs and ingots"
+-- Paid in sandstone slabs or ingots, not planks: PlotFill takes them from the
+-- loose parts dropped on the ghost (BuildCost has the numbers).
 
 local function piece(def: { [string]: any }): { [string]: any }
 	def.category = def.category or "Buildings"
@@ -243,7 +242,6 @@ return {
 		woodUnits = 0,
 		ingots = { Copper = 1 }, -- PROPOSAL
 		gated = true,
-		locked = FILL_PENDING,
 		edge = true,
 		footprint = V2(4, 1),
 		boxes = {
@@ -258,7 +256,6 @@ return {
 		woodUnits = 0,
 		slabUnits = 2, -- PROPOSAL
 		gated = true,
-		locked = FILL_PENDING,
 		edge = true,
 		footprint = V2(4, 1),
 		boxes = {
@@ -273,7 +270,6 @@ return {
 		woodUnits = 0,
 		slabUnits = 2, -- PROPOSAL
 		gated = true,
-		locked = FILL_PENDING,
 		footprint = V2(4, 4),
 		boxes = {
 			{ size = V3(4, 0.3, 4), offset = V3(0, 0.15, 0), color = SANDSTONE, material = "Sandstone" },
@@ -287,7 +283,6 @@ return {
 		woodUnits = 0,
 		slabUnits = 4, -- PROPOSAL
 		gated = true,
-		locked = FILL_PENDING,
 		edge = true,
 		footprint = V2(8, 2),
 		slot = { size = V3(4, 6, 1.4), offset = V3(0, 3, 0) },

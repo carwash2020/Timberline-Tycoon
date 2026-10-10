@@ -3,6 +3,7 @@
 -- server (which decides) and the client's ghost preview (which shows green
 -- or red) agree, and tests can run it.
 
+local BuildCost = require(script.Parent.BuildCost)
 local ChopSawLogic = require(script.Parent.ChopSawLogic)
 local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
@@ -48,7 +49,7 @@ export type Placed = {
 	y: number?, -- base height; missing means the ground (0)
 	wood: string?, -- the wood it shows; missing means the authored look
 	paint: string?, -- a KitPaint id; missing means natural (the wood shows). Kit pieces only
-	fill: { units: number }?, -- kit only; missing means already built
+	fill: BuildCost.Fill?, -- kit only; missing means already built. Slabs and ingots ride beside the planks
 	paid: number?, -- the fee charged to place it; missing on a kit piece means the legacy price
 	len: number?, -- resized length along local X; missing means the base length
 	lenX: number?, -- floor width; missing means the base
@@ -221,32 +222,46 @@ function PlotLogic.IsBuilt(bp: Blueprint, item: Placed): boolean
 	if bp.kit ~= true then
 		return true
 	end
-	local fill = item.fill
-	if fill == nil then
-		return true
-	end
-	return fill.units >= PieceSize.Units(bp, item)
+	return BuildCost.IsComplete(bp, item)
 end
 
 export type SellPlan = {
 	cash: number,
 	planks: number, -- u³ to put back on the ground; never also cash
 	wood: string?,
+	slabs: number?, -- sandstone slabs to put back (never cash)
+	ingots: { [string]: number }?, -- ingots to put back, by ore (never cash)
 }
 
 -- What selling gives back. An empty kit piece returns the fee. A partly
--- filled one returns the planks and no cash. A finished one returns half
+-- filled one returns what went in and no cash. A finished one returns half
 -- of what was paid, or half the legacy price when the save has no `paid`.
-function PlotLogic.SellPlan(bp: Blueprint, item: Placed): SellPlan
+-- Within UndoSeconds (`withinUndo`) everything comes back: the whole fee
+-- and every plank, slab and ingot the piece took. Slabs and ingots are
+-- only ever returned as themselves, never as cash.
+function PlotLogic.SellPlan(bp: Blueprint, item: Placed, withinUndo: boolean?): SellPlan
 	if bp.kit == true then
-		local need = PieceSize.Units(bp, item)
 		local fill = item.fill
-		local filled = if fill then fill.units else need
-		if fill and filled <= 0 then
-			return { cash = item.paid or PlotData.Price(bp), planks = 0, wood = nil }
+		local held = BuildCost.Held(bp, item)
+		local paid = item.paid or PlotData.Price(bp)
+		local function plan(cash: number): SellPlan
+			local out: SellPlan = { cash = cash, planks = held.units, wood = if held.units > 0 then item.wood else nil }
+			if held.slabs > 0 then
+				out.slabs = held.slabs
+			end
+			if next(held.ingots) ~= nil then
+				out.ingots = held.ingots
+			end
+			return out
 		end
-		if fill and filled < need then
-			return { cash = 0, planks = filled, wood = item.wood }
+		if fill and BuildCost.IsEmpty(fill) then
+			return { cash = paid, planks = 0, wood = nil }
+		end
+		if fill and not BuildCost.IsComplete(bp, item) then
+			return plan(if withinUndo == true then paid else 0)
+		end
+		if withinUndo == true then
+			return plan(paid)
 		end
 		local basis = item.paid or PlotData.LegacyPrice(bp)
 		return { cash = math.floor(basis * PlotData.SellBack), planks = 0, wood = nil }
@@ -693,12 +708,13 @@ function PlotLogic.Check(
 		local needed = PlotData.Tier(bp.tier)
 		return false, string.format("Needs a %s plot", if needed then needed.name else "bigger")
 	end
-	local kitCount, otherCount = 0, 0
+	local kitCount, otherCount, kitParts = 0, 0, 0
 	for _, item in ipairs(placed) do
 		if item.uid ~= ignoreUid then
 			local other = PlotLogic.Blueprint(item.blueprintId)
 			if other and other.kit then
 				kitCount += 1
+				kitParts += BuildCost.PartsOf(other)
 			else
 				otherCount += 1
 			end
@@ -708,6 +724,11 @@ function PlotLogic.Check(
 		if bp.kit then
 			if kitCount >= PlotData.MaxKit then
 				return false, string.format("Your plot holds %d kit pieces at most", PlotData.MaxKit)
+			end
+			-- At most 1,200 kit parts in all. Only a new piece is refused; a
+			-- plot already over it (an older, bigger build) keeps every piece.
+			if not BuildCost.PartsFit(kitParts, BuildCost.PartsOf(bp)) then
+				return false, string.format(BuildCost.PartCapText, BuildCost.MaxKitParts)
 			end
 		elseif otherCount >= PlotData.MaxItems then
 			return false, string.format("Your plot holds %d things at most", PlotData.MaxItems)

@@ -19,6 +19,7 @@
 --   * Migrate brings an old save's book up to date and is safe to run any
 --     number of times.
 
+local BuildCost = require(script.Parent.BuildCost)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlotData = require(script.Parent.PlotData)
 local PlotLogic = require(script.Parent.PlotLogic)
@@ -483,6 +484,10 @@ function BlueprintBook.NeedsText(bp: PlotData.Blueprint, stock: number?): string
 	if BlueprintBook.IsBoxed(bp.id) then
 		return if (stock or 0) > 0 then "Placed from your box" else "A box from the Tool Shed"
 	end
+	if bp.kit == true and BuildCost.NeedsSlabsOrIngots(BuildCost.Of(bp)) then
+		-- Sandstone and copper pieces: what to carry to the ghost, then the fee.
+		return string.format("%s · fee %s", BuildCost.Text(BuildCost.Of(bp)), Util.formatCash(PlotData.Price(bp)))
+	end
 	if bp.kit == true and type(bp.woodUnits) == "number" then
 		return string.format("%d u³ of planks, one wood · fee %s", bp.woodUnits, Util.formatCash(PlotData.Price(bp)))
 	end
@@ -519,7 +524,10 @@ function BlueprintBook.Row(entry: Entry, ctx: Context): Row
 		BlueprintBook.NeedsText(bp, entry.stock)
 	)
 	local needed = PlotData.Tier(bp.tier)
-	local own = if entry.stock > 0 then string.format("· %d in stock", entry.stock) else nil
+	local own = if entry.stock > 0
+		then string.format("· %d in stock", entry.stock)
+		elseif PlotLogic.FreeToPlace(bp) then "· Free"
+		else nil
 	local row: Row = {
 		name = bp.displayName,
 		own = own,

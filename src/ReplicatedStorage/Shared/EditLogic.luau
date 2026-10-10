@@ -5,6 +5,7 @@
 -- empty and pays its own fee. Resizing changes only the fee difference.
 -- woodUnits is never saved; it is worked out from the size.
 
+local BuildCost = require(script.Parent.BuildCost)
 local GameConfig = require(script.Parent.GameConfig)
 local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
@@ -109,7 +110,7 @@ function EditLogic.Locked(item: Item): boolean
 	if fill == nil then
 		return true
 	end
-	return fill.units ~= 0
+	return not BuildCost.IsEmpty(fill)
 end
 
 function EditLogic.Readout(bp: PlotData.Blueprint, item: Item): string
@@ -145,7 +146,7 @@ function EditLogic.Snapshot(item: Item): Item
 		y = item.y,
 		wood = item.wood,
 		paint = item.paint,
-		fill = if item.fill then { units = item.fill.units } else nil,
+		fill = BuildCost.CloneFill(item.fill),
 		paid = item.paid,
 		len = item.len,
 		lenX = item.lenX,
@@ -369,7 +370,7 @@ function EditLogic.Copy(world: World, request: { [string]: any }, newUid: () -> 
 		copy.x += dx
 		copy.z += dz
 		copy.wood = nil
-		copy.fill = { units = 0 }
+		copy.fill = BuildCost.NewFill(bp)
 		copy.data = nil
 		local fee = EditLogic.Fee(bp, copy)
 		copy.paid = fee

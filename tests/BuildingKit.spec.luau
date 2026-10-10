@@ -38,9 +38,10 @@ return function(t)
 		local laneF = { CopperTrim4 = true, SandWall4 = true, SandFloor4 = true, SandArch8 = true }
 		for _, piece in ipairs(PlotData.Blueprints) do
 			if piece.kit and laneF[piece.id] then
-				-- Lane F slab and ingot pieces: their own fee, locked until the
-				-- fill takes slabs and ingots (BuildCost.spec covers them).
-				t.ok(type(piece.locked) == "string", piece.id .. " locked")
+				-- Lane F slab and ingot pieces: their own fee, filled with slabs
+				-- and ingots (BuildCost.spec and FillMaterials.spec cover them).
+				t.eq(piece.locked, nil, piece.id .. " is placeable")
+				t.eq(PlotData.Price(piece), piece.priceCash, piece.id .. " pays its own fee")
 			elseif piece.kit then
 				seen += 1
 				-- Only the glass plan is sold (ModernKit): it still pays the kit fee.
