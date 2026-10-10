@@ -577,9 +577,11 @@ return function(t)
 		t.eq(rec.itemKind, "Robux")
 		t.eq(rec.price, 0)
 		t.eq(rec.limited, false)
-		t.eq(rec.model:FindFirstChild("Strip").Color, t.roblox.Color3.fromHex("#E3B73C"), "a gold name strip")
-		t.eq(rec.model:FindFirstChild("Base").Color, t.roblox.Color3.fromHex("#E3B73C"), "and a gold edge")
-		t.eq(#rec.model:FindFirstChild("Contents"):GetChildren(), 3, "gold coins in the window")
+		-- Lane P: an open honey crate of coins with a cream name tag.
+		t.ok(rec.model:FindFirstChild("Tag") ~= nil, "a name tag")
+		t.eq(rec.model:GetAttribute("RobuxKind"), "Pass")
+		t.eq(rec.model:GetAttribute("RobuxKey"), "DoubleCash")
+		t.eq(#rec.model:FindFirstChild("Contents"):GetChildren(), 3, "gold coins in the crate")
 		for _, d in ipairs(rec.model:GetDescendants()) do
 			t.ok(not (d.Name == "Price" and d:IsA("TextLabel")), "no price printed on a Robux box")
 		end
