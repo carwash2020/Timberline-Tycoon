@@ -51,24 +51,33 @@ PlotData.Count = GameConfig.MaxPlayers + 2
 -- Centres from MAP_V1.md. The first four are the opener. From the fifth,
 -- nearer the sawmill comes first. East Meadow stays east of the lot.
 PlotData.Homes = {
-	{ id = "birch", name = "Birch Side", region = "Starter Forest", x = -118, z = -120 },
-	{ id = "orchard", name = "Orchard Edge", region = "Starter Forest", x = -340.8, z = -260.8 },
+	-- Ring map (Oct 8): 12 further south-west, so its lawn stops short of the
+	-- truck lot's paint.
+	{ id = "birch", name = "Birch Side", region = "Starter Forest", x = -130, z = -130 },
+	{ id = "orchard", name = "Orchard Edge", region = "Starter Forest", x = -341, z = -261 },
 	{ id = "oak", name = "Oak Side", region = "Starter Forest", x = 118, z = -300 },
 	{ id = "climb", name = "The Climb", region = "The Hills", x = -718, z = 80 },
-	-- North Bend sits south of the snow disc: a 200-stud yard on the peak
-	-- would cover the toll gorge. Ash Gate and High Meadow sit off the
-	-- volcano disc for the same reason. Order from the fifth is still
-	-- nearer the sawmill first.
-	{ id = "north", name = "North Bend", region = "the north road", x = 118, z = 500 },
-	{ id = "high", name = "High Meadow", region = "the north road", x = 560, z = 250 },
-	{ id = "west", name = "West Shelf", region = "west country", x = -359, z = 701.8 },
-	{ id = "pine", name = "Pine Bend", region = "The Hills", x = -621.8, z = 439 },
-	{ id = "mill", name = "East Meadow", region = "east of town", x = 710, z = -10 },
-	{ id = "long", name = "Long Meadow", region = "south country", x = -621.8, z = -279 },
-	{ id = "ridge", name = "Lower Ridge", region = "south country", x = -359, z = -541.8 },
-	{ id = "meadow", name = "North Meadow", region = "the north road", x = 359, z = -541.8 },
-	{ id = "ash", name = "Ash Gate", region = "the east road", x = 676, z = 604 },
+	-- Ring map (Oct 8): the ring's north arc now runs in under the snow
+	-- peak's and the volcano's cliff rings, so North Bend moved inside it,
+	-- north-west of town, and High Meadow left the volcano's rim for the
+	-- high meadow under the north-west mountains. East Meadow came off the
+	-- east junction's flare and the beach to the open ground east of town,
+	-- south of the dealership's lot. Ash Gate left the volcano's cone for
+	-- the south-east coast. West Shelf moved 81 west so its yard clears the
+	-- ring road. Only two homes after the first four sit inside NearHaul.
+	-- From the fifth, nearer the sawmill comes first.
+	{ id = "north", name = "North Bend", region = "the north road", x = -180, z = 370 },
+	{ id = "mill", name = "East Meadow", region = "east of town", x = 380, z = -100 },
+	{ id = "pine", name = "Pine Bend", region = "The Hills", x = -622, z = 439 },
+	{ id = "long", name = "Long Meadow", region = "south country", x = -622, z = -279 },
+	{ id = "west", name = "West Shelf", region = "west country", x = -440, z = 700 },
+	{ id = "ridge", name = "Lower Ridge", region = "south country", x = -359, z = -542 },
+	{ id = "meadow", name = "North Meadow", region = "the north road", x = 359, z = -542 },
+	-- Ring map (Oct 8): down the coast past the lighthouse's headland. Its
+	-- lawn runs to the water.
+	{ id = "ash", name = "Ash Gate", region = "the south-east coast", x = 690, z = -410 },
 	{ id = "east", name = "East Field", region = "east country", x = -208, z = -760 },
+	{ id = "high", name = "High Meadow", region = "the north-west mountains", x = -700, z = 700 },
 } :: { Home }
 
 PlotData.Slots = {} :: { Vector2 }

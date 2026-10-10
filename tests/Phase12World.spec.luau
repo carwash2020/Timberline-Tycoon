@@ -24,7 +24,7 @@ return function(t)
 			HillsRoad = 28,
 			SnowRoad = 28,
 			VolcanoRoad = 28,
-			SkyrootRoad = 24,
+			SkyrootRoad = 28, -- ring map (Oct 8): every link is 28 wide (MAP_V1)
 			MillRoad = 22,
 			LotLoop = 16,
 		}
@@ -45,19 +45,26 @@ return function(t)
 	end)
 
 	t.test("the snow and volcano junctions flare, and the flare is pale road", function()
-		t.eq(#WorldLayout.Junctions, 2)
-		local seen = { [30] = false, [-20] = false }
+		-- Ring map (Oct 8): a flare where each link meets the ring, and at the
+		-- ends of the Bayou and Mesa spurs.
+		t.eq(#WorldLayout.Junctions, 6)
+		local seen = {}
 		for _, junction in ipairs(WorldLayout.Junctions) do
 			t.ok(junction.haul, junction.name)
 			t.ok(junction.radius >= 28, junction.name .. " is wide enough to turn a rig")
-			seen[junction.at.X] = true
+			seen[junction.name] = junction.at
 			local _, material = TerrainGen.Sample(junction.at.X, junction.at.Y)
 			t.eq(material, TerrainGen.GravelMaterial, junction.name .. " is pale")
 			-- Twenty studs off the Snow Road's centre, still inside the flare.
 			local _, beside = TerrainGen.Sample(junction.at.X + 20, junction.at.Y)
 			t.eq(beside, TerrainGen.GravelMaterial, junction.name .. " stays pale off the centreline")
 		end
-		t.ok(seen[30] and seen[-20], "flares at (30, 450) and (-20, 760)")
+		t.eq(seen.SnowVolcano, Vector2.new(0, 480), "the Snow Road meets the ring's north arc")
+		t.eq(seen.SnowSkyroot, Vector2.new(600, 80), "the east link meets the ring")
+		t.eq(seen.RingWest, Vector2.new(-600, 80), "the west link meets the ring")
+		t.eq(seen.RingSouth, Vector2.new(0, -520), "the south link meets the ring")
+		t.eq(seen.Bayou, Vector2.new(-692, -612), "the Bayou spur's end")
+		t.eq(seen.Mesa, Vector2.new(585, -700), "the Mesa spur's end")
 	end)
 
 	t.test("a truck-wide way runs past the shops to the Snow Road, and a loop runs south of the lot", function()

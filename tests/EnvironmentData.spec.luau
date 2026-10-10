@@ -588,9 +588,10 @@ return function(t)
 				end
 			end
 		end
-		-- The lake (centre (-830, -190), radius 135) and the pond (78, -182).
-		scan(-16, -10, -6, 0)
-		scan(0, 2, -4, -2)
+		-- Ring map (Oct 8): the lake (centre (-740, 262), radius 55) and the
+		-- pond (95, -125).
+		scan(-13, -11, 3, 5)
+		scan(0, 2, -3, -1)
 		t.ok((kinds.LilyPad or 0) > 0, "some lily pads")
 		t.ok((kinds.Reeds or 0) + (kinds.Cattails or 0) > 0, "some reeds")
 	end)

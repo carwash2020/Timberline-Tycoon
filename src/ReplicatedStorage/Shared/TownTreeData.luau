@@ -117,7 +117,7 @@ TownTreeData.Lanes = {
 	-- The lighthouse's lamp stays in view from the spawn pad (WorldPlan.Lighthouse,
 	-- tests/WorldPlan.spec): no trunk within 10 studs of the line from the pad's
 	-- eye to the lamp. 11 here; the spec compares the lamp's place.
-	{ name = "LighthouseSight", ax = 0, az = 40, bx = 1203, bz = 236, half = 11 },
+	{ name = "LighthouseSight", ax = 0, az = 40, bx = 801, bz = -356, half = 11 },
 } :: { Lane }
 TownTreeData.GondolaStation = { x = -40, z = 150 } -- WorldPlan.TownGondolaSpot (the spec compares)
 TownTreeData.GondolaLaneLength = 280
