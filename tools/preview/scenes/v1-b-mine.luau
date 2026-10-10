@@ -39,11 +39,39 @@ return {
 			if len > 0 then
 				local cf = CF.lookAt(mid, mid + dir)
 				local half = ramp.width / 2
-				Kit.part(root, "RampFloor", V3.new(ramp.width, 0.4, len + 0.05), cf * CF.new(0, -0.2, 0), floorColor, Enum.Material.Slate)
-				Kit.part(root, "RampWall", V3.new(0.6, ramp.height, len + 0.05), cf * CF.new(-half - 0.3, ramp.height / 2, 0), rock, Enum.Material.Slate)
-				Kit.part(root, "RampWall", V3.new(0.6, ramp.height, len + 0.05), cf * CF.new(half + 0.3, ramp.height / 2, 0), rock, Enum.Material.Slate)
+				Kit.part(
+					root,
+					"RampFloor",
+					V3.new(ramp.width, 0.4, len + 0.05),
+					cf * CF.new(0, -0.2, 0),
+					floorColor,
+					Enum.Material.Slate
+				)
+				Kit.part(
+					root,
+					"RampWall",
+					V3.new(0.6, ramp.height, len + 0.05),
+					cf * CF.new(-half - 0.3, ramp.height / 2, 0),
+					rock,
+					Enum.Material.Slate
+				)
+				Kit.part(
+					root,
+					"RampWall",
+					V3.new(0.6, ramp.height, len + 0.05),
+					cf * CF.new(half + 0.3, ramp.height / 2, 0),
+					rock,
+					Enum.Material.Slate
+				)
 				if a.s >= ramp.landing then
-					Kit.part(root, "RampRoof", V3.new(ramp.width + 1.2, 0.6, len + 0.05), cf * CF.new(0, ramp.height + 0.3, 0), rock, Enum.Material.Slate)
+					Kit.part(
+						root,
+						"RampRoof",
+						V3.new(ramp.width + 1.2, 0.6, len + 0.05),
+						cf * CF.new(0, ramp.height + 0.3, 0),
+						rock,
+						Enum.Material.Slate
+					)
 				end
 			end
 		end
@@ -53,7 +81,14 @@ return {
 		-- The same lamps UndergroundBuilder hangs.
 		for i = 1, ramp.lights do
 			local at = samples[math.clamp(math.floor(i / (ramp.lights + 0.5) * #samples) + 1, 1, #samples)]
-			local lamp = Kit.part(root, "RampLamp", V3.new(1, 1, 1), CF.new(at.x, at.y + ramp.height - 2, at.z), C3.fromRGB(255, 220, 160), Enum.Material.Neon)
+			local lamp = Kit.part(
+				root,
+				"RampLamp",
+				V3.new(1, 1, 1),
+				CF.new(at.x, at.y + ramp.height - 2, at.z),
+				C3.fromRGB(255, 220, 160),
+				Enum.Material.Neon
+			)
 			local light = roblox.Instance.new("PointLight")
 			light.Brightness = 0.6
 			light.Range = 26
@@ -81,10 +116,31 @@ return {
 				{ pos = { 150, 5.5, -128 }, target = { 150, 6.5, -148 }, label = "the door", fov = 52 },
 				{ pos = { 250, 48, -130 }, target = { 160, 8, -180 }, label = "the hill from the east", fov = 50 },
 				{ pos = { 170, 230, -190 }, target = { 170, 0, -189 }, label = "the hill from above", fov = 55 },
-				{ pos = { door.x, door.y + 5.5, door.z + 1 }, target = { door.x, door.y + 2, door.z - 40 }, label = "inside, at the door", fov = 70 },
-				{ pos = { half.x, half.y + 6, half.z + 6 }, target = { half.x + 10, half.y - 6, half.z - 20 }, label = "half way down", fov = 70 },
-				{ pos = { half.x, half.y + 6, half.z + 6 }, target = { half.x + 10, half.y - 6, half.z - 20 }, label = "half way down at night", fov = 70, night = true },
-				{ pos = { foot.x + 8, foot.y + 6, foot.z + 4 }, target = { 150, -46, -222 }, label = "the foot of the ramp", fov = 70 },
+				{
+					pos = { door.x, door.y + 5.5, door.z + 1 },
+					target = { door.x, door.y + 2, door.z - 40 },
+					label = "inside, at the door",
+					fov = 70,
+				},
+				{
+					pos = { half.x, half.y + 6, half.z + 6 },
+					target = { half.x + 10, half.y - 6, half.z - 20 },
+					label = "half way down",
+					fov = 70,
+				},
+				{
+					pos = { half.x, half.y + 6, half.z + 6 },
+					target = { half.x + 10, half.y - 6, half.z - 20 },
+					label = "half way down at night",
+					fov = 70,
+					night = true,
+				},
+				{
+					pos = { foot.x + 8, foot.y + 6, foot.z + 4 },
+					target = { 150, -46, -222 },
+					label = "the foot of the ramp",
+					fov = 70,
+				},
 			},
 		}
 	end,

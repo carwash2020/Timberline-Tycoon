@@ -2051,9 +2051,9 @@ function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
 			local steps = math.max(2, math.floor(len / 6))
 			for s = 0, steps do
 				local p = a:Lerp(b, s / steps)
-				local out = (p - Vector2.new(rim.cx, rim.cz)).Magnitude - mid
-				local err = math.abs(out)
-				if err <= RIM_SIGN_REACH and out >= -10 then -- at the rim or on its way in
+				local radial = (p - Vector2.new(rim.cx, rim.cz)).Magnitude - mid
+				local err = math.abs(radial)
+				if err <= RIM_SIGN_REACH and radial >= -10 then -- at the rim or on its way in
 					table.insert(stops, { p = p, dir = (b - a).Unit, err = err })
 				end
 			end
@@ -2069,7 +2069,10 @@ function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
 				local from = Vector3.new(at.X, 0, at.Y)
 				-- Facing the road, or (on a climb, where only the ground
 				-- across the road is level) facing the drivers coming up it.
-				for _, toward in ipairs({ Vector3.new(stop.p.X, 0, stop.p.Y), from - Vector3.new(stop.dir.X, 0, stop.dir.Y) }) do
+				for _, toward in ipairs({
+					Vector3.new(stop.p.X, 0, stop.p.Y),
+					from - Vector3.new(stop.dir.X, 0, stop.dir.Y),
+				}) do
 					local cf, level = setDown(CFrame.lookAt(from, toward))
 					if level then
 						spot = cf
