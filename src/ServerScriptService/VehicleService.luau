@@ -92,7 +92,6 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local DealershipLot = require(ReplicatedStorage.Shared.Art.DealershipLot)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
-local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local TreeService = require(script.Parent.TreeService)
 
@@ -2138,8 +2137,9 @@ local function visitorAllowed(player: Player, ownerId: number, padInst: Instance
 	if type(permissions) ~= "table" then
 		return false
 	end
-	return PermissionLogic.Allows(permissions, player.UserId, "interact")
-		or PermissionLogic.Allows(permissions, player.UserId, "drive")
+	-- Lane F: the one edit-rights rule (PlotService.CanEdit's pure twin).
+	return PlotLogic.CanEdit(permissions, player.UserId, ownerId, "interact")
+		or PlotLogic.CanEdit(permissions, player.UserId, ownerId, "drive")
 end
 
 local function ownsTow(player: Player): boolean

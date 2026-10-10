@@ -7,6 +7,7 @@
 
 local BuildCost = require(script.Parent.BuildCost)
 local GameConfig = require(script.Parent.GameConfig)
+local KitPaint = require(script.Parent.KitPaint)
 local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
 local PlotLogic = require(script.Parent.PlotLogic)
@@ -100,6 +101,7 @@ export type Entry = {
 	before: Item?,
 	cash: number,
 	spawned: { Item }?,
+	paints: { [string]: string }?, -- paint all: each piece's colour before ("" for natural)
 }
 
 function EditLogic.Locked(item: Item): boolean
@@ -334,6 +336,40 @@ function EditLogic.Run(world: World, request: { [string]: any }, newUid: () -> s
 	return false, "missing"
 end
 
+-- Paint every piece of one blueprint (Lane F). The caller has checked that
+-- the actor may paint here (PlotService.CanEdit "paint") and has the cash;
+-- `record` says whether it joins the undo stack (the plot's owner only).
+-- One entry covers all the pieces, so one undo puts every colour back.
+-- Returns ok, a reason, and the pieces' uids that changed.
+function EditLogic.PaintAll(
+	world: World,
+	pieceId: unknown,
+	paintId: unknown,
+	record: boolean
+): (boolean, string?, { string })
+	local plan, why = KitPaint.AllPlan(world.placed, PlotLogic.Blueprint, pieceId, paintId)
+	if not plan then
+		return false, why, {}
+	end
+	if world.cash < plan.price - 1e-6 then
+		return false, "cash", {}
+	end
+	local paints: { [string]: string } = {}
+	local want = KitPaint.Clean(paintId)
+	for _, uid in ipairs(plan.uids) do
+		local item = find(world.placed, uid)
+		if item then
+			paints[uid] = item.paint or ""
+			item.paint = want
+		end
+	end
+	applyCash(world, -plan.price)
+	if record then
+		remember(world, { kind = "paintall", uid = plan.uids[1], cash = -plan.price, paints = paints })
+	end
+	return true, nil, plan.uids
+end
+
 function EditLogic.Copy(world: World, request: { [string]: any }, newUid: () -> string): (boolean, string?)
 	if world.playerId ~= world.ownerId then
 		return false, "owner"
@@ -409,6 +445,17 @@ function EditLogic.Undo(world: World): (boolean, string?)
 		return false, "empty"
 	end
 	table.remove(world.undo)
+	if entry.kind == "paintall" then
+		-- Every colour back, in one step. A piece sold since is skipped.
+		for uid, was in pairs(entry.paints or {}) do
+			local live = find(world.placed, uid)
+			if live then
+				live.paint = if was == "" then nil else was
+			end
+		end
+		applyCash(world, -entry.cash)
+		return true, nil
+	end
 	if entry.kind == "copy" then
 		local spawned = entry.spawned or {}
 		for _, made in ipairs(spawned) do

@@ -40,11 +40,13 @@ local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local ChopSawLogic = require(ReplicatedStorage.Shared.ChopSawLogic)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
+local EditRights = require(script.Parent.EditRights)
 local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HammerLogic = require(ReplicatedStorage.Shared.HammerLogic)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
+local LooseSave = require(ReplicatedStorage.Shared.LooseSave)
 local SlabData = require(ReplicatedStorage.Shared.SlabData)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
@@ -188,6 +190,52 @@ local function tellFill(player: Player, itemUid: string, why: string, text: stri
 	if not prev or now - prev >= FILL_WINDOW then
 		fillTold[key] = now
 		notify(player, text)
+	end
+end
+
+-- LooseService (the loose wood, slabs and ingots a base keeps when it is
+-- unloaded) pulls in TruckLoad and WoodService, so it is loaded when first
+-- needed, and a spec swaps it.
+local looseMod: any = nil
+local looseTried = false
+
+local function looseService(): any
+	if looseTried then
+		return looseMod
+	end
+	looseTried = true
+	local ok, mod = pcall(function(): any
+		return require(script.Parent.LooseService)
+	end)
+	if ok then
+		looseMod = mod
+	end
+	return looseMod
+end
+
+-- A base just stood up on a pad: the loose things it was saved with come
+-- back, once, and wood a map remake parked comes back at the plot.
+local function restoreLoose(player: Player, slot: Slot, profile: Profile)
+	local loose = looseService()
+	if loose == nil then
+		return
+	end
+	local ok, back, waiting = pcall(function(): (number, number)
+		return loose.Restore(player, slot, profile)
+	end)
+	if ok and type(back) == "number" and back > 0 then
+		notify(player, LooseSave.RestoredText(back, waiting :: number))
+	elseif not ok then
+		warn("[PlotService] loose wood not restored: " .. tostring(back))
+	end
+	local okStranded, strandedBack = pcall(function(): number
+		local n = loose.RestoreStranded(player, slot, profile)
+		return n
+	end)
+	if okStranded and type(strandedBack) == "number" and strandedBack > 0 then
+		notify(player, "Wood that was left out on the old map is back on your plot.")
+	elseif not okStranded then
+		warn("[PlotService] stranded wood not restored: " .. tostring(strandedBack))
 	end
 end
 
@@ -799,6 +847,7 @@ local function grant(player: Player, slot: Slot, profile: Profile, moveIfFar: bo
 	adoptSpawn(player, slot, moveIfFar)
 	rescueProfile(profile, slot.cframe * CFrame.new(0, 2, 0))
 	pcall(PlotService.Hooks.assigned, player, profile) -- its vehicle pads stand up on this pad
+	restoreLoose(player, slot, profile)
 	if first then
 		QuestService.Event(player, "plotClaimed")
 		MilestoneService.Mark(player, "Claimed a plot")
@@ -1038,17 +1087,26 @@ end
 -- flag in the owner's permissions. flag: "build" | "destroy" | "interact" |
 -- "paint" | "grab". Other lanes call this instead of PermissionLogic.
 function PlotService.CanEdit(player: Player?, owner: Player?, flag: string): boolean
-	if not player or not owner then
-		return false
+	return EditRights.Can(player, owner, flag)
+end
+
+-- Whose plot a world position is on, or nil (off every plot). Lane F: the
+-- services that act at a spot (a dropped blueprint) ask this, then CanEdit.
+function PlotService.OwnerAt(position: Vector3): Player?
+	for _, slot in ipairs(slots) do
+		local owner = slot.owner
+		local profile = if owner then ProfileService.GetProfile(owner) else nil
+		if owner and profile then
+			local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+			local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+			local half = PlotLogic.Extent(tier.size, squares) / 2
+			local p = slot.cframe:PointToObjectSpace(position)
+			if math.abs(p.X) <= half and math.abs(p.Z) <= half then
+				return owner
+			end
+		end
 	end
-	if player == owner then
-		return true
-	end
-	local profile = ProfileService.GetProfile(owner)
-	if not profile then
-		return false
-	end
-	return PlotLogic.CanEdit(profile.permissions, player.UserId, owner.UserId, flag)
+	return nil
 end
 
 local function onlinePlayers(): { Player }
@@ -1803,6 +1861,105 @@ function PlotService.Paint(player: Player, uid: unknown, paintId: unknown)
 	LogicService.Sync(slot :: any, profile, owner)
 end
 
+-- Paint all of this type (Lane F). Repaints every piece with that blueprint
+-- id on the plot the player stands on and may edit (CanEdit "paint"), takes
+-- the summed paint price once (paint is free today), and is one undo step
+-- for the plot's owner. The client asks for a confirm first; the server
+-- only checks the rules.
+function PlotService.PaintAllType(player: Player, pieceId: unknown, paintId: unknown)
+	if type(pieceId) ~= "string" or type(paintId) ~= "string" or not RateLimiter.Allow(player, "PaintAllType") then
+		return
+	end
+	local slot, profile, owner, denied = hostFor(player, "paint")
+	if not slot or not profile or not owner then
+		if denied then
+			notify(player, "You can't paint on this plot.")
+		end
+		return
+	end
+	local payer = if player == owner then profile else ProfileService.GetProfile(player)
+	if not payer then
+		return
+	end
+	local isOwner = player == owner
+	local stack = if isOwner then undoStacks[player] else nil
+	if isOwner and not stack then
+		stack = {}
+		undoStacks[player] = stack
+	end
+	local world: EditLogic.World = {
+		cash = payer.cash,
+		tier = profile.plot.tier,
+		ownerId = owner.UserId,
+		playerId = player.UserId,
+		placed = profile.plot.placed,
+		undo = stack or {},
+		squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {},
+	}
+	local stackSnap = if stack then table.clone(stack) else nil
+	local oldPaint: { [string]: string? } = {}
+	for _, item in ipairs(profile.plot.placed) do
+		oldPaint[item.uid] = item.paint
+	end
+	local ok, why, uids = EditLogic.PaintAll(world, pieceId, paintId, isOwner)
+	if not ok then
+		local bp = PlotLogic.Blueprint(pieceId)
+		local text = if why == "cash"
+			then EditLogic.Message("cash")
+			else KitPaint.AllMessage(why, if bp then bp.displayName else nil)
+		if text then
+			notify(player, text)
+		end
+		return
+	end
+	local price = payer.cash - world.cash
+	if price > 0 and not EconomyService.SpendCash(player, price, "painted all", "kit") then
+		-- Put every colour and the stack back as they were.
+		for _, item in ipairs(profile.plot.placed) do
+			item.paint = oldPaint[item.uid]
+		end
+		if stack and stackSnap then
+			table.clear(stack)
+			for i, entry in ipairs(stackSnap) do
+				stack[i] = entry
+			end
+		end
+		notify(player, EditLogic.Message("cash") or "You don't have enough for that.")
+		return
+	end
+	for _, uid in ipairs(uids) do
+		local item = findPlaced(profile, uid)
+		if item then
+			local old = slot.items:FindFirstChild(uid)
+			if old then
+				old:Destroy()
+			end
+			buildItem(slot, owner, item)
+		end
+	end
+	LogicService.Sync(slot :: any, profile, owner)
+	local bp = PlotLogic.Blueprint(pieceId)
+	notify(
+		player,
+		string.format("Painted %d %s%s.", #uids, if bp then bp.displayName else "piece", if #uids == 1 then "" else "s")
+	)
+end
+
+-- BaseBoot binds the remote (GameServer's remote list is not edited).
+function PlotService.BindPaintAll(remote: RemoteEvent?)
+	if remote then
+		remote.OnServerEvent:Connect(function(player: Player, pieceId: unknown, paintId: unknown)
+			PlotService.PaintAllType(player, pieceId, paintId)
+		end)
+	end
+end
+
+-- A base change is running for this player (a claim, an expansion, an
+-- unload or a swap). Save now waits for it.
+function PlotService.IsBusy(player: Player): boolean
+	return switching[player] == true or claiming[player] == true or expanding[player] == true
+end
+
 local function samePiece(a: PlotLogic.Placed, b: PlotLogic.Placed): boolean
 	return a.x == b.x
 		and a.z == b.z
@@ -2233,6 +2390,7 @@ function PlotService.Reload(player: Player, profile: Profile): boolean
 	LogicService.Restore(slot :: any, profile, player)
 	refreshSign(slot)
 	rescueProfile(profile, slot.cframe * CFrame.new(0, 2, 0))
+	restoreLoose(player, slot, profile)
 	return true
 end
 
@@ -2247,6 +2405,19 @@ function PlotService.PlayerRemoving(player: Player)
 	undoStacks[player] = nil
 	forgetFill(player)
 	expanding[player] = nil
+	-- Leaving with the base on its pad: the loose wood and slabs go into the
+	-- save the same way an unload does (ingots stay with Lane M's own save). If
+	-- the pile is too big to hold, it is left alone and the older ground-load
+	-- save keeps the wood.
+	local slot = slotOf[player]
+	local profile = ProfileService.GetProfile(player)
+	local loose = looseService()
+	if slot and profile and profile.plot and loose ~= nil then
+		local ok, err = (pcall :: any)(loose.Collect, player, slot, profile, false)
+		if not ok then
+			warn("[PlotService] loose wood not saved on leave: " .. tostring(err))
+		end
+	end
 	release(player)
 end
 
@@ -2729,28 +2900,20 @@ end
 -- Unload base / load base (Shared/BaseLogic)
 ---------------------------------------------------------------------------
 
--- Their logs and planks lying on their own plot (not held). Loose wood is
--- not in the save, so a base never comes off the pad while some is out there.
-local function looseWoodOn(player: Player, slot: Slot, profile: Profile): number
-	local wood = woodModule()
-	if not wood or type(wood.All) ~= "function" then
-		return 0
+-- What lies loose on their own plot (LooseService.Scan): the unload saves it
+-- with the base and refuses only when the save cannot hold it.
+local function looseOn(player: Player, slot: Slot, profile: Profile): LooseSave.Found
+	local loose = looseService()
+	if loose == nil then
+		return { pieces = 0, sections = 0, unsaveable = 0 }
 	end
-	local pieces = wood.All()
-	if type(pieces) ~= "table" then
-		return 0
+	local ok, found = pcall(function(): LooseSave.Found
+		return loose.Scan(player, slot, profile)
+	end)
+	if ok and type(found) == "table" then
+		return found
 	end
-	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
-	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
-	local extent = PlotLogic.Extent(tier.size, squares)
-	local n = 0
-	for _, piece in pairs(pieces) do
-		local root = woodRoot(piece)
-		if root and not woodHeld(piece) and piece.ownerId == player.UserId and onPlot(slot, extent, root.Position) then
-			n += 1
-		end
-	end
-	return n
+	return { pieces = 0, sections = 0, unsaveable = 0 }
 end
 
 -- Everyone but the owner who stands on or beside the yard is set down just
@@ -2770,6 +2933,18 @@ local FAILED = "Something went wrong and your base is still on its pad. Try agai
 -- nothing is moved, copied or lost. If the release throws, the base is built
 -- back on its pad. A save written before this runs, or after, is whole.
 local function unloadBase(player: Player, profile: Profile, slot: Slot): boolean
+	-- The loose wood, slabs and ingots on the plot go into the save first, in
+	-- one step, so the commit below does not also save them as ground wood.
+	local loose = looseService()
+	if loose ~= nil then
+		local okCollect, saved, why = (pcall :: any)(loose.Collect, player, slot, profile, true)
+		if not okCollect or saved ~= true then
+			if okCollect and type(why) == "string" then
+				notify(player, why)
+			end
+			return false
+		end
+	end
 	pcall(PlotService.Hooks.commit, player)
 	pcall(PlotService.Hooks.despawn, player)
 	-- The commit may have yielded: still the same save, still on that pad?
@@ -2785,6 +2960,7 @@ local function unloadBase(player: Player, profile: Profile, slot: Slot): boolean
 		slot.owner = player
 		pcall(assign, player, slot, profile)
 		pcall(PlotService.Hooks.assigned, player, profile)
+		restoreLoose(player, slot, profile) -- what was just saved off the plot comes straight back
 		return false
 	end
 	return true
@@ -2807,7 +2983,7 @@ function PlotService.BaseAction(player: Player, action: unknown)
 			now = os.time(),
 			hasPad = slot ~= nil,
 			busy = switching[player] == true or claiming[player] == true or expanding[player] == true,
-			looseWood = if slot then looseWoodOn(player, slot, profile) else 0,
+			loose = if slot then looseOn(player, slot, profile) else { pieces = 0, sections = 0, unsaveable = 0 },
 		}
 		local ok, why = BaseLogic.CheckUnload(profile, ctx)
 		if not ok or not slot then

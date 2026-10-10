@@ -366,6 +366,27 @@ function BlueprintService.Spawn(position: Vector3, id: string): Model?
 	return layDown(position, { uid = "world-" .. Util.guid(), id = id }, nil)
 end
 
+-- PlotService reaches BlueprintService's neighbours, so it is not required
+-- here (a cycle). BaseBoot sets these two to PlotService.OwnerAt and
+-- PlotService.CanEdit; with them unset (a spec) there are no plots to refuse on.
+BlueprintService.Hooks = {
+	ownerAt = nil :: ((Vector3) -> Player?)?,
+	canEdit = nil :: ((Player, Player, string) -> boolean)?,
+}
+
+local function plotOwnerAt(spot: Vector3): Player?
+	local find = BlueprintService.Hooks.ownerAt
+	return if find then find(spot) else nil
+end
+
+local function canEdit(player: Player, owner: Player, flag: string): boolean
+	local check = BlueprintService.Hooks.canEdit
+	if check then
+		return check(player, owner, flag) == true
+	end
+	return player == owner
+end
+
 function BlueprintService.Drop(player: Player, uid: unknown)
 	if type(uid) ~= "string" or not RateLimiter.Allow(player, "DropBlueprint") then
 		return
@@ -391,8 +412,15 @@ function BlueprintService.Drop(player: Player, uid: unknown)
 		notify(player, string.format("You already have %d blueprints lying around. Pick some up first.", mine))
 		return
 	end
-	tool:Destroy()
 	local spot = (root.CFrame * CFrame.new(0, 0, -3)).Position
+	-- Lane F: a plan is only left lying on someone else's plot if they let
+	-- you build there (PlotService.CanEdit). Nothing is taken on a refusal.
+	local plotOwner = plotOwnerAt(spot)
+	if plotOwner ~= nil and not canEdit(player, plotOwner, "build") then
+		notify(player, "You can't leave things on that plot.")
+		return
+	end
+	tool:Destroy()
 	layDown(spot, item, player)
 end
 

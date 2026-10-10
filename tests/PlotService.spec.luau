@@ -241,6 +241,22 @@ return function(t)
 					end,
 				},
 				WoodService = options.wood,
+				-- Lane F: the loose wood a base keeps when it is unloaded. The
+				-- default finds nothing; the loose-wood tests pass their own.
+				LooseService = options.loose or {
+					Scan = function()
+						return { pieces = 0, sections = 0, unsaveable = 0 }
+					end,
+					Collect = function()
+						return true
+					end,
+					Restore = function()
+						return 0, 0
+					end,
+					RestoreStranded = function()
+						return 0, 0
+					end,
+				},
 				PlotFill = options.plotFill,
 				ItemMeshes = options.itemMeshes,
 			},
@@ -2582,36 +2598,85 @@ return function(t)
 		t.eq(bob.attrs.PlotSlot, nil)
 	end)
 
+	t.test("loose wood on the plot does not block the unload: it is saved with the base and comes back", function()
+		local collected, restored = 0, 0
+		local found = { pieces = 12, sections = 30, unsaveable = 0 }
+		local saved = {}
+		local s, ann, profile, calls = baseWorld({
+			cash = 100000,
+			loose = {
+				Scan = function()
+					return found
+				end,
+				Collect = function(_, _, prof, withIngots)
+					collected += 1
+					t.eq(withIngots, true, "an unload takes the ingots too")
+					prof.plot.loose = saved
+					return true
+				end,
+				Restore = function(_, _, prof)
+					restored += 1
+					return #prof.plot.loose, 0
+				end,
+				RestoreStranded = function()
+					return 0, 0
+				end,
+			},
+		})
+		saved[1] = { w = "oak", k = "log", bed = "Plot", at = { 1, 2, 3, 0, 0, 0 }, s = { { 1, 1, 1 } } }
+		local restoredAtJoin = restored -- the first claim also asks for a restore (an empty one)
+		s.P.BaseAction(ann, "unload")
+		t.eq(collected, 1, "the loose things were collected into the save")
+		t.eq(ann.attrs.PlotSlot, nil, "and the base came off the pad")
+		t.eq(calls.commit, 1)
+		t.eq(profile.plot.loose, saved)
+		s.P.BaseAction(ann, "load")
+		s.P.Claim(ann, 2)
+		t.eq(restored, restoredAtJoin + 1, "loading the base on a pad puts them back")
+		local told = false
+		for _, line in ipairs(s.toasts) do
+			if string.find(line, "back on your plot", 1, true) ~= nil then
+				told = true
+			end
+		end
+		t.ok(told, "the player is told what came back")
+	end)
+
 	t.test(
-		"refused with nothing changed: loose wood on the plot, a base with no pad, another change in flight",
+		"refused with nothing changed: too much loose to save, a base with no pad, another change in flight",
 		function()
-			local pieces = {}
+			local found = { pieces = 160, sections = 90, unsaveable = 0 }
+			local collected = 0
 			local s, ann, profile, calls = baseWorld({
 				cash = 100000,
-				wood = {
-					All = function()
-						return pieces
+				loose = {
+					Scan = function()
+						return found
 					end,
-					Get = function(id)
-						return pieces[id]
+					Collect = function()
+						collected += 1
+						return true
 					end,
-					Remove = function() end,
-					SpawnPlank = function()
-						return {}
+					Restore = function()
+						return 0, 0
+					end,
+					RestoreStranded = function()
+						return 0, 0
 					end,
 				},
 			})
-			local origin = Vector3.new(s.PlotData.Slots[1].X, 0, s.PlotData.Slots[1].Y)
-			pieces.log1 = loose(origin, "log1", { kind = "log", ownerId = 1 })
 			s.P.BaseAction(ann, "unload")
-			t.ok(string.find(s.lastToast(), "loose logs and planks", 1, true) ~= nil, s.lastToast())
+			t.ok(
+				string.find(s.lastToast(), "160", 1, true) ~= nil
+					and string.find(s.lastToast(), "10 first", 1, true) ~= nil,
+				s.lastToast()
+			)
 			t.eq(ann.attrs.PlotSlot, 1)
 			t.eq(#s.items(1), 2)
 			t.eq(calls.commit, 0, "the world was not touched either")
+			t.eq(collected, 0)
 			t.eq(profile.baseCooldownUntil, 0)
-			-- Held in a hand, or somebody else's, does not count.
-			pieces.log1 = loose(origin, "log1", { kind = "log", ownerId = 1, heldBy = 1 })
-			pieces.log2 = loose(origin, "log2", { kind = "plank", ownerId = 2 })
+			found = { pieces = 5, sections = 9, unsaveable = 0 }
 			s.P.BaseAction(ann, "unload")
 			t.eq(ann.attrs.PlotSlot, nil, "then it goes")
 			profile.baseCooldownUntil = 0

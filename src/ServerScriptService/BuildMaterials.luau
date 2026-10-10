@@ -88,7 +88,7 @@ end
 
 -- Destroys the part. False when it is already gone.
 function BuildMaterials.Take(uid: string): boolean
-	local inst = live[uid]
+	local inst: Instance? = live[uid]
 	live[uid] = nil
 	if inst == nil or inst.Parent == nil then
 		return false

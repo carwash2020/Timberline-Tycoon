@@ -154,8 +154,8 @@ function BuildCost.Taken(fill: Fill?): number
 	end
 	local n = whole(fill.units) + whole(fill.slabs)
 	if fill.ingots ~= nil then
-		for _, count in pairs(fill.ingots) do
-			n += whole(count)
+		for _, have in pairs(fill.ingots) do
+			n += whole(have)
 		end
 	end
 	return n
@@ -169,8 +169,8 @@ function BuildCost.TakenOf(
 ): number
 	local held = BuildCost.Held(bp, item)
 	local n = held.units + held.slabs
-	for _, count in pairs(held.ingots) do
-		n += count
+	for _, have in pairs(held.ingots) do
+		n += have
 	end
 	return n
 end

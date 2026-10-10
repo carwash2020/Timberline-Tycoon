@@ -213,6 +213,7 @@ return function(t)
 			end,
 		})
 		owner = player(1, V3.zero)
+		toastPlayer = owner -- Players:GetPlayerByUserId(1): the plot's owner is online
 		Sawmill.Set(owner, "mill-1", "x", 1)
 		t.eq(mill:GetAttribute("CutX"), 1.2)
 		t.eq(mill:GetAttribute("CutY"), 0.6)
@@ -220,6 +221,17 @@ return function(t)
 		local other = player(2, V3.zero)
 		Sawmill.Set(other, "mill-1", "x", 1)
 		t.eq(mill:GetAttribute("CutX"), 1.2, "someone else can't change it")
+		-- Lane F: PlotService.CanEdit's rule. A friend with Interact may; it is saved on the owner's plot.
+		profile.permissions = { ["2"] = { interact = true } }
+		Sawmill.Set(other, "mill-1", "x", 1)
+		t.eq(mill:GetAttribute("CutX"), 1.4, "a friend with Interact may step the cut")
+		t.eq(profile.plot.placed[1].data.x, 1.4, "saved on the owner's plot")
+		profile.permissions = { ["2"] = { grab = true } }
+		Sawmill.Set(other, "mill-1", "x", -1)
+		t.eq(mill:GetAttribute("CutX"), 1.4, "a friend without Interact may not")
+		profile.permissions = nil
+		Sawmill.Set(owner, "mill-1", "x", -1)
+		t.eq(mill:GetAttribute("CutX"), 1.2)
 		owner = player(1, V3.new(80, 0, 0))
 		Sawmill.Set(owner, "mill-1", "y", 1)
 		t.eq(mill:GetAttribute("CutY"), 0.6, "too far away")
