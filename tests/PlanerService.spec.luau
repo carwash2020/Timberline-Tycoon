@@ -399,4 +399,51 @@ return function(t)
 		planer:Destroy()
 		P._reset()
 	end)
+
+	t.test("Lane W: power off mid-plane pauses, power on resumes, one pass only", function()
+		local r = setup("PlanerBench", V3.new(2 * u, 8, 1.2 * u))
+		r.planer:SetAttribute("PowerIn", false)
+		r.tick(0)
+		r.tick(Planer.Settle + 1)
+		t.eq(r.piece.selling, nil, "an unpowered planer does not take the plank")
+		r.planer:SetAttribute("PowerIn", nil)
+		r.advance(0)
+		r.advance(Planer.Settle)
+		t.eq(r.piece.selling, true, "powered: it takes the plank")
+		r.advance(Logic.ProcessSeconds(r.piece.volume) / 3)
+		r.planer:SetAttribute("PowerIn", false)
+		r.advance(0)
+		r.advance(Logic.ProcessSeconds(r.piece.volume) * 5)
+		t.eq(#r.finished, 0, "nothing finishes while unpowered")
+		t.eq(r.piece.selling, true, "the plank is still held")
+		r.planer:SetAttribute("PowerIn", true)
+		r.advance(0)
+		t.eq(#r.finished, 0, "the clock resumes, it does not jump ahead")
+		r.advance(Logic.ProcessSeconds(r.piece.volume) + 0.1)
+		t.eq(#r.finished, 1, "planed once")
+		done(r)
+	end)
+
+	t.test("Lane W: a reversed belt pushing a board back into the output is never re-planed", function()
+		local asked = {}
+		local r
+		r = setup("PlanerBench", V3.new(2 * u, 8, 1.2 * u), nil, {
+			partsIn = function(region)
+				asked[region.Name] = true
+				return if r.part.Parent then { r.part } else {}
+			end,
+		})
+		r.tick(0)
+		r.tick(Planer.Settle)
+		r.advance(Logic.ProcessSeconds(r.piece.volume) + 0.1)
+		t.eq(#r.finished, 1)
+		for _ = 1, 5 do
+			r.advance(2)
+		end
+		t.eq(#r.finished, 1, "a finished board is not planed again")
+		for name in pairs(asked) do
+			t.eq(name, "Intake", "only the intake takes wood")
+		end
+		done(r)
+	end)
 end

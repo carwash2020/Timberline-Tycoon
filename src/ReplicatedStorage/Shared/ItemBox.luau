@@ -67,7 +67,7 @@ function ItemBox.GroupOf(kind: string, itemId: string): string
 		local machine = ItemCatalog.GetMachine(itemId)
 		if machine and machine.planer ~= nil then
 			return "Planer"
-		elseif machine and machine.belt ~= nil then
+		elseif machine and machine.belt ~= nil and machine.shop == "ToolShed" then
 			return "Belt"
 		end
 	end
@@ -86,7 +86,10 @@ local function members(group: string): { { kind: string, id: string } }?
 		return out
 	elseif group == "Planer" or group == "Belt" then
 		for _, machine in ipairs(ItemCatalog.MachineList()) do
-			if (group == "Planer" and machine.planer ~= nil) or (group == "Belt" and machine.belt ~= nil) then
+			-- The Tool Shed belt kit scales together. Lane W's line pieces are
+			-- Sparkworks stock and size their own boxes.
+			local shedBelt = machine.belt ~= nil and machine.shop == "ToolShed"
+			if (group == "Planer" and machine.planer ~= nil) or (group == "Belt" and shedBelt) then
 				table.insert(out, { kind = "Machine", id = machine.id })
 			end
 		end

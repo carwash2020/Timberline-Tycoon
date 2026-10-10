@@ -52,6 +52,7 @@ type Job = {
 	size: PlanerLogic.Plank,
 	board: number,
 	out: CFrame,
+	pausedAt: number?, -- Lane W: power went off mid-plane at this time
 }
 
 type Context = {
@@ -307,7 +308,11 @@ end
 local function poll(c: Context, now: number)
 	local inside: { [Model]: boolean } = {}
 	for _, planer in ipairs(c.planers()) do
-		if jobs[planer] or planer.Parent == nil then
+		if
+			jobs[planer]
+			or planer.Parent == nil
+			or not AutomationLogic.MachinePowered(planer:GetAttribute("PowerIn"))
+		then
 			continue
 		end
 		local intake = planer:FindFirstChild("Intake")
@@ -350,6 +355,18 @@ local function stepJobs(c: Context, now: number)
 			jobs[planer] = nil
 			continue
 		end
+		-- Lane W: power off pauses the plank where it is; the clock resumes
+		-- with power, so the board comes out once, the same size.
+		if not AutomationLogic.MachinePowered(planer:GetAttribute("PowerIn")) then
+			if job.pausedAt == nil then
+				job.pausedAt = now
+			end
+			piece.root.AssemblyLinearVelocity = Vector3.zero
+			continue
+		elseif job.pausedAt ~= nil then
+			job.start += AutomationLogic.PauseShift(job.pausedAt, now)
+			job.pausedAt = nil
+		end
 		local alpha = math.clamp((now - job.start) / math.max(job.duration, 0.05), 0, 1)
 		piece.model:PivotTo(job.from:Lerp(job.to, alpha))
 		c.moved(piece.model)
@@ -374,7 +391,7 @@ function PlanerService.Tick()
 	end
 	local now = c.now()
 	for _, planer in ipairs(c.planers()) do
-		MachineArt.AimBelt(planer)
+		MachineArt.AimBelt(planer, if AutomationLogic.MachinePowered(planer:GetAttribute("PowerIn")) then nil else 0)
 	end
 	poll(c, now)
 	stepJobs(c, now)

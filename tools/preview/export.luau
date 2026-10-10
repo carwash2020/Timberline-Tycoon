@@ -90,6 +90,37 @@ if fs.isFile("assets/meshes/manifest.json") then
 	end
 end
 
+-- A preview-only manifest (PREVIEW_MESHES=<json>) adds meshes that are not
+-- in the repo yet, such as the uploaded backlog models job 17 wires in:
+-- { "<meshId>": { "file": "<path to the .glb>", "node": ..., "initialSize": ... } }.
+-- A relative file is read from the JSON's folder. The game never reads it.
+do
+	local extra = process.env.PREVIEW_MESHES
+	if type(extra) == "string" and extra ~= "" and fs.isFile(extra) then
+		local ok, decoded = pcall(function()
+			return serde.decode("json", fs.readFile(extra))
+		end)
+		local dir = string.match(extra, "^(.*)/[^/]*$") or "."
+		if ok and type(decoded) == "table" then
+			local n = 0
+			for id, info in pairs(decoded) do
+				if type(info) == "table" and type(info.file) == "string" then
+					local file = info.file
+					if string.sub(file, 1, 1) ~= "/" then
+						file = dir .. "/" .. file
+					end
+					info.file = "@" .. file
+					manifest[id] = info
+					n += 1
+				end
+			end
+			print(string.format("  preview meshes: %d from %s", n, extra))
+		else
+			print("  warning: " .. extra .. " did not parse")
+		end
+	end
+end
+
 local function numericId(value): number?
 	if type(value) == "number" and value == value and value > 0 then
 		return value
@@ -108,7 +139,8 @@ local function blobFor(file: string): string?
 	if cached then
 		return cached
 	end
-	local path = "assets/meshes/" .. file
+	-- "@<path>": a preview-only mesh (PREVIEW_MESHES), read where it is.
+	local path = if string.sub(file, 1, 1) == "@" then string.sub(file, 2) else "assets/meshes/" .. file
 	if not fs.isFile(path) then
 		return nil
 	end

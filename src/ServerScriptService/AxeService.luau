@@ -31,6 +31,7 @@ local AxeArt = require(ReplicatedStorage.Shared.Art.AxeArt)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
@@ -232,7 +233,15 @@ function AxeService.GetEquippedAxe(player: Player): AxeDef?
 		return nil
 	end
 	local item = findItem(player, uid)
-	return if item then ItemCatalog.GetAxe(item.id) else nil
+	local def = if item then ItemCatalog.GetAxe(item.id) else nil
+	if not def then
+		return nil
+	end
+	-- A tempered axe swings with its temper (Keen: cooldown, Heavy: damage).
+	-- The catalog entry is never changed; Apply returns a copy.
+	local profile = ProfileService.GetProfile(player)
+	local temper = if profile and type((profile :: any).temper) == "table" then (profile :: any).temper[uid] else nil
+	return if temper then TemperLogic.Apply(def, temper) else def
 end
 
 -- Fills a fresh character's Backpack with every axe the player owns (that

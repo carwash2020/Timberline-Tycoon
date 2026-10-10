@@ -19,6 +19,10 @@ return function(t)
 		"SparkLamp",
 		"GlowWire",
 		"Hatch",
+		-- Lane W (8 Oct 2026): practical automation pieces.
+		"WoodSweeper",
+		"LaserEmitter",
+		"LaserReceiver",
 	}
 
 	t.test("every V1 piece is listed once, in shelf order, at its LogicItems price", function()

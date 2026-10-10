@@ -8,6 +8,8 @@
 -- is not 1, so an old save still loads. A latch that is on is its uid in
 -- profile.plot.switches. Tunable times live in profile.plot.logic.
 
+local AutomationLogic = require(script.Parent.AutomationLogic)
+
 local WireLogic = {}
 
 export type Wire = { from: string, to: string, fromPort: number?, toPort: number? }
@@ -33,6 +35,7 @@ export type Spec = {
 	sustain: boolean?,
 	op: string?,
 	sink: boolean?,
+	reads: boolean?, -- a source that also reads its input ports (Wood Detector)
 	setting: string?,
 	min: number?,
 	max: number?,
@@ -95,7 +98,47 @@ local SPECS: { [string]: Spec } = {
 	GlowWire = { role = "glow", outs = {}, ins = { 1 }, sink = true },
 	Hatch = { role = "hatch", outs = {}, ins = { 1 }, sink = true },
 	Door = { role = "door", outs = {}, ins = { 1 }, sink = true },
+	-- Lane W (Sparkworks stock). The sweeper pushes wood when its input
+	-- turns on; the laser emitter is on while wood breaks its beam; the
+	-- receiver only completes the pair.
+	WoodSweeper = { role = "sweeper", outs = {}, ins = { 1 }, sink = true },
+	LaserEmitter = { role = "laser", outs = { 1 }, ins = {}, sense = true },
+	LaserReceiver = { role = "receiver", outs = {}, ins = {} },
 }
+
+-- Belts, sawmills and planers are wire targets too (Lane W), but not
+-- logic pieces: they never count toward MaxItems. Their ports come from
+-- AutomationLogic.Ports. The Wood Detector is a belt that is also a source.
+local machineSpecs: { [string]: Spec } = {}
+local notMachine: { [string]: boolean } = {}
+
+local function machineSpec(blueprintId: string): Spec?
+	local cached = machineSpecs[blueprintId]
+	if cached then
+		return cached
+	end
+	if notMachine[blueprintId] then
+		return nil
+	end
+	local ins = AutomationLogic.InPorts(blueprintId)
+	local spec: Spec? = nil
+	if #ins > 0 then
+		local _, def = AutomationLogic.Get(blueprintId)
+		if def and def.shape == "detector" then
+			spec = { role = "detector", outs = { 1 }, ins = ins, sense = true, reads = true }
+		elseif def then
+			spec = { role = "belt", outs = {}, ins = ins, sink = true }
+		else
+			spec = { role = "machine", outs = {}, ins = ins, sink = true }
+		end
+	end
+	if spec then
+		machineSpecs[blueprintId] = spec
+	else
+		notMachine[blueprintId] = true
+	end
+	return spec
+end
 
 local SOURCE_ROLE: { [string]: boolean } = {
 	switch = true,
@@ -107,6 +150,8 @@ local SOURCE_ROLE: { [string]: boolean } = {
 	delay = true,
 	sustain = true,
 	clock = true,
+	laser = true,
+	detector = true,
 }
 
 local TARGET_ROLE: { [string]: boolean } = {
@@ -118,16 +163,25 @@ local TARGET_ROLE: { [string]: boolean } = {
 	sustain = true,
 	glow = true,
 	hatch = true,
+	belt = true,
+	machine = true,
+	sweeper = true,
+	detector = true,
 }
 
 function WireLogic.Spec(blueprintId: string): Spec?
-	return SPECS[blueprintId]
+	return SPECS[blueprintId] or machineSpec(blueprintId)
 end
 
 -- "switch", "lamp", "door", and the sandbox roles, or nil.
 function WireLogic.Role(blueprintId: string): string?
-	local spec = SPECS[blueprintId]
+	local spec = WireLogic.Spec(blueprintId)
 	return if spec then spec.role else nil
+end
+
+-- A belt, sawmill or planer (Lane W): a wire target that is not a logic piece.
+function WireLogic.IsMachine(blueprintId: string): boolean
+	return SPECS[blueprintId] == nil and machineSpec(blueprintId) ~= nil
 end
 
 function WireLogic.IsSource(role: string?): boolean
@@ -170,12 +224,12 @@ local function listed(ports: { number }, port: number): boolean
 end
 
 function WireLogic.HasOut(blueprintId: string, port: number): boolean
-	local spec = SPECS[blueprintId]
+	local spec = WireLogic.Spec(blueprintId)
 	return spec ~= nil and listed(spec.outs, port)
 end
 
 function WireLogic.HasIn(blueprintId: string, port: number): boolean
-	local spec = SPECS[blueprintId]
+	local spec = WireLogic.Spec(blueprintId)
 	return spec ~= nil and listed(spec.ins, port)
 end
 
