@@ -11,6 +11,8 @@ Last updated 8 October 2026 (Lane D axe, box, shelf and hover remake, branch `ph
 
 Branch `phase-2/v1-p-purchases`. All nine Robux items are wired with their real ids (5 passes, 4 products). Prices are only ever Roblox's live answer. Pieces: the bulletin board redesigned to the approved mockup (pages of three cards and a Coming soon strip), the store panel in the GAD look, open gold crates on a two-row gold table in the Tool Shed, and stage-scaled cash packs. Previews are in `previews/v1-p/`. Creator Hub steps are in `STORE_SETUP.md`, and Studio checks are in PHASE2_NOTES.md "Lane P". Awaiting Connor: whether 2x Wood should mean twice the logs (it doubles wood value today); fitting the uploaded RobuxTable and RobuxBox meshes (job 17) to the 9-crate table; and two-line card bodies on the board, which go beyond GAD's one line.
 
+Lane P previews (`previews/v1-p/`, UI laid out from the real Instances, board and crates from the real scene): `store-passes-667x375.png`, `store-passes-1920x1080.png`, `store-products-667x375.png`, `store-products-1920x1080.png`, `store-gamepad-1920x1080.png`, `purchase-flow-states-1920x1080.png`, `bulletin-board-day.png`, `bulletin-board-night.png`, `board-side.png`, `gold-boxes.png`, `gold-box-closeup.png`. The bright block at the counter in `gold-boxes.png` is the shop lamp, not a crate.
+
 ## Lane D — axes, boxes, shelves, displays (done)
 
 Branch `phase-2/v1-d-axes-displays`, rebased onto main at `f96b62c` (A1). Connor reviews each render before this merges. Paths below are the pictures to open.
