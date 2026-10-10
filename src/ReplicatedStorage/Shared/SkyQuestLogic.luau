@@ -11,6 +11,8 @@
 -- Progress is a per-slot save field (profile.skyQuest), so it survives a
 -- rejoin and a slot swap.
 
+local BiomeData = require(script.Parent.BiomeData)
+
 local SkyQuestLogic = {}
 
 export type Step = { id: string, kind: "own" | "handin", target: string, amount: number }
@@ -24,7 +26,7 @@ SkyQuestLogic.Steps = {
 
 -- The words a gate sign and a refused ride show (no price: the fare is in
 -- the prompt).
-SkyQuestLogic.GateWords = "Obsidian Axe + Gondola Pass from Gus"
+SkyQuestLogic.GateWords = BiomeData.Gate("sky").words
 SkyQuestLogic.RefuseText = "Gondola Pass needed. Ask Gus about his charter."
 
 local WOOD_NAMES: { [string]: string } = {
