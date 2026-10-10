@@ -67,7 +67,7 @@ Net.RemoteNames = {
 	"BoardData", -- server -> client: (payload) the top rows and your own (LeaderboardLogic.ParsePayload)
 	"PaintTruck", -- client -> server: (truckId, color) Paint Shop; the server clamps it
 	"NewsSeen", -- client -> server: () the player closed What's new; stored as onboarding["News:V1"]
-	"SkyQuest", -- client -> server: the Sky Pass quest
+	"SkyQuest", -- client -> server: the Gondola Pass quest
 	"ForgeAction", -- client -> server: a forge order
 	"ForgeOpen", -- client -> server: open the forge
 	"SaveNow", -- client -> server: write the save now

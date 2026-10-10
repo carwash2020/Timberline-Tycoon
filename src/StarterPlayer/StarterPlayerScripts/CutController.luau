@@ -60,6 +60,7 @@ local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local SwingLogic = require(ReplicatedStorage.Shared.SwingLogic)
+local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
 local FaceTarget = require(script.Parent.FaceTarget)
 local HUD = require(script.Parent.HUD)
 local Quality = require(script.Parent.Quality)
@@ -674,9 +675,11 @@ local function trySwing(fromClick: boolean)
 		return
 	end
 	face(hrp, target.hit)
+	-- Keen shortens the swing the way the server's tempered copy does.
+	local keen = TemperLogic.CooldownMultiplier(tool:GetAttribute("TemperPrefix"), tool:GetAttribute("TemperTier"))
 	local cooldown = if target.kind == "node"
 		then GameConfig.SwingCooldown
-		else select(2, CutController.Stats(axe, target.woodId or ""))
+		else select(2, CutController.Stats(axe, target.woodId or "")) * keen
 	cooldownUntil = now + cooldown
 	swingSerial += 1
 	local state = SwingLogic.Begin(swingSerial, now, cooldown)
