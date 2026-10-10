@@ -686,6 +686,46 @@ return function(t)
 		Sawmill._reset()
 	end)
 
+	-- Connor's decision 12 (Oct 8): hand-fed wood counts the same as belt-fed. The
+	-- value is identical: the same log in gives the same planks out, both ways.
+	t.test("hand-fed equals belt-fed: the same log gives the same planks, in the same sizes, either way", function()
+		local function planks(lastInteracted)
+			local r = run("Millmaster200", { lastInteracted = lastInteracted, woodId = "oak", boost = 1.2 })
+			r.tick(0)
+			r.tick(Sawmill.Settle)
+			r.finish()
+			local out = {}
+			for _, info in ipairs(r.spawned) do
+				table.insert(out, {
+					woodId = info.woodId,
+					size = { info.size.X, info.size.Y, info.size.Z },
+					ownerId = info.ownerId,
+					figure = info.figure,
+					boost = info.boost,
+					mill = info.mill,
+					board = info.board,
+				})
+			end
+			r.mill:Destroy()
+			Sawmill._reset()
+			return out
+		end
+		local byHand = planks(0) -- touched a moment ago: hand-fed
+		local byBelt = planks(-100) -- untouched for ages: came by belt
+		t.ok(#byHand > 0, "hand-fed cut planks")
+		t.eq(#byBelt, #byHand, "the same number of planks")
+		t.eq(
+			byBelt,
+			byHand,
+			"every plank identical: wood, size, owner, boost and mill bonus (rare wood stays manual, GAME_DESIGN 9)"
+		)
+		local total = 0
+		for _, p in ipairs(byHand) do
+			total += p.size[2]
+		end
+		t.ok(total > 0, "and they have length")
+	end)
+
 	t.test(
 		"belts refuse rare wood, someone else's wood, an offline owner and a full plot; hand work is fine",
 		function()

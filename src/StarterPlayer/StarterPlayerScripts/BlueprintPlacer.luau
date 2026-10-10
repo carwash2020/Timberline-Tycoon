@@ -7,8 +7,11 @@
 --     the middle of the screen on a gamepad, snapped to PlotData.Grid.
 --   * Green where PlotLogic.Check allows it (and you can pay), red with the
 --     reason where it doesn't. The server checks again: this is a preview.
---   * Click or PLACE (R2 on a gamepad) to place; R or ROTATE (D-pad right)
---     for a quarter turn; Q or CANCEL (B) to stop. On a gamepad, hold LT to
+--   * Click or PLACE (A on a gamepad) to place; R or ROTATE (D-pad right)
+--     for a quarter turn; PageUp / PageDown or UP / DOWN (D-pad up / down)
+--     raise and lower; Q or CANCEL (B) to stop. The input and the bar are
+--     PlaceControls (Lane F); the right trigger is never bound. On a phone, tap
+--     or drag the ghost to aim, then PLACE. On a gamepad, hold LT to
 --     lock the ghost and flick the LEFT (movement) stick: left or right
 --     turns it a quarter, up or down raises or lowers it. The left stick
 --     does not walk you while LT is held, and the right stick stays the
@@ -18,7 +21,6 @@
 --   * Walking off your plot stops placing.
 
 local CollectionService = game:GetService("CollectionService")
-local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +40,7 @@ local PlotPlatform = require(ReplicatedStorage.Shared.PlotPlatform)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
+local PlaceControls = require(script.Parent.PlaceControls)
 local PromptSwitch = require(script.Parent.PromptSwitch)
 local UITheme = require(script.Parent.UITheme)
 
@@ -50,16 +53,6 @@ local VALID = UITheme.Colors.Green
 local INVALID = Color3.fromRGB(255, 80, 80)
 
 local LEAVE_REACH = 40 -- studs past the plot's edge before placing stops (PlotService's BUILD_REACH)
-local ACTIONS = {
-	"PlacerRotate",
-	"PlacerPlace",
-	"PlacerCancel",
-	"PlacerUp",
-	"PlacerDown",
-	"PlacerLock",
-	"PlacerStick",
-	"PlacerPush",
-}
 local PUSH_MIN, PUSH_MAX = -25, 40 -- studs the gamepad can slide the ghost nearer or further than the crosshair
 local PUSH_SPEED = 18 -- studs a second while RB or LB is held
 
@@ -95,7 +88,6 @@ type State = {
 
 local state: State? = nil
 local placedListeners: { (Vector3) -> () } = {}
-local bar: Frame? = nil
 local barLabel: TextLabel? = nil
 -- The mouse is over the build bar: don't drag the ghost under the buttons
 -- (pressing PLACE would build right there).
@@ -128,7 +120,7 @@ end
 -- Above the HUD's D-pad shortcuts (they bind at High). Returning Sink
 -- from the rotate handler keeps DPadRight from opening Settings.
 function BlueprintPlacer.RotatePriority(): number
-	return Enum.ContextActionPriority.High.Value + 100
+	return PlaceControls.Priority()
 end
 
 function BlueprintPlacer.NextRot(rot: number): number
@@ -494,29 +486,15 @@ function BlueprintPlacer.Stop()
 	for _, conn in ipairs(s.conns) do
 		conn:Disconnect()
 	end
-	for _, name in ipairs(ACTIONS) do
-		ContextActionService:UnbindAction(name)
-	end
+	PlaceControls.Unbind()
 	for _, p in ipairs(s.hidden) do
 		p.LocalTransparencyModifier = 0
 	end
 	s.ghost:Destroy()
-	local b = bar
-	if b then
-		b.Visible = false
-	end
+	PlaceControls.Show(false)
 	HUD.SetHintContext(nil)
 	if s.options.onStop then
 		s.options.onStop()
-	end
-end
-
-local function action(fn: () -> ())
-	return function(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
-		if inputState == Enum.UserInputState.Begin then
-			fn()
-		end
-		return Enum.ContextActionResult.Sink
 	end
 end
 
@@ -613,75 +591,46 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		)
 	end
 
-	ContextActionService:BindActionAtPriority(
-		"PlacerRotate",
-		action(BlueprintPlacer.Rotate),
-		false,
-		BlueprintPlacer.RotatePriority(),
-		Enum.KeyCode.R,
-		Enum.KeyCode.DPadRight
-	)
-	ContextActionService:BindAction("PlacerPlace", action(BlueprintPlacer.Place), false, Enum.KeyCode.ButtonR2)
-	-- LT hangs the ghost; the LEFT (movement) stick flicks it round or up
-	-- and down and, sunk while LT is held, walks nobody; the right stick
-	-- stays the camera's. RB and LB slide it further or nearer. All gamepad
-	-- only: they bind to nothing else.
-	ContextActionService:BindActionAtPriority(
-		"PlacerLock",
-		function(_name: string, inputState: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
-			if inputState == Enum.UserInputState.Begin then
-				BlueprintPlacer.Lock(true, input.UserInputType)
-			elseif inputState ~= Enum.UserInputState.Change then
-				BlueprintPlacer.Lock(false)
-			end
-			return Enum.ContextActionResult.Sink
-		end,
-		false,
-		BlueprintPlacer.RotatePriority(),
-		Enum.KeyCode.ButtonL2
-	)
-	ContextActionService:BindActionAtPriority(
-		"PlacerStick",
-		function(_name: string, _inputState: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+	PlaceControls.Bind({
+		place = BlueprintPlacer.Place,
+		rotate = BlueprintPlacer.Rotate,
+		raise = BlueprintPlacer.Raise,
+		lower = BlueprintPlacer.Lower,
+		cancel = BlueprintPlacer.Stop,
+		lock = BlueprintPlacer.Lock,
+		stick = function(stickX: number, stickY: number): boolean
 			local current = state
 			if not current or GrabLogic.StickWalks(current.lockedAt ~= nil) then
-				return Enum.ContextActionResult.Pass -- not locked: it walks you, as always
+				return false -- not locked: it walks you, as always
 			end
-			BlueprintPlacer.Stick(input.Position.X, input.Position.Y)
-			return Enum.ContextActionResult.Sink -- locked: it turns the ghost and walks nobody
+			BlueprintPlacer.Stick(stickX, stickY)
+			return true -- locked: it turns the ghost and walks nobody
 		end,
-		false,
-		BlueprintPlacer.RotatePriority(),
-		Enum.KeyCode.Thumbstick1
-	)
-	ContextActionService:BindActionAtPriority(
-		"PlacerPush",
-		function(_name: string, inputState: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+		push = function(axis: number)
 			local current = state
 			if current then
-				local axis = if input.KeyCode == Enum.KeyCode.ButtonR1 then 1 else -1
-				if inputState == Enum.UserInputState.Begin then
-					current.pushAxis = axis
-				elseif inputState ~= Enum.UserInputState.Change and current.pushAxis == axis then
-					current.pushAxis = 0
-				end
+				current.pushAxis = axis
 			end
-			return Enum.ContextActionResult.Sink
 		end,
-		false,
-		BlueprintPlacer.RotatePriority(),
-		Enum.KeyCode.ButtonR1,
-		Enum.KeyCode.ButtonL1
-	)
-	ContextActionService:BindAction(
-		"PlacerCancel",
-		action(BlueprintPlacer.Stop),
-		false,
-		Enum.KeyCode.Q,
-		Enum.KeyCode.ButtonB
-	)
-	ContextActionService:BindAction("PlacerUp", action(BlueprintPlacer.Raise), false, Enum.KeyCode.E)
-	ContextActionService:BindAction("PlacerDown", action(BlueprintPlacer.Lower), false, Enum.KeyCode.C)
+		-- Phone: a finger dragging the ghost aims it where the finger is.
+		drag = function(screen: Vector2?)
+			local current = state
+			local camera = workspace.CurrentCamera
+			if current and screen and camera then
+				local ray = camera:ScreenPointToRay(screen.X, screen.Y)
+				current.aim = onGround(ray) or current.aim
+			end
+		end,
+		ghostOnScreen = function(): Vector2?
+			local current = state
+			local camera = workspace.CurrentCamera
+			if not current or not camera then
+				return nil
+			end
+			local point, onScreen = camera:WorldToScreenPoint(current.ghost:GetPivot().Position)
+			return if onScreen then Vector2.new(point.X, point.Y) else nil
+		end,
+	})
 	table.insert(
 		s.conns,
 		UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
@@ -735,10 +684,7 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 			end
 		end)
 	)
-	local b = bar
-	if b then
-		b.Visible = true
-	end
+	PlaceControls.Show(true)
 	HUD.SetHintContext("build") -- the hint says how to place, turn and stop
 	update(s)
 end
@@ -763,24 +709,18 @@ end
 function BlueprintPlacer.Start()
 	Net.Remote("WorldFX").OnClientEvent:Connect(onWorldFx)
 	local gui = UITheme.Screen("BlueprintPlacer", UITheme.Layers.World)
-	local b = UITheme.Bar(gui, "Placing")
-	barLabel = b.label
-	local function add(text: string, style: string, order: number, onClick: () -> ())
-		local button = UITheme.Button({ text = text, size = Vector2.new(96, 36), style = style })
-		button.root.LayoutOrder = order
-		button.root.Parent = b.row
-		button.face.Activated:Connect(onClick)
-	end
-	add("ROTATE", "bark", 1, BlueprintPlacer.Rotate)
-	add("UP", "bark", 2, BlueprintPlacer.Raise)
-	add("DOWN", "bark", 3, BlueprintPlacer.Lower)
-	add("PLACE", "buy", 4, BlueprintPlacer.Place)
-	add("CANCEL", "skip", 5, BlueprintPlacer.Stop)
-	bar = b.outer
-	b.outer.MouseEnter:Connect(function()
+	local outer, line = PlaceControls.Build(gui, {
+		rotate = BlueprintPlacer.Rotate,
+		raise = BlueprintPlacer.Raise,
+		lower = BlueprintPlacer.Lower,
+		place = BlueprintPlacer.Place,
+		cancel = BlueprintPlacer.Stop,
+	})
+	barLabel = line
+	outer.MouseEnter:Connect(function()
 		overBar = true
 	end)
-	b.outer.MouseLeave:Connect(function()
+	outer.MouseLeave:Connect(function()
 		overBar = false
 	end)
 	gui.Parent = player:WaitForChild("PlayerGui")

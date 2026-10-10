@@ -2784,6 +2784,20 @@ local function onPlot(slot: Slot, size: number, pos: Vector3): boolean
 	return math.abs(p.X) <= half and math.abs(p.Z) <= half
 end
 
+-- Who may put wood, slabs and ingots into this plot's ghosts: the owner, and
+-- anyone with Build on it who stands on or beside the yard (PlotService.CanEdit
+-- "build"). Their own parts only: nothing of anyone's turns into cash or moves
+-- from one player to another. Keyed by user id.
+local function fillers(owner: Player, slot: Slot, profile: Profile): { [number]: Player }
+	local out: { [number]: Player } = { [owner.UserId] = owner }
+	for _, other in ipairs(onlinePlayers()) do
+		if other ~= owner and PlotService.CanEdit(other, owner, "build") and actorOn(other, slot, profile) then
+			out[other.UserId] = other
+		end
+	end
+	return out
+end
+
 function PlotService.FillStep()
 	local now = os.clock()
 	if now - lastFillAt < FILL_EVERY then
@@ -2825,6 +2839,7 @@ function PlotService.FillStep()
 				end
 			end
 			if #pending > 0 then
+				local who = fillers(player, slot, profile)
 				local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
 				local planks: { { piece: any, root: BasePart } } = {}
 				local logs: { { piece: any, root: BasePart } } = {}
@@ -2833,7 +2848,7 @@ function PlotService.FillStep()
 					if
 						root
 						and not woodHeld(piece)
-						and piece.ownerId == player.UserId
+						and (who[piece.ownerId] :: Player?) ~= nil
 						and piece.ownerId ~= 0
 						and onPlot(
 							slot,
@@ -2849,7 +2864,7 @@ function PlotService.FillStep()
 						elseif
 							piece.kind == "log"
 							and type(piece.uid) == "string"
-							and releasedJustNow(player, piece.uid, now)
+							and releasedJustNow(who[piece.ownerId], piece.uid, now)
 						then
 							-- A log can't fill anything. It only exists here so a
 							-- drop onto a blueprint can say to saw it first.
@@ -2880,7 +2895,7 @@ function PlotService.FillStep()
 								mill = piece.mill,
 								board = piece.board,
 								temper = piece.temper,
-							}, player.UserId, api)
+							}, piece.ownerId, api)
 							if changed then
 								local model = slot.items:FindFirstChild(item.uid)
 								if model and model:IsA("Model") and type(BlueprintModels.ApplyWood) == "function" then
@@ -2898,7 +2913,7 @@ function PlotService.FillStep()
 								end
 								local text = FillLogic.Message(why, bp.displayName, woodName)
 								if text then
-									tellFill(player, item.uid, why, text, piece.uid, now)
+									tellFill(who[piece.ownerId], item.uid, why, text, piece.uid, now)
 								end
 							end
 						end
@@ -2913,12 +2928,19 @@ function PlotService.FillStep()
 									return mats.Take(uid) == true
 								end,
 							}
-							for _, m in ipairs(mats.Of(player.UserId)) do
+							local offered: { { who: Player, part: any } } = {}
+							for userId, contributor in pairs(who) do
+								for _, m in ipairs(mats.Of(userId)) do
+									table.insert(offered, { who = contributor, part = m })
+								end
+							end
+							for _, entry in ipairs(offered) do
+								local m = entry.part
 								if item.fill == nil then
 									break
 								end
 								if FillLogic.InRange((m.position - origin).Magnitude) then
-									local changed, why = PlotFill.ApplyMaterial(item, m, player.UserId, matApi)
+									local changed, why = PlotFill.ApplyMaterial(item, m, entry.who.UserId, matApi)
 									if changed then
 										local model = slot.items:FindFirstChild(item.uid)
 										if model and model:IsA("Model") then
@@ -2934,7 +2956,7 @@ function PlotService.FillStep()
 									elseif type(why) == "string" then
 										local text = FillLogic.Message(why, bp.displayName, m.ore)
 										if text then
-											tellFill(player, item.uid, why, text, m.uid, now)
+											tellFill(entry.who, item.uid, why, text, m.uid, now)
 										end
 									end
 								end
