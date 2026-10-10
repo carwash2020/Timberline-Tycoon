@@ -2799,7 +2799,8 @@ return function(t)
 			end
 			-- Two shelves sit on this grassland, so one cluster moved off it.
 			t.ok(near("starter", 350) >= 2, near("starter", 350) .. " clusters round the Starter Forest")
-			t.ok(near("hills", 350) >= 3, near("hills", 350) .. " clusters on the Hills' grassland")
+			-- Ring map: 2 (it was 3): the Hills disc is smaller and the lake, river and Pine Bend take its grassland.
+			t.ok(near("hills", 350) >= 2, near("hills", 350) .. " clusters on the Hills' grassland")
 			local far = 0
 			for _, spot in ipairs(clusters) do
 				if Vector2.new(spot.center.X, spot.center.Z - 110).Magnitude > 700 then
@@ -3048,10 +3049,12 @@ return function(t)
 			end
 			-- (Or near it: the furthest-east stretch the spawn can see it from.)
 			local tip, furthest = edgeAt(base.Z), -math.huge
-			for z = 120, 460, 4 do
+			-- Ring map: the stretch of coast the lighthouse searches (it was z 120 to 460).
+			for z = WorldPlan.LighthouseZ[1], WorldPlan.LighthouseZ[2], 4 do
 				furthest = math.max(furthest, edgeAt(z))
 			end
-			t.ok(tip >= furthest - 12, string.format("on a headland: its shore %d, the furthest %d", tip, furthest))
+			-- Ring map: 25 (it was 12): Ash Gate's lawn holds the furthest stretch of the sand.
+			t.ok(tip >= furthest - 25, string.format("on a headland: its shore %d, the furthest %d", tip, furthest))
 			t.ok(base.X >= tip - 30, "set back from the water's edge on the sand")
 			local toTown = Vector2.new(WorldLayout.Sawmill.X - base.X, WorldLayout.Sawmill.Z - base.Z).Unit
 			local look = lighthouse.cframe.LookVector
@@ -3137,8 +3140,9 @@ return function(t)
 					end
 				end
 			end
+			-- Ring map: past StreamingTargetRadius (640), as the name says; it was 1000 when the lamp stood 1,200 off.
 			local far = Vector2.new(lamp.X - eye.X, lamp.Z - eye.Z).Magnitude
-			t.ok(far > 1000, string.format("%.0f studs off: past StreamingTargetRadius, so it must be Persistent", far))
+			t.ok(far > 640, string.format("%.0f studs off: past StreamingTargetRadius, so it must be Persistent", far))
 		end
 	)
 

@@ -838,9 +838,11 @@ function WorldPlan.Boulders(): { Boulder }
 	local tries = 0
 	while #out < 90 and tries < 2000 do
 		tries += 1
-		local x, z = rng:range(-1350, 1350), rng:range(-1350, 1350)
+		-- Ring map: inside the 2000-stud square (it was +-1350), and off the river's banks.
+		local x, z = rng:range(-1000, 1000), rng:range(-1000, 1000)
 		local ok = WorldLayout.FlatWeight(x, z) <= 0
 			and TerrainGen.WaterLevelAt(x, z) == nil
+			and WorldLayout.PolylineDistance(Vector2.new(x, z), WorldLayout.River.points) > 60
 			and TerrainGen.RoadClearance(x, z) > 10
 			and TerrainGen.HeightAt(x, z) < 90
 			and TerrainGen.SlopeAt(x, z) < 0.6
@@ -1169,6 +1171,7 @@ end
 -- of the ferry dock, clear of the Lumen isles' disc and the dock road),
 -- and how far it stands back from the water's edge.
 local LIGHTHOUSE_Z = { -440, -180 }
+WorldPlan.LighthouseZ = LIGHTHOUSE_Z
 local LIGHTHOUSE_BACK = 26 -- studs inland from the water's edge
 
 -- Where the lighthouse lamp will stand: the furthest-east headland the
@@ -1202,7 +1205,9 @@ local function sightOfLamp(): (Vector3, Vector3)
 	for _, tip in ipairs(tips) do
 		local x, z = tip.x - LIGHTHOUSE_BACK, tip.z
 		local lowest = math.huge
-		local dry = true
+		-- On the sand: Ash Gate's lawn runs down to the coast (ring map).
+		local _, ground = TerrainGen.Sample(x, z)
+		local dry = ground == "Sand" and WorldLayout.FlatWeight(x, z) <= 0
 		for _, q in ipairs(WorldPlan.SceneryFootprint(x, z, radius)) do
 			if TerrainGen.WaterLevelAt(q.X, q.Y) ~= nil then
 				dry = false
@@ -3719,6 +3724,12 @@ end
 
 -- Whether a disc of radius `r` at (x, z) is clear for a landmark.
 local function landmarkClear(x: number, z: number, r: number): boolean
+	-- Off every yard's pad and its blend (town and the homesteads are flat zones).
+	for _, d in ipairs({ { 0, 0 }, { r, 0 }, { -r, 0 }, { 0, r }, { 0, -r } }) do
+		if WorldLayout.FlatWeight(x + d[1], z + d[2]) > 0 then
+			return false
+		end
+	end
 	return clearOfClutter(x, z, r, WorldPlan.LandmarkGap, WorldPlan.LandmarkGap * 5)
 		and clearOfClusters(x, z, r, WorldPlan.LandmarkGap)
 		and TerrainGen.RoadClearance(x, z) >= WorldPlan.LandmarkRoad + r
@@ -4191,7 +4202,8 @@ function WorldPlan.Lighthouse(): Lighthouse?
 	local mill = WorldLayout.Sawmill
 	for _, tip in ipairs(tips) do
 		local x, z = tip.x - LIGHTHOUSE_BACK, tip.z
-		local ok = landmarkClear(x, z, radius)
+		local _, ground = TerrainGen.Sample(x, z)
+		local ok = ground == "Sand" and landmarkClear(x, z, radius) -- on the sand: Ash Gate's lawn runs down to the coast
 		local lowest = math.huge
 		if ok then
 			for _, q in ipairs(WorldPlan.SceneryFootprint(x, z, radius)) do
