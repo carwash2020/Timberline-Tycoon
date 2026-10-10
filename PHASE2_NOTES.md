@@ -38,8 +38,8 @@ Part counts: the board has 15 parts (cap 16), a gold crate has 11, and the gold 
 **Xbox (controller)**
 11. With a controller connected, walk to the board. The prompt shows ButtonX. Press it, and the store opens with the selection ring on the first Buy pill. Use the D-pad to move between pills, to the tabs (Up), and to the X close button. A on a pill opens the prompt. B closes the store. RT is never bound by the store.
 12. At the Tool Shed counter, the keeper's question works with A and B, and the prompt opens with A.
-## Lane W: practical automation (8 October 2026, branch `phase-2/v1-w-automation`)
 
+## Lane W: practical automation (8 October 2026, branch `phase-2/v1-w-automation`)
 
 What changed: `AutomationLogic` (ports, power and reverse rules, detector filter, sweeper pick, laser reach), `WireLogic` (belts, mills and planers are wire targets; detector and laser are sources; machines never count toward the logic cap), `LogicGraph` (per-port levels, machine nodes only when wired), `LogicService` (targets, Reverse/Flip/Filter prompts, sweeper, detector, laser), `BeltService` (signed speed), `SawmillService` / `PlanerService` (pause while unpowered), `MachineArt` (TLD-1 deck, Switch Belt, Tilted Belt, Belt Support, Wood Detector), `ItemCatalog`, `LogicItems`, `SparkworksStock`, `ProfileSchema` (keeps `reversed`/`flip` only as `true` on pieces that have them), `RateLimiter` (BeltReverse 2, BeltFlip 2, DetectorFilter 3). Cross-lane: `ItemBox` scales only ToolShed belts in its Belt group.
 
