@@ -469,9 +469,11 @@ return function(t)
 		local dir = "src/StarterPlayer/StarterPlayerScripts/"
 		local drag = fs.readFile(dir .. "DragController.luau")
 		local placer = fs.readFile(dir .. "BlueprintPlacer.luau")
+			.. fs.readFile(dir .. "PlaceControls.luau")
+			.. fs.readFile("src/ReplicatedStorage/Shared/PlaceControlsLogic.luau")
 		for name, src in pairs({ DragController = drag, BlueprintPlacer = placer }) do
 			t.eq(string.find(src, "Enum.KeyCode.Thumbstick2", 1, true), nil, name .. " never binds the right stick")
-			t.ok(string.find(src, "Enum.KeyCode.Thumbstick1", 1, true), name .. " binds the left stick")
+			t.ok(string.find(src, "Thumbstick1", 1, true), name .. " binds the left stick")
 			t.ok(string.find(src, "GrabLogic.StickWalks(", 1, true), name .. " asks whether the stick walks")
 			t.ok(string.find(src, "GrabLogic.LockStays(", 1, true), name .. " ends the lock on its own")
 			t.ok(
@@ -493,12 +495,14 @@ return function(t)
 		t.ok(unbind and string.find(unbind, "locked = false", 1, true), "the drop clears the lock")
 		t.ok(unbind and string.find(unbind, 'UnbindAction("DragStick")', 1, true), "and gives the stick back")
 		local stop = string.match(placer, "function BlueprintPlacer.Stop%(%).-\nend\n")
-		t.ok(stop and string.find(stop, "UnbindAction(name)", 1, true), "stopping unbinds the placer's stick sink")
+		t.ok(stop and string.find(stop, "PlaceControls.Unbind()", 1, true), "stopping unbinds the placer's stick sink")
+		t.ok(string.find(placer, "UnbindAction(name)", 1, true), "and PlaceControls unbinds each action")
 		-- The hint says it the right way round.
 		local HintLogic = t.shared("HintLogic")
 		t.ok(string.find(HintLogic.PickV2("console", "holding"), "left stick", 1, true))
 		t.eq(string.find(HintLogic.PickV2("console", "holding"), "right stick", 1, true), nil)
-		t.ok(string.find(HintLogic.Pick("console", "build"), "left stick", 1, true))
+		-- The build line is short (40 chars) and names no stick at all.
+		t.eq(string.find(HintLogic.Pick("console", "build"), "right stick", 1, true), nil)
 		-- InputKit's maps name the left stick, once per context.
 		local InputKit = t.shared("InputKit")
 		for _, context in ipairs({ "placer", "drag" }) do

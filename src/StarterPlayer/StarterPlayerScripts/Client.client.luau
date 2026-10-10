@@ -60,6 +60,7 @@ local MODULES = {
 	"MiningUI",
 	"NPCController",
 	"NewsUI",
+	"PlaceControls",
 	"PlotPickerUI",
 	"PlotUI",
 	"PromptSwitch",

@@ -264,18 +264,20 @@ return function(t)
 
 	t.test("the placer keeps the hammer in hand and stops when it goes away", function()
 		local src = fs.readFile(dir .. "BlueprintPlacer.luau")
+			.. fs.readFile(dir .. "PlaceControls.luau")
+			.. fs.readFile("src/ReplicatedStorage/Shared/PlaceControlsLogic.luau")
 		t.ok(string.find(src, "isHammer(inHand)", 1, true), "it does not unequip the hammer")
 		t.ok(string.find(src, "char.ChildRemoved:Connect", 1, true), "putting the hammer away ends it")
 		t.ok(string.find(src, "BlueprintPlacer.OnPlaced", 1, true), "placing tells the hammer to swing")
 		-- The old bindings are all still there, unchanged.
 		for _, needle in ipairs({
-			"Enum.KeyCode.R,",
-			"Enum.KeyCode.DPadRight",
-			"Enum.KeyCode.ButtonR2",
-			"Enum.KeyCode.ButtonL2",
-			"Enum.KeyCode.Thumbstick1", -- LT + the LEFT stick flicks the ghost; the right stick is the camera's
-			"Enum.KeyCode.ButtonR1",
-			"Enum.KeyCode.ButtonL1",
+			'"R"',
+			"DPadRight",
+			"ButtonR2",
+			"ButtonL2",
+			"Thumbstick1", -- LT + the LEFT stick flicks the ghost; the right stick is the camera's
+			"ButtonR1",
+			"ButtonL1",
 			"PlotLogic.Check(",
 			"GrabLogic.StickFlick",
 		}) do
