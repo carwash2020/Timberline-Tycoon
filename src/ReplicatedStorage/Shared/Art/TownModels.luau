@@ -5,23 +5,16 @@
 -- The 41 props run from ParkingBay (48) to MurphsCamp (1,736), all under
 -- PropTriCap. No stats.json in the repo, so per-prop tris stays nil.
 
+local BacklogModels = require(script.Parent.BacklogModels)
+
 local TownModels = {}
 
-export type Category = "environment" | "building" | "npc"
-
-export type Piece = {
-	name: string,
-	meshId: number,
-	size: Vector3,
-}
-
-export type Asset = {
-	id: string,
-	category: Category,
-	modelId: number,
-	pieces: { Piece },
-	tris: number?,
-}
+-- The shapes live in BacklogModels (it cannot require this module back).
+-- Category is widened for the Blender backlog's shops, gear, landmarks,
+-- furniture, plants, cave props, critters and polish pieces.
+export type Category = BacklogModels.Category
+export type Piece = BacklogModels.Piece
+export type Asset = BacklogModels.Asset
 
 local function V(x: number, y: number, z: number): Vector3
 	return Vector3.new(x, y, z)
@@ -790,8 +783,18 @@ TownModels.NpcTriCap = 2000
 TownModels.PropTriCap = 2000
 TownModels.SellViewTriCap = 60000
 
+-- A row of this module first; then the Blender backlog (BacklogModels).
+-- The townsfolk rows there belong to the NPC lane and are not reachable.
 function TownModels.Get(id: string): Asset?
-	return BY_ID[id]
+	local own = BY_ID[id]
+	if own then
+		return own
+	end
+	local backlog = BacklogModels.Get(id)
+	if backlog and backlog.category ~= "npc" then
+		return backlog
+	end
+	return nil
 end
 
 function TownModels.Ids(category: Category): { string }

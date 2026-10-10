@@ -9,10 +9,42 @@
 
 local CollectionService = game:GetService("CollectionService")
 
+local BacklogModels = require(script.Parent.BacklogModels)
 local MeshKit = require(script.Parent.MeshKit)
 local TownModels = require(script.Parent.TownModels)
 
 local TownMeshes = {}
+
+-- Backlog assets (BacklogModels) whose Dress/Adorn found a mesh missing and kept the part build.
+-- Logged once per asset (and only once the engine has been asked: a test
+-- run with no AssetService is not a miss), and the model carries a
+-- MeshFallback attribute naming the asset.
+local fellBack: { [string]: boolean } = {}
+
+function TownMeshes.FellBack(assetId: string): boolean
+	return fellBack[assetId] == true
+end
+
+function TownMeshes.ResetFallbacks()
+	table.clear(fellBack)
+end
+
+local function noteFallback(target: Instance, assetId: string)
+	if BacklogModels.Get(assetId) == nil then
+		return -- only the Blender backlog is tracked; older assets stay as they were
+	end
+	pcall(function()
+		target:SetAttribute("MeshFallback", assetId)
+	end)
+	if fellBack[assetId] then
+		return
+	end
+	fellBack[assetId] = true
+	local stats = MeshKit.Stats()
+	if stats.loaded + stats.failed > 0 then
+		warn(string.format("[TownMeshes] %s: a mesh is missing, keeping the part build", assetId))
+	end
+end
 
 export type Options = {
 	scale: Vector3?,
@@ -468,6 +500,7 @@ function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boo
 			for _, old in ipairs(made) do
 				old:Destroy()
 			end
+			noteFallback(model, assetId)
 			return false
 		end
 		table.insert(made, part)
@@ -523,6 +556,7 @@ function TownMeshes.Adorn(parent: Instance, assetId: string, pivot: CFrame): boo
 			for _, old in ipairs(made) do
 				old:Destroy()
 			end
+			noteFallback(parent, assetId)
 			return false
 		end
 		table.insert(made, part)

@@ -3419,3 +3419,15 @@ Small fixes after the end game PR (#132).
 3. **Keen.** Temper an axe Keen I and chop a tree: the swings come about 8% faster than the same axe before (III about 22%). Keen on one axe does not speed another axe. Swap axes in the hotbar and back. Hold the chop button (PC mouse, phone, Xbox RT is unchanged) to check the pace.
 4. **Boot.** Join: the Sky Forge opens at the anvil, Gus's "Gus's Charter" prompt is on the town station, and the Output has no "[V1Boot]" warnings.
 
+## V1 backlog meshes (branch `phase-2/v1-backlog-meshes`, 10 October 2026)
+
+What changed: see STATUS.md. Output tags to send back: `[MeshKit]` (misses) and `[TownMeshes]` (one line per backlog asset that kept its parts).
+
+Studio checks (PC, phone 667x375, Xbox: same walk, nothing here is input-bound):
+1. Output on server start: no `[MeshKit] mesh ... did not load` and no `[TownMeshes] ... keeping the part build`. If one appears, the id's asset needs its permission opened for this experience (see "Creator Hub: mesh permissions").
+2. Odds and Ends, Sparkworks, Land Office, a gate kiosk (each gate's glow keeps its colour) and the Arrival Arch: roof, walls and sign sit on the ground, nothing sunk or floating, the sign text still reads and faces the street, the counter still works, nothing blocks a door.
+3. Tool Shed Robux shelf: each gold crate is the new mesh, the item's name reads on the cream window, hovering still shows your own price, crates sit on the table with no gap or overlap.
+4. Lanternwood trees (Ferry Island): trunk, crown and the lantern pods match the sections, nothing floats, felling still works.
+5. Turn the templates off (rename `MeshTemplates` in Studio): the shops and crates fall back to the part build and the Output says so once per asset.
+
+Awaiting Connor: the Robux table mesh does not fit the shelf layout (it is a single 2.5 high table with a back sign; `RobuxShelf` stands two rows with a 1.0 riser on a 3.9 top). Default: the part-built table stays. Say which wins and the shelf constants change to match.
