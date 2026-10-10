@@ -7,8 +7,9 @@
 --     saved with the player's profile before Roblox is told it's done
 --     (ProfileService.ProcessPurchaseAsync), so a crash can't lose or
 --     double a purchase.
---       - Cash packs: only offered when the cash fits under the wallet cap.
---       - 2x Wood: trees drop twice the logs for 48 h; buying again extends it.
+--       - Cash packs: scaled to the stage, only offered when they fit the cap.
+--       - 2x Wood: for 48 h, wood from every tree you fell sells for double
+--         (the piece carries the boost, SellLogic); buying again extends it.
 --       - Instant Delivery: sell your truck bed once, from anywhere.
 --   * Owner grants (the hub's Paid items tab, via AdminService): OwnerGrant,
 --     OwnerRevoke and OwnerState give or take back any item in
@@ -18,20 +19,36 @@
 --     analytics. A pass is saved in profile.ownerGrants (not `passes`), so
 --     the join check ORs it in and a revoke never touches a real purchase.
 --     Every grant and revoke is also written to profile.ownerGrantLog.
---   * BuyRobuxItem (client -> server): the server checks the item is set up
---     (and that a cash pack fits), then shows Roblox's purchase prompt.
+--   * BuyRobuxItem (client -> server): the server checks the item has a
+--     real id, asks Roblox whether it is for sale (StoreSaleService; a "no"
+--     or no answer is refused with a toast), checks a cash pack fits, then
+--     shows Roblox's purchase prompt. Products get the same gate as passes.
+--   * Cash packs scale with the player's stage (StoreData.PackCash),
+--     worked out at receipt time. Every fallible step runs before the cash
+--     is credited, and nothing after the credit can throw, so a retried
+--     receipt never credits twice.
+--   * Studio: a test purchase never writes profile.passes (a free Studio
+--     buy must not become a real pass on a live save), and an owner may
+--     test-buy an item Roblox lists as off sale. Neither happens outside
+--     Studio.
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
+local AdminLogic = require(ReplicatedStorage.Shared.AdminLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
+local StageOf = require(ReplicatedStorage.Shared.StageOf)
+local StoreCopy = require(ReplicatedStorage.Shared.Store.StoreCopy)
 local StoreData = require(ReplicatedStorage.Shared.StoreData)
+local StoreSale = require(ReplicatedStorage.Shared.Store.StoreSale)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local StoreSaleService = require(script.Parent.StoreSaleService)
 
 type Profile = ProfileService.Profile
 
@@ -45,13 +62,45 @@ local onPass: ((Player, string) -> ())? = nil
 -- GameServer wires this to take the Lux Axe back after an owner revoke.
 local onPassRevoked: ((Player, string) -> ())? = nil
 
+local function isStudio(): boolean
+	local ok, studio = pcall(function()
+		return RunService:IsStudio()
+	end)
+	return ok and studio == true
+end
+
+-- Studio test mode: in Studio only, an owner (AdminLogic, read only) may
+-- test-buy an item Roblox lists as off sale. Never outside Studio.
+function MonetizationService.StudioTestMode(player: Player): boolean
+	if not isStudio() then
+		return false
+	end
+	local creatorType, creatorId = nil, nil
+	pcall(function()
+		creatorType = (game :: any).CreatorType
+		creatorId = (game :: any).CreatorId
+	end)
+	return AdminLogic.IsOwner(player.UserId, creatorType, creatorId, true)
+end
+
+-- A toast that can never throw (it may run after cash was credited).
+local function tell(player: Player, message: string)
+	local ok, err = pcall(function()
+		notify(player, message)
+	end)
+	if not ok then
+		warn("[Monetization] toast failed: " .. tostring(err))
+	end
+end
+
 -- `mode` "seed" only copies a saved pass into the live set (join, no hook).
 -- "purchase" (the default) is a real grant (a purchase, or Roblox confirming
 -- ownership): it writes profile.passes so a later join still has the pass if
 -- UserOwnsGamePassAsync fails. "grant" is the owner's: it switches the pass
 -- on and runs the same listener but writes nothing to `passes` (OwnerGrant
 -- saves it in profile.ownerGrants). Never clears a pass: a false or a failed
--- check leaves the backup in place.
+-- check leaves the backup in place. In Studio a purchase is a free test
+-- buy, so it also writes nothing to `passes` (gap 13).
 local function setPass(player: Player, key: string, mode: string?)
 	local set = owned[player] or {}
 	owned[player] = set
@@ -60,7 +109,7 @@ local function setPass(player: Player, key: string, mode: string?)
 	if mode == "seed" then
 		return
 	end
-	if mode ~= "grant" then
+	if mode ~= "grant" and not isStudio() then
 		local profile = ProfileService.GetProfile(player)
 		if profile then
 			if type(profile.passes) ~= "table" then
@@ -86,6 +135,8 @@ end
 local function publishBoosts(player: Player, profile: Profile)
 	player:SetAttribute("DoubleWoodUntil", profile.doubleWoodUntil)
 	player:SetAttribute("InstantDeliveries", profile.instantDeliveries)
+	-- The stage a cash pack card shows its amount for (StoreUI).
+	player:SetAttribute("StoreStage", StageOf.Current(profile))
 end
 
 function MonetizationService.HasPass(player: Player, key: StoreData.PassKey): boolean
@@ -136,31 +187,28 @@ local function addInstantDelivery(profile: Profile)
 	profile.instantDeliveries += 1
 end
 
+-- Every step that can fail (the amount, the text) runs before the grant
+-- changes anything; after the credit only `tell` and attribute writes run,
+-- inside pcall, so the receipt can't error after cash moved (gap 14).
 local function grantProduct(player: Player, profile: Profile, product: StoreData.Product)
 	local effect = PaidItems.EffectOf(product)
 	if effect == "cash" then
-		local cash = product.cash :: number
-		local credited, banked = EconomyService.AddPaidCash(player, cash, "robux: " .. product.key, product.key)
-		if banked > 0 then
-			notify(
-				player,
-				string.format(
-					"Thanks! +%s now; %s more is saved for you and arrives as you spend.",
-					Util.formatCash(credited),
-					Util.formatCash(banked)
-				)
-			)
-		else
-			notify(player, string.format("Thanks! +%s", Util.formatCash(cash)))
-		end
+		local cash = StoreData.PackCash(product, profile)
+		local reason = "robux: " .. product.key
+		local credited, banked = EconomyService.AddPaidCash(player, cash, reason, product.key)
+		local text = if banked > 0
+			then string.format(StoreCopy.ThanksCashBanked, Util.formatCash(credited), Util.formatCash(banked))
+			else string.format(StoreCopy.ThanksCash, Util.formatCash(cash))
+		tell(player, text)
 	elseif effect == "boost" then
+		local text = string.format(StoreCopy.ThanksBoost, product.name)
 		startBoost(profile, product.boostHours :: number)
-		notify(player, string.format("Thanks! %s is on: trees drop twice the logs.", product.name))
+		tell(player, text)
 	elseif effect == "counter" then
 		addInstantDelivery(profile)
-		notify(player, "Thanks! Use Instant Delivery to sell your truckload from anywhere.")
+		tell(player, StoreCopy.ThanksDelivery)
 	end
-	publishBoosts(player, profile)
+	pcall(publishBoosts, player, profile)
 end
 
 local function processReceipt(receipt: { [string]: any }): Enum.ProductPurchaseDecision
@@ -200,45 +248,73 @@ local function ownsPass(player: Player, passId: number): boolean
 	return false
 end
 
+-- Whether Roblox says the item may be sold now: asks again (the cache can
+-- be up to 10 minutes old) and tells the player why not. A "no" is
+-- refused unless Studio test mode is on; no answer is always refused.
+local function saleGate(player: Player, kind: string, key: string): boolean
+	local answer = StoreSaleService.Lookup(kind, key)
+	if answer == nil then
+		answer = StoreSaleService.IsOnSale(kind, key)
+	end
+	if answer == nil then
+		tell(player, StoreCopy.NoAnswer)
+		return false
+	end
+	if StoreSale.MayPrompt(StoreData.IdOf(kind, key), answer) then
+		return true
+	end
+	if MonetizationService.StudioTestMode(player) then
+		return true
+	end
+	tell(player, StoreCopy.NotForSale)
+	return false
+end
+
 local function onBuy(player: Player, kind: unknown, key: unknown)
 	if type(kind) ~= "string" or type(key) ~= "string" or not RateLimiter.Allow(player, "BuyRobuxItem") then
 		return
 	end
 	if kind == "Pass" then
 		local pass = StoreData.Pass(key)
-		if not pass or not StoreData.IsForSale(pass.id) then
+		if not pass then
+			return
+		end
+		if not StoreData.IsForSale(pass.id) then
+			tell(player, StoreCopy.NotForSale)
 			return
 		end
 		if MonetizationService.HasPass(player, pass.key) then
-			notify(player, string.format("You already have %s.", pass.name))
+			tell(player, string.format(StoreCopy.AlreadyHave, pass.name))
 			return
 		end
 		-- The check on join may have failed (Roblox's service hiccupped):
 		-- ask again before prompting, so an owner isn't asked to buy it twice.
 		if ownsPass(player, pass.id) then
 			setPass(player, pass.key)
-			notify(player, string.format("You already own %s; it's active now.", pass.name))
+			tell(player, string.format(StoreCopy.AlreadyOwnActive, pass.name))
 			return
 		end
-		-- Off sale in Creator Hub: no prompt. A failed lookup stays refused.
-		local ok, info = pcall(function(): any
-			return MarketplaceService:GetProductInfo(pass.id, Enum.InfoType.GamePass)
-		end)
-		if not ok or type(info) ~= "table" or info.IsForSale ~= true then
+		if not saleGate(player, "Pass", pass.key) then
 			return
 		end
 		MarketplaceService:PromptGamePassPurchase(player, pass.id)
 	elseif kind == "Product" then
 		local product = StoreData.Product(key)
 		local profile = ProfileService.GetProfile(player)
-		if not product or not StoreData.IsForSale(product.id) or not profile then
+		if not product or not profile then
 			return
 		end
-		if not StoreData.PackFits(product, profile.cash, GameConfig.CashCap) then
-			notify(
-				player,
-				string.format("Your wallet can't hold that much (the cap is %s).", Util.formatCash(GameConfig.CashCap))
-			)
+		if not StoreData.IsForSale(product.id) then
+			tell(player, StoreCopy.NotForSale)
+			return
+		end
+		local amount = StoreData.PackCash(product, profile)
+		player:SetAttribute("StoreStage", StageOf.Current(profile))
+		if not StoreData.PackFits(product, profile.cash, GameConfig.CashCap, amount) then
+			tell(player, string.format(StoreCopy.WalletCap, Util.formatCash(GameConfig.CashCap)))
+			return
+		end
+		if not saleGate(player, "Product", product.key) then
 			return
 		end
 		MarketplaceService:PromptProductPurchase(player, product.id)
@@ -290,7 +366,13 @@ function MonetizationService.OwnerGrant(player: Player, itemId: unknown, by: By,
 		return false, string.format("Just gave %s to %s. Wait a moment before doing it again.", item.name, player.Name)
 	end
 	local st = stateOf(player, profile, item)
-	local ok, why = PaidItems.CanGrant(item, st, { cash = profile.cash, cap = GameConfig.CashCap })
+	local packProduct = if item.effect == "cash" then StoreData.Product(item.key) else nil
+	local wallet = {
+		cash = profile.cash,
+		cap = GameConfig.CashCap,
+		amount = if packProduct then StoreData.PackCash(packProduct, profile) else nil,
+	}
+	local ok, why = PaidItems.CanGrant(item, st, wallet)
 	if not ok then
 		return false, why or "Can't give that."
 	end
@@ -312,13 +394,15 @@ function MonetizationService.OwnerGrant(player: Player, itemId: unknown, by: By,
 		setPass(player, item.key, "grant")
 		told = string.format("The owner gave you %s.", item.name)
 	elseif item.effect == "cash" then
-		local credited = EconomyService.AddCash(player, item.cash :: number, "owner grant: " .. item.key, item.key)
+		local product = StoreData.Product(item.key)
+		local amount = if product then StoreData.PackCash(product, profile) else item.cash :: number
+		local credited = EconomyService.AddCash(player, amount, "owner grant: " .. item.key, item.key)
 		detail = Util.formatCash(credited)
 		told = string.format("The owner gave you %s.", Util.formatCash(credited))
 	elseif item.effect == "boost" then
 		startBoost(profile, length :: number)
 		told = string.format(
-			"The owner turned on %s for %d hours: trees drop twice the logs.",
+			"The owner turned on %s for %d hours: wood from every tree you fell sells for double.",
 			item.name,
 			length :: number
 		)
@@ -466,6 +550,7 @@ function MonetizationService.Init(buyRemote: RemoteEvent, notifyFn: (Player, str
 	if clockFn then
 		clock = clockFn
 	end
+	StoreSaleService.Init(MarketplaceService)
 	buyRemote.OnServerEvent:Connect(onBuy)
 	MarketplaceService.ProcessReceipt = processReceipt
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
@@ -477,7 +562,7 @@ function MonetizationService.Init(buyRemote: RemoteEvent, notifyFn: (Player, str
 			local pass = StoreData.PassById(passId)
 			if pass then
 				setPass(player, pass.key)
-				notify(player, string.format("Thanks! %s is yours.", pass.name))
+				tell(player, string.format(StoreCopy.ThanksPass, pass.name))
 			end
 		end
 	)

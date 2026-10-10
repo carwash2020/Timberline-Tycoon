@@ -13,9 +13,17 @@
 --
 -- Positions are final studs from the shop's origin, like StoreStock: a
 -- table along the back wall, centred on x = 0. Its boxes are class S.
+--
+-- Lane P: only items Roblox says are for sale get a box. The table has a
+-- slot for every item with a real id (StoreData order); the server's sale
+-- cache (StoreSaleService) is installed with SetSaleCheck, and an item it
+-- knows is off sale has no box and is refused at the counter. No price is
+-- read here or on the server: the hover tag asks the player's own client
+-- (StorePrices), because regional prices differ per player.
 
 local BoxSize = require(script.Parent.BoxSize)
 local StoreData = require(script.Parent.StoreData)
+local StoreSale = require(script.Parent.Store.StoreSale)
 
 local RobuxShelf = {}
 
@@ -38,46 +46,64 @@ export type Placement = {
 RobuxShelf.Gold = "#E3B73C"
 RobuxShelf.GoldInk = "#6B4A12"
 
--- The table: where it stands (final studs) and how wide a box needs.
+-- The table: where it stands (final studs). Two rows: the passes on the
+-- table top at the front, the products on a riser behind them, so nine
+-- boxes fit the shed's back wall (one row of nine would be 40 studs).
 RobuxShelf.Class = "S"
-RobuxShelf.TableZ = 19.0 -- behind the counter and its keeper, against the back wall
-RobuxShelf.TableDepth = 3.8
+RobuxShelf.TableZ = 19.1 -- the table's middle: its front edge behind the lanes (16.8), the back row clear of the axe rack (21.36)
+RobuxShelf.TableDepth = 4.5
 RobuxShelf.TableTop = 3.9 -- the table top, above the model origin (the counter top height)
-RobuxShelf.Step = BoxSize.Class(RobuxShelf.Class).size.X + BoxSize.Gap -- centre to centre along x
+RobuxShelf.RiserH = 1.0 -- the back row stands this much higher
+RobuxShelf.FrontZ = RobuxShelf.TableZ - 1.15
+RobuxShelf.BackZ = RobuxShelf.TableZ + 1.15
+RobuxShelf.Gap = BoxSize.Gap -- between boxes in a row (the shelves' gap)
+RobuxShelf.Step = BoxSize.Class(RobuxShelf.Class).size.X + RobuxShelf.Gap -- centre to centre along x
 RobuxShelf.BoxHalfHeight = BoxSize.Class(RobuxShelf.Class).size.Y / 2
 
 function RobuxShelf.SlotId(kind: string, key: string): string
 	return "robux-" .. kind .. "-" .. key
 end
 
--- Every listed pass, then every listed product, in StoreData's order.
+-- Roblox's sale answer for an item (true, false, or nil while unknown).
+-- The server installs its cache; until then (and in tests) nothing is known.
+local saleCheck: (kind: string, key: string) -> boolean? = function(_kind: string, _key: string): boolean?
+	return nil
+end
+
+function RobuxShelf.SetSaleCheck(fn: (kind: string, key: string) -> boolean?)
+	saleCheck = fn
+end
+
+-- Every item with a real id, in StoreData's order (passes, then products):
+-- the table's slots. Whether a slot holds a box is OnSale's.
 function RobuxShelf.List(): { Entry }
 	local out: { Entry } = {}
-	for _, pass in ipairs(StoreData.ListedPasses()) do
-		table.insert(out, {
-			slotId = RobuxShelf.SlotId("Pass", pass.key),
-			kind = "Pass",
-			key = pass.key :: string,
-			displayName = pass.name,
-			color = RobuxShelf.Gold,
-		})
-	end
-	for _, product in ipairs(StoreData.ListedProducts()) do
-		table.insert(out, {
-			slotId = RobuxShelf.SlotId("Product", product.key),
-			kind = "Product",
-			key = product.key :: string,
-			displayName = product.name,
-			color = RobuxShelf.Gold,
-		})
+	for _, entry in ipairs(StoreData.Ordered()) do
+		if StoreData.IsForSale(entry.item.id) then
+			table.insert(out, {
+				slotId = RobuxShelf.SlotId(entry.kind, entry.key),
+				kind = entry.kind :: string,
+				key = entry.key,
+				displayName = entry.item.name,
+				color = RobuxShelf.Gold,
+			})
+		end
 	end
 	return out
 end
 
+-- Whether a listed entry shows a box: Roblox says it's for sale, or hasn't
+-- answered yet. A known "no" has no box.
+function RobuxShelf.OnSale(entry: Entry): boolean
+	return StoreSale.ShowInWorld(StoreData.IdOf(entry.kind, entry.key), saleCheck(entry.kind, entry.key))
+end
+
+-- The entry for a slot, only while it is on sale (BoxService stocks and
+-- sells through this).
 function RobuxShelf.Get(slotId: string): Entry?
 	for _, entry in ipairs(RobuxShelf.List()) do
 		if entry.slotId == slotId then
-			return entry
+			return if RobuxShelf.OnSale(entry) then entry else nil
 		end
 	end
 	return nil
@@ -89,32 +115,47 @@ function RobuxShelf.Find(kind: string, key: string): Entry?
 	return RobuxShelf.Get(RobuxShelf.SlotId(kind, key))
 end
 
--- One row along the back wall, evenly spaced.
+-- Two rows, each evenly spaced and centred: passes at the front on the
+-- table top, products behind on the riser.
 function RobuxShelf.Placements(): { Placement }
-	local list = RobuxShelf.List()
+	local rows: { [string]: { Entry } } = { Pass = {}, Product = {} }
+	for _, entry in ipairs(RobuxShelf.List()) do
+		table.insert(rows[entry.kind], entry)
+	end
 	local out: { Placement } = {}
-	for i, entry in ipairs(list) do
-		table.insert(out, {
-			slotId = entry.slotId,
-			x = (i - (#list + 1) / 2) * RobuxShelf.Step,
-			y = RobuxShelf.TableTop + RobuxShelf.BoxHalfHeight,
-			z = RobuxShelf.TableZ,
-		})
+	for _, kind in ipairs({ "Pass", "Product" }) do
+		local row = rows[kind]
+		local back = kind == "Product"
+		for i, entry in ipairs(row) do
+			table.insert(out, {
+				slotId = entry.slotId,
+				x = (i - (#row + 1) / 2) * RobuxShelf.Step,
+				y = RobuxShelf.TableTop + (if back then RobuxShelf.RiserH else 0) + RobuxShelf.BoxHalfHeight,
+				z = if back then RobuxShelf.BackZ else RobuxShelf.FrontZ,
+			})
+		end
 	end
 	return out
 end
 
--- How wide the row is, so the table can be built to fit.
+-- How wide the table is: the longer row, plus a margin.
 function RobuxShelf.RowWidth(): number
-	local n = #RobuxShelf.List()
-	return math.max(1, n) * RobuxShelf.Step + 1.2
+	local passes, products = 0, 0
+	for _, entry in ipairs(RobuxShelf.List()) do
+		if entry.kind == "Pass" then
+			passes += 1
+		else
+			products += 1
+		end
+	end
+	return math.max(1, passes, products) * RobuxShelf.Step + 1.0
 end
 
--- The tag over a box. Roblox owns the price; until the server has it the
--- tag says only R$.
+-- The tag over a box. Roblox owns the price, read by this player's client;
+-- until it is back the tag says only R$.
 function RobuxShelf.Tag(price: number?): string
 	if type(price) == "number" and price > 0 then
-		return string.format("R$ %d", math.floor(price))
+		return "R$ " .. tostring(math.floor(price))
 	end
 	return "R$"
 end

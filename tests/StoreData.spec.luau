@@ -26,8 +26,12 @@ return function(t)
 		t.eq(StoreData.CreatorIds.Passes.LuxAxe, 2005226878)
 		t.eq(StoreData.CreatorIds.Products.Cash1k, 3716312861)
 		t.eq(StoreData.CreatorIds.Products.Cash10k, 3716312899)
-		t.eq(StoreData.CreatorIds.Products.DoubleWood, 0)
-		t.eq(StoreData.CreatorIds.Products.InstantDelivery, 0)
+		-- Lane P: every item has its Creator Hub id now (8 Oct 2026).
+		t.eq(StoreData.CreatorIds.Passes.TowService, 2006186967)
+		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 2006912886)
+		t.eq(StoreData.CreatorIds.Passes.PaintShop, 2006456926)
+		t.eq(StoreData.CreatorIds.Products.DoubleWood, 3717310556)
+		t.eq(StoreData.CreatorIds.Products.InstantDelivery, 3717310577)
 		local forSale = 0
 		local seen = {}
 		for _, pass in ipairs(StoreData.Passes) do
@@ -46,14 +50,13 @@ return function(t)
 				seen[product.id] = true
 			end
 		end
-		-- Two passes and two cash packs. Tow, Timber Classic and Paint are off sale
-		-- (id 0); 2x Wood and Instant Delivery stay hidden.
-		t.eq(forSale, 4)
+		-- Five passes and four products. Whether each is on sale is Roblox's
+		-- answer (StoreSale), not a 0 here.
+		t.eq(forSale, 9)
 		t.eq(StoreData.AnyForSale(), true)
-		t.eq(#StoreData.ListedPasses(), 2)
-		t.eq(#StoreData.ListedProducts(), 2)
-		t.eq(StoreData.Product("DoubleWood").id, 0)
-		t.eq(StoreData.Product("InstantDelivery").id, 0)
+		t.eq(#StoreData.ListedPasses(), 5)
+		t.eq(#StoreData.ListedProducts(), 4)
+		t.eq(#StoreData.Ordered(), 9)
 		t.eq(StoreData.ProductById(0), nil, "id 0 never lists a product")
 		t.eq(StoreData.Pass("LuxAxe").image, 0, "Lux Axe image slot left at 0")
 		t.eq(StoreData.Pass("DoubleCash").image, 0, "2x Cash image slot left at 0")
@@ -61,9 +64,6 @@ return function(t)
 		t.eq(StoreData.Passes[1].key, "DoubleCash", "2x Cash stays first so its test id stays 101")
 		t.eq(StoreData.CreatorIds.Passes.DoubleCash, 2005256811)
 		t.eq(StoreData.CreatorIds.Passes.LuxAxe, 2005226878)
-		t.eq(StoreData.CreatorIds.Passes.TowService, 0)
-		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 0)
-		t.eq(StoreData.CreatorIds.Passes.PaintShop, 0)
 		t.eq(StoreData.CreatorIds.Products.Cash1k, 3716312861)
 		t.eq(StoreData.CreatorIds.Products.Cash10k, 3716312899)
 		t.eq(StoreData.Pass("TowService").image, 91282142796474)
@@ -80,11 +80,11 @@ return function(t)
 		)
 		t.eq(
 			StoreData.Pass("LuxAxe").description,
-			"A black axe with a gold head, a diamond edge, and a sparkle. It sits between the Inferno Axe and the Starfall Axe, and the Starfall Axe can still be bought with cash. Wood you cut with it sells for 10% more. It's yours to keep and can't be sold."
+			"A black axe with a gold head, a diamond edge, and a sparkle. It sits between the Inferno Axe and the Starfall Axe, and the Starfall Axe can still be bought with cash. Wood you cut with it sells for 10% more. It's yours to keep and can't be sold. It can't be tempered."
 		)
 		t.eq(
 			StoreData.Pass("TowService").description,
-			"Free recalls for every truck you own. Without this pass, a recall costs 2% of the truck's price, with a $2 minimum."
+			"Free recalls for every truck you own. Without this pass, a recall costs 5% of the truck's price, with a $5 minimum."
 		)
 		t.eq(
 			StoreData.Pass("TimberClassic").description,
@@ -106,6 +106,38 @@ return function(t)
 				end
 			end
 		end
+	end)
+
+	t.test("Lane P: the packs are Small and Large and say what they add; 2x Wood says what it does", function()
+		t.eq(StoreData.Product("Cash1k").name, "Small Cash Pack")
+		t.eq(StoreData.Product("Cash10k").name, "Large Cash Pack")
+		t.eq(StoreData.Product("Cash1k").description, "Adds 15 minutes of wood income at your current stage.")
+		t.eq(StoreData.Product("Cash10k").description, "Adds 2 hours of wood income at your current stage.")
+		t.eq(
+			StoreData.Product("DoubleWood").description,
+			"For 48 hours, wood from every tree you fell sells for double. Buying it again adds 48 more hours."
+		)
+		local small, large = StoreData.Product("Cash1k"), StoreData.Product("Cash10k")
+		t.eq(StoreData.PackCashAt(small, 1), 1000, "never under the old floor")
+		t.eq(StoreData.PackCashAt(large, 1), 10000)
+		t.eq(StoreData.PackCashAt(small, 6), 28700)
+		t.eq(StoreData.PackCashAt(large, 6), 229600)
+		for n = 2, 8 do
+			t.ok(StoreData.PackCashAt(large, n) >= StoreData.PackCashAt(large, n - 1), "climbs at S" .. n)
+			t.eq(StoreData.PackCashAt(large, n) % 10, 0, "rounded to $10")
+		end
+		t.eq(StoreData.PackCash(large, { onboarding = { ["Stage:S6"] = true } }), 229600)
+		t.eq(StoreData.PackCash(large, { onboarding = {}, bestAxeTier = 7 }), 229600, "a veteran before Lane E")
+		t.ok(StoreData.PackFits(large, 0, 300000, 229600))
+		t.ok(not StoreData.PackFits(large, 100000, 300000, 229600), "the scaled amount is what must fit")
+		local order = {}
+		for _, entry in ipairs(StoreData.Ordered()) do
+			table.insert(order, entry.key)
+			t.eq(StoreData.IdOf(entry.kind, entry.key), entry.item.id)
+		end
+		t.eq(order[1], "DoubleCash")
+		t.eq(#order, 9)
+		t.eq(StoreData.IdOf("Gift", "DoubleCash"), 0)
 	end)
 
 	t.test("a pass with IsForSale == false is hidden", function()

@@ -44,101 +44,151 @@ return function(t)
 		end
 	end)
 
-	t.test("the board has a store prompt, and posters only for items on sale", function()
+	-- Lane P (8 Oct 2026): the board Connor approved (handoff
+	-- assets/store-board-mockup.jpg): a TIMBERLINE header on two posts and a
+	-- cork field of cream cards, one per item, each with a pin, an art
+	-- disc, a title, one short line and an "R$" pill the client prices.
+	-- Replaces the old arch-and-banner checks (4 posters, 2-line copy,
+	-- lanterns): the mockup has none of those.
+	local StoreData = t.shared("StoreData")
+	local StoreCopy = t.shared("Store/StoreCopy")
+
+	local function cards(model)
+		local out = {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("Frame") and d:GetAttribute("RobuxKey") ~= nil then
+				table.insert(out, d)
+			end
+		end
+		return out
+	end
+
+	t.test("the board has a store prompt, and a card for every item until Roblox says no", function()
 		local model = StoreBoard.Build()
 		local prompt = model:FindFirstChild("StorePrompt", true)
 		t.ok(prompt, "prompt")
-		t.eq(prompt.ActionText, "Browse")
+		t.eq(prompt.ActionText, "Browse Store")
 		t.eq(prompt.KeyboardKeyCode.Name, "E")
 		t.eq(prompt.GamepadKeyCode.Name, "ButtonX")
+		t.ok(prompt.GamepadKeyCode.Name ~= "ButtonR2")
 		t.eq(prompt.RequiresLineOfSight, false)
-		t.eq(model:FindFirstChild("ComingSoon", true), nil, "items are on sale, so no coming-soon label")
-		local StoreData = t.shared("StoreData")
-		local posters = 0
-		for _, pass in ipairs(StoreData.ListedPasses()) do
-			t.ok(model:FindFirstChild(pass.name, true), pass.name)
-			posters += 1
+		t.eq(model:FindFirstChild("ComingSoon", true), nil, "nothing answered no, so no strip")
+		t.eq(#cards(model), #StoreData.Ordered(), "one card per item with an id")
+		for _, entry in ipairs(StoreData.Ordered()) do
+			t.ok(model:FindFirstChild(entry.item.name, true), entry.item.name)
 		end
-		for _, product in ipairs(StoreData.ListedProducts()) do
-			t.ok(model:FindFirstChild(product.name, true), product.name)
-			posters += 1
-		end
-		t.eq(posters, 4, "two passes and two cash packs; off-sale passes are not posted")
-		t.eq(model:FindFirstChild("2x Wood (48 hours)", true), nil)
-		t.eq(model:FindFirstChild("Instant Delivery", true), nil)
 	end)
 
-	t.test("poster descriptions are 14 px, wrapped, and at most two lines", function()
+	t.test("an item Roblox says isn't for sale leaves the cards for the Coming soon strip", function()
+		local function saleCheck(kind, key)
+			return not (kind == "Pass" and key == "DoubleCash")
+		end
+		local model = StoreBoard.Build(saleCheck)
+		t.eq(#cards(model), #StoreData.Ordered() - 1)
+		local name = StoreData.Pass("DoubleCash").name
+		t.eq(model:FindFirstChild(name, true), nil, "no card for it")
+		local strip = model:FindFirstChild("ComingSoon", true)
+		t.ok(strip, "the strip")
+		local words = strip:FindFirstChild("Words").Text
+		t.ok(string.find(words, StoreCopy.Soon, 1, true) == 1, words)
+		t.ok(string.find(words, name, 1, true) ~= nil, "named on the strip")
+		local _, soon = StoreBoard.Split(function()
+			return false
+		end)
+		t.eq(#soon, #StoreData.Ordered(), "all soon")
+		-- Refilling in place (StoreSaleService on a change) leaves no stale cards.
+		local list = model:FindFirstChild("List", true)
+		StoreBoard.FillPosters(list, nil)
+		t.eq(#cards(model), #StoreData.Ordered())
+		t.eq(model:FindFirstChild("ComingSoon", true), nil)
+	end)
+
+	t.test("a card is a title, one short line, a pin, an art disc and an R$ pill with no number", function()
 		local Enum = t.roblox.Enum
 		local model = StoreBoard.Build()
 		local gui = model:FindFirstChild("Posters", true)
 		local width = StoreBoard.BodyWidth(gui.CanvasSize.X)
-		local StoreData = t.shared("StoreData")
-		local function check(item)
-			local card = model:FindFirstChild(item.name, true)
+		local titleW = StoreBoard.TitleWidth(gui.CanvasSize.X)
+		for _, card in ipairs(cards(model)) do
+			local key = card:GetAttribute("RobuxKey")
 			local body = card:FindFirstChild("Description")
-			t.eq(body.TextSize, 14, item.name)
-			t.eq(body.TextWrapped, true, item.name)
-			t.eq(body.TextTruncate, Enum.TextTruncate.AtEnd, item.name)
-			t.eq(body.Size.Y.Offset, 28, item.name)
-			t.ok(StoreBoard.LineCount(body.Text, width, 14) <= 2, item.name)
-			if StoreBoard.LineCount(item.description, width, 14) <= 2 then
-				t.eq(body.Text, item.description, item.name .. " fits whole")
-			else
-				t.ok(string.sub(body.Text, -#"…") == "…", item.name .. " clips")
-			end
-			local title = nil
-			for _, d in ipairs(card:GetChildren()) do
-				if d:IsA("TextLabel") and d.Text == item.name then
-					title = d
-				end
-			end
-			t.eq(title.TextSize, 16, item.name .. " title")
-		end
-		for _, pass in ipairs(StoreData.ListedPasses()) do
-			check(pass)
-		end
-		for _, product in ipairs(StoreData.ListedProducts()) do
-			check(product)
+			t.ok(body.TextSize >= 14, key)
+			t.eq(body.TextTruncate, Enum.TextTruncate.AtEnd, key)
+			t.ok(
+				StoreBoard.LineCount(body.Text, width, body.TextSize) <= StoreBoard.DescLines,
+				key .. ": " .. body.Text
+			)
+			t.ok(StoreCopy.BoardLines[key] ~= nil, key .. " has a board line")
+			t.eq(body.Text, StoreCopy.BoardLines[key], key .. " fits whole")
+			local title = card:FindFirstChild("Title")
+			t.ok(title.TextSize >= 16, key)
+			t.eq(title.Text, card.Name, key .. ": the whole name fits")
+			t.ok(StoreBoard.LineCount(title.Text, titleW, title.TextSize) <= StoreBoard.TitleLines, key)
+			t.ok(card:FindFirstChild("Pin") ~= nil and card:FindFirstChild("Art") ~= nil, key)
+			local price = card:FindFirstChild("Price", true)
+			t.eq(price.Text, "R$", key .. ": the server never writes a price")
+			t.ok(price:HasTag("StorePricePill"), key)
 		end
 	end)
 
-	t.test("the board is big and easy to find: a 7 stud tall board, a large heading, and a lit arch", function()
+	t.test("three cards a page; the board turns the page and wraps round", function()
+		local model = StoreBoard.Build()
+		local list = model:FindFirstChild("List", true)
+		local pages = StoreBoard.PageCount(#StoreData.Ordered())
+		t.eq(list:GetAttribute("Pages"), pages)
+		local function shown()
+			local out = {}
+			for _, child in ipairs(list:GetChildren()) do
+				if child:GetAttribute("Page") ~= nil and child.Visible then
+					table.insert(out, child.Name)
+				end
+			end
+			return out
+		end
+		t.eq(shown(), { "Page1" })
+		t.eq(#list:FindFirstChild("Page1"):GetChildren() - 1, 3, "three cards and a grid layout")
+		StoreBoard.NextPage(list)
+		t.eq(shown(), { "Page2" })
+		for _ = 2, pages do
+			StoreBoard.NextPage(list)
+		end
+		t.eq(shown(), { "Page1" }, "wraps")
+		t.eq(#list:FindFirstChild("Dots"):GetChildren() - 1, pages)
+		local one = StoreBoard.Build(function(_, key)
+			return key == "DoubleCash"
+		end)
+		t.eq(one:FindFirstChild("List", true):GetAttribute("Pages"), 1)
+		t.eq(one:FindFirstChild("Dots", true), nil, "no dots for one page")
+	end)
+
+	t.test("the board is big and easy to find: a TIMBERLINE header on two posts over a wide field", function()
 		local Enum = t.roblox.Enum
 		local size = StoreBoard.BoardSize
-		t.ok(size.X >= 5 and size.Y >= 7, "at least 5 wide and 7 tall (it was 4.6 square)")
+		t.ok(size.X >= 5, "at least 5 wide")
 		local model = StoreBoard.Build()
 		local board = model:FindFirstChild("Board")
 		t.ok((board.Size - size).Magnitude < 1e-3)
+		t.eq(board.Material, Enum.Material.Fabric, "cork")
 		local gui = model:FindFirstChild("Posters", true)
 		t.ok(math.abs(gui.CanvasSize.Y / gui.CanvasSize.X - size.Y / size.X) < 0.01, "the canvas has the face's shape")
-		local heading
-		for _, d in ipairs(gui:GetDescendants()) do
-			if d:IsA("TextLabel") and d.Text == "TIMBERLINE STORE" then
-				heading = d
-			end
-		end
-		t.ok(heading and heading.TextSize >= 30, "the heading is at least 30 px on a 400 px canvas")
-		-- The arch: two collidable posts a board's width out, a banner over the
-		-- board that reads STORE on both faces, and a lantern on each post.
+		local ground = board.CFrame.Position.Y - StoreBoard.FieldBottom - size.Y / 2
 		local posts = 0
 		for _, d in ipairs(model:GetChildren()) do
-			if d.Name == "ArchPost" then
+			if d.Name == "Post" then
 				posts += 1
 				t.ok(d.CanCollide, "posts are solid")
-				t.ok(d.Size.Y >= size.Y + 3, "posts stand over the board")
+				t.ok(d.CFrame.Position.Y + d.Size.Y / 2 - ground >= 7, "7 studs tall overall")
+				t.ok(math.abs(d.CFrame.Position.Y - d.Size.Y / 2 - ground) < 1e-3, "on the ground")
 			end
 		end
 		t.eq(posts, 2)
-		local banner = model:FindFirstChild("Banner")
-		t.ok(banner, "a banner")
-		t.eq(banner.CanCollide, false)
-		t.ok(banner.Size.X > size.X + 2, "wider than the board and its posts")
+		local header = model:FindFirstChild("Header")
+		t.eq(header.CanCollide, false)
+		t.ok(header.CFrame.Position.Y - header.Size.Y / 2 > board.CFrame.Position.Y + size.Y / 2, "over the field")
 		local faces = 0
-		for _, d in ipairs(banner:GetChildren()) do
+		for _, d in ipairs(header:GetChildren()) do
 			if d:IsA("SurfaceGui") then
-				local label = d:FindFirstChildWhichIsA("TextLabel")
-				t.eq(label.Text, StoreBoard.BannerText)
+				t.eq(d:FindFirstChildWhichIsA("TextLabel").Text, "TIMBERLINE")
 				faces += 1
 			end
 		end
@@ -147,21 +197,19 @@ return function(t)
 		for _, d in ipairs(model:GetChildren()) do
 			if d.Name == "LanternGlow" then
 				lamps += 1
-				t.eq(d.Material, Enum.Material.Neon)
 				t.eq(d.CanCollide, false)
+				local light = d:FindFirstChildWhichIsA("PointLight")
+				t.ok(light ~= nil and light.Enabled == false, "off by day; LightingController lights it after dark")
 			end
 		end
-		t.eq(lamps, 2, "LanternGlow, so the night lights switch them")
+		t.eq(lamps, 2, "a lantern on each post")
 		local parts = 0
 		for _, d in ipairs(model:GetDescendants()) do
 			if d:IsA("BasePart") then
 				parts += 1
 			end
 		end
-		t.ok(parts <= 16, "the board stays cheap: " .. parts)
-		local prompt = model:FindFirstChild("StorePrompt", true)
-		t.eq(prompt.ActionText, "Browse")
-		t.eq(prompt.GamepadKeyCode.Name, "ButtonX")
+		t.ok(parts <= StoreBoard.PartCap and parts <= 16, "the board stays cheap: " .. parts)
 	end)
 
 	t.test("the footprint covers the arch and stays out of the camp and off the spawn walk", function()
