@@ -41,6 +41,12 @@ return function(t)
 				return options.ownsPass == id
 			end,
 			GetProductInfo = function(_, id)
+				if options.noAnswer then
+					error("HTTP 503 (the store didn't answer)")
+				end
+				if options.offSaleIds and options.offSaleIds[id] then
+					return { IsForSale = false, PriceInRobux = 300 }
+				end
 				local onSale = options.isForSale
 				if type(onSale) ~= "boolean" then
 					onSale = true
@@ -77,6 +83,14 @@ return function(t)
 			services = {
 				MarketplaceService = market,
 				Players = players,
+				RunService = {
+					IsStudio = function()
+						return options.studio == true
+					end,
+					IsServer = function()
+						return true
+					end,
+				},
 			},
 			globals = {
 				task = {
@@ -95,6 +109,11 @@ return function(t)
 			item.id = 200 + i
 		end
 		local Monetization = loader:server("MonetizationService")
+		if options.notifyThrows then
+			options.notify = function()
+				error("the toast broke")
+			end
+		end
 		local buy
 		Monetization.Init(
 			{ OnServerEvent = {
@@ -103,6 +122,9 @@ return function(t)
 				end,
 			} },
 			function(_, message)
+				if options.notify then
+					options.notify()
+				end
 				table.insert(toasts, message)
 			end,
 			function()
@@ -449,7 +471,7 @@ return function(t)
 		local s = setup()
 		local ok, text = s.M.OwnerGrant(s.player, "product_Cash10k", OWNER, nil)
 		t.eq(ok, true)
-		t.eq(text, "Gave $10,000 to Tester.")
+		t.eq(text, "Gave Large Cash Pack to Tester.") -- renamed from "$10,000" (Lane P)
 		t.eq(s.profile.cash, 10000, "EconomyService.AddCash did it")
 		t.eq(s.profile.passes, {}, "nothing about passes")
 		t.eq(s.profile.pendingCash, 0, "nothing banked: a grant only goes in whole")
@@ -569,5 +591,90 @@ return function(t)
 			s.profile.ownerGrantLog[#s.profile.ownerGrantLog].at = NOW - 1000 + i
 		end
 		t.eq(#s.profile.ownerGrantLog, 30)
+	end)
+	t.test("Lane P: restored passes are checked on join and their perk is on for past buyers", function()
+		for i, key in ipairs({ "TowService", "TimberClassic", "PaintShop" }) do
+			local s = setup({ ownsPass = 100 + 2 + i })
+			t.eq(s.StoreData.Pass(key).id, 100 + 2 + i)
+			t.ok(s.M.HasPass(s.player, key), key .. " owned on join")
+			t.eq(s.player.attrs["Pass_" .. key], true)
+		end
+		local tow = setup({ ownsPass = 103 })
+		t.eq(tow.M.WaivesRespawn(tow.player), true, "Tow Service waives the recall fee")
+	end)
+
+	t.test("Lane P: an off-sale item or a silent store is refused with a toast, products too", function()
+		local s = setup({ isForSale = false })
+		s.buy("Pass", "LuxAxe")
+		s.buy("Product", "DoubleWood")
+		t.eq(s.prompts, {})
+		t.eq(s.toasts, { "That isn't for sale yet.", "That isn't for sale yet." })
+		local quiet = setup({ noAnswer = true })
+		quiet.buy("Product", "InstantDelivery")
+		t.eq(quiet.prompts, {})
+		t.eq(quiet.toasts, { "Roblox's store didn't answer. Try again in a moment." })
+		local zero = setup()
+		zero.StoreData.Pass("PaintShop").id = 0
+		zero.buy("Pass", "PaintShop")
+		t.eq(zero.prompts, {})
+		t.eq(zero.toasts, { "That isn't for sale yet." })
+	end)
+
+	t.test("Lane P: Studio test mode skips only the off-sale gate, and only in Studio", function()
+		local live = setup({ isForSale = false })
+		t.eq(live.M.StudioTestMode(live.player), false, "never outside Studio")
+		local studio = setup({ isForSale = false, studio = true })
+		t.eq(studio.M.StudioTestMode(studio.player), true)
+		studio.buy("Pass", "TowService")
+		t.eq(studio.prompts, { "pass 103" }, "the owner can test-buy an off-sale pass in Studio")
+		local silent = setup({ noAnswer = true, studio = true })
+		silent.buy("Pass", "TowService")
+		t.eq(silent.prompts, {}, "no answer from Roblox is still refused")
+	end)
+
+	t.test("Lane P: a Studio test purchase never writes the permanent pass backup", function()
+		local studio = setup({ studio = true })
+		studio.passFinished("DoubleCash", true)
+		t.eq(studio.M.SaleMultiplier(studio.player), 2, "the effect is on for the session")
+		t.eq(studio.profile.passes.DoubleCash, nil, "profile.passes untouched in Studio")
+		local live = setup()
+		live.passFinished("DoubleCash", true)
+		t.eq(live.profile.passes.DoubleCash, true, "a real purchase still saves the backup")
+	end)
+
+	t.test("Lane P: cash packs scale with the stage at receipt time, never below the old amount", function()
+		local s1 = setup()
+		t.eq(s1.receipt("Cash1k", "a1"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(s1.profile.cash, 1000, "S1: the old $1,000 floor")
+		local s6 = setup()
+		s6.profile.onboarding["Stage:S6"] = true
+		s6.receipt("Cash1k", "a2")
+		t.eq(s6.profile.cash, 28700, "S6: 15 minutes of $114,800/h")
+		s6.receipt("Cash10k", "a3")
+		t.eq(s6.profile.cash, 28700 + 229600, "S6: 2 hours")
+		local veteran = setup()
+		veteran.profile.bestAxeTier = 7 -- Obsidian Axe, no Stage keys yet (before Lane E)
+		veteran.receipt("Cash10k", "a4")
+		t.eq(veteran.profile.cash, 229600, "the progress fallback, never S1 for a veteran")
+		t.eq(veteran.receipt("Cash10k", "a4"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(veteran.profile.cash, 229600, "a replayed receipt grants once")
+	end)
+
+	t.test("Lane P: a scaled pack that wouldn't fit shows the wallet message and no prompt", function()
+		local s = setup({ cash = 1_900_000 })
+		s.profile.onboarding["Stage:S6"] = true
+		s.buy("Product", "Cash10k")
+		t.eq(s.prompts, {})
+		t.ok(string.find(s.toasts[1], "can't hold", 1, true) ~= nil)
+	end)
+
+	t.test("Lane P: a grant whose toast throws after the credit still grants once", function()
+		local s = setup({ notifyThrows = true })
+		t.eq(s.receipt("Cash1k", "n1"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(s.profile.cash, 1000)
+		t.eq(s.receipt("Cash1k", "n1"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(s.profile.cash, 1000, "Roblox's retry grants nothing more")
+		t.eq(s.receipt("DoubleWood", "n2"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(s.profile.doubleWoodUntil, NOW + 48 * 3600)
 	end)
 end

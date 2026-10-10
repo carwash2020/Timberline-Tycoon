@@ -420,7 +420,7 @@ local function loadCycle(axe, wood, owned, cash: number?)
 	if wood.id == "frostwood" and not owned.InsulatedCoat then
 		return nil
 	end
-	-- The Sky Pass is a $30,000 quest turn-in (GondolaPass), not a shelf price.
+	-- The Gondola Pass is a $30,000 quest turn-in (GondolaPass), not a shelf price.
 	if b.access == "gondola" and not owned.GondolaPass then
 		return nil
 	end
@@ -587,7 +587,7 @@ local function simulate()
 	end
 	table.insert(candidates, {
 		id = "GondolaPass",
-		displayName = "Sky Pass",
+		displayName = "Gondola Pass",
 		priceCash = 30000,
 		v2 = { price = 30000 },
 	})
@@ -760,7 +760,7 @@ line(
 )
 line()
 line(
-	"Modelled: the sawmill `plankBonus` and the planer `boardBonus` the player owns, capped together with temper `t` (SellLogic.Stack; `t` is 1 until Prosperous is a purchase). Gloam earns 10/24 of its night rate. Frostwood waits for the Insulated Coat. The Sky Pass is a $30,000 turn-in before lumenwood. Conveyor belts are bought only when they raise the rate, which this model does not give them."
+	"Modelled: the sawmill `plankBonus` and the planer `boardBonus` the player owns, capped together with temper `t` (SellLogic.Stack; `t` is 1 until Prosperous is a purchase). Gloam earns 10/24 of its night rate. Frostwood waits for the Insulated Coat. The Gondola Pass is a $30,000 turn-in before lumenwood. Conveyor belts are bought only when they raise the rate, which this model does not give them."
 )
 line()
 line("## Headline targets (V2_PLAN §17)")

@@ -43,6 +43,9 @@ export type BiomeDef = {
 	ground: { color: string, material: string }?,
 	trees: { [string]: number }?,
 	nodes: { [string]: number }?,
+	-- What a gate sign for the biome says, in words (no price: a price shows
+	-- in the prompt). Only biomes with a quest gate carry one.
+	gateWords: string?,
 }
 
 -- What a biome does to a player right now (BiomeData.Rules).
@@ -149,6 +152,7 @@ local biomes: { BiomeDef } = {
 		displayName = "Aether Isles",
 		access = "gondola",
 		gondola = { rideSec = 40, fee = 250 },
+		gateWords = "Obsidian Axe + Gondola Pass from Gus",
 		skyBinCapacity = 30,
 		skyBinVolume = 120,
 		chuteWalkStuds = 30,
@@ -174,6 +178,26 @@ end
 
 function BiomeData.All(): { BiomeDef }
 	return biomes
+end
+
+-- The gate into a biome: `needs` is the id of the gear or pass the player
+-- must hold ("GondolaPass" for the sky, the gear for a gear-gated biome, nil
+-- for an open one) and `words` is what its gate sign says ("" when it has no
+-- sign). An unknown biome is open.
+export type GateInfo = { needs: string?, words: string }
+
+function BiomeData.Gate(biomeId: string): GateInfo
+	local def = byId[biomeId]
+	if def == nil then
+		return { needs = nil, words = "" }
+	end
+	local needs: string? = def.requiresGear
+	if def.access == "gondola" then
+		needs = "GondolaPass"
+	elseif needs == nil and def.exposure ~= nil then
+		needs = def.exposure.gear
+	end
+	return { needs = needs, words = def.gateWords or "" }
 end
 
 -- True if the biome exists in the world today (it has an area).

@@ -39,4 +39,54 @@ return function(t)
 		Boot.Start(safely, { LogicSet = remote })
 		t.eq(#connected, 1, "the remote is not bound twice")
 	end)
+	t.test("the end game starts from V1Boot: the Sky Forge now, Gus once the station is found", function()
+		local fired = {}
+		local loader = t.loader({
+			mocks = {
+				AetherService = {
+					V1Init = function(ctx)
+						table.insert(fired, { "aether", ctx })
+					end,
+				},
+				SkyQuestService = {
+					V1Init = function(ctx)
+						table.insert(fired, { "quest", ctx })
+					end,
+				},
+			},
+		})
+		local Boot = loader:server("V1Boot")
+		local station = { Name = "Platform" }
+		Boot.Spawn = function(fn)
+			fn()
+		end
+		Boot.WaitStation = function()
+			return station
+		end
+		local sent = {}
+		local remotes = {
+			SkyQuest = {},
+			ForgeAction = {},
+			ForgeOpen = {},
+			Notify = {
+				FireClient = function(_, player, text)
+					table.insert(sent, { player, text })
+				end,
+			},
+		}
+		local order = {}
+		Boot.Start(function(name, fn)
+			table.insert(order, name)
+			fn()
+		end, remotes)
+		t.eq(fired[1][1], "aether", "the Sky Forge binds first")
+		t.eq(fired[2][1], "quest")
+		t.eq(fired[2][2].station, station)
+		t.eq(fired[1][2].remotes, remotes)
+		fired[2][2].notify("ann", "hi")
+		t.eq(sent[1][2], "hi", "notify goes through the Notify remote")
+		t.ok(table.find(order, "AetherService.V1Init") ~= nil and table.find(order, "SkyQuestService") ~= nil)
+		local fs = require("@lune/fs")
+		t.ok(not fs.isFile("src/ServerScriptService/EndGameBoot.server.luau"), "EndGameBoot is gone")
+	end)
 end

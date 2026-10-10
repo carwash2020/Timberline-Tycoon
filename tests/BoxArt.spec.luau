@@ -333,11 +333,17 @@ return function(t)
 		t.eq(model:GetAttribute("Open"), true)
 	end)
 
-	t.test("a Robux box is a dark gold box with gold coins inside; the tier line is on the foot", function()
-		local model = dressed("Robux", nil, { name = "2x Cash", gold = true })
-		t.eq(model:FindFirstChild("Strip").Color, BoxLook.Gold)
-		t.eq(model:FindFirstChild("Back").Color, BoxLook.CharcoalGold)
-		t.ok(#model:FindFirstChild("Contents"):GetChildren() == 3, "three coins")
+	t.test("a Robux box is an open crate of gold coins (Lane P); the tier line is on the foot", function()
+		local RobuxBoxArt = t.shared("Art/RobuxBoxArt")
+		local model, body = dressed("Robux", nil, { name = "2x Cash", gold = true, robuxKey = "DoubleCash" })
+		t.eq(model:FindFirstChild("Back").Color, RobuxBoxArt.PlankHoney, "honey planks")
+		t.ok(
+			model:FindFirstChild("Front").Size.Y < model:FindFirstChild("Back").Size.Y,
+			"a low front, so the coins show"
+		)
+		t.eq(model:FindFirstChild("Window"), nil, "no glass")
+		t.ok(#model:FindFirstChild("Contents"):GetChildren() == 3, "a coin bed and two coins")
+		t.eq(body.Transparency, 1, "the box part is only the hitbox")
 		local tiered = dressed("Sawmill", "SawmillSturdy", { tier = "STURDY, TIER 2 OF 5" })
 		local gui = tiered:FindFirstChild("Base"):FindFirstChildWhichIsA("SurfaceGui")
 		t.eq(gui:FindFirstChildWhichIsA("TextLabel").Text, "STURDY, TIER 2 OF 5")

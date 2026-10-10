@@ -531,10 +531,12 @@ return function(t)
 				end
 			end
 			t.ok(spun, "the sell text turns so it still reads from -Z")
+			-- Lane P: the store board is built from parts to the mockup Connor
+			-- approved (8 Oct); the old shop-board mesh is no longer dressed on it.
+			-- The StoreBoardV1 meshes are wired by job 17.
 			local store = StoreBoard.Build()
-			local storeMesh = visualNamed(store, "Board")
-			local storePart = store:FindFirstChild("Board")
-			t.ok((storeMesh.CFrame.Position - storePart.CFrame.Position).Magnitude <= 0.25, "store board centre")
+			t.eq(visualNamed(store, "Board"), nil, "no stale mesh over the cork")
+			t.ok(store:FindFirstChild("Board") ~= nil, "the cork field")
 		end)
 	end)
 

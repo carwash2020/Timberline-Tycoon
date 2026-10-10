@@ -47,30 +47,49 @@ return function(t)
 		t.eq(RobuxShelf.Find("Gift", "DoubleCash"), nil)
 		t.eq(RobuxShelf.Get("robux-Pass-DoubleCash").key, "DoubleCash")
 		t.eq(RobuxShelf.Get("toolshed-SteelAxe"), nil)
-		-- An item whose id is still 0 (not for sale) is not on the shelf.
-		for _, entry in ipairs(RobuxShelf.List()) do
-			t.ok(entry.key ~= "DoubleWood" and entry.key ~= "InstantDelivery", "ids of 0 stay off the shelf")
-		end
+		-- Lane P: four items have ids (the other five stay at 0, no box); an
+		-- item Roblox says isn't for sale is refused at the counter (Get/Find)
+		-- while its box stands.
+		t.eq(#RobuxShelf.List(), 4)
+		RobuxShelf.SetSaleCheck(function(_, key)
+			return key ~= "DoubleCash"
+		end)
+		t.eq(RobuxShelf.Find("Pass", "DoubleCash"), nil, "off sale: refused")
+		t.eq(RobuxShelf.Get("robux-Pass-DoubleCash"), nil)
+		t.ok(RobuxShelf.Find("Pass", "LuxAxe") ~= nil)
+		RobuxShelf.SetSaleCheck(function()
+			return nil
+		end)
+		t.ok(RobuxShelf.Find("Pass", "DoubleCash") ~= nil, "not answered yet: shown (the prompt is still gated)")
 	end)
 
-	t.test("the boxes sit in one even row on the table, which is as wide as the row needs", function()
+	t.test("passes stand in front on the table, packs on the riser behind, each row even and centred", function()
 		local places = RobuxShelf.Placements()
 		t.eq(#places, #RobuxShelf.List())
 		local width = RobuxShelf.RowWidth()
-		for i, place in ipairs(places) do
-			t.eq(place.slotId, RobuxShelf.List()[i].slotId)
-			t.eq(place.z, RobuxShelf.TableZ)
-			t.ok(math.abs(place.y - (RobuxShelf.TableTop + RobuxShelf.BoxHalfHeight)) < 1e-9, "on the table top")
-			t.ok(math.abs(place.x) + 0.7 <= width / 2, "inside the table's width")
-			if i > 1 then
-				t.ok(math.abs(place.x - places[i - 1].x - RobuxShelf.Step) < 1e-9, "evenly spaced")
-			end
-		end
-		local sum = 0
+		local byKind = { Pass = {}, Product = {} }
 		for _, place in ipairs(places) do
-			sum += place.x
+			local entry = RobuxShelf.Get(place.slotId)
+			table.insert(byKind[entry.kind], place)
 		end
-		t.ok(math.abs(sum) < 1e-9, "centred on the shop's middle")
+		for kind, row in pairs(byKind) do
+			local back = kind == "Product"
+			local sum = 0
+			for i, place in ipairs(row) do
+				t.eq(place.z, if back then RobuxShelf.BackZ else RobuxShelf.FrontZ)
+				local top = RobuxShelf.TableTop + (if back then RobuxShelf.RiserH else 0)
+				t.ok(math.abs(place.y - (top + RobuxShelf.BoxHalfHeight)) < 1e-9, kind .. " on its surface")
+				t.ok(math.abs(place.x) + 0.7 <= width / 2, "inside the table's width")
+				if i > 1 then
+					t.ok(math.abs(place.x - row[i - 1].x - RobuxShelf.Step) < 1e-9, "evenly spaced")
+				end
+				sum += place.x
+			end
+			t.ok(math.abs(sum) < 1e-9, kind .. " centred on the shop's middle")
+		end
+		t.ok(RobuxShelf.BackZ - RobuxShelf.FrontZ >= 2.2, "the rows don't touch")
+		-- (ShelfLayout.spec checks the walls and the lanes from BuildingArt's frame.)
+		t.ok(RobuxShelf.TableZ - RobuxShelf.TableDepth / 2 >= 16.8, "behind the lanes")
 	end)
 
 	t.test("the tag says R$ until Roblox's price is known", function()
@@ -85,8 +104,9 @@ return function(t)
 		t.eq(string.find(source, "%d%d%d%d%d%d"), nil, "no six-digit id")
 		t.eq(string.find(source, "CreatorIds", 1, true), nil)
 		local box = fs.readFile("src/ServerScriptService/BoxService.luau")
-		-- BoxService reads StoreData for the price lookup only.
-		t.ok(string.find(box, "StoreData.Pass(key)", 1, true) ~= nil)
+		-- Lane P: BoxService reads no price at all (QA P7); the client prices the tag.
+		t.eq(string.find(box, "StoreData", 1, true), nil)
+		t.eq(string.find(box, "GetProductInfo", 1, true), nil)
 		t.eq(string.find(box, "PromptGamePassPurchase", 1, true), nil, "the prompt stays in MonetizationService")
 		t.eq(string.find(box, "PromptProductPurchase", 1, true), nil)
 		t.eq(string.find(box, "ProcessReceipt", 1, true), nil)

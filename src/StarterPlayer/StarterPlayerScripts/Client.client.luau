@@ -74,6 +74,7 @@ local MODULES = {
 	"SettingsUI",
 	"ShopDoorAnim",
 	"ShopUI",
+	"StorePrices",
 	"StoreUI",
 	"SprintController",
 	"SwingPose",

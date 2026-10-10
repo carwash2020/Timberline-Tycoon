@@ -17,3 +17,5 @@ sourcemap.json
 roblox.yml
 globalTypes.d.luau
 /preview/
+__pycache__/
+tools/blender/__pycache__/

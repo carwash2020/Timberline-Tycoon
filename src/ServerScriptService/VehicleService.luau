@@ -69,6 +69,7 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local DriveStart = require(ReplicatedStorage.Shared.DriveStart)
 local Handling = require(ReplicatedStorage.Shared.Handling)
+local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local StreamAhead = require(ReplicatedStorage.Shared.StreamAhead)
@@ -1469,7 +1470,9 @@ end
 function truckExtras(player: Player, def: TruckDef): TruckArt.BuildExtras?
 	local profile = ProfileService.GetProfile(player)
 	local paint: string? = nil
-	if profile and type(profile.passes) == "table" and profile.passes.PaintShop == true then
+	-- Lane P: an owner grant or a live purchase paints too, not only the save's backup.
+	local hasPaint = player:GetAttribute("Pass_PaintShop") == true or PaidItems.SaveHasPass(profile, "PaintShop")
+	if profile and hasPaint then
 		local saved = if type(profile.truckPaint) == "table" then profile.truckPaint[def.id] else nil
 		local color = PaintShop.Normalize(saved)
 		if color and PaintShop.InPalette(color) then
