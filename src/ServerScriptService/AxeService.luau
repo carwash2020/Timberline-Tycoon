@@ -179,6 +179,25 @@ local function findTool(player: Player, uid: string): Tool?
 	return nil
 end
 
+-- Copies the axe's temper onto its tool (TemperPrefix, TemperTier) so the
+-- client paces its swings with Keen. Clears both when it has none.
+function AxeService.StampTemper(player: Player, uid: string, tool: Tool?)
+	local target = tool or findTool(player, uid)
+	if target == nil then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	local all = if profile then (profile :: any).temper else nil
+	local rec = if type(all) == "table" then all[uid] else nil
+	if type(rec) == "table" and TemperLogic.Known(rec.prefix) then
+		target:SetAttribute("TemperPrefix", rec.prefix)
+		target:SetAttribute("TemperTier", rec.tier)
+	else
+		target:SetAttribute("TemperPrefix", nil)
+		target:SetAttribute("TemperTier", nil)
+	end
+end
+
 -- Puts a tool for `item` in the player's Backpack (unless it's already there).
 local function giveTool(player: Player, item: AxeItem): Tool?
 	local def = ItemCatalog.GetAxe(item.id)
@@ -201,6 +220,7 @@ local function giveTool(player: Player, item: AxeItem): Tool?
 	tool.CanBeDropped = false -- dropping goes through Drop(), not Roblox's built-in drop
 	tool:SetAttribute("AxeId", def.id)
 	tool:SetAttribute("AxeUid", item.uid)
+	AxeService.StampTemper(player, item.uid, tool)
 	-- The hand holds near the foot of the haft, the blade facing forward.
 	tool.Grip = AxeArt.Grip(def)
 	local art = AxeArt.Held(def)

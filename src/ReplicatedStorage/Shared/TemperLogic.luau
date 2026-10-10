@@ -126,6 +126,18 @@ function TemperLogic.EffectText(prefix: string, tier: number): string
 	return string.format("Wood it fells sells for %d%% more", pct)
 end
 
+-- The factor a temper puts on the swing cooldown: Keen I, II, III is 0.92,
+-- 0.85, 0.78 (Effects.Keen); anything else, or no temper, is 1. The client
+-- reads the tool's TemperPrefix / TemperTier attributes (AxeService stamps
+-- them) so its own swing pacing matches the cooldown Apply gives the server.
+function TemperLogic.CooldownMultiplier(prefix: any, tier: any): number
+	if prefix ~= "Keen" or type(tier) ~= "number" then
+		return 1
+	end
+	local m = TemperLogic.Effects.Keen[tier]
+	return if type(m) == "number" then m else 1
+end
+
 -- A copy of `axe` with the temper's swing effects (v2 damage, cooldown and
 -- each per-wood row). Prosperous changes no swing; it is stamped on the
 -- wood instead (Multiplier). The catalog entry is never written.

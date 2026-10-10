@@ -670,4 +670,16 @@ function PlotData.Tier(index: number): Tier?
 	return PlotData.Tiers[index]
 end
 
+-- The plot sign (PlotSign mesh over a 8 x 3.5 board). The mesh's post runs
+-- up in front of the board to SignPostTop studs above the board's bottom
+-- edge, so any text lower than that is hidden behind it. The owner's name
+-- and the plot line sit above it: fractions of the board's height from its
+-- top (PlotService draws them, PlotData.spec checks they clear the post).
+PlotData.SignBoard = { width = 8, height = 3.5 }
+PlotData.SignPostTop = 1.35
+PlotData.SignText = {
+	name = { top = 0.06, height = 0.3 }, -- the owner's name, the big line
+	info = { top = 0.38, height = 0.16 }, -- "PLOT 3 · HOMESTEAD"
+}
+
 return PlotData

@@ -459,26 +459,49 @@ local function export(name: string, def)
 					cf = part.CFrame + inst.StudsOffset + Vector3.new(0, part.Size.Y / 2, 0)
 					w, h = 4, 1.2
 				end
-				local c = cframeList(cf)
-				table.insert(texts, {
-					if inst:IsA("SurfaceGui") then "surface" else "billboard",
-					round(w, 2),
-					round(h, 2),
-					c[1],
-					c[2],
-					c[3],
-					c[4],
-					c[5],
-					c[6],
-					c[7],
-					c[8],
-					c[9],
-					c[10],
-					c[11],
-					c[12],
-					text,
-					hex(label.TextColor3),
-				})
+				local function emit(at, tw, th, str, color)
+					local c = cframeList(at)
+					table.insert(texts, {
+						if inst:IsA("SurfaceGui") then "surface" else "billboard",
+						round(tw, 2),
+						round(th, 2),
+						c[1],
+						c[2],
+						c[3],
+						c[4],
+						c[5],
+						c[6],
+						c[7],
+						c[8],
+						c[9],
+						c[10],
+						c[11],
+						c[12],
+						str,
+						hex(color),
+					})
+				end
+				-- Labels given their own place on the face (Size under the whole
+				-- face, scale only) are drawn each in its own box, so a sign with
+				-- a name above a plot line previews where it sits.
+				local placed = {}
+				if inst:IsA("SurfaceGui") then
+					for _, d in ipairs(inst:GetDescendants()) do
+						if d:IsA("TextLabel") and d.Text ~= "" and d.Size.Y.Scale < 1 and d.Size.Y.Offset == 0 then
+							table.insert(placed, d)
+						end
+					end
+				end
+				if #placed > 0 then
+					for _, d in ipairs(placed) do
+						local px, py = d.Position.X.Scale, d.Position.Y.Scale
+						local sx, sy = d.Size.X.Scale, d.Size.Y.Scale
+						local at = cf * CFrame.new((px + sx / 2 - 0.5) * w, (0.5 - (py + sy / 2)) * h, 0)
+						emit(at, w * sx, h * sy, d.Text, d.TextColor3)
+					end
+				else
+					emit(cf, w, h, text, label.TextColor3)
+				end
 			end
 		end
 	end

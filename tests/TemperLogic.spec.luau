@@ -39,6 +39,23 @@ return function(t)
 		end
 	end)
 
+	t.test("CooldownMultiplier: only Keen, by grade, and it matches what Apply gives the server", function()
+		t.eq(T.CooldownMultiplier("Keen", 1), 0.92)
+		t.eq(T.CooldownMultiplier("Keen", 2), 0.85)
+		t.eq(T.CooldownMultiplier("Keen", 3), 0.78)
+		t.eq(T.CooldownMultiplier("Heavy", 3), 1)
+		t.eq(T.CooldownMultiplier("Prosperous", 3), 1)
+		t.eq(T.CooldownMultiplier(nil, nil), 1, "no temper")
+		t.eq(T.CooldownMultiplier("Keen", 4), 1, "a grade past III is none")
+		t.eq(T.CooldownMultiplier("Keen", "2"), 1)
+		local axe = ItemCatalog.GetAxe("ObsidianAxe")
+		for tier = 1, 3 do
+			local _, tempered = ItemCatalog.AxeStats(T.Apply(axe, { prefix = "Keen", tier = tier }), "oak")
+			local _, base = ItemCatalog.AxeStats(axe, "oak")
+			near(tempered, base * T.CooldownMultiplier("Keen", tier), "client pace = server cooldown, grade " .. tier)
+		end
+	end)
+
 	t.test("one family per axe, grades in order; a new family starts again at I", function()
 		t.eq(T.NextTier("SteelAxe", nil, "Keen"), 1)
 		t.eq(T.NextTier("SteelAxe", { prefix = "Keen", tier = 1 }, "Keen"), 2)

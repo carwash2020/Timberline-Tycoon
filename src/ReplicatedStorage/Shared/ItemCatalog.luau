@@ -336,10 +336,10 @@ ItemCatalog.Gear = {
 		biome = "volcano",
 		color = "#B5472A",
 	},
-	-- The Sky Pass (Gondola Pass). A quest turn-in, not a shelf item.
+	-- The Gondola Pass. A quest turn-in, not a shelf item.
 	GondolaPass = {
 		id = "GondolaPass",
-		displayName = "Sky Pass",
+		displayName = "Gondola Pass",
 		effect = "The gondola to the Aether Isles",
 		priceCash = 0,
 		biome = "sky",
