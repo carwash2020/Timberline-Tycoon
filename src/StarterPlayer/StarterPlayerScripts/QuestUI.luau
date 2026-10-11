@@ -573,7 +573,7 @@ function QuestUI.JoyBeat()
 	local banner = Instance.new("Frame")
 	banner.AnchorPoint = Vector2.new(0.5, 0)
 	banner.Position = UDim2.fromScale(0.5, 0.14)
-	banner.Size = UDim2.fromOffset(340, 72)
+	banner.Size = UDim2.fromOffset(340, 84)
 	banner.BackgroundColor3 = C.Ink
 	banner.BackgroundTransparency = 0.12
 	UITheme.corner(banner, 12)
@@ -584,8 +584,8 @@ function QuestUI.JoyBeat()
 	title.Size = UDim2.new(1, 0, 0, 30)
 	title.TextXAlignment = Enum.TextXAlignment.Center
 	local sub = UITheme.label(banner, TutorialData.JoyLine(player:GetAttribute("NextGoal")), F.Bold, 14, C.Cream)
-	sub.Position = UDim2.fromOffset(8, 38)
-	sub.Size = UDim2.new(1, -16, 0, 28)
+	sub.Position = UDim2.fromOffset(8, 40)
+	sub.Size = UDim2.new(1, -16, 0, 38)
 	sub.TextXAlignment = Enum.TextXAlignment.Center
 	sub.TextWrapped = true
 	for i = 1, TutorialData.JoyConfetti do

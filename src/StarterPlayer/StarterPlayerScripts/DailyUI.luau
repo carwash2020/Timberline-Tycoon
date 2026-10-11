@@ -91,6 +91,7 @@ end
 local goalRows: { GoalRow } = {}
 local calendarCells: { { frame: Frame, label: TextLabel } } = {}
 local calendarNote: TextLabel? = nil
+local headingLabel: TextLabel? = nil
 local calendarFrame: Frame? = nil -- hidden on a phone so the panel fits 375 px
 local eventHeading: TextLabel? = nil -- the seasonal event's goals (EventGoals / EventInfo), hidden outside one
 local eventLines: TextLabel? = nil
@@ -232,6 +233,20 @@ local function refresh()
 	refreshCalendar()
 	refreshEvent()
 	local roomy = not UITheme.Compact()
+	-- On a phone the panel is goals, Close and Take only (about 196 tall), so it
+	-- clears the thumbstick and jump zones: no heading, countdown or tomorrow.
+	for _, extra in ipairs({ headingLabel, countdown, tomorrow }) do
+		if extra then
+			extra.Visible = roomy
+		end
+	end
+	for _, row in ipairs(goalRows) do
+		row.frame.Size = UDim2.new(1, 0, 0, if roomy then 40 else 34)
+		local bar = row.fill.Parent
+		if bar and bar:IsA("GuiObject") then
+			bar.Position = UDim2.fromOffset(0, if roomy then 26 else 22)
+		end
+	end
 	local cal, note = calendarFrame, calendarNote
 	if cal then
 		cal.Visible = roomy
@@ -310,6 +325,16 @@ local function refresh()
 				Util.formatCash(DailyData.Bonus(bestAxeTier(), nextStreak, if loop == 2 then 2 else nil)),
 				nextStreak
 			)
+		if UITheme.Compact() then
+			-- One short line on a phone (the panel has to clear the jump zone).
+			f.Text = if allDone
+				then string.format("All done! %d-day streak", streak())
+				else string.format(
+					"Bonus for all %d: %s",
+					#list,
+					Util.formatCash(DailyData.Bonus(bestAxeTier(), nextStreak, if loop == 2 then 2 else nil))
+				)
+		end
 	end
 	local c = countdown
 	if c then
@@ -322,7 +347,7 @@ local function refresh()
 		local day = DailyData.Day(os.time()) + 1
 		local first = DailyData.Roll(player.UserId, day, bestAxeTier(), if loop == 2 then 2 else nil)[1]
 		nextDay.Text = if first then "Tomorrow: " .. DailyData.GoalText(first) else ""
-		nextDay.Visible = first ~= nil
+		nextDay.Visible = first ~= nil and not UITheme.Compact()
 	end
 end
 
@@ -333,7 +358,7 @@ function DailyUI.OpenForeman()
 		return
 	end
 	local card = panel
-	local close = if card then card:FindFirstChild("Close") else nil
+	local close = if card then card:FindFirstChild("Close", true) else nil
 	if not card or not close or not close:IsA("GuiObject") then
 		return
 	end
@@ -407,9 +432,22 @@ local function build()
 	layout.Parent = p
 	p.Parent = gui
 	panel = p
+	-- Close and Take share one row, so the panel stays short enough to clear
+	-- the phone's jump zone.
+	local actions = Instance.new("Frame")
+	actions.Name = "Actions"
+	actions.LayoutOrder = 0
+	actions.Size = UDim2.new(1, 0, 0, UITheme.Size.Tap)
+	actions.BackgroundTransparency = 1
+	actions.Parent = p
+	local actionList = Instance.new("UIListLayout")
+	actionList.FillDirection = Enum.FillDirection.Horizontal
+	actionList.SortOrder = Enum.SortOrder.LayoutOrder
+	actionList.Padding = UDim.new(0, 8)
+	actionList.Parent = actions
 	local close = Instance.new("TextButton")
 	close.Name = "Close"
-	close.LayoutOrder = 0
+	close.LayoutOrder = 1
 	close.Size = UDim2.fromOffset(84, UITheme.Size.Tap) -- wide enough for its word
 	close.BackgroundColor3 = BARK
 	close.TextColor3 = CREAM
@@ -418,7 +456,7 @@ local function build()
 	close.Text = "Close"
 	close.AutoButtonColor = true
 	corner(close, 8)
-	close.Parent = p
+	close.Parent = actions
 	close.Activated:Connect(function()
 		DailyUI._close()
 	end)
@@ -432,8 +470,8 @@ local function build()
 
 	local take = Instance.new("TextButton")
 	take.Name = "Take"
-	take.LayoutOrder = 5 -- under the three goals
-	take.Size = UDim2.new(1, 0, 0, UITheme.Size.Tap)
+	take.LayoutOrder = 2 -- beside Close
+	take.Size = UDim2.new(1, -92, 0, UITheme.Size.Tap)
 	take.BackgroundColor3 = GREEN
 	take.TextColor3 = CREAM
 	take.Font = UITheme.Fonts.Black
@@ -441,14 +479,16 @@ local function build()
 	take.AutoButtonColor = true
 	take.Visible = false
 	corner(take, 8)
-	take.Parent = p
+	take.Parent = actions
 	take.Activated:Connect(function()
 		-- The server checks Rook is within reach and pays once; this only asks.
 		Net.Remote("ForemanTurnIn"):FireServer()
 	end)
 	takeButton = take
 
-	text(p, "TODAY'S GOALS", UITheme.Sized("DailyHeading").text, UITheme.Fonts.Black, 1).TextColor3 = BARK
+	local goalsHeading = text(p, "ROOK'S JOBS", UITheme.Sized("DailyHeading").text, UITheme.Fonts.Black, 1)
+	goalsHeading.TextColor3 = BARK
+	headingLabel = goalsHeading
 	for i = 1, DailyData.GoalsPerDay do
 		local row = Instance.new("Frame")
 		row.LayoutOrder = 1 + i

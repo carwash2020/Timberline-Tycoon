@@ -430,3 +430,17 @@ Landed:
 
 Not done (open): visitArea goal (needs a save field and a BadgeService call), day counter, climate vignette, gate-sign state text, region toast wiring, Field Guide stamps, tutorial skip flag rework, NPC remake to under 60 parts, HUD renders at 667x375 and 1920x1080, NextGoal/V1Stages changes.
 Previews: `previews/v1-e/foreman-layout-*-PART-BUILT.png` are the part-built fallbacks for layout and facing only. The NPC GLBs are not in the pack (only stats.json), so there are no mesh renders.
+
+### Lane E round 2 (11 October 2026, same branch)
+
+Landed after the first push:
+- **Discover a new area** daily goal: kinds `visitArea` (v1) and `visitNewArea` (v2; the pools share no kind name), only rolled up to axe tier 5 (`DailyData.VisitAreaMaxTier`), still three jobs a day. New save field `daily.areasToday` (ProfileSchema, idempotent Migrate). `DailyService.Area` is called from `BadgeService.OnNewArea` in `GameServer`; each area counts once a day, repeats finish the goal once.
+- **Day counter**: `DayCounterLogic`; `QuestService.Start` stamps `profile.dayCounter` (stored as first world day + 1, 0 = unset; account-wide, as A1 made it) and sets the `FirstWorldDay` attribute; `WorldUI` shows "Day N" under the clock (not in HUD.luau, which is Lane U's).
+- **Climate vignette** (`ClimateHudLogic`, `WorldUI`): frost or heat edge bands from the `ClimateKind` and `Exposure` attributes (HazardService sets `Exposure`, not `ClimateExposure`); the one-line first-time tip is a toast from `QuestService` saved in `tipsSeen` (`climate:cold`, `climate:heat`).
+- **Gate signs** (`GateSignLogic`, `WorldUI`): signs tagged `GateSign` with a `GateId` attribute and a `State` TextLabel read "Protected" / "Open" (SaleGreen) or the requirement in words (StopRed), per player. Nothing on main tags the signs yet: see Cross-lane requests.
+- **Rosa's Field Guide stamps** (`FieldGuideStamps`, `FieldGuideService.Stamp`): the first sale of each wood stamps it and pays 2 minutes of stage income; a finished biome page pays 6 (PROPOSAL amounts, rounded to $5). The guide's header shows "Stamps n of N. Secrets f of 5." (`SecretLogic.Count`).
+- **Tutorial**: Skip shows on every step (still two taps); `tutorialSkipped` is a new slot save field; a skipper is paid the starter cash of the steps they skipped, once (`TutorialData.SkipCash`; nothing on a replay or refresher). Joy beat at the end of the lessons: banner naming the next goal, chime, confetti (`QuestUI.JoyBeat`).
+- **NextGoal.PickV1**: the S1 to S8 ladder, one line of at most 40 characters (QuestService uses it). `GameConfig.V1Stages` does not exist on main, so the ladder reads `StageOf` and the gear and wood facts. DailyUI shows tomorrow's first goal greyed out.
+- Region toasts show once per region per session (existing `RegionLogic.Toast`); Bayou and Red Mesa region ids are not in `RegionLogic` on main, so those toasts wait for job 11.
+- UI renders: `previews/v1-e/ui-*.png` (`tools/preview/v1e_ui.py`), composites built from the UITheme tokens and DailyUI's own numbers, not engine screenshots.
+- Not done: NPC part-count trim (14 NPCs at 55 to 88 parts; `tests/NPCPartCount.spec` pins a ceiling of 90), real-mesh NPC renders (no GLBs in the pack).
