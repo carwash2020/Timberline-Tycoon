@@ -195,6 +195,7 @@ local function stamp(model: Model, ore: OreData.Ore, kind: string, value: number
 	model:SetAttribute("Uid", uid)
 	model:SetAttribute("OwnerId", ownerId)
 	model:SetAttribute("Kind", kind)
+	model:SetAttribute("Born", os.clock()) -- LooseCaps: the oldest go first when there are too many
 	pcall(function()
 		CollectionService:AddTag(model, if kind == "ingot" then "Ingot" else "OreChunk")
 	end)

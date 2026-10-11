@@ -428,7 +428,7 @@ function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (bool
 		return false, "bad"
 	end
 	local reach = (Tune.Get("GrabRange") :: number) + GameConfig.RangeTolerance
-	if (grip - hrp.Position).Magnitude > reach then
+	if not ((grip - hrp.Position).Magnitude <= reach) then -- a NaN distance is not in reach
 		notify(player, GrabLogic.Message("far") :: string)
 		return false, "far"
 	end

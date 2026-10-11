@@ -445,6 +445,71 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"V1 hardening: the wood caps are the GameConfig numbers, and the per-player cap is under the server's",
+		function()
+			local s = setup()
+			t.eq(s.GameConfig.MaxWoodPiecesPerPlayer, 150)
+			t.eq(s.GameConfig.MaxWoodPartsServer, 2500)
+			t.ok(s.GameConfig.MaxWoodPiecesPerPlayer < s.GameConfig.MaxWoodPartsServer)
+		end
+	)
+
+	t.test("V1 hardening: over the server cap the oldest unowned wood goes first, one piece at a time", function()
+		local s = setup()
+		local saved = s.GameConfig.MaxWoodPartsServer
+		s.GameConfig.MaxWoodPartsServer = 6
+		-- Four two-part logs (a section and its leaf): the first is unowned and oldest.
+		local first = s.log(1, 4, 2, Vector3.new(0, 1, 0), { ownerId = 0 })
+		s.now += 1
+		local second = s.log(1, 4, 2, Vector3.new(0, 1, 10), { ownerId = 0 })
+		s.now += 1
+		local mine = s.log(1, 4, 2, Vector3.new(0, 1, 20), { ownerId = 1 })
+		t.eq(first.model.Parent ~= nil, true, "six parts: at the cap, nothing goes yet")
+		s.now += 1
+		local newest = s.log(1, 4, 2, Vector3.new(0, 1, 30), { ownerId = 1 })
+		t.eq(first.model.Parent, nil, "eight parts: the oldest unowned piece goes, and only it")
+		t.ok(second.model.Parent ~= nil and mine.model.Parent ~= nil and newest.model.Parent ~= nil)
+		s.GameConfig.MaxWoodPartsServer = saved
+	end)
+
+	t.test("V1 hardening: wood riding on a truck bed is never capped away, however old", function()
+		local s = setup()
+		local saved = s.GameConfig.MaxWoodPiecesPerPlayer
+		s.GameConfig.MaxWoodPiecesPerPlayer = 2
+		local driver = s.player(1)
+		local riding = {}
+		s.Wood.Hooks.onBed = function(piece)
+			return if riding[piece.uid] then driver else nil
+		end
+		local oldest = s.log(1, 2, 1, Vector3.new(0, 1, 0), { ownerId = 1 })
+		riding[oldest.uid] = true
+		s.now += 1
+		local second = s.log(1, 2, 1, Vector3.new(0, 1, 5), { ownerId = 1 })
+		s.now += 1
+		local third = s.log(1, 2, 1, Vector3.new(0, 1, 10), { ownerId = 1 })
+		s.now += 1
+		local fourth = s.log(1, 2, 1, Vector3.new(0, 1, 15), { ownerId = 1 })
+		t.ok(oldest.model.Parent ~= nil, "the oldest is on the bed: it stays")
+		t.eq(second.model.Parent, nil, "the next oldest went instead")
+		t.eq(third.model.Parent, nil, "and the next, to get back under the cap")
+		t.ok(fourth.model.Parent ~= nil, "the newest stays")
+		s.Wood.Hooks.onBed = nil
+		s.GameConfig.MaxWoodPiecesPerPlayer = saved
+	end)
+
+	t.test("V1 hardening: the afterTick hook runs once at the end of every Tick", function()
+		local s = setup()
+		local ran = 0
+		s.Wood.Hooks.afterTick = function()
+			ran += 1
+		end
+		s.Wood.Tick(s.now)
+		s.Wood.Tick(s.now + 1)
+		t.eq(ran, 2)
+		s.Wood.Hooks.afterTick = nil
+	end)
+
 	t.test("sawmill planks count toward MaxWoodPartsServer; the oldest loose wood goes first", function()
 		local s = setup()
 		local saved = s.GameConfig.MaxWoodPartsServer

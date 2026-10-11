@@ -49,6 +49,44 @@ return function(t)
 		t.eq(sheet.anyone, nil)
 	end)
 
+	-- V1 hardening: SetPermission's payload is (anything, anything, anything).
+	t.test("bad payloads: a junk target, flag or value never writes a row", function()
+		local junk = {
+			0 / 0,
+			math.huge,
+			-math.huge,
+			-1,
+			0,
+			1.5,
+			1e308,
+			1e16,
+			"",
+			"abc",
+			"01",
+			"-5",
+			"1 ",
+			"1e5",
+			string.rep("9", 1000),
+			string.rep("A", 100000),
+			true,
+			{},
+			print,
+		}
+		for i, bad in ipairs(junk) do
+			t.eq(PermissionLogic.Target(bad), nil, "target " .. i)
+			local sheet = {}
+			t.ok(not PermissionLogic.Set(sheet, bad, "sit", true), "set with target " .. i)
+			t.ok(not PermissionLogic.Set(sheet, "5", bad, true), "set with flag " .. i)
+			if type(bad) ~= "boolean" then
+				t.ok(not PermissionLogic.Set(sheet, "5", "sit", bad), "set with value " .. i)
+			end
+			t.eq(next(sheet), nil, "junk " .. i .. " wrote a row")
+		end
+		t.ok(not PermissionLogic.Set(nil, "5", "sit", true))
+		t.ok(not PermissionLogic.Set("sheet", "5", "sit", true))
+		t.eq(PermissionLogic.Target(123456789), "123456789", "a real user id still works")
+	end)
+
 	t.test("a door opens for the owner, and for someone they allowed to interact", function()
 		local ok, why = DoorLogic.MayToggle(1, 2, 10, nil, nil)
 		t.eq(ok, false)

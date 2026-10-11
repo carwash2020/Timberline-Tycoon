@@ -139,6 +139,12 @@ local GameConfig = {
 	WoodDespawnAfterSec = 300, -- ...then vanishes this much later
 	MaxWoodPiecesPerPlayer = 150,
 	MaxWoodPartsServer = 2500,
+	-- Other loose parts (sandstone slabs, ore chunks, ingots; LooseCaps): a
+	-- player's oldest go past the first number, the server's oldest past the
+	-- second. Held or boxed ones never go. Backstops: the per-kind refusals
+	-- (24 slabs, 40 ore pieces a player) normally hold first.
+	MaxLooseMaterialsPerPlayer = 64,
+	MaxLooseMaterialsServer = 400,
 	WoodMaxSpeed = 80, -- a player-owned piece faster than this is put back
 	WoodJudgeEvery = 0.5,
 	SellPollSec = 0.25,

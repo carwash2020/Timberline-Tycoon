@@ -203,6 +203,9 @@ export type Hooks = {
 	-- Lane F: where an owned piece that fell out of the world goes back to (its
 	-- owner's plot), or nil when there is nowhere (no pad): then it is left.
 	recover: ((Piece) -> CFrame?)?,
+	-- V1 hardening: runs at the end of every Tick (a second), after the wood
+	-- caps. GameServer keeps the other loose parts' caps here (BuildMaterials).
+	afterTick: (() -> ())?,
 }
 WoodService.Hooks = {} :: Hooks
 
@@ -773,28 +776,52 @@ end
 -- Keeps the caps (see PickEvictions).
 local function enforceCaps()
 	local entries: { CapEntry } = {}
+	local entryOf: { [string]: CapEntry } = {}
+	local onBed = WoodService.Hooks.onBed
 	for uid, p in pairs(pieces) do
 		-- Count the parts that are actually there (a sawmill plank is one
 		-- section; a log's bark and cut faces count too). The oldest loose
 		-- wood is what PickEvictions drops first.
 		local parts = partsIn(p.model)
 		p.partCount = parts
-		table.insert(entries, {
+		local entry: CapEntry = {
 			uid = uid,
 			ownerId = p.ownerId,
 			parts = parts,
 			lastInteracted = p.lastInteracted,
+			-- Never the pieces in a hand or in a machine (selling).
 			protected = p.selling == true or GrabService.HeldBy(p.model) ~= nil,
-		})
+		}
+		table.insert(entries, entry)
+		entryOf[uid] = entry
 	end
-	local evict = WoodService.PickEvictions(
-		entries,
-		Tune.Get("MaxWoodPiecesPerPlayer") :: number,
-		Tune.Get("MaxWoodPartsServer") :: number
-	)
+	local maxPieces = Tune.Get("MaxWoodPiecesPerPlayer") :: number
+	local maxParts = Tune.Get("MaxWoodPartsServer") :: number
+	local evict = WoodService.PickEvictions(entries, maxPieces, maxParts)
+	-- Nor a piece riding on a truck bed: a capped load would vanish under its
+	-- driver. The bed test is only asked about pieces about to go (a loop over
+	-- every truck is too much for every piece every second), and the list is
+	-- worked out again without the ones it protects.
+	if onBed ~= nil then
+		for _ = 1, 8 do
+			local changed = false
+			for _, uid in ipairs(evict) do
+				local p = pieces[uid]
+				local entry = entryOf[uid]
+				if p and entry and not entry.protected and onBed(p) ~= nil then
+					entry.protected = true
+					changed = true
+				end
+			end
+			if not changed then
+				break
+			end
+			evict = WoodService.PickEvictions(entries, maxPieces, maxParts)
+		end
+	end
 	for _, uid in ipairs(evict) do
 		local p = pieces[uid]
-		if p then
+		if p and not (onBed ~= nil and onBed(p) ~= nil) then
 			WoodService.Remove(p, "capped")
 		end
 	end
@@ -1576,6 +1603,10 @@ function WoodService.Tick(now: number)
 		end
 	end
 	enforceCaps()
+	local afterTick = hooks.afterTick
+	if afterTick then
+		afterTick()
+	end
 end
 
 -- Takes a piece back from a device that moved it further than anything

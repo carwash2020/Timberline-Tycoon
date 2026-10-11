@@ -3643,6 +3643,42 @@ Not remapped without losing something: nothing was dropped. One side effect: RB 
 5. Blueprint placer: A places, RB and LB slide the ghost, B cancels; RB does not also grab.
 6. With the axe out, RB shows the "put your axe away to drag" toast and RT still chops.
 7. PC (click, E, R, Q) and phone (taps, hold to drag, PLACE button): unchanged.
+## V1 hardening: exploit guards and performance (branch `phase-2/v1-hardening-guards`, 11 October 2026)
+
+What changed and why is in STATUS.md. Nothing here changes a price, a payout or a balance number.
+
+### Studio checks
+
+PC
+1. Join, chop a tree, grab a log, load it on your truck bed, drive around for 15 minutes (or set `Tune_WoodUnownedAfterSec`
+   small in the command bar). The log stays on the bed and keeps its owner; it does not vanish or turn unowned.
+2. Drop 20 logs on the ground far from your plot and wait: the oldest unowned ones disappear first, one at a time, never the
+   one in your hands. Output shows no errors.
+3. Quarry slabs at Red Mesa until you hold 24: the 25th is refused ("No room for another slab"), as before. Nothing you carry
+   or hold disappears.
+4. Open Output, hold the chop button on a tree with an axe: you see one `[Chop]` line per accepted or refused swing, and no
+   flood of lines when you mash the button (rate-limited swings print nothing).
+5. Stand at a shop box you paid for: open it with E at the door (works), then from 20 studs away (nothing).
+6. Walk the whole map by road with the phone profile off: no pop-in of the sawmill, the shops, Murph, the town board or the
+   ferry (they are Persistent); trees and plots stream in as you near them.
+
+Phone (667 x 375 in the emulator, Lower quality)
+7. Pick Lower on the join screen. Shop boxes show a flat window with the name, not the item. No sun rays or far blur; rain is
+   thin; at most two lights in a cave.
+8. Chop, grab (hold), buy and sell with taps: every tap target is at least 44 px and nothing needs a keyboard.
+9. Run to the edge of the loaded area at the map's far side: the game pauses briefly (the 128-stud bubble), then goes on. No
+   white void under your feet. Memory (F9 / MicroProfiler) stays flat after five minutes of walking.
+
+Xbox
+10. Grab with RB (hold), buy and sell from the selection ring, B closes the shop panel. Same results as PC.
+11. Drive a loaded truck fast down the long road: the load stays on the bed, the road ahead streams in before you reach it.
+12. Join with an Xbox on a full server (12 players) and chop for ten minutes: no hitch every second (the caps run once a second).
+
+Exploit spot checks (Studio command bar, as a normal player)
+13. Fire a remote with junk: `game.ReplicatedStorage.Remotes.BuyItem:FireServer(0/0, math.huge)` and the same for
+    `PlaceBlueprint`, `Grab`, `BoxOpen`, `SetPermission`: nothing changes, no red text in Output.
+14. Fire `BuyItem:FireServer("Axe", "SteelAxe")` 50 times in a loop: you get at most three tries a second, never a kick for
+    ordinary mashing; a 200-per-second loop for five seconds kicks you with "Disconnected: too many requests."
 
 ## V1 hardening: saves and the server (branch `phase-2/v1-hardening-saves`, 11 October 2026)
 

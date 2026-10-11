@@ -911,7 +911,7 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 	local pos = rootPosition(player)
 	local part = rec.part
 	local reach = GameConfig.CounterPayReach + GameConfig.RangeTolerance
-	if pos == nil or part == nil or (pos - part.CFrame.Position).Magnitude > reach then
+	if pos == nil or part == nil or not ((pos - part.CFrame.Position).Magnitude <= reach) then
 		speak(player, "missing", rec)
 		return false, "missing"
 	end

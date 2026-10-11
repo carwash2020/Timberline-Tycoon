@@ -3195,6 +3195,154 @@ return function(t)
 		t.eq(#profile.plot.placed, 300, "the 301st piece (1,204 parts) is refused")
 		t.ok(string.find(s.lastToast(), "1200 kit parts", 1, true) ~= nil, s.lastToast())
 	end)
+	-- V1 hardening: the build family's remotes (Place, Move, Sell, Paint, PaintAll, Upgrade,
+	-- Expand, Claim, Edit) against junk, another player's plot and far-away targets.
+	-- The RateLimiter is a stub in this spec; the real budgets are tested in RemoteGuards.spec.
+	t.test("bad payloads to the build remotes: no cash, no piece, no plot change, no error", function()
+		local huge = 1e308
+		local Vector3 = t.roblox.Vector3
+		local junk = {
+			"x",
+			"",
+			string.rep("A", 100000),
+			true,
+			false,
+			{},
+			{ 1, 2, 3 },
+			0 / 0,
+			math.huge,
+			-math.huge,
+			huge,
+			-huge,
+			1e15,
+			Vector3.new(0 / 0, 0, 0),
+			t.roblox.Instance.new("Part"),
+			print,
+		}
+		local function snapshot(s, profile)
+			return {
+				cash = profile.cash,
+				placed = #profile.plot.placed,
+				tier = profile.plot.tier,
+				squares = #(profile.plot.squares or {}),
+				claimed = profile.plot.claimed,
+				items = #s.items(1),
+				stock = #(profile.sawmillStock or {}),
+				book = #(profile.blueprintBook or {}),
+			}
+		end
+		local s = setup({ cash = 100000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "Bench", 4, 4, 0)
+		local bench = profile.plot.placed[1]
+		profile.cash = 100000
+		local before = snapshot(s, profile)
+		local calls = {
+			Place = function(a)
+				return s.P.Place(ann, a, a, a, a, a, a)
+			end,
+			PlaceName = function(a)
+				return s.P.Place(ann, "Bench", a, a, a, a, a)
+			end,
+			PlaceId = function(a)
+				return s.P.Place(ann, a, 12, 4, 0)
+			end,
+			Move = function(a)
+				return s.P.Move(ann, bench.uid, a, a, a, a)
+			end,
+			MoveUid = function(a)
+				return s.P.Move(ann, a, 12, 4, 0, nil)
+			end,
+			Sell = function(a)
+				return s.P.Sell(ann, a)
+			end,
+			Paint = function(a)
+				return s.P.Paint(ann, a, a)
+			end,
+			PaintColour = function(a)
+				return s.P.Paint(ann, bench.uid, a)
+			end,
+			PaintAll = function(a)
+				return s.P.PaintAllType(ann, a, a)
+			end,
+			Expand = function(a)
+				return s.P.Expand(ann, a, a, a)
+			end,
+			Claim = function(a)
+				return s.P.Claim(ann, a)
+			end,
+			Edit = function(a)
+				return s.P.Edit(ann, a)
+			end,
+			EditOp = function(a)
+				return s.P.Edit(ann, { op = a, uid = a, x = a, z = a, rot = a, w = a, h = a })
+			end,
+			Visit = function(a)
+				return s.P.Visit(ann, a)
+			end,
+			Base = function(a)
+				return s.P.BaseAction(ann, a)
+			end,
+		}
+		for name, call in pairs(calls) do
+			for i, bad in ipairs(junk) do
+				s.advance(1)
+				local ok, err = pcall(call, bad)
+				t.ok(ok, name .. " with junk " .. i .. " threw: " .. tostring(err))
+			end
+		end
+		-- Missing arguments, all of them.
+		for name, call in pairs(calls) do
+			local ok, err = pcall(call, nil)
+			t.ok(ok, name .. " with nothing threw: " .. tostring(err))
+		end
+		for _, name in ipairs({ "Place", "Move", "Sell", "Paint", "PaintAllType", "Expand", "Claim", "Edit", "Upgrade" }) do
+			t.ok(pcall(s.P[name], ann), name .. " with no payload threw")
+		end
+		local after = snapshot(s, profile)
+		-- Upgrade with no payload is a real request from a player with $100,000: it may buy
+		-- the next tier. Everything else must have changed nothing.
+		after.cash, before.cash = nil, nil
+		after.tier, before.tier = nil, nil
+		t.eq(after, before, "junk changed the plot")
+		t.ok(profile.cash <= 100000, "junk never adds cash")
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.plot.placed[1].blueprintId, "Bench")
+	end)
+
+	t.test("another player's plot and pieces: a stranger can not move, sell, paint or build, from anywhere", function()
+		local s = setup({ cash = 100000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "Bench", 4, 4, 0)
+		local bench = profile.plot.placed[1]
+		local at = { bench.x, bench.z, bench.rot, bench.paint }
+		profile.cash = 5000
+		bobProfile.cash = 5000
+		-- Bob stands on Ann's plot, then right beside it, then far away.
+		for _, where in ipairs({ 1, nil }) do
+			bob.standOn(where)
+			s.advance(1)
+			s.P.Move(bob, bench.uid, 30, 30, 0)
+			s.P.Sell(bob, bench.uid)
+			s.P.Paint(bob, bench.uid, "white")
+			s.P.PaintAllType(bob, "Bench", "white")
+			s.P.Place(bob, "Bench", 20, 20, 0)
+			s.P.Upgrade(bob)
+			s.P.Edit(bob, { op = "delete", uid = bench.uid })
+			s.P.Edit(bob, { op = "undo" })
+		end
+		t.eq(#profile.plot.placed, 1, "Ann's bench is still the only piece")
+		t.eq({ bench.x, bench.z, bench.rot, bench.paint }, at, "and has not moved or been painted")
+		t.eq(profile.cash, 5000, "Ann was not paid or charged")
+		t.eq(bobProfile.cash, 5000, "Bob was not paid or charged")
+		t.eq(#bobProfile.plot.placed, 0)
+	end)
+
 	-- Lane F: paint all of this type.
 	t.test("PaintAllType: every piece of that type on the owner's plot, one undo step, others untouched", function()
 		local s = setup({ cash = 100000 })

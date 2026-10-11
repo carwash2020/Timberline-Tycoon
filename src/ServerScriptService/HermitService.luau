@@ -147,7 +147,7 @@ function HermitService.Talk(player: Player, model: Model): HermitLogic.Stage?
 		return nil
 	end
 	local reach = NPCData.TalkDistance + HermitLogic.TalkSlack
-	if (root.CFrame.Position - anchor.CFrame.Position).Magnitude > reach then
+	if not ((root.CFrame.Position - anchor.CFrame.Position).Magnitude <= reach) then
 		d.say(player, DialogueData.HermitLine("far"))
 		return nil
 	end

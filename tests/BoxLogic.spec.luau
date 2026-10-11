@@ -68,6 +68,8 @@ return function(t)
 		end
 		t.eq({ BoxLogic.CanOpen(open({})) }, { true })
 		t.eq({ BoxLogic.CanOpen(open({ distance = 12.01 })) }, { false, "far" })
+		t.eq({ BoxLogic.CanOpen(open({ distance = 0 / 0 })) }, { false, "far" }, "NaN is not in reach")
+		t.eq({ BoxLogic.CanOpen(open({ distance = math.huge })) }, { false, "far" })
 		t.eq({ BoxLogic.CanOpen(open({ userId = 2 })) }, { false, "owner" })
 		t.eq({ BoxLogic.CanOpen(open({ paid = false })) }, { false, "unpaid" })
 		t.eq({ BoxLogic.CanOpen(open({ promptUid = "b" })) }, { false, "uid" })

@@ -1278,7 +1278,7 @@ function SectionTrees.Chop(
 		piece = p
 		def = p.def
 	end
-	if (hrp.Position - at).Magnitude > stats.range + GameConfig.RangeTolerance then
+	if not ((hrp.Position - at).Magnitude <= stats.range + GameConfig.RangeTolerance) then
 		notify(player, SectionLogic.Message("far"))
 		return false, "far", nil
 	end
