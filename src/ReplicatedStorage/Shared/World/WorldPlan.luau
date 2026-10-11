@@ -80,9 +80,9 @@ local function pullThroughLanes(): { { number } }
 	end
 	local lanes: { { number } } = {}
 	cachedPullLanes = lanes -- (Town() does not ask for good ground; this guards the loop anyway)
-	local town = WorldPlan.Town()
+	local town = (WorldPlan :: any).Town()
 	for i, size in ipairs(town.parkingSizes) do
-		if size.Z >= WorldPlan.ParkingBays.long.Z then
+		if size.Z >= (WorldPlan :: any).ParkingBays.long.Z then
 			local cf = town.parkingSlots[i]
 			table.insert(lanes, { cf.X - size.X / 2 - 5, cf.X + size.X / 2 + 5 })
 		end
@@ -104,7 +104,7 @@ function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxS
 	-- them down to z -150 (the Starter Forest now reaches up to the lot).
 	local lot = WorldLayout.ParkingLot
 	-- And the bays' pull-out strip along the lot's south edge (the Starter Forest reaches it).
-	if z < lot.z0 and z > lot.z0 - WorldPlan.ParkingPullOut - 4 and x > lot.x0 - 4 and x < lot.x1 + 4 then
+	if z < lot.z0 and z > lot.z0 - (WorldPlan :: any).ParkingPullOut - 4 and x > lot.x0 - 4 and x < lot.x1 + 4 then
 		return false
 	end
 	if z > -150 and z < lot.z0 then
@@ -1222,7 +1222,7 @@ local function sightOfLamp(): (Vector3, Vector3)
 	if cached then
 		return cached[1], cached[2]
 	end
-	local eye = WorldPlan.Town().spawn + Vector3.new(0, 6, 0)
+	local eye = (WorldPlan :: any).Town().spawn + Vector3.new(0, 6, 0)
 	local radius = LandmarkArt.LIGHTHOUSE_RADIUS
 	local tips: { { x: number, z: number } } = {}
 	for z = LIGHTHOUSE_Z[1], LIGHTHOUSE_Z[2], 4 do
@@ -4152,7 +4152,7 @@ local function townBlockers(): { Blocker }
 	if cachedTownBlockers then
 		return cachedTownBlockers
 	end
-	local town = WorldPlan.Town()
+	local town = (WorldPlan :: any).Town()
 	local discs: { Blocker } = {
 		{ at = town.sawmill.Position, r = 45, tall = 45 },
 		{ at = town.gondola.Position, r = 16, tall = 25 },

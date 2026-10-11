@@ -184,7 +184,7 @@ TownTreeData.Sites = {
 	cluster("ne", 385, 48, 16, 3, "high", "the north-east, past the showroom"),
 	cluster("eastLotA", 256, 23, 16, 2, "high", "east of the lot, beside the plot road"),
 	cluster("eastLotB", 217, 23, 16, 2, "high", "east of the lot, by the turnaround"),
-	cluster("northFar2", 57, 290, 16, 4, "high", "north, east of the Snow Road"),
+	cluster("northFar2", 61, 294, 16, 4, "high", "north, east of the Snow Road"),
 }
 
 -- How many trees each tier plants: a tier plants its own sites and every
