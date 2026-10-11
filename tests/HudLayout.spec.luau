@@ -715,4 +715,104 @@ return function(t)
 		t.eq(HudLayout.CornerInBar(inBar, row, v(0, 0), 0), nil, "no line yet")
 		t.ok(HudLayout.CornerTopPad < 8, "the default spot is also higher than the old 8 px")
 	end)
+
+	t.test("a side button's mark and its label never share pixels (the S behind the SAVES icon)", function()
+		local left = HudLayout.MarkTextLeft()
+		t.eq(left, HudLayout.MarkLeft + HudLayout.MarkSize + HudLayout.MarkGap)
+		t.ok(left >= HudLayout.MarkLeft + HudLayout.MarkSize + 6, "a gap between the icon and the first letter")
+		for name, size in pairs({ desktop = DESK.SideButton.size, phone = PHONE.SideButton.size }) do
+			local room = size.X - left - 6 -- the label's width: right padding 6
+			t.ok(room >= 56, name .. ": " .. room .. " px left for SAVES, enough for 5 capitals at 13 px")
+		end
+	end)
+
+	-- The first screen at 963 x 478 (UIScale 0.85) and 667 x 375 (0.78125): what is drawn at the
+	-- right edge is the side column; the tutorial beacon is a 64 x 80 billboard that must not be under it.
+	local function sideObstacles(w, h, scale)
+		local room = h / scale / 2 - 60
+		local buttons3 = { v(110, 43), v(110, 43), v(110, 43) }
+		local spots = HudLayout.Stack(buttons3, room, GAP)
+		local corner = v(w / scale - 12, h / scale / 2 + 60)
+		local out = {}
+		for i, spot in ipairs(spots) do
+			local right, bottom = corner.X - spot.X, corner.Y - spot.Y
+			table.insert(out, {
+				left = (right - buttons3[i].X) * scale,
+				top = (bottom - buttons3[i].Y) * scale,
+				right = right * scale,
+				bottom = bottom * scale,
+			})
+		end
+		-- The corner's lines under the cash row, top right.
+		table.insert(out, { left = w - 12 - 330 * scale, top = 8, right = w - 12, bottom = 8 + 66 * scale })
+		return out
+	end
+
+	t.test(
+		"the beacon slides clear of the side buttons or hides, never cut off behind one (963 x 478, 667 x 375)",
+		function()
+			for _, win in ipairs({ { 963, 478, 0.85 }, { 667, 375, 0.78125 } }) do
+				local w, h, scale = win[1], win[2], win[3]
+				local obstacles = sideObstacles(w, h, scale)
+				local bounds = { left = 0, top = 0, right = w, bottom = h }
+				local moved, hidden = 0, 0
+				for x = 32, w - 32, 6 do
+					for y = 40, h - 40, 10 do
+						local box = { left = x - 32, top = y - 40, right = x + 32, bottom = y + 40 }
+						local shift = HudLayout.ClearOfRects(box, obstacles, bounds, 6)
+						if shift == nil then
+							hidden += 1
+						else
+							if shift ~= 0 then
+								moved += 1
+							end
+							local after = {
+								left = box.left + shift,
+								top = box.top,
+								right = box.right + shift,
+								bottom = box.bottom,
+							}
+							t.ok(
+								after.left >= 0 and after.right <= w,
+								string.format("%dx%d (%d,%d) stays on screen", w, h, x, y)
+							)
+							for _, o in ipairs(obstacles) do
+								local apart = after.right <= o.left
+									or after.left >= o.right
+									or after.bottom <= o.top
+									or after.top >= o.bottom
+								t.ok(apart, string.format("%dx%d (%d,%d) clear of a HUD box", w, h, x, y))
+							end
+						end
+					end
+				end
+				t.ok(moved > 0, w .. ": some beacons had to slide")
+			end
+		end
+	)
+
+	t.test("ClearOfRects: clear stays put, the shorter slide wins, a boxed-in beacon hides", function()
+		local bounds = { left = 0, top = 0, right = 400, bottom = 300 }
+		local box = { left = 300, top = 100, right = 364, bottom = 180 }
+		t.eq(HudLayout.ClearOfRects(box, {}, bounds, 6), 0)
+		local button = { left = 340, top = 120, right = 400, bottom = 160 }
+		t.eq(HudLayout.ClearOfRects(box, { button }, bounds, 6), -30, "left of the button, 6 px apart")
+		-- Against the left edge the slide goes right instead.
+		local nearLeft = { left = 10, top = 100, right = 74, bottom = 180 }
+		local wall = { left = 0, top = 110, right = 50, bottom = 150 }
+		t.eq(HudLayout.ClearOfRects(nearLeft, { wall }, bounds, 6), 46)
+		-- A wall of buttons all the way across: nothing helps.
+		local across = { { left = 0, top = 100, right = 400, bottom = 180 } }
+		t.eq(HudLayout.ClearOfRects(box, across, bounds, 6), nil)
+	end)
+
+	t.test("the wiring: the beacon steers clear of the HUD's boxes, the side labels start after their mark", function()
+		local fs = require("@lune/fs")
+		local quest = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
+		t.ok(string.find(quest, "HudLayout.ClearOfRects(box, HUD.Obstacles(), bounds, 6)", 1, true))
+		local hud = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HUD.luau")
+		t.ok(string.find(hud, "HudLayout.MarkTextLeft()", 1, true))
+		local badge = fs.readFile("src/StarterPlayer/StarterPlayerScripts/BadgeUI.luau")
+		t.ok(string.find(badge, "HudRules.BadgesButton", 1, true), "BADGES waits for the end of the tutorial")
+	end)
 end

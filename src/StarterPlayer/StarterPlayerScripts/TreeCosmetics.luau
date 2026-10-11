@@ -19,11 +19,24 @@ local TreeCosmetics = {}
 
 local CANOPY: { [string]: boolean } = { Leaves = true, Frond = true, Facet = true }
 
-local baseColor: { [BasePart]: Color3 } = {}
-local remembered: { [BasePart]: boolean } = {}
-local paintedSeason: { [Model]: number } = {}
-local paintedTint: { [Model]: number } = {}
-local accented: { [Model]: boolean } = {}
+-- Weak keys: a tree and its parts leave the world when they stream out, and a
+-- strong table kept every one of them (and every canopy part's colour) for
+-- the whole session, which is memory a phone does not have.
+local function weak(): any
+	return setmetatable({}, { __mode = "k" })
+end
+local baseColor: { [BasePart]: Color3 } = weak()
+local remembered: { [BasePart]: boolean } = weak()
+local paintedSeason: { [Model]: number } = weak()
+local paintedTint: { [Model]: number } = weak()
+local accented: { [Model]: boolean } = weak() -- true: it has been looked at, and may carry a SeasonAccent
+
+-- Trees dressed (painted, accented, ringed) in one pass, at most: a season
+-- change, or the spawn area's trees arriving, used to repaint every tree
+-- in one frame. The rest wait for the next pass (a few a second).
+TreeCosmetics.PerPass = 24
+local searched: { [Model]: number } = weak() -- passes that found no crown to hang an accent on
+local ACCENT_SEARCHES = 5
 
 local function remember(part: BasePart)
 	if not remembered[part] then
@@ -56,6 +69,12 @@ local function paint(tree: Model, season: number, tint: number)
 end
 
 local function clearAccent(tree: Model)
+	-- Only a tree that was looked at can carry one (ensureAccent is the only
+	-- maker). This ran GetDescendants on every tree on every pass on phones,
+	-- where the accents are off and there is nothing to clear.
+	if not accented[tree] then
+		return
+	end
 	for _, d in ipairs(tree:GetDescendants()) do
 		if d:IsA("ParticleEmitter") and d.Name == "SeasonAccent" and d:GetAttribute("Cosmetic") == true then
 			d:Destroy()
@@ -82,6 +101,14 @@ local function ensureAccent(tree: Model)
 		end
 	end
 	if not host then
+		-- No crown to hang it on (a stump, a dead tree, a crown still streaming
+		-- in): look again a few passes, then give up rather than walking this
+		-- tree's descendants on every pass for good.
+		local tries = (searched[tree] or 0) + 1
+		searched[tree] = tries
+		if tries >= ACCENT_SEARCHES then
+			accented[tree] = true
+		end
 		return
 	end
 	local e = Instance.new("ParticleEmitter")
@@ -136,6 +163,64 @@ local function dressNature(tree: Model)
 	end
 end
 
+-- How many trees it has painted or accented (tests: a tree that has left the
+-- world must not be counted, or held, for good).
+function TreeCosmetics.Tracked(): number
+	local n = 0
+	for _ in pairs(paintedSeason) do
+		n += 1
+	end
+	return n
+end
+
+-- One pass over the trees streamed in: dresses at most PerPass of them and
+-- leaves the rest for the next pass. Returns how many it dressed.
+function TreeCosmetics.Pass(trees: { Instance }, look: TreeArt.Cosmetics, season: number): number
+	local worked = 0
+	for _, inst in ipairs(trees) do
+		if worked >= TreeCosmetics.PerPass then
+			break
+		end
+		if inst:IsA("Model") then
+			local tree = inst
+			local did = false
+			if look.tint > 0 then
+				if paintedSeason[tree] ~= season or paintedTint[tree] ~= look.tint then
+					paint(tree, season, look.tint)
+					paintedSeason[tree] = season
+					paintedTint[tree] = look.tint
+					did = true
+				end
+			elseif paintedSeason[tree] ~= nil then
+				paint(tree, 1, 0)
+				paintedSeason[tree] = nil
+				paintedTint[tree] = nil
+				did = true
+			end
+			if look.accents then
+				if not accented[tree] then
+					ensureAccent(tree)
+					did = did or accented[tree] == true
+				end
+			else
+				if accented[tree] then
+					did = true
+				end
+				clearAccent(tree)
+			end
+			if look.tint > 0 then
+				dressNature(tree)
+			else
+				clearNature(tree)
+			end
+			if did then
+				worked += 1
+			end
+		end
+	end
+	return worked
+end
+
 function TreeCosmetics.Start()
 	local since = math.huge
 	RunService.Heartbeat:Connect(function(dt: number)
@@ -147,34 +232,11 @@ function TreeCosmetics.Start()
 			return
 		end
 		since = 0
-		local look = TreeArt.Cosmetics(Quality.Budget().Tier)
-		local season = TreeArt.SeasonIndex(os.time())
-		for _, inst in ipairs(CollectionService:GetTagged("Tree")) do
-			if inst:IsA("Model") then
-				local tree = inst
-				if look.tint > 0 then
-					if paintedSeason[tree] ~= season or paintedTint[tree] ~= look.tint then
-						paint(tree, season, look.tint)
-						paintedSeason[tree] = season
-						paintedTint[tree] = look.tint
-					end
-				elseif paintedSeason[tree] ~= nil then
-					paint(tree, 1, 0)
-					paintedSeason[tree] = nil
-					paintedTint[tree] = nil
-				end
-				if look.accents then
-					ensureAccent(tree)
-				else
-					clearAccent(tree)
-				end
-				if look.tint > 0 then
-					dressNature(tree)
-				else
-					clearNature(tree)
-				end
-			end
-		end
+		TreeCosmetics.Pass(
+			CollectionService:GetTagged("Tree"),
+			TreeArt.Cosmetics(Quality.Budget().Tier),
+			TreeArt.SeasonIndex(os.time())
+		)
 	end)
 end
 

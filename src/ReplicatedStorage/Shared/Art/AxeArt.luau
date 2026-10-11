@@ -466,7 +466,7 @@ local handleLengths: { [string]: number } = {} -- [axe id], filled by Build
 -- Visual meshes only. The gameplay Handle (size, grip, swing, hitbox) is
 -- the part-built haft. A mesh id of 0, or any mesh that fails to load,
 -- leaves that axe exactly as the builder made it.
-local function applyAxeMeshes(model: Model, def: AxeDef): boolean
+local function applyAxeNow(model: Model, def: AxeDef): boolean
 	local spec = AxeModels.Get(def.id)
 	local handle = model.PrimaryPart
 	if not spec or not handle then
@@ -561,7 +561,20 @@ function AxeArt.Build(def: AxeDef): Model
 		generic(model, def)
 	end
 	local handle = model.PrimaryPart :: BasePart
-	applyAxeMeshes(model, def)
+	-- Never waits for a mesh: an axe whose meshes are still loading is
+	-- part-built and is dressed (and welded) when they land (MeshKit.Attempt).
+	local welded = false
+	MeshKit.Attempt(model, function()
+		local ok = applyAxeNow(model, def)
+		if ok and welded then
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") and d ~= handle and d:FindFirstChild("Weld") == nil then
+					weldTo(handle, d)
+				end
+			end
+		end
+		return ok
+	end, true)
 	if def.id == "LuxAxe" then
 		-- Always, even when the meshes fail, so the swing effect has a home
 		-- on the part-built axe. Offsets are the Blender points minus half
@@ -574,6 +587,7 @@ function AxeArt.Build(def: AxeDef): Model
 			weldTo(handle, d)
 		end
 	end
+	welded = true
 	return model
 end
 

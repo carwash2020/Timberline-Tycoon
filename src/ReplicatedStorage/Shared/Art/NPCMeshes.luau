@@ -168,16 +168,22 @@ local warnedAssets: { [string]: boolean } = {}
 
 -- True when every mesh loaded and the part look stepped aside.
 function NPCMeshes.Dress(model: Model, assetId: string): boolean
-	local dressed = NPCMeshes.dress(model, assetId)
-	if not dressed and TownModels.Get(assetId) ~= nil then
-		-- The part-built NPC stays. Said once per asset, never per spawn.
-		model:SetAttribute("MeshFallback", assetId)
-		if not warnedAssets[assetId] and not MeshKit.NoEngine() then
-			warnedAssets[assetId] = true
-			warn(string.format("[NPCMeshes] %s: a mesh did not load; keeping the part-built NPC", assetId))
+	-- Never waits for a mesh: a townsperson whose meshes are still loading stays
+	-- part-built and is dressed when they land (MeshKit.Attempt runs this again).
+	return MeshKit.Attempt(model, function()
+		local dressed = NPCMeshes.dress(model, assetId)
+		if dressed then
+			model:SetAttribute("MeshFallback", nil)
+		elseif TownModels.Get(assetId) ~= nil and not MeshKit.WasPending() then
+			-- The part-built NPC stays. Said once per asset, never per spawn.
+			model:SetAttribute("MeshFallback", assetId)
+			if not warnedAssets[assetId] and not MeshKit.NoEngine() then
+				warnedAssets[assetId] = true
+				warn(string.format("[NPCMeshes] %s: a mesh did not load; keeping the part-built NPC", assetId))
+			end
 		end
-	end
-	return dressed
+		return dressed
+	end)
 end
 
 function NPCMeshes.dress(model: Model, assetId: string): boolean

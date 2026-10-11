@@ -27,7 +27,7 @@ end
 
 -- Puts the piece's meshes on `model`. Returns how many meshes were added.
 -- Zero means the parts stay as they are.
-function KitMeshes.Dress(model: Model, id: string, ghost: boolean): number
+local function dressNow(model: Model, id: string, ghost: boolean): number
 	local piece = KitMeshData.Get(id)
 	local root = model.PrimaryPart
 	if not piece or not root then
@@ -136,6 +136,14 @@ function KitMeshes.Dress(model: Model, id: string, ghost: boolean): number
 		end
 	end
 	return #made
+end
+
+-- Never waits for a mesh: a piece whose meshes are still loading keeps its
+-- parts and is dressed when they land (MeshKit.Attempt).
+function KitMeshes.Dress(model: Model, id: string, ghost: boolean): number
+	return MeshKit.Attempt(model, function()
+		return dressNow(model, id, ghost)
+	end, true)
 end
 
 return KitMeshes

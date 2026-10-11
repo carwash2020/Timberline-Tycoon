@@ -6,6 +6,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Net = {}
 
+-- How long a server boot script waits for GameServer to create the Remotes
+-- folder. GameServer starts when MapBuilder's SellArea appears (it waits up to
+-- 600 s for it), so a boot script that waits less than that can time out
+-- before the folder exists on a slow build. Keep this >= that wait.
+Net.RemotesWaitSeconds = 600
+
 Net.RemoteNames = {
 	"ChopTree", -- client -> server: (treeUid)
 	"PickupLog", -- client -> server: (logUid)

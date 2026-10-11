@@ -14,13 +14,13 @@
 --   * Player attributes SkyQuestStep and GondolaPass mirror the save for
 --     the HUD and Lane E's Gus talk. State(player) is the read API.
 
-local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local SkyQuestLogic = require(ReplicatedStorage.Shared.SkyQuestLogic)
 local HandInLogic = require(ReplicatedStorage.Shared.HandInLogic)
+local GameAnalytics = require(script.Parent.GameAnalytics)
 local AxeService = require(script.Parent.AxeService)
 local HandInWood = require(script.Parent.HandInWood)
 local ProfileService = require(script.Parent.ProfileService)
@@ -90,9 +90,13 @@ local function grantPass(profile: any)
 end
 
 local function logStep(player: Player, stepId: string)
-	pcall(function()
-		(AnalyticsService :: any):LogProgressionCompleteEvent(player, "SkyCharter", stepId)
-	end)
+	-- The level is the step's number (a whole number: Roblox refuses a string).
+	for i, step in ipairs(SkyQuestLogic.Steps) do
+		if step.id == stepId then
+			GameAnalytics.Progression(player, "SkyCharter", i, stepId)
+			return
+		end
+	end
 end
 
 -- One action from the remote or the prompt. Returns the toast it showed.

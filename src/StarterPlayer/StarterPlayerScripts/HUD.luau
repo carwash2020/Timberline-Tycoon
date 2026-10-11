@@ -79,6 +79,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
+local JoinPickLogic = require(ReplicatedStorage.Shared.JoinPickLogic)
 local LoadStages = require(ReplicatedStorage.Shared.LoadStages)
 local Net = require(ReplicatedStorage.Shared.Net)
 local GamepadNavLogic = require(ReplicatedStorage.Shared.GamepadNavLogic)
@@ -458,6 +459,28 @@ end
 
 function HUD.UnderCash(): Frame?
 	return underCash
+end
+
+-- The HUD's buttons and rows that world markers must not sit under, in
+-- screen pixels: the side buttons showing, the corner's two lines and the
+-- cash row. The tutorial beacon steers clear of them (HudLayout.ClearOf
+-- Rects) instead of being cut off behind one.
+function HUD.Obstacles(): { HudLayout.Rect }
+	local out: { HudLayout.Rect } = {}
+	local function add(obj: GuiObject?)
+		if obj and obj.Visible and obj.AbsoluteSize.X > 0 and obj.AbsoluteSize.Y > 0 then
+			local at, size = obj.AbsolutePosition, obj.AbsoluteSize
+			table.insert(out, { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y })
+		end
+	end
+	for _, side in ipairs(sides) do
+		if side.button.root.Parent == sideColumn then
+			add(side.button.root)
+		end
+	end
+	add(shelf)
+	add(HUD.TopRow())
+	return out
 end
 
 -- Popups drop down at the right margin under both lines of the corner,
@@ -866,9 +889,23 @@ local function refreshChip()
 end
 
 local tipsOn = true
+local buildOpen = false
+local hintHolds: { [string]: boolean } = {} -- panels that keep the bottom row away (HUD.HoldHint)
+
+-- The bottom row (the hint and the load chip) never draws over a join
+-- screen: the save picker hides it (JoinPickLogic.HintHidden). Build mode
+-- hides it too, for its own readout.
+local function syncRowVisible()
+	local row = bottomRow
+	if row then
+		local held = next(hintHolds) ~= nil
+		row.Visible = not buildOpen and not JoinPickLogic.HintHidden(held, player:GetAttribute("SlotPick") == true)
+	end
+end
 
 -- The hint and the load chip show unless a panel is open over the game.
 local function refreshModal()
+	syncRowVisible()
 	local hint = hintLabel
 	if hint then
 		hint.Visible = modalRect == nil and tipsOn and not hintQuiet
@@ -890,20 +927,27 @@ function HUD.SetTips(on: boolean)
 	refreshModal()
 end
 
+-- A panel that must never have the hint bar or the load chip over it (the
+-- save picker, the SAVES panel): `name` holds the bottom row hidden while
+-- `on`. Safe to call before HUD.Start.
+function HUD.HoldHint(name: string, on: boolean)
+	if on then
+		hintHolds[name] = true
+	else
+		hintHolds[name] = nil
+	end
+	syncRowVisible()
+end
+
 -- Build mode (PlotUI): the hint row hides so the builder readout is the
 -- only hint. Safe to call before HUD.Start.
-local buildOpen = false
-
 function HUD.BuildOpen(): boolean
 	return buildOpen
 end
 
 function HUD.SetBuildMode(on: boolean)
 	buildOpen = on
-	local row = bottomRow
-	if row then
-		row.Visible = not on
-	end
+	syncRowVisible()
 end
 
 -- A panel open over the game (ShopUI: the shops, the Store, the Field
@@ -1287,8 +1331,13 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	end
 	local pad = side.button.face:FindFirstChildOfClass("UIPadding")
 	if pad then
-		local iconPad = if side.button.face:FindFirstChild("Mark") and not asIcon then 28 else 0
-		pad.PaddingLeft = UDim.new(0, (if console then 36 else 6) + iconPad)
+		-- With a mark (SAVES, BUILD, the truck): the text starts where the mark
+		-- ends (HudLayout.MarkTextLeft) and is left-aligned, so no letter can
+		-- ever sit behind the icon, whatever the label's width.
+		local marked = side.button.face:FindFirstChild("Mark") ~= nil and not asIcon
+		local left = if marked then HudLayout.MarkTextLeft() else 6
+		pad.PaddingLeft = UDim.new(0, (if console then 36 else 0) + left)
+		side.button.face.TextXAlignment = if marked then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center
 		if asIcon then
 			pad.PaddingLeft = UDim.new(0, 0)
 			pad.PaddingRight = UDim.new(0, 0)
@@ -2034,9 +2083,10 @@ local function buildBottomRow(gui: ScreenGui)
 	list.VerticalAlignment = Enum.VerticalAlignment.Center
 	buildChip(row)
 	buildHint(row)
-	row.Visible = not buildOpen
 	row.Parent = gui
 	bottomRow = row
+	syncRowVisible()
+	player:GetAttributeChangedSignal("SlotPick"):Connect(syncRowVisible)
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueRow)
 	refreshModal() -- a panel may already be open (HUD.SetModal before HUD.Start); fills the chip
 	queueRow()

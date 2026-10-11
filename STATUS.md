@@ -4,6 +4,7 @@ Last updated 11 October 2026 (the V1 integration pass, branch `phase-2/v1-z-inte
 Everything below marked as a branch is merged unless this header says otherwise. The consolidated V1 Studio checklist
 (PC, phone, Xbox) and every open decision with its default are in `V1_STUDIO_CHECKLIST.md`.
 
+- **Client freeze and the late forest** (branch `phase-2/fix-client-freeze`, 11 October 2026, draft PR): Studio showed `TreeFill:380: Script timeout` every 10 s, `WeatherController Start took 11.28s`, and 3 trees at spawn then 1,217 about 10 s later. Causes: `WorldPlan.Trees` (about 10 s of work in Lune) was started again by every client script that asked for it while ForestFiller's paused build was still running (a paused build caches nothing until it ends), and the first ask came through `NatureData.FromWorldPlan` (cave points of interest are placed against every tree) from `WeatherController.Start`'s aurora and from `AmbientLife.zones` (each a full unpaused build); several planners had no pause at all (Scenery 2.2 s, BoulderClusters 3 s, ForestTrees, the Boulders, which were also never cached: 0.6 s each, MeadowBoulders 0.7 s each, many times). Fixes: `TreeFill.takenNear` is a hash grid (same answers as the scan, `TreeFill.TakenNearScan` is the reference); `WorldPlan.WithPause` plus `breathe()` in every planner's hot loop (bound to the calling thread, results unchanged); `WorldPlan.Trees`, `FirstTrees` and the heavy planners run one at a time (a second caller waits for the first's result); `WorldPlan.TreesReady`; `NatureData.FromWorldPlan` is worked out once per plan and leaves the caves out until the trees are ready (callers: `WeatherController`, `AmbientLife`; cells loaded before the caves joined are re-scattered); `WeatherController.Start` spawns the aurora off its path; Boulders and MeadowBoulders cached. The server (`MapBuilder` "5. The trees") plants `WorldPlan.FirstTrees` first (meadow and wild groves, under a second), then each batch the planner hands over (`WorldPlan.Trees(pause, emit)`: the town's trees first, they stand round the spawn; `TreeFill.Extra` plans them first, and keeps the list order, so every tree is where it was: pinned checksum in `tests/ClientFreeze.spec`), nearest the spawn first inside each batch, instead of planning all 1,041 before planting any (one global sawmill-first sort). No tree count, wood or price changed, so ECONOMY.md and ECONOMY_V1.md did not move. The one design change: the old "nearest the sawmill first, globally" spec became "the first batch, then the town's trees, each nearest the spawn first" (MapBuilder.spec). Still needs Studio: no frame over 100 ms in the profiler on PC, phone and Xbox, and the tree timeline (PHASE2_NOTES.md "Client freeze and the late forest").
 - **V1 backlog meshes** (branch `phase-2/v1-backlog-meshes`, 10 October 2026, off main `ec9d2cb`; draft PR): `Art/BacklogModels` holds the 109 uploaded backlog assets (shops, gear, landmarks, furniture, plants, cave props, critters, polish, the two environment remakes, townsfolk) with every piece's real MeshPart id, and `TownModels.Get` falls through to it (not for townsfolk, which stay with the NPC lane). All 372 ids have `MeshTemplates` files. Wired now: OddsAndEnds, Sparkworks, LandOffice, GateKiosk (glow keeps the gate colour), ArrivalArch (`TownMeshes.Dress`) and the Robux crate (`RobuxBoxArt`, the open crate of parts stays as the fallback). A missing mesh keeps the part build, sets `MeshFallback` on the model and logs once per asset. Trees: `TreeModels` rows for Lanternwood (live), Bog Cypress and Ironwood (waiting for job 11) plus the `Knees` branch in `TreeMeshes`. Not wired, waiting on a design call or a builder: the Robux table (mesh is a one-row 2.5 high table, the shelf has two rows on a riser at 3.9), Sky Forge Court, the other boards and scenes, gear, landmarks, plants, cave props, critters, polish, the two environment remakes (`SawdustPileV2`, `PathRoundV2`). Source GLBs for the backlog are in `assets/glb/backlog` (from `phase-2/v1-glb-sources`, npcs excluded). Previews with the real meshes: `previews/v1-backlog/` (34 shots: five shops, the Robux crate, Lanternwood, five angles each; made by `python3 tools/preview/backlog_manifest.py` then `PREVIEW_MESHES=preview/backlog-meshes.json bash tools/preview/shoot.sh v1-backlog`) and `previews/v1-a2/relic-trophies.png` re-shot (`v1-backlog-trophies`). Studio checklist: PHASE2_NOTES.md "V1 backlog meshes".
 Last updated 8 October 2026 (V1 map remake, branch `phase-2/v1-b-world`). The layout plan is `MAP_V1.md`. The labelled picture is `previews/v1-b/00-overview.png`.
 **Merged to main (V1):** #118 A1 economy, saves and caps; #119 nature; #120 buildings, shops and props; #121 world
@@ -20,6 +21,113 @@ key (deriving it from a full plot is awaiting Connor, it would raise cash packs 
 **Rules that did not change:** the five formerly off-sale products keep id 0 (Coming soon), badge ids stay 0 until Connor
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
 the old ones), no Robux price in code.
+
+## Client boot and first minute audit (branch `phase-2/fix-client-audit`, 11 October 2026, draft PR)
+
+Goal: a new player is playable within about 15 s of joining on phone, PC and Xbox. Method: read the whole client boot (`Client.client` controller order, every `Start`, `LoadingScreen` / `JoinFlow` / `ClientReady`, HUD build, per-frame loops, tagged-instance handlers), and measure the pure parts in Lune (a counter in the `pause` hook; Studio's client is slower than Lune, `WorldPlan.Trees` was 6 s in Lune and 11 s in Studio). Nothing here was seen in Studio. Fix status: FIXED (this PR), THEIRS (in another agent's open branch: `fix-load-meshes`, `fix-client-freeze`, `fix-startup-errors`, `fix-first-screen-ui`, `fix-world-first-look`), TODAY-RISKY / NOTE (listed, not changed).
+
+| # | Severity | Where | Evidence | Status |
+|---|---|---|---|---|
+| 1 | blocks play (a multi-second freeze right after the card fades) | `ForestFiller.Start` ran the filler plan steps one per frame with no slicing: `WorldPlan.Scenery` 2.1 s, `BoulderClusters` 0.6 s, `CountryStands` 0.5 s, `ForestTrees` 0.4 s, filler clutter 0.9 s in Lune, plus a one-off 0.3 s coast scan | measured before #155 with a counter in the pause; found at the same time as `fix-client-freeze` and fixed there (`WorldPlan.WithPause`, #155). With #155 merged I re-measured: the worst gap between pause offers is 53 ms in every step (the 62,480 offers in `Trees` included) | FIXED in #155 (my duplicate change was dropped on the merge) |
+| 2 | hitch every 0.25 to 0.5 s on phones and "Lower", memory growth on every device | `TreeCosmetics`: with the accents off (low and medium) `clearAccent` ran `tree:GetDescendants()` on every streamed-in tree on every pass (an estimate of about 1,000 trees inside the 640-stud streaming radius, 2 to 4 passes a second, 40 to 100 descendants each; the tree count was not measured in Studio); a season change or the spawn trees arriving repainted every tree in one frame; five tables keyed by tree and part were strong, so every tree that ever streamed in (and each canopy part's colour) stayed in memory for the session | `tests/TreeCosmetics.spec.luau`: 0 `GetDescendants` over 20 low passes of 300 trees; a pass dresses at most `PerPass` (24); a stump stops being searched after 5 passes; the tables are weak (the spec fails with strong tables) | FIXED |
+| 3 | long load (client) | `AmbientLife.zones` and `WeatherController.shelterZonesNow` called `NatureData.FromWorldPlan` at Start: `GroveDiscs` builds the first 322 trees (0.68 to 0.74 s in Lune) in one frame | measured `WorldPlan.FirstTreeCount()` | FIXED in #155 (weather start off the plan, `NatureData`) |
+| 4 | hitch | `WorldPlan.Trees` step: up to 0.9 s between two pauses inside `TreeFill.Extra` | counter in the pause before #155; after it the worst gap is 38 ms | FIXED in #155 |
+| 5 | minor | `LightingController` and `CarryController` waited for `TimberlineMap` (and the sell area) with no timeout inside their own threads: an "infinite yield" warning if the map is late, a thread that never ends if it never comes | read | FIXED (bounded 120 s, then a warning and no sell prompt) |
+| 6 | minor | `WeatherController` `watchMapEmitters`: the same bare `WaitForChild("TimberlineMap")` | read | FIXED (bounded 120 s) |
+| 7 | minor | `CanopyFade.look` loops every child of `TimberlineMap.Trees` 10 times a second (2 on Lower) doing a `GetAttribute("HomePivot")` and a sightline test per tree; fine at a few hundred trees; an estimate of a few ms at a thousand on a phone, not measured | read | NOTE (a spatial bin by trunk position would make it constant; not done today) |
+| 8 | minor | `PromptUI.Start` walks `workspace:GetDescendants()` once and `workspace.DescendantAdded` calls `restyle` for every instance that ever streams in or is built (the filler forest too); each call is one `IsA` | read | NOTE (setting `Style` on the server's prompts would remove it) |
+| 9 | NOTE | `ForestFiller` slices the plan at 8 ms a frame (`PLAN_SLICE`) for 20 to 40 s on a phone after joining; the ring forest appears gradually and the frame budget loses about a quarter meanwhile | read | NOTE (a lower slice on the Lower tier is a one-line change if Studio says it hitches) |
+| 10 | NOTE | `LoadingScreen` gives up at 30 s (`MAX_SECONDS`), the goal is 15 s; the server's gates (`JoinFlow.GateWaitSeconds` 90, `ClientWaitSeconds` 12) decide when a player is let in | read | NOTE (server side and the mesh load are `fix-load-meshes`) |
+| 11 | NOTE | `Client.client` indexes `ReplicatedStorage.Shared` without waiting, as every module does; it has worked in Studio and is the same assumption everywhere | read | NOTE, not changed |
+
+Checked and fine (no change): every `Net.Remote("X")` name is in `Net.RemoteNames` (so no remote waits forever); the controllers' `Start` waits (the `CoreLoop` attribute is set before the build, `Net.Remote` waits for the remotes the client cannot talk without anyway); `ClientReady` goes out when every `Start` has returned or after 20 s and the server never waits more than 12 s; every other `WaitForChild` is `PlayerGui` or has a timeout; the per-frame loops are all on `CosmeticHz` (`TownFX`, `WindSway`, `AmbientLife`, `RegionFX`, `LifeFX`, `CanopyFade`, `TownMarkers`, `ForestFiller`); `TreeFX` returns at once under the v2 loop; the join screens take turns through `PickerSequence`; `UIArt` preloads one image a thread; B closes every started panel (`LeaderboardUI` is not started); all client modules together load in 0.64 s in Lune (`WorldPlan` 0.32 s of it).
+
+
+## Load takes 5 minutes: the world build no longer waits on meshes (branch `phase-2/fix-load-meshes`, 12 October 2026, draft PR)
+
+Connor's bug report items 1, 7 and 9. His Studio log: `[MapBuilder] 4. The shops done in 300.2s`, `meshes: 476 of 685 loaded
+... (timed out)`, `[BaseBoot] no Remotes folder`, `GlowWire has no MeshTemplates model`.
+
+- **Cause (item 1).** `MeshKit.Create` yielded in `CreateMeshPartAsync` for every mesh that was not cached yet. The shops, the
+  buildings, the townsfolk and the trees all call it on the build thread, one mesh after another, and the 24 preload workers
+  already held the asset quota (a load is about 0.4 s of network time). 685 serial loads is minutes, and the preload timed out
+  at 40 s with 476 in. NPCService (up to 40 s) and PlotService (3 s) also waited on loads by design.
+- **Fix.** `MeshKit.Create` never yields: an uncached mesh is `nil` at once (the caller keeps its part-built art, as for a
+  failed load) and is requested in the background. Every dresser runs inside `MeshKit.Attempt(model, step)`; a step that failed
+  only because meshes were still loading is run again when every mesh it missed has landed, a few ms a frame (`MeshKit.Pump`,
+  `SwapBudget` 4 ms), in the frame it was built in for the dressers that write absolute coordinates. A failed mesh never
+  retries. The old yielding call is `MeshKit.CreateAwait`, fenced to `ItemMeshes.LoadAsync` (its own thread). Wired:
+  TownMeshes (Dress, Adorn), NPCMeshes, VehicleMeshes, TreeMeshes, AxeArt, NatureArt (rocks, mine mouth), RobuxBoxArt,
+  KitMeshes, LogicItems (machines). MapBuilder starts the preload with `MeshKit.PreloadAsync` and no longer probes a mesh;
+  NPCService no longer joins a preload; `PlotService.Init` no longer waits 3 s for the plot kit (pads are built part-built and
+  redrawn when it lands, as before). The `meshes` gate is not a first-player gate.
+- **Timings.** `Shared/BuildTimings` records every top-level build step; at the world gate MapBuilder prints
+  `[MapBuilder] build phases that gate play:` (seconds per step, slow ones flagged) and `gating build X of 15s budget`, and
+  warns with the slowest step if it is over. `Gating build` is terrain, town, shops and the rest before SellArea goes in.
+- **Client.** The loading card never waited on meshes (it waits for a character, the save and `game:IsLoaded()`, 30 s cap);
+  the only client preload is UIArt's own thread. The client's dressers (AmbientLife rocks and mushrooms) were blocking its
+  render thread the same way; they are now non-blocking too. Pinned in `tests/BuildBudget.spec`.
+- **BaseBoot (item 7).** Name and parent were right: GameServer makes `ReplicatedStorage.Remotes` only after the world is
+  built (it waits up to 600 s for SellArea), and BaseBoot waited 60 s. With a 300 s build it gave up at +60 s and `SaveNow` and
+  `PaintAllType` were never bound. It now waits `Net.RemotesWaitSeconds` (600, as long as GameServer waits for the world).
+  `tests/BaseBootWait.spec`.
+- **GlowWire (item 9).** No GLB for it exists on `phase-2/v1-glb-sources` or main (no GlowWire anywhere in `assets/glb`) and it
+  has no `MachineMeshes` row, so there is nothing to make a template from. Its part build is by design: the fallback is silent
+  and said once at debug level (`LogicItems.Debug` prints, `LogicItems.DebugSink` for specs). Pieces that have mesh art and
+  lose it still warn. Pending: a GLB for the Glow Wire (a 3.4 x 0.28 neon bar on two iron posts, footprint 4 x 2).
+- **What is proven here and what is not.** Lune cannot load meshes, so `tests/BuildBudget.spec` holds the engine load: a
+  685-dressing build returns with zero loads run and without yielding, then the meshes land and every dressing swaps in (part
+  built, then load, then swap), batched. A source scan fences who may call a yielding load, and a failing spec means a build
+  step awaits a mesh. The real timings (play within 15 s, meshes popping in without a hitch, the swap of a shop and an NPC
+  in place) need Studio: PHASE2_NOTES.md "Load: meshes never block the build".
+## Server audit: game-breaking and long-loading bugs (branch `phase-2/fix-server-audit`, 11 October 2026, draft PR)
+
+Goal: a new player playable within about 15 s of joining. Traced the server boot and a new player's first 60 seconds end to
+end; measured the pure build code in Lune. Full findings (severity, file:line, evidence, status): PHASE2_NOTES.md "Server
+audit". Fixed here:
+
+- **Long load: the terrain.** The "terrain" gate sat behind all 100 chunks (about 0.54 s a chunk in Lune, 54 s; most of the
+  wait for a first player). `TerrainBuilder.Build` now takes `{ nearRadius, firstSpots, sliceSeconds }`: the chunks touching a
+  230-stud disc round the sawmill block (the spawn, shops, sell area, Murph, the tutorial grove), the rest comes back as
+  `finish`, which MapBuilder runs after the world gate in 16-column blocks (about 1/16 of a chunk, one a frame), the
+  plot pads' ground first, then outward, the caves last. New gate `terrainFull`; `LoadState.Track("terrain")` keeps "fully
+  built" honest. `TerrainGen.WaterLevelFor(x, z, h)` stops `WaterLevelAt` recomputing the height the builder already has
+  (about a third of the time of writing the terrain).
+- **Long load: the save.** GameServer connected PlayerAdded only after the world and every service, so the DataStore
+  load began then. `ProfileService.Prefetch` (PlayerAdded at the top of GameServer) starts it on arrival; `LoadProfile`
+  picks it up; `PrefetchLeft` releases the session of a player who left before the join flow had it.
+- **Plots lookups.** `SkyForgeService` and `MiningService` looked for `Workspace/Plots`; PlotService builds
+  `TimberlineMap/Plots`. Trophies never appeared, mining never found a plot, and a thread waited 120 s.
+- Not done, in other lanes or too risky for today: see the PHASE2_NOTES list (BaseBoot's 60 s wait for Remotes is the
+  fix-load-meshes lane; the town settle at the start of the terrain, about 4 s, is left alone).
+
+## First screen UI fix (branch `phase-2/fix-first-screen-ui`, 11 October 2026, draft PR)
+
+Connor's bug report PART B items 10 and 11 (PC window 963x478, phone 667x375, Xbox). Nothing seen in Studio yet; the
+previews are composites (the engine viewer cannot draw UI): `previews/fix-first-screen/` (`before-*`, `after-*`,
+`closeup-*`, `markers-sell-logs.png`, made by `python3 tools/preview/first_screen_ui.py`). Studio checks: PHASE2_NOTES.md
+"First screen UI fix".
+
+- **Join flow.** The save picker only opens when two or more saves have been played (`JoinPickLogic.AutoPick`); a brand
+  new profile or a single save loads straight in (`SaveSlotService.PlayerJoined` plays it and asks for its pad). One played
+  save that is not the last-played slot still shows the picker (a swap would spend the 120 s cooldown). The tutorial
+  (tracker, Murph's card, the beacon) waits for the pick (`JoinPickLogic.TutorialWaits`, `QuestUI`).
+- **Saves panel layout.** `SaveSlotLogic.Layout` / `Panel`: the panel is as tall as its cards, never taller than the screen;
+  while joining there is no Unload base / Save now row, so the cards sit right under the note (no empty gap); a card is one
+  94 px block (name and a 44 px PLAY side by side, facts under them) so all three fit on 963x478 and 667x375, and the list
+  scrolls on a window too short for the SAVES panel's extra row.
+- **Hint bar.** The bottom row (hint and load chip) hides while the picker is up and while the SAVES panel is open
+  (`HUD.HoldHint`, `JoinPickLogic.HintHidden`).
+- **HUD overlap.** BADGES waits for the end of the tutorial (`HudRules.BadgesButton`); Murph's portrait circle stays hidden
+  until his head is in it; side buttons with a mark start their label after the mark and left-aligned
+  (`HudLayout.MarkTextLeft`); the tutorial beacon slides clear of HUD boxes or hides (`HudLayout.ClearOfRects`,
+  `HUD.Obstacles`) instead of being cut off behind SAVES; the town markers have a cream rim (SELL LOGS was a dark blob
+  on dark forest); an NPC's name tag hides whole if any of its ends or its top is behind a wall (`TextAnchor.Probes`).
+- **Not found / not reproduced.** The "S behind the icon" and the "empty outlined box" could not be traced to one cause by
+  reading the code (the old label math put the text clear of the mark at 110 px); the box may be Roblox's own chat window.
+  Studio checks 7 and 9 ask Connor to confirm or send a screenshot.
+- **Awaiting Connor** (defaults used): picker only with 2+ played saves; the tutorial text starts after the pick; BADGES
+  hidden while the tutorial runs.
 
 ## V1 hardening: exploit guards and performance (branch `phase-2/v1-hardening-guards`, 11 October 2026, draft PR)
 
@@ -60,7 +168,7 @@ Items 5, 6 and 8 of the hardening list. The audit came first; only what was miss
 
 | Piece | Found on main | Added or fixed here |
 | --- | --- | --- |
-| Settings card, music and sound volume, graphics (Lower / Higher via `QualityProfile`), camera shake, UI scale, tips, Restart save, What's new, controller and touch handling | all there (`SettingsLogic`, `SettingsUI`, `QualityService`) | Camera speed row (`cameraSensitivity`, 25% to 200%, saved in `settings`, server-clamped), a CODES tab, the four tabs on one row, the card cut to end above the jump button on a phone |
+| Settings card, music and sound volume, graphics (Lower / Higher via `QualityProfile`), camera shake, UI scale, tips, Restart save, What's new, controller and touch handling | all there (`SettingsLogic`, `SettingsUI`, `QualityService`) | a CODES tab (the Camera speed row was dropped on 11 October, see Startup errors below), the four tabs on one row, the card cut to end above the jump button on a phone |
 | Tutorial replay | "RESET TUTORIAL" two-press row + `QuestService.Reset` | Renamed REPLAY TUTORIAL. **Bug fixed:** a replay paid every step's `rewardCash` again; now `tutorialReplay` pays nothing (spec) |
 | Save fields | `settings` table sanitised in `ProfileSchema.Migrate` | no new field: the new setting is a key in `settings` (idempotent, specced); flags for funnel, codes and the reminder live in the existing account-wide `onboarding` table |
 | Funnel analytics | `MilestoneService` funnel (Joined, First chop, First sale, Claimed a plot, ...) once per player, `LogProgressionCompleteEvent` stages | `GameAnalytics` wrapper (pcall, once-ever flags), `First machine placed` step (appended: number 13), `Shared/AnalyticsEvents` (pure names, sku and amount checks) |
@@ -72,7 +180,7 @@ Items 5, 6 and 8 of the hardening list. The audit came first; only what was miss
 
 - **Codes.** Rewards are cash (through `EconomyService.AddCash`, so the wallet cap clamps it; a full wallet refuses without using the code) or a free crafted furniture piece (`PlotService.GrantPiece`). `CodeLogic.ValidReward` refuses any other shape, so a Robux or paid reward cannot exist. One use per player ever: `onboarding["Code:<id>"]`. Expiry is a UTC date, good through 23:59:59 UTC, compared on the server's clock; an unreadable date counts as expired. Six wrong codes in a minute lock the box for 30 s; the remote is rate limited at one a second. `CodeData` lives under ServerScriptService on purpose (nothing in ReplicatedStorage reaches a client). It ships with only `PLACEHOLDER-DISABLED` (disabled): **no real codes exist yet.**
 - **Favorite reminder.** Roblox has no API that favorites an experience (`AvatarEditorService:PromptSetFavorite` is for avatar assets, `SocialService` only prompts invites), so it is a toast pointing at the star on the game's page.
-- **Camera speed.** Written to `UserGameSettings.MouseSensitivity` and `GamepadCameraSensitivity` (each guarded, the device's own value read once). Phone touch camera uses the engine's own speed; Studio check 3 in PHASE2_NOTES finds out whether the engine honours it.
+- **Camera speed (dropped).** It wrote the player's own game settings, which scripts may not do ("Insufficient permissions", repeated). We run Roblox's default camera, which has no supported hook to scale its input, so the row is hidden and the `settings.cameraSensitivity` save field stays, harmless (default 1, still sanitized). `NoUserGameSettingsWrites.spec` fails if any source names those engine properties.
 - Previews (composites of the UITheme layout, not engine shots; made by `python3 tools/preview/v1h_settings.py`): `previews/v1-hardening/settings-{game,scrolled,bottom,codes}-{667x375,1920x1080}.png`.
 - Studio checks: PHASE2_NOTES.md "V1 launch hardening".
 
@@ -107,7 +215,7 @@ Connor's instruction: remove every use of `Enum.KeyCode.ButtonR2` and move Xbox 
 | Grab / drag wood and boxes (DragController) | empty hands, held | RT (InputBegan read) | RB, held (`ButtonR1`) | RB was "further" while holding; that stays on D-pad up (D-pad down and LB are nearer). X would clash with world prompts (Interact/Talk/Buy), so not X. |
 | Place a blueprint (InputKit target table) | placer | RT (table only) | A (`ButtonA`) | The real binding was already A (`PlaceControlsLogic`); the table now says what the game does. RB stays Push there. |
 
-- Hints now say RB for these: wiring bar "RB pick · X cut · B done", `{grab}` is "hold RB", the drag line "Hold RB on wood to drag it", the holding line "LT + left stick: turn · D-pad: reach". RT stays in the chop hint and `{click}` ("RT to swing", "press RT"): that is the tool's own button.
+- Hints now say RB for these: wiring bar "RB pick · X cut · B done", `{grab}` was "hold RB" and the drag line "Hold RB on wood to drag it" (both now RT, see "Grab on the right trigger"), the holding line "LT + left stick: turn · D-pad: reach". RT stays in the chop hint and `{click}` ("RT to swing", "press RT"): that is the tool's own button.
 - PC and phone inputs are unchanged.
 - Studio checks: PHASE2_NOTES.md "No ButtonR2 (Xbox remap)".
 
@@ -601,3 +709,14 @@ Connor's bug report, items 12 to 14. Studio has not seen any of it.
 - **12. The dark board at the top centre of the first screen.** Not reproducible without Studio. The only board in that view is the sawmill's crest sign (TIMBERLINE SAWMILL, cream on dark brown, on two roof posts); at 1:19 AM it is a dark plank. It has its text in every render (`FirstLook.spec` pins it). The day start (item 13) is the fix for how it read. Also fixed, defensively: with `GameConfig.TownMeshes` on (off today), a sign mesh sat level with its board's text face; it now sits 0.04 behind it (`TownMeshes.SignFaceGap`, `TownMesh.spec`). If a dark blank board is still there in daylight, send a screenshot and the camera position.
 - **13. Day start.** A fresh server opens at 08:00 (`GameConfig.StartClockHour`) of the same world day (`WorldClock.StartFresh`, from `MapBuilder` step 7; `WorldTime.FreshStart`). The day number is the real day, so no "Day N" moves: a new player is Day 1 at 8 AM, a returning player keeps their stamp. A clock an owner already set is left alone, `/timereset` still goes back to real time. New players who join a server that is already at night still see its night (one shared clock).
 - **14. Lux Axe.** Two ways a $35 player could hold it: in Studio `MonetizationService.PlayerJoined` asked Roblox who owns the pass, and a Studio session runs as the creator; and a Studio test buy saved the axe into the profile (then `accountAxes` kept it on every slot). Now Studio ignores the ownership answer (a pass comes from the save, an owner grant or a test buy), and a Studio test buy gives the axe for the session only (`PaidItems.SessionOnlyAxe`, `AxeService.Ensure(..., sessionOnly)`). Outside Studio nothing changes. A new profile has the Rusty Axe, the Hammer and the Rusty Pick only (`ProfileSchema.spec`). No prices or sale lists touched. A Studio profile that already saved the Lux Axe keeps it: use the hub's Paid items, take back.
+## Startup errors (branch `phase-2/fix-startup-errors`, 11 October 2026)
+
+From Connor's Studio log:
+- **Analytics progression.** `LogProgressionCompleteEvent` takes `(player, path: string, level: number, levelName: string?)`; we passed the stage name as the level, so Roblox failed with "Unable to cast string to int". `GameAnalytics.Progression(player, path, level, levelName)` now sends the stage number as the level and "S1" as its name; the Sky Charter steps (`SkyQuestService`) go through it too. Non-whole levels and non-int funnel steps are dropped before the call. Every call stays in a pcall. The funnel, custom and economy argument orders were checked against the API and were right. `AnalyticsEvents.spec` asserts the type of every argument of every event.
+- **Camera speed** dropped (above).
+- **Murph's Talk prompt.** NPCs the tutorial depends on (Murph, Old Hank) carry `persistent = true` in `NPCData`; `NPCService` sets ModelStreamingMode Persistent from it (Murph was already; Old Hank is new). `QuestUI` now waits for the prompt with a bounded `WaitForChild` (`QuestUI.TalkWait`, 15 s) and, on a miss, warns and shows a line in Murph's card telling the player to follow the arrow to his camp.
+- Studio checks: PHASE2_NOTES.md "Startup errors".
+
+## Grab on the right trigger (Xbox)
+
+Connor's call: the pad's grab goes back to the right trigger (RT), the same button as chop, because most players put the axe away to carry. The rule is still that no code BINDS the trigger. `DragController` READS it (an `InputBegan`, never a ContextActionService bind), and only with empty hands: `GrabLogic.PadGrabAllowed(toolOut, placing)` is false with a tool in hand (the engine fires `Tool.Activated` on RT, which is the swing, and the grab ignores it, so no toast and no grab) and false while the placer is up. RB no longer grabs: it stays the builder's select, the wire pick and the placer's push. The key is named once in the source, as `GrabLogic.PadGrabKey` (InputKit's key table and DragController read it from there). `tests/NoButtonR2.spec` fails on any other mention of the button, on a second use, and on any ContextActionService line that takes the key. Hints say RT now ("hold RT", "Hold RT on wood to drag it"). PC and phone are unchanged.

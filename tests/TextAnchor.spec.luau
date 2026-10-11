@@ -107,4 +107,24 @@ return function(t)
 		-- No second place turns the name tag on behind checkText's back.
 		t.eq(string.find(npcs, "rig.tag.Enabled", 1, true), nil)
 	end)
+
+	t.test("Probes: the card's middle, ends, top and bottom, so a card half behind a corner hides whole", function()
+		local TextAnchor = t.shared("TextAnchor")
+		local probes = TextAnchor.Probes(3, 1)
+		t.eq(#probes, 5)
+		local seen = {}
+		for _, p in ipairs(probes) do
+			seen[p.x .. "," .. p.y] = true
+		end
+		for _, key in ipairs({ "0,0", "-3,0", "3,0", "0,1", "0,-1" }) do
+			t.ok(seen[key], "probe " .. key)
+		end
+		t.eq(#TextAnchor.Probes(-1, -1), 5, "a bad size collapses to the middle")
+	end)
+
+	t.test("the wiring: an NPC's name tag is hidden when any probe of the card is behind a wall", function()
+		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/NPCController.luau")
+		t.ok(string.find(src, "TextAnchor.Probes(halfW, half)", 1, true), "NPCController tests the card's ends and top")
+		t.ok(string.find(src, "TextAnchor.NextHidden(rig.hidden, blocked, rig.clear)", 1, true))
+	end)
 end

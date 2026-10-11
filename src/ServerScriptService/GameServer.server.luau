@@ -128,6 +128,17 @@ task.spawn(function()
 	safely("PlaceCheck.Run", PlaceCheck.Run)
 end)
 
+-- Start every arriving player's save loading NOW, not when the join flow gets
+-- to them (that is after the world and every service: tens of seconds on a
+-- cold server). The join flow's LoadProfile picks the result up
+-- (ProfileService.Prefetch). A player who leaves before then gets their
+-- session released here, since the leave handler below is not connected yet.
+Players.PlayerAdded:Connect(ProfileService.Prefetch)
+Players.PlayerRemoving:Connect(ProfileService.PrefetchLeft)
+for _, existing in ipairs(Players:GetPlayers()) do
+	ProfileService.Prefetch(existing)
+end
+
 -- Wait for the code-built world. MapBuilder writes the terrain first (a few
 -- seconds to a minute) and adds the SellArea last, once everything exists.
 local mapFolder = workspace:WaitForChild("TimberlineMap", 60)

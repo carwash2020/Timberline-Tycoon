@@ -85,7 +85,7 @@ end
 -- Returns (profile, nil) on success, or (nil, "left" | "failed"). On
 -- "failed" nothing was kept: the player is marked unsaveable and no session
 -- is left running that could write.
-function ProfileService.LoadProfile(player: Player): (Profile?, string?)
+local function loadNow(player: Player): (Profile?, string?)
 	local startedAt = os.clock()
 	local started, session = pcall(function(): any
 		return store:StartSessionAsync(KEY_PREFIX .. player.UserId, {
@@ -154,6 +154,70 @@ function ProfileService.LoadProfile(player: Player): (Profile?, string?)
 	LeaveCommit.Bind(session.OnLastSave, player)
 	sessions[player] = session
 	return session.Data :: Profile, nil
+end
+
+-- Server audit (11 October 2026): GameServer connects PlayerAdded only after
+-- the world and every service are up (a cold server: tens of seconds), so the
+-- save load, a DataStore round trip that can take seconds (or ~45 s when the
+-- save is still held by another server), only began then. Prefetch starts it
+-- the moment the player arrives; LoadProfile (the join flow) picks up the
+-- result. Nothing else changes: the same load, run earlier.
+type Fetch = { done: boolean, profile: Profile?, err: string? }
+local fetches: { [Player]: Fetch } = setmetatable({}, { __mode = "k" }) :: any
+
+function ProfileService.Prefetch(player: Player)
+	if fetches[player] ~= nil then
+		return
+	end
+	local fetch: Fetch = { done = false, profile = nil, err = nil }
+	fetches[player] = fetch
+	task.spawn(function()
+		local ok, profile, err = pcall(loadNow, player)
+		if ok then
+			fetch.profile, fetch.err = profile :: any, err :: any
+		else
+			warn(string.format("[ProfileService] loading %s's save failed: %s", player.Name, tostring(profile)))
+			unsaveable[player] = "start"
+			fetch.err = if player.Parent ~= Players then "left" else "failed"
+		end
+		fetch.done = true
+	end)
+end
+
+-- Yields until the player's save is loaded (starting the load if Prefetch
+-- did not). Returns (profile, nil) or (nil, "left" | "failed"); see loadNow.
+function ProfileService.LoadProfile(player: Player): (Profile?, string?)
+	local fetch = fetches[player]
+	if fetch == nil then
+		return loadNow(player) -- no prefetch: load here, as it always did
+	end
+	while not fetch.done do
+		task.wait()
+	end
+	if fetches[player] == fetch then
+		fetches[player] = nil
+	end
+	return fetch.profile, fetch.err
+end
+
+-- A player who leaves before the join flow has picked their save up (the
+-- server was still starting; its own PlayerRemoving is not connected yet)
+-- must not leave the session open: it holds the save's lock for as long as
+-- this server lives. Releases it once the load is done.
+function ProfileService.PrefetchLeft(player: Player)
+	local fetch = fetches[player]
+	if fetch == nil then
+		return
+	end
+	task.spawn(function()
+		while not fetch.done do
+			task.wait()
+		end
+		if fetches[player] == fetch then
+			fetches[player] = nil
+		end
+		ProfileService.ReleaseProfile(player)
+	end)
 end
 
 function ProfileService.GetProfile(player: Player): Profile?

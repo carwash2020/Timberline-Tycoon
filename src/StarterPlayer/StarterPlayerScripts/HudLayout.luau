@@ -325,6 +325,54 @@ function HudLayout.BottomRow(
 	return hintMax, math.max(centre, low + width / 2)
 end
 
+-- A side button's mark (SAVES, BUILD, the truck) is an 18 px icon 8 px in
+-- from the face's left; the label starts MarkGap after it and is
+-- left-aligned, so the first letter never sits behind the icon.
+HudLayout.MarkLeft = 8
+HudLayout.MarkSize = 18
+HudLayout.MarkGap = 8
+function HudLayout.MarkTextLeft(): number
+	return HudLayout.MarkLeft + HudLayout.MarkSize + HudLayout.MarkGap
+end
+
+-- A world marker drawn on screen (the tutorial beacon's arrow and distance
+-- pill) is cut off if a HUD button is drawn over it. `box` is where it
+-- would be (screen pixels), `obstacles` the HUD's boxes, `bounds` the
+-- screen. Returns how far to slide it sideways (px, + right) so that it
+-- misses every obstacle by `gap` and stays inside `bounds`, 0 when it
+-- already does, or nil when no slide helps (hide it instead).
+function HudLayout.ClearOfRects(box: Rect, obstacles: { Rect }, bounds: Rect, gap: number): number?
+	local shift = 0
+	for _ = 1, #obstacles + 1 do
+		local moved: Rect = { left = box.left + shift, top = box.top, right = box.right + shift, bottom = box.bottom }
+		local hit: Rect? = nil
+		for _, o in ipairs(obstacles) do
+			if overlaps(moved, o, gap) then
+				hit = o
+				break
+			end
+		end
+		if hit == nil then
+			if moved.left < bounds.left or moved.right > bounds.right then
+				return nil
+			end
+			return shift
+		end
+		local toLeft = hit.left - gap - moved.right
+		local toRight = hit.right + gap - moved.left
+		local leftOk = moved.left + toLeft >= bounds.left
+		local rightOk = moved.right + toRight <= bounds.right
+		if leftOk and (not rightOk or math.abs(toLeft) <= math.abs(toRight)) then
+			shift += toLeft
+		elseif rightOk then
+			shift += toRight
+		else
+			return nil
+		end
+	end
+	return nil
+end
+
 export type ClockLine = "beside" | "under" | "none"
 
 -- Which corner line the clock goes in. On a computer or a TV: beside the

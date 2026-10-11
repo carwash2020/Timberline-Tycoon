@@ -204,7 +204,7 @@ end
 function MilestoneService.CheckStages(player: Player, profile: Profile)
 	for _, n in ipairs(StageOf.Pending(profile)) do
 		profile.onboarding[StageOf.Key(n)] = true
-		GameAnalytics.Progression(player, "Stages", "S" .. tostring(n))
+		GameAnalytics.Progression(player, "Stages", n, "S" .. tostring(n))
 	end
 end
 
