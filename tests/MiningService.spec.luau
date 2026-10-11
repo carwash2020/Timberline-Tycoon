@@ -189,6 +189,52 @@ return function(t)
 		t.eq(world.profile.mining.bombs, 4)
 	end)
 
+	-- V1 hardening: the MineAction remote's (op, id, n) with junk, standing at the stall.
+	t.test("bad payloads to MineAction: cash never rises, no pick or bomb for free, nothing throws", function()
+		local huge = 1e308
+		local junk = {
+			0 / 0,
+			math.huge,
+			-math.huge,
+			huge,
+			-huge,
+			-1,
+			0,
+			1.5,
+			"",
+			string.rep("A", 100000),
+			true,
+			{},
+			print,
+		}
+		local ops = { "buyPick", "buyBomb", "equip", "turnIn", "crawl", "rope", "nope", "", string.rep("x", 100000) }
+		for _, op in ipairs(ops) do
+			for i, bad in ipairs(junk) do
+				local world = setup(1000, { bombs = 4, picks = { RustyPick = true }, pick = "RustyPick" })
+				stall(world.miningFolder(), Vector3.zero)
+				world.stand(Vector3.new(0, 0, 4))
+				local ok, err = pcall(world.Mining.Handle, world.player, op, bad, bad)
+				t.ok(ok, string.sub(op, 1, 20) .. " with junk " .. i .. " threw: " .. tostring(err))
+				t.ok(world.profile.cash <= 1000, "cash rose")
+				t.ok(world.profile.cash >= 0, "cash went negative")
+				t.eq(world.profile.mining.picks.CopperPick, nil, "a pick came free")
+				t.ok(world.profile.mining.bombs <= 99, "past the charge cap")
+				local bought = world.profile.mining.bombs - 4
+				t.eq(1000 - world.profile.cash, bought * 220, "bombs are paid for at the price, whatever the amount")
+			end
+		end
+		-- A non-string op, or none.
+		for _, op in ipairs({ 0 / 0, 42, true, {}, print }) do
+			local world = setup(1000, { bombs = 4, picks = { RustyPick = true }, pick = "RustyPick" })
+			stall(world.miningFolder(), Vector3.zero)
+			world.stand(Vector3.new(0, 0, 4))
+			t.ok(pcall(world.Mining.Handle, world.player, op, "CopperPick", 5))
+			t.ok(pcall(world.Mining.Handle, world.player))
+			t.eq(world.profile.cash, 1000)
+			t.eq(world.profile.mining.bombs, 4)
+		end
+	end)
+
 	t.test("buyPick, buyBomb and turnIn require the prospector stall", function()
 		local far = setup(100000, nil)
 		stall(far.miningFolder(), Vector3.zero)

@@ -27,6 +27,7 @@ function SlabData.Make(ownerId: number, uid: string): Part
 	part:SetAttribute("OwnerId", ownerId)
 	part:SetAttribute("Uid", uid)
 	part:SetAttribute("Slab", true)
+	part:SetAttribute("Born", os.clock()) -- LooseCaps: the oldest go first when there are too many
 	pcall(function()
 		game:GetService("CollectionService"):AddTag(part, SlabData.Tag)
 	end)

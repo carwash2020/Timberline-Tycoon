@@ -633,6 +633,48 @@ return function(t)
 		t.eq(s.toasts[#s.toasts][2], "You need a Lantern to chop gloamwood.")
 	end)
 
+	-- V1 hardening: the Chop remote's (part, hitPos, normal) with every kind of junk.
+	t.test("bad payloads to Chop: no damage, no cut, no error, whatever it is sent", function()
+		local huge = 1e308
+		local bad = {
+			{ "numbers", 1, 2, 3 },
+			{ "strings", "a", "b", "c" },
+			{ "tables", {}, {}, {} },
+			{ "nothing", nil, nil, nil },
+			{ "part only", true, nil, nil },
+			{ "NaN hit", true, Vector3.new(0 / 0, 0, 0), Vector3.xAxis },
+			{ "NaN normal", true, Vector3.new(1, 1.4, 0), Vector3.new(0 / 0, 0 / 0, 0 / 0) },
+			{ "infinite hit", true, Vector3.new(math.huge, 0, 0), Vector3.xAxis },
+			{ "huge hit", true, Vector3.new(huge, huge, huge), Vector3.xAxis },
+			{ "far hit", true, Vector3.new(5000, 0, 0), Vector3.xAxis },
+			{ "a CFrame for a Vector3", true, CFrame.new(1, 1, 1), CFrame.new() },
+			{ "a folder, not a part", Instance.new("Folder"), Vector3.new(1, 1, 1), Vector3.xAxis },
+			{ "a model", Instance.new("Model"), Vector3.new(1, 1, 1), Vector3.xAxis },
+			{ "a part of nothing we know", Instance.new("Part"), Vector3.new(1, 1, 1), Vector3.xAxis },
+		}
+		for _, case in ipairs(bad) do
+			local s = setup()
+			local rec = s.tree("oak")
+			local part = rec.sections[1]
+			local p = s.player(1)
+			local target = if case[2] == true then part else case[2]
+			local before = #rec.sections
+			local ok, err = pcall(s.Trees.Chop, p, target, case[3], case[4])
+			t.ok(ok, case[1] .. " threw: " .. tostring(err))
+			t.eq(#rec.sections, before, case[1] .. " cut a section")
+			t.eq(#s.fxOf("Clink"), 0, case[1] .. " struck the tree")
+			local verdict = select(1, s.Trees.Chop(p, target, case[3], case[4]))
+			t.eq(verdict, false, case[1] .. " was accepted")
+		end
+		-- A player with no character, or a dead one, cuts nothing.
+		local s = setup()
+		local rec = s.tree("oak")
+		local ghost = s.player(2)
+		ghost.Character = nil
+		local ok, why = s.Trees.Chop(ghost, rec.sections[1], Vector3.new(1, 1.4, 0), Vector3.xAxis)
+		t.eq({ ok, why }, { false, "dead" })
+	end)
+
 	t.test("a section grouped under a folder is still that section; a part with no parent is not", function()
 		local s = setup()
 		local rec = s.tree("oak")

@@ -231,6 +231,66 @@ return function(t)
 		t.eq(#profile.axes, 1)
 	end)
 
+	-- V1 hardening: the BoxOpen remote with junk, someone else's box, a box out of reach.
+	t.test("bad payloads to BoxOpen: nothing opens, nothing is granted, nothing throws", function()
+		local handlers = {}
+		local remote = {
+			OnServerEvent = {
+				Connect = function(_, fn)
+					table.insert(handlers, fn)
+					return { Disconnect = function() end }
+				end,
+			},
+		}
+		local junk = {
+			42,
+			true,
+			{},
+			{ uid = "x" },
+			0 / 0,
+			math.huge,
+			-1,
+			"",
+			string.rep("A", 100000),
+			"no-such-box",
+			Instance.new("Folder"),
+			Instance.new("Part"), -- a part that is not a box
+			Vector3.new(0 / 0, 0, 0),
+			print,
+		}
+		for i, bad in ipairs(junk) do
+			-- A fresh world each: the 4-a-second budget is never what stops it.
+			local _, Box, charges, profile = boot()
+			Box.Init(remote)
+			local rec = place(Box, Vector3.new(0, 4.5, 0), counterPart())
+			rec.paid = true
+			rec.buyerId = 7
+			rec.axeUid = "axe-1"
+			local buyer = person(rec.part.CFrame.Position + Vector3.new(2, 0, 0), 7)
+			local ok, err = pcall(handlers[#handlers], buyer, bad)
+			t.ok(ok, "junk " .. i .. " threw: " .. tostring(err))
+			t.eq(rec.opened, false, "junk " .. i .. " opened the box")
+			t.eq(#charges, 0, "junk " .. i .. " charged")
+			t.eq(#profile.axes, 1, "junk " .. i .. " granted")
+		end
+		-- Fired with no payload at all.
+		local _, Box = boot()
+		Box.Init(remote)
+		t.ok(pcall(handlers[#handlers], person(Vector3.new(0, 0, 0), 7)))
+		-- Someone else's box, and a box out of reach, by the real uid.
+		local _, Box2, _, profile2 = boot()
+		Box2.Init(remote)
+		local rec = place(Box2, Vector3.new(0, 4.5, 0), counterPart())
+		rec.paid = true
+		rec.buyerId = 7
+		rec.axeUid = "axe-1"
+		handlers[#handlers](person(rec.part.CFrame.Position, 8), rec.uid)
+		handlers[#handlers](person(rec.part.CFrame.Position + Vector3.new(300, 0, 0), 7), rec.uid)
+		handlers[#handlers](person(rec.part.CFrame.Position + Vector3.new(0 / 0, 0, 0), 7), rec.uid)
+		t.eq(rec.opened, false, "a stranger, a far buyer and a NaN position all fail")
+		t.eq(#profile2.axes, 1)
+	end)
+
 	t.test("leaving with a paid box keeps it, and coming back shows it once", function()
 		local _, Box, charges, profile = boot()
 		local counter = counterPart()

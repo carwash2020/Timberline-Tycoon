@@ -73,6 +73,7 @@ local RegionWake = require(script.Parent.RegionWake)
 local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
 local TruckLoad = require(script.Parent.TruckLoad)
+local BuildMaterials = require(script.Parent.BuildMaterials)
 local VehicleService = require(script.Parent.VehicleService)
 local WeatherService = require(script.Parent.WeatherService)
 local WoodService = require(script.Parent.WoodService)
@@ -915,6 +916,13 @@ if CoreLoop.V2() then
 		end,
 		moved = WoodService.Moved,
 	})
+	-- V1 hardening: wood riding on a truck bed never ages out and is never
+	-- capped away (WoodService.Tick and its caps read this hook), and the
+	-- other loose parts' caps (slabs, ore, ingots) run on the same second.
+	WoodService.Hooks.onBed = TruckLoad.BedOwner
+	WoodService.Hooks.afterTick = function()
+		BuildMaterials.EnforceCaps()
+	end
 	VehicleService.Hooks.onDriverChanged = TruckLoad.OnDriverChanged
 	VehicleService.Hooks.onRebuild = TruckLoad.OnRebuild
 	VehicleService.Hooks.loadCount = TruckLoad.LoadCount
@@ -971,7 +979,7 @@ if CoreLoop.V2() then
 		-- SectionTrees.Chop: the specs call that directly.
 		if ok then
 			print("[Chop] cut")
-		else
+		elseif why ~= "rate" then -- a flood is RateLimiter's to warn about, once a second, not a line per request
 			print("[Chop] rejected: " .. tostring(why))
 		end
 	end)

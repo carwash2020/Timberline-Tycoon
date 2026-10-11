@@ -161,7 +161,8 @@ end
 
 local function onDialogue(player: Player, action: unknown, a: unknown, b: unknown)
 	if not RateLimiter.Allow(player, "Dialogue") then
-		print(string.format("[Talk] %s: %s dropped (Dialogue rate limit)", tostring(player.Name), tostring(action)))
+		-- No log line here: a flood must not write one per request, and
+		-- `action` is whatever the client sent (any length).
 		return
 	end
 	if type(action) ~= "string" then

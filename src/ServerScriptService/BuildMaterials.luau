@@ -15,6 +15,8 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local LooseCaps = require(ReplicatedStorage.Shared.LooseCaps)
 local SlabData = require(ReplicatedStorage.Shared.SlabData)
 
 local BuildMaterials = {}
@@ -127,6 +129,60 @@ function BuildMaterials.SlabRoom(userId: number): number
 		end
 	end
 	return math.max(0, SlabData.MaxLoose - n)
+end
+
+-- Every loose slab, ore chunk and ingot in the world, as LooseCaps entries,
+-- and the instance behind each uid. Protected: in a hand (HeldBy, or a
+-- CarryWeld) or no longer lying in the world's loose folders (a slab inside a
+-- box, a truck or a machine model).
+function BuildMaterials.CapEntries(): ({ LooseCaps.Entry }, { [string]: Instance })
+	local entries: { LooseCaps.Entry } = {}
+	local byUid: { [string]: Instance } = {}
+	local function add(inst: Instance, inside: boolean)
+		local uid = inst:GetAttribute("Uid")
+		if type(uid) ~= "string" or byUid[uid] ~= nil then
+			return
+		end
+		local owner = inst:GetAttribute("OwnerId")
+		local born = inst:GetAttribute("Born")
+		byUid[uid] = inst
+		table.insert(entries, {
+			uid = uid,
+			ownerId = if type(owner) == "number" then owner else 0,
+			bornAt = if type(born) == "number" then born else 0,
+			protected = inside or held(inst),
+		})
+	end
+	for _, inst in ipairs(CollectionService:GetTagged(SlabData.Tag)) do
+		local parent = inst.Parent
+		if parent then
+			add(inst, not parent:IsA("Folder"))
+		end
+	end
+	local mining = Workspace:FindFirstChild("Mining")
+	if mining then
+		for _, inst in ipairs(mining:GetChildren()) do
+			if inst:IsA("Model") and (inst.Name == "Ingot" or inst.Name == "OreChunk") then
+				add(inst, false)
+			end
+		end
+	end
+	return entries, byUid
+end
+
+-- Keeps the loose-parts caps (GameConfig.MaxLooseMaterialsPerPlayer and
+-- MaxLooseMaterialsServer; see LooseCaps): the oldest go. Returns how many.
+function BuildMaterials.EnforceCaps(): number
+	local entries, byUid = BuildMaterials.CapEntries()
+	local evict =
+		LooseCaps.PickEvictions(entries, GameConfig.MaxLooseMaterialsPerPlayer, GameConfig.MaxLooseMaterialsServer)
+	for _, uid in ipairs(evict) do
+		local inst = byUid[uid]
+		if inst then
+			inst:Destroy()
+		end
+	end
+	return #evict
 end
 
 local slabFolder: Folder? = nil

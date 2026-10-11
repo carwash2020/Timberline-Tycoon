@@ -97,7 +97,7 @@ function NodeService.Hit(player: Player, uid: string): string?
 	if not rec or not rec.alive or not hrp or not profile then
 		return nil
 	end
-	if (hrp.Position - rec.part.Position).Magnitude > GameConfig.ChopRange + GameConfig.RangeTolerance then
+	if not ((hrp.Position - rec.part.Position).Magnitude <= GameConfig.ChopRange + GameConfig.RangeTolerance) then
 		return "far"
 	end
 	rec.hp -= 1

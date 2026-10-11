@@ -379,6 +379,61 @@ return function(t)
 		t.eq(#w.ownerCalls, 0)
 	end)
 
+	-- V1 hardening: every kind of junk the Grab and Release remotes can be sent.
+	t.test("bad payloads: NaN, infinity, huge, forged and far-off grabs and releases change nothing", function()
+		local huge = 1e308
+		local bad = {
+			Vector3.new(huge, huge, huge),
+			Vector3.new(math.huge, 0, 0),
+			Vector3.new(0, -math.huge, 0),
+			Vector3.new(0 / 0, 0 / 0, 0 / 0),
+			Vector3.new(1e10, 0, 0),
+			PIECE_AT + Vector3.new(500, 0, 0),
+		}
+		for i, hit in ipairs(bad) do
+			local w = setup()
+			local _, section = w.piece()
+			local player = w.player(1)
+			local ok, err = pcall(w.GrabService.Grab, player, section, hit)
+			t.ok(ok, "hit " .. i .. " threw: " .. tostring(err))
+			t.eq(w.GrabService.HeldBy(section.Parent), nil, "hit " .. i .. " took hold")
+			t.eq(#w.ownerCalls, 0, "hit " .. i .. " handed physics over")
+		end
+		-- A player standing at NaN or infinity is not in reach of anything.
+		for _, at in ipairs({ Vector3.new(0 / 0, 0, 0), Vector3.new(math.huge, 0, 0), Vector3.new(0, 0 / 0, 0) }) do
+			local w = setup()
+			local _, section = w.piece()
+			local player = w.player(1, at)
+			local ok = pcall(w.GrabService.Grab, player, section, HIT)
+			t.ok(ok)
+			t.eq(w.GrabService.HeldBy(section.Parent), nil, "a player at a bad position grabbed")
+		end
+		-- Releasing what you do not hold, with junk, someone else's part, or a part off the held piece.
+		local w = setup()
+		local _, section = w.piece()
+		local _, other = w.piece()
+		local holder, stranger = w.player(1), w.player(2)
+		t.ok(w.GrabService.Grab(holder, section, HIT))
+		for _, junk in ipairs({ 42, true, {}, "Section", 0 / 0, math.huge, print, Instance.new("Folder"), other }) do
+			w.wait(1)
+			t.ok(pcall(w.GrabService.Release, stranger, junk), "a stranger's release threw")
+			w.wait(1)
+			t.ok(pcall(w.GrabService.Release, holder, junk), "a holder's junk release threw")
+			t.ok(w.GrabService.HeldBy(section.Parent) ~= nil, "junk let go of the piece")
+		end
+		-- Spam beyond the budget: the rest are dropped and the piece is held once.
+		local flood = setup()
+		local _, target = flood.piece()
+		local spammer = flood.player(3)
+		local taken = 0
+		for _ = 1, 200 do
+			if flood.GrabService.Grab(spammer, target, HIT) then
+				taken += 1
+			end
+		end
+		t.ok(taken <= 6, "a flood of 200 grabs got " .. taken .. " through; the budget is 6 a second")
+	end)
+
 	t.test("rate: six grabs a second, the seventh is dropped", function()
 		local w = setup()
 		local _, section = w.piece()

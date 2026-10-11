@@ -361,6 +361,64 @@ return function(t)
 		end
 	end)
 
+	-- V1 hardening: whatever a client sends, nothing is charged, granted or toasted, and nothing throws.
+	t.test("bad payloads to BuyItem and EquipItem: no cash, no item, no truck switch, no error", function()
+		local roblox = t.roblox
+		local huge = 1e308
+		local junk = {
+			{ "wrong types", 42, 7 },
+			{ "booleans", true, false },
+			{ "tables", {}, { "SteelAxe" } },
+			{ "NaN", 0 / 0, 0 / 0 },
+			{ "infinity", math.huge, -math.huge },
+			{ "huge numbers", huge, -huge },
+			{ "negative", -1, -1 },
+			{ "missing", nil, nil },
+			{ "missing id", "Axe", nil },
+			{ "empty", "", "" },
+			{ "too long", string.rep("A", 100000), string.rep("B", 100000) },
+			{ "long id", "Axe", string.rep("SteelAxe", 20000) },
+			{ "control characters", "Axe\0", "Steel\nAxe\0" },
+			{ "wrong case", "axe", "steelaxe" },
+			{ "not an item class", roblox.Instance.new("Folder"), roblox.Instance.new("Part") },
+			{ "a function", print, print },
+			{ "a Vector3", roblox.Vector3.new(0 / 0, 1, 1), roblox.Vector3.new(1, 1, 1) },
+			{ "another category's id", "Axe", "Rustbucket" },
+			{ "table key trick", "__index", "__index" },
+			{ "prototype key", "constructor", "constructor" },
+		}
+		for _, case in ipairs(junk) do
+			-- A fresh server each, so the rate budget is never what stops it.
+			local s = setup({ cash = 1000000 })
+			local before = { cash = s.profile.cash, gear = #s.profile.gear, trucks = #s.profile.ownedTrucks }
+			local okBuy, errBuy = pcall(s.buy, case[2], case[3])
+			t.ok(okBuy, case[1] .. ": BuyItem threw " .. tostring(errBuy))
+			local okUse, errUse = pcall(s.use, case[2], case[3])
+			t.ok(okUse, case[1] .. ": EquipItem threw " .. tostring(errUse))
+			t.eq(s.profile.cash, before.cash, case[1] .. ": cash moved")
+			t.eq(#s.profile.gear, before.gear, case[1] .. ": gear changed")
+			t.eq(#s.profile.ownedTrucks, before.trucks, case[1] .. ": trucks changed")
+			t.eq(s.granted, {}, case[1] .. ": something was granted")
+			t.eq(s.switched, {}, case[1] .. ": the truck was switched")
+		end
+	end)
+
+	t.test("a buy from far away or with no character spends nothing, and a flood stops at the budget", function()
+		local far = setup({ cash = 1000, at = Vector3.new(5000, 3, 5000) })
+		far.buy("Axe", "SteelAxe")
+		t.eq(far.profile.cash, 1000)
+		t.eq(far.granted, {})
+		local nowhere = setup({ cash = 1000, at = Vector3.new(0 / 0, 0, 0) })
+		nowhere.buy("Axe", "SteelAxe")
+		t.eq(nowhere.profile.cash, 1000)
+		t.eq(nowhere.granted, {})
+		local flood = setup({ cash = 1000000, bestTier = 3, owned = { SteelAxe = 1 }, ownedTotal = 2 })
+		for _ = 1, 200 do
+			flood.buy("Axe", "SteelAxe")
+		end
+		t.ok(#flood.granted <= 3, "a flood of 200 buys got " .. #flood.granted .. " axes; the budget is 3 a second")
+	end)
+
 	t.test("BuyItem is rate-limited", function()
 		local s = setup({ cash = 100000, bestTier = 3, owned = { SteelAxe = 1 }, ownedTotal = 2 })
 		for _ = 1, 10 do

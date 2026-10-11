@@ -258,7 +258,7 @@ function SkyBinLogic.CanSell(f: SellFacts): (boolean, SellRefusal?)
 	if f.binOwnerId == nil or f.binOwnerId ~= f.userId then
 		return false, "notYours"
 	end
-	if f.distance == nil or f.distance > f.reach then
+	if f.distance == nil or not (f.distance <= f.reach) then
 		return false, "far"
 	end
 	return true, nil

@@ -91,6 +91,12 @@ return function(t)
 		t.eq({ Logic.CanSell({ binOwnerId = nil, userId = 8, distance = 1, reach = REACH }) }, { false, "notYours" })
 		t.eq({ Logic.CanSell({ binOwnerId = 7, userId = 7, distance = REACH + 0.1, reach = REACH }) }, { false, "far" })
 		t.eq({ Logic.CanSell({ binOwnerId = 7, userId = 7, distance = nil, reach = REACH }) }, { false, "far" })
+		t.eq(
+			{ Logic.CanSell({ binOwnerId = 7, userId = 7, distance = 0 / 0, reach = REACH }) },
+			{ false, "far" },
+			"NaN is not in reach"
+		)
+		t.eq({ Logic.CanSell({ binOwnerId = 7, userId = 7, distance = math.huge, reach = REACH }) }, { false, "far" })
 		t.eq({ Logic.CanSell({ binOwnerId = 7, userId = 7, distance = REACH, reach = REACH }) }, { true, nil })
 	end)
 

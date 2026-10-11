@@ -21,6 +21,32 @@ key (deriving it from a full plot is awaiting Connor, it would raise cash packs 
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
 the old ones), no Robux price in code.
 
+## V1 hardening: exploit guards and performance (branch `phase-2/v1-hardening-guards`, 11 October 2026, draft PR)
+
+Launch items 2 and 3. Audit first, then only what was missing.
+
+- **Exploit guards.** `tests/RemoteGuards.spec.luau` classifies every remote in `Net.RemoteNames` (a new one fails until it
+  is added to the table), proves each handler's file connects it and spends its own `RateLimiter` budget, that every payload
+  parameter is typed `unknown`, that no budget is over 8 a second (sell, buy, build and grab are pinned tighter), that spam
+  is dropped quietly and a flood is kicked, and that the v1-loop remotes connect only under the v1 loop. Bad-payload tests
+  (NaN, infinity, huge, negative, long, missing, wrong class, far away, someone else's plot or box) sit in the family specs:
+  ShopService, PlotService, GrabService, BoxService, SectionTrees, MiningService, PermissionLogic.
+- **Fixed in the audit.** A NaN distance passed every `distance > reach` check (the comparison is false): box opening
+  (BoxLogic, BoxService), box unpacking, the Sky Bin, Grab, Chop, node mining and the Hermit now use `not (d <= reach)`.
+  Chop and Dialogue no longer write a log line for every rate-limited request (a flood could fill Output).
+- **Loose caps.** Wood already had `MaxWoodPiecesPerPlayer` 150 and `MaxWoodPartsServer` 2500 (oldest unowned first).
+  New: `WoodService.Hooks.onBed` was never wired, so wood on a truck bed aged out and could be capped; GameServer now wires
+  it to `TruckLoad.BedOwner`, and a bed piece is never capped away. New: `Shared/LooseCaps` plus
+  `BuildMaterials.EnforceCaps` cap slabs, ore chunks and ingots (`MaxLooseMaterialsPerPlayer` 64, `MaxLooseMaterialsServer`
+  400), oldest first, never a held or boxed one, run each second from `WoodService.Hooks.afterTick`. Saved plot items and
+  `plot.loose` records are not in the world, so they are never candidates.
+- **Streaming.** Reviewed, not changed: Improved, PauseOutsideLoadedArea, min 128, target 640, Opportunistic stream-out.
+  `tests/StreamingSafe.spec.luau` pins them and scans the client for unsafe world lookups (none found). Plots, items,
+  wood, trees and trucks stay Atomic; the town anchors the client waits for are Persistent (MapBuilder.spec).
+- **Phone profile.** `tests/PhoneProfile.spec.luau`: a 667 x 375 touch-only phone runs the low tier; part, mesh and light
+  budgets, effects and tap sizes are pinned.
+- Studio checks: PHASE2_NOTES.md "V1 hardening: exploit guards and performance".
+
 ## Lane R: Bayou and Red Mesa (#139, 11 October 2026)
 ## V1: no ButtonR2 anywhere (branch `phase-2/v1-no-buttonr2`, 11 October 2026, draft PR)
 

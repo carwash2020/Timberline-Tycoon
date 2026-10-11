@@ -144,7 +144,7 @@ function BoxLogic.CanOpen(facts: OpenFacts): (boolean, OpenReason?)
 	if facts.buyerId ~= facts.userId then
 		return false, "owner"
 	end
-	if facts.distance > BoxLogic.OpenRange then
+	if not (facts.distance <= BoxLogic.OpenRange) then -- a NaN distance is not in reach
 		return false, "far"
 	end
 	if facts.opened then

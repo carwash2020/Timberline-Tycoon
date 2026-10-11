@@ -75,7 +75,7 @@ function BoxUnpack.CanTake(facts: TakeFacts): (boolean, TakeReason?)
 	if facts.buyerId ~= facts.userId then
 		return false, "owner"
 	end
-	if facts.distance > BoxUnpack.TakeRange then
+	if not (facts.distance <= BoxUnpack.TakeRange) then
 		return false, "far"
 	end
 	return true, nil
