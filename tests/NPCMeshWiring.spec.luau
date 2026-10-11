@@ -56,6 +56,7 @@ return function(t)
 				t.eq(plain:GetAttribute("TownMesh"), nil, npc.id .. " part-built without meshes")
 				t.eq(plain:GetAttribute("MeshFallback"), id, npc.id .. " notes the miss (logged once per asset in the engine)")
 				t.ok(plain.Torso.Transparency < 1, npc.id .. " keeps the part look")
+				MeshKit.Reset() -- the part-built pass cached its misses
 				MeshKit.Override = function(_id, name, size)
 					local part = roblox.Instance.new("MeshPart")
 					part.Name = name
