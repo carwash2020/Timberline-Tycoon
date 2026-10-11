@@ -2423,14 +2423,14 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 904070929, "the first 322 trees moved, changed wood or changed order")
+		t.eq(h, 130106653, "the first 322 trees moved, changed wood or changed order")
 		local function at(i, woodId, biome, x, z)
 			local tree = trees[i]
 			t.eq(tree.woodId, woodId)
 			t.eq(tree.biome, biome)
 			t.ok(math.abs(tree.position.X - x) < 0.01 and math.abs(tree.position.Z - z) < 0.01, "tree " .. i)
 		end
-		at(1, "birch", "starter", 22.84, -179.0)
+		at(1, "birch", "starter", 29.73, -177.05)
 		at(161, "emberwood", "volcano", 508.15, 486.41)
 		at(FIRST, "birch", "wild", 747.08, 411.5)
 	end)

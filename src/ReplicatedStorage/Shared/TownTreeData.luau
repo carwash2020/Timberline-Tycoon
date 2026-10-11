@@ -84,7 +84,7 @@ TownTreeData.Empty = {
 	{ name = "SellArea", x0 = -60, z0 = 80, x1 = 60, z1 = 140 },
 	{ name = "SpawnLane", x0 = -18, z0 = 8, x1 = 18, z1 = 100 },
 	-- A few steps clear of every shop door: the front of each one.
-	{ name = "DealershipDoor", x0 = 170, z0 = 62, x1 = 210, z1 = 104 },
+	{ name = "DealershipDoor", x0 = 170, z0 = 62, x1 = 210, z1 = 107.4 },
 	{ name = "ToolShedDoor", x0 = -108, z0 = 78, x1 = -60, z1 = 94 },
 	{ name = "GeneralStoreDoor", x0 = -126, z0 = 148, x1 = -74, z1 = 166 },
 } :: { Rect }
@@ -95,7 +95,7 @@ TownTreeData.Empty = {
 TownTreeData.Buildings = {
 	{ name = "ToolShed", x0 = -125, z0 = 87, x1 = -43, z1 = 149 },
 	{ name = "GeneralStore", x0 = -147, z0 = 158, x1 = -53, z1 = 211 },
-	{ name = "Showroom", x0 = 178, z0 = 90, x1 = 337, z1 = 160 },
+	{ name = "Showroom", x0 = 178, z0 = 93.4, x1 = 337, z1 = 163.4 },
 	{ name = "Sawmill", x0 = -32, z0 = 95, x1 = 33, z1 = 139 },
 	{ name = "SellStation", x0 = 37, z0 = 94, x1 = 84, z1 = 129 },
 	{ name = "GondolaStation", x0 = -49, z0 = 140, x1 = -30, z1 = 159 },

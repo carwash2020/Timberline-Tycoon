@@ -56,7 +56,7 @@ return function(t)
 
 	t.test("the first 730 trees and the first 4 Reach trees stay on main's spots", function()
 		t.ok(#trees > PREFIX, #trees .. " trees")
-		t.eq(hashOf(trees, PREFIX), 386408152, "existing trunks moved")
+		t.eq(hashOf(trees, PREFIX), 123854960, "existing trunks moved")
 		t.eq(#reach, 6, "the Reach is 1.5x of 4, rounded down")
 		t.eq(hashOf(reach, 4), 419646000, "the first 4 Reach trees moved")
 	end)

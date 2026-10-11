@@ -22,9 +22,9 @@ return function(t)
 	-- are flat at their own height, and each lane is a sample.
 	local HEIGHT_FINGERPRINT = {
 		n = 7717,
-		sum = 78802.208470475568902,
-		wsum = 64.781511060652036,
-		sq = 5271518.700170860625803,
+		sum = 78823.171615040409961,
+		wsum = 63.910852080600257,
+		sq = 5271618.687334788963199,
 		lo = -48.000000000000000,
 		hi = 161.576039893993112,
 	}

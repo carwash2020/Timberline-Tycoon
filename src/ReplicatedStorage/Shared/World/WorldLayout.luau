@@ -630,7 +630,8 @@ WorldLayout.TownPaint = {
 	-- The road along the showroom's forecourt (the hall stands at x 181 to 336,
 	-- z 96 to 162, behind the Land Office and its sign), and the path up to its door.
 	{ name = "TruckLotPath", x0 = 116, x1 = 340, z0 = 64, z1 = 70, material = ROAD },
-	{ name = "DealershipPath", x0 = 182, x1 = 196.5, z0 = 69.5, z1 = 95.4, material = ROAD },
+	-- Ring map: the hall stands 3.4 further north (off the East Link), so the path runs 3.4 further.
+	{ name = "DealershipPath", x0 = 182, x1 = 196.5, z0 = 69.5, z1 = 98.8, material = ROAD },
 	-- The shop paths lead to each counter (TWN-13: the shops grew 1.5x).
 	-- The General Store stands behind the Tool Shed (z 165.5 to 209): its path
 	-- runs up the lane west of the Tool Shed, then across to its door.
@@ -650,7 +651,7 @@ WorldLayout.TownPaint = {
 WorldLayout.TownFloors = {
 	{ name = "ToolShedFloor", x0 = -106.5, x1 = -62, z0 = 88.5, z1 = 142.5, material = "Ground" },
 	{ name = "HearthAndHomeFloor", x0 = -128, x1 = -72, z0 = 164, z1 = 212, material = "Ground" },
-	{ name = "DealershipFloor", x0 = 178, x1 = 338.5, z0 = 92, z1 = 164.5, material = "Ground" },
+	{ name = "DealershipFloor", x0 = 178, x1 = 338.5, z0 = 95.4, z1 = 165.9, material = "Ground" },
 	-- The sell station (pad x 39 to 67, z 95 to 127, Weigh House to x 83): the
 	-- MillYard stops at x 33, so without this the grass grew over the pad.
 	-- Gravel like the yard beside it: a truck yard, not a shop floor.

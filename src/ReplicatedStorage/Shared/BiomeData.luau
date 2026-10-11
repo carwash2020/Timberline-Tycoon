@@ -81,7 +81,7 @@ local biomes: { BiomeDef } = {
 		displayName = "Starter Forest",
 		access = "truck",
 		haulStuds = 260,
-		area = { x = 0, z = -180, radius = 150 }, -- south of spawn
+		area = { x = 8, z = -178, radius = 143 }, -- south of spawn
 		ground = { color = "#64B838", material = "Grass" },
 		trees = { oak = 70, birch = 26 },
 	},

@@ -185,10 +185,9 @@ return function(t)
 				end
 			end
 		end
-		-- Ring map, Oct 10: 46 (it was 49 on Oct 8; North Bend, East Meadow, High
-		-- Meadow, Pine Bend and Ash Gate moved again to make room for the coast's
-		-- landmarks and the mine).
-		t.eq(onYard, 46, "saved trees standing on a yard")
+		-- Ring map, Oct 10: 0 (it was 49 on Oct 8). The first batch is placed on the map
+		-- as it is (WorldVersion 2), so none stands on a yard.
+		t.eq(onYard, 0, "trees standing on a yard")
 		local zones = 0
 		for _, zone in ipairs(WorldLayout.FlatZones) do
 			if zone.name == "Plot" then
