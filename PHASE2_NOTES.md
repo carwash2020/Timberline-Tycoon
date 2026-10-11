@@ -3751,3 +3751,27 @@ Policy (any device)
 10. Open the Robux store (the board, the shelf, or the STORE button): it looks exactly as before, every card, price and Coming soon line unchanged. No paid random item is sold, so nothing is hidden; the specs cover the hiding and the refusal.
 11. Output: no red errors from `[PolicyGate]` or `[TextFilter]` during join. A warning "policy lookup failed" in Studio without API access is expected; the strict default then applies, which hides nothing today.
 12. Rename a save to something rude: it shows as hashes or the default name, never as typed (Studio may not filter without an experience; the live server does).
+
+## Client freeze and the late forest (branch `phase-2/fix-client-freeze`, 11 October 2026)
+
+What and why are in STATUS.md. Claude cannot run Studio: the Lune specs (`tests/ClientFreeze.spec.luau`, `MapBuilder.spec`) prove the causes with work counters and equivalence checks (the same 1,041 trees in the same order, `takenNear` equal to the scan on seeded random points, 0.4 distance checks a query at 1,300 trees against the scan's 1,300, the plan built once for three callers, 72,000 pauses and no stretch of planner work over 100 ms in Lune with the town warmed, the town's trees handed over after 22% of the work). Lune numbers are not Studio numbers: these checks are the part only Studio can answer.
+
+### Studio checks
+
+Use the MicroProfiler (Ctrl+F6) and the Script Performance window (View, Script Performance), a fresh Studio Play (not Run) so the client loads cold. Good looks like: no frame over 100 ms in the profiler after the loading card goes, and no `Script timeout` line in Output.
+
+PC (keyboard and mouse)
+1. Output: no `TreeFill:380: Script timeout`, no `WeatherController Start took ...` over 0.1 s in the `[Load]` lines, no `Script timeout` of any kind in the first two minutes.
+2. Profiler while the forest fills in (the `[ForestFiller] plan ready in ... s` line says when it ends): no frame over 100 ms. The plan takes as long as before in total, spread over frames. A one-off hitch of up to about half a second when the town is first read (WorldPlan.Town, shared with the town markers) is known; tell Claude if it is longer.
+3. Spawn: the three tutorial oaks west of the spawn are there at once. Within a few seconds of spawning the meadow trees (south) and the trees in and round the town (the pad, the dealership, the lanes) stand; the far forest and the biome trees keep arriving after. Chop the nearest tree in the first minute: it works.
+4. Murph's "find an oak" beacon points at a tutorial oak from the first moment.
+5. Walk into a cave, the tunnel and the grotto in the first minutes: rain stops inside (the cave zones join once the plan is ready, a moment after the start), and cave nature parts and lights appear.
+6. Run, drive and chop while the forest is still planting: no stutter.
+
+Phone (667x375)
+7. Same as 1 to 3 on the phone (or the Studio phone emulator at the low tier): no hitch bigger than the profiler's 100 ms line, the three oaks at spawn straight away, the meadow and town trees within a few seconds. Touch: the chop button works on the first tree.
+
+Xbox (controller)
+8. Same as 1 to 3 with the controller: the chop (RT) works on the first oak; the selection ring and B closing panels are untouched by this change.
+
+If a number is off, send the `[Load]` lines and the `loadLine` lines from the server (`first forest trees planted`, `forest planned`, `forest planted`).

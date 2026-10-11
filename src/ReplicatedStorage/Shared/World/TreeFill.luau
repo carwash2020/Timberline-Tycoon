@@ -158,35 +158,90 @@ function TreeFill.Clear(x: number, z: number): boolean
 end
 
 -- The lists of taken spots only ever grow, so each keeps its X and Z as
--- plain numbers (reading a Vector3's fields is slow), extended on use.
-type Flat = { n: number, xs: { number }, zs: { number } }
+-- plain numbers (reading a Vector3's fields is slow), extended on use, and
+-- a hash grid of CELL-stud squares (cell key -> the indices inside), so a
+-- query looks only at the few squares a `gap`-disc touches instead of at
+-- every taken spot. The answer is exactly the linear scan's (TakenNearScan,
+-- kept as the reference the spec compares against).
+type Flat = { n: number, xs: { number }, zs: { number }, grid: { [number]: { number } } }
 local flats: { [{ Vector3 }]: Flat } = setmetatable({}, { __mode = "k" }) :: any
-local function takenNear(taken: { Vector3 }, x: number, z: number, gap: number): boolean
+local CELL = 16
+local KEY_SPAN = 4096 -- cells per row in the hash key; the world is far smaller
+local KEY_BIAS = 2048
+
+-- Work counters (read by the specs, never by the game): how many queries ran,
+-- how many spot-to-point distances they measured, and how many times the
+-- whole fill was planned (once per world: WorldPlan.Trees caches it).
+TreeFill.Stats = { takenNearCalls = 0, takenNearChecks = 0, extraRuns = 0 }
+
+local function cellKey(cx: number, cz: number): number
+	return (cx + KEY_BIAS) * KEY_SPAN + (cz + KEY_BIAS)
+end
+
+-- The reference: every spot, in order, no grid.
+function TreeFill.TakenNearScan(taken: { Vector3 }, x: number, z: number, gap: number): boolean
 	local g2 = gap * gap
-	local flat = flats[taken]
-	if not flat then
-		flat = { n = 0, xs = {}, zs = {} }
-		flats[taken] = flat
-	end
-	local xs, zs = flat.xs, flat.zs
-	local count = #taken
-	if flat.n > count then -- (shrunk: start over)
-		table.clear(xs)
-		table.clear(zs)
-		flat.n = 0
-	end
-	for i = flat.n + 1, count do
-		local p = taken[i]
-		xs[i], zs[i] = p.X, p.Z
-	end
-	flat.n = count
-	for i = 1, count do
-		local dx, dz = xs[i] - x, zs[i] - z
+	for _, p in ipairs(taken) do
+		local dx, dz = p.X - x, p.Z - z
 		if dx * dx + dz * dz < g2 then
 			return true
 		end
 	end
 	return false
+end
+
+local function takenNear(taken: { Vector3 }, x: number, z: number, gap: number): boolean
+	local g2 = gap * gap
+	local flat = flats[taken]
+	if not flat then
+		flat = { n = 0, xs = {}, zs = {}, grid = {} }
+		flats[taken] = flat
+	end
+	local xs, zs, grid = flat.xs, flat.zs, flat.grid
+	local count = #taken
+	if flat.n > count then -- (shrunk: start over)
+		table.clear(xs)
+		table.clear(zs)
+		table.clear(grid)
+		flat.n = 0
+	end
+	for i = flat.n + 1, count do
+		local p = taken[i]
+		local px, pz = p.X, p.Z
+		xs[i], zs[i] = px, pz
+		local key = cellKey(math.floor(px / CELL), math.floor(pz / CELL))
+		local bucket = grid[key]
+		if bucket then
+			table.insert(bucket, i)
+		else
+			grid[key] = { i }
+		end
+	end
+	flat.n = count
+	local stats = TreeFill.Stats
+	stats.takenNearCalls += 1
+	local c0x, c1x = math.floor((x - gap) / CELL), math.floor((x + gap) / CELL)
+	local c0z, c1z = math.floor((z - gap) / CELL), math.floor((z + gap) / CELL)
+	for cx = c0x, c1x do
+		for cz = c0z, c1z do
+			local bucket = grid[cellKey(cx, cz)]
+			if bucket then
+				stats.takenNearChecks += #bucket
+				for _, i in ipairs(bucket) do
+					local dx, dz = xs[i] - x, zs[i] - z
+					if dx * dx + dz * dz < g2 then
+						return true
+					end
+				end
+			end
+		end
+	end
+	return false
+end
+
+-- Exposed for the specs: the grid's answer on a list.
+function TreeFill.TakenNear(taken: { Vector3 }, x: number, z: number, gap: number): boolean
+	return takenNear(taken, x, z, gap)
 end
 
 -- Scenery was laid out against the original trees. New trunks stay 8 studs
@@ -374,9 +429,15 @@ local function placeOne(
 	zone: TreeZone,
 	taken: { Vector3 },
 	rng: any,
-	gap: number
+	gap: number,
+	pause: (() -> ())?
 ): Spot?
 	local function free(px: number, pz: number): boolean
+		-- A spot that cannot be filled walks a whole grid of candidates (a disc
+		-- of hundreds of studs at 4 apart): the frame goes back from in here.
+		if pause then
+			pause()
+		end
 		return not takenNear(taken, px, pz, gap) and TreeFill.Ground(px, pz)
 	end
 	local x, z = ForestLogic.FindSpot(cx, cz, radius, 80, function()
@@ -441,10 +502,21 @@ end
 -- must not freeze a frame (the server planting the forest after players are
 -- in, the client's filler plan) passes a time slice that yields when its
 -- budget is spent. It changes nothing about the result.
-function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
+-- `emit` (optional) is handed each batch of spots the moment it is planned,
+-- nearest-the-spawn batch first (the town's trees, planned before the slow
+-- ones: they were always placed against the existing trees only, so planning
+-- them first moves nothing, tests/ClientFreeze.spec), so the server can plant
+-- the starter area while the rest of the plan is still being worked out.
+function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?, emit: (({ Spot }) -> ())?): { Spot }
 	local function tick()
 		if pause then
 			pause()
+		end
+	end
+	TreeFill.Stats.extraRuns += 1
+	local function announce(batch: { Spot })
+		if emit and #batch > 0 then
+			emit(batch)
 		end
 	end
 	local out: { Spot } = {}
@@ -453,6 +525,14 @@ function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
 		table.insert(taken, s.position)
 	end
 	local rng = Kit.rng(hashString("tree fill"))
+	-- The town's trees first (own rng per site; placed against the existing
+	-- trees and each other only, the same trunks as when they came last),
+	-- but they join `out` last, so the list's order is as it always was.
+	local townSpots = TreeFill.TownRings(taken, pause)
+	for _, spot in ipairs(townSpots) do
+		table.insert(taken, spot.position)
+	end
+	announce(townSpots)
 
 	for _, biome in ipairs(BiomeData.All()) do
 		local area = biome.area
@@ -486,7 +566,8 @@ function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
 				while left > 0 and tries < left * 40 do
 					tries += 1
 					tick()
-					local spot = placeOne(area.x, area.z, area.radius - 6, woodId, biome.id, zone, taken, rng, TREE_GAP)
+					local spot =
+						placeOne(area.x, area.z, area.radius - 6, woodId, biome.id, zone, taken, rng, TREE_GAP, pause)
 					if spot then
 						table.insert(out, spot)
 						left -= 1
@@ -496,6 +577,8 @@ function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
 		end
 	end
 
+	announce(table.move(out, 1, #out, 1, {}))
+	local announced = #out
 	local discs = world().GroveDiscs() :: { GroveDisc }
 	for index, disc in ipairs(discs) do
 		local id = "grove:" .. tostring(index)
@@ -508,7 +591,7 @@ function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
 			tries += 1
 			tick()
 			local woodId = rng:pick(woodsNear(Vector2.new(disc.cx, disc.cz)))
-			local spot = placeOne(disc.cx, disc.cz, disc.radius, woodId, "wild", zone, taken, rng, TREE_GAP)
+			local spot = placeOne(disc.cx, disc.cz, disc.radius, woodId, "wild", zone, taken, rng, TREE_GAP, pause)
 			if spot then
 				table.insert(out, spot)
 				left -= 1
@@ -534,8 +617,18 @@ function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
 				tries += 1
 				tick()
 				local woodId = rng:pick(woodsNear(stand.center))
-				local spot =
-					placeOne(stand.center.X, stand.center.Y, stand.radius, woodId, "wild", zone, taken, rng, TREE_GAP)
+				local spot = placeOne(
+					stand.center.X,
+					stand.center.Y,
+					stand.radius,
+					woodId,
+					"wild",
+					zone,
+					taken,
+					rng,
+					TREE_GAP,
+					pause
+				)
 				if spot then
 					table.insert(out, spot)
 					left -= 1
@@ -544,20 +637,25 @@ function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
 		end
 	end
 
+	announce(table.move(out, announced + 1, #out, 1, {}))
+	announced = #out
 	local clumps = TreeFill.Clumps(taken, rng, pause)
 	for _, spot in ipairs(clumps) do
 		table.insert(out, spot)
 		table.insert(taken, spot.position)
 	end
+	announce(clumps)
 	-- Last, with their own rng, so nothing above moves: trees round each pad.
-	for _, spot in ipairs(TreeFill.PlotRings(taken, pause)) do
+	local rings = TreeFill.PlotRings(taken, pause)
+	for _, spot in ipairs(rings) do
 		table.insert(out, spot)
 		table.insert(taken, spot.position)
 	end
-	-- And last of all, the trees in and round the town (its own rng too).
-	for _, spot in ipairs(TreeFill.TownRings(taken, pause)) do
+	announce(rings)
+	-- And last of all in the list, the trees in and round the town (planned
+	-- first, above).
+	for _, spot in ipairs(townSpots) do
 		table.insert(out, spot)
-		table.insert(taken, spot.position)
 	end
 	return out
 end

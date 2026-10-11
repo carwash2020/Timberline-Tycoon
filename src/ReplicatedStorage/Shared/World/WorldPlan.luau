@@ -53,6 +53,36 @@ local function hashString(s: string): number
 	return h
 end
 
+-- Giving the frame back while a planner works. The planners are pure and
+-- deterministic, and the biggest cost seconds (about 10 s in all, in Lune);
+-- a caller that must not freeze a frame (the server planting after players are
+-- in, the client's filler plan) runs them under WithPause, and each planner's
+-- hot loop calls `breathe`, which yields on the caller's time slice. It is
+-- bound to the calling thread, so another script that asks for the same plan
+-- meanwhile is not suspended, and a planner's result is the same either way.
+local pauseThread: thread? = nil
+local pauseStep: (() -> ())? = nil
+local function breathe()
+	local step = pauseStep
+	if step and coroutine.running() == pauseThread then
+		step()
+	end
+end
+
+-- Runs `fn` with `pause` called from the planners' loops.
+function WorldPlan.WithPause(pause: (() -> ())?, fn: () -> any): any
+	local prevThread, prevStep = pauseThread, pauseStep
+	if pause then
+		pauseThread, pauseStep = coroutine.running(), pause
+	end
+	local ok, result = pcall(fn)
+	pauseThread, pauseStep = prevThread, prevStep
+	if not ok then
+		error(result, 0)
+	end
+	return result
+end
+
 -- The CFrame standing at (x, z) on the ground, facing (tx, tz).
 local function standing(x: number, z: number, tx: number, tz: number): CFrame
 	local y = TerrainGen.HeightAt(x, z)
@@ -184,10 +214,24 @@ end
 -- (BiomeData counts), then the wild groves between them. Never change
 -- what this returns; new trees go after it (WorldPlan.Trees).
 local cachedFirst: { TreeSpot }? = nil
+local firstBuilding = false
 function firstTrees(): { TreeSpot }
 	if cachedFirst then
 		return cachedFirst
 	end
+	-- It gives the frame back while it works (breathe), so a second asker
+	-- meanwhile waits for the first's result: running it twice would plant the
+	-- groves twice.
+	if firstBuilding and task then
+		local waited = 0
+		while firstBuilding and not cachedFirst and waited < 120 do
+			waited += task.wait()
+		end
+		if cachedFirst then
+			return cachedFirst
+		end
+	end
+	firstBuilding = true
 	-- Ring map (WorldVersion 2): the first batch is placed on the map as it
 	-- is, not on the old narrower roads and the one lawn. (It was placed on
 	-- that old layout so saved trees kept their X and Z; the ring map is a new
@@ -196,6 +240,7 @@ function firstTrees(): { TreeSpot }
 	-- rollback to v1.
 	local out: { TreeSpot } = {}
 	local taken: { Vector3 } = {}
+	local discs: { GroveDisc } = {}
 	local function build(): any
 		for _, biome in ipairs(BiomeData.All()) do
 			local area = biome.area
@@ -212,6 +257,7 @@ function firstTrees(): { TreeSpot }
 					local placed, tries = 0, 0
 					while placed < want and tries < want * 60 do
 						tries += 1
+						breathe()
 						local angle = rng:range(0, math.pi * 2)
 						local r = math.sqrt(rng:next()) * (area.radius - 6) -- even spread over the disc
 						local x, z = area.x + math.cos(angle) * r, area.z + math.sin(angle) * r
@@ -259,6 +305,7 @@ function firstTrees(): { TreeSpot }
 		local tries = 0
 		while #centers < WILD_GROVES and tries < 6000 do
 			tries += 1
+			breathe()
 			local x, z = wildRng:range(-half, half), wildRng:range(-half, half)
 			local ok = Vector2.new(x - mill.X, z - mill.Z).Magnitude > WILD_NEAREST
 				and WorldLayout.FlatWeight(x, z) <= 0
@@ -310,6 +357,7 @@ function firstTrees(): { TreeSpot }
 			}
 			while placed < want and attempts < want * 30 do
 				attempts += 1
+				breathe()
 				local angle = wildRng:range(0, math.pi * 2)
 				local r = math.sqrt(wildRng:next()) * 26
 				local x, z = c.X + math.cos(angle) * r, c.Y + math.sin(angle) * r
@@ -331,11 +379,12 @@ function firstTrees(): { TreeSpot }
 					placed += 1
 				end
 			end
-			table.insert(groveDiscs, { cx = c.X, cz = c.Y, radius = 26, count = placed })
+			table.insert(discs, { cx = c.X, cz = c.Y, radius = 26, count = placed })
 		end
 		return nil
 	end
 	local placedOk, placedErr = pcall(build)
+	firstBuilding = false
 	TerrainGen.SetLegacyLayout(false)
 	if not placedOk then
 		error(placedErr)
@@ -344,8 +393,16 @@ function firstTrees(): { TreeSpot }
 		local p = spot.position
 		spot.position = Vector3.new(p.X, TerrainGen.HeightAt(p.X, p.Z) - 0.3, p.Z)
 	end
+	table.move(discs, 1, #discs, #groveDiscs + 1, groveDiscs)
 	cachedFirst = out
 	return out
+end
+
+-- The first batch (each biome's trees, then the wild groves'): cheap beside
+-- the rest (under a second), and the trees round the spawn, so the server
+-- plants them before the rest of WorldPlan.Trees is even worked out.
+function WorldPlan.FirstTrees(): { TreeSpot }
+	return firstTrees()
 end
 
 -- Country stands: more wild stands out in the open country, so the land
@@ -455,6 +512,7 @@ function WorldPlan.CountryStands(): { Stand }
 
 	-- Whether a stand tree could grow at (x, z).
 	local function ground(x: number, z: number): boolean
+		breathe()
 		if math.abs(x) > STAND_EDGE or math.abs(z) > STAND_EDGE or (z < coast.northZ and x > beachX) then
 			return false
 		end
@@ -581,6 +639,7 @@ function WorldPlan.CountryStands(): { Stand }
 					local dir = (b - a).Unit
 					local normal = Vector2.new(-dir.Y, dir.X)
 					while nextAt <= walked + len do
+						breathe()
 						local along = a + dir * (nextAt - walked)
 						local done = false
 						for _, s in ipairs({ side, -side }) do
@@ -673,26 +732,78 @@ end
 -- server planting after players are in, the client's filler) passes `pause`,
 -- a time slice's step, called after every placement attempt. The trees are
 -- the same with or without it.
-function WorldPlan.Trees(pause: (() -> ())?): { TreeSpot }
+local treesBuilding = false
+
+-- Whether WorldPlan.Trees is worked out (cached). Anything that only needs
+-- the trees to decorate (the weather's and the wildlife's cave zones) waits
+-- for this instead of asking for them: asking costs seconds on the spot.
+function WorldPlan.TreesReady(): boolean
+	return cachedTrees ~= nil
+end
+
+-- `emit` (optional) gets every tree after the first batch (WorldPlan.FirstTrees,
+-- which the caller has), once each, as it is planned: the town's trees first
+-- (they stand round the spawn), then the country stands' and the forest's, then
+-- the extra trees (TreeFill.Extra) phase by phase. The server plants each batch
+-- the moment it comes, so the starter area is up while the rest is still being
+-- worked out. A tree emitted is in the returned list too, in its place.
+function WorldPlan.Trees(pause: (() -> ())?, emit: (({ TreeSpot }) -> ())?): { TreeSpot }
 	if cachedTrees then
 		return cachedTrees
 	end
-	local out = table.clone(baseTrees())
-	for _, spot in ipairs(WorldPlan.ForestTrees()) do
-		table.insert(out, spot)
+	-- One build at a time: a second caller (the plan is paused between frames,
+	-- so others get to ask meanwhile) waits for the first's result instead of
+	-- starting the seconds of work again, which froze the client over and over.
+	-- (A build that died frees the flag; a wait gives up after 120 s.)
+	if treesBuilding and task then
+		local waited = 0
+		while treesBuilding and not cachedTrees and waited < 120 do
+			waited += task.wait()
+		end
+		if cachedTrees then
+			return cachedTrees
+		end
 	end
-	-- Denser biomes, groves and stands, then the wild clumps. Appended, so
-	-- every tree above keeps its X and Z.
-	local TreeFill = require(script.Parent.TreeFill)
-	for _, spot in ipairs(TreeFill.Extra(out, pause)) do
-		table.insert(out, spot)
+	treesBuilding = true
+	local ok, result = pcall(function(): { TreeSpot }
+		return WorldPlan.WithPause(pause, function(): any
+			local out = table.clone(baseTrees())
+			for _, spot in ipairs(WorldPlan.ForestTrees()) do
+				table.insert(out, spot)
+			end
+			-- Denser biomes, groves and stands, then the wild clumps. Appended, so
+			-- every tree above keeps its X and Z.
+			local TreeFill = require(script.Parent.TreeFill)
+			local preCount = #out
+			local sentRest = false
+			local announce: (({ TreeSpot }) -> ())? = nil
+			if emit then
+				announce = function(batch: { TreeSpot })
+					emit(batch)
+					-- The country stands' and the forest's trees are planned by
+					-- now: they follow the town's.
+					if not sentRest then
+						sentRest = true
+						emit(table.move(out, WorldPlan.FirstTreeCount() + 1, preCount, 1, {}))
+					end
+				end
+			end
+			for _, spot in ipairs(TreeFill.Extra(out, pause, announce)) do
+				table.insert(out, spot)
+			end
+			return out
+		end)
+	end)
+	treesBuilding = false
+	if not ok then
+		error(result, 0)
 	end
 	-- Another caller may have finished while this one was paused: keep theirs.
 	if cachedTrees then
 		return cachedTrees
 	end
-	cachedTrees = out
-	return out
+	cachedTrees = result
+	return result
 end
 
 -- The Petrified Reach: a few gloamwood on the far side of the hollow's
@@ -936,13 +1047,18 @@ export type Boulder = { position: Vector3, size: number, seed: number, snowy: bo
 -- Boulders out in the country: dry, off the roads, below the high peaks,
 -- and on ground gentle enough (slope under 0.6) that sinking them 0.6
 -- leaves no gap under their downhill side.
+local cachedBoulders: { Boulder }? = nil
 function WorldPlan.Boulders(): { Boulder }
+	if cachedBoulders then
+		return cachedBoulders
+	end
 	local out: { Boulder } = {}
 	local rng = Kit.rng(4242)
 	local trees = firstTrees() -- not the country stands: they keep off the boulders
 	local tries = 0
 	while #out < 90 and tries < 2000 do
 		tries += 1
+		breathe()
 		-- Ring map: inside the 2000-stud square (it was +-1350), and off the river's banks.
 		local x, z = rng:range(-1000, 1000), rng:range(-1000, 1000)
 		local ok = WorldLayout.FlatWeight(x, z) <= 0
@@ -972,19 +1088,25 @@ function WorldPlan.Boulders(): { Boulder }
 			})
 		end
 	end
+	cachedBoulders = out
 	return out
 end
 
 -- Brown rocks on the open lawn round the town (phase 12). Not part of
 -- Boulders(): those 90 are a fingerprint the country stands keep off, and
 -- these sit inside 300 studs of the sawmill where the stands never grow.
+local cachedMeadowBoulders: { Boulder }? = nil
 function WorldPlan.MeadowBoulders(): { Boulder }
+	if cachedMeadowBoulders then
+		return cachedMeadowBoulders
+	end
 	local out: { Boulder } = {}
 	local rng = Kit.rng(hashString("meadow boulders"))
 	local mill = WorldLayout.Sawmill
 	local tries = 0
 	while #out < 32 and tries < 5000 do
 		tries += 1
+		breathe()
 		local ang = rng:range(0, math.pi * 2)
 		local dist = rng:range(155, 265)
 		local x = mill.X + math.cos(ang) * dist
@@ -1023,6 +1145,7 @@ function WorldPlan.MeadowBoulders(): { Boulder }
 			})
 		end
 	end
+	cachedMeadowBoulders = out
 	return out
 end
 
@@ -1292,6 +1415,7 @@ local function sightOfLamp(): (Vector3, Vector3)
 	local radius = LandmarkArt.LIGHTHOUSE_RADIUS
 	local tips: { { x: number, z: number } } = {}
 	for z = LIGHTHOUSE_Z[1], LIGHTHOUSE_Z[2], 4 do
+		breathe()
 		local coast = WorldLayout.Coast
 		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt do
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
@@ -1308,6 +1432,7 @@ local function sightOfLamp(): (Vector3, Vector3)
 	end)
 	local lamp = Vector3.new(1203, 48, 236)
 	for _, tip in ipairs(tips) do
+		breathe()
 		local x, z = tip.x - LIGHTHOUSE_BACK, tip.z
 		local lowest = math.huge
 		-- On the sand: Ash Gate's lawn runs down to the coast (ring map).
@@ -1379,6 +1504,7 @@ function WorldPlan.Scenery(): { ScenerySpot }
 	-- Where a piece of footprint `r` could stand at (x, z): its base height,
 	-- or nil.
 	local function fits(x: number, z: number, r: number): number?
+		breathe()
 		if math.abs(x) > SCENERY_EDGE or math.abs(z) > SCENERY_EDGE or x > beachX then
 			return nil
 		end
@@ -1502,6 +1628,7 @@ function WorldPlan.Scenery(): { ScenerySpot }
 					local dir = (b - a).Unit
 					local normal = Vector2.new(-dir.Y, dir.X)
 					while nextAt <= walked + len do
+						breathe()
 						local along = a + dir * (nextAt - walked)
 						local kind = SCENERY_CYCLE[(turn - 1) % #SCENERY_CYCLE + 1]
 						local placed: ScenerySpot? = nil
@@ -3670,6 +3797,7 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 
 	-- Where a rock of `size` could stand at (x, z): its base, or nil.
 	local function rockAt(x: number, z: number, size: number, others: { ClusterRock }): Vector3?
+		breathe()
 		local reach = size * WorldPlan.ClusterReach
 		if math.abs(x) > edge or math.abs(z) > edge or x > beachX then
 			return nil
@@ -4026,6 +4154,7 @@ function WorldPlan.Footbridge(): Footbridge?
 		local dir = (b - a).Unit
 		local n = Vector2.new(-dir.Y, dir.X)
 		for s = 0, len, 6 do
+			breathe()
 			found = bridgeAcross(a + dir * s, n)
 			if found then
 				break
@@ -4516,6 +4645,7 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 
 	-- Whether a forest tree could grow at (x, z), `setBack` off the roads.
 	local function ground(x: number, z: number, setBack: number): boolean
+		breathe()
 		if math.abs(x) > STAND_EDGE or math.abs(z) > STAND_EDGE or (z < coast.northZ and x > beachX) then
 			return false
 		end
@@ -4584,6 +4714,7 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 					local dir = (b - a).Unit
 					local normal = Vector2.new(-dir.Y, dir.X)
 					while nextAt <= walked + len do
+						breathe()
 						local along = a + dir * (nextAt - walked)
 						for _, s in ipairs({ 1, -1 }) do
 							-- The same draws each side, planted or not.
@@ -4615,6 +4746,7 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 	local middles: { Vector2 } = {}
 	local steps = (STAND_EDGE * 2) // 12
 	for ix = 0, steps do
+		breathe()
 		for iz = 0, steps do
 			local x, z = -STAND_EDGE + ix * 12, -STAND_EDGE + iz * 12
 			local c, ring = WorldLayout.ForestCover(x, z)
@@ -4847,6 +4979,7 @@ local function fillerClutter(): FillerClutter
 	end
 	local bins: { [number]: { Disc } } = {}
 	local function add(x: number, z: number, r: number)
+		breathe()
 		local disc = { x = x, z = z, r = r }
 		for bx = (x - r) // FILLER_CELL, (x + r) // FILLER_CELL do
 			for bz = (z - r) // FILLER_CELL, (z + r) // FILLER_CELL do
@@ -5437,6 +5570,45 @@ function WorldPlan.SpacingViolations(): { string }
 end
 
 local TreeFill = require(script.Parent.TreeFill)
+-- The planners that give the frame back while they work (breathe) run one at
+-- a time: a second caller that arrives meanwhile (the server's deferred build
+-- and its forest planter both want the scenery, say) waits for the first's
+-- result instead of working the same seconds out again. Once a planner has
+-- its result it is a plain lookup, as before.
+local function oneAtATime(name: string)
+	local inner = (WorldPlan :: any)[name] :: (...any) -> any
+	local building = false
+	(WorldPlan :: any)[name] = function(...: any): any
+		if building and task then
+			local waited = 0
+			while building and waited < 120 do
+				waited += task.wait() or 0.03
+			end
+		end
+		local mine = not building
+		building = true
+		local ok, result = pcall(inner, ...)
+		if mine then
+			building = false
+		end
+		if not ok then
+			error(result, 0)
+		end
+		return result
+	end
+end
+for _, name in ipairs({
+	"Boulders",
+	"MeadowBoulders",
+	"Scenery",
+	"CountryStands",
+	"BoulderClusters",
+	"Footbridge",
+	"ForestTrees",
+}) do
+	oneAtATime(name)
+end
+
 TreeFill.Bind({
 	GoodGround = WorldPlan.GoodGround,
 	Town = WorldPlan.Town,
