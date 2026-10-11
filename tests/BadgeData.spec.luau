@@ -27,7 +27,7 @@ return function(t)
 		t.eq(BadgeData.IsLive(1), true)
 	end)
 
-	t.test("the list is the three firsts, the places, and the rare woods", function()
+	t.test("the list is the three firsts, the places, the rare woods and Lane X's eight", function()
 		t.eq(keys(), {
 			"FirstSale",
 			"FirstTruck",
@@ -46,7 +46,16 @@ return function(t)
 			"WoodGloamwood",
 			"WoodLumenwood",
 			"WoodLanternwood",
+			"AreaBayou",
+			"AreaMesa",
+			"WoodCypress",
+			"WoodIronwood",
+			"FirstBuild",
+			"Homestead",
+			"Stonemason",
+			"Millionaire",
 		})
+		t.eq(#keys(), 25, "25 badges in all")
 		t.eq(BadgeData.Get("WoodGloamwood").woodId, "phantomwood")
 		-- Lanternwood is its own wood. The glow placeholder stays lumenwood.
 		t.eq(GameConfig.NightGlowWoodId, "lumenwood")
@@ -68,6 +77,36 @@ return function(t)
 			t.eq(BadgeData.Ids[key], 0, key)
 			t.eq(BadgeData.IsLive(BadgeData.RobloxId(key)), false, key)
 		end
+	end)
+
+	t.test("the eight new badges: names, triggers and thresholds", function()
+		t.eq(BadgeData.Get("AreaBayou").name, "The Bayou")
+		t.eq(BadgeData.Get("AreaMesa").name, "Red Mesa")
+		t.eq(BadgeData.Get("WoodCypress").woodId, "bogcypress")
+		t.eq(BadgeData.Get("WoodIronwood").woodId, "ironwood")
+		t.eq(BadgeData.ForWood("bogcypress"), { "WoodCypress" })
+		t.eq(BadgeData.ForWood("ironwood"), { "WoodIronwood" })
+		t.eq(BadgeData.HomesteadPieces, 40)
+		t.eq(BadgeData.MillionaireEarned, 1000000)
+		t.eq(BadgeData.KeysFor("area", { id = "bayou" }), { "AreaBayou" })
+		t.eq(BadgeData.KeysFor("area", { id = "mesa" }), { "AreaMesa" })
+		t.eq(BadgeData.KeysFor("area", { id = "redmesa" }), { "AreaMesa" })
+		t.eq(BadgeData.KeysFor("area", { id = "AreaBayou" }), { "AreaBayou" })
+		t.eq(BadgeData.KeysFor("build", { id = "Wall4", count = 1 }), { "FirstBuild" })
+		t.eq(BadgeData.KeysFor("build", { id = "Wall4", count = 39 }), { "FirstBuild" })
+		t.eq(BadgeData.KeysFor("build", { id = "Wall4", count = 40 }), { "FirstBuild", "Homestead" })
+		t.eq(BadgeData.KeysFor("build", { id = "SandWall4", count = 1 }), { "FirstBuild", "Stonemason" })
+		t.eq(BadgeData.KeysFor("build", { id = "SandWall4" }), { "Stonemason" }, "the id alone is a sandstone piece")
+		t.eq(BadgeData.KeysFor("build", { id = "Wall4", count = 0 }), {})
+		t.eq(BadgeData.KeysFor("build", nil), {})
+		t.eq(BadgeData.KeysFor("earned", { count = 999999 }), {})
+		t.eq(BadgeData.KeysFor("earned", { count = 1000000 }), { "Millionaire" })
+		t.eq(BadgeData.KeysFor("earned", nil), {})
+		local WorldLayout = t.shared("World/WorldLayout")
+		local b, m = WorldLayout.Bayou, WorldLayout.RedMesa
+		t.eq(BadgeData.AreasAt(b.x, 0, b.z), { "AreaBayou" })
+		t.eq(BadgeData.AreasAt(m.x, 40, m.z), { "AreaMesa" })
+		t.eq(BadgeData.AreasAt(b.x + b.radius + 30, 0, b.z), {}, "past the Bayou's edge")
 	end)
 
 	t.test("rows show locked and earned, and the wire form drops unknown keys", function()
