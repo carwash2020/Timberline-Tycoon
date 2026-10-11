@@ -76,6 +76,12 @@ local BRASS = Color3.fromRGB(201, 162, 74)
 -- A display vehicle's Neon lenses are never near-white (ShopKit.NearWhite, luma 0.86): the live
 -- trucks' pale headlamp lens (#FFE9B0) blows out in a lit hall, so the display copy wears warm amber.
 DealershipLot.MaxNeonLuma = 0.86
+-- The tallest a display vehicle may stand over its plinth: the hall's ceiling
+-- beams hang to 14.1 over the floor (15 less their 0.9), the floor top is
+-- FloorY and the plinth PlinthHeight, less a little air. The Logging Rig's
+-- crane and stacks stand 15.8 tall, so its display copy (never the gameplay
+-- truck) is scaled down to fit; every other vehicle is already under this.
+DealershipLot.MaxVehicleHeight = 12.4
 DealershipLot.DisplayLens = Color3.fromRGB(255, 205, 125)
 
 -- The vehicles on show: ItemBox.Showroom, the one list.
@@ -100,7 +106,7 @@ end
 -- how far the pivot is above the lowest part. Measured once from a built
 -- model (defined below, after the builders).
 export type Measured = { length: number, span: number, cx: number, cz: number, feet: number }
-local measureVehicle: (string, string) -> Measured
+local measureVehicle: (string, string, boolean?) -> Measured
 
 export type Bay = {
 	kind: string,
@@ -325,13 +331,55 @@ local function paintOf(kind: string, id: string): Color3
 	return Color3.fromRGB(150, 150, 150)
 end
 
-local function modelOf(kind: string, id: string): Model?
-	return if kind == "Truck" then placeTruck(id) else placeTrailer(id)
+-- (The bays and the hall are still laid out from the full-size vehicle, so
+-- the footprint the world and the shop's shell are built round does not move;
+-- only the copy on the plinth is fitted.)
+-- A display copy taller than DealershipLot.MaxVehicleHeight is scaled down
+-- about its feet (at the origin, as built) so it clears the
+-- ceiling beams. Looks only: the vehicle the player drives is another model.
+local function fitUnderCeiling(model: Model)
+	local lo, hi = math.huge, -math.huge
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			local c = d.CFrame
+			local half = (
+				math.abs(c.RightVector.Y) * d.Size.X
+				+ math.abs(c.UpVector.Y) * d.Size.Y
+				+ math.abs(c.LookVector.Y) * d.Size.Z
+			) / 2
+			lo = math.min(lo, c.Position.Y - half)
+			hi = math.max(hi, c.Position.Y + half)
+		end
+	end
+	local height = hi - lo
+	if height > DealershipLot.MaxVehicleHeight then
+		-- Like TruckArt's grow: each part's size and position (its turn kept)
+		-- and each attachment's offset (set by CFrame, which Lune reads).
+		local k = DealershipLot.MaxVehicleHeight / height
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				local cf = d.CFrame
+				d.Size = d.Size * k
+				d.CFrame = CFrame.new(cf.Position * k) * (cf - cf.Position)
+			elseif d:IsA("Attachment") then
+				local cf = d.CFrame
+				d.CFrame = CFrame.new(cf.Position * k) * (cf - cf.Position)
+			end
+		end
+	end
 end
 
-measureVehicle = function(kind: string, id: string): Measured
+local function modelOf(kind: string, id: string, fitted: boolean?): Model?
+	local model = if kind == "Truck" then placeTruck(id) else placeTrailer(id)
+	if model and fitted == true then
+		fitUnderCeiling(model)
+	end
+	return model
+end
+
+measureVehicle = function(kind: string, id: string, fitted: boolean?): Measured
 	measuring = true
-	local model = modelOf(kind, id)
+	local model = modelOf(kind, id, fitted)
 	measuring = false
 	if model == nil then
 		return { length = 20, span = 10, cx = 0, cz = 0, feet = 2 }
@@ -441,12 +489,12 @@ function DealershipLot.Build(): Model
 			end
 		end
 
-		local model = modelOf(bay.kind, bay.id)
+		local model = modelOf(bay.kind, bay.id, true)
 		if model then
 			model.Parent = lot
 			-- Side-on, nose toward the approach (west), on the plinth: its
 			-- measured middle over the plinth's middle, its feet on the top.
-			local m = measureVehicle(bay.kind, bay.id)
+			local m = measureVehicle(bay.kind, bay.id, true)
 			model:PivotTo(
 				CFrame.new(cx, top + m.feet, oz + bay.vz)
 					* CFrame.Angles(0, math.pi / 2, 0)

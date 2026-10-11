@@ -20,7 +20,18 @@ local WorldLayout = require(script.Parent.World.WorldLayout)
 
 local RegionLogic = {}
 
-export type Shape = "plains" | "hills" | "plateau" | "cone" | "hollow" | "beach" | "banks" | "sky" | "underground" | "swamp" | "mesa"
+export type Shape =
+	"plains"
+	| "hills"
+	| "plateau"
+	| "cone"
+	| "hollow"
+	| "beach"
+	| "banks"
+	| "sky"
+	| "underground"
+	| "swamp"
+	| "mesa"
 
 export type RegionDef = {
 	id: string,
