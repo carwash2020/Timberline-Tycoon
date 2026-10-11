@@ -3498,3 +3498,39 @@ Xbox:
 - Server owns it: no remotes; prompts call `RegionService` handlers that check rate (`RegionAction`, 3 a second), distance, stage and ownership. Cash only through `EconomyService.SpendCash`; the planks go through `HandInWood`; the slab through `BuildMaterials.ReturnSlab` (24 cap). New save data: only `guideStamps` keys with the `Region:` prefix (no `ProfileSchema` field, no Migrate).
 - Budgets (spec and printed by `tests/RegionArt.spec`): boardwalk 47 of 60, Bait Shack 26 of 40, overlook 19 of 30, arch 28 of 60, scatter pieces at most 10 parts and looks only, 4 and 2 lights at Range 16 or less with shadows off, 44 and 38 trees, regions 500 or more apart.
 
+
+## Lane X: milestone badges and the town leaderboard board (branch `phase-2/v1-x-extras`, 11 October 2026)
+
+### What changed
+
+- `BadgeData`: 8 new badges (list order is the Creator Hub order, five free a day: AreaBayou, AreaMesa, WoodCypress, WoodIronwood, FirstBuild, then Homestead, Stonemason, Millionaire), all ids 0. New `BadgeData.HomesteadPieces = 40`, `MillionaireEarned = 1,000,000`, `BuildKeys(id, count)`, and `"build"` and `"earned"` in `KeysFor`.
+- `BadgeService`: `Poll` also awards FirstBuild, Homestead and Stonemason from the plot's filled kit pieces (a kit blueprint whose `fill` is gone) and Millionaire from `totalEarned`; both stop once earned. `OnNewArea(fn)` fires once per new area from Poll, and a throwing listener does not stop the poll.
+- `LeaderboardService`: `Top()`, `Failed()` and `OnRefresh(fn)` added. No new DataStore call, no change to the write or read budgets (specs count the fake store's calls).
+- Town board: `TownBoardLogic`, `Art/TownBoardArt`, `TownBoardService`, `TownBoardBoot.server`. 14 x 8 stud board in two columns of five, ten parts, persistent, front to the street at `WorldPlan.LeaderboardBoard`.
+- `BadgeUI`: the PC panel is 420 tall (was 280) so eight of the 25 rows show; the phone panel stays 200.
+
+### Studio checks (Connor)
+
+PC
+1. Walk MainStreet to x -50 and look north: the board stands 8 studs off the street between the gondola path and the Tool Shed. Its walnut face, brass frame, two timber posts and the plaque under it ("Want a spot? Settings, then Leaderboard") all read the right way round, the posts are on the ground, nothing floats, and the Tool Shed door and the street are clear.
+2. Open Settings, Leaderboard, switch "Show me on the leaderboard" on. Within about a minute (the board redraws on the server's 60-second read, not on your tap) your name appears with "$X earned". Turn it off: you drop off at the next read.
+3. With nobody opted in the board says "No one is on the board yet. Turn it on in Settings, Leaderboard." under TOP LUMBERJACKS.
+4. Walk around to the back: the title in brass, not mirrored, no rows.
+5. Press B: BADGES lists 25 rows (the new ones at the bottom), earned rows dark with cream text, locked rows muted; Esc closes. Tap a row: a toast says how to earn it.
+6. Test the badges: stand in the Bayou (-760, -700) and Red Mesa (590, -790): each shows Earned. Finish a kit piece on your plot: First Build shows Earned; a Sandstone piece: Stonemason. Ids are 0, so Roblox's badge toast does not appear until Connor pastes ids.
+
+Phone (667 x 375)
+7. The board reads from the street: the title and the ranks read from about 30 studs; names and cash lines read from about 15 studs. Say if you want them bigger.
+8. BADGES from the quick menu: the panel stays inside the safe area and clear of the thumbstick and jump button; rows are at least 44 px tall and scroll by touch.
+
+Xbox
+9. View button, quick menu, BADGES: the D-pad moves between rows, A shows the line, B closes it.
+10. Walk up to the board: text is readable on a TV from the street (the board has no prompt, so there is nothing to press).
+
+### Awaiting Connor
+
+1. Creating the 8 new badges (and the 17 old ones) in Creator Hub: Engagement, Badges, Create, name, description, 512 x 512 icon. Five free a day; any paid badge is his yes. Then paste each id into `BadgeData.Ids` (the first five are AreaBayou, AreaMesa, WoodCypress, WoodIronwood, FirstBuild).
+2. Names, descriptions, and the Homestead threshold (40 filled pieces, a proposal).
+3. Icon drafts and uploads (his).
+4. Default used: stage badges (S4, S8) are not added until E's stage events land.
+5. Default used: names show as Roblox usernames (what `LeaderboardService` caches), not display names.

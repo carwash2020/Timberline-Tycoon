@@ -43,6 +43,7 @@ local lastReadAt: number? = nil
 local reading = false
 local names: { [number]: string } = {}
 local nameCount = 0
+local refreshListeners: { () -> () } = {}
 
 local function now(): number
 	return os.clock()
@@ -123,6 +124,13 @@ local function refresh()
 		cacheFailed = false
 	end
 	reading = false
+	-- Tell the listeners (the town board) after every read, good or not.
+	for _, fn in ipairs(refreshListeners) do
+		local called = pcall(fn)
+		if not called then
+			warn("[LeaderboardService] refresh listener failed")
+		end
+	end
 end
 
 -- A player is on the board here unless this server knows they opted out.
@@ -130,17 +138,47 @@ local function hidden(userId: number): boolean
 	return present[userId] ~= nil and not optedIn[userId]
 end
 
--- What a client gets: the top ten (opted-out players dropped as of now),
--- and, if they're opted in, their own score and rank.
-local function payloadFor(player: Player): LeaderboardLogic.Payload
+-- The top ten from the cache (opted-out players dropped as of now), ranked
+-- and named, plus the ranked entries. nil while nothing has been read.
+local function topRows(): ({ LeaderboardLogic.Row }?, { LeaderboardLogic.Ranked })
 	local entries = cache
 	if entries == nil then
-		return { ok = false, rows = {}, me = nil }
+		return nil, {}
 	end
 	local ranked = LeaderboardLogic.Rank(entries, hidden)
 	local rows: { LeaderboardLogic.Row } = {}
 	for _, r in ipairs(ranked) do
 		table.insert(rows, { rank = r.rank, name = nameFor(r.userId), score = r.score })
+	end
+	return rows, ranked
+end
+
+-- The cached, opted-in, ranked top ten with names, for the town board. nil
+-- while the first read is still loading or has failed (no cache to show).
+-- A later failed read keeps the older cache, as the client answer does.
+-- Reads no DataStore: refresh() is the only reader, at most every 60 s.
+function LeaderboardService.Top(): { LeaderboardLogic.Row }?
+	local rows = topRows()
+	return rows
+end
+
+-- True when a read failed and there is no cache to fall back on.
+function LeaderboardService.Failed(): boolean
+	return cache == nil and cacheFailed
+end
+
+-- fn() runs after each read of the top list (success or failure), which is
+-- at most once per LeaderboardLogic.ReadInterval.
+function LeaderboardService.OnRefresh(fn: () -> ())
+	table.insert(refreshListeners, fn)
+end
+
+-- What a client gets: the top ten (opted-out players dropped as of now),
+-- and, if they're opted in, their own score and rank.
+local function payloadFor(player: Player): LeaderboardLogic.Payload
+	local rows, ranked = topRows()
+	if rows == nil then
+		return { ok = false, rows = {}, me = nil }
 	end
 	local me: LeaderboardLogic.Me? = nil
 	if optedIn[player.UserId] then

@@ -325,4 +325,88 @@ return function(t)
 		env.ask(ann)
 		t.eq(#env.tops, 1)
 	end)
+
+	-- Lane X: the town board's accessors. Top() and OnRefresh() read the
+	-- same cache as a client answer; neither makes a DataStore call.
+	t.test("Top is nil while loading, then the ranked named cache, with no DataStore call of its own", function()
+		local env = boot({
+			top = { { userId = 10, score = 5000 }, { userId = 11, score = 9000 } },
+			names = { [10] = "Zed", [11] = "Yan" },
+		})
+		t.eq(env.Service.Top(), nil, "nothing read yet")
+		t.eq(env.Service.Failed(), false)
+		env.join(1, "Ann", 100, false)
+		env.Service.Tick() -- the first read
+		t.eq(#env.tops, 1)
+		local rows = env.Service.Top()
+		t.eq(rows, {
+			{ rank = 1, name = "Yan", score = 9000 },
+			{ rank = 2, name = "Zed", score = 5000 },
+		})
+		for _ = 1, 20 do
+			env.Service.Top()
+		end
+		t.eq(#env.tops, 1, "asking for the top does not read the store")
+		t.eq(#env.sets, 0)
+	end)
+
+	t.test("Top hides a player here who opts out, at once", function()
+		local env = boot({
+			top = { { userId = 1, score = 9000 }, { userId = 10, score = 100 } },
+			names = { [10] = "Zed" },
+		})
+		local ann = env.join(1, "Ann", 9000, true)
+		env.Service.Tick()
+		t.eq(#env.Service.Top(), 2)
+		env.Service.SettingChanged(ann, false)
+		local rows = env.Service.Top()
+		t.eq(#rows, 1)
+		t.eq(rows[1], { rank = 1, name = "Zed", score = 100 })
+	end)
+
+	t.test("an empty store gives an empty list, a failed first read gives nil and Failed", function()
+		local env = boot({ top = {} })
+		env.join(1, "Ann", 0, false)
+		env.Service.Tick()
+		t.eq(env.Service.Top(), {})
+		t.eq(env.Service.Failed(), false)
+		local bad = boot({ top = { { userId = 10, score = 5 } }, names = { [10] = "Zed" } })
+		bad.state.failTop = true
+		bad.join(1, "Ann", 0, false)
+		bad.Service.Tick()
+		t.eq(bad.Service.Top(), nil)
+		t.eq(bad.Service.Failed(), true)
+		bad.advance(61)
+		bad.state.failTop = false
+		bad.Service.Tick()
+		t.eq(#bad.Service.Top(), 1, "the next good read fills it")
+		t.eq(bad.Service.Failed(), false)
+		bad.advance(61)
+		bad.state.failTop = true
+		bad.Service.Tick()
+		t.eq(#bad.Service.Top(), 1, "a later failed read keeps the older list")
+	end)
+
+	t.test("OnRefresh fires after each read, at most once a minute", function()
+		local env = boot({ top = { { userId = 10, score = 5 } }, names = { [10] = "Zed" } })
+		local fired = 0
+		env.Service.OnRefresh(function()
+			fired += 1
+		end)
+		env.Service.OnRefresh(function()
+			error("a bad listener")
+		end)
+		env.join(1, "Ann", 0, false)
+		env.Service.Tick()
+		t.eq(fired, 1)
+		for _ = 1, 10 do
+			env.advance(5)
+			env.Service.Tick()
+		end
+		t.eq(fired, 1, "inside the minute: no read, no call")
+		env.advance(30)
+		env.Service.Tick()
+		t.eq(fired, 2)
+		t.eq(#env.tops, 2)
+	end)
 end
