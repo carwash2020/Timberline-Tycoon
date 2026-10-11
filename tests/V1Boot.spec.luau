@@ -18,7 +18,9 @@ return function(t)
 		local fs = require("@lune/fs")
 		local boot = fs.readFile("src/ServerScriptService/GameServer.server.luau")
 		t.ok(string.find(boot, "V1Boot.Start(safely, remote)", 1, true), "the server passes the remotes")
-		local loader = t.loader()
+		-- SecretService (Lane B) is a real module now; MapBuilder starts it,
+		-- so stub it here and keep this test on LogicSet.
+		local loader = t.loader({ mocks = { SecretService = {} } })
 		local Boot = loader:server("V1Boot")
 		local connected = {}
 		local remote = {
@@ -41,6 +43,7 @@ return function(t)
 		local fired = {}
 		local loader = t.loader({
 			mocks = {
+				SecretService = {}, -- (a real module now: MapBuilder starts it)
 				AetherService = {
 					V1Init = function(ctx)
 						table.insert(fired, { "aether", ctx })

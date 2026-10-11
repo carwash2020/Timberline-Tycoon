@@ -35,15 +35,21 @@ local RunService = game:GetService("RunService")
 
 local BaseLogic = require(ReplicatedStorage.Shared.BaseLogic)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
+local BuildCost = require(ReplicatedStorage.Shared.BuildCost)
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local ChopSawLogic = require(ReplicatedStorage.Shared.ChopSawLogic)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
+local FallenLogic = require(ReplicatedStorage.Shared.FallenLogic)
+local FurnitureData = require(ReplicatedStorage.Shared.FurnitureData)
+local EditRights = require(script.Parent.EditRights)
 local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HammerLogic = require(ReplicatedStorage.Shared.HammerLogic)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
+local LooseSave = require(ReplicatedStorage.Shared.LooseSave)
+local SlabData = require(ReplicatedStorage.Shared.SlabData)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -176,7 +182,7 @@ end
 
 -- `wood` and `logs` only, and only for a piece this player just released.
 local function tellFill(player: Player, itemUid: string, why: string, text: string, woodUid: string, now: number)
-	if why ~= "wood" and why ~= "logs" then
+	if why ~= "wood" and why ~= "logs" and why ~= "noslab" and why ~= "noingot" then
 		return
 	end
 	if not releasedJustNow(player, woodUid, now) then
@@ -188,6 +194,71 @@ local function tellFill(player: Player, itemUid: string, why: string, text: stri
 		fillTold[key] = now
 		notify(player, text)
 	end
+end
+
+-- LooseService (the loose wood, slabs and ingots a base keeps when it is
+-- unloaded) pulls in TruckLoad and WoodService, so it is loaded when first
+-- needed, and a spec swaps it.
+local looseMod: any = nil
+local looseTried = false
+
+local function looseService(): any
+	if looseTried then
+		return looseMod
+	end
+	looseTried = true
+	local ok, mod = pcall(function(): any
+		return require(script.Parent.LooseService)
+	end)
+	if ok then
+		looseMod = mod
+	end
+	return looseMod
+end
+
+-- A base just stood up on a pad: the loose things it was saved with come
+-- back, once, and wood a map remake parked comes back at the plot.
+local function restoreLoose(player: Player, slot: Slot, profile: Profile)
+	local loose = looseService()
+	if loose == nil then
+		return
+	end
+	local ok, back, waiting = pcall(function(): (number, number)
+		return loose.Restore(player, slot, profile)
+	end)
+	if ok and type(back) == "number" and back > 0 then
+		notify(player, LooseSave.RestoredText(back, waiting :: number))
+	elseif not ok then
+		warn("[PlotService] loose wood not restored: " .. tostring(back))
+	end
+	local okStranded, strandedBack = pcall(function(): number
+		local n = loose.RestoreStranded(player, slot, profile)
+		return n
+	end)
+	if okStranded and type(strandedBack) == "number" and strandedBack > 0 then
+		notify(player, "Wood that was left out on the old map is back on your plot.")
+	elseif not okStranded then
+		warn("[PlotService] stranded wood not restored: " .. tostring(strandedBack))
+	end
+end
+
+-- Slabs and ingots live in the world as parts (BuildMaterials). It is
+-- loaded when first needed, and a spec swaps it.
+local materialsMod: any = nil
+local materialsTried = false
+
+local function materials(): any
+	if materialsTried then
+		return materialsMod
+	end
+	materialsTried = true
+	local ok, mod = pcall(function(): any
+		return require(script.Parent.BuildMaterials)
+	end)
+	if ok then
+		materialsMod = mod
+	end
+	return materialsMod
 end
 
 ---------------------------------------------------------------------------
@@ -456,7 +527,10 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	if bp.kit then
 		model:SetAttribute("Kit", true)
 		if item.fill then
-			model:SetAttribute("FillUnits", item.fill.units)
+			-- Anything in the ghost (planks, slabs, ingots) locks it, so the
+			-- client reads one number: zero means still empty.
+			model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
+			model:SetAttribute("Needs", BuildCost.MissingText(BuildCost.Missing(bp, item)))
 		end
 		if item.len then
 			model:SetAttribute("Len", item.len)
@@ -549,8 +623,7 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 			if not ownerProfile then
 				return
 			end
-			local allowed = who.UserId == hostOwner.UserId
-				or PermissionLogic.Allows(ownerProfile.permissions, who.UserId, "interact")
+			local allowed = PlotLogic.CanEdit(ownerProfile.permissions, who.UserId, hostOwner.UserId, "interact")
 			if not allowed then
 				notify(who, "The owner hasn't let you use that.")
 				return
@@ -791,6 +864,7 @@ local function grant(player: Player, slot: Slot, profile: Profile, moveIfFar: bo
 	adoptSpawn(player, slot, moveIfFar)
 	rescueProfile(profile, slot.cframe * CFrame.new(0, 2, 0))
 	pcall(PlotService.Hooks.assigned, player, profile) -- its vehicle pads stand up on this pad
+	restoreLoose(player, slot, profile)
 	if first then
 		QuestService.Event(player, "plotClaimed")
 		MilestoneService.Mark(player, "Claimed a plot")
@@ -1016,7 +1090,7 @@ local function hostFor(player: Player, flag: string): (Slot?, Profile?, Player?,
 		if owner and owner ~= player then
 			local profile = ProfileService.GetProfile(owner)
 			if profile and actorOn(player, slot, profile) then
-				if PermissionLogic.Allows(profile.permissions, player.UserId, flag) then
+				if PlotLogic.CanEdit(profile.permissions, player.UserId, owner.UserId, flag) then
 					return slot, profile, owner, false
 				end
 				denied = true
@@ -1024,6 +1098,32 @@ local function hostFor(player: Player, flag: string): (Slot?, Profile?, Player?,
 		end
 	end
 	return nil, nil, nil, denied
+end
+
+-- Lane F: one edit-rights check. The owner always; anyone else needs the
+-- flag in the owner's permissions. flag: "build" | "destroy" | "interact" |
+-- "paint" | "grab". Other lanes call this instead of PermissionLogic.
+function PlotService.CanEdit(player: Player?, owner: Player?, flag: string): boolean
+	return EditRights.Can(player, owner, flag)
+end
+
+-- Whose plot a world position is on, or nil (off every plot). Lane F: the
+-- services that act at a spot (a dropped blueprint) ask this, then CanEdit.
+function PlotService.OwnerAt(position: Vector3): Player?
+	for _, slot in ipairs(slots) do
+		local owner = slot.owner
+		local profile = if owner then ProfileService.GetProfile(owner) else nil
+		if owner and profile then
+			local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+			local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+			local half = PlotLogic.Extent(tier.size, squares) / 2
+			local p = slot.cframe:PointToObjectSpace(position)
+			if math.abs(p.X) <= half and math.abs(p.Z) <= half then
+				return owner
+			end
+		end
+	end
+	return nil
 end
 
 local function onlinePlayers(): { Player }
@@ -1312,7 +1412,7 @@ function PlotService.Place(
 	-- starter plan, a store unlock you learned from its physical blueprint).
 	-- Stock is spent only after the cash check, so a refused place leaves it.
 	local stock = if type(payer.sawmillStock) == "table" then payer.sawmillStock else nil
-	local fromShop = BlueprintBook.IsBoxed(bp.id)
+	local fromShop = BlueprintBook.IsFromStock(bp.id)
 	local stockAt = if fromShop and stock then table.find(stock, bp.id) else nil
 	-- A sawmill, planer or belt comes out of the box you opened (boxUid): one
 	-- use, the box is spent below once everything has passed. An old save may
@@ -1360,7 +1460,7 @@ function PlotService.Place(
 	}
 	if bp.kit then
 		item.paid = price
-		item.fill = { units = 0 }
+		item.fill = BuildCost.NewFill(bp)
 	end
 	table.insert(profile.plot.placed, item)
 	placedAt[item.uid] = os.clock()
@@ -1422,25 +1522,24 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 	tellHammer(slot, player, item)
 end
 
--- What selling gives back: cash, plank units, and which wood those planks are.
--- An unlock bought at the store refunds nothing. Within a minute a finished
--- piece (or an empty kit piece) gives the whole fee back.
-local function sellPlan(item: PlotLogic.Placed, bp: PlotData.Blueprint): (number, number, string?)
-	local plan = PlotLogic.SellPlan(bp, item)
-	if plan.planks > 0 then
-		return 0, plan.planks, plan.wood
-	end
+-- What selling gives back. An unlock bought at the store refunds nothing.
+-- Within a minute of placing it (UndoSeconds) a piece gives the whole fee
+-- back, and a kit piece also gives back every plank, slab and ingot it took
+-- (PlotLogic.SellPlan says what). After that, SellBack; slabs and ingots
+-- only ever come back as slabs and ingots, never as cash.
+local function sellPlan(item: PlotLogic.Placed, bp: PlotData.Blueprint): PlotLogic.SellPlan
 	local at = placedAt[item.uid]
-	if at and os.clock() - at <= UNDO_SECONDS then
-		if bp.kit then
-			return item.paid or PlotData.Price(bp), 0, nil
-		end
-		if bp.unlock then
-			return 0, 0, nil
-		end
-		return bp.priceCash, 0, nil
+	local within = at ~= nil and os.clock() - at <= UNDO_SECONDS
+	if bp.kit then
+		return PlotLogic.SellPlan(bp, item, within)
 	end
-	return plan.cash, 0, nil
+	if within then
+		if bp.unlock then
+			return { cash = 0, planks = 0, wood = nil }
+		end
+		return { cash = bp.priceCash, planks = 0, wood = nil }
+	end
+	return PlotLogic.SellPlan(bp, item)
 end
 
 local woodMod: any = nil
@@ -1475,6 +1574,84 @@ local function givePlanks(player: Player, slot: Slot, item: PlotLogic.Placed, un
 	return spawned ~= nil
 end
 
+local function ingotCount(ingots: { [string]: number }?): number
+	local n = 0
+	if ingots then
+		for _, count in pairs(ingots) do
+			n += count
+		end
+	end
+	return n
+end
+
+-- Can the owner take these slabs and ingots back as parts? A refusal names
+-- how many do not fit; nothing is dropped and nothing is taken.
+local function materialsRoom(owner: Player, plan: PlotLogic.SellPlan): string?
+	local slabs = math.ceil(plan.slabs or 0)
+	local ingots = ingotCount(plan.ingots)
+	if slabs <= 0 and ingots <= 0 then
+		return nil
+	end
+	local mats = materials()
+	if mats == nil then
+		return "Those slabs and ingots have nowhere to go. Try again in a moment."
+	end
+	if slabs > 0 then
+		local room = mats.SlabRoom(owner.UserId)
+		if room < slabs then
+			return string.format(
+				"Pick up or use %d loose slab%s first: %d come back and you can only carry %d.",
+				slabs - room,
+				if slabs - room == 1 then "" else "s",
+				slabs,
+				SlabData.MaxLoose
+			)
+		end
+	end
+	if ingots > 0 then
+		local room = mats.IngotRoom(owner)
+		if room < ingots then
+			return string.format(
+				"Pick up or use %d loose ore piece%s first: %d ingot%s come back.",
+				ingots - room,
+				if ingots - room == 1 then "" else "s",
+				ingots,
+				if ingots == 1 then "" else "s"
+			)
+		end
+	end
+	return nil
+end
+
+-- Puts the slabs and ingots a piece took back in the world beside where it
+-- stood. materialsRoom has already said yes.
+local function giveMaterials(owner: Player, slot: Slot, item: PlotLogic.Placed, plan: PlotLogic.SellPlan)
+	local mats = materials()
+	if mats == nil then
+		return
+	end
+	local base = slot.cframe * CFrame.new(item.x, (item.y or 0) + 2, item.z)
+	local n = 0
+	for _ = 1, math.ceil(plan.slabs or 0) do
+		local col, row = n % 3, n // 3
+		n += 1
+		mats.ReturnSlab(owner.UserId, base * CFrame.new((col - 1) * 4.5, row * 2.2, 3))
+	end
+	local ores: { string } = {}
+	for ore in pairs(plan.ingots or {}) do
+		table.insert(ores, ore)
+	end
+	table.sort(ores)
+	local m = 0
+	for _, ore in ipairs(ores) do
+		for _ = 1, (plan.ingots :: any)[ore] do
+			local col, row = m % 4, m // 4
+			m += 1
+			mats.ReturnIngot(owner, ore, base * CFrame.new((col - 1.5) * 1.8, row * 0.5, -3))
+		end
+	end
+end
+
 -- Pays out a Sky Bin's wood before the bin is sold: true when the bin is
 -- empty or its wood was paid in full (AetherService.PayOutBin; the wallet must
 -- have room for it plus `extra`). A spec swaps it.
@@ -1506,7 +1683,8 @@ function PlotService.Sell(player: Player, uid: unknown)
 		notify(player, SkyBinLogic.OnlyOwnerSellLine)
 		return
 	end
-	local refund, planks, woodId = sellPlan(item, bp)
+	local plan = sellPlan(item, bp)
+	local refund, planks, woodId = plan.cash, plan.planks, plan.wood
 	if refund > 0 and profile.cash + refund > GameConfig.CashCap then
 		notify(
 			player,
@@ -1514,6 +1692,11 @@ function PlotService.Sell(player: Player, uid: unknown)
 				then "Your wallet is too full to sell that. Spend some first."
 				else "The owner's wallet is too full for that."
 		)
+		return
+	end
+	local roomRefusal = materialsRoom(owner, plan)
+	if roomRefusal then
+		notify(player, roomRefusal)
 		return
 	end
 	if planks > 0 and not givePlanks(owner, slot, item, planks, woodId) then
@@ -1537,6 +1720,7 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if model then
 		model:Destroy()
 	end
+	giveMaterials(owner, slot, item, plan)
 	LogicService.Sync(slot :: any, profile, player)
 	if refund > 0 then
 		EconomyService.Refund(owner, refund, "sold " .. bp.displayName, bp.id)
@@ -1545,8 +1729,17 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if bp.unlock and not bp.kit then
 		full = 0
 	end
-	local text = if planks > 0
-		then string.format("Took apart the %s. The planks are on the ground.", bp.displayName)
+	local gaveBack = planks > 0 or (plan.slabs or 0) > 0 or plan.ingots ~= nil
+	local text = if gaveBack and refund > 0
+		then string.format(
+			"Took back the %s: %s refunded, and what went into it is on the ground.",
+			bp.displayName,
+			Util.formatCash(refund)
+		)
+		elseif gaveBack then string.format(
+			"Took apart the %s. What went into it is on the ground.",
+			bp.displayName
+		)
 		elseif refund == full and refund > 0 then string.format(
 			"Took back the %s: %s refunded.",
 			bp.displayName,
@@ -1685,6 +1878,121 @@ function PlotService.Paint(player: Player, uid: unknown, paintId: unknown)
 	LogicService.Sync(slot :: any, profile, owner)
 end
 
+-- Paint all of this type (Lane F). Repaints every piece with that blueprint
+-- id on the plot the player stands on and may edit (CanEdit "paint"), takes
+-- the summed paint price once (paint is free today), and is one undo step
+-- for the plot's owner. The client asks for a confirm first; the server
+-- only checks the rules.
+function PlotService.PaintAllType(player: Player, pieceId: unknown, paintId: unknown)
+	if type(pieceId) ~= "string" or type(paintId) ~= "string" or not RateLimiter.Allow(player, "PaintAllType") then
+		return
+	end
+	local slot, profile, owner, denied = hostFor(player, "paint")
+	if not slot or not profile or not owner then
+		if denied then
+			notify(player, "You can't paint on this plot.")
+		end
+		return
+	end
+	local payer = if player == owner then profile else ProfileService.GetProfile(player)
+	if not payer then
+		return
+	end
+	local isOwner = player == owner
+	local stack = if isOwner then undoStacks[player] else nil
+	if isOwner and not stack then
+		stack = {}
+		undoStacks[player] = stack
+	end
+	local world: EditLogic.World = {
+		cash = payer.cash,
+		tier = profile.plot.tier,
+		ownerId = owner.UserId,
+		playerId = player.UserId,
+		placed = profile.plot.placed,
+		undo = stack or {},
+		squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {},
+	}
+	local stackSnap = if stack then table.clone(stack) else nil
+	local oldPaint: { [string]: string? } = {}
+	for _, item in ipairs(profile.plot.placed) do
+		oldPaint[item.uid] = item.paint
+	end
+	local ok, why, uids = EditLogic.PaintAll(world, pieceId, paintId, isOwner)
+	if not ok then
+		local bp = PlotLogic.Blueprint(pieceId)
+		local text = if why == "cash"
+			then EditLogic.Message("cash")
+			else KitPaint.AllMessage(why, if bp then bp.displayName else nil)
+		if text then
+			notify(player, text)
+		end
+		return
+	end
+	local price = payer.cash - world.cash
+	if price > 0 and not EconomyService.SpendCash(player, price, "painted all", "kit") then
+		-- Put every colour and the stack back as they were.
+		for _, item in ipairs(profile.plot.placed) do
+			item.paint = oldPaint[item.uid]
+		end
+		if stack and stackSnap then
+			table.clear(stack)
+			for i, entry in ipairs(stackSnap) do
+				stack[i] = entry
+			end
+		end
+		notify(player, EditLogic.Message("cash") or "You don't have enough for that.")
+		return
+	end
+	for _, uid in ipairs(uids) do
+		local item = findPlaced(profile, uid)
+		if item then
+			local old = slot.items:FindFirstChild(uid)
+			if old then
+				old:Destroy()
+			end
+			buildItem(slot, owner, item)
+		end
+	end
+	LogicService.Sync(slot :: any, profile, owner)
+	local bp = PlotLogic.Blueprint(pieceId)
+	notify(
+		player,
+		string.format("Painted %d %s%s.", #uids, if bp then bp.displayName else "piece", if #uids == 1 then "" else "s")
+	)
+end
+
+-- BaseBoot binds the remote (GameServer's remote list is not edited).
+function PlotService.BindPaintAll(remote: RemoteEvent?)
+	if remote then
+		remote.OnServerEvent:Connect(function(player: Player, pieceId: unknown, paintId: unknown)
+			PlotService.PaintAllType(player, pieceId, paintId)
+		end)
+	end
+end
+
+-- Where a piece that fell out of the world comes back to: a spot over the
+-- player's own plot, a little different each time so rescues do not stack
+-- (FallenLogic.Offset). nil when they have no pad (a base unloaded).
+local rescues: { [Player]: number } = {}
+
+function PlotService.RecoverSpot(player: Player): CFrame?
+	local slot = slotOf[player]
+	if slot == nil then
+		return nil
+	end
+	local n = ((rescues[player] or 0) % 16) + 1
+	rescues[player] = n
+	local x, y, z = FallenLogic.Offset(n)
+	return slot.cframe * CFrame.new(x, y, z)
+end
+
+-- A base change is running for this player (a claim, an expansion, an
+-- unload or a swap). Save now waits for it.
+function PlotService.IsBusy(player: Player): boolean
+	return switching[player] == true or claiming[player] == true or expanding[player] == true
+end
+
 local function samePiece(a: PlotLogic.Placed, b: PlotLogic.Placed): boolean
 	return a.x == b.x
 		and a.z == b.z
@@ -1821,6 +2129,47 @@ function PlotService.Edit(player: Player, request: unknown)
 	end
 	syncEdits(slot, player, before, profile.plot.placed)
 	LogicService.Sync(slot :: any, profile, player)
+end
+
+-- Crafted furniture (Lane M's Copper Lamp Post and Gold-banded Chest recipes):
+-- GrantPiece puts one placeable piece in the player's stock, where it shows in
+-- the hammer's list like a boxed machine and is spent when placed (free). It is
+-- a from-stock entry, not a learned plan, so the book does not grow. Returns
+-- whether it was granted, and why not (a name, or "full"). `source` is a short
+-- label for the log ("craft").
+function PlotService.CanGrant(player: Player, pieceId: unknown): (boolean, string?)
+	if type(pieceId) ~= "string" or not FurnitureData.IsGranted(pieceId) then
+		return false, "unknown"
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return false, "missing"
+	end
+	if type(profile.sawmillStock) == "table" and #profile.sawmillStock >= FurnitureData.MaxStock then
+		return false, "full"
+	end
+	return true, nil
+end
+
+function PlotService.GrantPiece(player: Player, pieceId: unknown, source: unknown): (boolean, string?)
+	local ok, why = PlotService.CanGrant(player, pieceId)
+	if not ok then
+		return false, why
+	end
+	local profile = ProfileService.GetProfile(player) :: Profile
+	if type(profile.sawmillStock) ~= "table" then
+		profile.sawmillStock = {}
+	end
+	table.insert(profile.sawmillStock, pieceId :: string)
+	player:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(profile.sawmillStock))
+	local bp = PlotData.Blueprint(pieceId :: string)
+	if bp then
+		notify(player, string.format("%s is in your hammer's list. Place it on your plot.", bp.displayName))
+	end
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "PieceGranted", if type(source) == "string" then source else "grant")
+	end)
+	return true, nil
 end
 
 function PlotService.Upgrade(player: Player)
@@ -2115,6 +2464,7 @@ function PlotService.Reload(player: Player, profile: Profile): boolean
 	LogicService.Restore(slot :: any, profile, player)
 	refreshSign(slot)
 	rescueProfile(profile, slot.cframe * CFrame.new(0, 2, 0))
+	restoreLoose(player, slot, profile)
 	return true
 end
 
@@ -2129,6 +2479,20 @@ function PlotService.PlayerRemoving(player: Player)
 	undoStacks[player] = nil
 	forgetFill(player)
 	expanding[player] = nil
+	rescues[player] = nil
+	-- Leaving with the base on its pad: the loose wood and slabs go into the
+	-- save the same way an unload does (ingots stay with Lane M's own save). If
+	-- the pile is too big to hold, it is left alone and the older ground-load
+	-- save keeps the wood.
+	local slot = slotOf[player]
+	local profile = ProfileService.GetProfile(player)
+	local loose = looseService()
+	if slot and profile and profile.plot and loose ~= nil then
+		local ok, err = (pcall :: any)(loose.Collect, player, slot, profile, false)
+		if not ok then
+			warn("[PlotService] loose wood not saved on leave: " .. tostring(err))
+		end
+	end
 	release(player)
 end
 
@@ -2435,6 +2799,20 @@ local function onPlot(slot: Slot, size: number, pos: Vector3): boolean
 	return math.abs(p.X) <= half and math.abs(p.Z) <= half
 end
 
+-- Who may put wood, slabs and ingots into this plot's ghosts: the owner, and
+-- anyone with Build on it who stands on or beside the yard (PlotService.CanEdit
+-- "build"). Their own parts only: nothing of anyone's turns into cash or moves
+-- from one player to another. Keyed by user id.
+local function fillers(owner: Player, slot: Slot, profile: Profile): { [number]: Player }
+	local out: { [number]: Player } = { [owner.UserId] = owner }
+	for _, other in ipairs(onlinePlayers()) do
+		if other ~= owner and PlotService.CanEdit(other, owner, "build") and actorOn(other, slot, profile) then
+			out[other.UserId] = other
+		end
+	end
+	return out
+end
+
 function PlotService.FillStep()
 	local now = os.clock()
 	if now - lastFillAt < FILL_EVERY then
@@ -2476,6 +2854,7 @@ function PlotService.FillStep()
 				end
 			end
 			if #pending > 0 then
+				local who = fillers(player, slot, profile)
 				local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
 				local planks: { { piece: any, root: BasePart } } = {}
 				local logs: { { piece: any, root: BasePart } } = {}
@@ -2484,7 +2863,7 @@ function PlotService.FillStep()
 					if
 						root
 						and not woodHeld(piece)
-						and piece.ownerId == player.UserId
+						and (who[piece.ownerId] :: Player?) ~= nil
 						and piece.ownerId ~= 0
 						and onPlot(
 							slot,
@@ -2500,7 +2879,7 @@ function PlotService.FillStep()
 						elseif
 							piece.kind == "log"
 							and type(piece.uid) == "string"
-							and releasedJustNow(player, piece.uid, now)
+							and releasedJustNow(who[piece.ownerId], piece.uid, now)
 						then
 							-- A log can't fill anything. It only exists here so a
 							-- drop onto a blueprint can say to saw it first.
@@ -2531,13 +2910,15 @@ function PlotService.FillStep()
 								mill = piece.mill,
 								board = piece.board,
 								temper = piece.temper,
-							}, player.UserId, api)
+							}, piece.ownerId, api)
 							if changed then
 								local model = slot.items:FindFirstChild(item.uid)
 								if model and model:IsA("Model") and type(BlueprintModels.ApplyWood) == "function" then
 									BlueprintModels.ApplyWood(model, item.wood)
 									BlueprintModels.ApplyPaint(model, item.paint)
 									BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
+									model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
+									model:SetAttribute("Needs", BuildCost.MissingText(BuildCost.Missing(bp, item)))
 								end
 							elseif type(why) == "string" and type(piece.uid) == "string" then
 								local woodName = nil
@@ -2547,7 +2928,52 @@ function PlotService.FillStep()
 								end
 								local text = FillLogic.Message(why, bp.displayName, woodName)
 								if text then
-									tellFill(player, item.uid, why, text, piece.uid, now)
+									tellFill(who[piece.ownerId], item.uid, why, text, piece.uid, now)
+								end
+							end
+						end
+					end
+					-- Sandstone slabs and ingots: the pieces that take them (BuildCost)
+					-- ask for each part within reach. One part fills once.
+					if BuildCost.NeedsSlabsOrIngots(BuildCost.Of(bp)) and item.fill then
+						local mats = materials()
+						if mats and type(mats.Of) == "function" then
+							local matApi = {
+								Take = function(uid: string): boolean
+									return mats.Take(uid) == true
+								end,
+							}
+							local offered: { { who: Player, part: any } } = {}
+							for userId, contributor in pairs(who) do
+								for _, m in ipairs(mats.Of(userId)) do
+									table.insert(offered, { who = contributor, part = m })
+								end
+							end
+							for _, entry in ipairs(offered) do
+								local m = entry.part
+								if item.fill == nil then
+									break
+								end
+								if FillLogic.InRange((m.position - origin).Magnitude) then
+									local changed, why = PlotFill.ApplyMaterial(item, m, entry.who.UserId, matApi)
+									if changed then
+										local model = slot.items:FindFirstChild(item.uid)
+										if model and model:IsA("Model") then
+											model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
+											model:SetAttribute(
+												"Needs",
+												BuildCost.MissingText(BuildCost.Missing(bp, item))
+											)
+											if type(BlueprintModels.SetFaded) == "function" then
+												BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
+											end
+										end
+									elseif type(why) == "string" then
+										local text = FillLogic.Message(why, bp.displayName, m.ore)
+										if text then
+											tellFill(entry.who, item.uid, why, text, m.uid, now)
+										end
+									end
 								end
 							end
 						end
@@ -2571,28 +2997,20 @@ end
 -- Unload base / load base (Shared/BaseLogic)
 ---------------------------------------------------------------------------
 
--- Their logs and planks lying on their own plot (not held). Loose wood is
--- not in the save, so a base never comes off the pad while some is out there.
-local function looseWoodOn(player: Player, slot: Slot, profile: Profile): number
-	local wood = woodModule()
-	if not wood or type(wood.All) ~= "function" then
-		return 0
+-- What lies loose on their own plot (LooseService.Scan): the unload saves it
+-- with the base and refuses only when the save cannot hold it.
+local function looseOn(player: Player, slot: Slot, profile: Profile): LooseSave.Found
+	local loose = looseService()
+	if loose == nil then
+		return { pieces = 0, sections = 0, unsaveable = 0 }
 	end
-	local pieces = wood.All()
-	if type(pieces) ~= "table" then
-		return 0
+	local ok, found = pcall(function(): LooseSave.Found
+		return loose.Scan(player, slot, profile)
+	end)
+	if ok and type(found) == "table" then
+		return found
 	end
-	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
-	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
-	local extent = PlotLogic.Extent(tier.size, squares)
-	local n = 0
-	for _, piece in pairs(pieces) do
-		local root = woodRoot(piece)
-		if root and not woodHeld(piece) and piece.ownerId == player.UserId and onPlot(slot, extent, root.Position) then
-			n += 1
-		end
-	end
-	return n
+	return { pieces = 0, sections = 0, unsaveable = 0 }
 end
 
 -- Everyone but the owner who stands on or beside the yard is set down just
@@ -2612,6 +3030,18 @@ local FAILED = "Something went wrong and your base is still on its pad. Try agai
 -- nothing is moved, copied or lost. If the release throws, the base is built
 -- back on its pad. A save written before this runs, or after, is whole.
 local function unloadBase(player: Player, profile: Profile, slot: Slot): boolean
+	-- The loose wood, slabs and ingots on the plot go into the save first, in
+	-- one step, so the commit below does not also save them as ground wood.
+	local loose = looseService()
+	if loose ~= nil then
+		local okCollect, saved, why = (pcall :: any)(loose.Collect, player, slot, profile, true)
+		if not okCollect or saved ~= true then
+			if okCollect and type(why) == "string" then
+				notify(player, why)
+			end
+			return false
+		end
+	end
 	pcall(PlotService.Hooks.commit, player)
 	pcall(PlotService.Hooks.despawn, player)
 	-- The commit may have yielded: still the same save, still on that pad?
@@ -2627,6 +3057,7 @@ local function unloadBase(player: Player, profile: Profile, slot: Slot): boolean
 		slot.owner = player
 		pcall(assign, player, slot, profile)
 		pcall(PlotService.Hooks.assigned, player, profile)
+		restoreLoose(player, slot, profile) -- what was just saved off the plot comes straight back
 		return false
 	end
 	return true
@@ -2649,7 +3080,7 @@ function PlotService.BaseAction(player: Player, action: unknown)
 			now = os.time(),
 			hasPad = slot ~= nil,
 			busy = switching[player] == true or claiming[player] == true or expanding[player] == true,
-			looseWood = if slot then looseWoodOn(player, slot, profile) else 0,
+			loose = if slot then looseOn(player, slot, profile) else { pieces = 0, sections = 0, unsaveable = 0 },
 		}
 		local ok, why = BaseLogic.CheckUnload(profile, ctx)
 		if not ok or not slot then

@@ -513,7 +513,8 @@ return function(t)
 		t.ok(problem(60, 20), "the parking lot")
 		t.ok(problem(-30, 48), "Murph's camp")
 		t.ok(problem(-60, 82), "Rosa's walk")
-		t.eq(problem(-60, -25), nil, "open meadow south-west of the pad")
+		-- Ring map: (-100, 30), (-60, -25) is Birch Side's yard now.
+		t.eq(problem(-100, 30), nil, "open meadow south-west of the pad")
 	end)
 
 	t.test("the sell area (x -60 to 60, z 80 to 140) and the spawn lane hold no town tree at any tier", function()
@@ -552,7 +553,8 @@ return function(t)
 				near.spawn += 1
 			end
 		end
-		t.ok(near.dealership >= 5, near.dealership .. " trees within 70 studs of the dealership door")
+		-- Ring map: 4 (it was 5): the new East Link and the Land Office queue leave one site fewer by the door.
+		t.ok(near.dealership >= 4, near.dealership .. " trees within 70 studs of the dealership door")
 		t.ok(near.round >= 15, near.round .. " trees within 190 studs of it")
 		t.ok(near.spawn >= 6, near.spawn .. " trees within 110 studs of the spawn pad")
 	end)
@@ -601,10 +603,11 @@ return function(t)
 	t.test("GroundFor: a town zone uses the town's ground, any other zone the general rule", function()
 		-- Behind the sawmill is inside the flat town: the general rule refuses it
 		-- (WorldPlan.GoodGround: not in town), the town's ground allows it.
-		local x, z = 30, 158
+		-- Ring map: (-100, 30), the west lawn (behind the sawmill is the gondola's east run now).
+		local x, z = -100, 30
 		t.ok(TreeFill.TownGround(x, z))
 		t.ok(not TreeFill.Ground(x, z), "the forest's rule says no in the flat town")
-		t.ok(TreeFill.GroundFor({ id = "town:mill", cx = x, cz = z, radius = 10 }, x, z))
+		t.ok(TreeFill.GroundFor({ id = "town:west", cx = x, cz = z, radius = 10 }, x, z))
 		t.ok(not TreeFill.GroundFor({ id = "wild", cx = x, cz = z, radius = 10 }, x, z))
 		t.ok(not TreeFill.GroundFor(nil, x, z))
 		-- A point the town's ground refuses (the street) is refused for a town zone.

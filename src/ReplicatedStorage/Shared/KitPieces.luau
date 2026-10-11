@@ -10,6 +10,12 @@ local V3 = Vector3.new
 
 local WOOD = "#654321"
 local WOOD_LIGHT = "#825A32"
+-- Lane F (V1 building). Game Art Director palette is still PENDING; these
+-- are the brief's defaults (Awaiting Connor).
+local SANDSTONE = "#C8643C"
+local COPPER = "#B87333"
+-- Paid in sandstone slabs or ingots, not planks: PlotFill takes them from the
+-- loose parts dropped on the ghost (BuildCost has the numbers).
 
 local function piece(def: { [string]: any }): { [string]: any }
 	def.category = def.category or "Buildings"
@@ -224,5 +230,67 @@ return {
 		footprint = V2(8, 1),
 		boxes = { { size = V3(8, 3, 1), offset = V3(0, 1.5, 0), color = WOOD, material = "WoodPlanks" } },
 		note = "An 8-stud railing",
+	}),
+	-- Lane F V1 pieces. Sizes match the uploaded meshes' bounding boxes
+	-- (assets/models/backlog/furniture/<Name>/stats.json) so job 17 can
+	-- swap the mesh in. woodUnits 0: BuildCost.Of reads slabUnits/ingots.
+	piece({
+		id = "CopperTrim4",
+		displayName = "Copper Trim",
+		category = "Decor",
+		priceCash = 4, -- PROPOSAL
+		woodUnits = 0,
+		ingots = { Copper = 1 }, -- PROPOSAL
+		gated = true,
+		edge = true,
+		footprint = V2(4, 1),
+		boxes = {
+			{ size = V3(4, 0.72, 0.44), offset = V3(0, 0.36, 0), color = COPPER, material = "Metal", role = "Trim" },
+		},
+		note = "A copper band for a wall top or a floor edge",
+	}),
+	piece({
+		id = "SandWall4",
+		displayName = "Sandstone Wall",
+		priceCash = 8, -- PROPOSAL
+		woodUnits = 0,
+		slabUnits = 2, -- PROPOSAL
+		gated = true,
+		edge = true,
+		footprint = V2(4, 1),
+		boxes = {
+			{ size = V3(4, 6.6, 0.65), offset = V3(0, 3.3, 0), color = SANDSTONE, material = "Sandstone" },
+		},
+		note = "A straight sandstone wall, 4 studs",
+	}),
+	piece({
+		id = "SandFloor4",
+		displayName = "Sandstone Floor",
+		priceCash = 8, -- PROPOSAL
+		woodUnits = 0,
+		slabUnits = 2, -- PROPOSAL
+		gated = true,
+		footprint = V2(4, 4),
+		boxes = {
+			{ size = V3(4, 0.3, 4), offset = V3(0, 0.15, 0), color = SANDSTONE, material = "Sandstone" },
+		},
+		note = "A 4×4 sandstone floor",
+	}),
+	piece({
+		id = "SandArch8",
+		displayName = "Sandstone Arch",
+		priceCash = 16, -- PROPOSAL
+		woodUnits = 0,
+		slabUnits = 4, -- PROPOSAL
+		gated = true,
+		edge = true,
+		footprint = V2(8, 2),
+		slot = { size = V3(4, 6, 1.4), offset = V3(0, 3, 0) },
+		boxes = {
+			{ size = V3(2, 7.6, 1.4), offset = V3(-3, 3.8, 0), color = SANDSTONE, material = "Sandstone" },
+			{ size = V3(2, 7.6, 1.4), offset = V3(3, 3.8, 0), color = SANDSTONE, material = "Sandstone" },
+			{ size = V3(4, 1.6, 1.4), offset = V3(0, 6.8, 0), color = SANDSTONE, material = "Sandstone" },
+		},
+		note = "An arch with a 4×6 opening",
 	}),
 }

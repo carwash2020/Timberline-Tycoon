@@ -1266,9 +1266,10 @@ return function(t)
 				n += 1
 				return (n * 0.2371) % 1
 			end
-			local zone = { id = zoneId, cx = 30, cz = 158, radius = 16, cap = 1 }
-			local rec = s.tree("oak", Vector3.new(30, 0, 158), { seed = 5, zone = zone, cap = 1 })
-			local p = s.player(1, Vector3.new(34, 3, 158))
+			-- Ring map: the west lawn (-100, 30); behind the sawmill is the gondola's east run now.
+			local zone = { id = zoneId, cx = -100, cz = 30, radius = 16, cap = 1 }
+			local rec = s.tree("oak", Vector3.new(-100, 0, 30), { seed = 5, zone = zone, cap = 1 })
+			local p = s.player(1, Vector3.new(-96, 3, 30))
 			s.clearSite(p, rec)
 			t.ok(rec.slot, zoneId .. ": felled")
 			s.now += s.WoodData.Get("oak").respawnSec * 1.4
@@ -1279,7 +1280,7 @@ return function(t)
 		local TreeFill = s.loader:load("ReplicatedStorage/Shared/World/TreeFill")
 		t.ok(not rec.slot and rec.model ~= nil, "it grew back")
 		t.ok(TreeFill.GroundFor(zone, rec.base.X, rec.base.Z), "on the town's ground")
-		t.ok(math.sqrt((rec.base.X - 30) ^ 2 + (rec.base.Z - 158) ^ 2) <= 16 + 1e-6, "inside its zone")
+		t.ok(math.sqrt((rec.base.X + 100) ^ 2 + (rec.base.Z - 30) ^ 2) <= 16 + 1e-6, "inside its zone")
 		t.ok(s.Trees.GetTree(rec.uid) == rec)
 		local _, stuck = felled("mill")
 		t.ok(stuck.slot, "the same disc as an ordinary zone has no legal spot in the flat town")

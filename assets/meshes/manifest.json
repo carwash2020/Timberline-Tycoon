@@ -1651,6 +1651,15 @@
     ],
     "node": "Body"
   },
+  "120649476858651": {
+    "file": "kit/backlog/SandWall4.glb",
+    "initialSize": [
+      4.1,
+      6.637,
+      0.65
+    ],
+    "node": "Body"
+  },
   "120660751744175": {
     "file": "kit/Wall12/Wall12.glb",
     "initialSize": [
@@ -3571,6 +3580,15 @@
     ],
     "node": "Body"
   },
+  "140489088509915": {
+    "file": "kit/backlog/SandArch8.glb",
+    "initialSize": [
+      8.3,
+      7.675,
+      1.4
+    ],
+    "node": "Body"
+  },
   "140520576025638": {
     "file": "kit/TallWall4/TallWall4.glb",
     "initialSize": [
@@ -4447,6 +4465,15 @@
     ],
     "node": "Wheel"
   },
+  "81608834142851": {
+    "file": "kit/backlog/SandFloor4.glb",
+    "initialSize": [
+      4.05,
+      0.32,
+      4.05
+    ],
+    "node": "Body"
+  },
   "81858976831127": {
     "file": "vehicles/ScoutATV/ScoutATV.glb",
     "initialSize": [
@@ -5034,6 +5061,15 @@
       5.147,
       1.44,
       5.046
+    ],
+    "node": "Body"
+  },
+  "87662133874242": {
+    "file": "kit/backlog/CopperTrim4.glb",
+    "initialSize": [
+      4.04,
+      0.73,
+      0.465
     ],
     "node": "Body"
   },

@@ -7,7 +7,13 @@
 -- It also polls, and reports what it finds through that same Event:
 --   * where the player stands (RegionLogic, via BadgeData.AreasAt)
 --   * woods already in the field guide (profile.compendium)
+--   * kit pieces filled on the plot (FirstBuild, Homestead, Stonemason) and
+--     lifetime earnings (Millionaire), read from the profile
 -- A first plank is MilestoneService.Event(player, "plank") from the sawmill.
+-- A "build" event ({ id = blueprintId, count = filledKitPieces }) and an
+-- "earned" event ({ count = totalEarned }) award the same keys.
+-- BadgeService.OnNewArea(fn) calls fn(player, areaId) once per new area
+-- (areaId is the areasVisited key, e.g. "bayou"); DailyService listens.
 -- BadgeSync is server -> client. Nothing connects OnServerEvent, and it
 -- has no rate limit. An id of 0 records the earn and never calls AwardBadge.
 -- badgesAwarded is the earn (the panel). badgesSent is set only when
@@ -18,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local BadgeData = require(ReplicatedStorage.Shared.BadgeData)
+local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 
@@ -54,6 +61,8 @@ local started = false
 local inflight: { [Player]: { [string]: boolean } } = {}
 local failed: { [Player]: { [string]: boolean } } = {}
 local greeted: { [Player]: boolean } = {}
+local announced: { [Player]: { [string]: boolean } } = {}
+local newAreaListeners: { (Player, string) -> () } = {}
 
 local function defaultAward(userId: number, badgeId: number): boolean
 	local api = game:GetService("BadgeService")
@@ -204,10 +213,66 @@ function BadgeService.Award(player: Player, key: string): boolean
 end
 
 local function onEvent(player: Player, kind: string, data: MilestoneService.EventData?)
-	for _, key in ipairs(BadgeData.KeysFor(kind, data)) do
+	-- BadgeData.Hook is the wider shape (count for "build" and "earned").
+	local hook = data :: any
+	for _, key in ipairs(BadgeData.KeysFor(kind, hook :: BadgeData.Hook?)) do
 		BadgeService.Award(player, key)
 	end
 end
+
+-- Subscribe to first visits. Fired from Poll when a new area is detected,
+-- not from remember, and once per area per player: an event repeated while
+-- a live badge id is still in flight does not fire it again.
+function BadgeService.OnNewArea(fn: (Player, string) -> ())
+	table.insert(newAreaListeners, fn)
+end
+
+local function announceArea(player: Player, profile: Profile, key: string)
+	local def = BadgeData.Get(key)
+	local visit = if def then def.visit else nil
+	if visit == nil or profile.areasVisited[visit] == true then
+		return
+	end
+	local seen = bag(announced, player)
+	if seen[visit] then
+		return
+	end
+	seen[visit] = true
+	for _, fn in ipairs(newAreaListeners) do
+		local ok, err = pcall(function()
+			fn(player, visit)
+		end)
+		if not ok then
+			warn("[BadgeService] new-area listener failed: " .. tostring(err))
+		end
+	end
+end
+
+-- Kit pieces on the plot that are fully filled (the blueprint has no fill
+-- left), and the id of the first sandstone one (nil when none).
+local function filledKit(profile: Profile): (number, string?)
+	local plot: any = profile.plot
+	if type(plot) ~= "table" or type(plot.placed) ~= "table" then
+		return 0, nil
+	end
+	local count = 0
+	local sandstone: string? = nil
+	local prefix = BadgeData.SandstonePrefix
+	for _, item in ipairs(plot.placed) do
+		if type(item) == "table" and item.fill == nil and type(item.blueprintId) == "string" then
+			local bp = PlotLogic.Blueprint(item.blueprintId)
+			if bp ~= nil and bp.kit == true then
+				count += 1
+				if sandstone == nil and string.sub(item.blueprintId, 1, #prefix) == prefix then
+					sandstone = item.blueprintId
+				end
+			end
+		end
+	end
+	return count, sandstone
+end
+
+local BUILD_KEYS = { "FirstBuild", "Homestead", "Stonemason" }
 
 local function positionOf(player: Player): (number?, number?, number?)
 	local character = player.Character
@@ -248,9 +313,31 @@ function BadgeService.Poll(player: Player)
 	local x, y, z = positionOf(player)
 	if x ~= nil and y ~= nil and z ~= nil then
 		for _, key in ipairs(BadgeData.AreasAt(x, y, z)) do
+			announceArea(player, profile, key)
 			if earned[key] ~= true then
 				MilestoneService.Event(player, "area", { id = key })
 			end
+		end
+	end
+	local pendingBuild = false
+	for _, key in ipairs(BUILD_KEYS) do
+		if earned[key] ~= true then
+			pendingBuild = true
+		end
+	end
+	if pendingBuild then
+		local count, sandstone = filledKit(profile)
+		if count > 0 then
+			for _, key in ipairs(BadgeData.BuildKeys(sandstone, count)) do
+				if earned[key] ~= true then
+					BadgeService.Award(player, key)
+				end
+			end
+		end
+	end
+	if earned.Millionaire ~= true and type(profile.totalEarned) == "number" then
+		for _, key in ipairs(BadgeData.KeysFor("earned", { count = profile.totalEarned })) do
+			BadgeService.Award(player, key)
 		end
 	end
 	local compendium = profile.compendium
@@ -272,6 +359,7 @@ function BadgeService.Forget(player: Player)
 	inflight[player] = nil
 	failed[player] = nil
 	greeted[player] = nil
+	announced[player] = nil
 end
 
 function BadgeService.Init(options: InitOptions?)

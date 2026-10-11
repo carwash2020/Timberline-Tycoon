@@ -35,8 +35,14 @@ return function(t)
 
 	t.test("H-Buy: every kit piece is pay on place at 4 cash a wood unit", function()
 		local seen = 0
+		local laneF = { CopperTrim4 = true, SandWall4 = true, SandFloor4 = true, SandArch8 = true }
 		for _, piece in ipairs(PlotData.Blueprints) do
-			if piece.kit then
+			if piece.kit and laneF[piece.id] then
+				-- Lane F slab and ingot pieces: their own fee, filled with slabs
+				-- and ingots (BuildCost.spec and FillMaterials.spec cover them).
+				t.eq(piece.locked, nil, piece.id .. " is placeable")
+				t.eq(PlotData.Price(piece), piece.priceCash, piece.id .. " pays its own fee")
+			elseif piece.kit then
 				seen += 1
 				-- Only the glass plan is sold (ModernKit): it still pays the kit fee.
 				t.eq(piece.unlock, if piece.family then true else nil, piece.id .. " store unlock")
@@ -398,10 +404,10 @@ return function(t)
 		local text = fs.readFile("ECONOMY.md")
 		t.ok(string.find(text, "68 s", 1, true) ~= nil)
 		t.ok(string.find(text, "5.4 min", 1, true) ~= nil)
-		t.ok(string.find(text, "17.9 min", 1, true) ~= nil)
-		t.ok(string.find(text, "66.3 min", 1, true) ~= nil)
+		t.ok(string.find(text, "17.8 min", 1, true) ~= nil)
+		t.ok(string.find(text, "50.7 min", 1, true) ~= nil)
 		-- Coat gate, modelled mill and planer bonuses, and the $7,600 step.
-		t.ok(string.find(text, "33.5 h", 1, true) ~= nil)
+		t.ok(string.find(text, "31.5 h", 1, true) ~= nil)
 	end)
 
 	t.test("kit meshes: fidelity is chosen per mesh, and a shared col loads once", function()
