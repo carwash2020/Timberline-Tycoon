@@ -444,11 +444,28 @@ end
 local installed: { [string]: Model } = {}
 local logged: { [string]: boolean } = {}
 
+-- A piece nobody ever made a mesh for (Glow Wire, 12 October 2026: no GLB, no
+-- MachineMeshes row, no MeshTemplates model) is part-built BY DESIGN. Its
+-- fallback is not a warning: it is said once, at debug level (LogicItems.Debug
+-- or LogicItems.DebugSink), and the item keeps its part build. Pieces that do
+-- have mesh art and lose it still warn.
+local DEBUG_PREFIX = "[LogicItems] (debug) "
+
 local function logMiss(id: string)
 	if logged[id] then
 		return
 	end
 	logged[id] = true
+	if MachineMeshes.Get(id) == nil then
+		local line = string.format("%s%s has no mesh art; it is part-built by design", DEBUG_PREFIX, id)
+		local sink = (items :: any).DebugSink
+		if sink then
+			sink(line)
+		elseif (items :: any).Debug == true then
+			print(line)
+		end
+		return
+	end
 	warn(string.format("[LogicItems] %s has no MeshTemplates model; keeping the part build", id))
 end
 
@@ -555,12 +572,15 @@ local function applyMachineMeshes(model: Model, id: string, ghost: boolean?): bo
 	return true
 end
 
-local function applyMeshes(model: Model, id: string, ghost: boolean?): boolean
+local function applyMeshesNow(model: Model, id: string, ghost: boolean?): boolean
 	if not known[id] then
 		return false
 	end
 	if applyMachineMeshes(model, id, ghost) then
 		return true
+	end
+	if MeshKit.WasPending() then
+		return false -- the Blender pieces are still loading; the swap tries again
 	end
 	local template = findTemplate(id)
 	local root = model:FindFirstChild("Root")
@@ -630,6 +650,14 @@ local function applyMeshes(model: Model, id: string, ghost: boolean?): boolean
 		end
 	end
 	return true
+end
+
+-- Never waits for a mesh: a machine whose meshes are still loading keeps its
+-- boxes and is dressed when they land (MeshKit.Attempt).
+local function applyMeshes(model: Model, id: string, ghost: boolean?): boolean
+	return MeshKit.Attempt(model, function()
+		return applyMeshesNow(model, id, ghost)
+	end)
 end
 
 -- Tests hand a stand-in model. Nil id forgets every stand-in.

@@ -37,7 +37,13 @@
 -- points of interest, trails, landmarks, backdrop), then the sky, each
 -- nearest the players first and a time slice at a time, after the first
 -- player can play. Every mesh starts loading when this script starts
--- (MeshKit.Preload) so no builder waits on one.
+-- (MeshKit.PreloadAsync) and NO builder waits on one (12 October 2026, after
+-- a Studio load of 300 s: "4. The shops done in 300.2s", "meshes: 476 of 685
+-- loaded ... (timed out)"). MeshKit.Create returns nil for a mesh that is not
+-- in yet, the builder keeps its part-built art, and MeshKit.Attempt dresses
+-- it again when the mesh lands (a few ms a frame). Each top-level step's
+-- seconds go to Shared/BuildTimings; the gating total is printed with the
+-- world gate against the 15 s play budget (tests/BuildBudget.spec).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -50,11 +56,11 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
-local AxeModels = require(ReplicatedStorage.Shared.Art.AxeModels)
 local MeshKit = require(ReplicatedStorage.Shared.Art.MeshKit)
 local MeshManifest = require(ReplicatedStorage.Shared.Art.MeshManifest)
 local LoadQueue = require(ReplicatedStorage.Shared.LoadQueue)
 local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
+local BuildTimings = require(ReplicatedStorage.Shared.BuildTimings)
 local LoadState = require(script.Parent.LoadState)
 local TownMeshes = require(ReplicatedStorage.Shared.Art.TownMeshes)
 local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
@@ -96,6 +102,7 @@ end
 -- how many Instances a top-level step added, so Output says where a slow
 -- start went. Nested steps skip the count (GetDescendants is not free).
 local stepDepth = 0
+local buildTimings = BuildTimings.new()
 local function loadLine(what: string)
 	print(string.format("[Load] +%.1fs %s", os.clock() - started, what))
 end
@@ -116,6 +123,7 @@ local function step(name: string, build: () -> ())
 	end
 	if top then
 		loadLine(string.format("%s took %.2fs", name, os.clock() - startedAt))
+		buildTimings.Record(name, os.clock() - startedAt, true)
 	end
 	if not ok then
 		failedSteps += 1
@@ -154,35 +162,27 @@ do
 	end
 end
 TownMeshes.Enabled = townMeshesOn
--- One probe load before anything is built, so a permission problem shows
--- here (and in MeshKit's warning) instead of as silent part-built art.
-do
-	local rusty = AxeModels.Get("RustyAxe")
-	if rusty then
-		local probe = MeshKit.Create(rusty.Handle.meshId, "Probe", rusty.Handle.size)
-		if probe then
-			probe:Destroy()
-		end
-	end
-end
 -- Every uploaded mesh the server will ask for starts loading NOW, a couple of
--- dozen at a time, while the terrain below is written (a mesh load is network
--- time, the terrain is CPU, so they overlap). Studio's log of 7 October 2026:
--- the same loads, one after another inside NPCService.Init and
--- PlotService.Init, cost 60 s and 11 s. The builders find every mesh cached.
+-- dozen at a time, on its own thread, while the terrain below is written (a
+-- mesh load is network time, the terrain is CPU, so they overlap). Nothing
+-- below waits for it: a builder that asks for a mesh that is not in yet gets
+-- nil, keeps its part-built art, and MeshKit.Attempt dresses it when the
+-- mesh lands. (Studio's log of 7 October 2026: the same loads, one after
+-- another inside NPCService.Init and PlotService.Init, cost 60 s and 11 s;
+-- of 12 October: the shops alone waited 300 s.) A permission problem still
+-- shows: MeshKit warns with the engine's text and the line below counts.
 LoadState.Stage("starting")
-task.spawn(function()
-	local entries = MeshManifest.Flat(townMeshesOn)
-	local result = MeshKit.Preload(entries)
+MeshKit.PreloadAsync(MeshManifest.Flat(townMeshesOn), nil, function(result: MeshKit.PreloadResult)
 	LoadState.Gates.Set("meshes")
 	LoadState.Line(
 		string.format(
-			"meshes: %d of %d loaded, %d failed in %.1fs%s",
+			"meshes: %d of %d loaded, %d failed in %.1fs%s (the world did not wait; %d swapped in so far)",
 			result.loaded,
 			result.total,
 			result.failed,
 			result.seconds,
-			if result.timedOut then " (timed out, the rest keep loading)" else ""
+			if result.timedOut then " (timed out, the rest keep loading)" else "",
+			MeshKit.SwapStats().swapped
 		)
 	)
 end)
@@ -1383,6 +1383,29 @@ sellArea.Parent = map
 -- spawn area is streamed in and their save is loaded, and respawns them.
 
 print(string.format("[MapBuilder] World built in %.1fs (terrain %.1fs)", builtSeconds, terrainSeconds))
+do
+	local swaps = MeshKit.SwapStats()
+	print("[MapBuilder] build phases that gate play:\n" .. table.concat(buildTimings.Lines(), "\n"))
+	print(
+		string.format(
+			"[MapBuilder] meshes still loading at the world gate: %d dressings waiting, %d already swapped in",
+			swaps.waiting + swaps.ready,
+			swaps.swapped
+		)
+	)
+	if buildTimings.OverBudget() then
+		local slowest = buildTimings.Slowest()
+		warn(
+			string.format(
+				"[MapBuilder] the gating build took %.1fs, over the %ds play budget; slowest step: %s (%.1fs)",
+				buildTimings.GatingSeconds(),
+				BuildTimings.PlayBudgetSeconds,
+				if slowest then slowest.name else "?",
+				if slowest then slowest.seconds else 0
+			)
+		)
+	end
+end
 print("[MapBuilder] meshes after the build: " .. MeshKit.Report())
 loadLine(string.format("world ready for players (terrain %.1fs); the forest plants next", terrainSeconds))
 

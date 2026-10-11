@@ -21,6 +21,44 @@ key (deriving it from a full plot is awaiting Connor, it would raise cash packs 
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
 the old ones), no Robux price in code.
 
+## Load takes 5 minutes: the world build no longer waits on meshes (branch `phase-2/fix-load-meshes`, 12 October 2026, draft PR)
+
+Connor's bug report items 1, 7 and 9. His Studio log: `[MapBuilder] 4. The shops done in 300.2s`, `meshes: 476 of 685 loaded
+... (timed out)`, `[BaseBoot] no Remotes folder`, `GlowWire has no MeshTemplates model`.
+
+- **Cause (item 1).** `MeshKit.Create` yielded in `CreateMeshPartAsync` for every mesh that was not cached yet. The shops, the
+  buildings, the townsfolk and the trees all call it on the build thread, one mesh after another, and the 24 preload workers
+  already held the asset quota (a load is about 0.4 s of network time). 685 serial loads is minutes, and the preload timed out
+  at 40 s with 476 in. NPCService (up to 40 s) and PlotService (3 s) also waited on loads by design.
+- **Fix.** `MeshKit.Create` never yields: an uncached mesh is `nil` at once (the caller keeps its part-built art, as for a
+  failed load) and is requested in the background. Every dresser runs inside `MeshKit.Attempt(model, step)`; a step that failed
+  only because meshes were still loading is run again when every mesh it missed has landed, a few ms a frame (`MeshKit.Pump`,
+  `SwapBudget` 4 ms), in the frame it was built in for the dressers that write absolute coordinates. A failed mesh never
+  retries. The old yielding call is `MeshKit.CreateAwait`, fenced to `ItemMeshes.LoadAsync` (its own thread). Wired:
+  TownMeshes (Dress, Adorn), NPCMeshes, VehicleMeshes, TreeMeshes, AxeArt, NatureArt (rocks, mine mouth), RobuxBoxArt,
+  KitMeshes, LogicItems (machines). MapBuilder starts the preload with `MeshKit.PreloadAsync` and no longer probes a mesh;
+  NPCService no longer joins a preload; `PlotService.Init` no longer waits 3 s for the plot kit (pads are built part-built and
+  redrawn when it lands, as before). The `meshes` gate is not a first-player gate.
+- **Timings.** `Shared/BuildTimings` records every top-level build step; at the world gate MapBuilder prints
+  `[MapBuilder] build phases that gate play:` (seconds per step, slow ones flagged) and `gating build X of 15s budget`, and
+  warns with the slowest step if it is over. `Gating build` is terrain, town, shops and the rest before SellArea goes in.
+- **Client.** The loading card never waited on meshes (it waits for a character, the save and `game:IsLoaded()`, 30 s cap);
+  the only client preload is UIArt's own thread. The client's dressers (AmbientLife rocks and mushrooms) were blocking its
+  render thread the same way; they are now non-blocking too. Pinned in `tests/BuildBudget.spec`.
+- **BaseBoot (item 7).** Name and parent were right: GameServer makes `ReplicatedStorage.Remotes` only after the world is
+  built (it waits up to 600 s for SellArea), and BaseBoot waited 60 s. With a 300 s build it gave up at +60 s and `SaveNow` and
+  `PaintAllType` were never bound. It now waits `Net.RemotesWaitSeconds` (600, as long as GameServer waits for the world).
+  `tests/BaseBootWait.spec`.
+- **GlowWire (item 9).** No GLB for it exists on `phase-2/v1-glb-sources` or main (no GlowWire anywhere in `assets/glb`) and it
+  has no `MachineMeshes` row, so there is nothing to make a template from. Its part build is by design: the fallback is silent
+  and said once at debug level (`LogicItems.Debug` prints, `LogicItems.DebugSink` for specs). Pieces that have mesh art and
+  lose it still warn. Pending: a GLB for the Glow Wire (a 3.4 x 0.28 neon bar on two iron posts, footprint 4 x 2).
+- **What is proven here and what is not.** Lune cannot load meshes, so `tests/BuildBudget.spec` holds the engine load: a
+  685-dressing build returns with zero loads run and without yielding, then the meshes land and every dressing swaps in (part
+  built, then load, then swap), batched. A source scan fences who may call a yielding load, and a failing spec means a build
+  step awaits a mesh. The real timings (play within 15 s, meshes popping in without a hitch, the swap of a shop and an NPC
+  in place) need Studio: PHASE2_NOTES.md "Load: meshes never block the build".
+
 ## V1 hardening: exploit guards and performance (branch `phase-2/v1-hardening-guards`, 11 October 2026, draft PR)
 
 Launch items 2 and 3. Audit first, then only what was missing.

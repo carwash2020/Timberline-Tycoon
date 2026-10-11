@@ -3751,3 +3751,39 @@ Policy (any device)
 10. Open the Robux store (the board, the shelf, or the STORE button): it looks exactly as before, every card, price and Coming soon line unchanged. No paid random item is sold, so nothing is hidden; the specs cover the hiding and the refusal.
 11. Output: no red errors from `[PolicyGate]` or `[TextFilter]` during join. A warning "policy lookup failed" in Studio without API access is expected; the strict default then applies, which hides nothing today.
 12. Rename a save to something rude: it shows as hashes or the default name, never as typed (Studio may not filter without an experience; the live server does).
+
+## Load: meshes never block the build (branch `phase-2/fix-load-meshes`, 12 October 2026)
+
+What changed is in STATUS.md. Watch the Output window during these. New lines: `[MapBuilder] build phases that gate play:`
+(each step's seconds, slow ones flagged, then `gating build X of 15s budget: ok`), `[Load] +Xs meshes: N of 685 loaded ... (the
+world did not wait; M swapped in so far)` and `[MapBuilder] meshes still loading at the world gate: N dressings waiting`.
+Old lines that must be gone: `4. The shops done in 300s`, `[BaseBoot] no Remotes folder`, `GlowWire has no MeshTemplates model`.
+
+**PC (keyboard and mouse)**
+1. Start a fresh server (Play Solo, empty Studio cache if you can). Join. Play within 15 s: the card goes, you can walk and
+   chop. `[Load] ready for play at +X s` should be X <= 15 and `gating build ... ok`. If it says OVER BUDGET the warning names
+   the slowest step; send me that line.
+2. Meshes pop in without a hitch: stand still for a minute while they land (the preload takes the same time as before, about a
+   minute for 685). Shops, the sawmill, the gondola station and Murph's camp go from part-built to the uploaded art one at a
+   time. No frame stalls, no flicker, nothing floating, sunk, doubled or at the world origin (a building swapped in the wrong
+   place would show at 0,0,0). Walk to a shop that has not swapped yet and watch it change.
+3. Townsfolk: each NPC is part-built, then dressed in place; nobody stuck in a T-pose or doubled.
+4. Trees and rocks: the forest and the boulders gain their meshes in the next minute; the mine mouth swaps from parts to the
+   doorway mesh and you can still walk in. Chop a tree before and after its swap: it still chops, sections still fall.
+5. Place a Sparkworks machine and a kit piece in the first 20 s (before the preload is done): they place as boxes and gain
+   their meshes when they land; Output has no warning for it. The Glow Wire shows as its neon bar, no warning.
+6. In Output: `[BaseBoot] no Remotes folder` is gone; the SaveNow button saves and Paint All works.
+7. Turn off the network or deny asset permission (Creator Hub): everything stays part-built, the game plays, Output warns
+   about permissions once (`MeshKit`), no endless retry lines.
+
+**Phone (667x375 emulator, touch)**
+1. Same first-load test: playable within 15 s; the loading card does not sit longer than the build.
+2. While meshes land, touch controls stay smooth (no hitches when a swap happens near you). Check a busy spot (the town centre).
+3. Tap targets and the HUD are unchanged.
+
+**Xbox (controller)**
+1. Join and play within 15 s with the controller; select ring and B-closes-panels unchanged.
+2. Swap-ins near you while moving the stick: no stutter. Axe on RT chops a tree that swaps mid-swing.
+3. Hold a log with RT while the building next to you swaps in: nothing drops or snaps.
+
+Cross-lane: none. Awaiting Connor: a GLB for the Glow Wire (default: it stays a part-built neon bar, silent).

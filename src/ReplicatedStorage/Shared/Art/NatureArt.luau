@@ -829,6 +829,9 @@ local meshTold: { [string]: boolean } = {}
 local oreTold: { [string]: boolean } = {}
 
 local function logFallback(shape: string, slot: string, meshId: number)
+	if MeshKit.WasPending() then
+		return -- still loading: the swap (MeshKit.Attempt) dresses it when it lands
+	end
 	local key = shape .. "/" .. slot
 	if meshTold[key] then
 		return
@@ -899,7 +902,7 @@ end
 -- Clone every slot or leave the part build alone. A 0 id or a failed load
 -- counts as missing. slots[1] is MeshHost. The part-built parts are dropped
 -- only once every mesh exists.
-local function applySlots(root: Model, shape: string, slots: { MeshSlot }, hostCentre: Vector3): boolean
+local function applySlotsNow(root: Model, shape: string, slots: { MeshSlot }, hostCentre: Vector3): boolean
 	for _, slot in ipairs(slots) do
 		if not RockModels.UsesMesh(slot.meshId) then
 			logFallback(shape, slot.label, slot.meshId)
@@ -950,7 +953,16 @@ local function applySlots(root: Model, shape: string, slots: { MeshSlot }, hostC
 		d:Destroy()
 	end
 	root:SetAttribute("RockMesh", true)
+	root:SetAttribute("MeshFallback", nil)
 	return true
+end
+
+-- Never waits for a mesh: a rock whose meshes are still loading stays
+-- part-built and is dressed when they land (MeshKit.Attempt).
+local function applySlots(root: Model, shape: string, slots: { MeshSlot }, hostCentre: Vector3): boolean
+	return MeshKit.Attempt(root, function()
+		return applySlotsNow(root, shape, slots, hostCentre)
+	end, true)
 end
 
 local function luminance(color: Color3): number
@@ -1295,72 +1307,94 @@ local function caveMouthLight(parent: BasePart)
 	lamp.Parent = parent
 end
 
+-- The mine mouth's meshes, all four or none (nothing is left behind).
+local function caveMeshes(m: Model, spec: any, base: CFrame): boolean
+	local order = { "Body", "Frame", "Glow", "Collision" }
+	for _, name in ipairs(order) do
+		if not RockModels.UsesMesh(spec.pieces[name].meshId) then
+			logFallback("CaveMouth", name, spec.pieces[name].meshId)
+			m:SetAttribute("MeshFallback", name)
+			return false
+		end
+	end
+	local made: { MeshPart } = {}
+	for _, name in ipairs(order) do
+		local piece = spec.pieces[name]
+		-- The Collision mesh is two pillars and a lintel round a 16 x 12
+		-- doorway. A Hull (or a Box) would be one solid block that fills
+		-- the doorway; precise convex pieces keep it open (the walk-in
+		-- mine mouth, tests/NatureArt.spec).
+		local fidelity = if name == "Collision"
+			then Enum.CollisionFidelity.PreciseConvexDecomposition
+			elseif name == "Body" then Enum.CollisionFidelity.Hull
+			else nil
+		local mesh = MeshKit.Create(piece.meshId, name, piece.size, fidelity)
+		if not mesh then
+			logFallback("CaveMouth", name, piece.meshId)
+			m:SetAttribute("MeshFallback", name)
+			for _, d in ipairs(made) do
+				d:Destroy()
+			end
+			return false
+		end
+		MeshKit.Visual(mesh, piece.meshId)
+		mesh.Anchored = true
+		mesh.CFrame = if name == "Body" then base else base * CFrame.new(piece.offset)
+		Kit.decor(mesh, false)
+		if name == "Body" then
+			mesh.Color = NatureArt.CliffRock
+			mesh.Material = ROCK
+		elseif name == "Frame" then
+			mesh.Color = Color3.new(1, 1, 1)
+		elseif name == "Glow" then
+			mesh.Material = Enum.Material.Neon
+			mesh.Color = hex("#FFC873")
+		elseif name == "Collision" then
+			mesh.Transparency = 1
+			mesh.CanCollide = true
+			mesh.CanQuery = true
+		end
+		mesh.Parent = m
+		table.insert(made, mesh)
+	end
+	return true
+end
+
 function NatureArt.CaveMouth(): Model
 	local m = model("CaveMouth")
 	local spec = RockModels.Scenery("CaveMouth")
 	assert(spec, "CaveMouth spec missing")
 	local base = CFrame.new(spec.hostCentre)
-	local order = { "Body", "Frame", "Glow", "Collision" }
-	local ok = true
-	for _, name in ipairs(order) do
-		if not RockModels.UsesMesh(spec.pieces[name].meshId) then
-			logFallback("CaveMouth", name, spec.pieces[name].meshId)
-			m:SetAttribute("MeshFallback", name)
-			ok = false
-			break
+	-- Never waits for a mesh: if they are still loading the part-built mouth
+	-- stands and is swapped for the meshes when they land (MeshKit.Attempt).
+	local partBuilt = false
+	local meshed = MeshKit.Attempt(m, function()
+		if not caveMeshes(m, spec, base) then
+			return false
 		end
-	end
-	local made: { MeshPart } = {}
-	if ok then
-		for _, name in ipairs(order) do
-			local piece = spec.pieces[name]
-			-- The Collision mesh is two pillars and a lintel round a 16 x 12
-			-- doorway. A Hull (or a Box) would be one solid block that fills
-			-- the doorway; precise convex pieces keep it open (the walk-in
-			-- mine mouth, tests/NatureArt.spec).
-			local fidelity = if name == "Collision"
-				then Enum.CollisionFidelity.PreciseConvexDecomposition
-				elseif name == "Body" then Enum.CollisionFidelity.Hull
-				else nil
-			local mesh = MeshKit.Create(piece.meshId, name, piece.size, fidelity)
-			if not mesh then
-				logFallback("CaveMouth", name, piece.meshId)
-				m:SetAttribute("MeshFallback", name)
-				for _, d in ipairs(made) do
-					d:Destroy()
+		if partBuilt then
+			local drop: { Instance } = {}
+			for _, d in ipairs(m:GetDescendants()) do
+				if d:IsA("BasePart") and d:GetAttribute("VisualMesh") ~= true then
+					table.insert(drop, d)
 				end
-				ok = false
-				break
 			end
-			MeshKit.Visual(mesh, piece.meshId)
-			mesh.Anchored = true
-			mesh.CFrame = if name == "Body" then base else base * CFrame.new(piece.offset)
-			Kit.decor(mesh, false)
-			if name == "Body" then
-				mesh.Color = NatureArt.CliffRock
-				mesh.Material = ROCK
-			elseif name == "Frame" then
-				mesh.Color = Color3.new(1, 1, 1)
-			elseif name == "Glow" then
-				mesh.Material = Enum.Material.Neon
-				mesh.Color = hex("#FFC873")
-			elseif name == "Collision" then
-				mesh.Transparency = 1
-				mesh.CanCollide = true
-				mesh.CanQuery = true
+			for _, d in ipairs(drop) do
+				d:Destroy()
 			end
-			mesh.Parent = m
-			table.insert(made, mesh)
 		end
-	end
-	if ok then
 		local glow = m:FindFirstChild("Glow")
 		if glow and glow:IsA("BasePart") then
 			caveMouthLight(glow)
 		end
 		m:SetAttribute("RockMesh", true)
+		m:SetAttribute("MeshFallback", nil)
+		return true
+	end, true)
+	if meshed then
 		return m
 	end
+	partBuilt = true
 	caveMouthParts(m, spec)
 	local lit = m:FindFirstChild("Glow")
 	if lit and lit:IsA("BasePart") then

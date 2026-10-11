@@ -66,6 +66,9 @@ local function hasAssets(): boolean
 end
 
 local function logMiss(id: string, piece: string, meshId: number)
+	if MeshKit.WasPending() then
+		return -- still loading: LogicItems' Attempt dresses it when it lands
+	end
 	if logged[id] then
 		return
 	end

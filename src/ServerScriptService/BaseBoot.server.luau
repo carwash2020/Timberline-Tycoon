@@ -7,9 +7,22 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", 60)
+local Net = require(ReplicatedStorage.Shared.Net)
+
+-- GameServer makes the Remotes folder only after the world is built (it waits
+-- for MapBuilder's SellArea first), and this script starts with the server, so
+-- it must out-wait the build. It used to wait 60 s: with Connor's 300 s build
+-- (12 October 2026) it gave up at +60 s with "[BaseBoot] no Remotes folder"
+-- and SaveNow / PaintAllType were never bound. Net.RemotesWaitSeconds is the
+-- same patience GameServer has for the world (tests/BaseBootWait.spec).
+local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", Net.RemotesWaitSeconds)
 if remotesFolder == nil then
-	warn("[BaseBoot] no Remotes folder")
+	warn(
+		string.format(
+			"[BaseBoot] no Remotes folder after %ds: GameServer never started (is the world build stuck?)",
+			Net.RemotesWaitSeconds
+		)
+	)
 	return
 end
 

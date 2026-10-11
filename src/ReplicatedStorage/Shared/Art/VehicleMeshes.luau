@@ -357,7 +357,7 @@ local function swapWheel(mesh: MeshPart, wheel: BasePart)
 end
 
 -- True when meshes replaced the decorative body. False leaves `model` as built.
-function VehicleMeshes.Apply(model: Model, truckId: string, trailerId: string?): boolean
+local function applyNow(model: Model, truckId: string, trailerId: string?): boolean
 	local truck = VehicleModels.Truck(truckId)
 	if not truck then
 		return false
@@ -446,6 +446,14 @@ function VehicleMeshes.Apply(model: Model, truckId: string, trailerId: string?):
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	model:SetAttribute("VehicleMesh", true)
 	return true
+end
+
+-- Never waits for a mesh: a truck whose meshes are still loading drives
+-- part-built and is dressed when they land (MeshKit.Attempt).
+function VehicleMeshes.Apply(model: Model, truckId: string, trailerId: string?): boolean
+	return MeshKit.Attempt(model, function()
+		return applyNow(model, truckId, trailerId)
+	end, true)
 end
 
 return VehicleMeshes
