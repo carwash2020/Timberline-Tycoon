@@ -32,6 +32,7 @@ local HazardService = require(script.Parent.HazardService)
 local HermitService = require(script.Parent.HermitService)
 local LogicService = require(script.Parent.LogicService)
 local PermissionService = require(script.Parent.PermissionService)
+local PolicyGate = require(script.Parent.PolicyGate)
 local DailyService = require(script.Parent.DailyService)
 local AdminService = require(script.Parent.AdminService)
 local DevCommands = require(script.Parent.DevCommands)
@@ -757,6 +758,7 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlotShown = remote.PlotShown,
 	BaseAction = remote.BaseAction,
 	VisitPlot = remote.VisitPlot,
+	PlotModerate = remote.PlotModerate,
 }, notify, { gates = LoadState.Gates })
 -- The pads, the Land Office counter and the plot picker's data exist now (or
 -- Init failed and warned: nothing will make them appear, so do not wait).
@@ -1052,6 +1054,12 @@ BootReport.StartStubs({
 				FerryService.Init(remote.FerryBoard)
 				FerryService.SetupWorld(mapFolder, notify)
 			end
+		end,
+	},
+	{
+		name = "PolicyGate",
+		init = function()
+			PolicyGate.Init()
 		end,
 	},
 	{

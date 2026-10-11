@@ -55,6 +55,7 @@ Net.RemoteNames = {
 	"ExpandLand", -- client -> server: (x, z) buy the square that touches yours
 	"VisitPlot", -- client -> server: (ownerUserId) go to that player's plot, if their visit flag allows it
 	"SetPermission", -- client -> server: (userId, flag, on)
+	"PlotModerate", -- client -> server: ("kick" | "ban" | "unban", userId) owner only; PlotService.Moderate
 	"Wire", -- client -> server: (fromUid, port, toUid, port) or ("cut", uid)
 	"TollPay", -- client -> server: () pay the toll
 	"FerryBoard", -- client -> server: () board the ferry

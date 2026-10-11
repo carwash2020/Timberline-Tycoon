@@ -19,7 +19,9 @@
 --     analytics. A pass is saved in profile.ownerGrants (not `passes`), so
 --     the join check ORs it in and a revoke never touches a real purchase.
 --     Every grant and revoke is also written to profile.ownerGrantLog.
---   * BuyRobuxItem (client -> server): the server checks the item has a
+--   * BuyRobuxItem (client -> server): the server refuses an item the
+--     player's region restricts (PolicyGate: a paid random item or a
+--     tradable one), checks the item has a
 --     real id, asks Roblox whether it is for sale (StoreSaleService; a "no"
 --     or no answer is refused with a toast), checks a cash pack fits, then
 --     shows Roblox's purchase prompt. Products get the same gate as passes.
@@ -40,6 +42,7 @@ local RunService = game:GetService("RunService")
 local AdminLogic = require(ReplicatedStorage.Shared.AdminLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
+local PolicyLogic = require(ReplicatedStorage.Shared.PolicyLogic)
 local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local StoreCopy = require(ReplicatedStorage.Shared.Store.StoreCopy)
 local StoreData = require(ReplicatedStorage.Shared.StoreData)
@@ -47,6 +50,7 @@ local StoreSale = require(ReplicatedStorage.Shared.Store.StoreSale)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
 local GameAnalytics = require(script.Parent.GameAnalytics)
+local PolicyGate = require(script.Parent.PolicyGate)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local StoreSaleService = require(script.Parent.StoreSaleService)
@@ -282,6 +286,11 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 		if not pass then
 			return
 		end
+		-- Region rules (PolicyService): a restricted item is never prompted.
+		if not PolicyGate.Allows(player, pass :: any) then
+			tell(player, PolicyLogic.Refusal)
+			return
+		end
 		if not StoreData.IsForSale(pass.id) then
 			tell(player, StoreCopy.NotForSale)
 			return
@@ -306,6 +315,10 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 		local product = StoreData.Product(key)
 		local profile = ProfileService.GetProfile(player)
 		if not product or not profile then
+			return
+		end
+		if not PolicyGate.Allows(player, product :: any) then
+			tell(player, PolicyLogic.Refusal)
 			return
 		end
 		if not StoreData.IsForSale(product.id) then

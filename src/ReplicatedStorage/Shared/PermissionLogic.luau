@@ -98,8 +98,36 @@ local function applyRow(into: Row, row: any)
 	end
 end
 
--- The row that applies to `userId`: defaults, then anyone, then that person.
+-- Plot bans (owner only, PlotService.Moderate). A ban is a marker on that
+-- person's row in the same saved `permissions` table (so it is saved with
+-- the slot and needs no new field): { banned = true, bannedName, bannedAt }.
+-- A banned person resolves to every flag off, so the one rule that decides
+-- visiting, building, grabbing and the doors (Allows, CanVisit, MustLeave,
+-- PlotLogic.CanEdit) refuses them with no extra check at each caller.
+PermissionLogic.MaxBans = 30
+
+function PermissionLogic.IsBanned(permissions: any, userId: number): boolean
+	if type(permissions) ~= "table" or type(userId) ~= "number" then
+		return false
+	end
+	local row = permissions[tostring(userId)]
+	return type(row) == "table" and row.banned == true
+end
+
+local function nothing(): Row
+	local row: Row = {}
+	for _, flag in ipairs(PermissionLogic.Flags) do
+		row[flag] = false
+	end
+	return row
+end
+
+-- The row that applies to `userId`: defaults, then anyone, then that
+-- person. A banned person gets every flag off.
 function PermissionLogic.Resolve(permissions: any, userId: number): Row
+	if PermissionLogic.IsBanned(permissions, userId) then
+		return nothing()
+	end
 	local row = PermissionLogic.DefaultRow()
 	if type(permissions) == "table" then
 		applyRow(row, permissions[PermissionLogic.Anyone])
@@ -197,7 +225,7 @@ end
 local function people(permissions: { [string]: any }): number
 	local count = 0
 	for key, row in pairs(permissions) do
-		if key ~= PermissionLogic.Anyone and type(row) == "table" then
+		if key ~= PermissionLogic.Anyone and type(row) == "table" and row.banned ~= true then
 			count += 1
 		end
 	end
@@ -211,6 +239,10 @@ function PermissionLogic.Set(permissions: any, target: string, flag: string, on:
 	end
 	if PermissionLogic.Target(target) ~= target then
 		return false
+	end
+	local existing = permissions[target]
+	if type(existing) == "table" and existing.banned == true then
+		return false -- a ban is lifted with Unban, not by a toggle
 	end
 	if
 		target ~= PermissionLogic.Anyone
@@ -226,6 +258,115 @@ function PermissionLogic.Set(permissions: any, target: string, flag: string, on:
 	end
 	row[flag] = on
 	return true
+end
+
+-- A name safe to keep and show: a Roblox user name (letters, digits,
+-- underscore), else a plain stand-in.
+local function safeName(name: unknown, userId: string): string
+	if type(name) == "string" and string.match(name, "^[%w_]+$") ~= nil and #name <= 20 then
+		return name
+	end
+	return "Player " .. userId
+end
+
+-- Bans `userId` from this plot. False (with a reason a toast can use) for a
+-- bad id, yourself, someone already banned or a full list.
+function PermissionLogic.Ban(
+	permissions: any,
+	ownerId: number,
+	userId: unknown,
+	name: unknown,
+	now: number
+): (boolean, string?)
+	if type(permissions) ~= "table" then
+		return false, "bad"
+	end
+	local target = PermissionLogic.VisitTarget(userId)
+	if not target then
+		return false, "bad"
+	end
+	if target == ownerId then
+		return false, "You can't ban yourself."
+	end
+	if PermissionLogic.IsBanned(permissions, target) then
+		return false, "They are already banned from your plot."
+	end
+	if #PermissionLogic.Bans(permissions) >= PermissionLogic.MaxBans then
+		return false, string.format("Your ban list is full (%d). Unban someone first.", PermissionLogic.MaxBans)
+	end
+	local key = string.format("%d", target)
+	local row = nothing() :: { [string]: any }
+	row.banned = true
+	row.bannedName = safeName(name, key)
+	row.bannedAt = if type(now) == "number" then now else 0
+	permissions[key] = row
+	return true, nil
+end
+
+-- Lifts a ban and drops that person's row (back to the "anyone" rules).
+function PermissionLogic.Unban(permissions: any, userId: unknown): boolean
+	local target = PermissionLogic.VisitTarget(userId)
+	if not target or not PermissionLogic.IsBanned(permissions, target) then
+		return false
+	end
+	permissions[string.format("%d", target)] = nil
+	return true
+end
+
+export type Ban = { userId: number, name: string, at: number }
+
+-- The ban list, oldest first (then by id).
+function PermissionLogic.Bans(permissions: any): { Ban }
+	local out: { Ban } = {}
+	if type(permissions) ~= "table" then
+		return out
+	end
+	for key, row in pairs(permissions) do
+		if
+			type(row) == "table"
+			and row.banned == true
+			and PermissionLogic.Target(key) == key
+			and key ~= PermissionLogic.Anyone
+		then
+			table.insert(out, {
+				userId = tonumber(key) :: number,
+				name = safeName(row.bannedName, key),
+				at = if type(row.bannedAt) == "number" then row.bannedAt else 0,
+			})
+		end
+	end
+	table.sort(out, function(a, b)
+		if a.at ~= b.at then
+			return a.at < b.at
+		end
+		return a.userId < b.userId
+	end)
+	return out
+end
+
+-- The PlotBans attribute: "id:name;id:name". The ban list is the owner's
+-- to read in Settings, so it rides on their own player.
+function PermissionLogic.EncodeBans(permissions: any): string
+	local parts = {}
+	for _, ban in ipairs(PermissionLogic.Bans(permissions)) do
+		table.insert(parts, string.format("%d:%s", ban.userId, (string.gsub(ban.name, "[:;]", ""))))
+	end
+	return table.concat(parts, ";")
+end
+
+function PermissionLogic.DecodeBans(text: unknown): { { userId: number, name: string } }
+	local out: { { userId: number, name: string } } = {}
+	if type(text) ~= "string" or text == "" then
+		return out
+	end
+	for chunk in string.gmatch(text, "[^;]+") do
+		local id, name = string.match(chunk, "^(%d+):(.+)$")
+		local userId = if id then PermissionLogic.VisitTarget(tonumber(id)) else nil
+		if userId and name then
+			table.insert(out, { userId = userId, name = name })
+		end
+	end
+	return out
 end
 
 local function piece(target: string, row: any): string?

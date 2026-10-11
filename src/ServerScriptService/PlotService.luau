@@ -50,6 +50,8 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
 local LooseSave = require(ReplicatedStorage.Shared.LooseSave)
 local SlabData = require(ReplicatedStorage.Shared.SlabData)
+local AdminLogic = require(ReplicatedStorage.Shared.AdminLogic)
+local ModerationLogic = require(ReplicatedStorage.Shared.ModerationLogic)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -57,6 +59,7 @@ local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local PermissionService = require(script.Parent.PermissionService)
 local PlotFill = require(script.Parent.PlotFill)
 local PlotDoors = require(script.Parent.PlotDoors)
 local LogicService = require(script.Parent.LogicService)
@@ -660,6 +663,7 @@ local function mirrorPlot(player: Player, profile: Profile)
 	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
 	player:SetAttribute("PlotSquares", table.concat(squares, ";"))
 	player:SetAttribute("PlotPermissions", PermissionLogic.Encode(profile.permissions))
+	player:SetAttribute("PlotBans", PermissionLogic.EncodeBans(profile.permissions))
 end
 
 local function assign(player: Player, slot: Slot, profile: Profile)
@@ -1213,6 +1217,9 @@ local function nudgeOff(visitor: Player, slot: Slot, profile: Profile)
 	root.Position = cf.Position
 end
 
+-- Recent kicks (server memory only): [ownerId][visitorId] = until (os.clock).
+local kicks: ModerationLogic.Kicks = {}
+
 -- A visit: `visitor` asked to go to `ownerId`'s plot. The server checks it
 -- all again (the Settings list is only a convenience): the owner is in
 -- the server with a plot, is not the visitor, and their visit flag lets
@@ -1239,6 +1246,14 @@ function PlotService.Visit(visitor: Player, ownerIdRaw: unknown): boolean
 		return false
 	end
 	if owner == visitor then
+		return false
+	end
+	if PermissionLogic.IsBanned(profile.permissions, visitor.UserId) then
+		notify(visitor, ModerationLogic.VisitBanned(owner.DisplayName))
+		return false
+	end
+	if ModerationLogic.IsKicked(kicks, owner.UserId, visitor.UserId, os.clock()) then
+		notify(visitor, ModerationLogic.VisitKicked(owner.DisplayName))
 		return false
 	end
 	if not PermissionLogic.CanVisit(profile.permissions, visitor.UserId, owner.UserId) then
@@ -1290,7 +1305,10 @@ function PlotService.VisitStep(list: { Player }?)
 				for _, visitor in ipairs(everyone) do
 					if
 						visitor ~= owner
-						and PermissionLogic.MustLeave(profile.permissions, visitor.UserId, owner.UserId)
+						and (
+							PermissionLogic.MustLeave(profile.permissions, visitor.UserId, owner.UserId)
+							or ModerationLogic.Excluded(profile.permissions, kicks, owner.UserId, visitor.UserId, now)
+						)
 					then
 						if actorOn(visitor, slot, profile) then
 							nudgeOff(visitor, slot, profile)
@@ -1300,6 +1318,89 @@ function PlotService.VisitStep(list: { Player }?)
 			end
 		end
 	end
+end
+
+-- Plot moderation (owner only): kick a visitor off the plot, ban a user id
+-- from it, or lift a ban. The server decides everything: the requester must
+-- own the plot they stand for, the target must be a real user id, and the
+-- rate limit is the remote's. A ban is saved with the slot (permissions),
+-- a kick lasts ModerationLogic.KickSeconds and is not saved.
+local function isStaff(userId: number): boolean
+	local ok, creatorType, creatorId = pcall(function()
+		return (game :: any).CreatorType, (game :: any).CreatorId
+	end)
+	return AdminLogic.IsOwner(userId, if ok then creatorType else nil, if ok then creatorId else nil, false)
+end
+
+function PlotService.Moderate(owner: Player, action: unknown, targetRaw: unknown): boolean
+	if not RateLimiter.Allow(owner, "PlotModerate") then
+		return false
+	end
+	local slot = slotOf[owner]
+	local profile = ProfileService.GetProfile(owner)
+	local target = PermissionLogic.VisitTarget(targetRaw)
+	local victim: Player? = nil
+	if target then
+		for _, other in ipairs(onlinePlayers()) do
+			if other.UserId == target then
+				victim = other
+			end
+		end
+	end
+	local onPlot = victim ~= nil and slot ~= nil and profile ~= nil and actorOn(victim, slot, profile)
+	local ok, userId, why = ModerationLogic.Check(if profile then profile.permissions else nil, action, targetRaw, {
+		ownerId = owner.UserId,
+		ownsPlot = slot ~= nil and profile ~= nil,
+		targetHere = victim ~= nil,
+		targetOnPlot = onPlot,
+		targetIsStaff = target ~= nil and isStaff(target),
+	})
+	if not ok or userId == nil or profile == nil or slot == nil then
+		if why and why ~= "bad" then
+			notify(owner, why)
+		end
+		return false
+	end
+	local ownerName = owner.DisplayName
+	local name = if victim then victim.DisplayName else "That player"
+	if action == "unban" then
+		PermissionLogic.Unban(profile.permissions, userId)
+		PermissionService.Publish(owner)
+		ProfileService.Save(owner)
+		notify(owner, ModerationLogic.UnbannedOwner(if victim then name else "They"))
+		return true
+	end
+	if action == "ban" then
+		local banned, banWhy = PermissionLogic.Ban(
+			profile.permissions,
+			owner.UserId,
+			userId,
+			if victim then victim.Name else nil,
+			os.time()
+		)
+		if not banned then
+			if banWhy and banWhy ~= "bad" then
+				notify(owner, banWhy)
+			end
+			return false
+		end
+		PermissionService.Publish(owner)
+		ProfileService.Save(owner)
+		notify(owner, ModerationLogic.BannedOwner(name))
+		if victim then
+			notify(victim, ModerationLogic.BannedVisitor(ownerName))
+		end
+	else
+		ModerationLogic.Kick(kicks, owner.UserId, userId, os.clock())
+		notify(owner, ModerationLogic.KickedOwner(name))
+		if victim then
+			notify(victim, ModerationLogic.KickedVisitor(ownerName))
+		end
+	end
+	if victim and onPlot then
+		nudgeOff(victim, slot, profile)
+	end
+	return true
 end
 
 local function findPlaced(profile: Profile, uid: string): (PlotLogic.Placed?, number)
@@ -2481,6 +2582,7 @@ end
 function PlotService.PlayerRemoving(player: Player)
 	-- Drop the timer first, so a timeout can't assign a pad after they leave.
 	pickingUntil[player] = nil
+	kicks[player.UserId] = nil
 	buying[player] = nil
 	claiming[player] = nil
 	switching[player] = nil
@@ -2747,6 +2849,11 @@ function PlotService.Init(
 		end)
 	end
 	remotes.UpgradePlot.OnServerEvent:Connect(PlotService.Upgrade)
+	if remotes.PlotModerate then
+		remotes.PlotModerate.OnServerEvent:Connect(function(player: Player, action: unknown, userId: unknown)
+			PlotService.Moderate(player, action, userId)
+		end)
+	end
 	if remotes.VisitPlot then
 		remotes.VisitPlot.OnServerEvent:Connect(function(player: Player, ownerId: unknown)
 			PlotService.Visit(player, ownerId)

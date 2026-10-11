@@ -27,6 +27,8 @@ local function publish(player: Player)
 		return
 	end
 	player:SetAttribute("PlotPermissions", PermissionLogic.Encode(profile.permissions))
+	-- The owner's own ban list, for Settings > Visitors (names are Roblox user names).
+	player:SetAttribute("PlotBans", PermissionLogic.EncodeBans(profile.permissions))
 end
 
 function PermissionService.Publish(player: Player)

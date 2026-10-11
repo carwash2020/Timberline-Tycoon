@@ -46,6 +46,11 @@ return function(t)
 		weld.Parent = seat
 	end)
 	roblox.implementMethod("BasePart", "SetNetworkOwner", function(part, owner)
+		if current == nil or current.owners == nil then
+			-- Outside this spec Lune has no physics: the engine's refusal, as
+			-- GrabService.spec expects, whatever order the specs run in.
+			error("no physics here")
+		end
 		table.insert(current.ownerCalls, { part = part, owner = owner })
 		if not current.handoverFails then
 			current.owners[part] = owner
@@ -712,5 +717,13 @@ return function(t)
 		local board = sign:FindFirstChild("Board", true) :: BasePart
 		t.ok(board ~= nil, "the sign has its board")
 		t.ok(math.abs(board.CFrame.Y - 27) < 0.05, "the board stands 7 up from the ground: " .. board.CFrame.Y)
+	end)
+
+	-- Last: the fake world is gone, so the shared methods above stand down.
+	t.test("the shared fake physics stands down when this spec ends", function()
+		current = nil
+		t.ok(not pcall(function()
+			Instance.new("Part"):SetNetworkOwner(nil)
+		end))
 	end)
 end

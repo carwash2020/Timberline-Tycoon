@@ -9,7 +9,7 @@ local SettingsLogic = {}
 -- The Settings card. "visitors" is the plot permission list, "board"
 -- the opt-in lifetime-earnings leaderboard and "codes" the redeem box. B on either tab returns to
 -- "game"; B again closes the card.
-SettingsLogic.Tabs = { "game", "visitors", "board", "codes" }
+SettingsLogic.Tabs = { "game", "visitors", "board", "report", "codes" }
 
 function SettingsLogic.HasTab(name: string): boolean
 	return table.find(SettingsLogic.Tabs, name) ~= nil

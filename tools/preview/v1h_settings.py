@@ -3,9 +3,9 @@
 replay tutorial) and its Codes tab, as the UITheme layout draws them.
 
 Hand-built from the same tokens as UITheme (the GAD plaque and button skins,
-reused from v1u_round3) and from SettingsUI's own numbers: a 280 x 300 card
-under the corner (cut to end above the jump zone on a phone, SettingsUI.fitCard), a one-row strip of four 44 px tabs (GAME, VISIT, BOARD,
-CODES), then 248 x 44 rows 6 px apart inside a scroll frame. The card scrolls,
+reused from v1u_round3) and from SettingsUI's own numbers: a 340 x 300 card
+under the corner (cut to end above the jump zone on a phone, SettingsUI.fitCard), a one-row strip of five 44 px tabs (GAME, VISIT, BOARD,
+REPORT, CODES; the card is 340 wide), then 308 x 44 rows 6 px apart inside a scroll frame. The card scrolls,
 so each size shows the top of the list, the list scrolled to the new rows, and
 the Codes tab. Liberation Sans stands in for Gotham. Composites of the layout,
 not engine screenshots.
@@ -28,8 +28,8 @@ ROOT = os.path.join(HERE, "..", "..")
 OUT = os.path.join(ROOT, "previews", "v1-hardening")
 m = r.m
 
-CARD_W, CARD_H = 280, 300
-ROW_W, ROW_H, GAP, DROP = 248, 44, 6, 3
+CARD_W, CARD_H = 340, 300
+ROW_W, ROW_H, GAP, DROP = 308, 44, 6, 3
 STEP = ROW_H + DROP + GAP
 
 GAME_ROWS = [
@@ -47,12 +47,12 @@ GAME_ROWS = [
 	"RESTART SAVE 1",
 ]
 STYLE = {"buy": "confirm", "skip": "muted"}  # UITheme.Styles names -> the preview palette
-TABS = ["GAME", "VISIT", "BOARD", "CODES"]
+TABS = ["GAME", "VISIT", "BOARD", "REPORT", "CODES"]
 HEAD = 8 + 18 + 6  # padding, title, gap
 
 
 def tab_strip(canvas, x, y, active):
-	w = (ROW_W - 3 * 4) // 4
+	w = (ROW_W - 4 * 4) // 5
 	for i, name in enumerate(TABS):
 		x0 = x + i * (w + 4)
 		r.button(
@@ -60,7 +60,7 @@ def tab_strip(canvas, x, y, active):
 			(x0, y, x0 + w, y + ROW_H),
 			name,
 			STYLE["buy" if i == active else "skip"],
-			fnt=r.font(r.BOLD, 13),
+			fnt=r.font(r.BOLD, 12),
 			selected=(i == 0 and active == 0),
 		)
 
@@ -84,7 +84,7 @@ def codes_canvas(status):
 	d = ImageDraw.Draw(canvas)
 	x = (CARD_W - ROW_W) // 2
 	d.text((x, 8), "SETTINGS", font=r.font(r.BOLD, 14), fill=r.BARK)
-	tab_strip(canvas, x, HEAD, 3)
+	tab_strip(canvas, x, HEAD, 4)
 	y = HEAD + STEP
 	d.text((x, y), "REDEEM A CODE", font=r.font(r.BOLD, 14), fill=r.BARK)
 	y += 18 + 6
@@ -94,6 +94,24 @@ def codes_canvas(status):
 	r.button(canvas, (x, y, x + ROW_W, y + ROW_H), "REDEEM", STYLE["buy"], fnt=r.font(r.BOLD, 15))
 	y += STEP
 	d.text((x, y), status, font=r.font(r.BOLD, 14), fill=r.INK)
+	return canvas
+
+
+def list_canvas(active, heading, ask, labels):
+	"""A tab with a heading, one question line and a list of 44 px rows (VISIT, REPORT)."""
+	canvas = Image.new("RGB", (CARD_W, CARD_H), r.PAPER)
+	d = ImageDraw.Draw(canvas)
+	x = (CARD_W - ROW_W) // 2
+	d.text((x, 8), "SETTINGS", font=r.font(r.BOLD, 14), fill=r.BARK)
+	tab_strip(canvas, x, HEAD, active)
+	y = HEAD + STEP
+	d.text((x, y), heading, font=r.font(r.BOLD, 14), fill=r.BARK)
+	y += 22
+	d.text((x, y), ask, font=r.font(r.BOLD, 14), fill=r.INK)
+	y += 22
+	for label in labels:
+		r.button(canvas, (x, y, x + ROW_W, y + ROW_H), label, STYLE["skip"], fnt=r.font(r.BOLD, 15))
+		y += STEP
 	return canvas
 
 
@@ -153,7 +171,7 @@ def main():
 		kind = "Phone" if phone else "PC"
 		outs = {
 			f"settings-game-{tag}": scene(
-				phone, game, 0, f"{kind} {tag}: Settings, GAME tab. Four 44 px tabs in one row; card ends at y {{bottom}}"
+				phone, game, 0, f"{kind} {tag}: Settings, GAME tab. Five 44 px tabs in one row; card ends at y {{bottom}}"
 			),
 			f"settings-scrolled-{tag}": scene(
 				phone,
@@ -166,6 +184,18 @@ def main():
 				game,
 				HEAD + STEP * 8,
 				f"{kind} {tag}: Settings scrolled down: TIPS, REPLAY TUTORIAL (asks twice), WHAT'S NEW",
+			),
+			f"settings-report-{tag}": scene(
+				phone,
+				list_canvas(3, "REPORT A PLAYER", "Who are you reporting?", ["Sam", "Riley", "Jo"]),
+				0,
+				f"{kind} {tag}: REPORT tab (shown while the moderation flow is on), one 44 px row per player",
+			),
+			f"settings-visit-{tag}": scene(
+				phone,
+				list_canvas(1, "VISIT A PLOT", "", ["Visit Sam", "Anyone", "Sam"]),
+				0,
+				f"{kind} {tag}: VISIT tab, still reachable on the five-tab row",
 			),
 			f"settings-codes-{tag}": scene(
 				phone,

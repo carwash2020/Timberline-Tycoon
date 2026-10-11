@@ -113,6 +113,7 @@ return function(t)
 			FerryBoard = 1,
 			Blast = 1,
 			VisitPlot = 1,
+			PlotModerate = 2,
 		}
 		for name, limit in pairs(budgets) do
 			t.eq(burst(limiter, fakePlayer(), name, limit + 3), limit, name)
