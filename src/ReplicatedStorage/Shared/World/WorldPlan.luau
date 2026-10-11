@@ -1674,11 +1674,14 @@ end
 
 -- The TO THE WOODS sign's destination lines, "<name>  <distance>", from
 -- BiomeData.SignDestinations (the same names the region toasts show and the
--- haul distances the economy model uses), nearest first.
+-- haul distances the economy model uses), nearest first. Note: the sign's
+-- rocks are seeded by its text length (BuildingArt.Signpost), and
+-- NPCClearance keeps Bram's route 1.5 studs off them; if this text changes
+-- length, re-run NPCClearance.
 function WorldPlan.WoodsSignLines(): { string }
 	local lines: { string } = {}
 	for _, biome in ipairs(BiomeData.SignDestinations()) do
-		table.insert(lines, string.format("%s  %d", biome.displayName, biome.haulStuds or 0))
+		table.insert(lines, string.format("%s %d", biome.displayName, biome.haulStuds or 0))
 	end
 	return lines
 end

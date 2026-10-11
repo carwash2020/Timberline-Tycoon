@@ -1265,7 +1265,7 @@ return function(t)
 		t.eq(#lines - 1, #want, "one line a place")
 		local sawNames = {}
 		for i, biome in ipairs(want) do
-			t.eq(lines[i + 1], string.format("%s  %d", biome.displayName, biome.haulStuds), "line " .. i)
+			t.eq(lines[i + 1], string.format("%s %d", biome.displayName, biome.haulStuds), "line " .. i)
 			sawNames[biome.displayName] = true
 			if i > 1 then
 				t.ok(biome.haulStuds >= want[i - 1].haulStuds, "nearest first")
