@@ -168,10 +168,15 @@ local function hideDrive(hide: boolean)
 end
 
 local function setupSellPrompt()
-	local map = workspace:WaitForChild("TimberlineMap")
-	local area = map:WaitForChild("SellArea") -- a Persistent model: always streamed in
-	local zone = area:WaitForChild("SellZone") :: BasePart
-	local point = zone:WaitForChild("SellPoint")
+	-- Bounded, so a map that never comes cannot leave this thread waiting for good.
+	local map = workspace:WaitForChild("TimberlineMap", 120)
+	local area = if map then map:WaitForChild("SellArea", 60) else nil -- a Persistent model: always streamed in
+	local zone = if area then area:WaitForChild("SellZone", 60) :: BasePart? else nil
+	local point = if zone then zone:WaitForChild("SellPoint", 60) else nil
+	if not zone or not point then
+		warn("[CarryController] the sell area never arrived: no sell prompt")
+		return
+	end
 
 	local prompt = newPrompt(point, 40) -- the zone check below is what gates it
 	prompt.ObjectText = "Timberline Sawmill"

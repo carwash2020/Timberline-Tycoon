@@ -3766,3 +3766,18 @@ Studio checks (Xbox; PC and phone unchanged):
 6. Wire tool: RB still picks, X cuts, B leaves.
 7. Tutorial: Murph's drag step says "hold RT on a log".
 8. Chop with a Keen axe still follows the cooldown (RT chop path unchanged).
+
+## Client boot and first minute audit (11 October 2026)
+
+The findings table (severity, file, evidence, status) is in STATUS.md "Client boot and first minute audit". What changed in code:
+- `Shared/World/WorldPlan`: `Scenery`, `CountryStands`, `BoulderClusters`, `ForestTrees`, `ReachTrees`, `MeadowBoulders` and the filler clutter take an optional `pause` (a time slice's step) and call it once per placement try; `Trees` hands its own on to `baseTrees` and `ForestTrees`. `FillerSteps` are all called with it. The plan is unchanged (`tests/PlanSteps.spec` compares every spot with and without a pause). A caller that finishes while another was paused keeps the first one's cached answer.
+- `ForestFiller`: every plan step runs on the 8 ms time slice.
+- `TreeCosmetics`: at most `PerPass` (24) trees dressed per pass, `clearAccent` only for a tree that was looked at, a tree with no crown is searched 5 times and then left, weak tables (a streamed-out tree is no longer held), `Pass` and `Tracked` for the spec.
+- `LightingController` and `CarryController`: bounded waits for `TimberlineMap` and the sell area.
+
+Studio checks (what good looks like; nothing here has been seen in Studio):
+1. PC, new server: join, wait for the loading card to fade, walk and look around for 30 s. Output has `[Load] client ForestFiller plan took N s` and no frame stalls of a second or more while it runs (the screen keeps moving; the forest ring fills in over the next 20 to 40 s). Before: one to three separate freezes of 1 to 3 s right after the card faded.
+2. Phone (667x375, Lower): same. Frame rate while the plan runs is lower than after it but never freezes; no hitch every half second while standing still among trees (before: a pulse from `TreeCosmetics` walking every tree).
+3. Phone: stand still in the Starter Forest for a minute, then walk 600 studs and back. The Developer Console memory (Client memory, "Instances" and "Lua heap") does not keep climbing with the trees streamed in and out (before: every tree stayed referenced).
+4. PC, Higher: seasonal tint and maple / frostwood motes still appear on trees near you within a second or two of arriving; a felled stump gets no mote and causes no hitch.
+5. Xbox: same as 1; nothing about input changed.

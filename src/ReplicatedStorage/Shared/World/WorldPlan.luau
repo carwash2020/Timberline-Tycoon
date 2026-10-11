@@ -390,7 +390,7 @@ WorldPlan.StandSpacing = STAND_SPACING
 
 local cachedStands: { Stand }? = nil
 
-function WorldPlan.CountryStands(): { Stand }
+function WorldPlan.CountryStands(pause: (() -> ())?): { Stand }
 	if cachedStands then
 		return cachedStands
 	end
@@ -400,7 +400,7 @@ function WorldPlan.CountryStands(): { Stand }
 	local coast = WorldLayout.Coast
 	local beachX = coast.shoreX - coast.beachWidth - 40
 	local boulders = WorldPlan.Boulders()
-	local scenery = WorldPlan.Scenery()
+	local scenery = WorldPlan.Scenery(pause)
 	local signs = WorldPlan.RoadSigns(function(): string
 		return ""
 	end)
@@ -502,6 +502,9 @@ function WorldPlan.CountryStands(): { Stand }
 	local planted = 0
 	-- A stand of `most` (4-9) trees round the middle `at(radius)` gives, if 4+ fit.
 	local function plant(at: (radius: number) -> Vector2, road: WorldLayout.Road?, most: number): Stand?
+		if pause then
+			pause()
+		end
 		local want = math.min(rng:int(4, most), STAND_MAX - planted)
 		if want < 4 then
 			return nil
@@ -524,6 +527,9 @@ function WorldPlan.CountryStands(): { Stand }
 		local attempts = 0
 		while #trees < want and attempts < want * 30 do
 			attempts += 1
+			if pause then
+				pause()
+			end
 			local angle = rng:range(0, math.pi * 2)
 			local r = math.sqrt(rng:next()) * radius
 			-- Rounded the way a Vector3 stores it, so what's checked is what's spawned.
@@ -641,6 +647,9 @@ function WorldPlan.CountryStands(): { Stand }
 			end
 		end
 	end
+	if cachedStands then
+		return cachedStands -- another caller finished while this one was paused: keep theirs
+	end
 	cachedStands = stands
 	return stands
 end
@@ -651,12 +660,12 @@ end
 -- and keep using them, so the forest's trees move none of them (they keep
 -- off all of it instead).
 local cachedBase: { TreeSpot }? = nil
-local function baseTrees(): { TreeSpot }
+local function baseTrees(pause: (() -> ())?): { TreeSpot }
 	if cachedBase then
 		return cachedBase
 	end
 	local out = table.clone(firstTrees())
-	for _, stand in ipairs(WorldPlan.CountryStands()) do
+	for _, stand in ipairs(WorldPlan.CountryStands(pause)) do
 		for _, spot in ipairs(stand.trees) do
 			table.insert(out, spot)
 		end
@@ -677,8 +686,8 @@ function WorldPlan.Trees(pause: (() -> ())?): { TreeSpot }
 	if cachedTrees then
 		return cachedTrees
 	end
-	local out = table.clone(baseTrees())
-	for _, spot in ipairs(WorldPlan.ForestTrees()) do
+	local out = table.clone(baseTrees(pause))
+	for _, spot in ipairs(WorldPlan.ForestTrees(pause)) do
 		table.insert(out, spot)
 	end
 	-- Denser biomes, groves and stands, then the wild clumps. Appended, so
@@ -712,7 +721,7 @@ local function nearTree(x: number, z: number, gap: number): boolean
 	return false
 end
 
-function WorldPlan.ReachTrees(): { TreeSpot }
+function WorldPlan.ReachTrees(pause: (() -> ())?): { TreeSpot }
 	if cachedReach then
 		return cachedReach
 	end
@@ -724,6 +733,9 @@ function WorldPlan.ReachTrees(): { TreeSpot }
 	local reachCap = 6 -- 1.5x the original 4, rounded down
 	while #out < reachCap and tries < 800 do
 		tries += 1
+		if pause then
+			pause() -- each try looks at every tree (nearTree): the frame goes back between tries
+		end
 		local ang = rng:range(0, math.pi * 2)
 		local rad = math.sqrt(rng:next()) * math.max(radius - 6, 8)
 		local x, z = cx + math.cos(ang) * rad, cz + math.sin(ang) * rad
@@ -748,6 +760,9 @@ function WorldPlan.ReachTrees(): { TreeSpot }
 				},
 			})
 		end
+	end
+	if cachedReach then
+		return cachedReach -- another caller finished while this one was paused: keep theirs
 	end
 	cachedReach = out
 	return out
@@ -978,13 +993,16 @@ end
 -- Brown rocks on the open lawn round the town (phase 12). Not part of
 -- Boulders(): those 90 are a fingerprint the country stands keep off, and
 -- these sit inside 300 studs of the sawmill where the stands never grow.
-function WorldPlan.MeadowBoulders(): { Boulder }
+function WorldPlan.MeadowBoulders(pause: (() -> ())?): { Boulder }
 	local out: { Boulder } = {}
 	local rng = Kit.rng(hashString("meadow boulders"))
 	local mill = WorldLayout.Sawmill
 	local tries = 0
 	while #out < 32 and tries < 5000 do
 		tries += 1
+		if pause and tries % 16 == 0 then
+			pause()
+		end
 		local ang = rng:range(0, math.pi * 2)
 		local dist = rng:range(155, 265)
 		local x = mill.X + math.cos(ang) * dist
@@ -1283,7 +1301,7 @@ local LIGHTHOUSE_BACK = 26 -- studs inland from the water's edge
 -- coast offers, set back on the sand. Scenery keeps off the line from the
 -- spawn to it. Not Lighthouse() itself (that reads the scenery).
 local cachedSight: { Vector3 }? = nil
-local function sightOfLamp(): (Vector3, Vector3)
+local function sightOfLamp(pause: (() -> ())?): (Vector3, Vector3)
 	local cached = cachedSight
 	if cached then
 		return cached[1], cached[2]
@@ -1292,6 +1310,9 @@ local function sightOfLamp(): (Vector3, Vector3)
 	local radius = LandmarkArt.LIGHTHOUSE_RADIUS
 	local tips: { { x: number, z: number } } = {}
 	for z = LIGHTHOUSE_Z[1], LIGHTHOUSE_Z[2], 4 do
+		if pause then
+			pause() -- one row of the coast at a time
+		end
 		local coast = WorldLayout.Coast
 		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt do
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
@@ -1341,7 +1362,7 @@ local cachedScenery: { ScenerySpot }? = nil
 -- off the roads, 8+ off any tree, clear of the boulders, the signs, the
 -- gondola's route, the town, the plots and every biome. Looks only:
 -- nothing there is chopped, collides or changes the balance.
-function WorldPlan.Scenery(): { ScenerySpot }
+function WorldPlan.Scenery(pause: (() -> ())?): { ScenerySpot }
 	if cachedScenery then
 		return cachedScenery
 	end
@@ -1366,6 +1387,9 @@ function WorldPlan.Scenery(): { ScenerySpot }
 		local base = sky.gondolaBase.Position
 		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
 		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
+	end
+	if pause then
+		sightOfLamp(pause) -- its one-off coast scan, paused (the first placement try would otherwise pay for it)
 	end
 	local discs: { { x: number, z: number, r: number } } = {}
 	for _, biome in ipairs(BiomeData.All()) do
@@ -1455,6 +1479,9 @@ function WorldPlan.Scenery(): { ScenerySpot }
 
 	-- Puts a `kind` piece at (x, z) facing `yaw` if it fits there.
 	local function try(kind: string, x: number, z: number, yaw: number): ScenerySpot?
+		if pause then
+			pause() -- one placement try is the unit of work: the client gives the frame back between them
+		end
 		local r = WorldPlan.SceneryRadius[kind]
 		local y = fits(x, z, r)
 		if not y then
@@ -1562,6 +1589,9 @@ function WorldPlan.Scenery(): { ScenerySpot }
 				end
 			end
 		end
+	end
+	if cachedScenery then
+		return cachedScenery -- another caller finished while this one was paused: keep theirs
 	end
 	cachedScenery = out
 	return out
@@ -3657,7 +3687,7 @@ end
 
 local cachedClusters: { BoulderCluster }? = nil
 
-function WorldPlan.BoulderClusters(): { BoulderCluster }
+function WorldPlan.BoulderClusters(pause: (() -> ())?): { BoulderCluster }
 	if cachedClusters then
 		return cachedClusters
 	end
@@ -3670,6 +3700,9 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 
 	-- Where a rock of `size` could stand at (x, z): its base, or nil.
 	local function rockAt(x: number, z: number, size: number, others: { ClusterRock }): Vector3?
+		if pause then
+			pause()
+		end
 		local reach = size * WorldPlan.ClusterReach
 		if math.abs(x) > edge or math.abs(z) > edge or x > beachX then
 			return nil
@@ -3809,6 +3842,9 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 				break
 			end
 		end
+	end
+	if cachedClusters then
+		return cachedClusters -- another caller finished while this one was paused: keep theirs
 	end
 	cachedClusters = out
 	return out
@@ -4435,7 +4471,7 @@ function WorldPlan.LandmarkDiscs(): { { number } }
 	return landmarkDiscs()
 end
 
-function WorldPlan.ForestTrees(): { TreeSpot }
+function WorldPlan.ForestTrees(pause: (() -> ())?): { TreeSpot }
 	if cachedForestTrees then
 		return cachedForestTrees
 	end
@@ -4458,10 +4494,10 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 		local p = sign.cframe.Position
 		table.insert(discs, { p.X, p.Z, STAND_SIGN })
 	end
-	for _, spot in ipairs(WorldPlan.Scenery()) do
+	for _, spot in ipairs(WorldPlan.Scenery(pause)) do
 		table.insert(discs, { spot.center.X, spot.center.Z, spot.radius + FOREST_CLEAR })
 	end
-	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+	for _, c in ipairs(WorldPlan.BoulderClusters(pause)) do
 		table.insert(discs, { c.center.X, c.center.Z, c.radius + FOREST_CLEAR })
 	end
 	for _, d in ipairs(landmarkDiscs()) do
@@ -4510,12 +4546,15 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 		end
 		return false
 	end
-	for _, spot in ipairs(baseTrees()) do
+	for _, spot in ipairs(baseTrees(pause)) do
 		addTree(spot.position)
 	end
 
 	-- Whether a forest tree could grow at (x, z), `setBack` off the roads.
 	local function ground(x: number, z: number, setBack: number): boolean
+		if pause then
+			pause() -- every candidate asks this first: the unit the client gives the frame back between
+		end
 		if math.abs(x) > STAND_EDGE or math.abs(z) > STAND_EDGE or (z < coast.northZ and x > beachX) then
 			return false
 		end
@@ -4615,6 +4654,9 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 	local middles: { Vector2 } = {}
 	local steps = (STAND_EDGE * 2) // 12
 	for ix = 0, steps do
+		if pause then
+			pause() -- one grid column at a time
+		end
 		for iz = 0, steps do
 			local x, z = -STAND_EDGE + ix * 12, -STAND_EDGE + iz * 12
 			local c, ring = WorldLayout.ForestCover(x, z)
@@ -4693,6 +4735,9 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 		end
 	end
 
+	if cachedForestTrees then
+		return cachedForestTrees -- another caller finished while this one was paused: keep theirs
+	end
 	cachedForestTrees = out
 	return out
 end
@@ -4841,12 +4886,15 @@ end
 -- its gap), binned by FILLER_CELL squares, and the gondola's routes.
 type FillerClutter = { bins: { [number]: { Disc } }, routes: { { Vector2 } } }
 local cachedFillerClutter: FillerClutter? = nil
-local function fillerClutter(): FillerClutter
+local function fillerClutter(pause: (() -> ())?): FillerClutter
 	if cachedFillerClutter then
 		return cachedFillerClutter
 	end
 	local bins: { [number]: { Disc } } = {}
 	local function add(x: number, z: number, r: number)
+		if pause then
+			pause()
+		end
 		local disc = { x = x, z = z, r = r }
 		for bx = (x - r) // FILLER_CELL, (x + r) // FILLER_CELL do
 			for bz = (z - r) // FILLER_CELL, (z + r) // FILLER_CELL do
@@ -4863,17 +4911,17 @@ local function fillerClutter(): FillerClutter
 	for _, tree in ipairs(WorldPlan.Trees()) do
 		add(tree.position.X, tree.position.Z, WorldPlan.FillerTreeGap)
 	end
-	for _, tree in ipairs(WorldPlan.ReachTrees()) do
+	for _, tree in ipairs(WorldPlan.ReachTrees(pause)) do
 		add(tree.position.X, tree.position.Z, WorldPlan.FillerTreeGap)
 	end
 	local gap = WorldPlan.FillerGap
 	for _, b in ipairs(WorldPlan.Boulders()) do
 		add(b.position.X, b.position.Z, b.size / 2 + gap)
 	end
-	for _, b in ipairs(WorldPlan.MeadowBoulders()) do
+	for _, b in ipairs(WorldPlan.MeadowBoulders(pause)) do
 		add(b.position.X, b.position.Z, b.size / 2 + gap)
 	end
-	for _, spot in ipairs(WorldPlan.Scenery()) do
+	for _, spot in ipairs(WorldPlan.Scenery(pause)) do
 		add(spot.center.X, spot.center.Z, spot.radius + gap)
 	end
 	for _, sign in
@@ -4884,7 +4932,7 @@ local function fillerClutter(): FillerClutter
 		local p = sign.cframe.Position
 		add(p.X, p.Z, SIGN_POST + gap)
 	end
-	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+	for _, c in ipairs(WorldPlan.BoulderClusters(pause)) do
 		add(c.center.X, c.center.Z, c.radius + gap)
 	end
 	local routes: { { Vector2 } } = {}
@@ -4895,6 +4943,9 @@ local function fillerClutter(): FillerClutter
 		local base = sky.gondolaBase.Position
 		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
 		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
+	end
+	if cachedFillerClutter then
+		return cachedFillerClutter -- another caller finished while this one was paused: keep theirs
 	end
 	local made: FillerClutter = { bins = bins, routes = routes }
 	cachedFillerClutter = made
@@ -4907,8 +4958,10 @@ function WorldPlan.FillerReady(): boolean
 	return cachedFillerClutter ~= nil
 end
 
--- The steps ForestFiller works the plan out in, one a frame: each is
--- cached, so the last (the filler's own index) finds the rest done.
+-- The steps ForestFiller works the plan out in, one at a time: each is
+-- cached, so the last (the filler's own index) finds the rest done. Each
+-- takes a `pause` (a time slice's step) it calls between small units of
+-- work, so the client keeps drawing; the plan is the same without one.
 WorldPlan.FillerSteps = {
 	WorldPlan.Boulders,
 	WorldPlan.Scenery,
@@ -4918,10 +4971,10 @@ WorldPlan.FillerSteps = {
 	WorldPlan.Docks,
 	WorldPlan.ForestTrees,
 	WorldPlan.Trees,
-	function(): any
-		return fillerClutter()
+	function(pause: (() -> ())?): any
+		return fillerClutter(pause)
 	end,
-} :: { () -> any }
+} :: { (pause: (() -> ())?) -> any }
 
 -- Whether a disc of radius `r` at (x, z) keeps clear of the filler's clutter.
 local function fillerClear(x: number, z: number, r: number): boolean

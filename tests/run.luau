@@ -52,6 +52,7 @@ local SLOW_SPECS: { [string]: number } = {
 	["NPCService.spec.luau"] = 3,
 	["Phase12World.spec.luau"] = 7,
 	["PlanPause.spec.luau"] = 14,
+	["PlanSteps.spec.luau"] = 26,
 	["PlotLogic.spec.luau"] = 6,
 	["PlotPlatform.spec.luau"] = 5,
 	["PlotService.spec.luau"] = 32,
