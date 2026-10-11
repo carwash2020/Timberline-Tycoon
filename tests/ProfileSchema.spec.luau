@@ -52,6 +52,30 @@ return function(t)
 		end
 	)
 
+	t.test("camera sensitivity: old saves get 1, junk is clamped, and migrating twice changes nothing", function()
+		local Schema, data = fresh()
+		t.eq(Schema.Template.settings.cameraSensitivity, 1)
+		data.settings = { music = false } -- from before the setting
+		Schema.Migrate(data)
+		t.eq(data.settings.cameraSensitivity, 1)
+		t.eq(data.settings.music, false, "its other settings are kept")
+		data.settings.cameraSensitivity = 1.5
+		Schema.Migrate(data)
+		t.eq(data.settings.cameraSensitivity, 1.5, "a saved value survives")
+		local before = t.loader():shared("Util").deepCopy(data)
+		Schema.Migrate(data)
+		sameClock(before, data)
+		t.eq(data, before)
+		local _, wild = fresh()
+		wild.settings = { cameraSensitivity = 900 }
+		Schema.Migrate(wild)
+		t.eq(wild.settings.cameraSensitivity, 2)
+		local _, bad = fresh()
+		bad.settings = { cameraSensitivity = "fast" }
+		Schema.Migrate(bad)
+		t.eq(bad.settings.cameraSensitivity, 1)
+	end)
+
 	t.test("a new save gets one Rusty Axe, equipped by nobody yet", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)

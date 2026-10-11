@@ -1575,6 +1575,16 @@ function PlotService.Place(
 	end
 	tellHammer(slot, player, item)
 	QuestService.Event(player, "itemPlaced")
+	-- First machine (analytics funnel; Mark is a no-op after the first).
+	if
+		SawmillLogic.Blueprint(bp.id)
+		or ChopSawLogic.Blueprint(bp.id)
+		or SkyBinLogic.IsBin(bp.id)
+		or PlanerLogic.IsPlaner(bp.id)
+		or AutomationLogic.IsBelt(bp.id)
+	then
+		MilestoneService.Mark(player, "First machine placed")
+	end
 end
 
 function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)

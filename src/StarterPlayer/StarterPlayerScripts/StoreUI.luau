@@ -485,6 +485,7 @@ local function openStore()
 	applyLayout()
 	frame.Visible = true
 	redraw()
+	Net.Remote("StoreOpened"):FireServer() -- analytics only: the server rate limits it and counts nothing else
 	StoreUI._open(firstPill or (if passTab then passTab.face else nil))
 	task.defer(function()
 		setModal(true)

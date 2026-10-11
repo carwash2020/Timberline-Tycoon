@@ -77,6 +77,7 @@ return function(t)
 			BoardData = true,
 			AdminResult = true,
 			AdminAccess = true,
+			CodeResult = true, -- server -> client: the Codes tab's answer
 		}
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then

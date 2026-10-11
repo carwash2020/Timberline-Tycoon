@@ -371,8 +371,10 @@ function QuestService.Event(player: Player, event: TutorialEvent, amount: number
 	end
 	local reward = step.rewardCash
 	-- A returning player's refresher walks the new steps without the cash
-	-- (they already had the first-sale bonus, or never will: it's once).
-	if reward and reward > 0 and not onRefresher(profile) then
+	-- (they already had the first-sale bonus, or never will: it's once). A replay
+	-- from Settings (tutorialReplay, set by Reset) pays nothing either: the
+	-- starter cash is once per player, never a way to farm cash.
+	if reward and reward > 0 and not onRefresher(profile) and profile.tutorialReplay ~= true then
 		EconomyService.AddCash(player, reward, "tutorial: " .. step.id, "tutorial")
 		-- The next card already says it (the first sale's thank-you), so a toast
 		-- on top would be a second pop-up for the same thing.

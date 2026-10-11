@@ -3644,6 +3644,33 @@ Not remapped without losing something: nothing was dropped. One side effect: RB 
 6. With the axe out, RB shows the "put your axe away to drag" toast and RT still chops.
 7. PC (click, E, R, Q) and phone (taps, hold to drag, PLACE button): unchanged.
 
+## V1 launch hardening: settings, analytics, launch extras (branch `phase-2/v1-hardening-settings`, 11 October 2026)
+
+What changed is in STATUS.md (the found / added table). Previews: `previews/v1-hardening/`.
+
+### Studio checklist
+
+PC (keyboard and mouse)
+1. Open Settings (the round button left of the cash plaque). The five tabs GAME, VISIT, BOARD, REPORT, CODES sit on one row. Click "Camera speed": it steps 100%, 125% ... 200%, then 25%. Move the mouse in a free-look camera: the speed follows. Rejoin: the value is kept.
+2. Click Music volume and Effects volume: the music and effect loudness follow; "Graphics: Lower" and "Graphics: Higher" switch the dressing at once (box windows, scenery).
+3. CODES tab: type `PLACEHOLDER-DISABLED` and press Enter or REDEEM: "That code isn't valid." and no cash. Type nothing: "Type a code first." (Real codes: ask Connor to add one in `ServerScriptService/CodeData.luau`, enabled, with a UTC expiry, then redeem it once for the cash, again for "You already used that code.", on a second save slot too.) Six wrong codes quickly: "Too many tries..." for about 30 s.
+4. REPLAY TUTORIAL: first tap changes to "TAP AGAIN TO REPLAY", second tap restarts the tutorial. Finish the first step: Murph says nothing about cash and your wallet does not change. (A first-time player's first run still pays.)
+5. Play 10 minutes (Studio: or lower `FavoriteLogic.AfterSeconds` for the test) with the tutorial finished: one toast "Enjoying Timberline Tycoon? Tap the star..." once. Rejoin and wait: it never comes again. Talk to a keeper when the 10 minutes pass: the toast waits until you leave the dialogue.
+6. Open the Robux store and close it; start a purchase prompt and cancel; Output must show no red text. (Roblox shows `StoreOpened`, `PurchasePrompted`, `PurchaseCompleted` under Analytics > Custom events after about a day; economy events under Economy; funnel steps under Funnels.)
+7. Place your first sawmill, saw, planer, bin or belt: no visible change (it is the "First machine placed" funnel step, once per player).
+8. Open What's new from Settings: every line reads whole (nothing cut off).
+
+Phone (667 x 375, landscape)
+9. The Settings card ends above the jump button (it does not cover it) and scrolls with a finger. Every row, tab and the code box is easy to hit with a thumb.
+10. CODES tab: tap the box, the keyboard appears, type, tap REDEEM. The answer shows under the button and as a toast.
+11. Camera speed: drag the camera with a thumb at 25% and at 200%. If nothing changes on a phone, the engine ignores the setting for touch; tell Claude (the row would then be hidden on touch-only devices).
+
+Xbox (controller)
+12. D-pad right opens Settings; the selection ring is on GAME. The stick or D-pad walks the tabs and rows; A presses; B on CODES, BOARD or VISIT returns to GAME, B again closes.
+13. CODES tab: A on the code box opens the Xbox keyboard; type a code, confirm, then A on REDEEM. The ring is visible on the box and the button.
+14. Camera speed row: A steps it; the right stick turns the camera faster or slower to match.
+15. No button does anything on the right trigger (RT still only chops).
+
 ## V1 hardening: moderation and policy (branch `phase-2/v1-hardening-moderation`, 11 October 2026)
 
 What and why are in STATUS.md. Rules: `Shared/TextFilterLogic`, `Shared/ModerationLogic`, `Shared/PolicyLogic`, `PermissionLogic.Ban`; services `TextFilter`, `PolicyGate`, `PlotService.Moderate`. Previews: `previews/v1-hardening-mod/`.

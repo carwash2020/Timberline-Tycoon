@@ -49,6 +49,7 @@ local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local StoreSale = require(ReplicatedStorage.Shared.Store.StoreSale)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
+local GameAnalytics = require(script.Parent.GameAnalytics)
 local PolicyGate = require(script.Parent.PolicyGate)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -227,6 +228,8 @@ local function processReceipt(receipt: { [string]: any }): Enum.ProductPurchaseD
 	end
 	return ProfileService.ProcessPurchaseAsync(player, tostring(receipt.PurchaseId), function(profile: Profile)
 		grantProduct(player, profile, product)
+		-- Inside the once-only grant, so a retried receipt isn't counted twice.
+		GameAnalytics.Store(player, "PurchaseCompleted", product.key)
 	end)
 end
 
@@ -306,6 +309,7 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 		if not saleGate(player, "Pass", pass.key) then
 			return
 		end
+		GameAnalytics.Store(player, "PurchasePrompted", pass.key)
 		MarketplaceService:PromptGamePassPurchase(player, pass.id)
 	elseif kind == "Product" then
 		local product = StoreData.Product(key)
@@ -330,6 +334,7 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 		if not saleGate(player, "Product", product.key) then
 			return
 		end
+		GameAnalytics.Store(player, "PurchasePrompted", product.key)
 		MarketplaceService:PromptProductPurchase(player, product.id)
 	end
 end
@@ -575,6 +580,7 @@ function MonetizationService.Init(buyRemote: RemoteEvent, notifyFn: (Player, str
 			local pass = StoreData.PassById(passId)
 			if pass then
 				setPass(player, pass.key)
+				GameAnalytics.Store(player, "PurchaseCompleted", pass.key)
 				tell(player, string.format(StoreCopy.ThanksPass, pass.name))
 			end
 		end
