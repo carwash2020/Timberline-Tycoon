@@ -278,17 +278,34 @@ local function checkText(rig: Rig, now: number)
 	local above = head + Vector3.new(0, rig.topOffset + 0.2, 0)
 	local from = camera.CFrame.Position
 	local blocked = workspace:Raycast(from, above - from, params) ~= nil
-	rig.hidden, rig.clear = TextAnchor.NextHidden(rig.hidden, blocked, rig.clear)
 	local reach = rig.tagBaseY + TextAnchor.ProbeExtra
 	local up = workspace:Raycast(head, Vector3.new(0, reach, 0), params)
 	rig.headroom = if up then up.Distance else nil
 	local tag = rig.tag
 	if tag then
+		local viewH = camera.ViewportSize.Y
 		local distance = (from - head).Magnitude
-		local half = TextAnchor.CardStuds(tag.Size.Y.Offset / 2, distance, camera.ViewportSize.Y)
+		local half = TextAnchor.CardStuds(tag.Size.Y.Offset / 2, distance, viewH)
 		local lift = TextAnchor.Lift(rig.topOffset, rig.tagBaseY - rig.topOffset, rig.headroom, half)
 		tag.StudsOffset = Vector3.new(0, lift, 0)
+		-- Not just the point over the head: the card's left and right ends and
+		-- its top too. A card half behind a shop's corner used to stay up and
+		-- be clipped by the wall (Old Bram by the shop); now any blocked probe
+		-- hides it whole.
+		if not blocked then
+			local halfW = TextAnchor.CardStuds(tag.Size.X.Offset / 2, distance, viewH)
+			local centre = head + Vector3.new(0, lift, 0)
+			local cf = camera.CFrame
+			for _, probe in ipairs(TextAnchor.Probes(halfW, half)) do
+				local at = centre + cf.RightVector * probe.x + cf.UpVector * probe.y
+				if workspace:Raycast(from, at - from, params) ~= nil then
+					blocked = true
+					break
+				end
+			end
+		end
 	end
+	rig.hidden, rig.clear = TextAnchor.NextHidden(rig.hidden, blocked, rig.clear)
 	showText(rig)
 end
 

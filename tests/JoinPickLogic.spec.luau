@@ -70,4 +70,50 @@ return function(t)
 		t.eq(Join.PlotText(true, 1), "Plot, 1 piece")
 		t.eq(Join.PlotText(true, 12), "Plot, 12 pieces")
 	end)
+
+	local function slots(played, active)
+		local out = {}
+		for i = 1, 3 do
+			table.insert(out, { index = i, fresh = not played[i], active = i == active })
+		end
+		return out
+	end
+
+	t.test("AutoPick: a new profile or a single save skips the picker; two or more open it", function()
+		t.eq(Join.AutoPick(slots({}, 1)), 1, "brand new: the active slot, no picker")
+		t.eq(Join.AutoPick(slots({ [1] = true }, 1)), 1, "one save, the last played: straight in")
+		t.eq(Join.AutoPick(slots({ [2] = true }, 2)), 2, "one save, in slot 2")
+		t.eq(Join.AutoPick(slots({ [1] = true, [2] = true }, 1)), nil, "two saves: pick")
+		t.eq(Join.AutoPick(slots({ [1] = true, [2] = true, [3] = true }, 3)), nil, "three saves: pick")
+	end)
+
+	t.test(
+		"AutoPick: the lone played save is not the last-played slot: ask (a swap would stamp the cooldown)",
+		function()
+			t.eq(Join.AutoPick(slots({ [2] = true }, 1)), nil)
+			t.eq(Join.AutoPick({}), nil, "no summaries at all: nothing to play")
+		end
+	)
+
+	t.test("the tutorial waits for the pick, and the hint bar never covers a join screen", function()
+		t.eq(Join.TutorialWaits(true), true, "SlotPick up: no tracker, Murph card or beacon yet")
+		t.eq(Join.TutorialWaits(nil), false, "no picker: the tutorial runs")
+		t.eq(Join.TutorialWaits(false), false)
+		t.eq(Join.TutorialWaits("yes"), false)
+		t.eq(Join.HintHidden(false, true), true, "the save picker is up")
+		t.eq(Join.HintHidden(true, false), true, "a panel holds it")
+		t.eq(Join.HintHidden(false, false), false)
+	end)
+
+	t.test("the wiring: the hint row hides behind a panel and the tutorial waits for the pick", function()
+		local fs = require("@lune/fs")
+		local hud = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HUD.luau")
+		t.ok(string.find(hud, "JoinPickLogic.HintHidden(held,", 1, true), "HUD hides the bottom row through the rule")
+		t.ok(string.find(hud, "function HUD.HoldHint", 1, true))
+		local ui = fs.readFile("src/StarterPlayer/StarterPlayerScripts/SaveSlotUI.luau")
+		t.ok(string.find(ui, 'HUD.HoldHint("SaveSlotUI", on)', 1, true), "the save panel holds the hint away")
+		local quest = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
+		t.ok(string.find(quest, "JoinPickLogic.TutorialWaits", 1, true), "the tracker waits for the pick")
+		t.ok(string.find(quest, 'GetAttributeChangedSignal("SlotPick")', 1, true), "and starts when the pick is made")
+	end)
 end

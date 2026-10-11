@@ -72,6 +72,16 @@ function TextAnchor.NextHidden(hidden: boolean, occluded: boolean, clear: number
 	return false, count
 end
 
+-- The points of a card to test for a wall between it and the camera: its
+-- middle, its left and right ends and its top and bottom, as offsets (x along
+-- the camera's right, y along its up, studs) from the card's middle.
+-- `halfW` and `halfH` are the card's half width and height in studs. A wall
+-- on any of them means part of the card is cut by it, so the whole card hides.
+function TextAnchor.Probes(halfW: number, halfH: number): { { x: number, y: number } }
+	local w, h = math.max(halfW, 0), math.max(halfH, 0)
+	return { { x = 0, y = 0 }, { x = -w, y = 0 }, { x = w, y = 0 }, { x = 0, y = h }, { x = 0, y = -h } }
+end
+
 -- Whether a prompt card on a part may be drawn on top of the scene: only
 -- when it is adorned to a thing the camera would otherwise see it through
 -- (a counter's own centre), never one over a person's head, which the

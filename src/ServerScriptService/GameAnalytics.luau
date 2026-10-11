@@ -38,7 +38,14 @@ function GameAnalytics.FunnelStep(
 	step: number,
 	name: string
 ): boolean
-	if type(name) ~= "string" or name == "" or type(step) ~= "number" or onboarding[name] then
+	if
+		type(name) ~= "string"
+		or name == ""
+		or type(step) ~= "number"
+		or step ~= step
+		or step % 1 ~= 0
+		or onboarding[name]
+	then
 		return false
 	end
 	onboarding[name] = true
@@ -83,10 +90,21 @@ function GameAnalytics.Economy(
 	end)
 end
 
--- A stage reached (MilestoneService.CheckStages).
-function GameAnalytics.Progression(player: Player, path: string, stage: string): boolean
-	return guarded("progression " .. stage, function()
-		service():LogProgressionCompleteEvent(player, path, stage)
+-- A stage reached (MilestoneService.CheckStages). Roblox's signature is
+-- (player, pathName: string, level: number, levelName: string?): the level
+-- must be a whole number (a string there fails with "Unable to cast string
+-- to int"), the name is the readable label.
+function GameAnalytics.Progression(player: Player, path: string, level: number, levelName: string?): boolean
+	if type(path) ~= "string" or type(level) ~= "number" or level ~= level or level % 1 ~= 0 then
+		return false
+	end
+	local label = if type(levelName) == "string" and levelName ~= "" then levelName else nil
+	return guarded("progression " .. (label or tostring(level)), function()
+		if label then
+			service():LogProgressionCompleteEvent(player, path, level, label)
+		else
+			service():LogProgressionCompleteEvent(player, path, level)
+		end
 	end)
 end
 

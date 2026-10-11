@@ -670,4 +670,66 @@ function SaveSlotLogic.Perform(
 	return true, nil
 end
 
+---------------------------------------------------------------------------
+-- The panel's geometry (SaveSlotUI), in the screen's offsets (UIScale units).
+-- Pure, so a spec can check it fits 963 x 478 and 667 x 375 windows.
+--   * Joining (picking): title, one note, then the cards right under it. No
+--     Unload / Save now row and no "Saved at" line, so no empty gap.
+--   * The SAVES button: those two rows come first, then the cards.
+--   * A card is one compact block: the name and its PLAY / LOAD button side
+--     by side (the button 96 x 44, a fingertip), the facts under them.
+--   * The panel is as tall as its content, never taller than the screen less
+--     a margin top and bottom; what doesn't fit scrolls (Rows), and the
+--     picker's three cards fit on both small windows without scrolling.
+---------------------------------------------------------------------------
+SaveSlotLogic.Panel = {
+	Width = 360,
+	Margin = 12, -- clear of the screen's edges
+	NoteTop = 48,
+	NoteHeight = 36,
+	ControlsTop = 90, -- Unload base | Save now
+	ControlsHeight = 48,
+	SavedTop = 142,
+	SavedHeight = 18,
+	Card = 94,
+	CardGap = 8,
+	Pad = 12,
+	ButtonW = 96,
+	ButtonH = 44,
+	CardInset = 8,
+	NameTop = 6,
+	DetailTop = 54,
+	DetailHeight = 34,
+}
+
+export type PanelLayout = {
+	width: number,
+	height: number,
+	rowsTop: number,
+	rowsHeight: number,
+	controls: boolean, -- the Unload / Save now row and the "Saved at" line show
+	contentHeight: number, -- all the cards, one under the other
+	scrolls: boolean,
+}
+
+function SaveSlotLogic.Layout(viewW: number, viewH: number, picking: boolean, count: number): PanelLayout
+	local P = SaveSlotLogic.Panel
+	local width = math.max(0, math.min(P.Width, viewW - 2 * P.Margin))
+	local rowsTop = if picking then P.NoteTop + P.NoteHeight + 4 else P.SavedTop + P.SavedHeight + 4
+	local cards = math.max(count, 1)
+	local content = cards * P.Card + (cards - 1) * P.CardGap
+	local want = rowsTop + content + P.Pad
+	local height = math.max(math.min(want, viewH - 2 * P.Margin), rowsTop + P.Card + P.Pad)
+	local rowsHeight = height - rowsTop - P.Pad
+	return {
+		width = width,
+		height = height,
+		rowsTop = rowsTop,
+		rowsHeight = rowsHeight,
+		controls = not picking,
+		contentHeight = content,
+		scrolls = content > rowsHeight,
+	}
+end
+
 return SaveSlotLogic
