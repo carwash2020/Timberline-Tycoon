@@ -145,13 +145,42 @@ local function spanOf(byName: { [string]: MeshPart }): number
 	return maxY - minY
 end
 
+-- Display names whose spaces-stripped form is not the uploaded model's id.
+local ASSET_ALIASES: { [string]: string } = {
+	TheHermit = "Hermit",
+	["Cap'nMoss"] = "CapnMoss",
+	RookCalloway = "Foreman",
+}
+
+-- The TownModels id for a CharacterArt spec name ("Old Tolly" is OldTolly,
+-- "The Hermit" is Hermit, "Rook Calloway" is Foreman).
+function NPCMeshes.AssetId(specName: string): string
+	local id = (specName:gsub("%s+", ""))
+	return ASSET_ALIASES[id] or id
+end
+
 -- The turn each NPC mesh gets about its vertical so its face is on -Z.
 function NPCMeshes.FrontTurn(): number
 	return TownModels.NpcMeshYaw
 end
 
+local warnedAssets: { [string]: boolean } = {}
+
 -- True when every mesh loaded and the part look stepped aside.
 function NPCMeshes.Dress(model: Model, assetId: string): boolean
+	local dressed = NPCMeshes.dress(model, assetId)
+	if not dressed and TownModels.Get(assetId) ~= nil then
+		-- The part-built NPC stays. Said once per asset, never per spawn.
+		model:SetAttribute("MeshFallback", assetId)
+		if not warnedAssets[assetId] and not MeshKit.NoEngine() then
+			warnedAssets[assetId] = true
+			warn(string.format("[NPCMeshes] %s: a mesh did not load; keeping the part-built NPC", assetId))
+		end
+	end
+	return dressed
+end
+
+function NPCMeshes.dress(model: Model, assetId: string): boolean
 	local asset = TownModels.Get(assetId)
 	if not asset or asset.category ~= "npc" then
 		return false
