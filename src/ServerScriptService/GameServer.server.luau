@@ -470,6 +470,7 @@ local function completeSale(
 	-- After the sale's toasts, so rewards read last.
 	QuestService.Event(player, "logsSold", count)
 	DailyService.Event(player, "logsSold", count, byWood, credited)
+	safely("FieldGuideService.Stamp", FieldGuideService.Stamp, player, byWood)
 end
 
 local function onSellLogs(player: Player)
@@ -633,6 +634,7 @@ local function onWoodSold(sale: SellService.Sale)
 		pieces = sale.pieceVolumes,
 		figured = sale.figured,
 	})
+	safely("FieldGuideService.Stamp", FieldGuideService.Stamp, player, sale.woods)
 end
 
 -- Each Init on its own (safely): one failing leaves that service broken

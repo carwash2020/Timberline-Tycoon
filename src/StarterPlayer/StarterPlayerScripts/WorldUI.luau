@@ -32,6 +32,7 @@ local RegionLogic = require(ReplicatedStorage.Shared.RegionLogic)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local ClimateHudLogic = require(ReplicatedStorage.Shared.ClimateHudLogic)
 local DayCounterLogic = require(ReplicatedStorage.Shared.DayCounterLogic)
+local GateSignLogic = require(ReplicatedStorage.Shared.GateSignLogic)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -400,6 +401,46 @@ local function buildVignette()
 	refresh()
 end
 
+-- Gate signs (tag "GateSign", attribute GateId) carry a SurfaceGui label named
+-- "State". It says, for this player only, "Protected" / "Open" in green or the
+-- requirement in words in red (GateSignLogic). Redrawn when the gear changes.
+local GATE_TAG = "GateSign"
+
+local function paintGate(sign: Instance)
+	local id = sign:GetAttribute("GateId")
+	if type(id) ~= "string" then
+		return
+	end
+	local label = sign:FindFirstChild("State", true)
+	if not label or not label:IsA("TextLabel") then
+		return
+	end
+	local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
+	if player:GetAttribute("GondolaPass") == true then
+		owned.GondolaPass = true -- SkyQuestService sets this attribute when Gus signs the charter
+	end
+	local state = GateSignLogic.State(id, owned)
+	label.Text = state.text
+	label.TextColor3 = Color3.fromRGB(state.color[1], state.color[2], state.color[3])
+end
+
+local function watchGateSigns()
+	for _, sign in ipairs(CollectionService:GetTagged(GATE_TAG)) do
+		paintGate(sign)
+	end
+	CollectionService:GetInstanceAddedSignal(GATE_TAG):Connect(function(sign: Instance)
+		-- The label may stream in a moment after the tag.
+		task.defer(paintGate, sign)
+	end)
+	local function repaint()
+		for _, sign in ipairs(CollectionService:GetTagged(GATE_TAG)) do
+			paintGate(sign)
+		end
+	end
+	player:GetAttributeChangedSignal("OwnedGear"):Connect(repaint)
+	player:GetAttributeChangedSignal("GondolaPass"):Connect(repaint)
+end
+
 function WorldUI.Start()
 	UserInputService.InputBegan:Connect(function(input: InputObject)
 		if input.UserInputState ~= Enum.UserInputState.Begin then
@@ -409,6 +450,7 @@ function WorldUI.Start()
 	end)
 	buildClock()
 	buildVignette()
+	watchGateSigns()
 	task.spawn(watchSkyBin)
 	watchGroves()
 	player:GetAttributeChangedSignal("Region"):Connect(onRegionChanged)
