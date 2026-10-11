@@ -7,7 +7,14 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ModulesReady = require(ReplicatedStorage.Shared.ModulesReady)
+-- Shared may not have replicated yet: wait for it (bounded) before the first require.
+local SHARED_WAIT = 30
+local SharedFolder = ReplicatedStorage:WaitForChild("Shared", SHARED_WAIT)
+if not SharedFolder then
+	warn("[MiningClient] ReplicatedStorage.Shared did not arrive in " .. SHARED_WAIT .. " seconds")
+	return
+end
+local ModulesReady = require(SharedFolder:WaitForChild("ModulesReady", SHARED_WAIT))
 
 -- This script starts on its own, maybe before every sibling has arrived in
 -- PlayerScripts: wait for Client to say they are all in.
