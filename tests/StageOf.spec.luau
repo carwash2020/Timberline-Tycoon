@@ -33,4 +33,27 @@ return function(t)
 		t.eq(StageOf.Income(0), StageOf.Income(1))
 		t.eq(StageOf.Income(12), StageOf.Income(8))
 	end)
+
+	t.test("S8 is a full plot: the top tier and every bought square, with no Stage key needed", function()
+		local squares = {}
+		for i = 1, StageOf.FullPlotSquares do
+			table.insert(squares, i .. ",0")
+		end
+		local full = { onboarding = {}, bestAxeTier = 9, plot = { tier = 5, squares = squares } }
+		t.eq(StageOf.Current(full), 8)
+		t.eq(StageOf.FullPlotTier, 5)
+		t.eq(StageOf.FullPlotSquares, 24)
+		-- One square short, or a lower tier, stays at the axe's stage.
+		local short =
+			{ onboarding = {}, bestAxeTier = 9, plot = { tier = 5, squares = { table.unpack(squares, 1, 23) } } }
+		t.eq(StageOf.Current(short), 7)
+		t.eq(StageOf.Current({ bestAxeTier = 9, plot = { tier = 4, squares = squares } }), 7)
+		t.eq(
+			StageOf.Current({ bestAxeTier = 1, plot = { tier = 5, squares = squares } }),
+			8,
+			"a full plot is a veteran"
+		)
+		t.eq(StageOf.Current({ plot = "junk" }), 1)
+		t.eq(StageOf.HasFullPlot(nil), false)
+	end)
 end

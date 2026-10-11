@@ -100,15 +100,15 @@ Found by the integration pass's scans and specs (`V1Refs`, `V1Playthrough`, `V1M
    Support and Wood Detector cannot be bought in a normal game, and `BlueprintBook.Message` tells a player to
    "Buy the X at the Sparkworks counter first". What's new also advertises "Sparkworks logic pieces".
    Owner: Lane F task 16 / Lane E (#138, the keeper). Until then they come only from the owner Gifts tab.
-2. **Stage 8 (Master Timber) cannot be reached on main.** `StageOf.FromProgress` tops out at S7 (the Starfall
-   Axe) and nothing writes `Stage:S8`; Lane E's `MilestoneService` stage events are in #138. Cash packs, the
-   blueprint book and the S8 badge read it.
+2. **Stage 8 (Master Timber) is now a full plot** (fixed in this PR): `StageOf` reads the top plot tier and all 24
+   bought squares, so S8 is reachable without Lane E's key; E's brief names S8 as "full plot". S1 to S7 results
+   are unchanged. #138's `Stage:S8` key agrees with it.
 3. **Old ButtonR2 uses**, not touched here (restricted Xbox files): `BuilderTools.luau` (select ray bound on R2
    while hands are empty, passes the press through), `WireTool.luau` and `InputKit.luau` (Pick, Place and Grab
    lists), `CutController.luau` and `DragController.luau` (read as input). A separate branch removes them.
-4. **The Dealership sits outside the ambient "town" zone.** It stands at (258, 130), 261 studs from the zone
-   centre (0, 90) whose radius is 180 (`ScatterZones`, `WorldPlan` scatter), so town weather and critter rules do
-   not cover the showroom. Lane G / B decide whether to widen the zone to about 300.
+4. **The ambient "town" zone now covers the Dealership** (fixed in this PR): `ScatterZones` town radius 180 to 300
+   (centre (0, 90)); the Dealership at (258, 130) is inside, and `V1World` pins every shop inside it. No town
+   scatter pieces exist (`NatureData` town = {}), so only town weather and critter rules widen.
 5. **No STATUS.md notes from #135, #136, #138 yet.** They add to it when they merge; merge conflicts there are
    keep-both.
 6. **Not run here (Studio only):** phone FPS on a real device (AR1), wade depth (AR6), every look in this file.

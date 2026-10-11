@@ -10,6 +10,7 @@ return function(t)
 	local PlotData = t.shared("PlotData")
 	local NPCData = t.shared("NPCData")
 	local BiomeData = t.shared("BiomeData")
+	local ScatterZones = t.shared("World/ScatterZones")
 
 	local function dry(x, z)
 		local h = TerrainGen.HeightAt(x, z)
@@ -67,8 +68,15 @@ return function(t)
 		t.ok(#town.shops >= #NPCData.Shops, "every NPC shop exists")
 		for i, shop in ipairs(town.shops) do
 			local p = shop.cframe.Position
-			-- (the Dealership sits 258 studs east of the ambient "town" zone centre (0, 90), past its 180 radius: V1_REVIEW)
-			t.ok(flat(p.X, p.Z - 90) <= 300, shop.title .. " is in town")
+			-- Every shop, the Dealership (258, 130) too, is inside the ambient "town" zone.
+			local zone
+			for _, candidate in ipairs(ScatterZones.Zones) do
+				if candidate.kind == "town" then
+					zone = candidate
+				end
+			end
+			local dx, dz = p.X - zone.center.X, p.Z - zone.center.Y
+			t.ok(math.sqrt(dx * dx + dz * dz) <= zone.radius, shop.title .. " is inside the town zone")
 			t.ok(math.abs(TerrainGen.HeightAt(p.X, p.Z)) < 1, shop.title .. " stands on the flat town")
 			for j = i + 1, #town.shops do
 				local q = town.shops[j].cframe.Position

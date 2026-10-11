@@ -69,7 +69,7 @@ return function(t)
 		end
 	end)
 
-	t.test("the stage ladder: every stage 1 to 7 is reached by something a player can earn", function()
+	t.test("the stage ladder: every stage 1 to 8 is reached by something a player can earn", function()
 		local reached = {}
 		for rung = 1, #ladder do
 			local profile = { bestAxeTier = rung, gear = {}, onboarding = {} }
@@ -92,8 +92,15 @@ return function(t)
 			t.ok(stage >= last, "monotone at " .. ladder[rung].id)
 			last = stage
 		end
-		-- Stage 8 (Master Timber) is Lane E's key, written with the stage event.
-		t.eq(StageOf.Current({ onboarding = { [StageOf.Key(8)] = true } }), 8)
+		-- Stage 8 (Master Timber) is a full plot: the top tier and every square, bought with cash.
+		local plotTiers = t.shared("PlotData").Tiers
+		t.eq(#plotTiers, StageOf.FullPlotTier)
+		local squares = {}
+		for i = 1, StageOf.FullPlotSquares do
+			table.insert(squares, i .. ",0")
+		end
+		t.eq(StageOf.Current({ bestAxeTier = #ladder, plot = { tier = #plotTiers, squares = squares } }), 8)
+		t.eq(StageOf.Current({ onboarding = { [StageOf.Key(8)] = true } }), 8, "and Lane E's key agrees")
 		t.eq(StageOf.Count, 8)
 	end)
 
