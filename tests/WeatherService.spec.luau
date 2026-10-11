@@ -202,6 +202,33 @@ return function(t)
 		t.eq(#lonelyStrikes, 0)
 	end)
 
+	t.test(
+		"a storm near town almost never skips a bolt: open ground is rare there, so StrikePoint tries many points",
+		function()
+			-- Only about one random point in eight is open ground beside the spawn
+			-- (plots, roads and yards are flat, and bolts keep off flat ground), so ten
+			-- tries missed a quarter of the bolts. Sixty tries find ground every time
+			-- on a fixed sequence.
+			local WeatherService = setup({ players = {} })
+			local realRandom = WeatherService.Random
+			local seed = 4242
+			WeatherService.Random = function()
+				seed = (seed * 1103515245 + 12345) % 2147483648
+				return seed / 2147483648
+			end
+			local near = Vector3.new(0, 1, -110)
+			local missed = 0
+			for _ = 1, 300 do
+				if WeatherService.StrikePoint(near) == nil then
+					missed += 1
+				end
+			end
+			WeatherService.Random = realRandom
+			t.eq(missed, 0, "bolts that found no ground in 300 tries of 60 points")
+			t.ok(WeatherService.StrikeTries >= 40, "enough tries for ground that is open one time in eight")
+		end
+	)
+
 	t.test("a struck tree pulls the bolt to its crown", function()
 		local model = {
 			Parent = {},
@@ -215,9 +242,18 @@ return function(t)
 			tree = { model = model, base = Vector3.new(7, 0, 9) },
 		})
 		attributes.WeatherOverride = "Storm"
+		-- A fixed sequence, so the spec never depends on where a random try lands
+		-- (open ground is rare near town: it used to fail about one run in four).
+		local realRandom = WeatherService.Random
+		local seed = 12345
+		WeatherService.Random = function()
+			seed = (seed * 1103515245 + 12345) % 2147483648
+			return seed / 2147483648
+		end
 		for i = 0, 60 do
 			WeatherService.Step(1790000000 + i)
 		end
+		WeatherService.Random = realRandom
 		local bolt
 		for _, f in ipairs(fired) do
 			if f.kind == "Lightning" then
