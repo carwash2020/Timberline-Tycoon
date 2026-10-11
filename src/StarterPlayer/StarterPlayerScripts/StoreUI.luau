@@ -27,6 +27,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
+local PolicyLogic = require(ReplicatedStorage.Shared.PolicyLogic)
 local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local StoreBoard = require(ReplicatedStorage.Shared.StoreBoard)
 local StoreCopy = require(ReplicatedStorage.Shared.Store.StoreCopy)
@@ -235,6 +236,14 @@ function StoreUI.CardFacts(kind: string, item: StoreData.Pass | StoreData.Produc
 			end
 		end
 	end
+	-- Region rules: a restricted item is not offered at all (a pass already
+	-- owned still shows, as owned). The server refuses the purchase too.
+	local policy = PolicyLogic.FromAttributes(function(name)
+		return player:GetAttribute(name)
+	end)
+	if not owned and not PolicyLogic.Allows(policy, item :: any) then
+		return { state = "Hidden", extra = nil }
+	end
 	local state: StoreSale.CardState = StoreSale.CardState(item, {
 		owned = owned,
 		robloxForSale = StorePrices.ForSale(kind, item.key),
@@ -440,7 +449,9 @@ local function refreshStoreButton()
 	end
 	local visible = false
 	for _, entry in ipairs(StoreData.Ordered()) do
-		local listed = StoreData.IsForSale(entry.item.id) and StorePrices.ForSale(entry.kind, entry.key) ~= false
+		local listed = StoreData.IsForSale(entry.item.id)
+			and StorePrices.ForSale(entry.kind, entry.key) ~= false
+			and StoreUI.CardFacts(entry.kind, entry.item).state ~= "Hidden"
 		local owned = entry.kind == "Pass" and player:GetAttribute("Pass_" .. entry.key) == true
 		if listed or owned then
 			visible = true
@@ -474,6 +485,7 @@ local function openStore()
 	applyLayout()
 	frame.Visible = true
 	redraw()
+	Net.Remote("StoreOpened"):FireServer() -- analytics only: the server rate limits it and counts nothing else
 	StoreUI._open(firstPill or (if passTab then passTab.face else nil))
 	task.defer(function()
 		setModal(true)
@@ -645,7 +657,14 @@ function StoreUI.Start()
 			player:GetAttributeChangedSignal("Pass_" .. entry.key):Connect(onChange)
 		end
 	end
-	for _, attribute in ipairs({ "DoubleWoodUntil", "InstantDeliveries", "Cash", "StoreStage" }) do
+	for _, attribute in ipairs({
+		"DoubleWoodUntil",
+		"InstantDeliveries",
+		"Cash",
+		"StoreStage",
+		"PolicyKnown",
+		"PolicyPaidRandomRestricted",
+	}) do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
 			if panel and panel.Visible then
 				redraw()

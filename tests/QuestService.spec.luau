@@ -213,6 +213,27 @@ return function(t)
 		t.eq(s.profile.tutorialReplay, true)
 	end)
 
+	t.test("a replayed tutorial pays no step rewards again", function()
+		local s = setup({ tutorialDone = true, tutorialStep = 1, tutorialProgress = 0 })
+		s.Quest.Reset(s.player)
+		local paying = 0
+		for _, step in ipairs(s.Steps) do
+			if (step.rewardCash or 0) > 0 then
+				paying += 1
+			end
+		end
+		t.ok(paying > 0, "the steps do have rewards to withhold")
+		local cashBefore = s.profile.cash
+		for _, step in ipairs(s.Steps) do
+			if s.profile.tutorialDone then
+				break
+			end
+			s.event(step.event, step.count)
+		end
+		t.ok(s.profile.tutorialStep > 1 or s.profile.tutorialDone, "the replay still advances")
+		t.eq(s.profile.cash, cashBefore, "but pays nothing")
+	end)
+
 	-- V1 (Connor): a skipper still gets the starter cash of the steps they skipped, once.
 	t.test("Skip ends it, pays the skipped steps' starter cash once; a finished tutorial stays finished", function()
 		local s = setup()

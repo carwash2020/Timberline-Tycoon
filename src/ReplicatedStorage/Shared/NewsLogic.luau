@@ -3,39 +3,16 @@
 -- The seen flag is profile.onboarding["News:V1"] (ProfileSchema already
 -- stores that table). No new save field.
 
+local NewsData = require(script.Parent.NewsData)
+
 local NewsLogic = {}
 
 NewsLogic.Key = "News:V1"
 
-export type Entry = { line: string, detail: string, icon: string }
+export type Entry = NewsData.Entry
 
--- Headline, a short second line, and a frame-drawn icon name. No uploaded
--- images. One table, so a later pass can edit the copy in one place.
-NewsLogic.Entries = {
-	{
-		line = "A new island map, with the Bayou and Red Mesa.",
-		detail = "Two regions past the old town.",
-		icon = "map",
-	},
-	{ line = "Mine the cave for ore.", detail = "Clear rubble, then follow the vein.", icon = "mine" },
-	{ line = "Build from blueprints.", detail = "Place a plan, then raise the walls.", icon = "blueprint" },
-	{
-		line = "Foreman Rook's daily jobs, with streaks.",
-		detail = "Three jobs a day. A streak pays more.",
-		icon = "daily",
-	},
-	{ line = "Temper your axe.", detail = "A hotter edge bites harder.", icon = "temper" },
-	{
-		line = "Sparkworks sells logic pieces, belts and lasers.",
-		detail = "Up the road past the Land Office. A plot first.",
-		icon = "spark",
-	},
-	{
-		line = "A sky island, reached by the gondola pass.",
-		detail = "Ride the line up from the pass.",
-		icon = "gondola",
-	},
-} :: { Entry }
+-- The lines are in Shared/NewsData (content only, one place to edit).
+NewsLogic.Entries = NewsData.Entries
 
 -- True only after the tutorial is finished (TutorialStep 0) and this save
 -- has not closed the panel yet. A new player (step above 0, or still

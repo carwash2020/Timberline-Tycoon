@@ -321,6 +321,9 @@ return function(t)
 		t.eq(SettingsUI.BackTarget("game"), nil, "from the game list B closes the card")
 		t.eq(SettingsUI.BackTarget("nope"), nil)
 		local Logic = loader:shared("SettingsLogic")
-		t.eq(Logic.Tabs, { "game", "visitors", "board" })
+		t.eq(SettingsUI.BackTarget("report"), "game", "the REPORT tab goes back to the game list too")
+		t.eq(SettingsUI.BackTarget("codes"), "game", "and so does the CODES tab")
+		-- Pinned list moved by design: the moderation PR added REPORT, the redeem box CODES.
+		t.eq(Logic.Tabs, { "game", "visitors", "board", "report", "codes" })
 	end)
 end

@@ -56,6 +56,7 @@ Net.RemoteNames = {
 	"ExpandLand", -- client -> server: (x, z) buy the square that touches yours
 	"VisitPlot", -- client -> server: (ownerUserId) go to that player's plot, if their visit flag allows it
 	"SetPermission", -- client -> server: (userId, flag, on)
+	"PlotModerate", -- client -> server: ("kick" | "ban" | "unban", userId) owner only; PlotService.Moderate
 	"Wire", -- client -> server: (fromUid, port, toUid, port) or ("cut", uid)
 	"TollPay", -- client -> server: () pay the toll
 	"FerryBoard", -- client -> server: () board the ferry
@@ -68,6 +69,9 @@ Net.RemoteNames = {
 	"BoardRequest", -- client -> server: () ask for the leaderboard; the server answers from its cache (LeaderboardService)
 	"BoardData", -- server -> client: (payload) the top rows and your own (LeaderboardLogic.ParsePayload)
 	"PaintTruck", -- client -> server: (truckId, color) Paint Shop; the server clamps it
+	"StoreOpened", -- client -> server: () the Robux store was opened; analytics only (GameAnalytics)
+	"RedeemCode", -- client -> server: (code) redeem a code from the Settings Codes tab (CodeService)
+	"CodeResult", -- server -> client: (ok, message) what the Codes tab shows after a redeem
 	"NewsSeen", -- client -> server: () the player closed What's new; stored as onboarding["News:V1"]
 	"SkyQuest", -- client -> server: the Gondola Pass quest
 	"ForgeAction", -- client -> server: a forge order

@@ -25,7 +25,6 @@
 --
 -- Also keeps profile.stats.playtimeMin up to date.
 
-local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -33,6 +32,7 @@ local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
+local GameAnalytics = require(script.Parent.GameAnalytics)
 local ProfileService = require(script.Parent.ProfileService)
 
 type Profile = ProfileService.Profile
@@ -56,6 +56,7 @@ local FUNNEL: { string } = {
 	"Saw a next goal",
 	"Claimed a plot",
 	"Bought a truck",
+	"First machine placed", -- the first sawmill, saw, planer, bin or belt put down on the plot
 }
 local STEP_NUMBER: { [string]: number } = {}
 for i, name in ipairs(FUNNEL) do
@@ -188,16 +189,11 @@ end
 
 local function logFunnelStep(player: Player, session: Session, name: string)
 	local step = STEP_NUMBER[name]
-	if step == nil or session.profile.onboarding[name] then
+	if step == nil then
 		return
 	end
-	session.profile.onboarding[name] = true
-	local ok, err = pcall(function()
-		AnalyticsService:LogOnboardingFunnelStepEvent(player, step, name)
-	end)
-	if not ok then
-		warn("[MilestoneService] Analytics funnel step failed: " .. tostring(err))
-	end
+	-- Once per player ever; never throws (GameAnalytics).
+	GameAnalytics.FunnelStep(player, session.profile.onboarding, step, name)
 end
 
 -- V1 progression: the first time a player reaches each stage S1 to S8
@@ -208,12 +204,7 @@ end
 function MilestoneService.CheckStages(player: Player, profile: Profile)
 	for _, n in ipairs(StageOf.Pending(profile)) do
 		profile.onboarding[StageOf.Key(n)] = true
-		local ok, err = pcall(function()
-			(AnalyticsService :: any):LogProgressionCompleteEvent(player, "Stages", "S" .. tostring(n))
-		end)
-		if not ok then
-			warn("[MilestoneService] Analytics stage event failed: " .. tostring(err))
-		end
+		GameAnalytics.Progression(player, "Stages", "S" .. tostring(n))
 	end
 end
 
