@@ -13,9 +13,10 @@
 
 local AdminLogic = {}
 
--- Paste Roblox UserIds here (a number each), e.g. { 123456789 }. Left empty,
--- only the experience's creator is the owner.
-AdminLogic.OwnerUserIds = {} :: { number }
+-- Roblox UserIds of the owners (a number each). The experience's creator is
+-- the owner too. 5682024709 is Elucidhealer618 (Connor). The second owner
+-- (the Xbox account) is not given yet: leave it out until Connor sends the id.
+AdminLogic.OwnerUserIds = { 5682024709 } :: { number }
 
 function AdminLogic.IsOwner(
 	userId: unknown,
