@@ -316,4 +316,65 @@ return function(t)
 		s.Service.Save(p)
 		t.eq(s.log.saves, 3)
 	end)
+
+	-- Server audit (11 October 2026): GameServer starts the save loading the moment a
+	-- player arrives (Prefetch), long before its join flow runs; LoadProfile
+	-- then picks the same load up.
+	t.test("a prefetched save is loaded once and LoadProfile hands it over", function()
+		local starts = 0
+		local s = setup({
+			start = function(_, make)
+				starts += 1
+				return make({ cash = 9 })
+			end,
+		})
+		local p = s.newPlayer(20)
+		s.Service.Prefetch(p)
+		s.Service.Prefetch(p) -- a second ask is not a second load
+		t.eq(starts, 1)
+		t.eq(s.Service.GetProfile(p).cash, 9, "the profile is there before the join flow asks")
+		local profile, err = s.Service.LoadProfile(p)
+		t.eq(err, nil)
+		t.eq(profile.cash, 9)
+		t.eq(starts, 1, "LoadProfile did not load it again")
+	end)
+
+	t.test("LoadProfile without a prefetch still loads, and a prefetched failure is a failure", function()
+		local s = setup({
+			start = function()
+				return nil
+			end,
+		})
+		local p = s.newPlayer(21)
+		s.Service.Prefetch(p)
+		t.eq(s.Service.Unsaveable(p), "load")
+		local profile, err = s.Service.LoadProfile(p)
+		t.eq({ profile, err }, { nil, "failed" })
+		local fine = setup()
+		local q = fine.newPlayer(22)
+		t.eq(fine.Service.LoadProfile(q).cash, 5)
+	end)
+
+	t.test("a player who left before the join flow picked the save up has the session released", function()
+		local s = setup()
+		local p = s.newPlayer(23)
+		s.Service.Prefetch(p)
+		t.eq(s.log.ended, 0)
+		p.Parent = nil
+		s.Service.PrefetchLeft(p)
+		t.eq(s.log.ended, 1, "the lock is let go instead of held for the server's life")
+		t.eq(s.Service.GetProfile(p), nil)
+		s.Service.PrefetchLeft(p)
+		t.eq(s.log.ended, 1, "and only once")
+	end)
+
+	t.test("a player the join flow already has is left to the normal leave path", function()
+		local s = setup()
+		local p = s.newPlayer(24)
+		s.Service.Prefetch(p)
+		s.Service.LoadProfile(p)
+		p.Parent = nil
+		s.Service.PrefetchLeft(p)
+		t.eq(s.log.ended, 0, "GameServer's PlayerRemoving commits and releases it")
+	end)
 end

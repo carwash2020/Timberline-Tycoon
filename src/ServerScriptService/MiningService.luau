@@ -837,12 +837,19 @@ local function components(cf: CFrame): { number }
 	return { x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 }
 end
 
+-- PlotService builds the pads in TimberlineMap/Plots, not Workspace/Plots (this
+-- looked in the wrong place, so no plot was ever found: server audit, 11 October 2026).
+local function plotsFolder(): Instance?
+	local map = Workspace:FindFirstChild("TimberlineMap")
+	return (if map then map:FindFirstChild("Plots") else nil) or Workspace:FindFirstChild("Plots")
+end
+
 local function plotOrigin(player: Player): CFrame
 	local slot = player:GetAttribute("PlotSlot")
 	if type(slot) ~= "number" then
 		return CFrame.identity
 	end
-	local plots = Workspace:FindFirstChild("Plots")
+	local plots = plotsFolder()
 	local pad = plots and plots:FindFirstChild("Plot_" .. tostring(slot))
 	if pad and pad:IsA("Model") then
 		return pad:GetPivot()
@@ -853,7 +860,7 @@ end
 local function onPlotOrTruck(player: Player, model: Model): boolean
 	local slot = player:GetAttribute("PlotSlot")
 	if type(slot) == "number" then
-		local plots = Workspace:FindFirstChild("Plots")
+		local plots = plotsFolder()
 		local items = plots and plots:FindFirstChild("PlotItems_" .. tostring(slot))
 		if items and model:IsDescendantOf(items) then
 			return true
@@ -880,7 +887,7 @@ local function placedCount(player: Player): number
 	if type(slot) ~= "number" then
 		return 0
 	end
-	local plots = Workspace:FindFirstChild("Plots")
+	local plots = plotsFolder()
 	local items = plots and plots:FindFirstChild("PlotItems_" .. tostring(slot))
 	local n = 0
 	if items then

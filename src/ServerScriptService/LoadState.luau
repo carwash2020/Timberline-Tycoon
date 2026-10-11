@@ -46,6 +46,7 @@ LoadState.Gates = ReadyGates.new()
 for _, name in ipairs({
 	"meshes",
 	"terrain",
+	"terrainFull",
 	"town",
 	"world",
 	"services",

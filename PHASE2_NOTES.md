@@ -1,5 +1,49 @@
 # Phase 2+ build notes
 
+## Server audit: game-breaking and long-loading bugs (11 October 2026, branch `phase-2/fix-server-audit`)
+
+Method: read GameServer's init order and a new player's first 60 seconds (PlayerAdded, save, gates, stream, character,
+ClientReady), every `WaitForChild` and `task.wait` on the server, every Heartbeat connection and `GetDescendants`; then
+timed the pure build code in Lune (numbers are Lune on a shared machine, so use the ratios; Roblox is about as fast or a
+little faster). Severity: **blocks play**, **long load**, **hitch**, **minor**.
+
+| # | Severity | Where | Evidence | Status |
+|---|---|---|---|---|
+| 1 | long load | `TerrainBuilder.Build`, `MapBuilder` "3. Terrain" (MapBuilder.server.luau:199) | 100 chunks at 0.44 to 0.54 s each (the heights are 66 x 66 `HeightAt` plus 64 x 64 water per chunk): about 45 to 55 s of CPU before the "terrain" gate, and every later step and the first player waited for it | **Fixed**: staged build, near chunks first (7 chunks, about 3 s), the rest in the background |
+| 2 | long load | `TerrainGen.WaterLevelAt` called from `writeChunk` | recomputed `HeightAt` for every column; with `WaterLevelFor(x, z, h)` the height-plus-water part of a chunk takes 40 to 55 % less | **Fixed** (WaterLevelAt kept, same answers: spec) |
+| 3 | long load | `GameServer.server.luau` PlayerAdded connected at the very end | the save's DataStore round trip (seconds, or about 45 s when another server still holds it) only began after the world and every service; it now overlaps them | **Fixed**: `ProfileService.Prefetch` / `PrefetchLeft` |
+| 4 | minor | `SkyForgeService.luau` 318/359/599, `MiningService.luau` 845/856/883 | both looked for `Workspace/Plots`; PlotService makes `TimberlineMap/Plots`. Relic trophies never built, mining's plot origin and placed-count never found a plot, and a thread waited 120 s | **Fixed** |
+| 5 | blocks play (a feature) | `BaseBoot.server.luau:10` | `WaitForChild("Remotes", 60)`, but GameServer creates the Remotes folder only after the world is built (GameServer.server.luau:146); on a slow cold build SaveNow, Paint all, stage unlocks, fallen-piece rescue never start | **Not touched: fix-load-meshes lane.** Suggest creating the Remotes folder before `WaitForChild("TimberlineMap")`, or waiting without a timeout. With fix 1 the world gate comes much sooner, so it is rarer |
+| 6 | hitch | `RegionWake.pass` (RegionWake.luau:61) | every 0.75 s: 2 `GetAttribute` and a `GetPivot` for each of about 1,400 trees, and trees are re-parented into ServerStorage right after planting if nobody is near | Not changed (works as designed; measure in Studio before touching) |
+| 7 | hitch | `DialogueService.watchKeepers` (DialogueService.luau:258) | `Workspace:GetDescendants()` once, plus a `DescendantAdded` Lua callback for every instance ever added (the forest alone adds about 60,000) | Not changed: about 30 to 60 ms in total, spread over the forest planting. A tag or the map folder would remove it |
+| 8 | hitch | `SkyForgeService.V1Init` (SkyForgeService.luau:593) | `TimberlineMap.DescendantAdded` plus a pass over the whole map for `TemperSpot` attachments | Not changed, same cost class as 7 |
+| 9 | minor | `GameServer.server.luau:1337` | the `ClientReady` handler is connected after the services, so a handshake before then is heard on the client's next repeat (every 3 s) | Not changed (bounded: the client repeats 30 times) |
+| 10 | minor | `TerrainBuilder.SettleTown` | the town chunks (up to 4) are written 2 to 5 times while the engine's drawn ground is measured: about 3 to 5 s, now the main part of the first stage | Not changed: it calibrates the whole world against the engine; shrinking it needs a Studio run |
+| 11 | info | `WorldPlan.Trees` | 11.5 s of CPU in Lune; already time-sliced after the world gate (12 ms a frame), planned once (cached) | OK |
+| 12 | info | `PlotService.Init` itemMeshes wait 3 s, NPCService mesh waits | bounded; mesh loading is the fix-load-meshes lane | Not touched |
+
+Checked and fine: every `WaitForChild` on the server has a timeout and a handling of nil; the world plan functions are
+cached (second call 0.000 s); the town and tutorial grove are in the pre-world path (0.4 s); GondolaService's stations are
+in the ready path; the load ceiling from #148 (`LoadBudgetSec` 150) and the gates' 90 s wait both bound the join.
+
+**What the terrain stages mean in play.** Players can walk into ground that is not written yet only past about 230 studs
+from the sawmill, and the background writes outward at about a 64-stud block a frame (the first 25 to 40 s), after the plot
+pads' ground (150 studs round each pad). A plot claimed in the first seconds lands on its pad's slab (a part), the ground
+under it follows within a few seconds. The caves are carved last. `FallenLogic` already returns anything that falls out of
+the world.
+
+**Studio checks (what good looks like).**
+
+1. PC, new server: Output shows `[Load] ... 3. Terrain took ~Ns` (the near chunks only, a few seconds), then `world ready
+   for players`, `[Load] ... can play` and a long way later `the rest of the terrain is written (Ns in the background)` and
+   `[Load] ... everything is built`. The first player stands on the ground at the spawn well before the last line.
+2. Walk or drive out of town in the first minute: the ground is there ahead of you (no void, no falling). Tell Claude if you
+   ever see sky through the ground; the writing order is `TerrainBuilder.Order`.
+3. Claim a plot in the first 20 seconds: you stand on your pad, the grass round it is there.
+4. The Town ground line still reads `good` (y = 0.0x).
+5. Join, leave within a second of joining, rejoin: no "save opened on another server" kick (the early-leave release).
+6. Phone and Xbox: nothing visible changes except the shorter wait; the loading card should drop in about half the time.
+
 ## Lane F: building and blueprints (10 October 2026, branch `phase-2/v1-f-base-systems`)
 
 What changed: `BuildCost` (fill = units + slabs + ingots, atomic take), `BuildMaterials`, `FillLogic`, `PlotFill`, `PlotLogic` (SellPlan refunds, kit-part cap), `EditRights` and `PlotService.CanEdit` at every edit site, `KitPieces` (new four unlocked), `BlueprintBook` (stage-locked rows, Free marks, granted and Sparkworks stock), `StageOf`, `FurnitureData`, `StockIds`, `SaveNowLogic`, `LooseSave` / `LooseService`, `FallenLogic`, `PlaceControlsLogic` / `PlaceControls`, `KitPaint` / `EditLogic.PaintAll`, `StoreStock.Sparkworks`, `BaseBoot.server`.

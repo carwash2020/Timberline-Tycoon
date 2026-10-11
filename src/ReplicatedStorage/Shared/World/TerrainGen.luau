@@ -1135,12 +1135,14 @@ function TerrainGen.HeightAt(x: number, z: number): number
 	return cover(x, z, h)
 end
 
--- Water surface above (x, z), or nil if the column is dry.
-function TerrainGen.WaterLevelAt(x: number, z: number): number?
+-- Water surface above (x, z) for a column whose ground height `h` is already
+-- known (TerrainGen.HeightAt(x, z)), or nil if the column is dry. TerrainBuilder
+-- has every height in hand, and looking it up again was about a third of the
+-- time of writing the terrain (server audit, 11 October 2026).
+function TerrainGen.WaterLevelFor(x: number, z: number, h: number): number?
 	if WorldLayout.InNorthStrip(x, z) then
 		return nil
 	end
-	local h = TerrainGen.HeightAt(x, z)
 	local _, surface = water(x, z)
 	if surface and h < surface then
 		return surface
@@ -1152,6 +1154,14 @@ function TerrainGen.WaterLevelAt(x: number, z: number): number?
 		return SEA_LEVEL
 	end
 	return nil
+end
+
+-- Water surface above (x, z), or nil if the column is dry.
+function TerrainGen.WaterLevelAt(x: number, z: number): number?
+	if WorldLayout.InNorthStrip(x, z) then
+		return nil
+	end
+	return TerrainGen.WaterLevelFor(x, z, TerrainGen.HeightAt(x, z))
 end
 
 -- Studs of plain Grass past a homestead's pad (see SurfaceMaterial).

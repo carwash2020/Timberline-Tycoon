@@ -21,6 +21,27 @@ key (deriving it from a full plot is awaiting Connor, it would raise cash packs 
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
 the old ones), no Robux price in code.
 
+## Server audit: game-breaking and long-loading bugs (branch `phase-2/fix-server-audit`, 11 October 2026, draft PR)
+
+Goal: a new player playable within about 15 s of joining. Traced the server boot and a new player's first 60 seconds end to
+end; measured the pure build code in Lune. Full findings (severity, file:line, evidence, status): PHASE2_NOTES.md "Server
+audit". Fixed here:
+
+- **Long load: the terrain.** The "terrain" gate sat behind all 100 chunks (about 0.54 s a chunk in Lune, 54 s; most of the
+  wait for a first player). `TerrainBuilder.Build` now takes `{ nearRadius, firstSpots, sliceSeconds }`: the chunks touching a
+  230-stud disc round the sawmill block (the spawn, shops, sell area, Murph, the tutorial grove), the rest comes back as
+  `finish`, which MapBuilder runs after the world gate in 16-column blocks (about 1/16 of a chunk, one a frame), the
+  plot pads' ground first, then outward, the caves last. New gate `terrainFull`; `LoadState.Track("terrain")` keeps "fully
+  built" honest. `TerrainGen.WaterLevelFor(x, z, h)` stops `WaterLevelAt` recomputing the height the builder already has
+  (about a third of the time of writing the terrain).
+- **Long load: the save.** GameServer connected PlayerAdded only after the world and every service, so the DataStore
+  load began then. `ProfileService.Prefetch` (PlayerAdded at the top of GameServer) starts it on arrival; `LoadProfile`
+  picks it up; `PrefetchLeft` releases the session of a player who left before the join flow had it.
+- **Plots lookups.** `SkyForgeService` and `MiningService` looked for `Workspace/Plots`; PlotService builds
+  `TimberlineMap/Plots`. Trophies never appeared, mining never found a plot, and a thread waited 120 s.
+- Not done, in other lanes or too risky for today: see the PHASE2_NOTES list (BaseBoot's 60 s wait for Remotes is the
+  fix-load-meshes lane; the town settle at the start of the terrain, about 4 s, is left alone).
+
 ## V1 hardening: exploit guards and performance (branch `phase-2/v1-hardening-guards`, 11 October 2026, draft PR)
 
 Launch items 2 and 3. Audit first, then only what was missing.
