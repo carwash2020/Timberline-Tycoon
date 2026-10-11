@@ -520,4 +520,12 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test("the BADGES button waits for the end of the tutorial (it sat over the tutorial card)", function()
+		for _, step in ipairs({ 1, 2, 7 }) do
+			t.eq(HudRules.BadgesButton(step), false, "step " .. step)
+		end
+		t.eq(HudRules.BadgesButton(nil), false, "while the save loads")
+		t.eq(HudRules.BadgesButton(0), true)
+	end)
 end
