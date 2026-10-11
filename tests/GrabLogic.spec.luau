@@ -307,7 +307,7 @@ return function(t)
 		t.eq(
 			{ GrabLogic.PadAction("ButtonR1") },
 			{},
-			"RB is the grab (it replaced the right trigger), so it is no push"
+			"RB is neither the grab nor a push here (the grab is the right trigger)"
 		)
 		t.eq({ GrabLogic.PadAction("ButtonL1") }, { nil, -1 })
 		t.eq({ GrabLogic.PadAction("DPadLeft") }, { { kind = "yaw", steps = 1 } })
@@ -383,17 +383,29 @@ return function(t)
 		t.eq(GrabLogic.CanPressPad({ userId = OTHER, ownerId = ME }), false)
 	end)
 
-	t.test("PadPressAccepted: a handled RB still grabs, a handled click does not, the placer owns RB", function()
-		-- processed, trigger, selecting, placing
-		t.eq(GrabLogic.PadPressAccepted(false, true, false, false), true)
-		t.eq(GrabLogic.PadPressAccepted(true, true, false, false), true, "a bound action marked it handled")
-		t.eq(GrabLogic.PadPressAccepted(true, true, true, false), false, "a menu has the pad selection")
-		t.eq(GrabLogic.PadPressAccepted(true, false, false, false), false, "a handled mouse click is a button's")
-		t.eq(GrabLogic.PadPressAccepted(false, false, false, false), true)
-		t.eq(GrabLogic.PadPressAccepted(true, true, false, true), false, "placing: RB slides the ghost, not Grab")
-		t.eq(GrabLogic.PadPressAccepted(false, true, false, true), false)
-		t.eq(GrabLogic.PadPressAccepted(false, false, false, true), true, "the mouse still grabs")
+	t.test("the pad grab is the right trigger, and only empty hands start it", function()
+		t.eq(GrabLogic.PadGrabKey.Name, "ButtonR2")
+		-- toolOut, placing
+		t.eq(GrabLogic.PadGrabAllowed(false, false), true, "empty hands: RT grabs")
+		t.eq(GrabLogic.PadGrabAllowed(true, false), false, "a tool in hand: RT is its swing, never a grab")
+		t.eq(GrabLogic.PadGrabAllowed(false, true), false, "the placer is up")
+		t.eq(GrabLogic.PadGrabAllowed(true, true), false)
 	end)
+
+	t.test(
+		"PadPressAccepted: a handled trigger still grabs, a handled click does not, the placer owns the pad",
+		function()
+			-- processed, trigger, selecting, placing
+			t.eq(GrabLogic.PadPressAccepted(false, true, false, false), true)
+			t.eq(GrabLogic.PadPressAccepted(true, true, false, false), true, "a bound action marked it handled")
+			t.eq(GrabLogic.PadPressAccepted(true, true, true, false), false, "a menu has the pad selection")
+			t.eq(GrabLogic.PadPressAccepted(true, false, false, false), false, "a handled mouse click is a button's")
+			t.eq(GrabLogic.PadPressAccepted(false, false, false, false), true)
+			t.eq(GrabLogic.PadPressAccepted(true, true, false, true), false, "placing: no grab")
+			t.eq(GrabLogic.PadPressAccepted(false, true, false, true), false)
+			t.eq(GrabLogic.PadPressAccepted(false, false, false, true), true, "the mouse still grabs")
+		end
+	)
 
 	t.test("LT + the LEFT stick turns a carried piece: dead zone, rescaled throw, yaw and tip", function()
 		local yaw, pitch = GrabLogic.StickTurn(0.1, -0.1, 0.016)

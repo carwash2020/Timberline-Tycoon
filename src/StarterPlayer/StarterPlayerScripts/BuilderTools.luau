@@ -588,7 +588,8 @@ end
 -- ButtonR1 (RB; the right trigger is the tool's and is never bound): a ray
 -- through the middle of the screen, then the same select (or copy-confirm)
 -- path a mouse click uses. Pass unless that ray hits a placed piece or copy
--- mode is confirming, so DragController still sees RB for a grab. A tool in
+-- mode is confirming. (The grab is the right trigger, which this bind never
+-- touches.) A tool in
 -- hand always passes: LB + RB unequips it, and RB must not select then.
 function BuilderTools.OnSelect(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
 	if inputState ~= Enum.UserInputState.Begin or BlueprintPlacer.Active() then
