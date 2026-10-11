@@ -20,7 +20,7 @@
 --     empty hands): "press 1" (the starter axe's hotbar key), "tap your
 --     axe" (its hotbar button), "press LB + RB" (the default backpack
 --     unequips on both bumpers). {grab} is starting a drag: "click and
---     hold", "tap and hold", "hold RT". Capitalised ({Click}, {Tap},
+--     hold", "tap and hold", "hold RB". Capitalised ({Click}, {Tap},
 --     {Press}, {Unequip}, {Grab}) at a sentence start.
 -- The v2 loop (V2_PLAN.md §4, Shared/CoreLoop) has its own hints:
 -- PickV2(device, context) and ContextForV2(state), with TooLong and
@@ -102,11 +102,11 @@ local UNEQUIP: { [string]: string } = { -- [Device]
 }
 
 -- Starting a drag, per device ({grab}): the main button held down, or on
--- a gamepad the right trigger held at the reticle (V2_PLAN.md §4a).
+-- a gamepad the right bumper held at the reticle (RT is the axe's).
 local GRAB: { [string]: string } = { -- [Device]
 	phone = "tap and hold",
 	desktop = "click and hold",
-	console = "hold RT",
+	console = "hold RB",
 }
 
 -- The hint line for `context` on `device` (the chopping one for anything
@@ -231,7 +231,7 @@ local LINES_V2: { [string]: { [string]: string } } = { -- [ContextV2][Device]; o
 	drag = {
 		phone = "Tap and hold wood to drag it",
 		desktop = "Click and hold wood to drag it",
-		console = "Hold RT on wood to drag it",
+		console = "Hold RB on wood to drag it",
 	},
 	unequip = {
 		phone = "Put your axe away to drag: tap it",
@@ -241,7 +241,7 @@ local LINES_V2: { [string]: { [string]: string } } = { -- [ContextV2][Device]; o
 	holding = {
 		phone = "+/- for distance · Turn to rotate",
 		desktop = "Scroll for distance · Q/E to turn",
-		console = "LT + left stick: turn · LB/RB: reach",
+		console = "LT + left stick: turn · D-pad: reach",
 	},
 	tooLong = {
 		phone = "Cut it shorter to fit your bed",

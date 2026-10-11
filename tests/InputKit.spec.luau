@@ -105,7 +105,7 @@ return function(t)
 		-- Rotate used to be ButtonX. Raise is still E, which is world Interact.
 		local today = {
 			bind("Rotate", Enum.KeyCode.ButtonX, Enum.KeyCode.R),
-			bind("Place", Enum.KeyCode.ButtonR2, nil),
+			bind("Place", Enum.KeyCode.ButtonA, nil), -- was the right trigger, which no script binds now
 			bind("Cancel", Enum.KeyCode.ButtonB, Enum.KeyCode.Q),
 			bind("Raise", Enum.KeyCode.ButtonR1, Enum.KeyCode.E),
 			bind("Lower", Enum.KeyCode.ButtonL1, Enum.KeyCode.C),
