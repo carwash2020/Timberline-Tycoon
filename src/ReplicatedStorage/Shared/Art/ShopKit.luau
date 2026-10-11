@@ -619,6 +619,9 @@ export type Section = {
 	header: string,
 	accent: Color3,
 	subs: { Sub },
+	subW: number?, -- sub-sign width (default 5.4)
+	subStagger: number?, -- when set, sub-signs alternate this far left and right of the lane's middle, so two signs in one lane do not hide each other from the door
+	subAbove: number?, -- studs from a box top to the middle of this section's sub-signs (default SUB_ABOVE; lower for a unit with no tier flags)
 }
 
 -- The header over each lane (at its front end) and a sub-sign over each
@@ -634,7 +637,7 @@ function ShopKit.SectionSigns(
 	parent: Instance,
 	shop: string,
 	sections: { Section },
-	cfg: { headerY: number, headerZ: number, tieY: number }
+	cfg: { headerY: number, headerZ: number, tieY: number, subShift: number? }
 )
 	local placements = StoreStock.Placements(shop)
 	local lanes: { [string]: ShelfLayout.Lane? } = {}
@@ -644,6 +647,7 @@ function ShopKit.SectionSigns(
 	local headerH = ShopKit.HeaderMinHeight + 0.4
 	local subH = ShopKit.SubMinHeight + 0.2
 	local chainTop = cfg.tieY - 0.25
+	local shift = cfg.subShift or 1.3
 	local tied: { [string]: boolean } = {}
 	local function tie(cx: number, w: number, z: number)
 		local key = string.format("%.2f:%.2f", cx, z)
@@ -671,7 +675,7 @@ function ShopKit.SectionSigns(
 			accent = section.accent,
 			ceilY = chainTop,
 		})
-		for _, sub in ipairs(section.subs) do
+		for subIndex, sub in ipairs(section.subs) do
 			local want: { [string]: boolean } = {}
 			for _, id in ipairs(sub.ids) do
 				want[id] = true
@@ -705,13 +709,14 @@ function ShopKit.SectionSigns(
 					top = math.max(top, place.y + place.size.Y / 2)
 				end
 			end
-			local cy = top + SUB_ABOVE
+			local cy = top + (section.subAbove or SUB_ABOVE)
+			local stagger = if section.subStagger then (if subIndex % 2 == 1 then -1 else 1) * section.subStagger else 0
 			tie(cx, w, z)
 			ShopKit.SubSign(parent, {
-				cx = cx + (if cx < 0 then -1.3 else 1.3), -- toward the wall, so it never covers the header's inner end from the aisle
+				cx = cx + (if cx < 0 then -shift else shift) + stagger, -- toward the wall (cfg.subShift, 1.3 by default; 0 for a lane against a wall), so it never covers the header's inner end from the aisle
 				cy = cy,
 				z = z,
-				w = math.min(w, 5.4),
+				w = math.min(w, section.subW or 5.4),
 				h = subH,
 				text = sub.text,
 				accent = section.accent,
