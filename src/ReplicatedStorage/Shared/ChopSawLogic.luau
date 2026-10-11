@@ -41,11 +41,14 @@ ChopSawLogic.GuardX = 3
 ChopSawLogic.GuardY = 4
 ChopSawLogic.GuardZ = 3
 
--- Infeed table. Its length is MaxCut timber units, so a full-length set
--- still has wood under the mark.
-ChopSawLogic.TableWidth = 4
-ChopSawLogic.TableTop = 1.2
-ChopSawLogic.TableThick = 0.4
+-- Infeed table: the TLD-1 roller deck (reference LINE-STANDARD.md), 5.0
+-- wide with its top at the deck top 0.72, so a belt feeds it flush. Its
+-- length is MaxCut timber units rounded up to the 2-stud grid (51.2 -> 52),
+-- so a full-length set still has wood under the mark.
+ChopSawLogic.TableWidth = 5
+ChopSawLogic.TableTop = 0.72
+ChopSawLogic.TableThick = 0.32
+ChopSawLogic.GridStep = 2
 ChopSawLogic.Leg = 0.4
 ChopSawLogic.IntakeHeight = 2.4
 
@@ -239,7 +242,7 @@ function ChopSawLogic.Inside(part: BasePart, point: Vector3): boolean
 end
 
 function ChopSawLogic.TableLength(): number
-	return ChopSawLogic.MaxCut * GameConfig.WoodUnit
+	return math.ceil(ChopSawLogic.MaxCut * GameConfig.WoodUnit / ChopSawLogic.GridStep) * ChopSawLogic.GridStep
 end
 
 function ChopSawLogic.Footprint(): Vector2

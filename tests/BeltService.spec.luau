@@ -53,7 +53,10 @@ return function(t)
 					count += 1
 				end
 			end
-			t.ok(count <= 16, id .. " keeps its part budget: " .. count)
+			-- 20, was 16: the TLD-1 deck is 8 rollers at the 1.0 pitch plus plate,
+			-- pan, rails, caps and collars on a straight (job 15). With the meshes
+			-- loaded a straight is 8 (root, band, two rails and four mesh pieces).
+			t.ok(count <= 20, id .. " keeps its part budget: " .. count)
 		end
 		t.eq(#conveyors(MachineArt.BuildBelt("ConveyorTurn", false)), 3, "a turn is entry, corner and exit")
 		-- The straight belt runs toward +Z, like a sawmill's.
