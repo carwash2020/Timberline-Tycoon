@@ -205,3 +205,14 @@ Resource regions (a wood biome, or one of these two) are at least 500 studs apar
 ## Not in this plan
 
 Biome disc centres live in `BiomeData`, which A1 owns. The terrain uses the centres in this file. After A1 merges, this lane writes only `haulStuds`, `GameConfig.WorldVersion = 2`, and `ExpansionPriceStep` if the full plot drops under 28 hours. Tree counts, gear and prices are not touched.
+
+## Changes made while finishing the build (11 October 2026)
+
+The numbers above are the plan. The built map differs in these places (code is the source of truth):
+
+- Starter Forest: centre (8, -178), radius 143.
+- Pads: Birch Side (-130, -130), Orchard Edge (-341, -261), North Bend (-180, 370), East Meadow (380, -100), Pine Bend (-622, 439), Long Meadow (-622, -279), West Shelf (-440, 700), High Meadow (-700, 700), Ash Gate (690, -410). Several of these break the plan's "within 120 of a 28-wide road" and "no shared nearest biome and water" rules (`python3 tools/preview/v1b_map.py` lists them). Awaiting Connor.
+- Rings and roads: the ring is 520 to 400 at the north arc (`WorldLayout.RingBends`), SnowRoad ends at z 760, VolcanoRoad runs (276, 356) to (410, 460), DockRoad ends at the shore (772, 133).
+- River and lake: Mirror Lake (-740, 262) radius 55, river from (-815, 508) south into it, pond at (95, -125).
+- Mine: `UndergroundData.Ramp` (see STATUS.md). The mouth is NatureArt.CaveMouth at (150, -150), door toward town, a 16-wide bore down to the upper mine, hill over it.
+- Lighthouse lamp (780, 48, -240). Lumen isles (680, 280) with cloud banks allowed half their size from the east wall.

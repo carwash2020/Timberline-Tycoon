@@ -39,7 +39,7 @@ Weather and critter zones (same discs Lane G should read from `ScatterZones` onc
 | Zone | Kind | Centre | Radius |
 |---|---|---|---|
 | town | town | (0, 90) | 180 |
-| starter | forest | (0, −180) | 100 |
+| starter | forest | (8, −178) | 143 |
 | hills | forest | (−500, 110) | 150 |
 | meadow-east | meadow | (300, −40) | 80 |
 | snow | snow | (0, 720) | 115 |
@@ -56,6 +56,17 @@ Preview paths so far:
 - `previews/v1-b/bayou-three-quarter.png`
 - `previews/v1-b/mesa-top.png`
 - `previews/v1-b/mesa-three-quarter.png`
+
+### Map remake finish (10 and 11 October 2026, PR #121)
+
+The ring map is now what the specs pin, not what the first draft of this file said. Where it differs from the tables above, the code wins (`WorldLayout`, `PlotData`, `BiomeData`, `UndergroundData`).
+
+- Mine mouth: `NatureArt.CaveMouth` stands at (150, -150), door toward town, with a walkable 16-wide bore (about 18 degrees) down to the upper mine and a hill over it (`UndergroundData.Ramp`, `HillAt`). The ground at the door is 1.5 (`Ramp.top`). `tests/MineMouth.spec` walks a capsule from the tunnel floor out to open ground, checks the doorway is clear of colliders, the roof keeps rock over it and five lamps hang in the bore (shadows off).
+- Starter Forest disc is (8, -178) radius 143 (it was (0, -180) radius 100): Birch Side, Oak Side and the South Link leave too little free ground for the 70 oak and 26 birch otherwise. Every plot centre stays outside the disc.
+- The first tree batch is placed on the map as it is (no legacy layout), wild groves keep off the river and the forest lanes, boulders stay in the 2000 square, scenery cells are 200.
+- River moved west (x about -815) so its footbridge has firm banks outside Pine Bend's yard. Lighthouse lamp at (780, 48, -240) on the sand south of the ferry. The overview picture is redrawn from the shipped layout (`tools/preview/v1b_map.py` now reads the same numbers).
+- Economy headlines moved with the shorter hauls (ECONOMY.md regenerated): first sale 68 s (same), Steel Axe 5.4 min (same), first $1k 17.9 to 17.8 min, Cobalt Axe 66.3 to 50.7 min, full plot 33.5 to 31.5 h. All inside their targets.
+- Previews: `previews/v1-b/mine-1.png` `mine-2.png` `mine-3.png` `mine-7.png` `mine-8.png`, `landmarks-3.png` (lighthouse), `landmarks-5.png` (footbridge), `landmarks-7.png` (lake dock), `landmarks-8.png` (coast dock).
 
 
 - **End game follow-ups** (branch `phase-2/v1-end-game-followups`, 10 October 2026, off main `a68d339`; draft PR): the plot sign shows the owner's name first with the plot line under it, above the post that ran up over it (`PlotData.SignText`); the player-facing "Sky Pass" is "Gondola Pass" everywhere (the save keys `gondolaPass` / `skyPass` and the `SkyQuest` remote are unchanged); `BiomeData.Gate(biomeId)` returns `{ needs, words }` (sky: `GondolaPass`, "Obsidian Axe + Gondola Pass from Gus"; `SkyQuestLogic.GateWords` reads it); Keen now speeds the swing you feel (`CutController` multiplies the client cooldown by `TemperLogic.CooldownMultiplier`, read from the tool's `TemperPrefix` / `TemperTier` attributes that `AxeService.StampTemper` sets; no input code touched); `EndGameBoot` is folded into `V1Boot`. Town model check: no real problems in the part-built town the game ships. Previews: `previews/v1-end-game-followups/plot-sign-1.png` to `plot-sign-5.png`, `town-pieces-*.png`. Studio checks: PHASE2_NOTES.md "End game follow-ups".
