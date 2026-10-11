@@ -32,6 +32,49 @@ function JoinPickLogic.NeedsPlotPick(slotChosen: boolean, onBase: boolean, picke
 	return slotChosen and not onBase and pickedHasPlot
 end
 
+-- Is there a real choice to make at join? The picker only opens when two or
+-- more saves have been played (Connor's default, 11 October 2026): a brand
+-- new profile or a single save loads straight in. `slots` are the summaries
+-- (index, fresh, active). Returns the save to play without asking, or nil
+-- when the picker must open: two or more played saves, or the lone played
+-- save is not the one last played (a swap would stamp the cooldown, so the
+-- player is asked instead).
+function JoinPickLogic.AutoPick(slots: { any }): number?
+	local played: number = 0
+	local active: number? = nil
+	local onlyPlayed: number? = nil
+	for _, slot in ipairs(slots) do
+		if slot.active then
+			active = slot.index
+		end
+		if not slot.fresh then
+			played += 1
+			onlyPlayed = slot.index
+		end
+	end
+	if active == nil or played >= 2 then
+		return nil
+	end
+	if played == 1 and onlyPlayed ~= active then
+		return nil
+	end
+	return active
+end
+
+-- The tutorial (tracker, Murph's card, the beacon) starts after the save
+-- pick: it waits while the server says the player is still picking
+-- (the SlotPick attribute, any type as read).
+function JoinPickLogic.TutorialWaits(slotPick: unknown): boolean
+	return slotPick == true
+end
+
+-- The hint bar and the load chip never draw over a join screen (the save
+-- picker): hidden while one is up. `modal` is a panel registered with
+-- HUD.SetModal, `picking` the SlotPick attribute.
+function JoinPickLogic.HintHidden(modal: boolean, picking: boolean): boolean
+	return modal or picking
+end
+
 -- The screens this state still owes, in the order they open.
 function JoinPickLogic.Screens(state: State): { string }
 	local out: { string } = {}

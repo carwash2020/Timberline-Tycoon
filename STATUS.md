@@ -21,6 +21,34 @@ key (deriving it from a full plot is awaiting Connor, it would raise cash packs 
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
 the old ones), no Robux price in code.
 
+## First screen UI fix (branch `phase-2/fix-first-screen-ui`, 11 October 2026, draft PR)
+
+Connor's bug report PART B items 10 and 11 (PC window 963x478, phone 667x375, Xbox). Nothing seen in Studio yet; the
+previews are composites (the engine viewer cannot draw UI): `previews/fix-first-screen/` (`before-*`, `after-*`,
+`closeup-*`, `markers-sell-logs.png`, made by `python3 tools/preview/first_screen_ui.py`). Studio checks: PHASE2_NOTES.md
+"First screen UI fix".
+
+- **Join flow.** The save picker only opens when two or more saves have been played (`JoinPickLogic.AutoPick`); a brand
+  new profile or a single save loads straight in (`SaveSlotService.PlayerJoined` plays it and asks for its pad). One played
+  save that is not the last-played slot still shows the picker (a swap would spend the 120 s cooldown). The tutorial
+  (tracker, Murph's card, the beacon) waits for the pick (`JoinPickLogic.TutorialWaits`, `QuestUI`).
+- **Saves panel layout.** `SaveSlotLogic.Layout` / `Panel`: the panel is as tall as its cards, never taller than the screen;
+  while joining there is no Unload base / Save now row, so the cards sit right under the note (no empty gap); a card is one
+  94 px block (name and a 44 px PLAY side by side, facts under them) so all three fit on 963x478 and 667x375, and the list
+  scrolls on a window too short for the SAVES panel's extra row.
+- **Hint bar.** The bottom row (hint and load chip) hides while the picker is up and while the SAVES panel is open
+  (`HUD.HoldHint`, `JoinPickLogic.HintHidden`).
+- **HUD overlap.** BADGES waits for the end of the tutorial (`HudRules.BadgesButton`); Murph's portrait circle stays hidden
+  until his head is in it; side buttons with a mark start their label after the mark and left-aligned
+  (`HudLayout.MarkTextLeft`); the tutorial beacon slides clear of HUD boxes or hides (`HudLayout.ClearOfRects`,
+  `HUD.Obstacles`) instead of being cut off behind SAVES; the town markers have a cream rim (SELL LOGS was a dark blob
+  on dark forest); an NPC's name tag hides whole if any of its ends or its top is behind a wall (`TextAnchor.Probes`).
+- **Not found / not reproduced.** The "S behind the icon" and the "empty outlined box" could not be traced to one cause by
+  reading the code (the old label math put the text clear of the mark at 110 px); the box may be Roblox's own chat window.
+  Studio checks 7 and 9 ask Connor to confirm or send a screenshot.
+- **Awaiting Connor** (defaults used): picker only with 2+ played saves; the tutorial text starts after the pick; BADGES
+  hidden while the tutorial runs.
+
 ## V1 hardening: exploit guards and performance (branch `phase-2/v1-hardening-guards`, 11 October 2026, draft PR)
 
 Launch items 2 and 3. Audit first, then only what was missing.
