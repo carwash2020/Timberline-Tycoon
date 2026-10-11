@@ -521,13 +521,13 @@ end
 
 -- A gamepad button while holding: a turn, or a hold-distance direction
 -- (+1 further while held, -1 nearer). D-pad left/right turn, D-pad up/down
--- and RB/LB push and pull. (Tipping is the left stick, with LT held.)
+-- and LB pull nearer. RB is the grab itself (held), not a push. (Tipping is the left stick, with LT held.)
 function GrabLogic.PadAction(keyName: string): (Turn?, number?)
 	if keyName == "DPadLeft" then
 		return { kind = "yaw", steps = 1 }, nil
 	elseif keyName == "DPadRight" then
 		return { kind = "yaw", steps = -1 }, nil
-	elseif keyName == "DPadUp" or keyName == "ButtonR1" then
+	elseif keyName == "DPadUp" then
 		return nil, 1
 	elseif keyName == "DPadDown" or keyName == "ButtonL1" then
 		return nil, -1
@@ -536,9 +536,9 @@ function GrabLogic.PadAction(keyName: string): (Turn?, number?)
 end
 
 -- Whether the drag hold takes an InputBegan press. A bound action marks
--- R2 handled even when it passes it on, and a trigger is no button's
--- click, so a handled trigger still counts unless a menu holds the pad
--- selection. While the placer is up R2 is its Place bind: no grab.
+-- RB handled even when it passes it on (the builder's select bind), and a
+-- bumper is no button's click, so a handled RB still counts unless a menu
+-- holds the pad selection. While the placer is up RB slides the ghost: no grab.
 function GrabLogic.PadPressAccepted(processed: boolean, trigger: boolean, selecting: boolean, placing: boolean): boolean
 	if trigger and placing then
 		return false

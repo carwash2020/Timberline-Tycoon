@@ -15,7 +15,7 @@
 --   * The town bulletin board's prompt (StorePrompt) opens the same panel,
 --     and its price pills (tag StorePricePill) get this player's prices.
 --   * Gamepad: opening selects the first Buy pill (or the Passes tab),
---     every button carries UITheme's ring, B closes. ButtonR2 is never bound.
+--     every button carries UITheme's ring, B closes. the right trigger is never bound.
 --   * "Sell here" stays while you have Instant Deliveries and wood on the truck.
 
 local CollectionService = game:GetService("CollectionService")

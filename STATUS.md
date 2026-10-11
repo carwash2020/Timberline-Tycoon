@@ -4,6 +4,22 @@
 
 Last updated 8 October 2026 (V1 map remake, branch `phase-2/v1-b-world`). The layout plan is `MAP_V1.md`. The labelled picture is `previews/v1-b/00-overview.png`.
 
+## V1: no ButtonR2 anywhere (branch `phase-2/v1-no-buttonr2`, 11 October 2026, draft PR)
+
+Connor's instruction: remove every use of `Enum.KeyCode.ButtonR2` and move Xbox extras off the right trigger. The engine fires `Tool.Activated` on RT by itself (it cannot be remapped from script), and any script that binds or sinks RT breaks chopping. Now no file under `src/` names the button (`tests/NoButtonR2.spec.luau` scans all of it, no exemption list).
+
+| Action | Context | Old Xbox key | New Xbox key | Why that key |
+| --- | --- | --- | --- | --- |
+| Chop / swing (axe, hammer, picks) | tool in hand | RT (engine) | RT (engine) | Unchanged. `Tool.Activated` fires on RT by itself; CutController now listens only to that (and the mouse). Pacing (cooldown, Keen multiplier) is the same `clickSwing` path. |
+| Select a placed piece (BuilderTools) | empty hands | RT (CAS bind) | RB (`ButtonR1`) | Free in that context; RB only means Push inside the placer, which BuilderTools already yields to. Still unbound while a tool is held (LB + RB unequips). |
+| Wire pick (WireTool, BUILD) | wiring | RT (CAS bind) | RB (`ButtonR1`) | X is Cut, B is Done in that list; the placer is not up, so RB is free (`InputKit.WireSafe`). |
+| Grab / drag wood and boxes (DragController) | empty hands, held | RT (InputBegan read) | RB, held (`ButtonR1`) | RB was "further" while holding; that stays on D-pad up (D-pad down and LB are nearer). X would clash with world prompts (Interact/Talk/Buy), so not X. |
+| Place a blueprint (InputKit target table) | placer | RT (table only) | A (`ButtonA`) | The real binding was already A (`PlaceControlsLogic`); the table now says what the game does. RB stays Push there. |
+
+- Hints now say RB for these: wiring bar "RB pick · X cut · B done", `{grab}` is "hold RB", the drag line "Hold RB on wood to drag it", the holding line "LT + left stick: turn · D-pad: reach". RT stays in the chop hint and `{click}` ("RT to swing", "press RT"): that is the tool's own button.
+- PC and phone inputs are unchanged.
+- Studio checks: PHASE2_NOTES.md "No ButtonR2 (Xbox remap)".
+
 ## Lane R: Bayou and Red Mesa (branch `phase-2/v1-r-regions`, 11 October 2026, draft PR)
 
 The two reserved regions are filled. Each has its own wood and one rare find, a signpost that says what it needs, and a small build of part-made art (built-in materials, the Art Director palette, no uploads). Numbers: `Shared/Regions/BayouData`, `MesaData`; rules: `MudLogic`, `QuarryLogic`, `RegionItems`, `RegionScatter`; art: `Shared/Art/RegionArt`; server: `RegionService`, started by `RegionBoot.server.luau`.
