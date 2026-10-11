@@ -70,8 +70,9 @@ function Eye.cameras(ctx)
 	local snow = road("SnowRoad")
 	add("the Snow Road at the Volcano fork", eye(snow[2].X, snow[2].Y), eye(snow[3].X, snow[3].Y))
 
-	-- 4: on the east beach, looking down the shore to the palm island.
-	local beach = eye(1150, 0)
+	-- 4: on the east beach, looking down the shore to the palm island (ring
+	-- map: the shore is at x 780, 40 studs back from it is the sand).
+	local beach = eye(WorldLayout.Coast.shoreX - 40, 0)
 	local island = WorldLayout.Island
 	add("the beach, to the palm island", beach, V3.new(island.x, beach.Y, island.z))
 

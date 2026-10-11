@@ -29,6 +29,7 @@ local FerryLogic = require(script.Parent.FerryLogic)
 local PlotSalesmanData = require(script.Parent.PlotSalesmanData)
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 local TollLogic = require(script.Parent.TollLogic)
+local WorldLayout = require(script.Parent.World.WorldLayout)
 
 local NPCData = {}
 
@@ -577,7 +578,11 @@ NPCData.List = {
 		id = "Hermit",
 		name = "The Hermit",
 		role = "Keeper of the cave",
-		spot = { kind = "fixed", position = Vector3.new(-755, 0, -652), lookAt = Vector3.new(-755, 0, -700) },
+		spot = {
+			kind = "fixed",
+			position = Vector3.new(WorldLayout.SecretCaveX + 10, 0, WorldLayout.SecretCaveZ + 3),
+			lookAt = Vector3.new(WorldLayout.SecretCaveX + 10, 0, WorldLayout.SecretCaveZ - 45),
+		},
 		idle = "lookAround",
 		promptLift = 0,
 		look = {
@@ -625,8 +630,8 @@ NPCData.List = {
 		role = "Toll keeper",
 		spot = {
 			kind = "fixed",
-			position = Vector3.new(22, 0, 1566),
-			lookAt = Vector3.new(22, 0, 1500),
+			position = Vector3.new(WorldLayout.BoothX, 0, WorldLayout.BoothZ),
+			lookAt = Vector3.new(WorldLayout.BoothX, 0, WorldLayout.BoothZ - 66),
 			ground = 1, -- the booth floor's thickness
 		},
 		idle = "clipboard",
@@ -678,8 +683,8 @@ NPCData.List = {
 		role = "Ferry captain",
 		spot = {
 			kind = "fixed",
-			position = Vector3.new(1177, 0, -697),
-			lookAt = Vector3.new(1260, 0, -697),
+			position = Vector3.new(WorldLayout.FerryDockX - 3, 0, WorldLayout.FerryDockZ + 3),
+			lookAt = Vector3.new(WorldLayout.FerryDockX + 80, 0, WorldLayout.FerryDockZ + 3),
 			ground = 1, -- the dock deck's thickness
 		},
 		idle = "lookAround",

@@ -812,9 +812,10 @@ return function(t)
 		local report = fs.readFile("ECONOMY.md")
 		t.ok(string.find(report, "68 s", 1, true) ~= nil)
 		t.ok(string.find(report, "5.4 min", 1, true) ~= nil)
-		t.ok(string.find(report, "17.9 min", 1, true) ~= nil)
-		t.ok(string.find(report, "66.3 min", 1, true) ~= nil)
+		t.ok(string.find(report, "17.8 min", 1, true) ~= nil)
+		t.ok(string.find(report, "50.7 min", 1, true) ~= nil)
+		-- Ring map (shorter hauls): 17.8 min (was 17.9), 50.7 min (was 66.3), 31.5 h (was 33.5), all inside their targets.
 		-- Coat gate, modelled mill and planer bonuses, and the $7,600 step.
-		t.ok(string.find(report, "33.5 h", 1, true) ~= nil)
+		t.ok(string.find(report, "31.5 h", 1, true) ~= nil)
 	end)
 end

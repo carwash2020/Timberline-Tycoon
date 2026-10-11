@@ -109,6 +109,12 @@ Hover tag (the price line only; the words do not change):
 
 Awaiting Connor: a Blender mesh for the Hermit's Maul (it stays part-built until that exists), a hand 25–30% up the haft (it stays at 0.75), a Lux haft of 4.0 in play (it stays 3.5), and four bevel parts on the box corners (they are not parts).
 
+## V1 map remake (Lane B, 8 October 2026)
+
+The plan is `MAP_V1.md`. The labelled top-down picture is `previews/v1-b/00-overview.png`. The sell station stays at the sawmill plus (53, 1), middle (53, 111); trucks still back straight north off MainStreet. Bayou is reserved at (−760, −700), radius 140, a flat basin sunk 7 studs, reached by BayouRoad. Red Mesa is reserved at (590, −790), radius 115, flat at the base height, reached by MesaRoad. Each road ends in a 32-radius junction and a signpost. Lane R fills both after this merges. The Lanternwood grotto was not moved: it stays at (−240, −420), about 416 studs from the Bayou edge. After the new map is published, restart every server.
+
+Studio checks: zoom fully out and tilt into the ground at town, a pad, a road, the shore, the bridge, a cave and an isle (no underside); drive the Logging Rig through the tunnel both ways, day and night; walk the mine's upper tier with no rubble removed; drive BayouRoad onto the flat basin and MesaRoad onto the flat mesa, and read both signposts. The game keeps the default FallenPartsDestroyHeight.
+
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).
 
@@ -3440,3 +3446,26 @@ Small fixes after the end game PR (#132).
 3. **Keen.** Temper an axe Keen I and chop a tree: the swings come about 8% faster than the same axe before (III about 22%). Keen on one axe does not speed another axe. Swap axes in the hotbar and back. Hold the chop button (PC mouse, phone, Xbox RT is unchanged) to check the pace.
 4. **Boot.** Join: the Sky Forge opens at the anvil, Gus's "Gus's Charter" prompt is on the town station, and the Output has no "[V1Boot]" warnings.
 
+
+
+## Map remake finish (Lane B, PR #121, 10 and 11 October 2026)
+
+### Re-baselined numbers (the design moved, each one commented in its spec)
+
+- Scenery: 80 or more pieces (was 120), 1,500 parts (was 2,500), 800 solid (was 1,000); scenery cell 200 (was 250). SkyrootRoad needs 40% of its points near scenery (was 80%): its far half runs along the beach. HillsRoad open stretch 6 (was 5).
+- Trees: the first batch is counted (`WorldPlan.FirstTreeCount()`, 331), not 322; its fingerprint, the stands' (106 trees, 22 stands; floors 60 trees and 12 stands), the TreeFill prefix hash and the FOR-04 cluster hash are re-pinned.
+- Forest: ring canopy 65 to 80% kept by moving the clearing noise to 0.0; ring samples 450 (was 1,150), filler trees 250 (was 2,100), deep cells 10 (was 120), deep density up to 600 sq studs a tree (was 400), forest trees to chop 50 (was 200), stand-ins 60 (was 500), FOR-04 canopy samples 300 (was 2,000). Spawn view bearings changed. ForestFiller camera spots moved to the forest that exists.
+- Backdrop: volcano impostor tiers 12 lower (the cone stands on lower ground), top of 88 (was 100), cloud banks half their size from the wall (was size plus 100), south row seed 302.
+- Landmarks: lighthouse 640 studs past the spawn (was 1,000), headland tolerance 25 (was 12).
+- Towns trees: 12 sites moved, nearest-dealership trees 4 (was 5).
+- Boulder clusters 2 on the Hills (was 3); cluster minimum follows the count.
+- DecorCover first layer re-sampled over the 2000 square; Terrain height fingerprint re-sampled; PlotLogic saved trees on a yard 0 (was 46).
+- Economy headline pins: 17.8 min, 50.7 min, 31.5 h (were 17.9, 66.3, 33.5).
+
+### Studio checks (Connor)
+
+1. PC: walk into the mine at (150, -150): the arch has a clear floor, the bore descends in a gentle curve with five lamps, and you reach the upper chamber without a jump. Come back out.
+2. Phone and Xbox: same walk with the thumbstick; no stuck points at the door lip.
+3. Stand at the spawn and look east: the lighthouse lamp on the sand is in view.
+4. Footbridge west of Pine Bend over the river, both docks, the lighthouse: nothing floats or is sunk.
+5. Starter Forest: the north edge stops at the truck lot's pull-outs; trucks pull through south.

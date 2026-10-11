@@ -28,15 +28,16 @@ return function(t)
 	---------------------------------------------------------------------------
 
 	t.test("STY-01: snow, sand, the volcano, the grove and cobbles keep their colours", function()
+		-- V1 ring map palette (MAP_V1). Exact RGB, not the October LT2 set.
 		local kept = {
-			Snow = { 238, 244, 250 },
-			Glacier = { 172, 214, 236 },
-			Sand = { 226, 205, 150 },
-			Basalt = { 52, 46, 44 },
-			Slate = { 74, 66, 62 },
-			CrackedLava = { 255, 108, 30 },
-			Mud = { 64, 50, 72 }, -- the Phantom Grove's violet floor
-			Cobblestone = { 170, 160, 146 }, -- the plaza
+			Snow = { 238, 243, 247 },
+			Glacier = { 169, 211, 230 },
+			Sand = { 216, 198, 154 },
+			Basalt = { 58, 52, 51 },
+			Slate = { 91, 86, 80 },
+			CrackedLava = { 255, 106, 30 },
+			Mud = { 90, 74, 62 },
+			Cobblestone = { 156, 149, 138 },
 		}
 		for name, want in pairs(kept) do
 			t.eq({ rgb(colors[name]) }, want, name)
@@ -72,15 +73,18 @@ return function(t)
 		t.ok(lum(leafy) > lum(grass) * 0.7, "and only a step: the forest floor is not a bog")
 	end)
 
-	t.test("LT2: earth, cliffs and hill faces are warm red-brown, rock a step darker than dirt, never green", function()
+	t.test("V1: dirt is warm brown #8E6C4A and rock is grey stone #7E766C", function()
 		local rock, ground = colors.Rock, colors.Ground
-		for name, c in pairs({ Rock = rock, Ground = ground }) do
-			local r, g, b = rgb(c)
-			t.ok(r > g and g > b, string.format("%s %d,%d,%d runs red > green > blue (brown)", name, r, g, b))
-			t.ok(r - g >= 35, name .. " leans red, not yellow (the old dirt was 150,116,78: R - G = 34)")
-			t.ok(hue(c) <= 0.08, string.format("%s is red-brown (hue %.3f)", name, hue(c)))
-		end
-		t.ok(lum(rock) < lum(ground), "rock is darker than dirt, so a cliff never reads as a road")
+		t.eq({ rgb(ground) }, { 142, 108, 74 }, "Ground")
+		t.eq({ rgb(rock) }, { 126, 118, 108 }, "Rock")
+		local gr, gg, gb = rgb(ground)
+		t.ok(gr > gg and gg > gb, "dirt runs red > green > blue")
+		t.eq(gr - gg, 34, "the brief's brown, R - G = 34")
+		local rr, rg, rb = rgb(rock)
+		t.ok(rr > rg and rg > rb, "rock is a warm grey, not green")
+		t.ok(rr - rg <= 12, "rock does not read as dirt")
+		-- Connor's #8E6C4A is hue 0.083 (30 degrees); the bound was 0.08 for the older red earth.
+		t.ok(hue(ground) <= 0.09, string.format("dirt is red-brown (hue %.3f)", hue(ground)))
 		local _, rs = rock:ToHSV()
 		local _, gs = ground:ToHSV()
 		t.ok(rs <= gs, "rock is no more saturated than dirt")
@@ -151,12 +155,13 @@ return function(t)
 		local c = colors[GRAVEL]
 		t.ok(c ~= nil, "the road has a colour in MaterialColors (TerrainBuilder's setLook applies it)")
 		local _, s, v = c:ToHSV()
-		t.ok(s < 0.06, "grey: hardly any colour in it")
+		t.eq({ rgb(c) }, { 168, 164, 156 }, "Asphalt #A8A49C")
+		t.ok(s < 0.09, "grey: hardly any colour in it")
 		t.ok(v > 0.6, "light")
-		t.ok(lum(c) > lum(colors.Ground) * 1.25, "much paler than dirt")
+		t.ok(lum(c) > lum(colors.Ground), "paler than dirt")
 		local r, g, b = rgb(c)
-		t.ok(r - b >= 0 and r - b <= 8, string.format("a neutral grey (%d, %d, %d)", r, g, b))
-		t.ok(math.abs(r - g) <= 4, string.format("neither pink nor green (%d, %d, %d)", r, g, b))
+		t.ok(r - b >= 0 and r - b <= 14, string.format("a warm grey (%d, %d, %d)", r, g, b))
+		t.ok(math.abs(r - g) <= 6, string.format("neither pink nor green (%d, %d, %d)", r, g, b))
 		for name, other in pairs(colors) do
 			if name ~= GRAVEL then
 				local d = math.max(math.abs(c.R - other.R), math.abs(c.G - other.G), math.abs(c.B - other.B))

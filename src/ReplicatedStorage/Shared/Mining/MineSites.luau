@@ -170,8 +170,17 @@ function MineSites.FindModule(): any?
 	local shared = ReplicatedStorage:FindFirstChild("Shared")
 	local world = shared and shared:FindFirstChild("World")
 	local mod = world and world:FindFirstChild("UndergroundData")
-	if mod == nil or not mod:IsA("ModuleScript") then
+	if mod == nil then
 		return nil
+	end
+	local isScript, yes = pcall(function()
+		return (mod :: any):IsA("ModuleScript")
+	end)
+	if not isScript or yes ~= true then
+		-- Outside Roblox (the Lune loader) a module is a table with __module.
+		if not (type(mod) == "table" and (mod :: any).__module ~= nil) then
+			return nil
+		end
 	end
 	local ok, result = pcall(require, mod)
 	if ok and type(result) == "table" then

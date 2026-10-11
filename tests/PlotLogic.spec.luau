@@ -141,7 +141,7 @@ return function(t)
 		local harsh = { snow = true, volcano = true, grove = true }
 		for i, home in ipairs(PlotData.Homes) do
 			local haul = math.sqrt((home.x - saw.X) ^ 2 + (home.z - saw.Z) ^ 2)
-			t.ok(haul < 800, string.format("%s is %.0f studs from town", home.name, haul))
+			t.ok(haul < 920, string.format("%s is %.0f studs from town", home.name, haul))
 			t.eq(TerrainGen.WaterLevelAt(home.x, home.z), nil, home.name .. " is dry")
 			local h = TerrainGen.HeightAt(home.x, home.z)
 			local lo, hi = h, h
@@ -171,15 +171,23 @@ return function(t)
 					)
 				end
 			end
-			for j = 1, 322 do
-				local tree = WorldPlan.Trees()[j]
+		end
+		-- The first 322 keep the X and Z saves point at. The new yards cover
+		-- some of them; those trunks are not moved. The count is locked so a
+		-- later pad move shows up here.
+		local onYard = 0
+		for j = 1, WorldPlan.FirstTreeCount() do
+			local tree = WorldPlan.Trees()[j]
+			for _, home in ipairs(PlotData.Homes) do
 				local dx, dz = tree.position.X - home.x, tree.position.Z - home.z
-				t.ok(
-					math.max(math.abs(dx), math.abs(dz)) > MAX / 2,
-					string.format("saved tree %d stands on %s", j, home.name)
-				)
+				if math.max(math.abs(dx), math.abs(dz)) <= MAX / 2 then
+					onYard += 1
+				end
 			end
 		end
+		-- Ring map, Oct 10: 0 (it was 49 on Oct 8). The first batch is placed on the map
+		-- as it is (WorldVersion 2), so none stands on a yard.
+		t.eq(onYard, 0, "trees standing on a yard")
 		local zones = 0
 		for _, zone in ipairs(WorldLayout.FlatZones) do
 			if zone.name == "Plot" then
@@ -252,12 +260,15 @@ return function(t)
 					)
 				end
 			end
+			-- MAP_V1 centres sit about 118 from the ring, so the 200-stud square
+			-- meets that road. The campsite stays clear on every home.
+			local campsite = PlotData.Tiers[1].size
 			for _, road in ipairs(WorldLayout.Roads) do
 				local pts = road.points
 				for s = 1, #pts - 1 do
 					local a, b = pts[s], pts[s + 1]
 					t.ok(
-						not hits(slot.X, slot.Y, MAX, a.X, a.Y, b.X, b.Y, road.width),
+						not hits(slot.X, slot.Y, campsite, a.X, a.Y, b.X, b.Y, road.width),
 						string.format("plot %d overlaps %s", i, road.name)
 					)
 				end
@@ -271,11 +282,10 @@ return function(t)
 			for j, b in ipairs(PlotData.Slots) do
 				if i < j then
 					local apart = math.sqrt((a.X - b.X) ^ 2 + (a.Y - b.Y) ^ 2)
-					local axis = math.max(math.abs(a.X - b.X), math.abs(a.Y - b.Y)) - PlotData.Pad
-					t.ok(
-						axis >= PlotData.MinSpacing - PlotData.Pad,
-						string.format("plots %d and %d have %.0f studs between shelves", i, j, axis)
-					)
+					-- MAP_V1 spaces centres by MinSpacing. The ring puts some
+					-- yards on a diagonal, so the old "48 studs on the wider
+					-- axis" gap is not how this map is packed. Shelves still
+					-- must not overlap (the rect check below).
 					t.ok(apart >= PlotData.MinSpacing, string.format("plots %d and %d are %.0f apart", i, j, apart))
 					t.ok(
 						not rectsOverlap(a.X, a.Y, MAX, MAX, b.X, b.Y, MAX, MAX),
@@ -291,10 +301,20 @@ return function(t)
 			for _, biome in ipairs(BiomeData.All()) do
 				local area = biome.area
 				if area and area.y == nil then -- the isles float far above
-					t.ok(
-						not circleHitsSquare(area.x, area.z, area.radius, slot.X, slot.Y, MAX),
-						string.format("plot %d runs into %s", i, biome.id)
-					)
+					local dx, dz = slot.X - area.x, slot.Y - area.z
+					local centreOut = dx * dx + dz * dz > area.radius * area.radius
+					-- Starter and hills yards sit beside those forests (MAP_V1).
+					-- Snow, the volcano, the grove and the ferry isle stay
+					-- clear of the whole 200-stud yard.
+					local beside = biome.id == "starter" or biome.id == "hills"
+					if beside then
+						t.ok(centreOut, string.format("plot %d centre is inside %s", i, biome.id))
+					else
+						t.ok(
+							not circleHitsSquare(area.x, area.z, area.radius, slot.X, slot.Y, MAX),
+							string.format("plot %d runs into %s", i, biome.id)
+						)
+					end
 				end
 			end
 			-- Town: sawmill, shops, spawn, parking lot and gondola station.

@@ -1,5 +1,5 @@
 --!strict
--- WorldLayout: where things are in the 3,000-stud world (GAME_DESIGN §10),
+-- WorldLayout: where things are in the 2,000-stud world (MAP_V1.md),
 -- shared by the terrain generator (TerrainGen), MapBuilder, the ambient
 -- life on clients and the preview tool. Biome centres and radii stay in
 -- BiomeData (the economy model reads their haul distances); this adds the
@@ -21,7 +21,8 @@ function WorldLayout.SetLegacyLayout(on: boolean)
 	legacyLayout = on
 end
 
-WorldLayout.WorldHalf = 1500 -- the world runs from -1500 to 1500 on both axes
+WorldLayout.WorldHalf = 1000 -- the playable square runs from -1000 to 1000
+WorldLayout.TerrainSkirt = 200 -- generated past the edge so the camera never sees under the world
 WorldLayout.Sawmill = Vector3.new(0, 0, 110)
 WorldLayout.SeaLevel = -3 -- ocean surface
 WorldLayout.LakeLevel = -2 -- river and lake surface
@@ -131,35 +132,69 @@ local function center(id: string): Vector2
 end
 
 local hills, snow, volcano, sky = center("hills"), center("snow"), center("volcano"), center("sky")
+WorldLayout.RegionCentres = { hills = hills, snow = snow, volcano = volcano, sky = sky }
+
+-- The ring's radius at each 15-degree bend, from east (0) round through
+-- north. 600 except the north-east and north arc, which come in under the
+-- volcano's and the snow peak's cliff rings so each keeps one gate (the
+-- Volcano Road and the Snow Road). Oct 8, ring map.
+WorldLayout.RingBends = { 600, 520, 420, 390, 400, 400, 400, 420, 520 }
+local function ringPoints(): { Vector2 }
+	local pts: { Vector2 } = {}
+	for i = 0, 24 do
+		local a = math.rad(i * 15)
+		local r = WorldLayout.RingBends[i + 1] or 600
+		table.insert(pts, Vector2.new(r * math.cos(a), 80 + r * math.sin(a)))
+	end
+	return pts
+end
 
 WorldLayout.Roads = {
+	-- The 28-wide ring about (0, 80), radius 600 (RingBends: in under the
+	-- north rims). Closed: the last point repeats the first.
+	{ name = "RingRoad", points = ringPoints(), width = 28 },
 	-- Town to the Starter Forest (south, a short walk). Wide enough for the
-	-- Logging Rig (phase 12).
+	-- Logging Rig (phase 12). Kept: the sell station backs in off MainStreet,
+	-- not off this path.
 	{ name = "ForestPath", points = { Vector2.new(0, 20), Vector2.new(-6, -30) }, width = 16 },
-	-- West to the Hills, curving past Hearth & Home. A haul road: 28 studs,
-	-- so two rigs can pass on a bend.
+	-- West link, then up to the hills disc.
 	{
 		name = "HillsRoad",
-		points = { Vector2.new(-20, 20), Vector2.new(-140, 40), Vector2.new(-230, 90), hills + Vector2.new(120, 0) },
+		points = { Vector2.new(-125, 80), Vector2.new(-600, 80), Vector2.new(-560, 200) },
 		width = 28,
 	},
-	-- North from behind the sawmill, up onto the Snowfields plateau.
+	-- North from behind the sawmill to the folded toll. The last span crosses
+	-- TollSpurJoinZ so the spur can meet it.
 	{
 		name = "SnowRoad",
-		points = { Vector2.new(0, 205), Vector2.new(30, 450), Vector2.new(-20, 760), snow - Vector2.new(0, 160) },
+		points = { Vector2.new(0, 205), Vector2.new(0, 480), Vector2.new(0, 760) },
 		width = 28,
 	},
-	-- North-east to the Volcano, branching off the snow road.
+	-- The short road from the ring into the volcano disc.
 	{
 		name = "VolcanoRoad",
-		points = { Vector2.new(30, 450), Vector2.new(380, 640), Vector2.new(760, 900), volcano - Vector2.new(150, 120) },
+		points = { Vector2.new(276, 356), Vector2.new(410, 460) },
 		width = 28,
 	},
-	-- West-north-west from the snow road to the Skyroot's foot.
+	-- East link, then under the isles.
 	{
 		name = "SkyrootRoad",
-		points = { Vector2.new(-20, 760), Vector2.new(-420, 860), Vector2.new(-760, 960), sky + Vector2.new(120, -40) },
-		width = 24,
+		points = { Vector2.new(600, 80), Vector2.new(800, 200), Vector2.new(700, 320) },
+		width = 28,
+	},
+	{
+		name = "HillsCross",
+		points = { Vector2.new(-460, -300), Vector2.new(-560, -40), Vector2.new(-520, 220), Vector2.new(-460, 460) },
+		width = 28,
+	},
+	{ name = "SouthLink", points = { Vector2.new(0, -32), Vector2.new(0, -520) }, width = 28 },
+	{ name = "EastLink", points = { Vector2.new(140, 80), Vector2.new(600, 80) }, width = 28 },
+	-- Ends at the ferry dock on the shore (ring map: the water starts near x 790 here).
+	{ name = "DockRoad", points = { Vector2.new(600, 80), Vector2.new(772, 133) }, width = 28 },
+	{
+		name = "RavineRoad",
+		points = { Vector2.new(0, -520), Vector2.new(-90, -560), Vector2.new(-90, -780) },
+		width = 28,
 	},
 	-- East of the Dealership, then north to the Snow Road's start. The mill
 	-- yard and the shop fill x 22 to 70, so the way stays east of them.
@@ -189,6 +224,16 @@ WorldLayout.Roads = {
 		},
 		width = 16,
 	},
+	-- Builder's spur into the Bayou. The start is the ring vertex at -135
+	-- degrees (600 * cos(-135), 80 + 600 * sin(-135)), written as the
+	-- rounded (-424, -344) he locked.
+	{ name = "BayouRoad", points = { Vector2.new(-424, -344), Vector2.new(-692, -612) }, width = 28 },
+	-- Builder's spur into Red Mesa, from the ring vertex at -45 degrees.
+	{
+		name = "MesaRoad",
+		points = { Vector2.new(424, -344), Vector2.new(540, -470), Vector2.new(585, -700) },
+		width = 28,
+	},
 } :: { Road }
 
 -- Flared turns where a haul road splits, wide enough for the Logging Rig.
@@ -196,9 +241,53 @@ WorldLayout.Roads = {
 -- country" sample. TerrainGen paints and grades them with the haul roads.
 export type Junction = { name: string, at: Vector2, radius: number, haul: boolean }
 WorldLayout.Junctions = {
-	{ name = "SnowVolcano", at = Vector2.new(30, 450), radius = 32, haul = true },
-	{ name = "SnowSkyroot", at = Vector2.new(-20, 760), radius = 32, haul = true },
+	{ name = "SnowVolcano", at = Vector2.new(0, 480), radius = 32, haul = true },
+	{ name = "SnowSkyroot", at = Vector2.new(600, 80), radius = 32, haul = true },
+	{ name = "RingWest", at = Vector2.new(-600, 80), radius = 32, haul = true },
+	{ name = "RingSouth", at = Vector2.new(0, -520), radius = 32, haul = true },
+	-- Where BayouRoad and MesaRoad end. Radius 32, same as the other flares.
+	{ name = "Bayou", at = Vector2.new(-692, -612), radius = 32, haul = true },
+	{ name = "Mesa", at = Vector2.new(585, -700), radius = 32, haul = true },
 } :: { Junction }
+
+-- Regions Lane R fills later. This lane reserves the ground and the road.
+-- Bayou sinks 7 studs (inside the 6–8 band) and stays flat. Red Mesa stays
+-- flat at the base height, no sink. Neither has trees yet.
+export type ReservedRegion = {
+	id: string,
+	name: string,
+	x: number,
+	z: number,
+	radius: number,
+	sink: number,
+}
+WorldLayout.Bayou = {
+	id = "bayou",
+	name = "Bayou",
+	x = -760,
+	z = -700,
+	radius = 140,
+	sink = 7,
+} :: ReservedRegion
+WorldLayout.RedMesa = {
+	id = "redmesa",
+	name = "Red Mesa",
+	x = 590,
+	z = -790,
+	radius = 115,
+	sink = 0,
+} :: ReservedRegion
+WorldLayout.ReservedRegions = { WorldLayout.Bayou, WorldLayout.RedMesa } :: { ReservedRegion }
+
+function WorldLayout.InReservedRegion(x: number, z: number): boolean
+	for _, region in ipairs(WorldLayout.ReservedRegions) do
+		local dx, dz = x - region.x, z - region.z
+		if dx * dx + dz * dz <= region.radius * region.radius then
+			return true
+		end
+	end
+	return false
+end
 
 -- A cliff ring outside a biome's trees, with one angular gap (the road).
 -- `gap` is the opening's centre angle (atan2 of z, x from the centre);
@@ -218,21 +307,21 @@ WorldLayout.Rims = {
 		kind = "snow",
 		cx = snow.X,
 		cz = snow.Y,
-		inner = 246,
-		outer = 316,
-		height = 16,
+		inner = 150,
+		outer = 190,
+		height = 30, -- ring map: the rim is tighter (150 to 190), so it stands taller to stay a wall
 		gap = -math.pi / 2,
-		half = 0.62,
+		half = 0.7,
 	},
 	{
 		kind = "volcano",
 		cx = volcano.X,
 		cz = volcano.Y,
-		inner = 228,
-		outer = 302,
-		height = 24,
-		gap = math.atan2(-120, -150),
-		half = 0.7,
+		inner = 155,
+		outer = 200,
+		height = 30, -- ring map: the Volcano Road climbs through its gap
+		gap = math.atan2(-144, -174), -- toward the Volcano Road off the ring
+		half = 0.8,
 	},
 } :: { Rim }
 
@@ -266,6 +355,10 @@ do
 	end
 	-- A straight lane. It has to miss every yard, including its own.
 	local laneHalf = PlotData.LaneWidth / 2
+	-- Ash Gate's nearest road passes the volcano's crater. A lane stays
+	-- off the pool (and a margin for its own width) so the crater stays lava.
+	local craterX, craterZ = volcano.X + 105, volcano.Y + 115
+	local craterKeep = 30 + laneHalf + 8
 	local slotReach = half + laneHalf + 1 -- past this a yard can't be within `reach`
 	local slotXs: { number } = {}
 	local slotZs: { number } = {}
@@ -294,6 +387,10 @@ do
 			end
 			local tdx, tdz = x - treeX, z - treeZ
 			if tdx * tdx + tdz * tdz < treeR * treeR then
+				return false
+			end
+			local cdx, cdz = x - craterX, z - craterZ
+			if cdx * cdx + cdz * cdz < craterKeep * craterKeep then
 				return false
 			end
 		end
@@ -503,7 +600,8 @@ WorldLayout.ParkingLot = { x0 = 8, x1 = 146, z0 = -18, z1 = 68 }
 -- Named rects only: not a flat zone, a paint, or a reserved box, so nothing
 -- reads them yet and the ground does not move.
 export type LoadingPad = { x0: number, x1: number, z0: number, z1: number }
-WorldLayout.DealershipLoadingPad = { x0 = 160, x1 = 174, z0 = 100, z1 = 114 } :: LoadingPad -- west of the showroom hall, east of the Land Office
+-- Ring map (Oct 8): 2 studs north of where it was, 8 off the new East Link.
+WorldLayout.DealershipLoadingPad = { x0 = 160, x1 = 174, z0 = 102, z1 = 116 } :: LoadingPad -- west of the showroom hall, east of the Land Office
 WorldLayout.ToolShedLoadingPad = { x0 = -88, x1 = -74, z0 = 144, z1 = 158 } :: LoadingPad -- behind the Tool Shed, in the lane to the General Store
 
 -- The town's ground (TerrainGen paints it): a cobbled plaza round the sell
@@ -532,7 +630,8 @@ WorldLayout.TownPaint = {
 	-- The road along the showroom's forecourt (the hall stands at x 181 to 336,
 	-- z 96 to 162, behind the Land Office and its sign), and the path up to its door.
 	{ name = "TruckLotPath", x0 = 116, x1 = 340, z0 = 64, z1 = 70, material = ROAD },
-	{ name = "DealershipPath", x0 = 182, x1 = 196.5, z0 = 69.5, z1 = 95.4, material = ROAD },
+	-- Ring map: the hall stands 3.4 further north (off the East Link), so the path runs 3.4 further.
+	{ name = "DealershipPath", x0 = 182, x1 = 196.5, z0 = 69.5, z1 = 98.8, material = ROAD },
 	-- The shop paths lead to each counter (TWN-13: the shops grew 1.5x).
 	-- The General Store stands behind the Tool Shed (z 165.5 to 209): its path
 	-- runs up the lane west of the Tool Shed, then across to its door.
@@ -552,7 +651,7 @@ WorldLayout.TownPaint = {
 WorldLayout.TownFloors = {
 	{ name = "ToolShedFloor", x0 = -106.5, x1 = -62, z0 = 88.5, z1 = 142.5, material = "Ground" },
 	{ name = "HearthAndHomeFloor", x0 = -128, x1 = -72, z0 = 164, z1 = 212, material = "Ground" },
-	{ name = "DealershipFloor", x0 = 178, x1 = 338.5, z0 = 92, z1 = 164.5, material = "Ground" },
+	{ name = "DealershipFloor", x0 = 178, x1 = 338.5, z0 = 95.4, z1 = 165.9, material = "Ground" },
 	-- The sell station (pad x 39 to 67, z 95 to 127, Weigh House to x 83): the
 	-- MillYard stops at x 33, so without this the grass grew over the pad.
 	-- Gravel like the yard beside it: a truck yard, not a shop floor.
@@ -565,85 +664,101 @@ WorldLayout.TownFloors = {
 
 -- The river runs from the pool under the Aether Isles' waterfall, south
 -- past the Hills' west side, into Mirror Lake, then out to the west edge.
+-- The lake drains west, off the ring, and stops inside the skirt.
+-- Ring map: the river rises at the spring pool north-west of the Hills,
+-- runs south outside the ring, west of Pine Bend's yard (no road crosses
+-- it), and fills Mirror Lake between The Climb's and Pine Bend's yards.
 WorldLayout.River = {
 	points = {
-		sky + Vector2.new(-20, -110),
-		Vector2.new(-930, 760),
-		Vector2.new(-820, 480),
-		Vector2.new(-770, 200),
-		Vector2.new(-800, -60),
+		Vector2.new(-815, 508),
+		Vector2.new(-821, 420),
+		Vector2.new(-815, 352),
+		Vector2.new(-760, 320),
 	},
 	width = 26,
 	depth = 7,
 }
-WorldLayout.Lake = { x = -830, z = -190, radius = 135, depth = 12 }
+WorldLayout.Lake = { x = -740, z = 262, radius = 55, depth = 12 }
 WorldLayout.LakeOutflow = {
-	points = { Vector2.new(-930, -250), Vector2.new(-1200, -320), Vector2.new(-1520, -300) },
+	points = { Vector2.new(-798, 262), Vector2.new(-950, 240), Vector2.new(-1120, 220) },
 	width = 24,
 	depth = 6,
 }
--- A little pond at the Starter Forest's edge (ducks, lily pads).
-WorldLayout.Pond = { x = 78, z = -182, radius = 16, depth = 4 }
+-- A little pond at the Starter Forest's edge (ducks, lily pads). Ring map:
+-- east of the forest, between the furnace and the mine, clear of every yard.
+WorldLayout.Pond = { x = 95, z = -125, radius = 16, depth = 4 }
+-- Named pools so each homestead has its own nearest water (MAP_V1). Ring
+-- map (Oct 8): each sits just outside its home's 200-stud yard.
+WorldLayout.Pools = {
+	{ x = 40, z = 820, radius = 16, depth = 6 },
+	{ x = 20, z = -760, radius = 22, depth = 8 },
+	{ x = -340, z = -760, radius = 12, depth = 4 },
+	{ x = -230, z = -400, radius = 12, depth = 4 },
+	{ x = 690, z = 490, radius = 12, depth = 4 },
+	{ x = -330, z = -130, radius = 14, depth = 4 },
+	{ x = -310, z = 775, radius = 12, depth = 4 },
+	{ x = -770, z = 520, radius = 12, depth = 4 },
+} :: { { x: number, z: number, radius: number, depth: number } }
 
 -- The east coast: beach then ocean. The coastline wanders with noise; the
 -- ocean starts east of `shoreX` south of the volcano.
-WorldLayout.Coast = { shoreX = 1190, beachWidth = 70, northZ = 820 }
+WorldLayout.Coast = { shoreX = 780, beachWidth = 70, northZ = 420 }
 
 -- An island offshore (the palmwood teaser; boats come after V1).
-WorldLayout.Island = { x = 1395, z = -760, radius = 70, height = 9 }
+WorldLayout.Island = { x = 930, z = -50, radius = 55, height = 9 }
 
 -- W2. The north strip is a rectangle past the square, not a larger world.
 -- Every tune is named so a playtest can move it without hunting literals.
-WorldLayout.TollLineZ = 1574
-WorldLayout.TollLineX0 = -400
-WorldLayout.TollLineX1 = 400
+WorldLayout.TollLineZ = 894
+WorldLayout.TollLineX0 = -200
+WorldLayout.TollLineX1 = 200
 WorldLayout.TollPushX = 0
-WorldLayout.TollPushZ = 1566
+WorldLayout.TollPushZ = 888
 WorldLayout.GorgeWidth = 24 -- across, north-south; at least 20
 WorldLayout.GorgeDepth = 16 -- down from the bank; at least 12
 WorldLayout.GorgeWallHeight = 24 -- unclimbable lip
 WorldLayout.BridgeWidth = 28
 WorldLayout.BridgeCenterX = 0
-WorldLayout.BridgeCenterZ = 1580
+WorldLayout.BridgeCenterZ = 906
 WorldLayout.BridgeLength = 52 -- spans the gorge plus bearings
 WorldLayout.BridgeRailHeight = 3
 WorldLayout.BridgeDeckThick = 1
-WorldLayout.NorthStripX0 = -400
-WorldLayout.NorthStripX1 = 400
-WorldLayout.NorthStripZ0 = 1500
-WorldLayout.NorthStripZ1 = 1900
+WorldLayout.NorthStripX0 = -200
+WorldLayout.NorthStripX1 = 200
+WorldLayout.NorthStripZ0 = 860
+WorldLayout.NorthStripZ1 = 1000
 WorldLayout.NorthStrip = {
 	x0 = WorldLayout.NorthStripX0,
 	x1 = WorldLayout.NorthStripX1,
 	z0 = WorldLayout.NorthStripZ0,
 	z1 = WorldLayout.NorthStripZ1,
 }
-WorldLayout.NorthStripBadgeZ0 = 1586 -- north of the booth and the south lip
-WorldLayout.NorthStripBadgeZ1 = 1900
+WorldLayout.NorthStripBadgeZ0 = 940 -- north of the deck
+WorldLayout.NorthStripBadgeZ1 = 1000
 WorldLayout.StripTreeCount = 40
 WorldLayout.StripMapleCount = 22
 WorldLayout.StripBirchCount = 18
 WorldLayout.StripClumpOffRoad = 40 -- past the deck's edge
 WorldLayout.StripRoadClear = 20 -- extra studs a trunk stays off the deck
 WorldLayout.StripZoneCx = 0
-WorldLayout.StripZoneCz = 1750
-WorldLayout.StripZoneRadius = 160
+WorldLayout.StripZoneCz = 970
+WorldLayout.StripZoneRadius = 120
 WorldLayout.StripZoneCap = 40
 WorldLayout.StripClumpRadius = 8
 WorldLayout.StripTreesPerClump = 5
 -- Centres sit at least StripClumpOffRoad past the bridge edge.
 WorldLayout.StripClumps = {
-	{ x = 70, z = 1680 },
-	{ x = -70, z = 1680 },
-	{ x = 100, z = 1740 },
-	{ x = -100, z = 1740 },
-	{ x = 70, z = 1800 },
-	{ x = -70, z = 1800 },
-	{ x = 100, z = 1860 },
-	{ x = -100, z = 1860 },
+	{ x = 70, z = 955 },
+	{ x = -70, z = 955 },
+	{ x = 110, z = 970 },
+	{ x = -110, z = 970 },
+	{ x = 70, z = 985 },
+	{ x = -70, z = 985 },
+	{ x = 110, z = 955 },
+	{ x = -110, z = 985 },
 }
-WorldLayout.FerryDockX = 1180 -- mainland dock, west of the deep water
-WorldLayout.FerryDockZ = -700
+WorldLayout.FerryDockX = 780 -- mainland dock on the shore (ring map: the water starts near x 790)
+WorldLayout.FerryDockZ = 136
 WorldLayout.FerryDock = { x = WorldLayout.FerryDockX, z = WorldLayout.FerryDockZ }
 WorldLayout.FerryLandingInset = 24 -- dock sits on the dry crown, not the shoal
 WorldLayout.FerryPathLength = 20
@@ -655,20 +770,23 @@ WorldLayout.PalmGridStep = 8
 WorldLayout.TreeSpacing = 8
 WorldLayout.FogClearance = 60 -- from the booth and both docks
 WorldLayout.FogAtomicMax = 128 -- a longer axis needs a Persistent model
-WorldLayout.SecretCaveX = -765
-WorldLayout.SecretCaveZ = -655
+-- Ring map (Oct 8): out on the Hills' far side, between The Climb's and
+-- Long Meadow's yards, past the spawn's 640-stud bubble (W2 adds nothing
+-- inside it). The breakables keep their places round the cave.
+WorldLayout.SecretCaveX = -720
+WorldLayout.SecretCaveZ = -100
 WorldLayout.SecretCaveRadius = 46
 WorldLayout.SecretCave = {
 	x = WorldLayout.SecretCaveX,
 	z = WorldLayout.SecretCaveZ,
 	radius = WorldLayout.SecretCaveRadius,
 }
-WorldLayout.CaveMouthX = -748
-WorldLayout.CaveMouthZ = -628
-WorldLayout.BackTrailX = -690
-WorldLayout.BackTrailZ = -560
-WorldLayout.RidgeBoulderX = -810
-WorldLayout.RidgeBoulderZ = -700
+WorldLayout.CaveMouthX = WorldLayout.SecretCaveX + 12
+WorldLayout.CaveMouthZ = WorldLayout.SecretCaveZ + 20
+WorldLayout.BackTrailX = WorldLayout.SecretCaveX + 40
+WorldLayout.BackTrailZ = WorldLayout.SecretCaveZ + 50
+WorldLayout.RidgeBoulderX = WorldLayout.SecretCaveX - 40
+WorldLayout.RidgeBoulderZ = WorldLayout.SecretCaveZ - 30
 WorldLayout.Breakables = {
 	{ x = WorldLayout.CaveMouthX, z = WorldLayout.CaveMouthZ },
 	{ x = WorldLayout.BackTrailX, z = WorldLayout.BackTrailZ },
@@ -680,12 +798,12 @@ WorldLayout.Spawn = Vector3.new(0, 0.5, 40)
 WorldLayout.SpawnBubble = 640
 WorldLayout.SpawnPartCap = 1500
 WorldLayout.BoothX = 22 -- east of the deck
-WorldLayout.BoothZ = 1566 -- south of the toll line, off the deck
+WorldLayout.BoothZ = 888 -- south of the toll line, off the deck
 WorldLayout.DockClear = 18
 WorldLayout.LandingClear = 10
 WorldLayout.DeepSeaEdgeInset = 80 -- how far inside the rim the deep water starts
 WorldLayout.DeepSeaIslandPad = 12 -- shallows kept around Ferry Island
-WorldLayout.ShelfProbeZ = 1499 -- last surveyed column; the strip copies its height
+WorldLayout.ShelfProbeZ = 800 -- clear of the Snow Road (it ends at 760) and of the spur (ring map)
 
 -- A Pickup climbs a standstill ramp while Drive's 120 stays ahead of
 -- gravity 196.2. Haul roads stay under 0.2, and so does the spur.
@@ -693,23 +811,26 @@ WorldLayout.PickupClimb = 120 / 196.2
 WorldLayout.SpurMaxGrade = 0.2
 WorldLayout.TollClearance = 4 -- setback and gorge rescue sit this far above the ground
 WorldLayout.SpurMeet = 20 -- the last studs, flush with the deck top
-WorldLayout.TollSpurJoinZ = 900 -- on Snow Road, where the ground is still gentle
+WorldLayout.TollSpurJoinZ = 760 -- on Snow Road, where the ground is still gentle
 -- Inside the wall gap (x -400..400) and clear of the height grid. This
 -- lane is also where the boot forest's trunks stay put; the decor sample
 -- skips the mountain cut itself (see EnvironmentData).
-WorldLayout.TollSpurWestX = -326
+WorldLayout.TollSpurWestX = -100
 -- North of the wild clumps and the boulder-cluster search, so the cut
 -- does not move a rock or a tree. The ground south of here is already
 -- gentle enough to drive.
-WorldLayout.TollSpurGradeZ = 1184
+WorldLayout.TollSpurGradeZ = 800
 -- The eastbound legs sit north of the height grid. Two of them, a road
 -- width apart, so the climb out to the deck does not fold back on itself.
-WorldLayout.TollSpurShelfZ = 1518
+WorldLayout.TollSpurShelfZ = 840
 -- Height at the shelf turn. The crossing of the north wall stays under
 -- the skirt run beside the cut (that run bottoms near 44), so the skirt
 -- block owns the trench instead of standing over it.
-WorldLayout.SpurCutHeight = 40
-WorldLayout.TollSpurReachX = 180 -- where the climb reaches the deck top
+-- Ring map (Oct 8): the snow plateau the spur leaves is about 35 high, so
+-- the shelf sits at 32 and both legs stay under SpurMaxGrade where the
+-- spur crosses the Snow Road.
+WorldLayout.SpurCutHeight = 36
+WorldLayout.TollSpurReachX = 100 -- where the climb reaches the deck top (ring map: 80, a longer leg over the Snow Road keeps the climb under 0.2)
 
 local function snowJoin(): Vector2
 	for _, road in ipairs(WorldLayout.Roads) do
@@ -761,11 +882,25 @@ WorldLayout.VolcanoCone =
 	{ x = volcano.X + 105, z = volcano.Y + 115, radius = 150, height = 175, crater = 30, pool = 14 }
 
 -- The Gloam Hollow sits in a hollow ringed by ridges (no road in).
-WorldLayout.GroveRidge = { inner = 132, outer = 205, height = 34, gapAngle = math.rad(35) }
+WorldLayout.GroveRidge = { inner = 100, outer = 150, height = 28, gapAngle = math.rad(40) }
 
 -- Mountains frame the map's north and west edges (a backdrop; the world
 -- walls stop players before the steep part).
-WorldLayout.Mountains = { start = 1180, peak = 210 }
+WorldLayout.Mountains = { start = 820, peak = 160 }
+
+-- Truck tunnel under the ridge between the peak and the volcano.
+-- Floor is flat so the grade is gentle. The surface over the bore stays
+-- at least TunnelOverhead above the ceiling; the mouths are open.
+WorldLayout.TunnelFloorY = 8
+WorldLayout.TunnelHeight = 24
+WorldLayout.TunnelWidth = 28
+WorldLayout.TunnelOverhead = 16
+WorldLayout.TunnelPoints = {
+	Vector2.new(60, 700),
+	Vector2.new(180, 660),
+	Vector2.new(300, 600),
+	Vector2.new(400, 560),
+}
 
 -- Distance from point p to segment a-b, and how far along it (0..1).
 function WorldLayout.SegmentDistance(p: Vector2, a: Vector2, b: Vector2): (number, number)
@@ -959,8 +1094,9 @@ WorldLayout.GroveGap = math.atan2(WorldLayout.Sawmill.Z - grove.Y, WorldLayout.S
 -- Shallow bowls on the hollow's floor, off the trail through the gap.
 export type Pool = { x: number, z: number, radius: number, depth: number }
 WorldLayout.GrovePools = {
-	{ x = grove.X + 48, z = grove.Y - 18, radius = 8, depth = 1.15 },
-	{ x = grove.X - 36, z = grove.Y + 42, radius = 7, depth = 1.05 },
+	-- Ring map: nudged off two saved trunks the grove's move put under them.
+	{ x = grove.X + 52, z = grove.Y - 2, radius = 8, depth = 1.15 },
+	{ x = grove.X - 50, z = grove.Y + 20, radius = 7, depth = 1.05 },
 	{ x = grove.X + 18, z = grove.Y + 58, radius = 6.5, depth = 1.0 },
 } :: { Pool }
 local toTown = (Vector2.new(WorldLayout.Sawmill.X, WorldLayout.Sawmill.Z) - grove).Unit
@@ -981,20 +1117,22 @@ WorldLayout.Forest = {
 	-- Noise above `from` opens a clearing (fully open `soft` above it), but
 	-- not within `keep` studs of the hub's lawn: the edge facing the town
 	-- and the plots stays a wall of trees.
-	clearing = { scale = 110, fine = 40, from = 0.1, soft = 0.14, keep = 70 },
+	clearing = { scale = 110, fine = 40, from = 0.0, soft = 0.14, keep = 70 },
 	-- Studs past each biome's area the forest keeps off (the grove's from its
 	-- ridge's outer foot). The Starter Forest's own trees are its edge.
 	wild = { starter = 8, hills = 40, snow = 170, volcano = 140, grove = 25, sky = 90 },
 	water = 16, -- studs off the river, its outflow, the lake and the pond
 	coast = 130, -- studs inland of the shore line (its wander and the beach inside it)
-	mountains = 1170, -- the forest fades out by here (|x| or |z|; the mountains rise at 1180)
+	mountains = 790, -- the forest fades out by here (|x| or |z|; ring map: the mountains rise at 820)
 	lanes = {
 		-- From the spawn to the lighthouse on the coast's headland
 		-- (WorldPlan.Lighthouse): its lamp stays in sight (Forest.spec).
-		{ name = "LighthouseVista", a = Vector2.new(0, 40), b = Vector2.new(1203, 236), half = 45 },
+		{ name = "LighthouseVista", a = Vector2.new(0, 40), b = Vector2.new(780, -240), half = 45 },
 		-- A trail out of the Phantom Grove's ridge gap toward town, so the
 		-- curious still find it.
-		{ name = "GroveTrail", a = gapFoot, b = gapFoot + toTown * 300, half = 18 },
+		-- Ring map: the grove sits due south of the Starter Forest, so the
+		-- trail stops at 250 and the canopy still closes south of the forest.
+		{ name = "GroveTrail", a = gapFoot, b = gapFoot + toTown * 250, half = 18 },
 	},
 	-- Out in the wild landscapes: small copses where this noise is high.
 	copse = { scale = 95, from = 0.2, soft = 0.08 },
@@ -1023,7 +1161,8 @@ end
 -- The near east of town used to be the district lawn, so a phone at the
 -- spawn didn't grow a forest there. Keep that patch of the ring open.
 -- The homesteads further out sit in the country.
-table.insert(HUB_RECTS, { 126, 380, -200, 80 })
+-- Ring map: up to z 210, so the showroom's east lawn (greenery at (346, 128)) stays open too.
+table.insert(HUB_RECTS, { 126, 380, -200, 210 })
 
 -- Each wild biome's disc (x, z, the radius the forest keeps out of).
 local WILD_DISCS: { { number } } = {}
@@ -1044,6 +1183,9 @@ local WATER_LINES = {
 	{ line = WorldLayout.FastLine(WorldLayout.LakeOutflow.points), half = WorldLayout.LakeOutflow.width / 2 + 4 },
 }
 local WATER_POOLS = { WorldLayout.Lake, WorldLayout.Pond }
+for _, pool in ipairs(WorldLayout.Pools) do
+	table.insert(WATER_POOLS, pool)
+end
 local LANE_LINES: { { number } } = {}
 for _, lane in ipairs(FOREST.lanes) do
 	table.insert(LANE_LINES, { lane.a.X, lane.a.Y, lane.b.X, lane.b.Y, lane.half })
