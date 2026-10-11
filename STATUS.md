@@ -21,6 +21,28 @@ key (deriving it from a full plot is awaiting Connor, it would raise cash packs 
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
 the old ones), no Robux price in code.
 
+## V1 launch hardening: settings, analytics, launch extras (branch `phase-2/v1-hardening-settings`, 11 October 2026, draft PR)
+
+Items 5, 6 and 8 of the hardening list. The audit came first; only what was missing was added.
+
+| Piece | Found on main | Added or fixed here |
+| --- | --- | --- |
+| Settings card, music and sound volume, graphics (Lower / Higher via `QualityProfile`), camera shake, UI scale, tips, Restart save, What's new, controller and touch handling | all there (`SettingsLogic`, `SettingsUI`, `QualityService`) | Camera speed row (`cameraSensitivity`, 25% to 200%, saved in `settings`, server-clamped), a CODES tab, the four tabs on one row, the card cut to end above the jump button on a phone |
+| Tutorial replay | "RESET TUTORIAL" two-press row + `QuestService.Reset` | Renamed REPLAY TUTORIAL. **Bug fixed:** a replay paid every step's `rewardCash` again; now `tutorialReplay` pays nothing (spec) |
+| Save fields | `settings` table sanitised in `ProfileSchema.Migrate` | no new field: the new setting is a key in `settings` (idempotent, specced); flags for funnel, codes and the reminder live in the existing account-wide `onboarding` table |
+| Funnel analytics | `MilestoneService` funnel (Joined, First chop, First sale, Claimed a plot, ...) once per player, `LogProgressionCompleteEvent` stages | `GameAnalytics` wrapper (pcall, once-ever flags), `First machine placed` step (appended: number 13), `Shared/AnalyticsEvents` (pure names, sku and amount checks) |
+| Economy analytics | `EconomyService` logged every earn / spend with a sku | now through `GameAnalytics` (same events; sku cleaned, bad amounts dropped) |
+| Store analytics | none | `StoreOpened` (client remote, rate limited), `PurchasePrompted`, `PurchaseCompleted` (inside the once-only receipt grant, and when a pass purchase finishes) |
+| Update log | `NewsLogic` + `NewsUI` (What's new, auto once after the tutorial, also in Settings) | the lines moved to `Shared/NewsData` (content only) with a spec: lines at most 52 characters, at most 7 rows (what the phone card fits) |
+| Redeem codes | none | `CodeLogic` (pure rules), `ServerScriptService/CodeData` (server only, one disabled placeholder), `CodeService`, `RedeemCode` / `CodeResult` remotes |
+| Favorite reminder | none | `FavoriteLogic` + `FavoriteService`: one toast after 10 minutes of play, once ever, never in a tutorial step or a dialogue |
+
+- **Codes.** Rewards are cash (through `EconomyService.AddCash`, so the wallet cap clamps it; a full wallet refuses without using the code) or a free crafted furniture piece (`PlotService.GrantPiece`). `CodeLogic.ValidReward` refuses any other shape, so a Robux or paid reward cannot exist. One use per player ever: `onboarding["Code:<id>"]`. Expiry is a UTC date, good through 23:59:59 UTC, compared on the server's clock; an unreadable date counts as expired. Six wrong codes in a minute lock the box for 30 s; the remote is rate limited at one a second. `CodeData` lives under ServerScriptService on purpose (nothing in ReplicatedStorage reaches a client). It ships with only `PLACEHOLDER-DISABLED` (disabled): **no real codes exist yet.**
+- **Favorite reminder.** Roblox has no API that favorites an experience (`AvatarEditorService:PromptSetFavorite` is for avatar assets, `SocialService` only prompts invites), so it is a toast pointing at the star on the game's page.
+- **Camera speed.** Written to `UserGameSettings.MouseSensitivity` and `GamepadCameraSensitivity` (each guarded, the device's own value read once). Phone touch camera uses the engine's own speed; Studio check 3 in PHASE2_NOTES finds out whether the engine honours it.
+- Previews (composites of the UITheme layout, not engine shots; made by `python3 tools/preview/v1h_settings.py`): `previews/v1-hardening/settings-{game,scrolled,bottom,codes}-{667x375,1920x1080}.png`.
+- Studio checks: PHASE2_NOTES.md "V1 launch hardening".
+
 ## Lane R: Bayou and Red Mesa (#139, 11 October 2026)
 ## V1: no ButtonR2 anywhere (branch `phase-2/v1-no-buttonr2`, 11 October 2026, draft PR)
 

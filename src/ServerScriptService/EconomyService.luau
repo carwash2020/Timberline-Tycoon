@@ -9,6 +9,7 @@ local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local GameAnalytics = require(script.Parent.GameAnalytics)
 local ProfileService = require(script.Parent.ProfileService)
 
 local EconomyService = {}
@@ -28,7 +29,7 @@ local function publish(player: Player, cash: number)
 	end
 end
 
--- Analytics must never break gameplay, so failures only warn.
+-- Analytics must never break gameplay (GameAnalytics pcalls and drops bad amounts).
 local function logEconomy(
 	player: Player,
 	flow: Enum.AnalyticsEconomyFlowType,
@@ -37,12 +38,7 @@ local function logEconomy(
 	transaction: Enum.AnalyticsEconomyTransactionType,
 	itemSku: string?
 )
-	local ok, err = pcall(function()
-		AnalyticsService:LogEconomyEvent(player, flow, "Cash", amount, balance, transaction.Name, itemSku)
-	end)
-	if not ok then
-		warn("[EconomyService] Analytics economy event failed: " .. tostring(err))
-	end
+	GameAnalytics.Economy(player, flow, amount, balance, transaction, itemSku)
 end
 
 function EconomyService.GetCash(player: Player): number

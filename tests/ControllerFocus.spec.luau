@@ -39,7 +39,7 @@ return function(t)
 			t.eq(string.find(source, "ButtonR2", 1, true), nil, row.panel .. " binds no ButtonR2")
 		end
 		local settings = fs.readFile(dir .. "SettingsUI.luau")
-		t.ok(string.find(settings, 'makeButton(scroll, "TabGame", "GAME"', 1, true), "GAME is the first tab")
+		t.ok(string.find(settings, 'tabButton("TabGame", "GAME"', 1, true), "GAME is the first tab")
 		t.ok(string.find(settings, "firstFace = gameTab.face", 1, true), "Settings opens on GAME")
 		t.ok(string.find(settings, 'row("whatsNew", "WHAT\'S NEW"', 1, true), "Settings can open What's new")
 		local news = fs.readFile(dir .. "NewsUI.luau")

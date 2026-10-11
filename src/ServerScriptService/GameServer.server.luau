@@ -54,6 +54,9 @@ local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NewsService = require(script.Parent.NewsService)
+local GameAnalytics = require(script.Parent.GameAnalytics)
+local CodeService = require(script.Parent.CodeService)
+local FavoriteService = require(script.Parent.FavoriteService)
 local PaintService = require(script.Parent.PaintService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
@@ -643,6 +646,8 @@ end
 -- loop that runs (MapBuilder published it before the map was built).
 local activeLoop = CoreLoop.Active()
 safely("MilestoneService.Init", MilestoneService.Init, notify, activeLoop)
+safely("CodeService.Init", CodeService.Init, remote.RedeemCode, remote.CodeResult, notify)
+safely("FavoriteService.Init", FavoriteService.Init, notify)
 safely("AxeService.Init", AxeService.Init, notify)
 safely("BlueprintService.Init", BlueprintService.Init, notify, {
 	UseBlueprint = remote.UseBlueprint,
@@ -1228,6 +1233,13 @@ remote.NewsSeen.OnServerEvent:Connect(function(player: Player)
 	NewsService.Seen(player)
 end)
 
+remote.StoreOpened.OnServerEvent:Connect(function(player: Player)
+	if not RateLimiter.Allow(player, "StoreOpened") then
+		return
+	end
+	GameAnalytics.Store(player, "StoreOpened")
+end)
+
 remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, value: unknown)
 	if not RateLimiter.Allow(player, "SaveSetting") then
 		return
@@ -1635,6 +1647,7 @@ local function onPlayerAdded(player: Player)
 	safely("MilestoneService.Start", MilestoneService.Start, player, profile)
 	safely("QuestService.Start", QuestService.Start, player, profile)
 	safely("NewsService.Start", NewsService.Start, player, profile)
+	safely("FavoriteService.Start", FavoriteService.Start, player, profile)
 	safely("DailyService.Start", DailyService.Start, player, profile)
 	safely("EventService.Start", EventService.Start, player, profile)
 	safely("ShopService.PlayerJoined", ShopService.PlayerJoined, player, profile)
@@ -1660,6 +1673,7 @@ end
 -- pass would write an empty load.
 local function savePlaytime(player: Player)
 	MilestoneService.Stop(player)
+	FavoriteService.Stop(player)
 end
 
 local function saveTruckLoad(player: Player)

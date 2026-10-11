@@ -4,7 +4,10 @@
 -- or Roblox's top-left menu). Music and sound effects have a mute and a
 -- volume stepper; graphics (Lower or Higher quality, the same choice the join
 -- screen asks for: QualityPickerUI), camera shake, UI scale and tips apply at once
--- and save (SaveSetting, and SetQuality for the graphics choice). Reset tutorial asks twice, then ResetTutorial.
+-- and save (SaveSetting, and SetQuality for the graphics choice). Camera speed
+-- steps 25% to 200% (the device's own camera speed times it). Replay tutorial
+-- asks twice, then ResetTutorial (the server pays no step cash again). The
+-- Codes tab is the redeem box (RedeemCode; the server answers on CodeResult).
 -- Visitors is the plot permission list, with a Visit button for each
 -- player in the server whose plot lets you in (PlotService.Visit checks it
 -- again). Leaderboard is the opt-in
@@ -47,6 +50,29 @@ local C = UITheme.Colors
 local F = UITheme.Fonts
 
 local SCALES = { "small", "normal", "large" }
+
+-- The device's own camera speeds, read once, so the multiplier never stacks on itself.
+local baseCamera: { [string]: number } = {}
+
+-- Writes the camera speed (mouse and gamepad stick) as the device's own times
+-- `multiplier`. Each write is guarded: a build that doesn't expose a property
+-- just leaves that input alone. Phone touch uses the engine's own speed.
+local function applyCameraSensitivity(multiplier: unknown)
+	local ok, settings = pcall(function(): any
+		return UserSettings():GetService("UserGameSettings")
+	end)
+	if not ok or settings == nil then
+		return
+	end
+	for _, name in ipairs({ "MouseSensitivity", "GamepadCameraSensitivity" }) do
+		pcall(function()
+			if baseCamera[name] == nil then
+				baseCamera[name] = settings[name]
+			end
+			settings[name] = SettingsLogic.ApplySensitivity(baseCamera[name], multiplier)
+		end)
+	end
+end
 
 local function cycle(list: { string }, current: string): string
 	for i, name in ipairs(list) do
@@ -99,6 +125,7 @@ function SettingsUI.Start()
 	card.outer.Name = "Settings"
 	card.outer.Visible = false
 	card.outer.Size = UDim2.fromOffset(280, 300)
+	local cardWidth = 280
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "Rows"
 	scroll.BackgroundTransparency = 1
@@ -124,6 +151,7 @@ function SettingsUI.Start()
 	local rowSize = rowSpec.size or Vector2.new(248, 44)
 	local tap = math.max(rowSize.Y, PermissionLogic.Tap, UITheme.Size.Tap)
 	local firstFace: GuiButton? = nil
+	local fitCard: () -> ()
 	local resetArmed = false
 	local restartArmedUntil = 0
 	local tabName = "game"
@@ -135,12 +163,13 @@ function SettingsUI.Start()
 		name: string,
 		text: string,
 		style: string,
-		onPress: () -> ()
+		onPress: () -> (),
+		width: number?
 	): UITheme.Button
 		local button = UITheme.Button({
 			name = name,
 			text = text,
-			size = Vector2.new(rowSize.X, tap),
+			size = Vector2.new(width or rowSize.X, tap),
 			style = style,
 			textSize = rowSpec.text,
 		})
@@ -166,9 +195,48 @@ function SettingsUI.Start()
 	UITheme.list(visitors, 6)
 	visitors.Parent = scroll
 
+	-- The Codes tab: a box, a Redeem button and the server's answer. The text is
+	-- sent as typed; the server normalises, checks and rate limits it.
+	local codes = Instance.new("Frame")
+	codes.Name = "Codes"
+	codes.BackgroundTransparency = 1
+	codes.Size = UDim2.fromScale(1, 0)
+	codes.AutomaticSize = Enum.AutomaticSize.Y
+	codes.Visible = false
+	codes.LayoutOrder = 55
+	UITheme.list(codes, 6)
+	codes.Parent = scroll
+	local codesHead = UITheme.label(codes, "REDEEM A CODE", F.Black, 14, C.Bark)
+	codesHead.Size = UDim2.new(1, 0, 0, 18)
+	local codeBox = Instance.new("TextBox")
+	codeBox.Name = "CodeBox"
+	codeBox.LayoutOrder = 2
+	codeBox.Size = UDim2.fromOffset(rowSize.X, tap)
+	codeBox.BackgroundColor3 = C.Cream
+	codeBox.BorderSizePixel = 0
+	codeBox.Font = F.Bold
+	codeBox.TextSize = 16
+	codeBox.TextColor3 = C.Ink
+	codeBox.PlaceholderText = "TYPE A CODE"
+	codeBox.PlaceholderColor3 = C.Muted
+	codeBox.Text = ""
+	codeBox.ClearTextOnFocus = false
+	codeBox.TextXAlignment = Enum.TextXAlignment.Left
+	UITheme.corner(codeBox, UITheme.Radius)
+	UITheme.stroke(codeBox, C.Bark, 2)
+	UITheme.padding(codeBox, 0, 10, 0, 10)
+	codeBox.Parent = codes
+	local codeStatus = UITheme.label(codes, "", F.Bold, 14, C.Ink)
+	codeStatus.Name = "Status"
+	codeStatus.LayoutOrder = 4
+	codeStatus.TextWrapped = true
+	codeStatus.AutomaticSize = Enum.AutomaticSize.Y
+	codeStatus.Size = UDim2.new(1, 0, 0, 18)
+
 	local gameTab: UITheme.Button
 	local visitorTab: UITheme.Button
 	local boardTab: UITheme.Button
+	local codesTab: UITheme.Button
 	local boardPanel: LeaderboardUI.Panel
 
 	local function permissions(): { [string]: PermissionLogic.Row }
@@ -276,6 +344,19 @@ function SettingsUI.Start()
 		end
 	end
 
+	-- The card is 300 tall; on a short touch screen it is cut to end above the jump
+	-- button (the bottom-right 90 px), and the rows scroll inside it.
+	fitCard = function()
+		local cam = workspace.CurrentCamera
+		local vp = if cam then cam.ViewportSize else Vector2.zero
+		local height = 300
+		if vp.Y > 0 and math.min(vp.X, vp.Y) < UITheme.CompactEdge then
+			local top = card.outer.AbsolutePosition.Y
+			height = math.clamp(math.floor((vp.Y - 98 - top) / math.max(UITheme.Scale(), 0.05)), 190, 300)
+		end
+		card.outer.Size = UDim2.fromOffset(cardWidth, height)
+	end
+
 	local function showTab(name: string)
 		if not SettingsLogic.HasTab(name) then
 			return
@@ -283,12 +364,16 @@ function SettingsUI.Start()
 		tabName = name
 		local visitorsOn = name == "visitors"
 		local boardOn = name == "board"
+		local codesOn = name == "codes"
 		for _, rowRoot in ipairs(gameRows) do
-			rowRoot.Visible = not visitorsOn and not boardOn
+			rowRoot.Visible = not visitorsOn and not boardOn and not codesOn
 		end
 		visitors.Visible = visitorsOn
+		codes.Visible = codesOn
+		codesTab:SetStyle(if codesOn then "buy" else "skip")
 		boardPanel.root.Visible = boardOn
-		card.outer.Size = UDim2.fromOffset(if boardOn then LeaderboardLogic.CardWidth(tenFoot()) else 280, 300)
+		cardWidth = if boardOn then LeaderboardLogic.CardWidth(tenFoot()) else 280
+		fitCard()
 		gameTab:SetStyle(if name == "game" then "buy" else "skip")
 		visitorTab:SetStyle(if visitorsOn then "buy" else "skip")
 		boardTab:SetStyle(if boardOn then "buy" else "skip")
@@ -299,6 +384,10 @@ function SettingsUI.Start()
 			boardPanel:Show()
 			if UITheme.Device() == "console" then
 				GuiService.SelectedObject = boardPanel:First()
+			end
+		elseif codesOn then
+			if UITheme.Device() == "console" then
+				GuiService.SelectedObject = codeBox
 			end
 		elseif visitorsOn then
 			rebuildVisitors()
@@ -311,18 +400,28 @@ function SettingsUI.Start()
 		end
 	end
 
-	gameTab = makeButton(scroll, "TabGame", "GAME", "buy", function()
-		showTab("game")
-	end)
-	gameTab.root.LayoutOrder = 1
-	visitorTab = makeButton(scroll, "TabVisitors", "VISITORS", "skip", function()
-		showTab("visitors")
-	end)
-	visitorTab.root.LayoutOrder = 2
-	boardTab = makeButton(scroll, "TabBoard", "LEADERBOARD", "skip", function()
-		showTab("board")
-	end)
-	boardTab.root.LayoutOrder = 3
+	-- The four tabs share one row (each 44 tall), so the card keeps room for the
+	-- settings under them on a short phone screen.
+	local tabStrip = Instance.new("Frame")
+	tabStrip.Name = "Tabs"
+	tabStrip.LayoutOrder = 1
+	tabStrip.BackgroundTransparency = 1
+	tabStrip.Size = UDim2.new(1, 0, 0, tap + UITheme.ButtonDrop)
+	UITheme.list(tabStrip, 4, true)
+	tabStrip.Parent = scroll
+	local tabWidth = math.floor((rowSize.X - 3 * 4) / 4)
+	local function tabButton(name: string, text: string, style: string, order: number, tab: string): UITheme.Button
+		local button = makeButton(scroll, name, text, style, function()
+			showTab(tab)
+		end, tabWidth)
+		button.root.LayoutOrder = order
+		button.root.Parent = tabStrip
+		return button
+	end
+	gameTab = tabButton("TabGame", "GAME", "buy", 1, "game")
+	visitorTab = tabButton("TabVisitors", "VISIT", "skip", 2, "visitors")
+	boardTab = tabButton("TabBoard", "BOARD", "skip", 3, "board")
+	codesTab = tabButton("TabCodes", "CODES", "skip", 4, "codes")
 	firstFace = gameTab.face
 
 	local musicFace: TextButton
@@ -333,6 +432,7 @@ function SettingsUI.Start()
 	local shakeFace: TextButton
 	local scaleFace: TextButton
 	local tipsFace: TextButton
+	local sensitivityFace: TextButton
 	local resetFace: TextButton
 	local restartFace: TextButton
 
@@ -365,6 +465,8 @@ function SettingsUI.Start()
 		UITheme.SetUserScale(SettingsLogic.ScaleMultiplier(scaleName))
 		local tips = player:GetAttribute("SettingShowTips")
 		HUD.SetTips(tips ~= false)
+		local sensitivity = player:GetAttribute("SettingCameraSensitivity")
+		applyCameraSensitivity(sensitivity)
 		local music = player:GetAttribute("SettingMusic")
 		if type(music) == "boolean" then
 			SoundData.MusicEnabled = music
@@ -385,11 +487,14 @@ function SettingsUI.Start()
 		shakeFace.Text = if shake == false then "CAMERA SHAKE: OFF" else "CAMERA SHAKE: ON"
 		scaleFace.Text = "UI scale  " .. string.upper(scaleName)
 		tipsFace.Text = if tips == false then "TIPS: OFF" else "TIPS: ON"
+		sensitivityFace.Text = "Camera speed  "
+			.. percent(if type(sensitivity) == "number" then sensitivity else 1)
+			.. "  ±"
 		musicFace.Text = if SoundData.MusicEnabled then "MUSIC: ON" else "MUSIC: OFF"
 		musicVolFace.Text = "Music volume  " .. percent(SoundData.MusicVolume) .. "  ±"
 		sfxFace.Text = if SoundData.SfxEnabled then "SOUND FX: ON" else "SOUND FX: OFF"
 		sfxVolFace.Text = "Effects volume  " .. percent(SoundData.SfxVolume) .. "  ±"
-		resetFace.Text = if resetArmed then "TAP AGAIN TO RESET" else "RESET TUTORIAL"
+		resetFace.Text = if resetArmed then "TAP AGAIN TO REPLAY" else "REPLAY TUTORIAL"
 		local restart = SettingsLogic.RestartRow(
 			player:GetAttribute("ActiveSlot"),
 			player:GetAttribute("SlotPick") == true,
@@ -451,13 +556,20 @@ function SettingsUI.Start()
 		save("uiScale", nextName)
 		applyAll()
 	end)
+	sensitivityFace = row("cameraSensitivity", "Camera speed  100%  ±", function()
+		local current = player:GetAttribute("SettingCameraSensitivity")
+		local nextValue = SettingsLogic.NextSensitivity(if type(current) == "number" then current else 1)
+		player:SetAttribute("SettingCameraSensitivity", nextValue) -- the server sets it too; this keeps the row snappy
+		save("cameraSensitivity", nextValue)
+		applyAll()
+	end)
 	tipsFace = row("tips", "TIPS: ON", function()
 		local on = player:GetAttribute("SettingShowTips") == false
 		HUD.SetTips(on)
 		save("showTips", on)
 		applyAll()
 	end)
-	resetFace = row("reset", "RESET TUTORIAL", function()
+	resetFace = row("reset", "REPLAY TUTORIAL", function()
 		if not resetArmed then
 			resetArmed = true
 			applyAll()
@@ -469,7 +581,7 @@ function SettingsUI.Start()
 		end
 		resetArmed = false
 		Net.Remote("ResetTutorial"):FireServer()
-		HUD.Toast("Tutorial reset.")
+		HUD.Toast("Replaying the tutorial. No extra cash this time.")
 		card.outer.Visible = false
 		applyAll()
 	end)
@@ -505,6 +617,31 @@ function SettingsUI.Start()
 		Net.Remote("SlotAction"):FireServer("reset", 0, true)
 		card.outer.Visible = false
 		applyAll()
+	end)
+
+	local lastCode = 0
+	local function redeem()
+		local text = codeBox.Text
+		if text == "" or os.clock() - lastCode < 1 then
+			return
+		end
+		lastCode = os.clock()
+		codeStatus.Text = "Checking..."
+		Net.Remote("RedeemCode"):FireServer(text)
+	end
+	local redeemButton = makeButton(codes, "Redeem", "REDEEM", "buy", redeem)
+	redeemButton.root.LayoutOrder = 3
+	codeBox.FocusLost:Connect(function(enterPressed: boolean)
+		if enterPressed then
+			redeem()
+		end
+	end)
+	Net.Remote("CodeResult").OnClientEvent:Connect(function(ok: unknown, message: unknown)
+		codeStatus.Text = if type(message) == "string" then message else ""
+		codeStatus.TextColor3 = if ok == true then C.Confirm else C.Ink
+		if ok == true then
+			codeBox.Text = ""
+		end
 	end)
 
 	for _, attr in pairs(SettingsLogic.Attributes) do
@@ -557,7 +694,13 @@ function SettingsUI.Start()
 		return SettingsUI.OpensOnPad(open.Visible, BlueprintPlacer.Active())
 	end, toggle)
 	local SETTINGS_NAV = "SettingsNav"
+	UITheme.WatchLayout(function()
+		fitCard()
+	end)
 	card.outer:GetPropertyChangedSignal("Visible"):Connect(function()
+		if card.outer.Visible then
+			fitCard()
+		end
 		if not card.outer.Visible then
 			ContextActionService:UnbindAction(SETTINGS_NAV)
 			if tabName ~= "game" then

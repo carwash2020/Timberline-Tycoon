@@ -121,4 +121,61 @@ return function(t)
 			t.ok(SettingsLogic.RestartArmSeconds <= 20, "the client's window is inside the server's")
 		end
 	)
+
+	t.test("camera sensitivity: default 1, clamped, idempotent in an old save, junk refused", function()
+		local d = SettingsLogic.Sanitize(nil)
+		t.eq(d.cameraSensitivity, 1)
+		local old = SettingsLogic.Sanitize({ music = false }) -- a save from before the setting
+		t.eq(old.cameraSensitivity, 1)
+		t.eq(SettingsLogic.Sanitize(old).cameraSensitivity, 1, "Sanitize twice changes nothing")
+		t.eq(SettingsLogic.Sanitize({ cameraSensitivity = 50 }).cameraSensitivity, 2, "clamped high")
+		t.eq(SettingsLogic.Sanitize({ cameraSensitivity = -3 }).cameraSensitivity, 0.25, "clamped low")
+		t.eq(SettingsLogic.Sanitize({ cameraSensitivity = "fast" }).cameraSensitivity, 1)
+		t.eq(SettingsLogic.Sanitize({ cameraSensitivity = 0 / 0 }).cameraSensitivity, 1)
+		local s = SettingsLogic.Sanitize(nil)
+		t.ok(SettingsLogic.Set(s, "cameraSensitivity", 1.5))
+		t.eq(s.cameraSensitivity, 1.5)
+		t.ok(SettingsLogic.Set(s, "cameraSensitivity", 99))
+		t.eq(s.cameraSensitivity, 2, "the server clamps")
+		t.ok(not SettingsLogic.Set(s, "cameraSensitivity", "1"))
+		t.ok(not SettingsLogic.Set(s, "cameraSensitivity", 0 / 0))
+		t.ok(not SettingsLogic.Set(s, "cameraSensitivity", nil))
+		t.eq(s.cameraSensitivity, 2, "refused values leave it alone")
+		t.eq(SettingsLogic.Attributes.cameraSensitivity, "SettingCameraSensitivity")
+	end)
+
+	t.test("camera sensitivity steps wrap and scale the device's own speed", function()
+		t.eq(SettingsLogic.NextSensitivity(1), 1.25)
+		t.eq(SettingsLogic.NextSensitivity(1.75), 2)
+		t.eq(SettingsLogic.NextSensitivity(2), 0.25, "after the highest, the lowest")
+		t.eq(SettingsLogic.NextSensitivity(0 / 0), 1.25, "junk counts as 1")
+		t.eq(SettingsLogic.ApplySensitivity(0.5, 2), 1)
+		t.eq(SettingsLogic.ApplySensitivity(0.5, "x"), 0.5)
+	end)
+
+	t.test("the codes tab exists", function()
+		t.ok(SettingsLogic.HasTab("codes"))
+	end)
+
+	t.test("the Settings card has every launch control, works on all inputs, and binds no right trigger", function()
+		local fs = require("@lune/fs")
+		local ui = fs.readFile("src/StarterPlayer/StarterPlayerScripts/SettingsUI.luau")
+		for _, needle in ipairs({
+			'row("music"',
+			'row("musicVolume"',
+			'row("sfx"',
+			'row("sfxVolume"',
+			'row("cameraSensitivity"',
+			'row("graphics"',
+			'row("reset", "REPLAY TUTORIAL"',
+			'Net.Remote("ResetTutorial")',
+			'Net.Remote("RedeemCode")',
+			'"TabCodes"',
+		}) do
+			t.ok(string.find(ui, needle, 1, true), needle .. " is in the Settings card")
+		end
+		t.ok(string.find(ui, "InputKit.Actions.Cancel.gamepad", 1, true), "B closes")
+		t.ok(string.find(ui, "UITheme.Size.Tap", 1, true), "every tap target is at least the 44 px tap size")
+		t.eq(string.find(ui, "ButtonR2", 1, true), nil)
+	end)
 end
