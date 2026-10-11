@@ -98,6 +98,10 @@ return function(t)
 		SlotAction = row("session", "SaveSlotService", "SaveSlotService", "SlotAction"),
 		SaveNow = row("session", "SaveSlotService", "SaveSlotService", "SaveNow"),
 		AdminRun = row("owner", GS, GS, "AdminRun"),
+		PlotModerate = row("build", "PlotService", "PlotService", "PlotModerate"),
+		RedeemCode = row("session", "CodeService", "CodeService", "RedeemCode"),
+		StoreOpened = row("session", GS, GS, "StoreOpened"),
+		Activity = row("session", GS, GS, "Activity"),
 	}
 	-- Server -> client only: the server fires them; nothing may connect them.
 	local SERVER_TO_CLIENT = {
@@ -110,6 +114,7 @@ return function(t)
 		WorldFX = true,
 		SlotState = true,
 		BoardData = true,
+		CodeResult = true,
 	}
 
 	local cache = {}
@@ -219,6 +224,7 @@ return function(t)
 			{ "LogicService", "function LogicService.OnWire(", { "a", "b", "c", "d" } },
 			{ "MonetizationService", "local function onBuy(", { "kind", "key" } },
 			{ "QuestService", "local function onSeen(", { "what" } },
+			{ "CodeService", "local function onRedeem(", { "raw" } },
 			{ "GameServer.server", "local function onSwing(", { "woodId", "cancel" } },
 			{ "GameServer.server", "local function onMineNode(", { "nodeUid" } },
 		}
@@ -400,8 +406,12 @@ return function(t)
 				for params in string.gmatch(src, "OnServerEvent:Connect%(function%(([^)]*)%)") do
 					for param in string.gmatch(params, "[^,]+") do
 						local name = string.lower(string.match(param, "^%s*([%w_]+)") or "")
+						-- PlotModerate(action, userId) names its TARGET (a visitor the plot's owner
+						-- removes); the owner is still the `player` the engine passes.
+						local target = name == "userid"
+							and string.find(params, "action: unknown, userId: unknown", 1, true)
 						t.ok(
-							name ~= "userid" and name ~= "actor" and name ~= "who" and name ~= "asplayer",
+							target or (name ~= "userid" and name ~= "actor" and name ~= "who" and name ~= "asplayer"),
 							file .. ": a handler parameter names the actor: " .. param
 						)
 					end
