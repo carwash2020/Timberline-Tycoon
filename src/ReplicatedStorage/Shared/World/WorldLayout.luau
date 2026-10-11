@@ -1116,7 +1116,7 @@ WorldLayout.Forest = {
 	-- Noise above `from` opens a clearing (fully open `soft` above it), but
 	-- not within `keep` studs of the hub's lawn: the edge facing the town
 	-- and the plots stays a wall of trees.
-	clearing = { scale = 110, fine = 40, from = 0.1, soft = 0.14, keep = 70 },
+	clearing = { scale = 110, fine = 40, from = 0.0, soft = 0.14, keep = 70 },
 	-- Studs past each biome's area the forest keeps off (the grove's from its
 	-- ridge's outer foot). The Starter Forest's own trees are its edge.
 	wild = { starter = 8, hills = 40, snow = 170, volcano = 140, grove = 25, sky = 90 },
@@ -1160,7 +1160,8 @@ end
 -- The near east of town used to be the district lawn, so a phone at the
 -- spawn didn't grow a forest there. Keep that patch of the ring open.
 -- The homesteads further out sit in the country.
-table.insert(HUB_RECTS, { 126, 380, -200, 80 })
+-- Ring map: up to z 210, so the showroom's east lawn (greenery at (346, 128)) stays open too.
+table.insert(HUB_RECTS, { 126, 380, -200, 210 })
 
 -- Each wild biome's disc (x, z, the radius the forest keeps out of).
 local WILD_DISCS: { { number } } = {}

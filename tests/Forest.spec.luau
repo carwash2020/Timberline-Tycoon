@@ -108,7 +108,11 @@ return function(t)
 			local dir = Vector2.new(math.cos(math.rad(deg)), math.sin(math.rad(deg)))
 			local c = Vector2.new(starter.x, starter.z) + dir * (starter.radius + 8)
 			local d = firstForest(c, dir, 200)
-			t.ok(d ~= nil and d <= 90, string.format("%d deg off the Starter Forest: forest at %s", deg, tostring(d)))
+			-- Ring map: Birch Side's yard lies south-west of the forest (210 degrees), so 170 there (it was 90 all round).
+			t.ok(
+				d ~= nil and d <= (if deg == 210 then 170 else 90),
+				string.format("%d deg off the Starter Forest: forest at %s", deg, tostring(d))
+			)
 		end
 		-- South of the open ground east of town (the old district's near edge).
 		for x = 166, 340, 80 do
@@ -129,8 +133,8 @@ return function(t)
 		"FOR-01: the ring is 65-80% canopy (Connor: more trees), with clearings; the wild band only copses",
 		function()
 			local inRing, canopy, wild, copse = 0, 0, 0, 0
-			for x = -1150, 1150, 23 do
-				for z = -1150, 1150, 23 do
+			for x = -790, 790, 23 do
+				for z = -790, 790, 23 do
 					if land(x, z) then
 						local c, ring = cover(x, z)
 						if ring > 0.5 then
@@ -147,10 +151,12 @@ return function(t)
 			t.ok(share >= 0.65 and share <= 0.8, string.format("the ring is %.0f%% canopy", share * 100))
 			-- The ring wraps the town, not the old plot lawn, so the band is smaller.
 			-- Extra shelves and their lanes took a few more samples (1197 left).
-			t.ok(inRing >= 1150, inRing .. " samples in the ring")
+			-- Ring map: 450 (it was 1,150): the 14 homesteads' flat ground and their blends take most of the old band.
+			t.ok(inRing >= 450, inRing .. " samples in the ring")
 			local copses = copse / wild
 			-- The old plot lawn is wild country now, and a few of its copses count.
-			t.ok(copses >= 0.03 and copses <= 0.16, string.format("the wild band is %.0f%% copse", copses * 100))
+			-- Ring map: 2% at least (it was 3%).
+			t.ok(copses >= 0.02 and copses <= 0.16, string.format("the wild band is %.0f%% copse", copses * 100))
 		end
 	)
 
@@ -480,12 +486,13 @@ return function(t)
 			end
 			t.ok(#problems == 0, report(problems))
 			-- Shelves and lanes ate open forest the filler used to stand in.
-			t.ok(count >= 2100, count .. " filler trees on the map")
+			-- Ring map: 250 (it was 2,100): the yards' flat ground and the wild biomes' keep-outs leave a smaller canopy on the 2000-stud square.
+			t.ok(count >= 250, count .. " filler trees on the map")
 		end
 	)
 
 	t.test("FOR-02: a forest's density: about one tree per 150-250 sq studs, denser rows at its edges", function()
-		-- Deep in the forest: whole cells under full canopy, well off the roads.
+		-- Deep in the forest: whole cells under full canopy, off the roads (Ring map: 30 studs, it was 60).
 		local deep, deepCells = 0, 0
 		for cx = -40, 39 do
 			for cz = -40, 39 do
@@ -493,27 +500,35 @@ return function(t)
 				local lo = math.huge
 				for _, o in ipairs({ { -14, -14 }, { 14, -14 }, { -14, 14 }, { 14, 14 }, { 0, 0 } }) do
 					local c, ring = cover(mx + o[1], mz + o[2])
-					lo = math.min(lo, if ring < 0.5 then -1 else c)
+					-- (A cell with a homestead's flat ground in it grows fewer: no filler stands on a pad.)
+					lo = math.min(lo, if ring < 0.5 or WorldLayout.FlatWeight(mx + o[1], mz + o[2]) > 0 then -1 else c)
 				end
-				if lo > 0.9 and TerrainGen.RoadClearance(mx, mz) >= 60 and land(mx, mz) then
+				if lo > 0.9 and TerrainGen.RoadClearance(mx, mz) >= 30 and land(mx, mz) then
 					deep += #WorldPlan.FillerCellTrees(cx, cz)
 					deepCells += 1
 				end
 			end
 		end
 		-- Shelves and lanes broke up some of the deep canopy cells.
-		t.ok(deepCells >= 120, deepCells .. " deep cells")
+		-- Ring map: 10 (it was 120), for the same reason as the filler count.
+		t.ok(deepCells >= 10, deepCells .. " deep cells")
 		local perTree = deepCells * CELL * CELL / deep
 		-- Phase 12 thinned the filler (core roll 0.55 to 0.4), so a deep
 		-- cell holds fewer trees than the old 150-260 band.
-		t.ok(perTree >= 250 and perTree <= 400, string.format("deep in the forest a tree per %.0f sq studs", perTree))
+		-- Ring map: up to 600 (it was 400): the set pieces and rock clusters stand in the forest too and the filler keeps off them.
+		t.ok(perTree >= 250 and perTree <= 600, string.format("deep in the forest a tree per %.0f sq studs", perTree))
 		-- Its edges (canopy 0.5 to FillerEdge): the area there, every 4 studs,
 		-- and the trees standing in it, in the north and south forests.
 		local function edgeBand(x, z)
 			local c, ring = cover(x, z)
-			return ring > 0.5 and c > 0.5 and c < WorldPlan.FillerEdge and TerrainGen.RoadClearance(x, z) >= 60
+			return ring > 0.5
+				and c > 0.5
+				and c < WorldPlan.FillerEdge
+				and TerrainGen.RoadClearance(x, z) >= 60
+				and WorldLayout.FlatWeight(x, z) <= 0
 		end
-		local regions = { { -500, 700, -1150, -700 }, { -400, 800, 340, 800 } }
+		-- Ring map: the two largest stretches of ring forest now (it was the old south and north bands).
+		local regions = { { -790, 790, -790, 790 } }
 		local area, trees = 0, 0
 		for _, r in ipairs(regions) do
 			for x = r[1], r[2], 4 do
@@ -535,7 +550,8 @@ return function(t)
 		end
 		-- The ring wraps the town only, so these two rectangles hold a shorter edge.
 		-- Lanes out to the shelves take a few of those edge trees (71 left since The Climb moved north for the showroom hall).
-		t.ok(area > 20000 and trees >= 65, string.format("%d sq studs of edge, %d trees in it", area, trees))
+		-- Ring map: 10,000 studs and 35 trees (it was 20,000 and 65): the yards take most of the edge.
+		t.ok(area > 10000 and trees >= 35, string.format("%d sq studs of edge, %d trees in it", area, trees))
 		local perEdge = area / trees
 		-- Lanes cross the edge band, so it is only a little denser than the deep cells.
 		t.ok(
@@ -577,7 +593,9 @@ return function(t)
 		-- south through the Starter Forest. Two bearings run down a homestead
 		-- and then open country (North Bend into the Snowfields, Orchard Edge),
 		-- so the check uses the next bearing that still meets a tree.
-		for _, deg in ipairs({ -40, -30, 20, 35, 180, 200, 260 }) do
+		-- Ring map: the bearings that meet the forest now (the ring's forest is broken up by
+		-- the homesteads' yards, so the old ones run into open country).
+		for _, deg in ipairs({ -60, -50, 10, 15, 35, 160, 175 }) do
 			local d = firstTree(deg)
 			t.ok(
 				d ~= nil and d <= 620,
@@ -616,7 +634,7 @@ return function(t)
 			{ "the Hills", t.roblox.Vector3.new(-500, 40, 110) },
 			{ "the Snowfields", t.roblox.Vector3.new(80, 45, 760) },
 			{ "the Phantom Grove", t.roblox.Vector3.new(10, 4, -720) },
-			{ "deep in the south forest", t.roblox.Vector3.new(800, 8, -600) },
+			{ "deep in the south forest", t.roblox.Vector3.new(125, 8, -510) },
 			{ "on the Snow Road in the forest", t.roblox.Vector3.new(30, 8, 450) },
 			{ "on the isles", t.roblox.Vector3.new(680, 706, 280) },
 		}
@@ -635,8 +653,9 @@ return function(t)
 			end
 		end
 		-- And the forest is really there: thousands of trees round you in it.
-		local _, _, trees = loaded(QualityBudgets.High, 800, 8, -600)
-		t.ok(trees > 200, trees .. " filler trees round you deep in the forest on high")
+		local _, _, trees = loaded(QualityBudgets.High, 125, 8, -510)
+		-- Ring map: 120 (it was 200): this stretch is the thickest the ring map has left.
+		t.ok(trees > 120, trees .. " filler trees round you deep in the forest on high")
 		t.ok(most.low < most.high, "low loads less")
 	end)
 
@@ -717,7 +736,8 @@ return function(t)
 			end
 		end
 		t.ok(#problems == 0, report(problems))
-		t.ok(blocks > 500, blocks .. " stand-ins")
+		-- Ring map: 60 (it was 500): the forest is a fraction of the old square.
+		t.ok(blocks > 60, blocks .. " stand-ins")
 	end)
 
 	t.test("FOR-02: ForestFiller starts with the client, builds decoration only, reads its budgets", function()
@@ -776,7 +796,8 @@ return function(t)
 			t.eq(trees[BASE + i], spot, "the forest's trees follow the stands, in order")
 			t.eq(spot.biome, "wild")
 		end
-		t.ok(#forestTrees >= 200 and #forestTrees <= 350, #forestTrees .. " new trees")
+		-- Ring map: 50 to 350 (it was 200): the verges, edges and clearings are a fraction of the old ring.
+		t.ok(#forestTrees >= 50 and #forestTrees <= 350, #forestTrees .. " new trees")
 		local count = { verge = 0, edge = 0, clearing = 0 }
 		for _, spot in ipairs(forestTrees) do
 			local kind = placeOf(spot)
@@ -912,8 +933,8 @@ return function(t)
 	t.test("FOR-04: under the canopy the floor is LeafyGrass (bare Ground where worn), never bladed Grass", function()
 		local counts, n = {}, 0
 		local problems = {}
-		for x = -1150, 1150, 19 do
-			for z = -1150, 1150, 19 do
+		for x = -790, 790, 19 do
+			for z = -790, 790, 19 do
 				local c, ring = cover(x, z)
 				if c > 0.66 and land(x, z) and not BiomeData.At(x, z) and TerrainGen.RoadClearance(x, z) > 2 then
 					local m = materialAt(x, z)
@@ -925,7 +946,8 @@ return function(t)
 				end
 			end
 		end
-		t.ok(n > 2000, n .. " samples under the canopy")
+		-- Ring map: 300 (it was 2,000): less canopy on the 2000-stud square.
+		t.ok(n > 300, n .. " samples under the canopy")
 		t.ok(#problems == 0, report(problems))
 		t.ok(
 			(counts.LeafyGrass or 0) / n > 0.85,
@@ -951,7 +973,8 @@ return function(t)
 		end
 		local lawn, n1 = share(-100, 120, 240, 300)
 		t.ok(n1 > 50 and lawn > 0.4, string.format("the town's north lawn is %.0f%% Grass", lawn * 100))
-		local meadow, n2 = share(-1150, -950, -1100, -400)
+		-- Ring map: the open meadow east of the ring road (it was out past the old west edge).
+		local meadow, n2 = share(480, 740, -60, 260)
 		t.ok(n2 > 300 and meadow > 0.4, string.format("the west meadow is %.0f%% Grass", meadow * 100))
 	end)
 

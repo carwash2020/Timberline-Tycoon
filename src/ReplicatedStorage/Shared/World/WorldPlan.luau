@@ -4262,7 +4262,9 @@ WorldPlan.ForestVerge = { 11, 16 } -- studs off a road's edge (the trunk's middl
 WorldPlan.ForestEdgeApart = 45
 WorldPlan.ForestSpacing = 21
 WorldPlan.ForestMost = { verge = 110, edge = 150, clearing = 90 } -- 350 at most
-local FOREST_ROADS = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
+-- Ring map: the ring and its links run through the forest now, so their verges are planted too.
+local FOREST_ROADS =
+	{ "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad", "RingRoad", "SouthLink", "EastLink", "HillsCross" }
 local FOREST_CLEAR = 10 -- studs a forest tree keeps off a scenery piece, cluster or landmark
 
 local cachedForestTrees: { TreeSpot }? = nil
