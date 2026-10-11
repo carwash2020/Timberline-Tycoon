@@ -8,13 +8,8 @@
 --     owned and the biome gear (coat, boots, lantern). A veteran is never
 --     read as S1 just because the keys are missing.
 --   * The result is the larger of the two, clamped to 1..8.
---   * S8 (Master Timber) is a full plot: the top tier and every bought square
---     (E's brief: "S8 full plot"). Derived from the plot, so it is reachable
---     without Lane E's key; the key and this agree.
 -- Used by StoreData.PackCash (cash packs scale with the stage); Lanes F and
 -- X read it too.
-
-local GameConfig = require(script.Parent.GameConfig)
 
 local StageOf = {}
 
@@ -52,25 +47,6 @@ StageOf.GearStage = {
 	Lantern = 5,
 } :: { [string]: number }
 
--- A full plot: the top tier (Timber Empire) and every square bought
--- (GameConfig.PlotGrid squared, less the pad's own).
-StageOf.FullPlotTier = #GameConfig.PlotTierPrices
-StageOf.FullPlotSquares = GameConfig.PlotGrid * GameConfig.PlotGrid - 1
-
-function StageOf.HasFullPlot(profile: unknown): boolean
-	if type(profile) ~= "table" then
-		return false
-	end
-	local plot = (profile :: any).plot
-	if type(plot) ~= "table" then
-		return false
-	end
-	return type(plot.tier) == "number"
-		and plot.tier >= StageOf.FullPlotTier
-		and type(plot.squares) == "table"
-		and #plot.squares >= StageOf.FullPlotSquares
-end
-
 function StageOf.FromProgress(profile: unknown): number
 	if type(profile) ~= "table" then
 		return 1
@@ -89,9 +65,6 @@ function StageOf.FromProgress(profile: unknown): number
 				stage = math.max(stage, s)
 			end
 		end
-	end
-	if StageOf.HasFullPlot(profile) then
-		stage = StageOf.Count
 	end
 	return stage
 end

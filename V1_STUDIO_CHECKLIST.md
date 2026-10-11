@@ -100,9 +100,9 @@ Found by the integration pass's scans and specs (`V1Refs`, `V1Playthrough`, `V1M
    Support and Wood Detector cannot be bought in a normal game, and `BlueprintBook.Message` tells a player to
    "Buy the X at the Sparkworks counter first". What's new also advertises "Sparkworks logic pieces".
    Owner: Lane F task 16 / Lane E (#138, the keeper). Until then they come only from the owner Gifts tab.
-2. **Stage 8 (Master Timber) is now a full plot** (fixed in this PR): `StageOf` reads the top plot tier and all 24
-   bought squares, so S8 is reachable without Lane E's key; E's brief names S8 as "full plot". S1 to S7 results
-   are unchanged. #138's `Stage:S8` key agrees with it.
+2. **Stage 8 (Master Timber) has no derivation from progress**: only Lane E's `Stage:S8` key sets it. DECISION FOR
+   CONNOR: derive S8 from a full plot (top tier plus all 24 squares)? It would raise the stage-scaled cash packs for
+   full-plot players by about 25% ($160k/h to $200k/h), so it waits for your approval. Default: not changed.
 3. **Old ButtonR2 uses**, not touched here (restricted Xbox files): `BuilderTools.luau` (select ray bound on R2
    while hands are empty, passes the press through), `WireTool.luau` and `InputKit.luau` (Pick, Place and Grab
    lists), `CutController.luau` and `DragController.luau` (read as input). A separate branch removes them.

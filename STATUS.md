@@ -12,8 +12,8 @@ tempering, relics); #133 purchases redesign; #134 end game follow-ups; #137 badg
 
 **Still open and NOT on main:** #135 machine meshes (`phase-2/v1-k-wirein`), #136 backlog meshes
 (`phase-2/v1-backlog-meshes`), #138 NPCs, tutorial and goals (`phase-2/v1-e-npcs-ui`). Until #138 lands nothing writes the
-`Stage:S1` to `Stage:S8` keys: the stage (`StageOf`) comes from the best axe, the gear and, for S8 (Master Timber), a full
-plot (top tier plus all 24 squares). Lane E's keeper lines, region banner and the Foreman goals are in #138.
+`Stage:S1` to `Stage:S8` keys: the stage (`StageOf`) comes from the best axe, and the gear; S8 (Master Timber) is set only by the
+key (deriving it from a full plot is awaiting Connor, it would raise cash packs about 25%). Lane E's keeper lines, region banner and the Foreman goals are in #138.
 
 **Rules that did not change:** the five formerly off-sale products keep id 0 (Coming soon), badge ids stay 0 until Connor
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes

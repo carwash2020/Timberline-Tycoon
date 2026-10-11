@@ -92,15 +92,8 @@ return function(t)
 			t.ok(stage >= last, "monotone at " .. ladder[rung].id)
 			last = stage
 		end
-		-- Stage 8 (Master Timber) is a full plot: the top tier and every square, bought with cash.
-		local plotTiers = t.shared("PlotData").Tiers
-		t.eq(#plotTiers, StageOf.FullPlotTier)
-		local squares = {}
-		for i = 1, StageOf.FullPlotSquares do
-			table.insert(squares, i .. ",0")
-		end
-		t.eq(StageOf.Current({ bestAxeTier = #ladder, plot = { tier = #plotTiers, squares = squares } }), 8)
-		t.eq(StageOf.Current({ onboarding = { [StageOf.Key(8)] = true } }), 8, "and Lane E's key agrees")
+		-- Stage 8 (Master Timber) has no derivation yet (a full plot is Connor's open decision); Lane E's key still sets it.
+		t.eq(StageOf.Current({ onboarding = { [StageOf.Key(8)] = true } }), 8, "Lane E's key sets stage 8")
 		t.eq(StageOf.Count, 8)
 	end)
 
