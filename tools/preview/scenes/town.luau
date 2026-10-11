@@ -135,6 +135,11 @@ return {
 					fov = 62,
 					label = "store interior from the door",
 				},
+				-- Sparkworks (WorldPlan.Town().shops): from the East Link, up its path,
+				-- and from the Mill Road side (the keeper stands inside, not in this scene).
+				{ pos = { 135, 8, 80 }, target = { 135, 7, 128 }, fov = 62, label = "Sparkworks, up its path" },
+				{ pos = { 100, 10, 98 }, target = { 135, 6, 128 }, fov = 60, label = "Sparkworks from the Mill Road" },
+				{ pos = { 135, 70, 70 }, target = { 135, 0, 132 }, fov = 55, label = "Sparkworks from above" },
 				-- The open display lot, trucks facing the plot road.
 				{ pos = { 235, 62, 40 }, target = { 262, 0, 125 }, fov = 55, label = "dealership display lot" },
 				-- The Robux store board: from the spawn, and close.

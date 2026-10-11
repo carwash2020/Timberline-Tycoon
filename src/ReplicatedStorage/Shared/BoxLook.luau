@@ -30,6 +30,7 @@ BoxLook.Categories = {
 	Machine = Color3.fromRGB(240, 196, 48),
 	Gear = Color3.fromRGB(46, 168, 148),
 	Blueprint = Color3.fromRGB(70, 130, 220),
+	Logic = Color3.fromRGB(63, 201, 192), -- the Sparkworks pieces: spark teal
 	Cosmetic = Color3.fromRGB(160, 100, 214),
 	Robux = Color3.fromRGB(227, 183, 60),
 	Truck = Color3.fromRGB(66, 170, 96),

@@ -3,12 +3,12 @@
 -- own lines. The keys are the cashier's outcomes (CounterLogic.Line).
 -- Nothing here is copied from another game.
 --
--- Land Office, Odds & Ends and Sparkworks have lines only. Their buildings
--- are not built, so they are not in NPCData and nothing here spawns them.
--- Those three sets are DRAFTS (marked below): placeholder writing for shops
--- that do not exist, kept so the tests keep every shop's lines complete.
--- Nobody hears them. Rewrite them when their buildings are built. The
--- Hermit is in NPCData (the Secret Cave) and speaks HermitLines.
+-- Land Office and Odds & Ends have lines only. The Land Office is Old Hank's
+-- kiosk (not a box counter) and Odds & Ends is not built, so nothing here
+-- spawns them. Those two sets are DRAFTS (marked below): placeholder writing,
+-- kept so the tests keep every shop's lines complete. Sparkworks is built
+-- (Juno keeps its counter) and its lines are live. The Hermit is in NPCData
+-- (the Secret Cave) and speaks HermitLines.
 
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 
@@ -93,17 +93,17 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Yours. Don't ask where I found it.",
 		locked = "Not for sale. Even I have limits.",
 	},
-	-- DRAFT: not spoken yet (no Sparkworks building); rewrite with the building.
 	Sparkworks = {
-		greet = "Mind the sparks. The counter's the safe bit.",
-		offer = "Wire this %s for %s?",
+		greet = "Set a box on the counter and I'll ring it up. Mind the sparks.",
+		offer = "Take this %s for %s?",
 		broke = "The coil won't spark on a short payment.",
 		declined = "It'll keep. Copper doesn't mind waiting.",
-		missing = "That box isn't on the bench.",
-		alreadyOwned = "You already wired one of those.",
-		needsLand = "A plot first, then the machine.",
-		thanks = "Paid. Open it somewhere that isn't my bench.",
-		locked = "That circuit isn't on the board.",
+		missing = "That box isn't on the counter.",
+		alreadyOwned = "You already have one of those.",
+		needsLand = "A plot first, then the wiring. The Land Office sells them.",
+		needsPlot = "Buy a plot at the Land Office first, then open this.",
+		thanks = "Paid. Open the box on your plot, not on my counter.",
+		locked = "That one isn't on my shelves.",
 	},
 	-- The Hermit is not a shop. These are the plain keys the counter uses if
 	-- anyone ever asks him one; his real talk is HermitLines below.
@@ -146,6 +146,11 @@ local IDLES: { [string]: { string } } = {
 		"That tyre stack is a system. Don't touch it.",
 		"I road-tested the Rustbucket. Once was enough.",
 		"Trailers hitch on the back. Your back will thank you.",
+	},
+	Sparkworks = {
+		"Lever for on and off. Button for a blink.",
+		"A Clock gate never gets tired. I check.",
+		"Lamps on the back wall. Count them. All five work.",
 	},
 }
 
@@ -226,7 +231,7 @@ function DialogueData.GusLine(step: string?): string
 end
 
 function DialogueData.Shops(): { string }
-	return { "ToolShed", "HearthAndHome", "Dealership" }
+	return { "ToolShed", "HearthAndHome", "Dealership", "Sparkworks" }
 end
 
 export type Card = { choice: boolean, noLabel: string }

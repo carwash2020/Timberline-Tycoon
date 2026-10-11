@@ -1894,8 +1894,8 @@ function WorldPlan.Town(): Town
 		{ "tree", -72, 232, 1, "birch" },
 		{ "tree", 82, 144, 1.22, "birch" },
 		{ "tree", 78, 136, 1.22, "maple" },
-		{ "tree", 128, 134, 1, "birch" },
-		{ "tree", 124, 150, 1, "maple" },
+		{ "tree", 162, 134, 1, "birch" }, -- (was 128, 134: Sparkworks stands there)
+		{ "tree", 164, 150, 1, "maple" }, -- (was 124, 150: inside Sparkworks)
 		{ "tree", 136, 168, 1.22, "birch" },
 		{ "tree", 78, 200, 1.22, "maple" },
 		-- By the lot (M1.5: off it and its pull-outs since it grew east): one
@@ -2002,6 +2002,18 @@ function WorldPlan.Town(): Town
 				title = "GENERAL STORE",
 				accent = Color3.fromRGB(122, 90, 60),
 				cframe = CFrame.new(-100, 0, 187.5), -- 43.5 deep, behind the Tool Shed with a 20-stud lane between (its path runs up the lane west of the shed)
+			},
+			{
+				-- The automation shop (36 x 36 built, 1.5x of 24 x 24; its roof reaches
+				-- x 115.5 to 154.5): east of the Mill Road (its edge is x 113) and
+				-- north of the East Link (z 94),
+				-- west of the showroom's loading pad (x 160), on the flat ground. Its
+				-- front (-Z) faces the link; SparkworksPath runs from the link's edge
+				-- to the door (WorldLayout.TownPaint).
+				kind = "Sparkworks",
+				title = "SPARKWORKS",
+				accent = Color3.fromRGB(46, 139, 139),
+				cframe = CFrame.new(135, 0, 132),
 			},
 		},
 		gondola = townGondola(),

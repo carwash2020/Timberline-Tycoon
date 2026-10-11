@@ -183,6 +183,19 @@ local function shopSpecific(model: Model, spec: Spec)
 		barrel(model, hw - 2.2, gy, fz - 1.6)
 		crate(model, hw - 4.4, gy, fz - 1.4, 1.7)
 		chimney(model, -16, 8, spec.roofTop - 0.2, 5)
+	elseif spec.kind == "Sparkworks" then
+		-- Two teal-framed windows, a teal and cream awning over the door, a
+		-- planter each side, a barrel and a crate by the east wall and the
+		-- sandwich board ("OPEN ALL DAY": Sparkworks has no hours).
+		for _, x in ipairs({ -16, 16 }) do
+			window(model, spec, x, 6.8, 3.6, 4.4, false)
+		end
+		awning(model, spec, 11.9, 4.2, spec.accent, hex("#F2E7CF"))
+		planter(model, -10.3, gy, fz - 1.8)
+		planter(model, 10.3, gy, fz - 1.8)
+		sandwichBoard(model, 17.5, gy, fz - 2.4, "Sparkworks")
+		barrel(model, hw - 2.2, gy, fz - 1.6)
+		crate(model, hw - 4.4, gy, fz - 1.4, 1.7)
 	elseif spec.kind == "ToolShed" then
 		-- (The grindstone and the chopping block stand out front, and the door
 		-- header carries the hours board, so the yard has no planters or sandwich

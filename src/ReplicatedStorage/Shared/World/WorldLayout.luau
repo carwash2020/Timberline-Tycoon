@@ -640,6 +640,8 @@ WorldLayout.TownPaint = {
 	{ name = "HearthAndHomePath", x0 = -119, x1 = -107, z0 = 84, z1 = 163.5, material = ROAD },
 	{ name = "HearthAndHomePath", x0 = -119, x1 = -92, z0 = 151, z1 = 163.5, material = ROAD },
 	{ name = "ToolShedPath", x0 = -90, x1 = -78, z0 = 82, z1 = 95, material = ROAD },
+	-- The Sparkworks door (x 135, z 114) up to the East Link's edge (z 94).
+	{ name = "SparkworksPath", x0 = 129, x1 = 141, z0 = 93, z1 = 114.5, material = ROAD },
 	{ name = "SpawnWalk", x0 = -6, x1 = 6, z0 = 34, z1 = 66, material = ROAD },
 	{ name = "MillYard", x0 = -32, x1 = 33, z0 = 95, z1 = 140, material = ROAD },
 	{ name = "GondolaPath", x0 = -37.5, x1 = -33, z0 = 82, z1 = 142, material = ROAD },
@@ -659,6 +661,8 @@ WorldLayout.TownFloors = {
 	-- Gravel like the yard beside it: a truck yard, not a shop floor.
 	{ name = "SellStationFloor", x0 = 31, x1 = 87, z0 = 84, z1 = 139, material = ROAD },
 	{ name = "GondolaStationFloor", x0 = -50.5, x1 = -29, z0 = 139, z1 = 160.5, material = "Ground" },
+	-- Sparkworks (36 x 36 at (135, 132), roof 39 x 39), a stud or two past its walls.
+	{ name = "SparkworksFloor", x0 = 115, x1 = 156, z0 = 112, z1 = 153, material = "Ground" },
 	-- The sky forge court on the south-west meadow (WorldPlan.Town().scenes).
 	-- A stud past the walls so grass does not grow through the floor.
 	{ name = "SkyForgeFloor", x0 = -130, x1 = -94, z0 = -36, z1 = -4, material = "Ground" },

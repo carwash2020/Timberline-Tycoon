@@ -23,6 +23,7 @@ local SHOP_OF: { [string]: string } = {
 	Tink = "ToolShed",
 	Hazel = "HearthAndHome",
 	Dale = "Dealership",
+	Juno = "Sparkworks",
 }
 
 local bound = false
@@ -282,7 +283,7 @@ function DialogueService.Init(remoteEvent: RemoteEvent?)
 		-- is the usual way in), so a made-up id is never stored.
 		if
 			action == "open"
-			and (type(a) ~= "string" or not table.find({ "ToolShed", "HearthAndHome", "Dealership" }, a))
+			and (type(a) ~= "string" or not table.find({ "ToolShed", "HearthAndHome", "Dealership", "Sparkworks" }, a))
 		then
 			return
 		end

@@ -87,6 +87,7 @@ TownTreeData.Empty = {
 	{ name = "DealershipDoor", x0 = 170, z0 = 62, x1 = 210, z1 = 107.4 },
 	{ name = "ToolShedDoor", x0 = -108, z0 = 78, x1 = -60, z1 = 94 },
 	{ name = "GeneralStoreDoor", x0 = -126, z0 = 148, x1 = -74, z1 = 166 },
+	{ name = "SparkworksDoor", x0 = 124, z0 = 92, x1 = 146, z1 = 112 },
 } :: { Rect }
 
 -- Buildings (their widest outline, roofs and eaves included), measured from
@@ -99,6 +100,7 @@ TownTreeData.Buildings = {
 	{ name = "Sawmill", x0 = -32, z0 = 95, x1 = 33, z1 = 139 },
 	{ name = "SellStation", x0 = 37, z0 = 94, x1 = 84, z1 = 129 },
 	{ name = "GondolaStation", x0 = -49, z0 = 140, x1 = -30, z1 = 159 },
+	{ name = "Sparkworks", x0 = 114, z0 = 107, x1 = 157, z1 = 154 },
 	-- The Land Office counter (PlotService.LandOfficeAt) and its sign.
 	{ name = "LandOffice", x0 = 134, z0 = 72, x1 = 162, z1 = 98 },
 } :: { Rect }
@@ -158,7 +160,15 @@ TownTreeData.Sites = {
 	-- low: the budget every server plants.
 	cluster("padSW1", -59, 25, 16, 4, "low", "south-west of the spawn pad, west of the Forest Path"),
 	cluster("padSW3", -106, 10, 16, 3, "low", "the meadow between the Forest Path and the Hills Road"),
-	cluster("strip1", 149, 129, 16, 4, "low", "west of the showroom hall, past the Land Office, by the loading pad"),
+	cluster(
+		"strip1",
+		192,
+		44,
+		16,
+		4,
+		"low",
+		"south of the truck lot path, west of the showroom (was (149, 129): Sparkworks stands there)"
+	),
 	cluster("strip2", 152, 205, 16, 3, "low", "west of the showroom hall, its north-west corner"),
 	cluster("forecourt", 316, 67, 16, 2, "low", "in front of the showroom, by its east end"),
 	cluster("west1", -152, 145, 16, 3, "low", "the town's west edge, by the Tool Shed and the General Store"),

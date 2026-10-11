@@ -140,6 +140,7 @@ BuildingArt.Scale = {
 	ToolShed = 1.5,
 	Dealership = 1, -- the showroom hall is built at its real size (DealershipLot.Hall)
 	HearthAndHome = 1.5,
+	Sparkworks = 1.5,
 } :: { [string]: number }
 
 -- The Tool Shed's half depth at design size. It was 7; the aisles and the
@@ -1677,6 +1678,92 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	end
 end
 
+-- The Sparkworks shop: 24 x 24 at design size, 36 x 36 once scaled, a shelf
+-- unit down each side wall and the counter at the back, the same open-front
+-- barn as Hearth & Home but with a slate roof, teal trim and a back wall of
+-- lamps and switches. It is open all day (no ShopHoursLogic span), so the
+-- hours board over the door says so. Part-built: the uploaded Sparkworks mesh
+-- (BlenderAssets "shops/Sparkworks", 20 x 16, the old demo-board building) is
+-- not this 36 x 36 shop's shape, so nothing here Dresses with it.
+BuildingArt.SparkworksHalfWidth = 12
+BuildingArt.SparkworksHalfDepth = 12
+BuildingArt.SparkworksCounterZ = 11.5 -- the counter's middle, final studs from the shop's middle
+
+local function sparkworks(model: Model, title: string, accent: Color3)
+	local plaster = Palette.PlankHoney
+	local wood = Kit.shade(accent, -0.32)
+	local HX, HZ, FLOOR, TOP = BuildingArt.SparkworksHalfWidth, BuildingArt.SparkworksHalfDepth, 0.4, 10
+	local mid = (FLOOR + TOP) / 2
+	local wallH = TOP - FLOOR
+	local DOOR_HALF, DOOR_H = 5, 8
+
+	Kit.part(model, "Floor", V3(2 * HX, FLOOR, 2 * HZ), CF(0, FLOOR / 2, 0), PLANK[2], MAT.WoodPlanks)
+	local function wall(cf: CFrame, w: number, h: number): Part
+		return Kit.part(model, "Wall", V3(w, h, 0.6), cf, plaster, MAT.WoodPlanks)
+	end
+	wall(CF(-HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, wallH)
+	wall(CF(HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, wallH)
+	wall(CF(0, mid, HZ), 2 * HX, wallH)
+	-- A 10-stud door (15 once scaled) so a carried box walks in; the header is
+	-- the leaf the hours board hangs on, the two door leaves are added once
+	-- the shop is scaled (ShopDoor).
+	local sideW = HX - DOOR_HALF
+	wall(CF(-(DOOR_HALF + sideW / 2), mid, -HZ), sideW, wallH)
+	wall(CF(DOOR_HALF + sideW / 2, mid, -HZ), sideW, wallH)
+	wall(CF(0, (DOOR_H + TOP) / 2, -HZ), 2 * DOOR_HALF, TOP - DOOR_H)
+	markHoursLeaf(dBox(model, "DoorHeader", V3(2 * DOOR_HALF + 1, 0.5, 1.0), CF(0, DOOR_H - 0.25, -HZ - 0.1), TRIM))
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(
+			model,
+			"DoorJamb",
+			V3(0.5, DOOR_H - 0.5 - FLOOR, 1.0),
+			CF(s * (DOOR_HALF + 0.2), (DOOR_H - 0.5 + FLOOR) / 2, -HZ - 0.1),
+			TRIM
+		)
+	end
+	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), Palette.RoofSlate, MAT.Slate)
+
+	-- The name board stands over the roof on two posts, like the General Store's.
+	local signW, signH = 20, 3
+	local signY, signZ = TOP + 0.65 + BuildingArt.SignRise + NAME_FRAME + signH / 2, -HZ - 0.6
+	nameSign(model, CF(0, signY, signZ), signW, signH, title, accent, wood, TRIM, false)
+	for _, x in ipairs({ -5, 5 }) do
+		gooseneck(model, CF(x, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
+		local top = signY - signH / 2 - NAME_FRAME
+		local base = TOP + 0.65
+		dBox(
+			model,
+			"SignPost",
+			V3(0.4, top - base + 0.3, 0.4),
+			CF(x * 1.6, (top + base - 0.3) / 2 + 0.3, signZ + 0.1),
+			wood
+		)
+	end
+
+	-- The counter stands at the back (customer side faces -Z), the keeper
+	-- behind it; the shelf units stop short of it.
+	placeCounter(model, 0, BuildingArt.SparkworksCounterZ / BuildingArt.Scale.Sparkworks)
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
+	end
+	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
+
+	-- The back wall behind the keeper: a row of spark lamps, each over its
+	-- switch, and a copper run joining them. Looks only.
+	local backZ = HZ - 0.3
+	for i = 1, 5 do
+		local x = (i - 3) * 3.4
+		local lampBit =
+			dBox(model, "SparkLamp", V3(0.9, 0.9, 0.3), CF(x, 7.4, backZ - 0.15), Palette.SparkTeal, MAT.Neon)
+		lampBit.CastShadow = false
+		dBox(model, "WallSwitch", V3(0.5, 0.8, 0.2), CF(x, 5.9, backZ - 0.1), Palette.IronBlack, MAT.Metal)
+	end
+	dBox(model, "CopperRun", V3(14.4, 0.2, 0.2), CF(0, 6.65, backZ - 0.08), Palette.Brass, MAT.Metal)
+	local board = Kit.part(model, "BackSign", V3(9, 1.6, 0.2), CF(0, 9, backZ - 0.2), Palette.SignInk, MAT.Wood)
+	Kit.signText(board, "WIRE IT UP", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	Kit.decor(board, false)
+end
+
 -- Shelf slots are attachments on the counter (they are not parts, so the
 -- shop stays inside its part budget). The store zone is attributes in
 -- build space; BoxService turns them into a world volume with the pivot
@@ -1822,6 +1909,15 @@ function BuildingArt.InteriorFrame(kind: string, s: number): { frame: ShopInteri
 			frame = { floorTop = 0.4, halfW = hx - 0.4, halfD = hz - 0.4, ceilY = 15 },
 			extra = { -hx + 0.4, hx - 0.4, -hz + 0.4, hz - 0.4 },
 		}
+	elseif kind == "Sparkworks" then
+		return {
+			frame = {
+				floorTop = 0.4 * s,
+				halfW = BuildingArt.SparkworksHalfWidth * s - 0.45,
+				halfD = BuildingArt.SparkworksHalfDepth * s - 0.45,
+				ceilY = 10 * s - 0.4,
+			},
+		}
 	end
 	return {
 		frame = {
@@ -1881,6 +1977,19 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			groundY = 0.4,
 			accent = accent,
 		}
+	elseif kind == "Sparkworks" then
+		return {
+			kind = kind,
+			halfW = BuildingArt.SparkworksHalfWidth * s,
+			frontZ = -(BuildingArt.SparkworksHalfDepth * s + 0.45),
+			doorCx = 0,
+			doorHalf = 5 * s,
+			doorTop = 7.5 * s,
+			wallTop = 10 * s,
+			roofTop = 10.65 * s,
+			groundY = 0.4 * s,
+			accent = accent,
+		}
 	end
 	return {
 		kind = kind,
@@ -1924,6 +2033,17 @@ function BuildingArt.DoorSpec(kind: string, s: number, accent: Color3): ShopDoor
 			color = STEEL_DARK,
 			trim = Kit.shade(accent, -0.35),
 		}
+	elseif kind == "Sparkworks" then
+		return {
+			style = "swing",
+			x0 = -5 * s,
+			x1 = 5 * s,
+			y0 = 0.4 * s,
+			y1 = 7.5 * s,
+			z = -(BuildingArt.SparkworksHalfDepth + 0.15) * s,
+			color = Kit.shade(accent, -0.05),
+			trim = Kit.shade(accent, -0.4),
+		}
 	end
 	return {
 		style = "swing",
@@ -1955,6 +2075,8 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		toolShed(model, title, accent)
 	elseif kind == "Dealership" then
 		dealership(model, title, accent)
+	elseif kind == "Sparkworks" then
+		sparkworks(model, title, accent)
 	else
 		hearthAndHome(model, title, accent)
 	end
@@ -1989,10 +2111,10 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 	end
 	addHoursBoard(model, kind)
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
-	if kind ~= "Dealership" then -- the hall has no uploaded mesh
+	if kind ~= "Dealership" and kind ~= "Sparkworks" then -- the hall has no uploaded mesh; its mesh is the old 20 x 16 demo building
 		TownMeshes.Dress(model, TownModels.ShopAsset(kind), { scale = BuildingArt.MeshStretch(kind) })
 	end
-	if kind == "ToolShed" or kind == "HearthAndHome" then
+	if kind == "ToolShed" or kind == "HearthAndHome" or kind == "Sparkworks" then
 		placeShelfSlots(model, kind, s)
 	end
 	local frame = BuildingArt.InteriorFrame(kind, s)

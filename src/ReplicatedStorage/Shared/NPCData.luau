@@ -374,6 +374,57 @@ NPCData.List = {
 		},
 	},
 	{
+		-- Juno keeps the Sparkworks counter (BuildingArt Sparkworks, east of the
+		-- Mill Road at (135, 132)). The shop has no hours (ShopHoursLogic has no
+		-- span for it), so she never sleeps. Her counter is the box counter like
+		-- the other three keepers': a box on it, Talk to ask, Yes to pay.
+		id = "Juno",
+		name = "Juno",
+		role = "Wire keeper",
+		shop = "Sparkworks",
+		spot = { kind = "counter", model = "Sparkworks", fallback = Vector3.new(135, 0, 146) },
+		idle = "glasses",
+		promptLift = 80,
+		look = {
+			name = "Juno",
+			role = "Wire keeper",
+			seed = 67,
+			skin = hex("#C98B66"),
+			shirt = hex("#2E8B8B"),
+			undershirt = hex("#EFE6D2"),
+			pants = hex("#3F4658"),
+			boots = hex("#3A2B22"),
+			hair = hex("#2B2230"),
+			hairStyle = "ponytail",
+			hat = "none",
+			glasses = hex("#C9A24A"),
+			apron = hex("#8A5A36"),
+			gloves = hex("#B87333"),
+			toolbelt = true,
+			rolledSleeves = true,
+			carry = "wrench",
+		},
+		greetings = { "Mind the sparks!", "Welcome to Sparkworks.", "Ooh, a customer. Watch the wires." },
+		lines = {
+			"A lever holds on or off. A button only blinks. Pick the one your door needs.",
+			"Two inputs into an AND gate and both must be on. That is the whole trick.",
+			"A Wood Detector on a belt, a Sweeper on the next one: the planks sort themselves.",
+			"Lasers reach forty studs. Aim the emitter true, and the receiver does the rest.",
+			"Pieces are placed from your hammer for free once you have paid for them.",
+			"You need a plot to wire anything. The Land Office is just up the road.",
+		},
+		react = {
+			morning = { "Copper's cold in the morning. Gloves on, please." },
+			day = { "Everything on the shelves is tested. Mostly by me." },
+			evening = { "Lamps glow best at dusk. Ask any Spark Lamp." },
+			night = { "Open all night. Sparks don't keep hours." },
+			rain = { "Rain and live wire don't mix. Come inside." },
+			storm = { "Storm's loud out there. Lightning's got nothing on a Clock gate." },
+			unsold = { "Sell some wood first. Then come wire something clever." },
+			sale = { "Cash in hand? A lever and a lamp make a fine first circuit." },
+		},
+	},
+	{
 		id = "Gus",
 		name = "Gus",
 		role = "Gondola operator",
@@ -870,7 +921,7 @@ function NPCData.All(): { NPC }
 end
 
 -- The shops that need a keeper behind their Counter.
-NPCData.Shops = { "ToolShed", "Dealership", "HearthAndHome" }
+NPCData.Shops = { "ToolShed", "Dealership", "HearthAndHome", "Sparkworks" }
 
 -- Talk, on every NPC. E and ButtonX, the same Interact key as Buy (InputKit
 -- lets Talk and Buy share it; the door uses Open, F / ButtonY, so a closed

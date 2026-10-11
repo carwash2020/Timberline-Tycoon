@@ -46,7 +46,9 @@ function BoxUnpack.Mode(kind: string, itemId: string?): Mode
 	elseif kind == "Machine" then
 		local machine = if itemId then ItemCatalog.GetMachine(itemId) else nil
 		return if machine and machine.placeFromBox == true then "place" else "stock"
-	elseif kind == "Blueprint" then
+	elseif kind == "Blueprint" or kind == "Logic" then
+		-- A plan, or a Sparkworks piece: it goes to the buyer's stock and the
+		-- hammer places it.
 		return "stock"
 	end
 	return "pickup"

@@ -35,6 +35,7 @@ return function(t)
 		{ name = "Dealership", x = 189, z = 91 },
 		{ name = "Tool Shed", x = -84, z = 88 },
 		{ name = "General Store", x = -100, z = 159 },
+		{ name = "Sparkworks", x = 135, z = 114 },
 	}
 
 	local function dist(x, z, ox, oz)

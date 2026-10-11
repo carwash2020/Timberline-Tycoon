@@ -214,7 +214,7 @@ One upgraded look for the town buildings. Shops keep the pinned footprints (Tool
 - Hearth and Home: green sign (#2F5D3A). The porch posts stand just inside the front wall (the pad starts at the wall; posts outside it sat on grass).
 - Dealership: red sign (#D9534F). The showroom walkway is clear. The three nearest bays have a low plinth and a dim lamp. The porch lantern is no brighter than the showroom lamps.
 - Weigh House: red metal roof, a round scale on the side. No new price text.
-- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage (the live office is still PlotService's).
+- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board; the live Sparkworks shop is a separate build, see "Sparkworks shop in the world"), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage (the live office is still PlotService's).
 - The sky forge court, the pond dock, the campfire, the lookout and the park bench are in the built town (`TownScenes`). Walk south-west across the meadow: the forge court is at (-112, -20), front toward the mill, stone floor, anvil, ORDERS board, four relic sockets. The lookout just west of it (-136, -20) has a ladder you can climb and a telescope aimed at town. On the green south of the main street, west of the well: a park bench at (-84, 56) and a teepee campfire at (-72, 56) with a pot. South of town, the fishing dock stands on the pond's north bank (pond at 78, -182): planks, posts in the water, a rod, a bucket and a crate. No second sheet of water.
 
 **Phone emulator**
@@ -3559,6 +3559,39 @@ Xbox
 3. Icon drafts and uploads (his).
 4. Default used: stage badges (S4, S8) are not added until E's stage events land.
 5. Default used: names show as Roblox usernames (what `LeaderboardService` caches), not display names.
+
+## Sparkworks shop in the world (branch `phase-2/v1-sparkworks-shop`, 11 October 2026)
+
+What changed: the Sparkworks building, its shelves, its keeper and the path to its door. Before this the automation pieces (logic pieces, belt pieces, switch and tilted belts, supports, wood detector, sweeper, lasers) had stock data and a buy path but no shop in the world, so nobody could buy them. The details are in STATUS.md (Sparkworks shop in the world).
+
+Files: `BuildingArt` (`sparkworks`, `Scale.Sparkworks`, the Sparkworks branches of `InteriorFrame`, `FacadeSpec`, `DoorSpec`), `ShopInterior`, `ShopFacade`, `StoreStock` (the Sparkworks lanes and zone), `WorldPlan` / `WorldLayout` / `TownTreeData`, `NPCData` (Juno), `DialogueData`, `DialogueService`, `BoxService.StockMap`, `ItemModel` / `BoxLook` / `BoxUnpack` (Logic boxes), `NewsLogic`. Specs: `SparkworksShop.spec.luau`. Scene views: `bash tools/preview/shoot.sh stores 11` to `15` (Sparkworks from above, from the door, the two shelves, the counter) and `town 16` to `18` (from its path, from the Mill Road, from above).
+
+### Studio checks (Connor)
+
+PC
+1. Walk east along the East Link (the road past the Land Office). North of it, past the PLOT DISTRICT sign, a teal-and-slate shop with a big SPARKWORKS board stands back from the road. A gravel path runs from the road to its door. The board reads the right way round from the road, and the sandwich board by the door says OPEN ALL DAY.
+2. Walk in. A shelf unit stands down each side with teal-backed boxes, hanging boards read BELTS + SWITCHES (left) and GATES + OUTPUTS (right), a red runner leads to the counter, and Juno stands behind it facing you with her name and "Wire keeper" over her. Nothing floats, sinks or clips: the boxes stand on their coloured blocks, the lamps on the back wall are over their switches.
+3. Aim at a box: a tag shows its name and price (Button $320, Lever $520, Pressure Plate $640, Wall Switch $100, AND/OR/XOR $260, NOT $200, Delay $520, Sustain $520, Clock $902, Spark Lamp $150, Glow Wire $720, Hatch $830, Switch Belt $150, Tilted Belt $120, Belt Support $40, Wood Detector $200, Wood Sweeper $450, Laser Emitter $380, Laser Receiver $220). Each box shows its own piece in its window (a lever, a gate, a belt), not a plain parcel. There are 21 boxes.
+4. With no plot: carry a Lever to the counter, press Talk on Juno, Yes. She says to buy a plot at the Land Office first and no cash moves. Buy a plot (Land Office, east of the shop's road), come back, repeat: the offer reads "Take this Lever for $520?", Yes, your cash drops by exactly that, and you are handed the box.
+5. Take the box to your plot and open it (E): the Lever is in your hammer's stock and places for nothing. Do the same with a Switch Belt: opening it starts the placement ghost.
+6. Say hello without a box: Juno greets you and says one of her own lines. Walk away: she lets you go. She is there at night too (no hours, the door never shuts).
+7. Open What's New (Settings): the Sparkworks line says it sells logic pieces, belts and lasers and that you need a plot first.
+
+Phone (667 x 375)
+8. Walk to the shop from the spawn: the name board reads from the East Link. Inside, the Buy and Talk prompts are at least 44 px and clear of the thumbstick; the offer card's Yes and No sit above the hotbar.
+9. The aisle is wide enough to walk a carried box in and out without catching the shelves.
+
+Xbox
+10. Walk up with a box: Talk on Juno is ButtonX, the card's Yes and No move with the D-pad, A answers, B closes. Nothing is bound to R2.
+
+### Awaiting Connor
+
+1. Where the shop stands. Default used: in the town, east of the Mill Road at (135, 132). An older note put the keeper on the ferry isle's dock side; that would put the automation pieces behind a ferry trip. Say if you want it on the isle instead (a new map change).
+2. Hours. Default used: open all day, no hours (the keeper never sleeps). One line in `ShopHoursLogic` gives it hours.
+3. The keeper's name and look (Juno, Wire keeper) and her lines are drafts.
+4. Prices are unchanged (the Lane F and W proposals). The belt pieces, sweeper and lasers are still PROPOSALS.
+5. The shop is part-built: the uploaded Sparkworks mesh is the old 20 x 16 demo building, a different shape. A mesh for this 36 x 36 shop would be a new asset.
+6. A map chip and a street sign for it were left out so the spawn view stays as it is. Say if you want one.
 
 
 ## Lane E: Studio checklist (11 October 2026)
