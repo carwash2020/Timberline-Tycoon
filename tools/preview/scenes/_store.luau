@@ -13,6 +13,7 @@
 -- Use: return Store.scene({ kind, title, accent, keeper, cameras = function() ... end })
 -- where cameras returns { entrance = cam, tierStand = cam, phone = cam, night = cam }
 -- and a cam is { pos, target, label?, fov? } (night is shot with the night preset);
+-- opts.populate(ctx, root, shop) may add the rest of the store (the Dealership's lot);
 -- cameras may also return extra = { cam, ... }, views 5 and up, for checking details.
 local Store = {}
 
@@ -66,6 +67,10 @@ function Store.scene(opts)
 			end
 			Kit.placeAt(shop, CF.new(0, 0, 0))
 			shop.Parent = root
+			-- (A store with more than its shell, like the Dealership's vehicle lot, adds it here.)
+			if opts.populate then
+				opts.populate(ctx, root, shop)
+			end
 
 			local counter = shop:FindFirstChild("Counter")
 			if counter then
