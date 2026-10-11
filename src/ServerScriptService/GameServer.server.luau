@@ -470,6 +470,7 @@ local function completeSale(
 	-- After the sale's toasts, so rewards read last.
 	QuestService.Event(player, "logsSold", count)
 	DailyService.Event(player, "logsSold", count, byWood, credited)
+	safely("FieldGuideService.Stamp", FieldGuideService.Stamp, player, byWood)
 end
 
 local function onSellLogs(player: Player)
@@ -633,6 +634,7 @@ local function onWoodSold(sale: SellService.Sale)
 		pieces = sale.pieceVolumes,
 		figured = sale.figured,
 	})
+	safely("FieldGuideService.Stamp", FieldGuideService.Stamp, player, sale.woods)
 end
 
 -- Each Init on its own (safely): one failing leaves that service broken
@@ -665,7 +667,7 @@ safely(
 	remote.ResetTutorial,
 	remote.TutorialSeen
 )
-safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop)
+safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop, remote.ForemanTurnIn)
 safely("EventService.InitEvent", EventService.InitEvent, notify)
 safely("BiomeService.Init", BiomeService.Init, notify)
 safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)
@@ -1120,6 +1122,11 @@ BootReport.StartStubs({
 			if BadgeService.Init then
 				BadgeService.Init()
 			end
+			-- "Discover a new area" daily goal: once per new area (BadgeService
+			-- fires it from Poll; DailyService counts each area once a day).
+			BadgeService.OnNewArea(function(player: Player, areaId: string)
+				DailyService.Area(player, areaId)
+			end)
 		end,
 	},
 })

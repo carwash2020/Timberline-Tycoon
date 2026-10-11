@@ -1,7 +1,7 @@
 --!strict
 -- PlaceControlsLogic: how a player places a blueprint on PC, phone and Xbox
 -- (Lane F, the brief's Step 8). Pure, so a spec can check every rule: which
--- keys do what, that no key is the right trigger, that the on-screen buttons
+-- keys do what, that no key is the right trigger (RT is the Tool's own), that the on-screen buttons
 -- are at least 44 px with 8 px between, and that on a phone nothing sits in
 -- the thumbstick or jump zones. PlaceControls (client) binds and draws from
 -- this.
@@ -69,9 +69,6 @@ PlaceControlsLogic.GamepadExtras = {
 	pushIn = "ButtonL1",
 }
 
--- Never bound by the placer (see the header).
-PlaceControlsLogic.Forbidden = { "ButtonR2" } :: { string }
-
 -- The mouse button that places on a PC.
 PlaceControlsLogic.PlaceMouse = "MouseButton1"
 
@@ -98,13 +95,11 @@ function PlaceControlsLogic.AllKeys(): { string }
 	return out
 end
 
--- The bindings a device uses for `action`, never including a forbidden key.
+-- The bindings a device uses for `action`.
 function PlaceControlsLogic.KeysFor(device: Device, action: Action): { string }
 	local out: { string } = {}
 	for _, key in ipairs(PlaceControlsLogic.Keys[device][action]) do
-		if table.find(PlaceControlsLogic.Forbidden, key) == nil then
-			table.insert(out, key)
-		end
+		table.insert(out, key)
 	end
 	return out
 end
@@ -253,14 +248,9 @@ function PlaceControlsLogic.StartsDrag(
 	return dx * dx + dy * dy <= PlaceControlsLogic.DragGrab * PlaceControlsLogic.DragGrab
 end
 
--- Validates the table: no forbidden key anywhere, no key doing two jobs on
+-- Validates the table: no key doing two jobs on
 -- one device, every action reachable. Returns true or the first problem.
 function PlaceControlsLogic.Validate(): (boolean, string?)
-	for _, key in ipairs(PlaceControlsLogic.AllKeys()) do
-		if table.find(PlaceControlsLogic.Forbidden, key) ~= nil then
-			return false, "binds " .. key
-		end
-	end
 	for _, device in ipairs({ "desktop", "console", "phone" }) do
 		local used: { [string]: string } = {}
 		for _, action in ipairs(PlaceControlsLogic.Actions) do

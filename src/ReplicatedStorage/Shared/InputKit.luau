@@ -92,7 +92,7 @@ InputKit.Target = {
 	},
 	placer = {
 		{ action = "Rotate", keyboard = Enum.KeyCode.R, gamepad = Enum.KeyCode.DPadRight },
-		{ action = "Place", gamepad = Enum.KeyCode.ButtonR2 },
+		{ action = "Place", gamepad = Enum.KeyCode.ButtonA }, -- as PlaceControlsLogic; RT is the tool's, never bound
 		{ action = "Cancel", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB },
 		-- Raise and lower: E and C on a keyboard; on a gamepad LT held and the
 		-- LEFT (movement) stick up or down; the same stick flicks it round
@@ -104,13 +104,12 @@ InputKit.Target = {
 		{ action = "Pull", gamepad = Enum.KeyCode.ButtonL1 }, -- and nearer
 	},
 	drag = {
-		{ action = "Grab", gamepad = Enum.KeyCode.ButtonR2 },
+		{ action = "Grab", gamepad = Enum.KeyCode.ButtonR1 }, -- held; RT is the axe's
 		{ action = "Yaw", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.DPadLeft },
 		{ action = "Yaw", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.DPadRight },
 		{ action = "Lock", gamepad = Enum.KeyCode.ButtonL2 }, -- hang it in the air; the left stick then turns and tips it (and walks nobody)
 		{ action = "Turn", gamepad = Enum.KeyCode.Thumbstick1 }, -- LT held: left/right spins, up/down tips
 		{ action = "Further", gamepad = Enum.KeyCode.DPadUp },
-		{ action = "Further", gamepad = Enum.KeyCode.ButtonR1 },
 		{ action = "Nearer", gamepad = Enum.KeyCode.DPadDown },
 		{ action = "Nearer", gamepad = Enum.KeyCode.ButtonL1 },
 	},
@@ -127,11 +126,11 @@ InputKit.Target = {
 } :: { [string]: { Bind } }
 
 -- The wiring tool (WireTool, BUILD mode). Like the placer it turns world
--- prompts off while it is up, so X is free to mean Cut there. RT picks what
+-- prompts off while it is up, so X is free to mean Cut there. RB picks what
 -- the crosshair is on (a tap or a click does it on phone and PC), B or Q
 -- leaves. WireSafe checks the list has no key twice.
 InputKit.WireBinds = {
-	{ action = "Pick", gamepad = Enum.KeyCode.ButtonR2 },
+	{ action = "Pick", gamepad = Enum.KeyCode.ButtonR1 },
 	{ action = "Cut", keyboard = Enum.KeyCode.X, gamepad = Enum.KeyCode.ButtonX },
 	{ action = "Done", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB },
 } :: { Bind }

@@ -26,6 +26,7 @@
 local CharacterArt = require(script.Parent.Art.CharacterArt)
 local FacingLogic = require(script.Parent.FacingLogic)
 local FerryLogic = require(script.Parent.FerryLogic)
+local ForemanData = require(script.Parent.ForemanData)
 local PlotSalesmanData = require(script.Parent.PlotSalesmanData)
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 local TollLogic = require(script.Parent.TollLogic)
@@ -95,6 +96,13 @@ end
 ---------------------------------------------------------------------------
 -- The roster
 ---------------------------------------------------------------------------
+
+-- The mill's MillForemanSpot pad in world studs: the mill hub is at (0, 110),
+-- the building (front on -Z, toward the spawn and the road) stands 6.5 past
+-- it (WorldPlan.Town), and the pad is at (-17.35, -12.7) in the mill's own
+-- frame at scale 1.5.
+-- tests/ForemanSpot.spec checks it against the built mill.
+NPCData.ForemanSpot = Vector3.new(-25.09, 0, 96.74)
 
 NPCData.List = {
 	{
@@ -781,6 +789,55 @@ NPCData.List = {
 			fog = { "Foggy as a barn at dawn. The counter's right here." },
 			unsold = { "Sell some wood first, then come see me about land." },
 			sale = { "Wood money in your pocket? A plot is a fine way to spend it." },
+		},
+	},
+	{
+		-- Rook Calloway, the Sawmill Foreman: pays the day's three jobs
+		-- (DailyService.TurnIn). He stands on the mill's MillForemanSpot
+		-- pad in the yard west of the office door (BuildingArt.Sawmill),
+		-- facing the road. NPCController opens his talk box and then the job
+		-- board (DailyUI.OpenForeman); the lines come from ForemanData.
+		id = ForemanData.Id,
+		name = ForemanData.Name,
+		role = ForemanData.Role,
+		spot = {
+			kind = "fixed",
+			position = NPCData.ForemanSpot,
+			lookAt = NPCData.ForemanSpot + Vector3.new(0, 0, -60),
+		},
+		idle = "clipboard",
+		promptLift = 0,
+		look = {
+			name = ForemanData.Name,
+			role = ForemanData.Role,
+			seed = 307,
+			skin = hex("#C48A62"),
+			shirt = hex("#5C7A4A"),
+			stripe = hex("#33482A"),
+			pants = hex("#4A4036"),
+			boots = hex("#3A281C"),
+			hair = hex("#3A2A20"),
+			hairStyle = "short",
+			beard = "stubble",
+			beardColor = hex("#3A2A20"),
+			hat = "hardhat",
+			hatColor = hex("#E0A82A"),
+			hatTrim = hex("#B5821C"),
+			toolbelt = true,
+			rolledSleeves = true,
+			carry = "clipboard",
+		},
+		greetings = { "Hold it right there. Jobs?", "Back on the clock?", "Mill's running. So are the jobs." },
+		lines = {
+			"Three jobs a day, every day. Do them all and the pay climbs with your streak.",
+			"Fell, load, sell. It is not fancy. It pays.",
+			"I keep the jobs on the board by the door. Finished ones, you hand in to me.",
+			"Miss a day and the streak starts over. I don't make the rules. I just write them down.",
+		},
+		react = {
+			morning = { "Early start. The board is fresh." },
+			night = { "Mill's quiet. Jobs reset at midnight, UTC." },
+			rain = { "Rain doesn't stop the mill. Or the jobs." },
 		},
 	},
 } :: { NPC }

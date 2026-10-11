@@ -1,9 +1,9 @@
-# Agent handoff (8 October 2026): read this, then STATUS.md
+# Agent handoff (updated 11 October 2026): read this, then STATUS.md
 
 Written at the end of a long session. It says where the work stands **right now** and what to do next.
-STATUS.md has the standing decisions and the history; some of its entries still say "branch ..., not
-merged". **Every one of those branches is merged** (see the list below). When this file and STATUS.md
-disagree about merge state, this file wins. Fix the stale STATUS.md lines when you next edit it.
+STATUS.md has the standing decisions and the history. Its branch notes were
+refreshed on 11 October 2026 and their merge marks are current; if the two ever
+disagree about merge state, check `git log origin/main` and fix the stale one.
 
 ## Who and how to work
 
@@ -17,7 +17,7 @@ disagree about merge state, this file wins. Fix the stale STATUS.md lines when y
 - Standing instruction: open a PR for each change, subscribe to it, **merge when CI is green** (squash,
   pass `expectedHeadSha`). Commits: `phase-2: <what>`. Never put a model name in commits or PRs.
 - Owner tools are for Connor only (Elucidhealer618; Xbox Catman9732). The server never trusts a client
-  `IsOwner`. Still needed from him: the two numeric UserIds for `AdminLogic.OwnerUserIds`.
+  `IsOwner`. `AdminLogic.OwnerUserIds` holds Elucidhealer618 (5682024709); the second id (Catman9732) is still needed from him.
 - Verify with `./scripts/check.sh` (about 10 minutes; StyLua, Selene, luau-lsp strict, Lune specs,
   ECONOMY.md and ECONOMY_V1.md current). CI runs the same script, one run per push event plus one per PR.
   After a balance change re-run `lune run tools/economy` and `tools/economy1` and commit the reports.
@@ -40,18 +40,21 @@ disagree about merge state, this file wins. Fix the stale STATUS.md lines when y
 
 ## State of main
 
-`main` is at #116 (`d001a6e`). **No PRs are open and no agents are running.** CI was green on every
-merge. **Nothing from #90 onward has been seen in Studio by Connor** except one load test (see below).
+`main` is at `2bf981d` (#139) as of 11 October 2026. CI was green on every merge. V1 is merged except three PRs that
+are still open and are not on main: #135 machine meshes (`phase-2/v1-k-wirein`), #136 backlog meshes
+(`phase-2/v1-backlog-meshes`) and #138 NPCs, tutorial and goals (`phase-2/v1-e-npcs-ui`). **Nothing from #90 onward has
+been seen in Studio by Connor** except one load test. STATUS.md lists every merged V1 PR and its lane;
+`V1_STUDIO_CHECKLIST.md` is the one Studio checklist and the list of open decisions with their defaults.
 
-Merged this stretch, newest last: #90 store polish; sell station fixes; Sky Bin, sawmill/planer tiers and
-conveyors (boxes that open and place once); NPC dialogue box and text-out-of-walls; store bugs; LT2 ground
-and raised 1-stud plot platforms; LT2 building kit; window boxes and stepped shelves; Lower/Higher quality
-choice; faster loading (97 s to about 9 s); owner hub and paid-item grants; #106 join race fix; #107 plot
-picker shows which pad (camera, map card, pillar, claim fade); #108 final pass; #109 held shop boxes hang
-steady; #110 uploaded vehicle meshes placed on the part-built hull; #111 NPCs face you while you talk and
-keepers/Old Hank use the full dialogue box; #112 drop the axe with B / Q / hotbar long press (no button);
-#113 manual saves, Restart save in Settings, Unload base / Load base (LT2 style); #114 **hotfix** for Talk
-and Buy dead after #107 to #111; #115 floating NPC bubbles removed; #116 54 more choppable trees in town.
+Merged since #116, newest first: #139 Bayou and Red Mesa; #137 badges and the town board; #121 ring map and world;
+#131 building and blueprints; #133 purchases redesign; #134 end game follow-ups; #130 Blender pipeline; #129
+automation; #132 end game; #128 UI round 3; #124 UI; #122 axes and boxes; #119 nature; #127 faster CI; #120
+buildings; #125 mining; #123 Sparkworks; #126 real-mesh previews; #118 A1 economy, saves and caps; #117 this note.
+Earlier, newest last: #90 store polish; sell station fixes; Sky Bin, sawmill/planer tiers and conveyors; NPC
+dialogue box; LT2 ground and raised plot platforms; the building kit; window boxes; Lower/Higher quality choice;
+faster loading; owner hub and paid-item grants; #106 join race fix; #107 plot picker; #108 final pass; #109 held shop
+boxes; #110 vehicle meshes; #111 NPCs face you; #112 drop the axe with B / Q; #113 manual saves and Unload base;
+#114 hotfix for dead Talk and Buy; #115 no NPC bubbles; #116 54 more choppable trees in town.
 
 ## What is unverified and where the risk is
 
@@ -103,6 +106,6 @@ and Buy dead after #107 to #111; #115 floating NPC bubbles removed; #116 54 more
 
 1. Get Connor's Studio results on the list above, starting with Talk / Buy (the live regression).
 2. Fix whatever the Output lines show; keep each fix minimal and add a spec that reproduces it.
-3. When he sends the UserIds, set `AdminLogic.OwnerUserIds` and test the owner hub.
+3. When he sends Catman9732's UserId, add it to `AdminLogic.OwnerUserIds` and test the owner hub.
 4. Then the cleanups in STATUS.md's open items: `ForestFiller` speed, vehicle leftovers, mesh permissions.
 5. Keep STATUS.md current in the same PR as any change that moves it, and fix its stale "not merged" lines.

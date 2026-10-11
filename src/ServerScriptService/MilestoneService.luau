@@ -30,6 +30,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local ProfileService = require(script.Parent.ProfileService)
@@ -199,6 +200,23 @@ local function logFunnelStep(player: Player, session: Session, name: string)
 	end
 end
 
+-- V1 progression: the first time a player reaches each stage S1 to S8
+-- (StageOf) it is remembered as "Stage:Sn" in profile.onboarding (account-
+-- wide, so once per player across save slots, and no new save field) and
+-- sent as a progression event. Marked first, so a failing log is never
+-- repeated. Server only.
+function MilestoneService.CheckStages(player: Player, profile: Profile)
+	for _, n in ipairs(StageOf.Pending(profile)) do
+		profile.onboarding[StageOf.Key(n)] = true
+		local ok, err = pcall(function()
+			(AnalyticsService :: any):LogProgressionCompleteEvent(player, "Stages", "S" .. tostring(n))
+		end)
+		if not ok then
+			warn("[MilestoneService] Analytics stage event failed: " .. tostring(err))
+		end
+	end
+end
+
 -- `notifyFn` shows a toast to one player (GameServer's notify);
 -- `activeLoop` is the core loop that runs (CoreLoop.Active(); 1 when not
 -- given).
@@ -244,6 +262,7 @@ function MilestoneService.Start(player: Player, profile: Profile)
 	}
 	sessions[player] = session
 	MilestoneService.Mark(player, "Joined")
+	MilestoneService.CheckStages(player, profile)
 end
 
 -- Records a milestone (one of the FUNNEL names). Only the first time per
@@ -262,6 +281,7 @@ function MilestoneService.Mark(player: Player, name: string)
 		stopwatch(player, session, name)
 	end
 	logFunnelStep(player, session, name)
+	MilestoneService.CheckStages(player, session.profile)
 	-- Badges (and anything else) listen here, so a mark doesn't need a
 	-- second call site in the service that noticed it.
 	MilestoneService.Event(player, "mark", { name = name })
@@ -298,6 +318,7 @@ function MilestoneService.CashEarned(player: Player, amount: number)
 		return
 	end
 	session.earned += amount
+	MilestoneService.CheckStages(player, session.profile)
 	local profile = session.profile
 	local axe = ItemCatalog.NextAxe(profile.bestAxeTier)
 	local price = if axe then ShopLogic.Price(axe, loop) else 0
