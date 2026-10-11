@@ -165,6 +165,7 @@ local function rollIfNewDay(player: Player, profile: Profile): boolean
 		toast(player, profile, string.format("Rook paid your %s for yesterday's jobs.", Util.formatCash(paid)))
 	end
 	daily.day = today
+	daily.areasToday = {}
 	daily.goals = DailyData.Roll(player.UserId, today, profile.bestAxeTier, if loop == 2 then 2 else nil)
 	if daily.lastCompleteDay < today - 1 then
 		daily.streak = 0 -- a whole day went by without finishing: the streak is over
@@ -286,6 +287,28 @@ function DailyService.Event(
 		end
 		return add
 	end)
+end
+
+-- A new area was found (BadgeService.OnNewArea, from GameServer). Counts once
+-- per area per day toward "Discover a new area": a repeated event (Poll re-fires
+-- while a badge award is in flight) finishes the goal once and pays nothing here
+-- (the foreman pays on hand-in).
+function DailyService.Area(player: Player, areaId: string)
+	local profile = ProfileService.GetProfile(player)
+	if not profile or type(areaId) ~= "string" then
+		return
+	end
+	local daily = profile.daily
+	if type(daily.areasToday) ~= "table" then
+		daily.areasToday = {}
+	end
+	progress(player, profile, function(goal: Goal): number
+		if (goal.kind == "visitArea" or goal.kind == "visitNewArea") and daily.areasToday[areaId] ~= true then
+			return 1
+		end
+		return 0
+	end)
+	daily.areasToday[areaId] = true
 end
 
 -- A v2 sale paid `player` (SellService's onSold, per payee per tick): its

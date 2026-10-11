@@ -87,6 +87,9 @@ export type DailyState = {
 	-- Cash the all-done bonus still owes. Lane E pays it at the Sawmill
 	-- Foreman. 0 until then.
 	bonusOwed: number,
+	-- Area ids counted toward today's "Discover a new area" goal (reset when
+	-- the day rolls). Missing in older saves, read as empty.
+	areasToday: { [string]: boolean },
 	-- The daily-return calendar (DailyData.LoginStep; absent in older saves,
 	-- read as 0): the calendar day 1..7 last paid, and the UTC day it paid.
 	loginDay: number?,
@@ -402,6 +405,7 @@ local TEMPLATE: Profile = {
 		loginDay = 0,
 		lastLoginDay = 0,
 		bonusOwed = 0,
+		areasToday = {},
 	},
 	purchaseIds = {},
 	passes = {},
@@ -828,9 +832,11 @@ local function applyDaily(record: any)
 			loginDay = 0,
 			lastLoginDay = 0,
 			bonusOwed = 0,
+			areasToday = {},
 		}
 		return
 	end
+	daily.areasToday = booleanMap(daily.areasToday)
 	local owed = finiteNumber(daily.bonusOwed, 0)
 	daily.bonusOwed = if owed < 0 then 0 else owed
 	if type(daily.goals) ~= "table" then

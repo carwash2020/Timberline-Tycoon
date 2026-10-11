@@ -1120,6 +1120,11 @@ BootReport.StartStubs({
 			if BadgeService.Init then
 				BadgeService.Init()
 			end
+			-- "Discover a new area" daily goal: once per new area (BadgeService
+			-- fires it from Poll; DailyService counts each area once a day).
+			BadgeService.OnNewArea(function(player: Player, areaId: string)
+				DailyService.Area(player, areaId)
+			end)
 		end,
 	},
 })

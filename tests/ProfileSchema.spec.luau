@@ -1325,6 +1325,22 @@ return function(t)
 		t.eq(data.daily, once, "a second migrate leaves it identical")
 	end)
 
+	t.test("daily.areasToday: missing becomes empty, junk is cleaned, a second migrate matches", function()
+		local Schema = t.server("ProfileSchema")
+		local Util = t.shared("Util")
+		local data = Util.deepCopy(Schema.Template)
+		data.daily.areasToday = nil
+		Schema.Migrate(data)
+		t.eq(data.daily.areasToday, {})
+		data.daily.areasToday = { cave = true, bad = "yes" }
+		Schema.Migrate(data)
+		t.eq(data.daily.areasToday.cave, true)
+		t.eq(data.daily.areasToday.bad, nil)
+		local once = Util.deepCopy(data.daily)
+		Schema.Migrate(data)
+		t.eq(data.daily, once)
+	end)
+
 	t.test(
 		"Lane W: a save keeps reversed only on a belt and flip only on a Switch Belt, and old saves gain nothing",
 		function()

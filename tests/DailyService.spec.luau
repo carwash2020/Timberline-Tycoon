@@ -79,6 +79,8 @@ return function(t)
 				s.Daily.Event(s.player, "seedPlanted", goal.target)
 			elseif goal.kind == "sellFigured" then
 				s.Daily.Event(s.player, "figuredSold", goal.target)
+			elseif goal.kind == "visitArea" then
+				s.Daily.Area(s.player, "snow")
 			else
 				s.Daily.Event(s.player, "logsSold", goal.target, { [goal.wood] = goal.target }, 0)
 			end
@@ -176,6 +178,48 @@ return function(t)
 		t.eq(credited, rewards + s.DailyData.Bonus(1, 1))
 		t.eq(s.profile.cash, rewards + s.DailyData.Bonus(1, 1))
 		t.eq(s.profile.daily.bonusOwed, 0)
+	end)
+
+	t.test("Discover a new area: counts once per area per day, repeats finish it once and pay once", function()
+		local found
+		for userId = 1, 200 do
+			local s = setup({ userId = userId, loop = 2 })
+			for _, goal in ipairs(s.profile.daily.goals) do
+				if goal.kind == "visitNewArea" then
+					found = { s = s, goal = goal }
+				end
+			end
+			if found then
+				break
+			end
+		end
+		t.ok(found, "the goal rolls for some players")
+		local s, goal = found.s, found.goal
+		t.eq(goal.target, 1)
+		s.Daily.Area(s.player, "cave")
+		s.Daily.Area(s.player, "cave") -- Poll re-fires while a badge award is in flight
+		t.eq(goal.done, true)
+		t.eq(goal.paid, false)
+		t.eq(s.profile.daily.areasToday.cave, true)
+		t.eq(s.profile.cash, 0, "owed, not paid")
+		local before = s.profile.cash
+		s.Daily.TurnIn(s.player)
+		local after = s.profile.cash
+		t.ok(after - before >= goal.reward)
+		s.Daily.Area(s.player, "snow")
+		s.Daily.TurnIn(s.player)
+		t.eq(s.profile.cash, after, "a done goal pays nothing again")
+	end)
+
+	t.test("a late-game player is never rolled Discover a new area", function()
+		for userId = 1, 60 do
+			for _, loop in ipairs({ 1, 2 }) do
+				local s = setup({ userId = userId, loop = loop, tier = 6 })
+				for _, goal in ipairs(s.profile.daily.goals) do
+					t.ok(goal.kind ~= "visitArea" and goal.kind ~= "visitNewArea")
+				end
+			end
+		end
 	end)
 
 	t.test("a second hand-in pays nothing more", function()
@@ -394,6 +438,8 @@ return function(t)
 				s.Daily.WoodSold(s.player, { pieces = pieces })
 			elseif goal.kind == "sellFiguredVolume" then
 				s.Daily.WoodSold(s.player, { figured = goal.target })
+			elseif goal.kind == "visitNewArea" then
+				s.Daily.Area(s.player, "snow")
 			else
 				error("not a v2 goal: " .. goal.kind)
 			end

@@ -45,6 +45,8 @@ export type GoalKind =
 	| "sellPieces"
 	| "plantSeeds"
 	| "sellFiguredVolume"
+	| "visitArea"
+	| "visitNewArea"
 
 export type Goal = {
 	kind: GoalKind,
@@ -78,7 +80,12 @@ local TIERS: { TierScale } = {
 }
 DailyData.Tiers = TIERS
 
-local KINDS: { GoalKind } = { "fell", "sell", "earn", "sellWood", "load", "sellFigured" }
+-- "visitArea" (v1) and "visitNewArea" (v2): Discover a new area. One in each
+-- pool (the pools share no kind name), and it only rolls for
+-- the early tiers, while there are areas left to discover.
+DailyData.VisitAreaMaxTier = 5
+
+local KINDS: { GoalKind } = { "fell", "sell", "earn", "sellWood", "load", "sellFigured", "visitArea" }
 DailyData.Kinds = KINDS
 
 -- The v2 loop's sizes by axe tier, set against V2_PLAN.md §17 and the v2
@@ -112,7 +119,7 @@ local TIERS_V2: { TierScaleV2 } = {
 DailyData.TiersV2 = TIERS_V2
 
 local KINDS_V2: { GoalKind } =
-	{ "fellTrees", "sellVolume", "earnCash", "sellWoodVolume", "sellPieces", "sellFiguredVolume" }
+	{ "fellTrees", "sellVolume", "earnCash", "sellWoodVolume", "sellPieces", "sellFiguredVolume", "visitNewArea" }
 DailyData.KindsV2 = KINDS_V2
 
 -- A sold piece counts toward a "sell N logs" goal from this many u³.
@@ -164,6 +171,8 @@ local function fillTarget(goal: Goal, tier: number, loop: number?, random: () ->
 			goal.target = scale.pieces
 		elseif goal.kind == "sellFiguredVolume" then
 			goal.target = scale.figured
+		elseif goal.kind == "visitArea" or goal.kind == "visitNewArea" then
+			goal.target = 1
 		else
 			goal.target = math.ceil(scale.volume / 2)
 			local woods = DailyData.WoodsForV2(tier)
@@ -179,6 +188,8 @@ local function fillTarget(goal: Goal, tier: number, loop: number?, random: () ->
 			goal.target = scale.cash
 		elseif goal.kind == "sellFigured" then
 			goal.target = scale.figured
+		elseif goal.kind == "visitArea" or goal.kind == "visitNewArea" then
+			goal.target = 1
 		else
 			goal.target = math.ceil(scale.logs / 2)
 			local woods = DailyData.WoodsFor(tier)
@@ -343,10 +354,23 @@ function rng(seed: number): () -> number
 	end
 end
 
+-- A late-game player has found the areas: no "Discover a new area" job.
+local function dropVisit(kinds: { GoalKind }, tier: number)
+	if tier > DailyData.VisitAreaMaxTier then
+		for _, kind in ipairs({ "visitArea", "visitNewArea" }) do
+			local at = table.find(kinds, kind :: GoalKind)
+			if at then
+				table.remove(kinds, at)
+			end
+		end
+	end
+end
+
 -- Today's goals under the v2 loop (Roll with loop 2): the same draw as
 -- v1's, from the v2 pool.
 local function rollV2(random: () -> number, tier: number): { Goal }
 	local kinds = table.clone(KINDS_V2)
+	dropVisit(kinds, tier)
 	local scale = scaleForV2(tier)
 	local goals: { Goal } = {}
 	for _ = 1, math.min(DailyData.GoalsPerDay, #kinds) do
@@ -362,6 +386,8 @@ local function rollV2(random: () -> number, tier: number): { Goal }
 			goal.target = scale.pieces
 		elseif kind == "sellFiguredVolume" then
 			goal.target = scale.figured
+		elseif kind == "visitArea" or kind == "visitNewArea" then
+			goal.target = 1
 		else -- sellWoodVolume
 			goal.target = math.ceil(scale.volume / 2)
 			local woods = DailyData.WoodsForV2(tier)
@@ -379,6 +405,7 @@ function DailyData.Roll(userId: number, day: number, tier: number, loop: number?
 		return rollV2(random, tier)
 	end
 	local kinds = table.clone(KINDS)
+	dropVisit(kinds, tier)
 	local scale = scaleFor(tier)
 	local goals: { Goal } = {}
 	for _ = 1, math.min(DailyData.GoalsPerDay, #kinds) do
@@ -392,6 +419,8 @@ function DailyData.Roll(userId: number, day: number, tier: number, loop: number?
 			goal.target = scale.cash
 		elseif kind == "sellFigured" then
 			goal.target = scale.figured
+		elseif kind == "visitArea" or kind == "visitNewArea" then
+			goal.target = 1
 		else
 			goal.target = math.ceil(scale.logs / 2)
 			local woods = DailyData.WoodsFor(tier)
@@ -414,6 +443,8 @@ function DailyData.GoalText(goal: Goal): string
 		return string.format("Earn %s selling logs", Util.formatCash(goal.target))
 	elseif goal.kind == "sellFigured" then
 		return string.format("Sell %d figured logs (read the bark!)", goal.target)
+	elseif goal.kind == "visitArea" or goal.kind == "visitNewArea" then
+		return "Discover a new area"
 	elseif goal.kind == "fellTrees" then
 		return if goal.target == 1 then "Fell a tree" else string.format("Fell %d trees", goal.target)
 	elseif goal.kind == "sellVolume" then
