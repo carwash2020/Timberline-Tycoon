@@ -171,6 +171,8 @@ return function(t)
 					end,
 				},
 				NodeService = { Spawn = function() end },
+				UndergroundBuilder = { Build = function() end },
+				SecretService = { V1Init = function() end },
 				WorldClock = { Start = function() end, Refresh = function() end },
 			},
 			services = {
@@ -697,8 +699,8 @@ return function(t)
 	t.test("I-Economy: the five headlines and the tutorial lines are unchanged", function()
 		local fs = require("@lune/fs")
 		local report = fs.readFile("ECONOMY.md")
-		-- The price ladder (axes) moved the headlines to these.
-		for _, headline in ipairs({ "68 s", "5.4 min", "17.9 min", "66.3 min", "33.5 h" }) do
+		-- Ring map (shorter hauls): first $1k 17.9 to 17.8 min, Cobalt Axe 66.3 to 50.7 min, full plot 33.5 to 31.5 h; the rest as before.
+		for _, headline in ipairs({ "68 s", "5.4 min", "17.8 min", "50.7 min", "31.5 h" }) do
 			t.ok(string.find(report, headline, 1, true) ~= nil, headline)
 		end
 		t.eq(NPCData.Get("Murph").tips[1], "I'm Murph. Chop a tree, haul the wood, sell it at the mill.")

@@ -20,13 +20,15 @@ return function(t)
 
 	t.test("zones: safe inland, warn near the edge, sea past it", function()
 		t.eq(HazardLogic.SeaZone(0, 0), "safe")
-		t.eq(HazardLogic.SeaZone(edge - GameConfig.SeaWarnBand - 5, 0), "safe")
-		t.eq(HazardLogic.SeaZone(edge - 10, 0), "warn")
+		-- Ring map: Ferry Island (930, -50) straddles the east edge at z 0,
+		-- so the east checks run along z 300, clear of its shallows.
+		t.eq(HazardLogic.SeaZone(edge - GameConfig.SeaWarnBand - 5, 300), "safe")
+		t.eq(HazardLogic.SeaZone(edge - 10, 300), "warn")
 		t.eq(HazardLogic.SeaZone(-(edge - 10), 0), "warn")
 		t.eq(HazardLogic.SeaZone(0, -(edge - 10)), "warn")
-		t.eq(HazardLogic.SeaZone(edge + 5, 0), "sea")
+		t.eq(HazardLogic.SeaZone(edge + 5, 300), "sea")
 		-- The strip to the north is not sea.
-		t.eq(HazardLogic.SeaZone(0, 1700), "safe")
+		t.eq(HazardLogic.SeaZone(0, 970), "safe") -- the folded strip on the ring map
 	end)
 
 	t.test("no damage in the grace period, then 15 every 1.5 s", function()

@@ -1,7 +1,9 @@
 --!strict
 -- CraftingService: the bench. One server transaction consumes the ingots
--- and, in the same block, the owned log through WoodService. Furniture
--- recipes stay disabled.
+-- and, in the same block, the owned log through WoodService. A furniture
+-- recipe grants one placeable piece through Hooks.grant (PlotService.GrantPiece,
+-- bound by BaseBoot); it checks Hooks.canGrant first, so a refused grant takes
+-- nothing.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +19,13 @@ local MiningLogic = require(ReplicatedStorage.Shared.Mining.MiningLogic)
 local MiningService = require(script.Parent.MiningService)
 
 local CraftingService = {}
+
+-- Lane F binds these (BaseBoot): PlotService.CanGrant / GrantPiece. Unset, a
+-- furniture recipe is refused and nothing is taken.
+CraftingService.Hooks = {
+	canGrant = nil :: ((Player, string) -> (boolean, string?))?,
+	grant = nil :: ((Player, string, string) -> (boolean, string?))?,
+}
 
 local started = false
 
@@ -199,6 +208,18 @@ function CraftingService.Craft(player: Player, recipeId: string): boolean
 		end
 		return false
 	end
+	local furniture = plan.gives.furniture
+	if furniture ~= nil then
+		local can = CraftingService.Hooks.canGrant
+		local fits, why = false, nil
+		if can then
+			fits, why = can(player, furniture)
+		end
+		if not fits then
+			toast(player, if why == "full" then "No room for another one in your hammer's list" else CraftData.Soon)
+			return false
+		end
+	end
 	-- One block: ingots and chunks, then the log. No wait between them.
 	-- A grab that already took the log fails the commit above.
 	if logModel ~= nil and logModel.Parent == nil then
@@ -230,6 +251,12 @@ function CraftingService.Craft(player: Player, recipeId: string): boolean
 	mining.lamp = granted.lamp
 	mining.hardhat = granted.hardhat
 	mining.crafted = granted.crafted
+	if furniture ~= nil then
+		local grant = CraftingService.Hooks.grant
+		if grant then
+			grant(player, furniture, "craft")
+		end
+	end
 	MiningService.Refresh(player)
 	if granted.lamp then
 		toast(player, "Miner's Lamp crafted")
@@ -239,6 +266,8 @@ function CraftingService.Craft(player: Player, recipeId: string): boolean
 		toast(player, "Bomb bundle crafted")
 	elseif (plan.gives.ropes or 0) > 0 then
 		toast(player, "Rope ladder crafted")
+	elseif furniture ~= nil then
+		toast(player, recipe.name .. " crafted")
 	end
 	return true
 end

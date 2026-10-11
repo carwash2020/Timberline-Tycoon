@@ -11,6 +11,7 @@
 --   questAxe.step  0 not met   1 met, still looking   2 Maul given
 
 local GameConfig = require(script.Parent.GameConfig)
+local WorldLayout = require(script.Parent.World.WorldLayout)
 
 local HermitLogic = {}
 
@@ -25,15 +26,22 @@ HermitLogic.CaveBoxKey = "secretCaveBox"
 HermitLogic.Marks = {
 	{ key = "mark_starter", x = 24, z = -150, label = "Starter Forest" },
 	{ key = "mark_hills", x = -420, z = 260, label = "the Old Ranger Cabin" },
-	{ key = "mark_snow", x = 40, z = 1100, label = "the Snowfields" },
-	{ key = "mark_volcano", x = 1000, z = 1100, label = "the Volcano shelf" },
-	{ key = "mark_grove", x = -780, z = -670, label = "the cave cliff" },
+	-- Ring map (MAP_V1.md): the snow peak, the volcano shelf west of the cone
+	-- and the cliff by the secret cave moved with their regions.
+	{ key = "mark_snow", x = -40, z = 760, label = "the Snowfields" },
+	{ key = "mark_volcano", x = 400, z = 460, label = "the Volcano shelf" },
+	{
+		key = "mark_grove",
+		x = WorldLayout.SecretCaveX - 15,
+		z = WorldLayout.SecretCaveZ - 15,
+		label = "the cave cliff",
+	},
 } :: { Mark }
 
-HermitLogic.CaveBox = { key = "secretCaveBox", x = -775, z = -655 }
+HermitLogic.CaveBox = { key = "secretCaveBox", x = WorldLayout.SecretCaveX - 10, z = WorldLayout.SecretCaveZ }
 
 -- Where the Hermit stands: inside the room, off the Lantern, facing the mouth.
-HermitLogic.Stand = { x = -755, z = -652 }
+HermitLogic.Stand = { x = WorldLayout.SecretCaveX + 10, z = WorldLayout.SecretCaveZ + 3 }
 HermitLogic.TalkSlack = 6 -- studs past the prompt's reach the server still allows
 
 function HermitLogic.MarkCount(secrets: { [string]: boolean }?): number

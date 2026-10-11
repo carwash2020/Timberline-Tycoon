@@ -35,7 +35,6 @@ local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local LogicGraph = require(ReplicatedStorage.Shared.LogicGraph)
 local MachineSkin = require(ReplicatedStorage.Shared.Art.MachineSkin)
-local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
@@ -145,7 +144,8 @@ function LogicService.Reset()
 end
 
 local function mayUse(owner: Player, profile: Profile, who: Player, flag: string): boolean
-	return who.UserId == owner.UserId or PermissionLogic.Allows(profile.permissions, who.UserId, flag)
+	-- Lane F: the one edit-rights rule (PlotService.CanEdit's pure twin).
+	return who.UserId == owner.UserId or PlotLogic.CanEdit(profile.permissions, who.UserId, owner.UserId, flag)
 end
 
 local function wiresOf(profile: Profile): { WireLogic.Wire }

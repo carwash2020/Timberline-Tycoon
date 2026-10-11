@@ -68,8 +68,21 @@ return function(t)
 	end)
 
 	t.test("with no module, Current is the fallback", function()
+		-- UndergroundData ships with the ring map (Lane B), so hide it here.
+		local find = MineSites.FindModule
+		MineSites.FindModule = function()
+			return nil
+		end
 		local sites = MineSites.Current(nil)
 		t.eq(sites.source, "fallback")
 		t.eq(MineSites.Current("nope").source, "fallback")
+		MineSites.FindModule = find
+	end)
+
+	t.test("with the ring map's UndergroundData, Current reads it, not the fallback", function()
+		local sites = MineSites.Current(nil)
+		t.ok(sites.source ~= "fallback", "source " .. tostring(sites.source))
+		t.eq(sites.mouth.x, 150)
+		t.eq(sites.mouth.z, -150)
 	end)
 end

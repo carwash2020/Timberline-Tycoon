@@ -811,6 +811,8 @@ return function(t)
 			t.eq(collision.CanCollide, true, "the collider collides")
 			t.eq(collision.CanQuery, true)
 			t.eq(collision.Transparency, 1)
+			-- Two pillars and a lintel round the doorway: a hull or a box would fill it.
+			t.eq(collision.CollisionFidelity, t.roblox.Enum.CollisionFidelity.PreciseConvexDecomposition)
 			t.eq(glow.Material, t.roblox.Enum.Material.Neon)
 			local lamp = glow:FindFirstChildWhichIsA("PointLight")
 			t.ok(lamp)

@@ -139,4 +139,11 @@ return function(t)
 			t.ok(math.abs(game - base) <= GameConfig.DayCycleMinutes * 60, "stays within the day")
 		end
 	end)
+
+	t.test("Day is how many full cycles have finished", function()
+		t.eq(WorldTime.Day(0), 0)
+		t.eq(WorldTime.Day(cycle - 0.01), 0)
+		t.eq(WorldTime.Day(cycle), 1)
+		t.eq(WorldTime.Day(cycle * 3 + 10), 3)
+	end)
 end

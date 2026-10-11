@@ -69,6 +69,8 @@ local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local StoreBoard = require(ReplicatedStorage.Shared.StoreBoard)
 local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
+local UndergroundBuilder = require(script.Parent.UndergroundBuilder)
+local SecretService = require(script.Parent.SecretService)
 local TreeService = require(script.Parent.TreeService)
 local WorldClock = require(script.Parent.WorldClock)
 
@@ -203,6 +205,11 @@ step("3. Terrain", function()
 end)
 LoadState.Gates.Set("terrain")
 LoadState.Stage("terrain")
+
+step("3b. Underground", function()
+	UndergroundBuilder.Build(map)
+end)
+SecretService.V1Init()
 
 -- Helpers ------------------------------------------------------------------
 

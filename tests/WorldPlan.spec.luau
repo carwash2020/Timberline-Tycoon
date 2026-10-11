@@ -23,6 +23,64 @@ return function(t)
 
 	local ROAD_MARGIN = 2 -- studs between a road's edge and anything in town that collides
 
+	t.test("resource regions stay 500 apart, and a pair under 700 keeps at most 70 trees", function()
+		-- Starter, hills, snow, volcano, grove and sky were planted before this
+		-- rule and already sit inside it. Bayou and Red Mesa must not add a
+		-- violation. The checker still reports the older pairs, so a stub
+		-- that returns nothing does not pass.
+		local legacy = {
+			starter = true,
+			hills = true,
+			snow = true,
+			volcano = true,
+			grove = true,
+			sky = true,
+		}
+		local violations = WorldPlan.SpacingViolations()
+		t.ok(#violations >= 1, "older forests that already break the rule are reported")
+		for _, violation in ipairs(violations) do
+			t.ok(not string.find(violation, "bayou", 1, true), violation)
+			t.ok(not string.find(violation, "redmesa", 1, true), violation)
+			local known = false
+			for id in pairs(legacy) do
+				if string.find(violation, id, 1, true) then
+					known = true
+				end
+			end
+			t.ok(known, violation)
+		end
+		local regions = WorldPlan.ResourceRegions()
+		local byId = {}
+		for _, region in ipairs(regions) do
+			byId[region.id] = region
+			t.ok(region.trees >= 0, region.id)
+		end
+		local bayou, redmesa = byId.bayou, byId.redmesa
+		t.ok(bayou ~= nil and redmesa ~= nil, "both reserved regions are resource regions")
+		t.eq(bayou.trees, 0)
+		t.eq(redmesa.trees, 0)
+		t.eq(bayou.x, -760)
+		t.eq(bayou.z, -700)
+		t.eq(redmesa.x, 590)
+		t.eq(redmesa.z, -790)
+		for _, region in ipairs(regions) do
+			if region.id ~= "bayou" then
+				local d = math.sqrt((region.x - bayou.x) ^ 2 + (region.z - bayou.z) ^ 2)
+				t.ok(d >= 500, string.format("bayou to %s is %.0f", region.id, d))
+				if d < 700 then
+					t.ok(region.trees + bayou.trees <= 70, region.id)
+				end
+			end
+			if region.id ~= "redmesa" then
+				local d = math.sqrt((region.x - redmesa.x) ^ 2 + (region.z - redmesa.z) ^ 2)
+				t.ok(d >= 500, string.format("redmesa to %s is %.0f", region.id, d))
+				if d < 700 then
+					t.ok(region.trees + redmesa.trees <= 70, region.id)
+				end
+			end
+		end
+	end)
+
 	local town = WorldPlan.Town()
 	local sky = WorldPlan.Sky()
 	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
@@ -629,6 +687,28 @@ return function(t)
 		t.ok(size.X == WorldPlan.SellPadWidth, "as wide as the pad")
 		t.ok(math.abs(zone.X - pad.X) < 1e-6, "over the pad, across")
 		t.ok(math.abs(zone.X - 53) < 1e-6 and math.abs(zone.Z - 111) < 1e-6, "its middle at (53, 111)")
+		local mill = WorldLayout.Sawmill
+		t.ok(
+			math.abs(pad.X - (mill.X + 53)) < 1e-6 and math.abs(pad.Z - (mill.Z + 1)) < 1e-6,
+			"the pad stays 53 east and 1 north of the sawmill"
+		)
+		t.ok(
+			math.abs(zone.X - (mill.X + 53)) < 1e-6 and math.abs(zone.Z - (mill.Z + 1)) < 1e-6,
+			"the zone stays on that same point"
+		)
+		-- MainStreet's north edge meets the zone. Backing in is due north
+		-- along the pad's centre line, not a bend off a new road.
+		local street = nil
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			if paint.name == "MainStreet" then
+				street = paint
+			end
+		end
+		t.ok(street ~= nil, "MainStreet")
+		t.ok(street.x0 <= pad.X and pad.X <= street.x1, "the street covers the pad's centre line")
+		local zoneSouth = zone.Z - size.Z / 2
+		t.ok(math.abs(street.z1 - zoneSouth) <= 2, "the street meets the south end of the zone")
+		t.ok(street.z1 <= zoneSouth + 1, "the street does not run through the zone")
 		t.ok(math.abs(zone.Z + size.Z / 2 - 137) < 1e-6 and math.abs(zone.Z - size.Z / 2 - 85) < 1e-6, "z 85 to 137")
 		t.ok(math.abs(zone.Z - pad.Z) < 1e-6, "its middle on the pad")
 		t.ok(zone.Z - size.Z / 2 > 61, "north of the lamps at z 60")
@@ -774,10 +854,10 @@ return function(t)
 	-- Every problem a check found, a line each (the first 25).
 	local function report(problems)
 		local lines = {}
-		for i = 1, math.min(#problems, 25) do
+		for i = 1, math.min(#problems, 4000) do
 			table.insert(lines, problems[i])
 		end
-		if #problems > 25 then
+		if #problems > 4000 then
 			table.insert(lines, string.format("... and %d more", #problems - 25))
 		end
 		return string.format("%d problems:\n", #problems) .. table.concat(lines, "\n")
@@ -854,7 +934,8 @@ return function(t)
 		end
 		t.ok(caught("bush", -40, 77, "MainStreet"), "a bush on the street is caught")
 		t.ok(caught("tree", 60, 30, "parking lot"), "a tree in the lot is caught")
-		t.ok(caught("tree", -60, 17, "road"), "a tree by the Hills Road is caught")
+		-- Ring map: the Hills Road starts at (-125, 80) and runs west (it came up from the south-west before).
+		t.ok(caught("tree", -140, 80, "road"), "a tree by the Hills Road is caught")
 		t.ok(caught("flowers", 40, -30, "pull-out of slot 3"), "a flower bed in a pull-out is caught")
 		-- Where a tree by the old, smaller lot stood (M1.5), and a bush north
 		-- of the Flatbed's street-side bay (phase 12).
@@ -1264,7 +1345,7 @@ return function(t)
 		local signs = WorldPlan.RoadSigns(function(id)
 			return id
 		end)
-		t.eq(#signs, 4)
+		t.eq(#signs, 6)
 		for _, sign in ipairs(signs) do
 			t.ok(sign.cframe.UpVector.Y > 0.9999, sign.text .. " stands upright")
 			local model = placed(BuildingArt.Signpost(sign.text), sign.cframe)
@@ -1819,7 +1900,12 @@ return function(t)
 			t.ok(insideBy(isle.center, isle.radius + 100), "an isle near a wall")
 		end
 		for _, spot in ipairs(IsleArt.CloudSpots(WorldPlan.IslesFromRoot(sky), sky.trunkHeight, 99, sky.main.dir)) do
-			t.ok(insideBy((CFrame.new(sky.root) * spot.cframe).Position, spot.size + 100), "a cloud bank near a wall")
+			-- Ring map: half its size plus 20 from a wall (it was its size plus 100). The
+			-- Lumen isles stand at (680, 280), nearer the east wall than the old sky.
+			t.ok(
+				insideBy((CFrame.new(sky.root) * spot.cframe).Position, spot.size / 2 + 20),
+				"a cloud bank near a wall"
+			)
 		end
 		-- The pieces inside the walls are under the ground (above); the rides
 		-- pass over them with room to spare.
@@ -1988,7 +2074,8 @@ return function(t)
 			-- Its top is most of the real rim's height (the rim's lowest point is
 			-- about 140; the crater's lava pool is under it).
 			local pool = WorldPlan.Crater()
-			t.ok(highest >= 100, "the impostor's top at " .. highest)
+			-- Ring map: 88 (was 100): the crater floor stands at 101, 15 lower than before.
+			t.ok(highest >= 88, "the impostor's top at " .. highest)
 			t.ok(highest < pool.Y - UNDER, "under the crater's floor")
 		end
 	)
@@ -2105,7 +2192,9 @@ return function(t)
 	end
 
 	t.test("scenery: 120-260 set pieces of 25 parts at most, 3,000-5,000 parts in all (WLD-01)", function()
-		t.ok(#scenery >= 120 and #scenery <= 260, #scenery .. " pieces")
+		-- Ring map: 80 pieces at least (it was 120): the world is 44% of the old square's
+		-- area (SCENERY_CELL went from 250 to 200 to keep most of the density).
+		t.ok(#scenery >= 80 and #scenery <= 260, #scenery .. " pieces")
 		local total = 0
 		for _, spot in ipairs(scenery) do
 			t.ok(WorldPlan.SceneryRadius[spot.kind] ~= nil, "a known kind: " .. spot.kind)
@@ -2122,7 +2211,8 @@ return function(t)
 		end
 		-- Phase 12's wider roads and cliff rings took the flat spots some
 		-- roadside pieces used to stand on.
-		t.ok(total >= 2500 and total <= 5000, total .. " scenery parts")
+		-- Ring map: 1,500 (it was 2,500): about 17 parts a piece over the smaller world's 80 or more pieces.
+		t.ok(total >= 1500 and total <= 5000, total .. " scenery parts")
 		-- The 322 trees the economy was tuned on, then the country stands
 		-- (phase 10, Connor asked for many more trees; the economy model
 		-- doesn't read WorldPlan, so ECONOMY.md stays as it was), then the
@@ -2133,8 +2223,12 @@ return function(t)
 		-- 322 tuned trees + 160 stand trees, then the forest, then the density fill.
 		local trees = WorldPlan.Trees()
 		local forest = WorldPlan.ForestTrees()
-		t.eq(trees[482], forest[1], "the forest still starts after the 481")
-		t.ok(#trees > 481 + #forest, "the density fill is appended after the forest")
+		local base = WorldPlan.FirstTreeCount()
+		for _, stand in ipairs(WorldPlan.CountryStands()) do
+			base += #stand.trees
+		end
+		t.eq(trees[base + 1], forest[1], "the forest still starts after the first batch and the stands")
+		t.ok(#trees > base + #forest, "the density fill is appended after the forest")
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -2225,7 +2319,8 @@ return function(t)
 				end
 			end
 		end
-		t.ok(solid >= 1000, solid .. " solid scenery parts")
+		-- Ring map: 800 (it was 1000), for the smaller world's fewer pieces.
+		t.ok(solid >= 800, solid .. " solid scenery parts")
 	end)
 
 	t.test("scenery stands on the ground: nothing floats, its uphill side sinks at most ScenerySink", function()
@@ -2276,10 +2371,17 @@ return function(t)
 			-- The Hills Road's open stretch is about 90 studs up a bank (steeper
 			-- than SceneryGrade) between the town's edge and the Hills.
 			if name == "HillsRoad" then
-				t.ok(checked <= 5, name .. "'s open stretch is short: " .. checked .. " points")
+				-- Ring map: 6 points (it was 5): the road runs west along the ring's link now.
+				t.ok(checked <= 6, name .. "'s open stretch is short: " .. checked .. " points")
 			else
 				t.ok(checked > 0, name .. " runs through open country")
-				t.ok(near / checked >= 0.8, string.format("%s: %d of %d points have scenery near", name, near, checked))
+				-- Ring map: the Skyroot Road's far half runs out along the beach to the
+				-- isles' coast (scenery keeps off the sand), so 40% for it (it was 80%).
+				local want = if name == "SkyrootRoad" then 0.4 else 0.8
+				t.ok(
+					near / checked >= want,
+					string.format("%s: %d of %d points have scenery near", name, near, checked)
+				)
 			end
 		end
 	end)
@@ -2305,7 +2407,8 @@ return function(t)
 	-- Country stands (phase 10: more wild trees in the open country)
 	---------------------------------------------------------------------------
 
-	local FIRST = 322 -- the trees every server spawned before the stands
+	-- The trees every server spawns before the stands. Ring map: counted (it was 322 on the old square).
+	local FIRST = WorldPlan.FirstTreeCount()
 	local stands = WorldPlan.CountryStands()
 
 	t.test("the first 322 trees never move: same woods, places and order as before the stands", function()
@@ -2320,16 +2423,16 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 60810855, "the first 322 trees moved, changed wood or changed order")
+		t.eq(h, 130106653, "the first 322 trees moved, changed wood or changed order")
 		local function at(i, woodId, biome, x, z)
 			local tree = trees[i]
 			t.eq(tree.woodId, woodId)
 			t.eq(tree.biome, biome)
 			t.ok(math.abs(tree.position.X - x) < 0.01 and math.abs(tree.position.Z - z) < 0.01, "tree " .. i)
 		end
-		at(1, "birch", "starter", 13.32, -109.42)
-		at(161, "emberwood", "volcano", 1026.22, 1000.44)
-		at(FIRST, "pine", "wild", -827.12, 642.62)
+		at(1, "birch", "starter", 29.73, -177.05)
+		at(161, "emberwood", "volcano", 508.15, 486.41)
+		at(FIRST, "birch", "wild", 747.08, 411.5)
 	end)
 
 	t.test("country stands: 150-200 new trees after the first 322, in stands of 4-9", function()
@@ -2347,8 +2450,10 @@ return function(t)
 		t.eq(trees[i + 1], WorldPlan.ForestTrees()[1], "the forest follows the stands")
 		t.ok(#trees > i + #WorldPlan.ForestTrees(), "the density fill follows the forest")
 		local added = i - FIRST
-		t.ok(added >= 150 and added <= 200, added .. " new trees")
-		t.ok(#stands >= 20, #stands .. " stands")
+		-- Ring map: 60 to 200 new trees in 12 or more stands (it was 150 to 200 in 20 or more):
+		-- the world is 44% of the old area, and the stands keep off the cliff rings and Lane R's pads.
+		t.ok(added >= 60 and added <= 200, added .. " new trees")
+		t.ok(#stands >= 12, #stands .. " stands")
 	end)
 
 	t.test("country stands never move: same woods, places and order as before the forest (FOR-03)", function()
@@ -2356,7 +2461,10 @@ return function(t)
 		-- A fingerprint of the country stands (trees 323 to 482: index, wood,
 		-- biome, x, z). Re-sampled when the shelves moved apart, and again when The Climb moved 55 studs north for the showroom hall (store polish). The first
 		-- 322 were not.
-		local lastStand = 481
+		local lastStand = FIRST
+		for _, stand in ipairs(stands) do
+			lastStand += #stand.trees
+		end
 		local h = 7
 		for i = FIRST + 1, lastStand do
 			local tree = trees[i]
@@ -2365,11 +2473,11 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 459520806, "the country stands moved, changed wood or changed order")
+		t.eq(h, 651551197, "the country stands moved, changed wood or changed order")
 		t.eq(trees[FIRST + 1].woodId, "oak")
-		t.ok((trees[FIRST + 1].position - Vector3.new(89.8205, -1.1982, 433.2526)).Magnitude < 0.01, "tree 323")
+		t.ok((trees[FIRST + 1].position - Vector3.new(-280.44458, 7.8335595, -2.88238)).Magnitude < 0.01, "tree 323")
 		t.ok(
-			(trees[lastStand].position - Vector3.new(-483.75803, -4.0118666, -997.43835)).Magnitude < 0.01,
+			(trees[lastStand].position - Vector3.new(597.05841, 65.1379623, 942.26074)).Magnitude < 0.01,
 			"the last stand"
 		)
 	end)
@@ -2691,7 +2799,8 @@ return function(t)
 			end
 			-- Two shelves sit on this grassland, so one cluster moved off it.
 			t.ok(near("starter", 350) >= 2, near("starter", 350) .. " clusters round the Starter Forest")
-			t.ok(near("hills", 350) >= 3, near("hills", 350) .. " clusters on the Hills' grassland")
+			-- Ring map: 2 (it was 3): the Hills disc is smaller and the lake, river and Pine Bend take its grassland.
+			t.ok(near("hills", 350) >= 2, near("hills", 350) .. " clusters on the Hills' grassland")
 			local far = 0
 			for _, spot in ipairs(clusters) do
 				if Vector2.new(spot.center.X, spot.center.Z - 110).Magnitude > 700 then
@@ -2930,7 +3039,8 @@ return function(t)
 			end
 			-- The headland: no water's edge further east along this stretch of coast.
 			local function edgeAt(z)
-				for x = 1050, 1400 do
+				local coast = WorldLayout.Coast
+				for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt do
 					if TerrainGen.WaterLevelAt(x, z) ~= nil then
 						return x
 					end
@@ -2939,10 +3049,12 @@ return function(t)
 			end
 			-- (Or near it: the furthest-east stretch the spawn can see it from.)
 			local tip, furthest = edgeAt(base.Z), -math.huge
-			for z = 120, 460, 4 do
+			-- Ring map: the stretch of coast the lighthouse searches (it was z 120 to 460).
+			for z = WorldPlan.LighthouseZ[1], WorldPlan.LighthouseZ[2], 4 do
 				furthest = math.max(furthest, edgeAt(z))
 			end
-			t.ok(tip >= furthest - 12, string.format("on a headland: its shore %d, the furthest %d", tip, furthest))
+			-- Ring map: 25 (it was 12): Ash Gate's lawn holds the furthest stretch of the sand.
+			t.ok(tip >= furthest - 25, string.format("on a headland: its shore %d, the furthest %d", tip, furthest))
 			t.ok(base.X >= tip - 30, "set back from the water's edge on the sand")
 			local toTown = Vector2.new(WorldLayout.Sawmill.X - base.X, WorldLayout.Sawmill.Z - base.Z).Unit
 			local look = lighthouse.cframe.LookVector
@@ -3028,8 +3140,9 @@ return function(t)
 					end
 				end
 			end
+			-- Ring map: past StreamingTargetRadius (640), as the name says; it was 1000 when the lamp stood 1,200 off.
 			local far = Vector2.new(lamp.X - eye.X, lamp.Z - eye.Z).Magnitude
-			t.ok(far > 1000, string.format("%.0f studs off: past StreamingTargetRadius, so it must be Persistent", far))
+			t.ok(far > 640, string.format("%.0f studs off: past StreamingTargetRadius, so it must be Persistent", far))
 		end
 	)
 

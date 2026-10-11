@@ -270,10 +270,11 @@ return function(t)
 	-- DragController), the D-pad pushes, pulls and turns it. Checked below:
 	-- only while holding, over HUD's shortcuts, and handed back on the drop.
 	local WHILE_HOLDING = "DragController"
-	-- While a blueprint is being placed, BlueprintPlacer also names
-	-- DPadRight (rotate). Settings stays the shortcut owner; the placer
-	-- binds higher and Settings.OpensOnPad is false while placing.
-	local WHILE_PLACING = { DPadRight = "BlueprintPlacer" }
+	-- While a blueprint is being placed, PlaceControls also binds DPadRight
+	-- (rotate), DPadUp and DPadDown (raise, lower), by name from
+	-- PlaceControlsLogic. Settings stays the shortcut owner; the placer binds
+	-- higher and Settings.OpensOnPad is false while placing.
+	local WHILE_PLACING = {}
 
 	t.test("each D-pad direction is bound by its own controller and by nothing else on the client", function()
 		local fs = require("@lune/fs")
@@ -297,10 +298,11 @@ return function(t)
 				end
 			end
 		end
-		local placer = fs.readFile(dir .. "/BlueprintPlacer.luau")
-		t.ok(users.DPadRight.BlueprintPlacer, "the placer names DPadRight")
+		local placer = fs.readFile(dir .. "/PlaceControls.luau")
+		local keys = fs.readFile("src/ReplicatedStorage/Shared/PlaceControlsLogic.luau")
+		t.ok(string.find(keys, '"DPadRight"', 1, true), "the placer's table names DPadRight")
 		t.ok(string.find(placer, "BindActionAtPriority", 1, true), "at a priority, not the default")
-		t.ok(string.find(placer, "BlueprintPlacer.RotatePriority()", 1, true), "using RotatePriority")
+		t.ok(string.find(placer, "PlaceControls.Priority()", 1, true), "using the placer's priority")
 		t.ok(
 			string.find(placer, "return Enum.ContextActionPriority.High.Value + 100", 1, true),
 			"above HUD.PadShortcut (High)"

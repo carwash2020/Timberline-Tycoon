@@ -84,4 +84,22 @@ function StageOf.Income(stage: number): number
 	return StageOf.IncomePerHour[math.clamp(math.floor(stage), 1, StageOf.Count)]
 end
 
+-- Display names for the stages (PROPOSAL, Awaiting Connor), used by the
+-- blueprint book's "Unlocks at <stage>" lines. 0 is "the start".
+StageOf.Names = {
+	[0] = "the start",
+	[1] = "Logger",
+	[2] = "Sawyer",
+	[3] = "Builder",
+	[4] = "Red Mesa",
+	[5] = "Smith",
+	[6] = "Highlands",
+	[7] = "Sky Island",
+	[8] = "Master Timber",
+} :: { [number]: string }
+
+function StageOf.Name(stage: number): string
+	return StageOf.Names[math.clamp(math.floor(stage), 0, StageOf.Count)] or "later"
+end
+
 return StageOf

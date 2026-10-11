@@ -1,5 +1,5 @@
 --!nocheck
--- CraftData: the six recipes, furniture disabled, bomb bundle is 6 iron and 4 coal.
+-- CraftData: the six recipes, furniture on (Lane F grants it), bomb bundle is 6 iron and 4 coal.
 
 return function(t)
 	local CraftData = t.load("ReplicatedStorage/Shared/Mining/CraftData")
@@ -13,14 +13,14 @@ return function(t)
 		return nil
 	end
 
-	t.test("the starter recipes and the two that wait", function()
+	t.test("the starter recipes and the two furniture recipes Lane F's GrantPiece turned on", function()
 		t.eq(#CraftData.All(), 6)
 		t.eq(recipe("MinersLamp").enabled, true)
 		t.eq(recipe("Hardhat").enabled, true)
 		t.eq(recipe("BombBundle").enabled, true)
 		t.eq(recipe("RopeLadder").enabled, true)
-		t.eq(recipe("CopperLampPost").enabled, false)
-		t.eq(recipe("GoldChest").enabled, false)
+		t.eq(recipe("CopperLampPost").enabled, true)
+		t.eq(recipe("GoldChest").enabled, true)
 	end)
 
 	t.test("inputs", function()

@@ -2,6 +2,73 @@
 
 > **Newer than this file's merge notes: read AGENT_HANDOFF.md first.** Every branch below marked "not merged" is merged (main is at #116 as of 8 October 2026).
 
+Last updated 8 October 2026 (V1 map remake, branch `phase-2/v1-b-world`). The layout plan is `MAP_V1.md`. The labelled picture is `previews/v1-b/00-overview.png`.
+
+## Lane B: world (in progress)
+
+Playable square goes from 3000×3000 to 2000×2000 (`WorldHalf` 1000). Area 9,000,000 sq studs down to 4,000,000 (44%). A 200-stud skirt is generated past the edge and is not playable. Town, the sawmill (0, 110) and the spawn stay. StreamingTargetRadius stays 640.
+
+The picture shows the 28-wide ring, four town links, the hills cross-link, the truck tunnel, the mine mouth (MINE), three hidden mouths (H), five secrets (?), the ore furnace pad and the dock. The sell station (SELL) stays at the sawmill plus (53, 1): pad and zone middle (53, 111). Trucks back straight north off MainStreet into that lane. Lane C's furnace art uses this same zone. The ore pad at (48, −110) is Lane M's, not the sell station. Region, pad and secret coordinates are in `MAP_V1.md`.
+
+Bayou (−760, −700, radius 140) is a flat basin sunk 7 studs. Red Mesa (590, −790, radius 115) is flat at the base height. BayouRoad and MesaRoad are 28 wide and each end in a 32-radius junction with a signpost. Lane R fills both later: trees, scatter and the unique items are hooks only (`WorldPlan` anchors, including one `UniqueItemSpawn` each and the leaderboard at (−50, 0, 92) facing south). The Lanternwood grotto stays at (−240, −420); it is about 416 studs from the Bayou edge.
+
+NPC stand spots, weather zones and critter zones (for Lanes E and G; the live modules still have the old numbers until those lanes read these):
+
+| Who | Position | Yaw (degrees, 0 faces −Z) |
+|---|---|---|
+| Murph | (−25, 0, 44) | toward the spawn |
+| Millie | (71, 0, 120) | toward the sell lane |
+| Tink | (−84, 0, 134) | toward the Tool Shed door |
+| Dale | (194, 0, 158) | toward the showroom aisle |
+| Hazel | (−100, 0, 205) | toward Hearth & Home's door |
+| Gus | town gondola (−40, 0, 150) | toward the isle column (680, 280) |
+| Rosa, Pip, Bram | unchanged town walks | unchanged |
+| Old Hank | Land Office counter | toward the door |
+| Hermit | secret camp mouth (−360, 4, −90) | 180, facing the cave |
+| Old Tolly | folded toll booth, east of the deck near z 940 | south, toward town |
+| Capn Moss | ferry dock (860, 4, 160) | toward the isle (930, −50) |
+| Odds & Ends keeper | snow junction (30, 4, 450) on the new north road, adjusted when the junction is placed | toward the road |
+| Sparkworks keeper | ferry isle dock side | toward the dock |
+| Fishing scene | pond (−40, 0, −160) | toward the water |
+| Campfire scene | starter edge (40, 0, −80) | toward town |
+| Lookout scene | (40, 8, 820), facing the volcano | toward (450, 500) |
+| Bench scene | town square | toward the mill |
+
+Weather and critter zones (same discs Lane G should read from `ScatterZones` once that module lands):
+
+| Zone | Kind | Centre | Radius |
+|---|---|---|---|
+| town | town | (0, 90) | 180 |
+| starter | forest | (8, −178) | 143 |
+| hills | forest | (−500, 110) | 150 |
+| meadow-east | meadow | (300, −40) | 80 |
+| snow | snow | (0, 720) | 115 |
+| volcano | volcano | (450, 500) | 125 |
+| gloam | gloam | (10, −720) | 80 |
+| shore | shore | (820, 40) | 120 |
+| isle | isle | (680, 280) | 100 |
+| cave | cave | (150, −200) | 80 |
+
+Preview paths so far:
+
+- `previews/v1-b/00-overview.png` (top-down, Bayou and Red Mesa labelled)
+- `previews/v1-b/bayou-top.png`
+- `previews/v1-b/bayou-three-quarter.png`
+- `previews/v1-b/mesa-top.png`
+- `previews/v1-b/mesa-three-quarter.png`
+
+### Map remake finish (10 and 11 October 2026, PR #121)
+
+The ring map is now what the specs pin, not what the first draft of this file said. Where it differs from the tables above, the code wins (`WorldLayout`, `PlotData`, `BiomeData`, `UndergroundData`).
+
+- Mine mouth: `NatureArt.CaveMouth` stands at (150, -150), door toward town, with a walkable 16-wide bore (about 18 degrees) down to the upper mine and a hill over it (`UndergroundData.Ramp`, `HillAt`). The ground at the door is 1.5 (`Ramp.top`). `tests/MineMouth.spec` walks a capsule from the tunnel floor out to open ground, checks the doorway is clear of colliders, the roof keeps rock over it and five lamps hang in the bore (shadows off).
+- Starter Forest disc is (8, -178) radius 143 (it was (0, -180) radius 100): Birch Side, Oak Side and the South Link leave too little free ground for the 70 oak and 26 birch otherwise. Every plot centre stays outside the disc.
+- The first tree batch is placed on the map as it is (no legacy layout), wild groves keep off the river and the forest lanes, boulders stay in the 2000 square, scenery cells are 200.
+- River moved west (x about -815) so its footbridge has firm banks outside Pine Bend's yard. Lighthouse lamp at (780, 48, -240) on the sand south of the ferry. The overview picture is redrawn from the shipped layout (`tools/preview/v1b_map.py` now reads the same numbers).
+- Economy headlines moved with the shorter hauls (ECONOMY.md regenerated): first sale 68 s (same), Steel Axe 5.4 min (same), first $1k 17.9 to 17.8 min, Cobalt Axe 66.3 to 50.7 min, full plot 33.5 to 31.5 h. All inside their targets.
+- Previews: `previews/v1-b/mine-1.png` `mine-2.png` `mine-3.png` `mine-7.png` `mine-8.png`, `landmarks-3.png` (lighthouse), `landmarks-5.png` (footbridge), `landmarks-7.png` (lake dock), `landmarks-8.png` (coast dock).
+
+
 - **End game follow-ups** (branch `phase-2/v1-end-game-followups`, 10 October 2026, off main `a68d339`; draft PR): the plot sign shows the owner's name first with the plot line under it, above the post that ran up over it (`PlotData.SignText`); the player-facing "Sky Pass" is "Gondola Pass" everywhere (the save keys `gondolaPass` / `skyPass` and the `SkyQuest` remote are unchanged); `BiomeData.Gate(biomeId)` returns `{ needs, words }` (sky: `GondolaPass`, "Obsidian Axe + Gondola Pass from Gus"; `SkyQuestLogic.GateWords` reads it); Keen now speeds the swing you feel (`CutController` multiplies the client cooldown by `TemperLogic.CooldownMultiplier`, read from the tool's `TemperPrefix` / `TemperTier` attributes that `AxeService.StampTemper` sets; no input code touched); `EndGameBoot` is folded into `V1Boot`. Town model check: no real problems in the part-built town the game ships. Previews: `previews/v1-end-game-followups/plot-sign-1.png` to `plot-sign-5.png`, `town-pieces-*.png`. Studio checks: PHASE2_NOTES.md "End game follow-ups".
 - **Lane A2 end game** (branch `phase-2/v1-a2-end-game`, 8 October 2026, off main `ae2c3f9`; not merged): Gus's Charter (Obsidian Axe, then 120 Frostwood, 120 Emberwood and 40 Gloamwood planks laid at the town station; no cash fee) gives the Gondola Pass; Ride up needs it (ride down never does; $250 fare and 40 s ride unchanged) and a gate sign states it in words. The Sky Forge window (`ForgeUI`, new `SkyForgeService`) has Starfall, four relics ($22.5k / $37.5k / $60k / $90k once each, trophies by your plot sign), Old Bram's weekly order ($18,000 + 4 Sky Shards, Monday 00:00 UTC) and tempering (Keen / Heavy / Prosperous I to III, one family per axe, fixed costs, no Robux, not the Lux Axe). Previews: `previews/v1-a2/court-bram.png`, `previews/v1-a2/gondola-gate-gus.png`, `previews/v1-a2/isle-starfall-forge.png`, `previews/v1-a2/relic-trophies.png`, `previews/v1-a2/forge-phone-temper.png`, `previews/v1-a2/forge-phone-confirm.png`, `previews/v1-a2/forge-phone-starfall.png`, `previews/v1-a2/forge-pc-temper.png`, `previews/v1-a2/forge-pc-confirm.png`, `previews/v1-a2/forge-pc-relics.png`, `previews/v1-a2/forge-pc-order.png`. Studio checks: PHASE2_NOTES.md "Lane A2: end game".
 - **V1 UI redesign** (branch `phase-2/v1-u-ui`, 8 October 2026): mockups `previews/v1-u/loading-667x375.png`, `previews/v1-u/loading-1920x1080.png` (sunset scene, the wordmark, a progress bar, one tip), `previews/v1-u/hud-667x375.png`, `previews/v1-u/hud-1920x1080.png` (in-context HUD: cash, Field Guide with its book icon, side buttons with saves/hammer/truck icons, a selection ring, a dark hint pill, and on the phone Roblox's thumbstick ring plus the jump button, with the hotbar clear of the stick), `previews/v1-u/hud-buttons-667x375.png`, `previews/v1-u/hud-buttons-1920x1080.png` (button styles only), `previews/v1-u/owner-menu-667x375.png`, `previews/v1-u/owner-menu-1920x1080.png`, `previews/v1-u/theme-sheet-667x375.png`, `previews/v1-u/theme-sheet-1920x1080.png` (Danger fill `#B23B30`; cream on danger is 4.80:1), `previews/v1-u/news-667x375.png`, `previews/v1-u/news-1920x1080.png` (the card is as tall as its rows, with a sunset wordmark; each headline has a muted second line; Close is centred, 44px on the phone, and clear of the jump box and the thumbstick). Live UI uses the same tokens (walnut, cream, amber, confirm, danger, muted; GothamBold and Gotham; radius 8; 2px stroke; 4px selection ring). Loading tips rotate one at a time from `ReplicatedFirst/LoadingTips`. What's new is seven headlines plus a short second line in `NewsLogic.Entries` (island map with the Bayou and Red Mesa, mining, blueprints, Foreman Rook's jobs, axe tempering, Sparkworks, the gondola sky island). It shows once after the tutorial (`onboarding["News:V1"]`, no new save field), and from Settings. On a short screen the card, including Close, sits right of the thumbstick and above the jump box. Owner menu, quick menu, Settings and What's new select their first button on open; B closes; none of them binds the right trigger. **Lane E:** `DailyUI` stays in the client module list, but the client does not start it, so there is no DailyUI startup warning. Lane E (Foreman) replaces that module. Studio checks: PHASE2_NOTES.md "V1 UI".
@@ -17,6 +84,12 @@ The uploaded machine meshes are wired into the plot machines and the logic piece
 - TLD-1 addendum section C: mills 8x12, 8x14, 10x16, 10x18, 10x26 and planers 8x8, 8x10, 8x12, 8x16 run along the feed; straight belt 6 wide; chop saw deck 5.0 wide, top 0.72, bed 52 (footprint 6 x 56). Cut maths untouched: `tests/CutParity.spec.luau` pins size and value of every wood through every tier (numbers taken from main before the change).
 - Sky Forge Court: a brass `Sign` board (6 x 1.4) on the back wall reading SKY FORGE on its -Z face.
 - Not done: wood stage looks (addendum D: WoodLook, TimberSawn/TimberPlaned, saved Stage; needs service and ProfileSchema edits); catalog items for ConveyorShort, Long, Reversible and BeltDrop (their meshes and templates are in). The TLD-1 GLBs and cards are not in the pack I was given, so TLD-1 machines have no real-mesh render and their deck pieces' offsets are derived from LINE-STANDARD (Body, blade, cutter, lamp exact). Previews (real meshes, the older pieces only; `tools/preview/v1_k_manifest.py`, scene `v1-k`): `previews/v1-k/` has the 13 logic pieces (`logic-*.png`, `pc-gate-and.png`, `pc-lever.png`), poses (`pc-lever-on.png`, `pc-hatch-open.png`, `posed-*.png`), `pc-prospector-stall-and-chute.png`, `ore-chute-1280.png`, `pc-craft-bench.png`, the court sign (`pc-sky-forge-court-sign.png`, `phone-sky-forge-court-sign.png`) and `phone-gate-and.png`. Studio checks: PHASE2_NOTES.md "Lane K wire-in".
+## Lane X: milestone badges and the town leaderboard board (branch `phase-2/v1-x-extras`, 11 October 2026)
+
+Eight new badges (25 in all, every id still 0 until Connor pastes them into `BadgeData.Ids`): AreaBayou, AreaMesa, WoodCypress, WoodIronwood, FirstBuild, Homestead (40 filled kit pieces, a proposal), Stonemason (a filled `Sand*` piece) and Millionaire (`profile.totalEarned >= 1,000,000`). The two regions use `WorldLayout.Bayou` and `WorldLayout.RedMesa` (so they work before Lane R fills them); the build and Millionaire badges are read from the profile in `BadgeService.Poll`, so no other lane has to fire an event (a `"build"` or `"earned"` event also works). `BadgeService.OnNewArea(fn)` fires once per new area from Poll (E's DailyService subscribes to it). The town board: `TownBoardLogic` (rows, states, layout, footprint), `TownBoardArt` (ten parts, one SurfaceGui, no light), `TownBoardService` (builds it at `WorldPlan.LeaderboardBoard`, redraws on `LeaderboardService.OnRefresh`, no DataStore call of its own), `TownBoardBoot.server`. `LeaderboardService` gains read-only `Top()`, `Failed()` and `OnRefresh(fn)`. Studio checks are in PHASE2_NOTES.md "Lane X".
+
+Lane X previews (`previews/v1-x/`; `tools/preview/scenes/v1-x-board.luau` with `shoot.sh`, and `tools/preview/v1x_badges.py` for the panel): `town-board-day.png`, `town-board-night.png`, `town-board-street-30-667x375.png`, `town-board-street-eye-667x375.png`, `town-board-closeup.png`, `town-board-empty.png`, `town-board-failed.png`, `town-board-side.png`, `town-board-back.png`, `badges-667x375.png`, `badges-1920x1080.png`. The viewer draws each label centred in its own box and has no rounded plates or medals, so row text is centred in the previews; in game it sits left of the cash line on a plate, beside a rank medal. The badge panel shots are drawn from UITheme's tokens (the same method as Lane U's).
+
 ## Lane P — purchases (done, awaiting review)
 
 Branch `phase-2/v1-p-purchases`. Four Robux items carry real ids (2x Cash, Lux Axe, Small and Large Cash Pack); Tow Service, Timber Classic, Paint Shop, 2x Wood and Instant Delivery stay at id 0 (Coming soon) until Connor flips them, their ids kept in comments in `StoreData`. Prices are only ever Roblox's live answer. Pieces: the bulletin board redesigned to the approved mockup (pages of three cards and a Coming soon strip), the store panel in the GAD look, open gold crates on a two-row gold table in the Tool Shed, and stage-scaled cash packs. Previews are in `previews/v1-p/`. Creator Hub steps are in `STORE_SETUP.md`, and Studio checks are in PHASE2_NOTES.md "Lane P". Awaiting Connor: whether 2x Wood should mean twice the logs (it doubles wood value today); fitting the uploaded RobuxTable and RobuxBox meshes (job 17) to the crate table; and two-line card bodies on the board, which go beyond GAD's one line.
@@ -53,6 +126,33 @@ Part-built axe, temper and shelf pictures are not in this PR. Connor rejected th
 Awaiting Connor: the Hermit's Maul is part-built and needs a Blender mesh. The hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and cash prices are unchanged.
 
 Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+## Lane F: building and blueprints (10 October 2026, branch `phase-2/v1-f-base-systems`)
+
+Not on main (PR #131, draft). Job 10 is done. Previews in `previews/v1-f/`. What landed:
+
+- The four new pieces (Copper Trim, Sandstone Wall, Floor, Arch) are placeable: the fill takes slabs and ingots (`BuildCost.Of`, atomic take; `BuildMaterials` server side). Unlocked, no free placement.
+- `PlotService.CanEdit` (shared rule `PlotLogic.CanEdit` / `EditRights`) at every edit site: Sawmill, ChopSaw, Paint, Blueprint drop, PlotFill contributions, Vehicle, Logic, Permission. BeltService has no player edit site; its prompts live in LogicService and stay owner-only.
+- 1,200 kit-part cap on NEW placement ("Your plot holds 1200 kit parts at most"); existing builds are never deleted. PlacedCap 320 and `SaveSize` measured: 886,791 -> 950,591 bytes (90.7% of 1 MB; DataStore limit 4 MB).
+- Undo and Take apart refund slabs and ingots (`PlotLogic.SellPlan`).
+- `PlaceControls` (phone, PC, Xbox; no ButtonR2). Furniture and `GrantPiece`: Copper Lamp Post and Gold-banded Chest, CraftData recipes enabled. Save now (30 s cooldown). Unload keeps loose wood (`LooseSave`, `LooseService`). Free-piece blueprints, Paint all of this type (free), recall fee on the button, Sparkworks counter stock (data and buy path), fallen pieces rescued (`FallenLogic`, `strandedLoad` restored), `StageOf` helper wired to `BlueprintBook.UnlockStage`.
+
+**Awaiting Connor** (all PROPOSALS, used as defaults)
+
+- Costs: Copper Trim $4 + 1 Copper ingot; Sandstone Wall $8 + 2 slabs; Sandstone Floor $8 + 2 slabs; Sandstone Arch $16 + 4 slabs.
+- Stage unlocks: walls, floors, flat roof S1; tall walls, sloped roofs, ramp, door and window walls S2; railings, beams, posts, gate S3; sandstone S4; copper S5. Starter pieces are not gated; only the 4 new plans show as locked rows.
+- `StageOf` names and the lifetime-earned fallback lines (100, 1,000, 5,000, 25,000, 100,000, 400,000, 1,000,000, 2,000,000) are guesses until Lane E's stage keys are the only source.
+- Loose-wood save caps 150 pieces / 300 sections; crafted furniture stock cap 20; fall rescue below Y -80; paint is free.
+- "Free" blueprints are marked on owned store unlocks only (not auto-given, which would free store purchases).
+- Odds & Ends is not stocked (no building; the blasting charge is pay-at-boulder). The Sparkworks shop building and counter do not exist on main: stock data and purchase path are done and tested.
+- `mining`, `guideStamps` and `dayCounter` are account-wide in code and specs while the brief says per slot. Left as is.
+- Colours: GAD palette still pending; sandstone `#C8643C`, copper `#B87333`.
+- Furniture meshes are not in the lite pack, so furniture renders part-built (job 17).
+- Worst case: a plot of 400 WindowWall8 is 1,600 parts; the cap now stops placement at 1,200.
+
+Cross-lane edits: MiningService (IngotRoom, ReturnIngot), CraftingService hooks and furniture grant, CraftData enabled, HammerController paint-all row, VehicleController fee label, HintLogic build text, EditLogic, LogicService / PermissionService / VehicleService / ChopSawService rules, WoodService recover hook, PlotUI locked rows. New `BaseBoot.server` binds the new remotes and hooks. The unsharded full Lune run has a GondolaService/GrabService order dependence that is already on main.
+
+Studio checks: PHASE2_NOTES.md, "Lane F: building and blueprints".
+
 ## Lane W: practical automation (8 October 2026, branch `phase-2/v1-w-automation`)
 
 Not on main. Wires from #123 now drive belts and machines. Every belt, sawmill, planer and the new line pieces register `LogicService.RegisterTarget(uid, {power, reverse})`. Ports: belts 1 power, 2 reverse; Switch Belt 1 side, 2 power, 3 reverse; sawmill and planer 1 power. An unwired port keeps the old behaviour, so old plots run as before (no new attributes, no new saved fields). Power off mid-cut pauses the log where it is and the clock resumes with power. Reverse is an owner-only prompt saved as `item.reversed = true`; Switch Belt flip is `item.flip = true`. New pieces: Switch Belt, Tilted Belt (rise 2.0), Belt Support (saddle 2.0), Wood Detector (belt-shaped wire source with a wood filter, saved in `plot.logic[uid].filter`, index pinned to WoodData order), Wood Sweeper (a pulse pushes up to 10 loose plot pieces off the belt), Laser Emitter and Receiver (only wood breaks the beam; `MaxLaserPairs` 8 per plot). Part builds per TLD-1; the uploaded TLD-1 meshes are wired in job 15. Previews: `previews/v1-w/`.

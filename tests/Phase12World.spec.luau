@@ -24,7 +24,7 @@ return function(t)
 			HillsRoad = 28,
 			SnowRoad = 28,
 			VolcanoRoad = 28,
-			SkyrootRoad = 24,
+			SkyrootRoad = 28, -- ring map (Oct 8): every link is 28 wide (MAP_V1)
 			MillRoad = 22,
 			LotLoop = 16,
 		}
@@ -45,19 +45,26 @@ return function(t)
 	end)
 
 	t.test("the snow and volcano junctions flare, and the flare is pale road", function()
-		t.eq(#WorldLayout.Junctions, 2)
-		local seen = { [30] = false, [-20] = false }
+		-- Ring map (Oct 8): a flare where each link meets the ring, and at the
+		-- ends of the Bayou and Mesa spurs.
+		t.eq(#WorldLayout.Junctions, 6)
+		local seen = {}
 		for _, junction in ipairs(WorldLayout.Junctions) do
 			t.ok(junction.haul, junction.name)
 			t.ok(junction.radius >= 28, junction.name .. " is wide enough to turn a rig")
-			seen[junction.at.X] = true
+			seen[junction.name] = junction.at
 			local _, material = TerrainGen.Sample(junction.at.X, junction.at.Y)
 			t.eq(material, TerrainGen.GravelMaterial, junction.name .. " is pale")
 			-- Twenty studs off the Snow Road's centre, still inside the flare.
 			local _, beside = TerrainGen.Sample(junction.at.X + 20, junction.at.Y)
 			t.eq(beside, TerrainGen.GravelMaterial, junction.name .. " stays pale off the centreline")
 		end
-		t.ok(seen[30] and seen[-20], "flares at (30, 450) and (-20, 760)")
+		t.eq(seen.SnowVolcano, Vector2.new(0, 480), "the Snow Road meets the ring's north arc")
+		t.eq(seen.SnowSkyroot, Vector2.new(600, 80), "the east link meets the ring")
+		t.eq(seen.RingWest, Vector2.new(-600, 80), "the west link meets the ring")
+		t.eq(seen.RingSouth, Vector2.new(0, -520), "the south link meets the ring")
+		t.eq(seen.Bayou, Vector2.new(-692, -612), "the Bayou spur's end")
+		t.eq(seen.Mesa, Vector2.new(585, -700), "the Mesa spur's end")
 	end)
 
 	t.test("a truck-wide way runs past the shops to the Snow Road, and a loop runs south of the lot", function()
@@ -117,7 +124,10 @@ return function(t)
 		local snowPass = TerrainGen.HeightAt(snow.x, snow.z - snowR)
 		local snowWall = TerrainGen.HeightAt(snow.x + snowR, snow.z)
 		t.ok(snowWall > snowPass + 8, string.format("snow wall %.1f over the pass %.1f", snowWall, snowPass))
-		t.eq(runs(snow.x, snow.z, snowR, snowPass), 1, "one pass into the Snowfields")
+		-- Ring map (Oct 10): the north strip (the toll crossing, z 860 up) now lies inside
+		-- the cliff ring, so the ring has two low stretches: the road in from the south
+		-- and the toll shelf in the north. It was one.
+		t.eq(runs(snow.x, snow.z, snowR, snowPass), 2, "the Snow Road in, and the toll shelf north")
 		local _, snowMat = TerrainGen.Sample(snow.x + snowR, snow.z)
 		t.eq(snowMat, "Rock", "the snow ring is brown rock")
 
@@ -160,7 +170,7 @@ return function(t)
 		t.ok(string.find(blob, "GLOAM", 1, true), "a hollow gate")
 		t.eq(#WorldPlan.RoadSigns(function()
 			return ""
-		end), 4)
+		end), 6)
 	end)
 
 	t.test("brown boulders sit on the open grass, and the forest is wider but still a forest", function()
@@ -183,7 +193,7 @@ return function(t)
 		-- their lanes take the rest. 730 is the live count on that world.
 		t.ok(#trees >= 730, #trees .. " trees")
 		local wet = 0
-		for i = 1, 322 do
+		for i = 1, WorldPlan.FirstTreeCount() do
 			local p = trees[i].position
 			if TerrainGen.WaterLevelAt(p.X, p.Z) ~= nil then
 				wet += 1

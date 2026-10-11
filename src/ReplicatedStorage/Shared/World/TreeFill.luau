@@ -293,6 +293,14 @@ function TreeFill.Ground(x: number, z: number): boolean
 	if WorldLayout.TreeBlocked(x, z) then
 		return false
 	end
+	-- The forest's lanes stay open: the spawn's view of the lighthouse (the
+	-- ring map's lamp is nearer, so a trunk beside the line may no longer hide
+	-- under it) and the grove's trail.
+	for _, lane in ipairs(WorldLayout.Forest.lanes) do
+		if WorldLayout.SegmentDistance(Vector2.new(x, z), lane.a, lane.b) < lane.half then
+			return false
+		end
+	end
 	-- Every test is a pure yes or no; the cheap ones go first and the
 	-- terrain's (GoodGround) last, since most points fail something cheap.
 	return TreeFill.Clear(x, z)

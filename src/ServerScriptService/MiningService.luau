@@ -258,6 +258,21 @@ local function spawnPiece(player: Player, ore: OreData.Ore, kind: string, cf: CF
 	return model
 end
 
+-- Lane F (building): an ingot a build gave back, put at `cf` for its owner.
+-- IngotRoom says how many fit under the live-piece cap, so a caller can
+-- refuse up front and never drop one.
+function MiningService.IngotRoom(player: Player): number
+	return math.max(0, MiningLogic.LiveChunks - liveChunks(player))
+end
+
+function MiningService.ReturnIngot(player: Player, oreId: string, cf: CFrame): boolean
+	local ore = OreData.Get(oreId)
+	if ore == nil or MiningService.IngotRoom(player) < 1 then
+		return false
+	end
+	return spawnPiece(player, ore, "ingot", cf) ~= nil
+end
+
 local function nearestNode(pos: Vector3): NodeRec?
 	local best: NodeRec? = nil
 	local bestDist = MiningLogic.SwingReach

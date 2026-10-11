@@ -48,6 +48,7 @@ local ACCOUNT: { [string]: boolean } = {
 	guideStamps = true,
 	tipsSeen = true,
 	dayCounter = true,
+	saveCooldownUntil = true, -- Save now's 30 s cooldown (SaveNowLogic): a slot swap must not clear it
 	mining = true, -- pick ladder, bombs, lamp, hat, stash (Lane M). Account-wide, like PickLevel.
 }
 
