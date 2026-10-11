@@ -539,7 +539,7 @@ end
 local function ridgeSign(id: string): CFrame
 	local body = MachineMeshes.Piece(id, "Body")
 	local top = if body then body.size.Y else 6
-	return CFrame.new(0, top + 0.7, 1.9)
+	return CFrame.new(0, top + 0.5, 1.9)
 end
 
 -- `ghost` is the placement preview: nothing collides and there are no buttons.

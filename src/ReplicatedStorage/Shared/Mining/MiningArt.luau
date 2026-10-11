@@ -572,8 +572,8 @@ function MiningArt.SmeltingFurnace(): Model
 end
 
 -- The furnace door: closed over the mouth, or ajar as the mesh is modelled
--- (about its hinge, a quarter turn less than square). No-op on the part build.
-MiningArt.FurnaceDoorAjar = math.rad(55)
+-- (about its hinge, 58 degrees from the closed leaf, read off the GLB). No-op on the part build.
+MiningArt.FurnaceDoorAjar = math.rad(58)
 
 function MiningArt.SetFurnaceDoor(model: Model, closed: boolean): boolean
 	local hinge = MachineMeshes.Point("SmeltingFurnace", "DoorHinge")

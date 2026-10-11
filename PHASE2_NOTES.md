@@ -3433,7 +3433,7 @@ Gus's Charter, the Gondola Pass gate, the Sky Forge window (Starfall, relics, Ol
 
 See STATUS.md for what landed. Part budgets with meshes on (off): Rickety 19 (16) of 21, Sturdy 19 (20), Mill 19 (23), Steam 19 (26), Industrial 20 (31); planers 18 (17) to 19 (28); chop saw 14 (16); furnace 19 (27) of 60. Pinned numbers moved because the design moved: `BeltService.spec` straight-belt part budget 16 to 20 (8 rollers at the 1.0 pitch in the part build), `LaneW.spec` sweeper fixture 3 to 3.8 off the belt and deck half-width 1.5 to 2.5, `SawmillLogic.spec` footprint 12x8 to 8x12.
 
-Derived, not read from a GLB (the TLD-1 GLBs were not in my pack): the offsets of Belt, Rollers, ArrowDecal, Gate, FurnaceDoor and Lever pieces of the 25 TLD-1 assets (see the MachineMeshes header). If one sits wrong in Studio, change only its offset.
+Offsets: every piece's bounds centre is read from its GLB (assets/glb/machines-tld1). My first LINE-STANDARD guesses were off by up to 0.12 (pan y 0.21, not 0.33), up to 8 studs for the chop saw's and planer's arrow decals, 2.26 for the switch gate (it is built thrown toward +X, so flipping turns it 100 degrees) and 0.32 for the sweeper arm; all fixed.
 
 ### Studio checks (Connor)
 1. **Every machine up close, PC.** Build a plot with all 5 mills, 4 planers, the chop saw, a belt line, the furnace. Good: each body sits on its deck, nothing floats or sinks, rollers and arrows lie on the rails, the blade is at the saw, the gabled housing is not clipped. If a piece is offset, note which.
