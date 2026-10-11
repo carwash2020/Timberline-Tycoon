@@ -18,6 +18,7 @@ local BadgeData = require(ReplicatedStorage.Shared.BadgeData)
 local Net = require(ReplicatedStorage.Shared.Net)
 local HUD = require(script.Parent.HUD)
 local HudNav = require(script.Parent.HudNav)
+local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 local BadgeUI = {}
@@ -148,6 +149,15 @@ function BadgeUI.Start()
 	local function toggle()
 		card.outer.Visible = not card.outer.Visible
 	end
+
+	-- The BADGES button waits until the tutorial is over (like Daily Goals):
+	-- in the left column it sat under, then over, the tutorial card on a small
+	-- window. The B key and the quick menu's tile still open the list.
+	local function placeButton()
+		open.root.Visible = HudRules.BadgesButton(player:GetAttribute("TutorialStep"))
+	end
+	player:GetAttributeChangedSignal("TutorialStep"):Connect(placeButton)
+	placeButton()
 
 	open.face.Activated:Connect(toggle)
 	-- A gamepad reaches it through the quick menu (View button), a tile here.

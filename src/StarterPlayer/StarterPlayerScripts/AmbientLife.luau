@@ -221,15 +221,23 @@ local cavePartCount: { [string]: number } = {}
 local caveLightCount: { [string]: number } = {}
 
 local natureZones: { NatureData.Zone }? = nil
+local natureComplete = false -- whether the plan's caves are in (they wait for WorldPlan's trees)
+local zonesUpgraded = false -- the caves just joined: the cells loaded before need a re-scatter
 local scatterBlocked: ((number, number) -> boolean)? = nil
 
 local function optionalModule(name: string): any
 	return NatureData.TryModule(ReplicatedStorage.Shared:FindFirstChild(name))
 end
 
+-- The nature zones: scatter and underground rooms and the plan's. The plan's
+-- cave points of interest are placed against every tree, so while WorldPlan's
+-- trees are not worked out (ForestFiller does that, a slice a frame) the zones
+-- are the rest, and the caves join when they are ready. Called for every cell
+-- of every scan: a lookup after the first, never a rebuild, and it never asks
+-- WorldPlan for the trees itself (seconds of work, which froze the client).
 local function zones(): { NatureData.Zone }
 	local cached = natureZones
-	if cached then
+	if cached and (natureComplete or not NatureData.PlanReady(WorldPlan)) then
 		return cached
 	end
 	local scatter = optionalModule("ScatterZones")
@@ -239,8 +247,13 @@ local function zones(): { NatureData.Zone }
 		scatterBlocked = scatter.Blocked
 	end
 	local rooms = if type(underground) == "table" then NatureData.FromRooms(underground.Rooms) else nil
-	local made = NatureData.Assemble(scatterZones, NatureData.FromWorldPlan(WorldPlan), rooms)
+	local planZones, complete = NatureData.FromWorldPlan(WorldPlan)
+	local made = NatureData.Assemble(scatterZones, planZones, rooms)
+	if cached and complete then
+		zonesUpgraded = true
+	end
 	natureZones = made
+	natureComplete = complete
 	return made
 end
 
@@ -1857,6 +1870,13 @@ function AmbientLife.Start()
 			sinceScan = 0
 			if not fillerSeen and WorldPlan.FillerReady() then
 				fillerSeen = true -- re-scatter what loaded before the filler's plan
+				for key in pairs(cells) do
+					dirty[key] = true
+				end
+			end
+			zones() -- picks up the caves the moment WorldPlan's trees are ready
+			if zonesUpgraded then
+				zonesUpgraded = false -- and re-scatter what loaded before them
 				for key in pairs(cells) do
 					dirty[key] = true
 				end

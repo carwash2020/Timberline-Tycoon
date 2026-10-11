@@ -196,12 +196,28 @@ print(
 		.. " studs"
 )
 
+-- Staged (server audit, 11 October 2026): the whole terrain took 30 to 55 s and
+-- the first player waited for all of it. Now the chunks round the town are
+-- written here (the "terrain" gate) and the rest follows in the background
+-- after the world gate, the plot pads' ground first (terrainFinish below).
+local terrainFinish: (() -> number)? = nil
 step("3. Terrain", function()
-	terrainSeconds = TerrainBuilder.Build(function(done: number, total: number)
+	local seconds, finish = TerrainBuilder.Build(function(done: number, total: number)
 		if done % 24 == 0 or done == total then
 			print(string.format("[MapBuilder] Terrain %d/%d", done, total))
 		end
-	end)
+	end, {
+		nearRadius = TerrainBuilder.NearRadius,
+		firstSpots = PlotData.Slots,
+		sliceSeconds = function(): number
+			-- Nobody is in yet: take more of each frame. Once a player can play, the same share as the forest.
+			return if LoadState.Gates.IsReady("firstPlayer")
+				then TerrainBuilder.BackgroundSliceSeconds
+				else TerrainBuilder.SliceSeconds
+		end,
+	})
+	terrainSeconds = seconds
+	terrainFinish = finish
 end)
 LoadState.Gates.Set("terrain")
 LoadState.Stage("terrain")
@@ -648,18 +664,76 @@ step("5. The trees", function()
 	-- longest part of the build, and nobody needs them to stand up: the
 	-- tutorial grove above is what a new player first meets. Under v2 they
 	-- are planted AFTER the sell area goes in (so GameServer starts and the
-	-- save loads meanwhile), nearest the sawmill first, a frame's worth at a
-	-- time (LOAD-01). v1 (a rollback) keeps its one synchronous pass.
+	-- save loads meanwhile), a frame's worth at a time (LOAD-01), and in the
+	-- order a player meets them: WorldPlan.FirstTrees (the meadow and the wild
+	-- groves, planned in under a second) at once, nearest the spawn first,
+	-- then each batch of the rest the moment the planner has it (the town's
+	-- trees first), nearest first again, so the starter area is up long before
+	-- the far forest is even worked out. v1 (a rollback) keeps its one
+	-- synchronous pass.
 	local function plant(yielding: boolean)
 		local before = os.clock()
 		local firstCount = treesSpawned
 		type Entry = { spot: WorldPlan.TreeSpot, reach: boolean, order: number }
-		local entries: { Entry } = {}
-		local function collect(list: { WorldPlan.TreeSpot }, reach: boolean)
-			for _, spot in ipairs(list) do
-				table.insert(entries, { spot = spot, reach = reach, order = #entries })
+		local failed, firstErr = 0, nil
+		local slice = TimeSlice.new({ budget = FOREST_SLICE })
+		local spawnedAny = false
+		-- Spawns `entries` (nearest the spawn first when yielding), a frame's
+		-- worth at a time. One tree that fails to build (a bad seed) mustn't take
+		-- the rest of the forest with it: each on its own, one warning for all.
+		local function spawnAll(entries: { Entry })
+			if yielding then
+				local spawn = WorldLayout.Spawn
+				local keyed: { [Entry]: number } = {}
+				for _, e in ipairs(entries) do
+					local dx, dz = e.spot.position.X - spawn.X, e.spot.position.Z - spawn.Z
+					keyed[e] = dx * dx + dz * dz
+				end
+				table.sort(entries, function(a: Entry, b: Entry): boolean
+					if keyed[a] ~= keyed[b] then
+						return keyed[a] < keyed[b]
+					end
+					return a.order < b.order
+				end)
+			end
+			for _, e in ipairs(entries) do
+				local spot = e.spot
+				local ok, err = pcall(function(): any
+					spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
+					return nil
+				end)
+				if not ok then
+					if e.reach then
+						warn(string.format("[MapBuilder] reach tree failed: %s", tostring(err)))
+					else
+						failed += 1
+						firstErr = firstErr
+							or string.format("%s at %s: %s", spot.woodId, tostring(spot.position), tostring(err))
+					end
+				end
+				if yielding and slice.step() then
+					workspace:SetAttribute("MapTrees", treesSpawned)
+				end
+			end
+			if yielding and #entries > 0 and not spawnedAny then
+				spawnedAny = true
+				loadLine(
+					string.format(
+						"first forest trees planted: %d in %.2fs",
+						treesSpawned - firstCount,
+						os.clock() - before
+					)
+				)
 			end
 		end
+		local function entriesOf(list: { WorldPlan.TreeSpot }, reach: boolean, startOrder: number): { Entry }
+			local entries: { Entry } = {}
+			for i, spot in ipairs(list) do
+				table.insert(entries, { spot = spot, reach = reach, order = startOrder + i })
+			end
+			return entries
+		end
+		local order = 0
 		-- Each planner is one block of CPU the engine cannot split, so the
 		-- server gets a frame between them when it is planting after the
 		-- players are in (a player's physics and remotes run in those frames).
@@ -668,67 +742,83 @@ step("5. The trees", function()
 				task.wait()
 			end
 		end
-		-- WorldPlan.Trees is the planner that costs seconds: it pauses on the
-		-- time slice, so the server keeps its frames while it works.
-		local planSlice = TimeSlice.new({ budget = FOREST_SLICE })
-		collect(WorldPlan.Trees(if yielding then planSlice.step else nil), false)
-		breathe()
-		-- Strip and ferry sites share one warning, so one bad wood is still
-		-- one line. Lanternwood waits until WoodData has the row (B12).
-		collect(WorldPlan.StripTrees(), false)
-		collect(WorldPlan.FerryPalms(), false)
-		breathe()
-		if WoodData.Get("lanternwood") then
-			collect(WorldPlan.Lanternwood(), false)
-		end
-		-- The Petrified Reach, planned after the fingerprint trees, so none of
-		-- those move.
-		collect(WorldPlan.ReachTrees(), true)
-		-- Bog Cypress in the Bayou and Ironwood on Red Mesa (Lane R).
-		collect(WorldPlan.RegionTrees(), false)
-		breathe()
-		loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
-		if yielding then
-			local hub = WorldLayout.Sawmill
-			local function far(e: Entry): number
-				local dx, dz = e.spot.position.X - hub.X, e.spot.position.Z - hub.Z
-				return dx * dx + dz * dz
-			end
-			local keyed: { [Entry]: number } = {}
-			for _, e in ipairs(entries) do
-				keyed[e] = far(e)
-			end
-			table.sort(entries, function(a: Entry, b: Entry): boolean
-				if keyed[a] ~= keyed[b] then
-					return keyed[a] < keyed[b]
-				end
-				return a.order < b.order
-			end)
-		end
-		-- One tree that fails to build (a bad seed) mustn't take the rest of
-		-- the forest with it: each on its own, one warning for all of them.
-		local failed, firstErr = 0, nil
-		local sliceStart = os.clock()
-		for _, e in ipairs(entries) do
-			local spot = e.spot
-			local ok, err = pcall(function(): any
-				spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
-				return nil
-			end)
-			if not ok then
-				if e.reach then
-					warn(string.format("[MapBuilder] reach tree failed: %s", tostring(err)))
-				else
-					failed += 1
-					firstErr = firstErr
-						or string.format("%s at %s: %s", spot.woodId, tostring(spot.position), tostring(err))
+		if not yielding then
+			-- The rollback's one pass, in the order it always had.
+			local entries: { Entry } = {}
+			local function collect(list: { WorldPlan.TreeSpot }, reach: boolean)
+				for _, e in ipairs(entriesOf(list, reach, #entries)) do
+					table.insert(entries, e)
 				end
 			end
-			if yielding and os.clock() - sliceStart > FOREST_SLICE then
-				workspace:SetAttribute("MapTrees", treesSpawned)
-				task.wait()
-				sliceStart = os.clock()
+			collect(WorldPlan.Trees(), false)
+			collect(WorldPlan.StripTrees(), false)
+			collect(WorldPlan.FerryPalms(), false)
+			if WoodData.Get("lanternwood") then
+				collect(WorldPlan.Lanternwood(), false)
 			end
+			collect(WorldPlan.ReachTrees(), true)
+			collect(WorldPlan.RegionTrees(), false)
+			loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
+			spawnAll(entries)
+		else
+			-- The first batch, nearest the spawn first. It pauses on the slice
+			-- like everything the planner does.
+			local planted: { [WorldPlan.TreeSpot]: boolean } = {}
+			local first = WorldPlan.WithPause(slice.step, function(): any
+				return WorldPlan.FirstTrees()
+			end) :: { WorldPlan.TreeSpot }
+			for _, spot in ipairs(first) do
+				planted[spot] = true
+			end
+			spawnAll(entriesOf(first, false, order))
+			order += #first
+			-- Then each batch the planner finishes, as it finishes it.
+			local all = WorldPlan.Trees(slice.step, function(batch: { WorldPlan.TreeSpot })
+				local fresh: { WorldPlan.TreeSpot } = {}
+				for _, spot in ipairs(batch) do
+					if not planted[spot] then
+						planted[spot] = true
+						table.insert(fresh, spot)
+					end
+				end
+				spawnAll(entriesOf(fresh, false, order))
+				order += #fresh
+			end)
+			-- Whatever the planner did not hand over on the way (nothing, once
+			-- its batches all came): the rest of the list.
+			local rest: { WorldPlan.TreeSpot } = {}
+			for _, spot in ipairs(all) do
+				if not planted[spot] then
+					planted[spot] = true
+					table.insert(rest, spot)
+				end
+			end
+			spawnAll(entriesOf(rest, false, order))
+			order += #rest
+			breathe()
+			-- Strip and ferry sites share one warning, so one bad wood is still
+			-- one line. Lanternwood waits until WoodData has the row (B12).
+			local tail: { Entry } = {}
+			local function collect(list: { WorldPlan.TreeSpot }, reach: boolean)
+				for _, e in ipairs(entriesOf(list, reach, order)) do
+					table.insert(tail, e)
+				end
+				order += #list
+			end
+			collect(WorldPlan.StripTrees(), false)
+			collect(WorldPlan.FerryPalms(), false)
+			breathe()
+			if WoodData.Get("lanternwood") then
+				collect(WorldPlan.Lanternwood(), false)
+			end
+			-- The Petrified Reach, planned after the fingerprint trees, so none of
+			-- those move.
+			collect(WorldPlan.ReachTrees(), true)
+			-- Bog Cypress in the Bayou and Ironwood on Red Mesa (Lane R).
+			collect(WorldPlan.RegionTrees(), false)
+			breathe()
+			loadLine(string.format("forest planned: %d sites in %.2fs", #all + #tail, os.clock() - before))
+			spawnAll(tail)
 		end
 		if failed > 0 then
 			warn(string.format("[MapBuilder] %d tree(s) failed to build; the first: %s", failed, tostring(firstErr)))
@@ -1385,6 +1475,28 @@ sellArea.Parent = map
 print(string.format("[MapBuilder] World built in %.1fs (terrain %.1fs)", builtSeconds, terrainSeconds))
 print("[MapBuilder] meshes after the build: " .. MeshKit.Report())
 loadLine(string.format("world ready for players (terrain %.1fs); the forest plants next", terrainSeconds))
+
+-- The rest of the terrain (the chunks past the town), a block a frame, the
+-- plot pads' ground first. "terrainFull" opens when it and the caves are in.
+if terrainFinish then
+	local finishTerrain = terrainFinish
+	terrainFinish = nil
+	LoadState.Track("terrain")
+	task.spawn(function()
+		local ok, result = xpcall(finishTerrain, traceback)
+		if ok then
+			loadLine(string.format("the rest of the terrain is written (%.1fs in the background)", result :: number))
+		else
+			failedSteps += 1
+			workspace:SetAttribute("MapBuildFailures", failedSteps)
+			warn(string.format("[MapBuilder] the rest of the terrain failed:\n%s", tostring(result)))
+		end
+		LoadState.Gates.Set("terrainFull")
+		LoadState.Finish("terrain")
+	end)
+else
+	LoadState.Gates.Set("terrainFull")
+end
 
 -- The forest, now the players can come in: planned, then planted a frame's
 -- worth at a time, nearest the sawmill first. The night-only woods are

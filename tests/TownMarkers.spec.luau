@@ -161,6 +161,22 @@ return function(t)
 		t.eq(board.offset.Z, 0)
 	end)
 
+	t.test("each marker is solid and rimmed in cream, so SELL LOGS is not faint against forest or shade", function()
+		for _, m in ipairs(TownMarkers.Markers) do
+			local face = TownMarkers.Build(m, false).Edge.Face
+			t.eq(face.BackgroundTransparency, 0, m.name .. ": an opaque face")
+			local label = face.Label
+			t.eq(label.TextTransparency, 0, m.name .. ": opaque text")
+			local rim = nil
+			for _, d in ipairs(face:GetChildren()) do
+				if d:IsA("UIStroke") then
+					rim = d
+				end
+			end
+			t.ok(rim ~= nil and rim.Color == C.Cream and rim.Thickness >= 2, m.name .. ": a cream rim, 2 px or more")
+		end
+	end)
+
 	t.test("each is a UITheme card: cream FredokaOne on bark, an ink edge, an icon chip drawn from Frames", function()
 		for _, m in ipairs(TownMarkers.Markers) do
 			for _, phone in ipairs({ true, false }) do
