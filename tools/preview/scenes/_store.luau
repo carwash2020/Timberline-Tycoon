@@ -50,6 +50,10 @@ function Store.scene(opts)
 				model.Parent = root
 			end
 
+			-- The town meshes are off in the game today (GameConfig.TownMeshes = false), so the
+			-- shell is part-built here too; with opts.townMeshes = true the barn GLB loads, which
+			-- brings its own baked white lamp blocks (not part of the interiors).
+			ctx.art("TownMeshes").Enabled = opts.townMeshes == true
 			local shop = BuildingArt.Shop(opts.kind, opts.title, C3.fromRGB(table.unpack(opts.accent)))
 			-- The roof is taken off: the preview has no ambient sky light under a roof, so a
 			-- roofed interior renders black. (The game's Lighting lifts it; judge the interior

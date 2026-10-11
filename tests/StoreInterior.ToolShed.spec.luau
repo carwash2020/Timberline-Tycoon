@@ -20,7 +20,6 @@ return function(t)
 	local StoreStock = t.shared("StoreStock")
 	local StoreTier = t.shared("StoreTier")
 	local HoverTag = t.shared("HoverTag")
-	local ShowroomLight = t.shared("ShowroomLight")
 
 	local function parts(root)
 		local out = {}
@@ -156,8 +155,8 @@ return function(t)
 		for _, d in ipairs(model:GetDescendants()) do
 			if d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight") then
 				lights += 1
-				t.ok(d.Brightness <= ShowroomLight.MaxBrightness, "brightness " .. d.Brightness)
-				t.ok(d.Range <= ShowroomLight.MaxRange, "range " .. d.Range)
+				t.ok(d.Brightness <= ShopKit.MaxLightBrightness, "brightness " .. d.Brightness)
+				t.ok(d.Range <= ShopKit.MaxLightRange, "range " .. d.Range)
 				t.eq(d.Shadows, false)
 				t.ok(d.Color.R >= d.Color.G and d.Color.G >= d.Color.B and d.Color.B < 0.8, "warm light")
 			end
@@ -166,6 +165,7 @@ return function(t)
 		for _, p in ipairs(parts(model)) do
 			if p.Material.Name == "Neon" then
 				t.ok(math.max(p.Size.X, p.Size.Y, p.Size.Z) <= 1.5, "no big Neon plane: " .. p.Name)
+				t.ok(not ShopKit.NearWhite(p.Color), "no near-white Neon: " .. p.Name)
 			end
 		end
 		local KIT = {
@@ -197,6 +197,22 @@ return function(t)
 				t.eq(p.CanCollide, false, p.Name .. " is looks only")
 			end
 		end
+	end)
+
+	t.test("nothing in the whole shop is near-white Neon or a light over the cap", function()
+		local model = BuildingArt.Shop(KIND, KIND, Color3.fromRGB(150, 62, 44))
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d.Material.Name == "Neon" then
+				t.ok(not ShopKit.NearWhite(d.Color), "near-white Neon: " .. d.Name)
+				t.ok(math.max(d.Size.X, d.Size.Y, d.Size.Z) <= 1.5, "big Neon: " .. d.Name)
+			elseif d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight") then
+				-- (the shell's own lanterns and gooseneck lamps are the older 1.4 / 1.2: held to that)
+				t.ok(d.Brightness <= 1.5, d.Parent.Name .. " light " .. d.Brightness)
+				t.ok(d.Range <= 25, d.Parent.Name .. " range " .. d.Range)
+			end
+		end
+		t.eq(ShopKit.NearWhite(Color3.fromRGB(255, 255, 255)), true)
+		t.eq(ShopKit.NearWhite(Color3.fromRGB(255, 200, 110)), false, "the lantern amber is fine")
 	end)
 
 	t.test("everything the kit adds is inside the room, under the ceiling, above the floor", function()

@@ -413,6 +413,18 @@ ShopKit.HeaderViewDist = 25
 ShopKit.SubViewDist = 15
 ShopKit.PhoneHeight = 375
 ShopKit.PhoneFov = 70
+ShopKit.SubSetback = 6 -- sub-signs hang no nearer than this many studs from a lane's front end
+
+-- The caps no interior light or glow may pass (spec: StoreInterior.*): a light is
+-- at most this bright and reaches this far, and a Neon part is never near-white.
+ShopKit.MaxLightBrightness = 1
+ShopKit.MaxLightRange = 22
+ShopKit.MaxNeonLuma = 0.86 -- a Neon part's colour luma (0 to 1) stays under this: warm cream or amber, never white
+
+-- Whether a Neon colour is too white (blows out at day and night).
+function ShopKit.NearWhite(c: Color3): boolean
+	return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B > ShopKit.MaxNeonLuma
+end
 
 -- How many pixels tall a sign's text is on a phone screen: the board is `h`
 -- studs tall, the text fills 0.84 of it (Kit.signText's padding), seen from
@@ -675,7 +687,12 @@ function ShopKit.SectionSigns(
 				continue
 			end
 			-- the tallest box among the category's first rows, near the sign
-			local z = math.max(z0 - 0.6, cfg.headerZ + 0.9)
+			-- never in the first SUB_SETBACK studs of the lane (that is the open entrance: the
+			-- phone camera stands there), and never in the header's plane
+			local z = math.max(z0 - 0.6, lane.z0 + ShopKit.SubSetback)
+			if math.abs(z - cfg.headerZ) < 2.4 then
+				z = cfg.headerZ + 2.4
+			end
 			local top = -math.huge
 			for _, place in ipairs(placements) do
 				local slot = StoreStock.Get(place.slotId)
@@ -688,13 +705,13 @@ function ShopKit.SectionSigns(
 					top = math.max(top, place.y + place.size.Y / 2)
 				end
 			end
-			local cy = math.min(top + SUB_ABOVE, cfg.headerY - headerH / 2 - 0.3 - 0.5 - subH / 2)
+			local cy = top + SUB_ABOVE
 			tie(cx, w, z)
 			ShopKit.SubSign(parent, {
-				cx = cx,
+				cx = cx + (if cx < 0 then -1.3 else 1.3), -- toward the wall, so it never covers the header's inner end from the aisle
 				cy = cy,
 				z = z,
-				w = math.min(w, 6.2),
+				w = math.min(w, 5.4),
 				h = subH,
 				text = sub.text,
 				accent = section.accent,

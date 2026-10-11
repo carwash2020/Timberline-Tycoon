@@ -35,7 +35,7 @@ local ToolShed = {}
 -- lane the underside is about 19 high, so a tie at 15.2 is under it). Everything
 -- else the interior adds stays under frame.ceilY.
 ToolShed.TieY = 15.2
-ToolShed.HeaderY = 13.0
+ToolShed.HeaderY = 12.6
 ToolShed.TopY = 15.7 -- the highest part the interior adds (the ties' tops)
 
 -- The axe rack on the back wall, as Lumber Tycoon 2 shows its axes: every axe
@@ -247,19 +247,21 @@ function ToolShed.Build(model: Model, frame: Frame)
 	runner(model, frame, 2.6, -frame.halfD + 1.4, 8)
 
 	-- Warm timber beams, and the warm lanterns hung from them.
-	ShopKit.Beams(model, frame, { -19, -8, -1, 12 })
+	ShopKit.Beams(model, frame, { -19, -13, -3, 5, 12 })
 	ShopKit.Rafter(model, frame, 0)
-	for _, z in ipairs({ -16, -8, 0 }) do
-		ShopKit.WarmLamp(model, -11.05, ceil - 3.4, z, ceil - 0.9)
-		ShopKit.WarmLamp(model, 11.05, ceil - 3.4, z, ceil - 0.9)
+	-- Over the aisle, at the beams, none in the first 9 studs (the entrance stays open) and
+	-- none beside a header's end.
+	for _, z in ipairs({ -3, 5 }) do
+		ShopKit.WarmLamp(model, -2.6, ceil - 3.4, z, ceil - 0.9)
+		ShopKit.WarmLamp(model, 2.6, ceil - 3.4, z, ceil - 0.9)
 	end
-	ShopKit.WarmLamp(model, 0, ceil - 3.4, -12, ceil - 0.9)
-	ShopKit.WarmLamp(model, 0, ceil - 3.4, 6, ceil - 0.9)
+	ShopKit.WarmLamp(model, 0, ceil - 3.4, -10, ceil - 0.9)
+	ShopKit.WarmLamp(model, 0, ceil - 3.4, 12, ceil - 0.9)
 
 	-- Signs: a header over each table and a sub-sign over each category.
 	ShopKit.SectionSigns(model, "ToolShed", ToolShed.Sections, {
 		headerY = ToolShed.HeaderY,
-		headerZ = -14,
+		headerZ = -8,
 		tieY = ToolShed.TieY,
 	})
 	ShopKit.CheckoutSign(model, frame)
