@@ -241,7 +241,24 @@ return function(t)
 					end,
 				},
 				WoodService = options.wood,
+				-- Lane F: the loose wood a base keeps when it is unloaded. The
+				-- default finds nothing; the loose-wood tests pass their own.
+				LooseService = options.loose or {
+					Scan = function()
+						return { pieces = 0, sections = 0, unsaveable = 0 }
+					end,
+					Collect = function()
+						return true
+					end,
+					Restore = function()
+						return 0, 0
+					end,
+					RestoreStranded = function()
+						return 0, 0
+					end,
+				},
 				PlotFill = options.plotFill,
+				BuildMaterials = options.materials,
 				ItemMeshes = options.itemMeshes,
 			},
 		})
@@ -2611,36 +2628,85 @@ return function(t)
 		t.eq(bob.attrs.PlotSlot, nil)
 	end)
 
+	t.test("loose wood on the plot does not block the unload: it is saved with the base and comes back", function()
+		local collected, restored = 0, 0
+		local found = { pieces = 12, sections = 30, unsaveable = 0 }
+		local saved = {}
+		local s, ann, profile, calls = baseWorld({
+			cash = 100000,
+			loose = {
+				Scan = function()
+					return found
+				end,
+				Collect = function(_, _, prof, withIngots)
+					collected += 1
+					t.eq(withIngots, true, "an unload takes the ingots too")
+					prof.plot.loose = saved
+					return true
+				end,
+				Restore = function(_, _, prof)
+					restored += 1
+					return #prof.plot.loose, 0
+				end,
+				RestoreStranded = function()
+					return 0, 0
+				end,
+			},
+		})
+		saved[1] = { w = "oak", k = "log", bed = "Plot", at = { 1, 2, 3, 0, 0, 0 }, s = { { 1, 1, 1 } } }
+		local restoredAtJoin = restored -- the first claim also asks for a restore (an empty one)
+		s.P.BaseAction(ann, "unload")
+		t.eq(collected, 1, "the loose things were collected into the save")
+		t.eq(ann.attrs.PlotSlot, nil, "and the base came off the pad")
+		t.eq(calls.commit, 1)
+		t.eq(profile.plot.loose, saved)
+		s.P.BaseAction(ann, "load")
+		s.P.Claim(ann, 2)
+		t.eq(restored, restoredAtJoin + 1, "loading the base on a pad puts them back")
+		local told = false
+		for _, line in ipairs(s.toasts) do
+			if string.find(line, "back on your plot", 1, true) ~= nil then
+				told = true
+			end
+		end
+		t.ok(told, "the player is told what came back")
+	end)
+
 	t.test(
-		"refused with nothing changed: loose wood on the plot, a base with no pad, another change in flight",
+		"refused with nothing changed: too much loose to save, a base with no pad, another change in flight",
 		function()
-			local pieces = {}
+			local found = { pieces = 160, sections = 90, unsaveable = 0 }
+			local collected = 0
 			local s, ann, profile, calls = baseWorld({
 				cash = 100000,
-				wood = {
-					All = function()
-						return pieces
+				loose = {
+					Scan = function()
+						return found
 					end,
-					Get = function(id)
-						return pieces[id]
+					Collect = function()
+						collected += 1
+						return true
 					end,
-					Remove = function() end,
-					SpawnPlank = function()
-						return {}
+					Restore = function()
+						return 0, 0
+					end,
+					RestoreStranded = function()
+						return 0, 0
 					end,
 				},
 			})
-			local origin = Vector3.new(s.PlotData.Slots[1].X, 0, s.PlotData.Slots[1].Y)
-			pieces.log1 = loose(origin, "log1", { kind = "log", ownerId = 1 })
 			s.P.BaseAction(ann, "unload")
-			t.ok(string.find(s.lastToast(), "loose logs and planks", 1, true) ~= nil, s.lastToast())
+			t.ok(
+				string.find(s.lastToast(), "160", 1, true) ~= nil
+					and string.find(s.lastToast(), "10 first", 1, true) ~= nil,
+				s.lastToast()
+			)
 			t.eq(ann.attrs.PlotSlot, 1)
 			t.eq(#s.items(1), 2)
 			t.eq(calls.commit, 0, "the world was not touched either")
+			t.eq(collected, 0)
 			t.eq(profile.baseCooldownUntil, 0)
-			-- Held in a hand, or somebody else's, does not count.
-			pieces.log1 = loose(origin, "log1", { kind = "log", ownerId = 1, heldBy = 1 })
-			pieces.log2 = loose(origin, "log2", { kind = "plank", ownerId = 2 })
+			found = { pieces = 5, sections = 9, unsaveable = 0 }
 			s.P.BaseAction(ann, "unload")
 			t.eq(ann.attrs.PlotSlot, nil, "then it goes")
 			profile.baseCooldownUntil = 0
@@ -2727,5 +2793,377 @@ return function(t)
 		s.atOffice(ann)
 		talk.Triggered.fn(ann)
 		t.eq(said[1], t.shared("PlotSalesmanData").OwnsLine)
+	end)
+	-- Lane F: crafted furniture. PlotService.GrantPiece puts one placeable piece
+	-- in stock; it places once for nothing and never enters the book.
+	t.test(
+		"GrantPiece: a crafted piece waits in stock, places free once, is never learned, sells for nothing",
+		function()
+			local s = setup({ cash = 100000 })
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			ann.standOn(1)
+			t.eq({ s.P.GrantPiece(ann, "CopperLampPost", "craft") }, { true, nil })
+			t.eq(profile.sawmillStock, { "CopperLampPost" })
+			t.eq(ann.attrs.SawmillStock, "CopperLampPost", "the client reads the stock")
+			t.eq(table.find(profile.blueprintBook, "CopperLampPost"), nil, "a crafted piece is stock, not a plan")
+			local cash = profile.cash
+			s.P.Place(ann, "CopperLampPost", 4, 4, 0)
+			t.eq(#profile.plot.placed, 1)
+			t.eq(profile.plot.placed[1].blueprintId, "CopperLampPost")
+			t.eq(profile.cash, cash, "placing it is free")
+			t.eq(#profile.sawmillStock, 0, "and spends the piece")
+			t.eq(ann.attrs.SawmillStock, "")
+			s.P.Place(ann, "CopperLampPost", 12, 4, 0)
+			t.eq(#profile.plot.placed, 1, "no second one without another craft")
+			t.ok(string.find(s.lastToast(), "Craft the Copper Lamp Post", 1, true) ~= nil, s.lastToast())
+			s.advance(120) -- past the undo window
+			s.P.Sell(ann, profile.plot.placed[1].uid)
+			t.eq(profile.cash, cash, "furniture a craft made never turns into cash")
+			t.eq(#profile.plot.placed, 0)
+		end
+	)
+
+	t.test("GrantPiece: only the two furniture pieces, and a full stock refuses", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		t.eq({ s.P.GrantPiece(ann, "Wall4", "craft") }, { false, "unknown" })
+		t.eq({ s.P.GrantPiece(ann, "SawmillRickety", "craft") }, { false, "unknown" })
+		t.eq({ s.P.GrantPiece(ann, 5, "craft") }, { false, "unknown" })
+		t.eq({ s.P.GrantPiece(ann, "GoldChest", "craft") }, { true, nil })
+		local max = t.shared("FurnitureData").MaxStock
+		for _ = 2, max do
+			t.eq(s.P.GrantPiece(ann, "GoldChest", "craft"), true)
+		end
+		t.eq({ s.P.GrantPiece(ann, "GoldChest", "craft") }, { false, "full" })
+		t.eq({ s.P.CanGrant(ann, "GoldChest") }, { false, "full" })
+		t.eq(#profile.sawmillStock, max, "nothing was added past the cap")
+	end)
+	-- Lane F: where fallen wood, slabs and trucks come back to.
+	t.test("RecoverSpot: a spot above the owner's own plot, a new one each time, nothing without a pad", function()
+		local s = setup({ cash = 100000 })
+		local ann = s.newPlayer(1, "Ann")
+		t.eq(s.P.RecoverSpot(ann), nil, "no pad, nowhere to come back to")
+		s.claim(ann, 1)
+		local centre = t.roblox.Vector3.new(s.PlotData.Slots[1].X, 0, s.PlotData.Slots[1].Y)
+		local seen = {}
+		for _ = 1, 16 do
+			local cf = s.P.RecoverSpot(ann)
+			t.ok(cf ~= nil)
+			local at = cf.Position
+			t.ok(math.abs(at.X - centre.X) < 30 and math.abs(at.Z - centre.Z) < 30, "over the plot")
+			t.ok(at.Y > 4, "in the air above the platform")
+			seen[string.format("%.1f,%.1f", at.X, at.Z)] = true
+		end
+		local count = 0
+		for _ in pairs(seen) do
+			count += 1
+		end
+		t.eq(count, 16, "sixteen different spots")
+		s.P.BaseAction(ann, "unload")
+		t.eq(s.P.RecoverSpot(ann), nil, "an unloaded base has no pad")
+	end)
+	-----------------------------------------------------------------------
+	-- Lane F: sandstone and copper pieces, the undo, and building with friends
+	-----------------------------------------------------------------------
+
+	-- A fake world of slabs and ingots (BuildMaterials): parts by uid, takes and
+	-- returns counted, the room for returns set by the test.
+	local function materialsWorld(origin)
+		local world = { parts = {}, taken = {}, slabsBack = {}, ingotsBack = {}, slabRoom = 24, ingotRoom = 40 }
+		function world.add(uid, kind, ownerId, ore, offset)
+			table.insert(world.parts, {
+				uid = uid,
+				kind = kind,
+				ore = ore,
+				ownerId = ownerId,
+				held = false,
+				position = origin + (offset or Vector3.zero),
+			})
+		end
+		world.api = {
+			Of = function(userId)
+				local out = {}
+				for _, part in ipairs(world.parts) do
+					if part.ownerId == userId and not world.taken[part.uid] then
+						table.insert(out, part)
+					end
+				end
+				return out
+			end,
+			Take = function(uid)
+				if world.taken[uid] then
+					return false
+				end
+				world.taken[uid] = true
+				return true
+			end,
+			SlabRoom = function()
+				return world.slabRoom
+			end,
+			IngotRoom = function()
+				return world.ingotRoom
+			end,
+			ReturnSlab = function(userId, cf)
+				table.insert(world.slabsBack, { userId = userId, cf = cf })
+				return true
+			end,
+			ReturnIngot = function(_, ore, cf)
+				table.insert(world.ingotsBack, { ore = ore, cf = cf })
+				return true
+			end,
+		}
+		return world
+	end
+
+	t.test("sandstone: a ghost takes slabs from the owner's parts within reach, one part once", function()
+		local pieces = {}
+		local world = materialsWorld(Vector3.zero)
+		local s = setup({ cash = 100000, wood = woodApi(pieces), materials = world.api })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		local origin = plotOrigin(s.PlotData, 1)
+		profile.blueprintBook = { "SandWall4" }
+		local cash = profile.cash
+		s.P.Place(ann, "SandWall4", 4, 4, 0)
+		t.eq(#profile.plot.placed, 1)
+		local item = profile.plot.placed[1]
+		t.eq(item.fill, { units = 0 }, "an empty ghost")
+		t.eq(profile.cash, cash - 8, "the fee is charged once, on placing")
+		world.parts = {}
+		world.add("s1", "slab", 1, nil, Vector3.new(4, 3, 4) + Vector3.new(0, 0, 0))
+		world.add("s2", "slab", 1, nil, Vector3.new(4, 3, 4))
+		world.add("s3", "slab", 1, nil, Vector3.new(4, 3, 4))
+		world.add("far", "slab", 1, nil, Vector3.new(0, 0, 400))
+		world.add("theirs", "slab", 2, nil, Vector3.new(4, 3, 4))
+		for _, part in ipairs(world.parts) do
+			part.position = origin + part.position
+		end
+		s.advance(1)
+		s.P.FillStep()
+		t.eq(item.fill, nil, "two slabs finished it (a built piece keeps no fill)")
+		local taken = 0
+		for _ in pairs(world.taken) do
+			taken += 1
+		end
+		t.eq(taken, 2, "exactly two slabs were destroyed")
+		t.eq(world.taken.far, nil, "a slab past reach was not used")
+		t.eq(world.taken.theirs, nil, "someone else's slab was not used")
+		local third = world.taken.s1 and world.taken.s2 and world.taken.s3
+		t.ok(not third, "the third slab stays a slab")
+		local model = s.items(1)[1]
+		t.eq(model:GetAttribute("Needs"), "Built")
+	end)
+
+	t.test("sandstone: a friend with Build adds their own slab; a stranger's is refused and stays", function()
+		local pieces = {}
+		local world = materialsWorld(Vector3.zero)
+		local s = setup({ cash = 100000, wood = woodApi(pieces), materials = world.api })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		local cal = s.newPlayer(3, "Cal")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		bob.standOn(1)
+		cal.standOn(1)
+		local origin = plotOrigin(s.PlotData, 1)
+		profile.blueprintBook = { "SandWall4" }
+		s.P.Place(ann, "SandWall4", 4, 4, 0)
+		local item = profile.plot.placed[1]
+		profile.permissions = { ["2"] = { build = true } }
+		world.add("bobs", "slab", 2, nil, origin + Vector3.new(4, 3, 4))
+		world.add("cals", "slab", 3, nil, origin + Vector3.new(4, 3, 4))
+		s.advance(1)
+		s.P.FillStep()
+		t.eq(item.fill, { units = 0, slabs = 1 }, "Bob's slab went in, nobody else's")
+		t.eq(world.taken.bobs, true)
+		t.eq(world.taken.cals, nil, "Cal has no Build permission: his slab is untouched")
+		profile.permissions = {}
+		world.add("bobs2", "slab", 2, nil, origin + Vector3.new(4, 3, 4))
+		s.advance(1)
+		s.P.FillStep()
+		t.eq(world.taken.bobs2, nil, "with the permission gone Bob's slab no longer fills it")
+	end)
+
+	t.test(
+		"undo (BL3): within 60 s a finished sandstone wall gives its fee and both slabs back; after, half the fee only",
+		function()
+			local pieces = {}
+			local world = materialsWorld(Vector3.zero)
+			local s = setup({ cash = 100000, wood = woodApi(pieces), materials = world.api })
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			ann.standOn(1)
+			local origin = plotOrigin(s.PlotData, 1)
+			profile.blueprintBook = { "SandWall4" }
+			local function build()
+				s.P.Place(ann, "SandWall4", 4, 4, 0)
+				local item = profile.plot.placed[#profile.plot.placed]
+				world.parts = {}
+				world.taken = {}
+				world.add("a" .. item.uid, "slab", 1, nil, origin + Vector3.new(4, 3, 4))
+				world.add("b" .. item.uid, "slab", 1, nil, origin + Vector3.new(4, 3, 4))
+				s.advance(1)
+				s.P.FillStep()
+				t.eq(item.fill, nil)
+				return item
+			end
+			local before = profile.cash
+			local item = build()
+			t.eq(profile.cash, before - 8)
+			s.P.Sell(ann, item.uid)
+			t.eq(profile.cash, before, "the whole fee came back")
+			t.eq(#world.slabsBack, 2, "both slabs are on the ground again")
+			t.eq(#profile.plot.placed, 0)
+			-- After the window: SellBack on the fee, and the stone is gone for good.
+			world.slabsBack = {}
+			item = build()
+			s.advance(61)
+			local cash = profile.cash
+			s.P.Sell(ann, item.uid)
+			t.eq(profile.cash, cash + 4, "half the fee: sandstone never turns into cash")
+			t.eq(#world.slabsBack, 0, "and no slab comes back")
+		end
+	)
+
+	t.test(
+		"undo (BL3): a half-filled ghost gives back its slabs and the whole fee; no room means it refuses and takes nothing",
+		function()
+			local pieces = {}
+			local world = materialsWorld(Vector3.zero)
+			local s = setup({ cash = 100000, wood = woodApi(pieces), materials = world.api })
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			ann.standOn(1)
+			profile.blueprintBook = { "SandArch8" }
+			local before = profile.cash
+			s.P.Place(ann, "SandArch8", 4, 4, 0)
+			local item = profile.plot.placed[1]
+			item.fill = { units = 0, slabs = 3 }
+			world.slabRoom = 2
+			s.P.Sell(ann, item.uid)
+			t.eq(#profile.plot.placed, 1, "refused: three slabs would not fit")
+			t.ok(string.find(s.lastToast(), "loose slab", 1, true) ~= nil, s.lastToast())
+			t.eq(profile.cash, before - 16, "nothing was refunded")
+			t.eq(#world.slabsBack, 0)
+			world.slabRoom = 24
+			s.P.Sell(ann, item.uid)
+			t.eq(#profile.plot.placed, 0)
+			t.eq(#world.slabsBack, 3)
+			t.eq(profile.cash, before, "the fee, in full, because it was within 60 s")
+		end
+	)
+
+	t.test("copper: an ingot fills the trim, and undo gives it back as an ingot", function()
+		local pieces = {}
+		local world = materialsWorld(Vector3.zero)
+		local s = setup({ cash = 100000, wood = woodApi(pieces), materials = world.api })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		local origin = plotOrigin(s.PlotData, 1)
+		profile.blueprintBook = { "CopperTrim4" }
+		s.P.Place(ann, "CopperTrim4", 4, 4, 0)
+		local item = profile.plot.placed[1]
+		world.add("iron", "ingot", 1, "Iron", origin + Vector3.new(4, 3, 4))
+		world.add("cu", "ingot", 1, "Copper", origin + Vector3.new(4, 3, 4))
+		s.advance(1)
+		s.P.FillStep()
+		t.eq(item.fill, nil, "the Copper ingot finished it")
+		t.eq(world.taken.cu, true)
+		t.eq(world.taken.iron, nil, "an Iron ingot is not taken")
+		s.P.Sell(ann, item.uid)
+		t.eq(#world.ingotsBack, 1)
+		t.eq(world.ingotsBack[1].ore, "Copper")
+	end)
+
+	t.test("the 1,200 kit part cap refuses a new piece with a clear line and never deletes a build", function()
+		local s = setup({ cash = 1000000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		local placed = {}
+		for i = 1, 300 do
+			placed[i] = {
+				uid = "w" .. i,
+				blueprintId = "WindowWall8",
+				x = -90 + (i % 30) * 6,
+				z = -90 + (i // 30) * 6,
+				rot = 0,
+			}
+		end
+		profile.plot.placed = placed
+		s.P.Place(ann, "Wall4", 0, 0, 0)
+		t.eq(#profile.plot.placed, 300, "the 301st piece (1,204 parts) is refused")
+		t.ok(string.find(s.lastToast(), "1200 kit parts", 1, true) ~= nil, s.lastToast())
+	end)
+	-- Lane F: paint all of this type.
+	t.test("PaintAllType: every piece of that type on the owner's plot, one undo step, others untouched", function()
+		local s = setup({ cash = 100000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		for i = 1, 3 do
+			s.P.Place(ann, "Wall4", -10 + i * 6, 4, 0)
+		end
+		s.P.Place(ann, "Floor4", 20, 20, 0)
+		profile.plot.placed[2].paint = "brick"
+		local cash = profile.cash
+		s.P.PaintAllType(ann, "Wall4", "charcoal")
+		for i = 1, 3 do
+			t.eq(profile.plot.placed[i].paint, "charcoal", "wall " .. i)
+		end
+		t.eq(profile.plot.placed[4].paint, nil, "the floor is another type")
+		t.eq(profile.cash, cash, "paint is free")
+		t.eq(s.lastToast(), "Painted 3 Short Walls.")
+		-- The model was rebuilt painted.
+		local model = s.items(1)[1]
+		t.ok(model ~= nil)
+		-- One undo step puts all three back.
+		s.P.Edit(ann, { op = "undo" })
+		t.eq(
+			{ profile.plot.placed[1].paint, profile.plot.placed[2].paint, profile.plot.placed[3].paint },
+			{ nil, "brick", nil }
+		)
+		s.P.PaintAllType(ann, "Wall4", "charcoal")
+		s.P.PaintAllType(ann, "Wall4", "charcoal")
+		t.eq(s.lastToast(), "Every Short Wall already wears that colour.", "a second press is a no-op with a line")
+	end)
+
+	t.test("PaintAllType: a friend with Build may, a stranger may not, and junk does nothing", function()
+		local s = setup({ cash = 100000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		local cal = s.newPlayer(3, "Cal")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		bob.standOn(1)
+		cal.standOn(1)
+		s.P.Place(ann, "Wall4", -4, 4, 0)
+		s.P.Place(ann, "Wall4", 4, 4, 0)
+		profile.permissions = { ["2"] = { build = true } }
+		s.P.PaintAllType(cal, "Wall4", "white")
+		t.eq(
+			{ profile.plot.placed[1].paint, profile.plot.placed[2].paint },
+			{ nil, nil },
+			"Cal has no Build permission"
+		)
+		t.eq(s.lastToast(), "You can't paint on this plot.")
+		s.P.PaintAllType(bob, "Wall4", "white")
+		t.eq({ profile.plot.placed[1].paint, profile.plot.placed[2].paint }, { "white", "white" }, "Bob may")
+		for _, junk in ipairs({ 5, true, {}, "Nope", "Table" }) do
+			s.P.PaintAllType(ann, junk, "tan")
+			s.P.PaintAllType(ann, "Wall4", junk)
+		end
+		t.eq({ profile.plot.placed[1].paint, profile.plot.placed[2].paint }, { "white", "white" }, "nothing changed")
+		profile.permissions = {}
+		local limited = setup({ cash = 1000, rate = false })
+		local dan, dprofile = limited.newPlayer(4, "Dan")
+		limited.claim(dan, 1)
+		dan.standOn(1)
+		limited.P.Place(dan, "Wall4", 4, 4, 0)
+		limited.P.PaintAllType(dan, "Wall4", "tan")
+		t.eq(dprofile.plot.placed[1], nil, "a rate-limited player cannot even place")
 	end)
 end

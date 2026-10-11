@@ -402,12 +402,9 @@ local function liveMayUse(player: Player, model: Model): boolean
 	if not owner then
 		return false
 	end
-	local ProfileService = require(script.Parent.ProfileService)
-	local profile = ProfileService.GetProfile(owner)
-	if not profile then
-		return false
-	end
-	return ChopSawLogic.MayUse(player.UserId, ownerId, profile.permissions)
+	-- Lane F: the one edit-rights rule (PlotService.CanEdit's twin).
+	local EditRights = require(script.Parent.EditRights)
+	return EditRights.Can(player, owner, ChopSawLogic.UseFlag)
 end
 
 -- The owner's placed saw stores the length. Other placed items are left alone.

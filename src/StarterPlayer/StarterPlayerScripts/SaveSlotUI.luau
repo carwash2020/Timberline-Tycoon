@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BaseLogic = require(ReplicatedStorage.Shared.BaseLogic)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local SaveNowLogic = require(ReplicatedStorage.Shared.SaveNowLogic)
 local JoinPickLogic = require(ReplicatedStorage.Shared.JoinPickLogic)
 local PickerSequence = require(ReplicatedStorage.Shared.PickerSequence)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -55,6 +56,8 @@ local sequence = PickerSequence.Shared()
 local setOpen: (boolean) -> ()
 local closeButton: GuiObject? = nil
 local baseButton: UITheme.Button? = nil
+local saveButton: UITheme.Button? = nil
+local savedLabel: TextLabel? = nil
 
 local function send(action: string, index: number, extra: boolean | string)
 	Net.Remote("SlotAction"):FireServer(action, index, extra)
@@ -117,15 +120,45 @@ local function refreshBase()
 	local untilAt = player:GetAttribute("BaseCooldownUntil")
 	local cooling = kind == "unload" and type(untilAt) == "number" and os.time() < untilAt
 	b.face.Text = if cooling
-		then string.format("UNLOAD BASE (%ds)", math.ceil((untilAt :: number) - os.time()))
+		then string.format("UNLOAD (%ds)", math.ceil((untilAt :: number) - os.time()))
 		else BaseLogic.ButtonText(kind)
 	b.face.Active = not cooling
 	b.face.AutoButtonColor = not cooling
 	b.root:SetAttribute("Kind", kind)
 end
 
+-- SAVE NOW: the label counts the cooldown down, the line under it says when
+-- the server last wrote the save ("Saved at 11:42", from LastSavedAt).
+local function refreshSave()
+	local b = saveButton
+	if not b then
+		return
+	end
+	local untilAt = player:GetAttribute("SaveCooldownUntil")
+	local now = os.time()
+	local ready = SaveNowLogic.Ready(now, if type(untilAt) == "number" then untilAt else nil)
+	b.face.Text = SaveNowLogic.ButtonText(now, if type(untilAt) == "number" then untilAt else nil)
+	b.face.Active = ready
+	b.face.AutoButtonColor = ready
+	b.root.Visible = not picking
+	local label = savedLabel
+	if label then
+		local at = player:GetAttribute("LastSavedAt")
+		label.Visible = not picking
+		if type(at) == "number" and at > 0 then
+			local ok, shown = pcall(function()
+				return DateTime.fromUnixTimestamp(at):FormatLocalTime("H:mm", "en-us")
+			end)
+			label.Text = if ok then "Saved at " .. shown else SaveNowLogic.Text(at, 0)
+		else
+			label.Text = SaveNowLogic.Text(nil, 0)
+		end
+	end
+end
+
 local function fill()
 	refreshBase()
+	refreshSave()
 	local holder = list
 	if not holder then
 		return
@@ -377,9 +410,9 @@ function SaveSlotUI.Start()
 	local base = UITheme.Button({
 		name = "BaseButton",
 		text = "UNLOAD BASE",
-		size = Vector2.new(336, math.max(48, UITheme.Size.Tap)),
+		size = Vector2.new(164, math.max(48, UITheme.Size.Tap)),
 		style = "bark",
-		textSize = 16,
+		textSize = 14,
 	})
 	base.root.Position = UDim2.fromOffset(12, 90)
 	base.root.Visible = false
@@ -399,12 +432,50 @@ function SaveSlotUI.Start()
 		end
 	end)
 
+	-- SAVE NOW beside it: writes the save on demand (30 s between writes).
+	local saveNow = UITheme.Button({
+		name = "SaveNowButton",
+		text = "Save now",
+		size = Vector2.new(164, math.max(48, UITheme.Size.Tap)),
+		style = "buy",
+		textSize = 14,
+	})
+	saveNow.root.Position = UDim2.fromOffset(184, 90)
+	saveNow.root.Parent = outer
+	saveButton = saveNow
+	saveNow.face.Activated:Connect(function()
+		local untilAt = player:GetAttribute("SaveCooldownUntil")
+		if not SaveNowLogic.Ready(os.time(), if type(untilAt) == "number" then untilAt else nil) then
+			return
+		end
+		local active = 1
+		for _, slot in ipairs(summaries) do
+			if slot.active then
+				active = slot.index
+			end
+		end
+		Net.Remote("SaveNow"):FireServer(active)
+	end)
+
+	local saved = Instance.new("TextLabel")
+	saved.Name = "SavedAt"
+	saved.BackgroundTransparency = 1
+	saved.Font = UITheme.Fonts.Body
+	saved.TextSize = 14
+	saved.TextColor3 = C.Ink
+	saved.TextXAlignment = Enum.TextXAlignment.Right
+	saved.Size = UDim2.new(1, -24, 0, 18)
+	saved.Position = UDim2.fromOffset(12, 142)
+	saved.Text = ""
+	saved.Parent = outer
+	savedLabel = saved
+
 	local rows = Instance.new("ScrollingFrame")
 	rows.Name = "Rows"
 	rows.BackgroundTransparency = 1
 	rows.BorderSizePixel = 0
-	rows.Position = UDim2.fromOffset(12, 144)
-	rows.Size = UDim2.new(1, -24, 1, -156)
+	rows.Position = UDim2.fromOffset(12, 164)
+	rows.Size = UDim2.new(1, -24, 1, -176)
 	rows.CanvasSize = UDim2.fromOffset(0, 0)
 	rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	rows.ScrollBarThickness = 6
@@ -489,6 +560,9 @@ function SaveSlotUI.Start()
 	player:GetAttributeChangedSignal("SlotPick"):Connect(considerPick)
 	for _, attr in ipairs({ "PlotSlot", "BaseCooldownUntil" }) do
 		player:GetAttributeChangedSignal(attr):Connect(refreshBase)
+	end
+	for _, attr in ipairs({ "LastSavedAt", "SaveCooldownUntil" }) do
+		player:GetAttributeChangedSignal(attr):Connect(refreshSave)
 	end
 
 	Net.Remote("SlotState").OnClientEvent:Connect(function(payload: unknown)

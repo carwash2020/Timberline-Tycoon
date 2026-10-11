@@ -22,6 +22,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local SaveNowLogic = require(ReplicatedStorage.Shared.SaveNowLogic)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
@@ -49,6 +50,7 @@ local stateRemote: RemoteEvent? = nil
 local armedUntil: { [Player]: number } = {}
 local awaiting: { [Player]: boolean } = {} -- joined, has not picked a save yet
 local chosen: { [Player]: boolean } = {} -- picked one this visit
+local performing: { [Player]: boolean } = {} -- a load or a reset is running right now (Save now waits)
 
 -- Text other players can read. PublicChat is the broadcast context.
 -- A failure returns nil so the caller stores the default name instead.
@@ -96,6 +98,7 @@ local function perform(player: Player, action: string, index: number): boolean
 	if not profile then
 		return false
 	end
+	performing[player] = true
 	local ok, why = SaveSlotLogic.Perform(profile, action, index, os.time(), ProfileSchema.Template, Util.guid, {
 		commit = function(_data: any)
 			hooks.commit(player)
@@ -107,6 +110,7 @@ local function perform(player: Player, action: string, index: number): boolean
 			hooks.rebuild(player)
 		end,
 	})
+	performing[player] = nil
 	if not ok then
 		if why and why ~= "bad" then
 			notify(player, why)
@@ -252,9 +256,71 @@ function SaveSlotService.IsPicking(player: Player): boolean
 end
 
 function SaveSlotService.PlayerRemoving(player: Player)
+	performing[player] = nil
 	armedUntil[player] = nil
 	awaiting[player] = nil
 	chosen[player] = nil
+end
+
+---------------------------------------------------------------------------
+-- Save now (SaveNowLogic): the SAVES panel's button. The server writes the
+-- truck's load into the profile, then the profile, on its own 30 s cooldown.
+-- Nothing is written while the cooldown runs, during a save swap, or while a
+-- base is being unloaded. The time shows from the LastSavedAt attribute.
+---------------------------------------------------------------------------
+
+type SaveHooks = {
+	truck: ((Player) -> ())?, -- TruckLoad.Save: the loose load into profile.truckLoad
+	busy: ((Player) -> boolean)?, -- an unload or other base change is running
+}
+
+local saveHooks: SaveHooks = {}
+
+function SaveSlotService.SaveNow(player: Player, slot: unknown, now: number?): boolean
+	if not RateLimiter.Allow(player, "SaveNow") then
+		return false
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile or not SaveNowLogic.SlotOk(slot, profile.activeSlot) then
+		return false
+	end
+	local clock = if type(now) == "number" then now else os.time()
+	local busyHook = saveHooks.busy
+	local ok, why = SaveNowLogic.Check({
+		now = clock,
+		untilAt = profile.saveCooldownUntil,
+		busy = performing[player] == true or (busyHook ~= nil and busyHook(player) == true),
+		picking = awaiting[player] == true,
+		hasProfile = true,
+	})
+	if not ok then
+		if why and why ~= SaveNowLogic.Reasons.bad then
+			notify(player, why)
+		end
+		return false
+	end
+	local truck = saveHooks.truck
+	if truck then
+		local wrote, err = (pcall :: any)(truck, player)
+		if not wrote then
+			warn("[SaveSlot] truck load not saved: " .. tostring(err))
+		end
+	end
+	profile.saveCooldownUntil = SaveNowLogic.Stamp(clock)
+	ProfileService.Save(player)
+	player:SetAttribute("LastSavedAt", clock)
+	player:SetAttribute("SaveCooldownUntil", profile.saveCooldownUntil)
+	return true
+end
+
+-- BaseBoot binds the remote and hands over the two world hooks.
+function SaveSlotService.BindSaveNow(remote: RemoteEvent?, hooksIn: SaveHooks?)
+	saveHooks = hooksIn or {}
+	if remote then
+		remote.OnServerEvent:Connect(function(player: Player, slot: unknown)
+			SaveSlotService.SaveNow(player, slot)
+		end)
+	end
 end
 
 function SaveSlotService.Init(action: RemoteEvent, state: RemoteEvent, notifyFn: (Player, string) -> (), world: Hooks)

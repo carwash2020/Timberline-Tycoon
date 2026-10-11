@@ -60,7 +60,8 @@ return function(t)
 				t.ok(flat(p, sky.main.center) < sky.main.radius - 5, "view 6 stands on the main isle")
 				floor = sky.main.center.Y -- the isle's top
 			end
-			t.ok(math.abs(p.Y - floor - 5.5) < 1e-6, string.format("view %d: eye %.2f above its floor", i, p.Y - floor))
+			-- (1e-4: Vector3 holds float32, which is 3e-6 off at y 44, ring map)
+			t.ok(math.abs(p.Y - floor - 5.5) < 1e-4, string.format("view %d: eye %.2f above its floor", i, p.Y - floor))
 		end
 	end)
 
@@ -72,8 +73,10 @@ return function(t)
 		t.ok(flat(v(cameras[1].target), town.sawmill.Position) < 1e-6, "1 looks at the sawmill")
 		local se = v(cameras[2].target) - at(2)
 		t.ok(se.X > 0 and se.Z < 0 and math.abs(math.abs(se.X) - math.abs(se.Z)) < 1e-3, "2 looks south-east")
-		t.ok(flat(at(3), Vector3.new(30, 0, 450)) < 1e-6, "3 on the Snow Road at (30, 450)")
-		t.ok(flat(at(4), Vector3.new(1150, 0, 0)) < 1e-6, "4 on the beach at (1150, 0)")
+		-- Ring map (Oct 10): the fork is at (0, 480), it was (30, 450).
+		t.ok(flat(at(3), Vector3.new(0, 0, 480)) < 1e-4, "3 on the Snow Road at (0, 480)")
+		-- Ring map: the shore is at x 780, so the beach eye is at (740, 0), it was (1150, 0).
+		t.ok(flat(at(4), Vector3.new(740, 0, 0)) < 1e-6, "4 on the beach at (740, 0)")
 		t.ok(flat(at(5), town.gondola.Position) < 30, "5 by the town gondola station")
 		t.ok(flat(at(7), roadEnd("HillsRoad")) < 50, "7 near the Hills Road's end")
 		t.ok(flat(at(8), roadEnd("VolcanoRoad")) < 20, "8 at the Volcano Road's end")

@@ -200,6 +200,16 @@ function WorldTime.Hour(now: number?): number
 	return clock
 end
 
+-- The in-game day number. A pure function of the shared clock, so every
+-- server agrees. Day 0 is the epoch.
+function WorldTime.Day(now: number): number
+	local cycle = cycleSeconds()
+	if cycle <= 0 then
+		return 0
+	end
+	return math.floor(now / cycle)
+end
+
 function WorldTime.IsNight(clockTime: number?): boolean
 	local clock = if type(clockTime) == "number" then clockTime else WorldTime.Hour()
 	local from, to = GameConfig.NightStartsAt, GameConfig.NightEndsAt

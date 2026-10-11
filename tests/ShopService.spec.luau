@@ -805,6 +805,60 @@ return function(t)
 		t.eq(gone, false, "the chop saw is a v2 item")
 	end)
 
+	-- Lane F: the Sparkworks counter's stock. A logic piece costs its one price and waits in
+	-- stock like a boxed machine; the hammer places it for nothing.
+	t.test("Sparkworks: a Lever is bought once into stock at its one price; belts and detectors too", function()
+		local s = setup({ cash = 1000, loop = 2, claimed = true })
+		local price = t.shared("SparkworksStock").Price("Lever")
+		local ok, line = s.ShopService.ChargeAndGrant(s.player, { uid = "sw-1", kind = "Logic", itemId = "Lever" })
+		t.eq({ ok, line }, { true, "thanks" })
+		t.eq(s.profile.cash, 1000 - price)
+		t.eq(s.profile.sawmillStock, { "Lever" })
+		t.eq(s.toasts[#s.toasts], "Bought a Lever! Place it with your hammer on your plot.")
+		local again = s.ShopService.ChargeAndGrant(s.player, { uid = "sw-1", kind = "Logic", itemId = "Lever" })
+		t.eq(again, false, "the same box never charges twice")
+		t.eq(s.profile.cash, 1000 - price)
+		-- Lane W's line pieces are machines sold at this counter.
+		local detector = t.shared("ItemCatalog").GetMachine("WoodDetector").priceCash
+		local m = s.ShopService.ChargeAndGrant(s.player, { uid = "sw-2", kind = "Machine", itemId = "WoodDetector" })
+		t.eq(m, true)
+		t.eq(s.profile.cash, 1000 - price - detector)
+		t.eq(s.profile.sawmillStock, { "Lever", "WoodDetector" })
+	end)
+
+	t.test("Sparkworks: no plot, too poor, an unknown piece and the v1 loop all take nothing", function()
+		local s = setup({ cash = 1000, loop = 2 })
+		local no, why = s.ShopService.ChargeAndGrant(s.player, { uid = "sw-3", kind = "Logic", itemId = "Lever" })
+		t.eq({ no, why }, { false, "needsLand" })
+		t.eq(s.profile.cash, 1000)
+		local poor = setup({ cash = 1, loop = 2, claimed = true })
+		t.eq(
+			select(
+				2,
+				poor.ShopService.ChargeAndGrant(poor.player, { uid = "sw-4", kind = "Logic", itemId = "GateAnd" })
+			),
+			"broke"
+		)
+		t.eq(poor.profile.cash, 1)
+		local owner = setup({ cash = 1000, loop = 2, claimed = true })
+		t.eq(
+			select(2, owner.ShopService.ChargeAndGrant(owner.player, { uid = "sw-5", kind = "Logic", itemId = "Door" })),
+			"locked",
+			"a Door is not sold here"
+		)
+		t.eq(
+			select(2, owner.ShopService.ChargeAndGrant(owner.player, { uid = "sw-6", kind = "Logic", itemId = "Nope" })),
+			"locked"
+		)
+		local v1 = setup({ cash = 1000, loop = 1, claimed = true })
+		t.eq(
+			select(2, v1.ShopService.ChargeAndGrant(v1.player, { uid = "sw-7", kind = "Logic", itemId = "Lever" })),
+			"locked"
+		)
+		t.eq(owner.profile.cash, 1000)
+		t.eq(owner.profile.sawmillStock, nil)
+	end)
+
 	t.test("the Sky Bin: $400 at the Tool Shed, one per player, the item owed when the box opens", function()
 		local s = setup({ cash = 1000, loop = 2, claimed = true })
 		-- Paid at the counter with the box handed over: nothing is owed until it opens.

@@ -119,7 +119,7 @@ return function(t)
 
 	t.test("the Snowfields award that area badge on the first visit", function()
 		local s = setup()
-		stand(s.player, 0, 30, 1240)
+		stand(s.player, 0, 30, 720)
 		s.BadgeService.Poll(s.player)
 		t.eq(s.profile.badgesAwarded.AreaSnow, true)
 		t.eq(s.profile.areasVisited.snow, true)
@@ -204,7 +204,7 @@ return function(t)
 		t.eq(s.profile.areasVisited.cave, true)
 		t.eq(s.profile.areasVisited.toll, true)
 		-- The volcano cave is not the secret cave, so standing there skips it.
-		stand(s.player, 1010, 40, 1110)
+		stand(s.player, 450, 40, 500) -- the volcano disc on the ring map (was 1010, 1110)
 		s.BadgeService.Poll(s.player)
 		t.eq(s.profile.badgesAwarded.AreaVolcano, true)
 		t.eq(s.calls, {})
@@ -247,5 +247,131 @@ return function(t)
 		t.eq(n, 2, "the next join tries again")
 		t.eq(s.profile.badgesSent.FirstSale, nil)
 		s.BadgeData.Ids.FirstSale = 0
+	end)
+
+	t.test("the Bayou and Red Mesa award by position, ids 0 never call AwardBadge", function()
+		local s = setup(function()
+			error("AwardBadge must not run for id 0")
+		end)
+		local WorldLayout = t.shared("World/WorldLayout")
+		local b, m = WorldLayout.Bayou, WorldLayout.RedMesa
+		stand(s.player, b.x, 0, b.z)
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.AreaBayou, true)
+		t.eq(s.profile.areasVisited.bayou, true)
+		stand(s.player, m.x, 30, m.z)
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.AreaMesa, true)
+		t.eq(s.profile.areasVisited.redmesa, true)
+		t.eq(s.calls, {})
+	end)
+
+	t.test("Bog Cypress and Ironwood award once from the field guide", function()
+		local s = setup()
+		s.profile.compendium.bogcypress = true
+		s.profile.compendium.ironwood = true
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.WoodCypress, true)
+		t.eq(s.profile.badgesAwarded.WoodIronwood, true)
+		s.Milestone.Event(s.player, "wood", { woodId = "ironwood" })
+		t.eq(s.attrs.Badges, "WoodCypress,WoodIronwood")
+	end)
+
+	t.test("build badges: first piece, 40 pieces, a sandstone piece; unfilled pieces do not count", function()
+		local s = setup()
+		local n = 0
+		local function piece(id, filled)
+			n += 1
+			return {
+				uid = "p" .. n,
+				blueprintId = id,
+				x = 0,
+				z = 0,
+				rot = 0,
+				fill = if filled then nil else { units = 0 },
+			}
+		end
+		s.profile.plot = { placed = { piece("Wall4", false), piece("Crate", true) } }
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.FirstBuild, nil, "an unfilled kit piece and a non-kit item are not builds")
+		table.insert(s.profile.plot.placed, piece("Wall4", true))
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.FirstBuild, true)
+		t.eq(s.profile.badgesAwarded.Homestead, nil)
+		t.eq(s.profile.badgesAwarded.Stonemason, nil)
+		table.insert(s.profile.plot.placed, piece("SandWall4", true))
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.Stonemason, true)
+		for _ = 1, 38 do
+			table.insert(s.profile.plot.placed, piece("Wall4", true))
+		end
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.Homestead, true, "40 filled pieces")
+	end)
+
+	t.test("a build event from a filling piece awards the same keys", function()
+		local s = setup()
+		s.Milestone.Event(s.player, "build", { id = "SandFloor4", count = 1 })
+		t.eq(s.profile.badgesAwarded.FirstBuild, true)
+		t.eq(s.profile.badgesAwarded.Stonemason, true)
+		t.eq(s.profile.badgesAwarded.Homestead, nil)
+	end)
+
+	t.test("Millionaire awards at a million lifetime earned, once, ids 0 skip AwardBadge", function()
+		local s = setup(function()
+			error("AwardBadge must not run for id 0")
+		end)
+		s.profile.totalEarned = 999999
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.Millionaire, nil)
+		s.profile.totalEarned = 1000000
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.Millionaire, true)
+		t.eq(s.calls, {})
+		local fires = #s.fired
+		s.BadgeService.Poll(s.player)
+		t.eq(#s.fired, fires, "no second earn")
+	end)
+
+	t.test("a live id for a new badge is awarded once, not on every poll", function()
+		local s = setup()
+		s.BadgeData.Ids.Millionaire = 99
+		s.profile.totalEarned = 2000000
+		s.BadgeService.Poll(s.player)
+		s.BadgeService.Poll(s.player)
+		t.eq(s.calls, { { userId = 42, badgeId = 99 } })
+		s.BadgeData.Ids.Millionaire = 0
+	end)
+
+	t.test("OnNewArea fires once per new area, from Poll, and not for a repeat visit", function()
+		local s = setup()
+		local seen = {}
+		s.BadgeService.OnNewArea(function(who, id)
+			table.insert(seen, { who = who, id = id })
+		end)
+		stand(s.player, 0, 30, 720) -- Snowfields
+		s.BadgeService.Poll(s.player)
+		s.BadgeService.Poll(s.player)
+		t.eq(#seen, 1)
+		t.eq(seen[1].id, "snow")
+		t.eq(seen[1].who, s.player)
+		-- An event alone (no Poll) is not a visit.
+		s.Milestone.Event(s.player, "area", { id = "ferry" })
+		t.eq(#seen, 1)
+		stand(s.player, 450, 40, 500)
+		s.BadgeService.Poll(s.player)
+		s.BadgeService.Poll(s.player)
+		t.eq(#seen, 2)
+		t.eq(seen[2].id, "volcano")
+	end)
+
+	t.test("a listener that errors does not stop the poll or the award", function()
+		local s = setup()
+		s.BadgeService.OnNewArea(function()
+			error("boom")
+		end)
+		stand(s.player, 0, 30, 720)
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.AreaSnow, true)
 	end)
 end

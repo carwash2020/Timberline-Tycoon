@@ -67,7 +67,15 @@ return function(t)
 			trucks = trucks,
 			placed = placedOf(record.plot),
 			truck = sectionsOf(record.truckLoad),
-			ground = sectionsOf(record.groundLoad),
+			-- Ring map (WorldVersion 2): an old save's ground wood moves to
+			-- strandedLoad (Lane F puts it back on the plot). It is not lost.
+			ground = (function()
+				local both = sectionsOf(record.groundLoad)
+				for _, piece in ipairs(sectionsOf(record.strandedLoad)) do
+					table.insert(both, piece)
+				end
+				return both
+			end)(),
 		}
 	end
 

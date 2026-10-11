@@ -1314,7 +1314,14 @@ function NatureArt.CaveMouth(): Model
 	if ok then
 		for _, name in ipairs(order) do
 			local piece = spec.pieces[name]
-			local fidelity = if name == "Body" or name == "Collision" then Enum.CollisionFidelity.Hull else nil
+			-- The Collision mesh is two pillars and a lintel round a 16 x 12
+			-- doorway. A Hull (or a Box) would be one solid block that fills
+			-- the doorway; precise convex pieces keep it open (the walk-in
+			-- mine mouth, tests/NatureArt.spec).
+			local fidelity = if name == "Collision"
+				then Enum.CollisionFidelity.PreciseConvexDecomposition
+				elseif name == "Body" then Enum.CollisionFidelity.Hull
+				else nil
 			local mesh = MeshKit.Create(piece.meshId, name, piece.size, fidelity)
 			if not mesh then
 				logFallback("CaveMouth", name, piece.meshId)

@@ -9,6 +9,13 @@
 -- not lumenwood. Ferry Island is not built yet: its id stays 0. The Secret
 -- Cave is built (the Petrified Reach disc); its id stays 0 until pasted. The North Strip trigger is built; its id stays 0 until the
 -- dashboard has one, and AreasAt still records the visit.
+--
+-- Lane X (V1 extras) added eight: the Bayou and Red Mesa (WorldLayout's
+-- reserved discs, so they work before Lane R fills them), Bog Cypress and
+-- Ironwood logs, the three build badges (a kit piece fully filled; 40 of
+-- them; a sandstone one) and a million earned. Creator Hub allows five new
+-- badges a day for free, so the first five of the eight (AreaBayou to
+-- FirstBuild) are the ones to create first.
 
 local RegionLogic = require(script.Parent.RegionLogic)
 local WorldLayout = require(script.Parent.World.WorldLayout)
@@ -41,6 +48,7 @@ export type Hook = {
 	name: string?,
 	woodId: string?,
 	id: string?,
+	count: number?, -- "build": filled kit pieces on the plot, this one included. "earned": lifetime earnings.
 }
 
 -- The only place a Creator Hub badge id is written. Fill these in when the
@@ -64,7 +72,23 @@ BadgeData.Ids = {
 	WoodGloamwood = 0, -- PASTE: Engagement → Badges → Gloamwood → ID
 	WoodLumenwood = 0, -- PASTE: Engagement → Badges → Lumenwood → ID
 	WoodLanternwood = 0, -- PASTE: Engagement → Badges → Lanternwood → ID
+	-- Lane X. Create these in this order (five free a day).
+	AreaBayou = 0, -- PASTE: Engagement → Badges → The Bayou → ID
+	AreaMesa = 0, -- PASTE: Engagement → Badges → Red Mesa → ID
+	WoodCypress = 0, -- PASTE: Engagement → Badges → Bog Cypress → ID
+	WoodIronwood = 0, -- PASTE: Engagement → Badges → Ironwood → ID
+	FirstBuild = 0, -- PASTE: Engagement → Badges → First Build → ID
+	Homestead = 0, -- PASTE: Engagement → Badges → Homestead → ID
+	Stonemason = 0, -- PASTE: Engagement → Badges → Stonemason → ID
+	Millionaire = 0, -- PASTE: Engagement → Badges → Millionaire → ID
 } :: { [string]: number }
+
+-- Thresholds (PROPOSALS, Connor decides): filled kit pieces for Homestead,
+-- and lifetime earnings (profile.totalEarned) for Millionaire.
+BadgeData.HomesteadPieces = 40
+BadgeData.MillionaireEarned = 1000000
+-- A kit piece whose blueprint id starts with this is sandstone (Stonemason).
+BadgeData.SandstonePrefix = "Sand"
 
 -- Places that are not in the world yet. AreasAt skips every key here, so
 -- standing there earns nothing. Their ids stay 0.
@@ -203,6 +227,58 @@ local ALL: { BadgeDef } = {
 		group = "wood",
 		woodId = "lanternwood",
 	},
+	{
+		key = "AreaBayou",
+		name = "The Bayou",
+		detail = "Wade into the Bayou.",
+		group = "area",
+		visit = "bayou",
+	},
+	{
+		key = "AreaMesa",
+		name = "Red Mesa",
+		detail = "Climb onto Red Mesa.",
+		group = "area",
+		visit = "redmesa",
+	},
+	{
+		key = "WoodCypress",
+		name = "Bog Cypress",
+		detail = "Cut or sell Bog Cypress.",
+		group = "wood",
+		woodId = "bogcypress",
+	},
+	{
+		key = "WoodIronwood",
+		name = "Ironwood",
+		detail = "Cut or sell Ironwood.",
+		group = "wood",
+		woodId = "ironwood",
+	},
+	{
+		key = "FirstBuild",
+		name = "First Build",
+		detail = "Finish your first kit piece on your plot.",
+		group = "milestone",
+	},
+	{
+		key = "Homestead",
+		name = "Homestead",
+		detail = "Finish 40 kit pieces on your plot.",
+		group = "milestone",
+	},
+	{
+		key = "Stonemason",
+		name = "Stonemason",
+		detail = "Finish a sandstone piece.",
+		group = "milestone",
+	},
+	{
+		key = "Millionaire",
+		name = "Millionaire",
+		detail = "Earn $1,000,000 in total.",
+		group = "milestone",
+	},
 }
 
 local BY_KEY: { [string]: BadgeDef } = {}
@@ -226,6 +302,9 @@ local REGION_BADGE: { [string]: string } = {
 	sky = "AreaSky",
 	ferry = "AreaFerry",
 	island = "AreaFerry",
+	bayou = "AreaBayou",
+	mesa = "AreaMesa",
+	redmesa = "AreaMesa",
 	cave = "AreaCave",
 	toll = "AreaToll",
 }
@@ -267,6 +346,23 @@ function BadgeData.ForWood(woodId: string): { string }
 	return keys
 end
 
+-- Build badges for a kit piece that just filled: `id` is its blueprint id,
+-- `count` the filled kit pieces on the plot, that one included.
+function BadgeData.BuildKeys(id: unknown, count: unknown): { string }
+	local keys: { string } = {}
+	if type(count) == "number" and count >= 1 then
+		table.insert(keys, "FirstBuild")
+		if count >= BadgeData.HomesteadPieces then
+			table.insert(keys, "Homestead")
+		end
+	end
+	local prefix = BadgeData.SandstonePrefix
+	if type(id) == "string" and string.sub(id, 1, #prefix) == prefix then
+		table.insert(keys, "Stonemason")
+	end
+	return keys
+end
+
 -- Badge keys for a MilestoneService.Event. Unknown kinds award nothing.
 function BadgeData.KeysFor(kind: string, data: Hook?): { string }
 	if kind == "mark" then
@@ -282,6 +378,11 @@ function BadgeData.KeysFor(kind: string, data: Hook?): { string }
 	elseif kind == "wood" then
 		local woodId = if data then data.woodId else nil
 		return if type(woodId) == "string" then BadgeData.ForWood(woodId) else {}
+	elseif kind == "build" then
+		return BadgeData.BuildKeys(if data then data.id else nil, if data then data.count else nil)
+	elseif kind == "earned" then
+		local total = if data then data.count else nil
+		return if type(total) == "number" and total >= BadgeData.MillionaireEarned then { "Millionaire" } else {}
 	elseif kind == "area" then
 		local id = if data then data.id else nil
 		if type(id) ~= "string" then
@@ -322,6 +423,15 @@ function BadgeData.AreasAt(x: number, y: number, z: number): { string }
 	local island = WorldLayout.Island
 	if inside(x, z, island.x, island.z, island.radius) then
 		add("AreaFerry")
+	end
+	-- The Bayou and Red Mesa discs are WorldLayout's reserved regions: they
+	-- count before Lane R's own region ids exist (REGION_BADGE has those too).
+	local bayou, mesa = WorldLayout.Bayou, WorldLayout.RedMesa
+	if inside(x, z, bayou.x, bayou.z, bayou.radius) then
+		add("AreaBayou")
+	end
+	if inside(x, z, mesa.x, mesa.z, mesa.radius) then
+		add("AreaMesa")
 	end
 	local rx, rz, rr = RegionLogic.ReachCenter()
 	if inside(x, z, rx, rz, rr) then

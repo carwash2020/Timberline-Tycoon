@@ -118,6 +118,10 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 			p.CanQuery = false
 			p.CanTouch = false
 		end
+		-- Furniture: parts under one stud cast no shadow (a lamp's bolt, a lock).
+		if bp.category == "Decor" and math.min(box.size.X, box.size.Y, box.size.Z) < 1 then
+			p.CastShadow = false
+		end
 		if box.light and not ghost then
 			local light = Instance.new("PointLight")
 			light.Color = Color3.fromRGB(255, 214, 140)

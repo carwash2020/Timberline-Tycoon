@@ -23,12 +23,14 @@
 local WorldLayout = require(game:GetService("ReplicatedStorage").Shared.World.WorldLayout)
 local TerrainGen = require(game:GetService("ReplicatedStorage").Shared.World.TerrainGen)
 local TerrainFit = require(game:GetService("ReplicatedStorage").Shared.World.TerrainFit)
+local UndergroundData = require(game:GetService("ReplicatedStorage").Shared.World.UndergroundData)
 
 local TerrainBuilder = {}
 
 local VOXEL = 4
 local CHUNK = 64 -- voxel columns per chunk side
-local CRUST = 3 -- solid voxels under a chunk's lowest ground
+local CRUST = 8 -- 32 studs of solid ground under the surface
+TerrainBuilder.Crust = CRUST
 local NO_WATER = -1e9
 
 local materialCache: { [string]: Enum.Material } = {}
@@ -95,6 +97,10 @@ local function writeChunk(terrain: Terrain, x0: number, z0: number, nx: number, 
 			hrow[k] = hw
 			lo = math.min(lo, hw)
 			hi = math.max(hi, hw, ww or -math.huge)
+			local floorY = UndergroundData.LowestFloor(x, z)
+			if floorY then
+				lo = math.min(lo, floorY - UndergroundData.FloorSolid)
+			end
 		end
 		surfaces[i], waters[i], written[i] = srow, wrow, hrow
 	end
@@ -239,7 +245,7 @@ export type Job = { x0: number, z0: number, nx: number, nz: number, dist: number
 
 -- Every chunk of the world, nearest the sawmill first.
 function TerrainBuilder.Jobs(): { Job }
-	local half = WorldLayout.WorldHalf
+	local half = WorldLayout.WorldHalf + WorldLayout.TerrainSkirt
 	local totalColumns = math.floor(2 * half / VOXEL)
 	local chunksPerSide = math.ceil(totalColumns / CHUNK)
 	local jobs: { Job } = {}
@@ -258,10 +264,16 @@ function TerrainBuilder.Jobs(): { Job }
 			})
 		end
 	end
-	-- The north strip, starting exactly where the square stops so a chunk
-	-- never writes both. Nearest the sawmill first, with the rest.
+	-- The north strip is folded inside the square (MAP_V1). Only add its
+	-- chunks when it sits outside the generated square, so a column is
+	-- never written twice.
 	local strip = WorldLayout.NorthStrip
-	local xCols = math.floor((strip.x1 - strip.x0) / VOXEL)
+	local generated = half
+	local stripOutside = strip.z0 >= generated
+		or strip.z1 <= -generated
+		or strip.x0 >= generated
+		or strip.x1 <= -generated
+	local xCols = if stripOutside then math.floor((strip.x1 - strip.x0) / VOXEL) else 0
 	local zCols = math.floor((strip.z1 - strip.z0) / VOXEL)
 	local xChunks = math.ceil(xCols / CHUNK)
 	local zChunks = math.ceil(zCols / CHUNK)
@@ -427,8 +439,27 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
 			onProgress(index, #jobs)
 		end
 	end
+	TerrainBuilder.Carve(terrain, shift)
 	reportTown(terrain)
 	return os.clock() - started
+end
+
+-- Second pass: air out the caves, the passages and the truck tunnel.
+-- The voxels under each floor stay, so the crust and the 24 studs under
+-- a floor are still solid. `shift` is the same studs added to the crust.
+function TerrainBuilder.Carve(terrain: Terrain, shift: number?)
+	local lift = shift or 0
+	local air = Enum.Material.Air
+	for _, box in ipairs(UndergroundData.AirBoxes()) do
+		local size = Vector3.new(box.sx, box.sy, box.sz)
+		local cf = CFrame.new(box.x, box.y + lift, box.z)
+		local ok, err = pcall(function()
+			terrain:FillBlock(cf, size, air)
+		end)
+		if not ok then
+			warn("[TerrainBuilder] carve failed: " .. tostring(err))
+		end
+	end
 end
 
 return TerrainBuilder

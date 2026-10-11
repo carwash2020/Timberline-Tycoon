@@ -15,7 +15,12 @@ return function(t)
 	end
 
 	local function ctx(over)
-		local c = { now = 1000, hasPad = true, busy = false, looseWood = 0 }
+		local c = {
+			now = 1000,
+			hasPad = true,
+			busy = false,
+			loose = { pieces = 0, sections = 0, unsaveable = 0 },
+		}
 		for k, v in pairs(over or {}) do
 			c[k] = v
 		end
@@ -36,7 +41,17 @@ return function(t)
 		t.eq(why, "Give it 30 more seconds before unloading again.")
 		t.eq({ Base.CheckUnload(p, ctx({ now = 1030 })) }, { true, nil }, "the cooldown ends exactly on time")
 		p.baseCooldownUntil = 0
-		t.eq({ Base.CheckUnload(p, ctx({ looseWood = 2 })) }, { false, Base.Reasons.wood })
+		-- Decision 9 (8 Oct): loose wood no longer blocks the unload. It is saved
+		-- with the base (LooseSave). Only a pile the save cannot hold refuses.
+		t.eq(
+			{ Base.CheckUnload(p, ctx({ loose = { pieces = 40, sections = 90, unsaveable = 0 } })) },
+			{ true, nil },
+			"loose wood on the plot is saved, not refused"
+		)
+		local over = select(2, Base.CheckUnload(p, ctx({ loose = { pieces = 160, sections = 90, unsaveable = 0 } })))
+		t.ok(over:find("160") ~= nil and over:find("150") ~= nil and over:find("10") ~= nil, over)
+		local unsaveable = Base.CheckUnload(p, ctx({ loose = { pieces = 3, sections = 9, unsaveable = 1 } }))
+		t.eq(unsaveable, false, "a piece the save cannot hold refuses with a count")
 		t.eq({ Base.CheckUnload(nil, ctx()) }, { false, "bad" })
 	end)
 

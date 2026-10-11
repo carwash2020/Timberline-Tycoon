@@ -29,6 +29,7 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local Util = require(ReplicatedStorage.Shared.Util)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -79,6 +80,36 @@ function BlueprintService.Publish(player: Player)
 		end
 	end
 	player:SetAttribute("Blueprints", ShopLogic.EncodeSet(ids))
+end
+
+-- Stage unlocks (BlueprintBook.UnlockStage, wired to StageOf.Current): teaches
+-- the book every plan the player's stage owes it and tells them once. The
+-- book never shrinks and nothing is sold for Robux. BaseBoot calls this for
+-- every player a few seconds apart, and a spec calls it directly. Returns
+-- how many plans were learned.
+function BlueprintService.SyncStage(player: Player): number
+	local profile = profileOf(player)
+	if not profile then
+		return 0
+	end
+	local stage = StageOf.Current(profile)
+	player:SetAttribute("BuildStage", stage)
+	local learned = BlueprintBook.SyncStage(profile)
+	if #learned == 0 then
+		return 0
+	end
+	BlueprintService.Publish(player)
+	local names: { string } = {}
+	for _, id in ipairs(learned) do
+		local bp = PlotData.Blueprint(id)
+		if bp and BlueprintBook.IsStarter(bp) == false then
+			table.insert(names, bp.displayName)
+		end
+	end
+	if #names > 0 then
+		notify(player, "New plans in your hammer: " .. table.concat(names, ", ") .. ".")
+	end
+	return #learned
 end
 
 ---------------------------------------------------------------------------
@@ -366,6 +397,27 @@ function BlueprintService.Spawn(position: Vector3, id: string): Model?
 	return layDown(position, { uid = "world-" .. Util.guid(), id = id }, nil)
 end
 
+-- PlotService reaches BlueprintService's neighbours, so it is not required
+-- here (a cycle). BaseBoot sets these two to PlotService.OwnerAt and
+-- PlotService.CanEdit; with them unset (a spec) there are no plots to refuse on.
+BlueprintService.Hooks = {
+	ownerAt = nil :: ((Vector3) -> Player?)?,
+	canEdit = nil :: ((Player, Player, string) -> boolean)?,
+}
+
+local function plotOwnerAt(spot: Vector3): Player?
+	local find = BlueprintService.Hooks.ownerAt
+	return if find then find(spot) else nil
+end
+
+local function canEdit(player: Player, owner: Player, flag: string): boolean
+	local check = BlueprintService.Hooks.canEdit
+	if check then
+		return check(player, owner, flag) == true
+	end
+	return player == owner
+end
+
 function BlueprintService.Drop(player: Player, uid: unknown)
 	if type(uid) ~= "string" or not RateLimiter.Allow(player, "DropBlueprint") then
 		return
@@ -391,8 +443,15 @@ function BlueprintService.Drop(player: Player, uid: unknown)
 		notify(player, string.format("You already have %d blueprints lying around. Pick some up first.", mine))
 		return
 	end
-	tool:Destroy()
 	local spot = (root.CFrame * CFrame.new(0, 0, -3)).Position
+	-- Lane F: a plan is only left lying on someone else's plot if they let
+	-- you build there (PlotService.CanEdit). Nothing is taken on a refusal.
+	local plotOwner = plotOwnerAt(spot)
+	if plotOwner ~= nil and not canEdit(player, plotOwner, "build") then
+		notify(player, "You can't leave things on that plot.")
+		return
+	end
+	tool:Destroy()
 	layDown(spot, item, player)
 end
 

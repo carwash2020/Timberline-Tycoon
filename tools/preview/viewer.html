@@ -61,7 +61,7 @@ const L = Object.assign({
 const NIGHT = Object.assign({}, L, {
   sunColor: "#7f8fc8", sunIntensity: 0.35, skyTop: "#0a1030", skyBottom: "#273256",
   ambient: 0.18, hemiIntensity: 0.45, fog: "#1b2140",
-});
+}, scene.nightLighting || {}); // a scene may brighten its dusk views (preview only)
 const NIGHT_ENV = 0.25; // metals reflect a quarter as much of the room at night
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });

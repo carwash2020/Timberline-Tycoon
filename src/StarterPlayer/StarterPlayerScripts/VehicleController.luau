@@ -33,6 +33,7 @@ local Handling = require(ReplicatedStorage.Shared.Handling)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local TruckLayout = require(ReplicatedStorage.Shared.TruckLayout)
+local Util = require(ReplicatedStorage.Shared.Util)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local HUD = require(script.Parent.HUD)
 local HudRules = require(script.Parent.HudRules)
@@ -217,6 +218,12 @@ local function refreshCallButton()
 	local fromYou = if hrp and truckPart then (hrp.Position - truckPart.Position).Magnitude else nil
 	local sendHome = HudRules.SendHome(hrp ~= nil and session == nil, fromYou, player:GetAttribute("TruckSlotDistance"))
 	local show, text = HudRules.TruckButton(player:GetAttribute("OwnsTruck") == true, sendHome)
+	-- The recall costs something after the free spawns: the server publishes it
+	-- (VehicleService.PublishRecallFee), and the button says so ("$5").
+	local fee = player:GetAttribute("RecallFee")
+	if sendHome and type(fee) == "number" and fee > 0 then
+		text = string.format("%s (%s)", text, Util.formatCash(fee))
+	end
 	button.root.Visible = show
 	button:SetText(text)
 end
@@ -234,6 +241,7 @@ local function buildButton()
 	})
 	player:GetAttributeChangedSignal("TruckSlotDistance"):Connect(refreshCallButton)
 	player:GetAttributeChangedSignal("OwnsTruck"):Connect(refreshCallButton)
+	player:GetAttributeChangedSignal("RecallFee"):Connect(refreshCallButton)
 	refreshCallButton()
 end
 

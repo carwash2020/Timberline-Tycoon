@@ -74,7 +74,9 @@ function HammerLogic.PieceActions(bp: PlotData.Blueprint, item: PlotLogic.Placed
 	local why = if fixed then EditLogic.Message("filled") else nil
 	local plan = PlotLogic.SellPlan(bp, item)
 	local sell = "Sell"
-	if plan.planks > 0 then
+	if (plan.slabs or 0) > 0 or plan.ingots ~= nil then
+		sell = "Take apart (materials back)"
+	elseif plan.planks > 0 then
 		sell = "Take apart (planks back)"
 	elseif plan.cash > 0 then
 		sell = "Sell +" .. Util.formatCash(plan.cash)

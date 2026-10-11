@@ -731,9 +731,9 @@ return function(t)
 		})
 	end)
 
-	-- The isles (BiomeData sky.area): x -1050, z 1050, y 650; the deck is 40
-	-- over that (690), and falling off is 40 under the deck (650).
-	local ISLE = Vector3.new(-1050, 700, 1050)
+	-- The isles (BiomeData sky.area). The deck is 50 over the floor.
+	local skyArea = t.shared("BiomeData").Get("sky").area
+	local ISLE = Vector3.new(skyArea.x, (skyArea.y or 650) + 50, skyArea.z)
 
 	t.test("wood that falls off the isles is lost to the clouds, with one toast to its owner", function()
 		local s = setup()
@@ -762,7 +762,7 @@ return function(t)
 
 	t.test("wood that never was on the isles, or left them some other way, isn't lost", function()
 		local s = setup()
-		local below = s.piece("a", 1, "oak", 4, nil, Vector3.new(-1050, 20, 1050)) -- the ground under the isles
+		local below = s.piece("a", 1, "oak", 4, nil, Vector3.new(skyArea.x, 20, skyArea.z)) -- the ground under the isles
 		s.A.FallTick()
 		s.A.FallTick()
 		t.ok(not s.gone(below))
@@ -770,7 +770,7 @@ return function(t)
 		s.A.FallTick()
 		part.CFrame = CFrame.new(0, 3, 40) -- teleported to town (a respawn's /spawnwood, say)
 		s.A.FallTick()
-		part.CFrame = CFrame.new(-1050, 20, 1050)
+		part.CFrame = CFrame.new(skyArea.x, 20, skyArea.z)
 		s.A.FallTick()
 		t.ok(not s.gone(m), "not watched once it left sideways")
 		local unknown = s.piece("c", 1, "lumenwood", 4, nil, ISLE)
@@ -791,7 +791,7 @@ return function(t)
 		s.A.FallTick()
 		part.CFrame = CFrame.new(ISLE - Vector3.new(0, 30, 0)) -- 20 under the deck: past GLIDE_BELOW (15), not yet FALL_BELOW (40)
 		s.A.FallTick()
-		part.CFrame = CFrame.new(-1050, 20, 1050) -- landed
+		part.CFrame = CFrame.new(skyArea.x, 20, skyArea.z) -- landed
 		s.held[m] = nil
 		s.A.FallTick()
 		t.ok(not s.gone(m), "glided down")

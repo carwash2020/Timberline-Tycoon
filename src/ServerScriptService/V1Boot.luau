@@ -83,7 +83,7 @@ function V1Boot.Start(safely: (string, (...any) -> ...any) -> (), remotes: { [st
 	local parent = script.Parent
 	for _, name in ipairs(V1Boot.Services) do
 		local child = parent:FindFirstChild(name)
-		if child ~= nil and child:IsA("ModuleScript") then
+		if isModule(child) then
 			safely(name, function()
 				local mod = require(child) :: any
 				if type(mod.Init) == "function" then

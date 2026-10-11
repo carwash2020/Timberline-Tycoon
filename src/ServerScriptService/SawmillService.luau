@@ -42,6 +42,7 @@ local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
+local EditRights = require(script.Parent.EditRights)
 local GrabService = require(script.Parent.GrabService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -607,7 +608,13 @@ function SawmillService.Set(player: Player, uid: unknown, axis: unknown, dir: un
 			break
 		end
 	end
-	if not model or model:GetAttribute("OwnerId") ~= player.UserId then
+	if not model then
+		return
+	end
+	-- Lane F: the owner always; a friend needs Interact on the owner's plot.
+	local mayId = model:GetAttribute("OwnerId")
+	local mayOwner = if type(mayId) == "number" then game:GetService("Players"):GetPlayerByUserId(mayId) else nil
+	if not EditRights.Can(player, mayOwner, "interact") then
 		return
 	end
 	local millId = model:GetAttribute("MillId")
@@ -619,7 +626,7 @@ function SawmillService.Set(player: Player, uid: unknown, axis: unknown, dir: un
 	model:SetAttribute("CutX", settings.x)
 	model:SetAttribute("CutY", settings.y)
 	MachineArt.SetCut(model, settings.x, settings.y, SawmillLogic.RangeText(mill))
-	local profile = ProfileService.GetProfile(player)
+	local profile = ProfileService.GetProfile(mayOwner :: Player)
 	if profile then
 		for _, item in ipairs(profile.plot.placed) do
 			if item.uid == uid then

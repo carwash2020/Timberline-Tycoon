@@ -5,6 +5,7 @@
 -- back as a plank before the original is destroyed, so a failed spawn
 -- leaves the plank where it was.
 
+local BuildCost = require(game:GetService("ReplicatedStorage").Shared.BuildCost)
 local FillLogic = require(game:GetService("ReplicatedStorage").Shared.FillLogic)
 local PlotData = require(game:GetService("ReplicatedStorage").Shared.PlotData)
 local PlotLogic = require(game:GetService("ReplicatedStorage").Shared.PlotLogic)
@@ -47,7 +48,7 @@ function PlotFill.Apply(item: PlotLogic.Placed, piece: Piece, ownerId: number, a
 	if api.Get(piece.uid) == nil then
 		return false, "gone"
 	end
-	local need = bp.woodUnits or 0
+	local need = BuildCost.Need(bp, item).units
 	local ok, why = FillLogic.Accept(item.wood, item.fill.units, need, piece, ownerId)
 	if not ok then
 		return false, why
@@ -94,10 +95,64 @@ function PlotFill.Apply(item: PlotLogic.Placed, piece: Piece, ownerId: number, a
 		item.wood = piece.woodId
 	end
 	item.fill.units += take
-	if item.fill.units >= need then
+	if BuildCost.IsComplete(bp, item) then
 		item.fill = nil
 	end
 	busyWood[piece.uid] = nil
+	busyItem[item.uid] = nil
+	return true, nil
+end
+
+export type MaterialApi = {
+	-- Destroys the slab or ingot. False when it was already gone (another
+	-- fill took it first). Must not yield.
+	Take: (uid: string) -> boolean,
+}
+
+-- Applies one slab or ingot to `item`. The part is destroyed first, with no
+-- yield between the check and the take, and only then counted: two touches
+-- in one step, or two ghosts grabbing one part, count once (QA BL2). A
+-- refusal takes nothing. Returns whether the piece changed.
+function PlotFill.ApplyMaterial(
+	item: PlotLogic.Placed,
+	offer: FillLogic.Material,
+	ownerId: number,
+	api: MaterialApi
+): (boolean, string?)
+	local bp = PlotLogic.Blueprint(item.blueprintId)
+	if not bp or bp.kit ~= true or not item.fill then
+		return false, "built"
+	end
+	if busyWood[offer.uid] or busyItem[item.uid] then
+		return false, "busy"
+	end
+	local need = BuildCost.Need(bp, item)
+	local missing = BuildCost.Missing(bp, item)
+	local ok, why = FillLogic.AcceptMaterial(need, missing, offer, ownerId)
+	if not ok then
+		return false, why
+	end
+	busyWood[offer.uid] = true
+	busyItem[item.uid] = true
+	local taken = api.Take(offer.uid)
+	if taken ~= true then
+		busyWood[offer.uid] = nil
+		busyItem[item.uid] = nil
+		return false, "gone"
+	end
+	local fill = item.fill :: BuildCost.Fill
+	if offer.kind == "slab" then
+		fill.slabs = (fill.slabs or 0) + 1
+	else
+		local ore = offer.ore :: string
+		local ingots = fill.ingots or {}
+		ingots[ore] = (ingots[ore] or 0) + 1
+		fill.ingots = ingots
+	end
+	if BuildCost.IsComplete(bp, item) then
+		item.fill = nil
+	end
+	busyWood[offer.uid] = nil
 	busyItem[item.uid] = nil
 	return true, nil
 end
