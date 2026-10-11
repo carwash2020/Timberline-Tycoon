@@ -3959,3 +3959,17 @@ Studio checks (nothing here has been seen in Studio; the renders are `tools/prev
 6. **Frame rate** in the Tool Shed on a phone at Low quality: about 245 interior parts, 8 lanterns (shadows off).
 
 What changed for other stores: `ShopInterior` now only dispatches to `Shared/Art/ShopInteriors/<Store>.luau`; Hearth & Home, Sparkworks and the Dealership are the old interiors moved unchanged until their agents restyle them. `ShopInterior.SteppedUnit` is now `ShopKit.SteppedUnit` (re-exported), so every store's plinths already become tier stands (colour, flag, lock chip, hover tag); that is the one look change to those three stores before their own pass.
+
+## V1.1 polish leftovers (branch `phase-2/polish-v11-leftovers`, 12 October 2026)
+
+What changed is in STATUS.md "V1.1 polish leftovers". Renders: `previews/polish-v11/` (`plot-sign-trophies.png`, `sparkworks-entrance.png`, `dealership-entrance.png`, `dealership-rig-before.png`, `dealership-rig-after.png`). Nothing here has been seen in Studio.
+
+Studio checks:
+1. **PC: gate signs.** Walk to the sign at the Snow road, the Volcano road, the Gloam Hollow trail and the gondola station. Each has a small plaque under the board. Without the gear it reads the requirement in red ("Cold hurts here. Coat protects.", "Heat hurts here. Boots protect.", "Dark and deep. Bring a Lantern.", "Needs the Gondola Pass from Gus..."). Buy the Coat (or Boots, Lantern, the pass): within a second the plaque turns green and reads "Protected". A second player without the gear still sees red.
+2. **Phone (667x375):** the plaque is readable from where the road meets the sign, and the board text above it is not covered.
+3. **Xbox:** same as PC; nothing is bound to a button.
+4. **Region banner.** Drive into the Bayou and into Red Mesa: a toast names "The Bayou" / "Red Mesa" with its line, once. Leave and come back in the same session: no repeat. Mud and stage gates behave as before.
+5. **Plot sign.** Stand in front of a claimed plot's sign: the name and "PLOT n · TIER" sit above the post, nothing crosses a letter (also from the side and from 20 studs).
+6. **Sparkworks.** Walk in from the door: "LOGIC & OUTPUTS" and "BELTS & INPUTS" read with no chain across a letter (PC and phone). A chain may cross a letter from a different spot; that is only the entrance view.
+7. **Dealership.** Walk down the aisle to the Logging Rig (the last plinth, back row): its crane and stacks are under the ceiling beams. It is about 20% smaller than the real truck (display copy only); buy one and the truck that spawns is full size.
+8. **Join on a slow connection** (Studio: Network Emulation, low bandwidth): the HUD, mining chip and forge window still start; Output may show "ReplicatedStorage.Shared did not arrive" only if it took over 30 seconds.
