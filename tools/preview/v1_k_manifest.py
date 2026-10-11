@@ -13,6 +13,7 @@ The ids and sizes are read from src/ReplicatedStorage/Shared/Art/MachineMeshes.l
 so what is drawn is what the game asks MeshKit for. A machine whose GLB is not
 in the pack is listed and skipped (the game keeps its part build there, and
 the preview shows that part build, never a stand-in).
+The TLD-1 GLBs are in the repo (assets/glb/machines-tld1/<Name>/<Name>.glb) and are read from there.
 Pack layout: assets/models/machines-tld1/<Name>/<Name>.glb (TLD-1 line kit)
 and assets/models/machines/<Name>/<Name>.glb (the older pieces).
 """
@@ -34,32 +35,21 @@ PIECE = re.compile(
 
 
 def parse() -> dict:
+    """Assets and pieces from MachineMeshes.luau (stylua wraps long piece lines, so read the text whole)."""
+    text = SOURCE.read_text()
+    text = text[text.index("local ASSETS") : text.index("local LAYOUT")]
     assets: dict = {}
-    current = None
-    in_assets = False
-    for line in SOURCE.read_text().splitlines():
-        if line.startswith("local ASSETS"):
-            in_assets = True
-            continue
-        if line.startswith("local LAYOUT"):
-            break
-        if not in_assets:
-            continue
-        m = ASSET.match(line)
-        if m:
-            current = {"source": None, "pieces": []}
-            assets[m.group(1)] = current
-            continue
-        if current is None:
-            continue
-        m = SOURCE_LINE.match(line)
-        if m:
-            current["source"] = m.group(1)
-            continue
-        m = PIECE.match(line)
-        if m:
-            size = [float(v) for v in m.group(3).split(",")]
-            current["pieces"].append({"name": m.group(1), "meshId": int(m.group(2)), "size": size})
+    for block in re.split(r"\n\t(?=\w+ = \{\n)", text)[1:]:
+        name = re.match(r"(\w+) = \{", block).group(1)
+        src = re.search(r'source = "(\w+)"', block)
+        pieces = []
+        for m in re.finditer(
+            r'name = "(\w+)",\s*meshId = (\d+),\s*size = V3\(([-\d., ]+)\)', block
+        ):
+            pieces.append(
+                {"name": m.group(1), "meshId": int(m.group(2)), "size": [float(v) for v in m.group(3).split(",")]}
+            )
+        assets[name] = {"source": src.group(1) if src else None, "pieces": pieces}
     return assets
 
 
@@ -75,6 +65,9 @@ def main() -> int:
     for name, asset in assets.items():
         folder = "machines-tld1" if asset["source"] == "tld1" else "machines"
         glb = pack / "assets" / "models" / folder / name / f"{name}.glb"
+        repo_glb = Path("assets/glb/machines-tld1") / name / f"{name}.glb"
+        if asset["source"] == "tld1" and repo_glb.is_file():
+            glb = repo_glb.resolve()
         if not glb.is_file():
             missing.append(f"{name} ({folder})")
             continue

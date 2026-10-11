@@ -21,22 +21,11 @@
 -- against both id tables in the briefs. `modelAssetId` is only the Open
 -- Cloud Model container; it is never a MeshId.
 --
--- Where the offsets come from. Every number is a studs value in mesh space.
---   job15 pieces        read from each GLB's node bounds (exact)
---   Body                the stats.json bounds (exact: every Body spans the
---                       whole footprint bounds, ground up)
---   SawBlade            the arbor / blade point in stats.json (exact)
---   CutterHead, Lamp    the cutter / lamp point in stats.json (exact)
---   Arm                 starts at the pivot post, reaches `size.X` (exact)
---   Belt, Rollers,      TLD-1 LINE-STANDARD: pan centre y 0.33, roller axle
---   ArrowDecal          y 0.5 (pitch 1.0, first 0.5 from each port face),
---                       arrows on the rail tops (1.32), all centred on the
---                       deck. Bends and the switch are centred on their own
---                       bounds. No GLB for these was in the pack, so they are
---                       standard-derived and each is pinned in the spec.
---   Gate, FurnaceDoor,  placed from their hinge and the size of their
---   Lever               bounds (door 55 degrees ajar, gate 45 degrees)
--- Studio check 1 in the PR looks at every one of them up close.
+-- Where the offsets come from. Every offset is the piece's bounds centre read
+-- from its GLB (assets/glb/machines-tld1/<Name>/<Name>.glb for the TLD-1 kit,
+-- the pack's machines GLBs for the 16 older pieces); sizes are the uploaded
+-- initialSize and match the GLB bounds to 0.001 (tools/preview/v1_k_manifest.py
+-- draws exactly these). Hinges and named points come from each stats.json.
 
 local V3 = Vector3.new
 
@@ -84,8 +73,13 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 82203253150448,
 		pieces = {
 			{ name = "Body", meshId = 82316315960701, size = V3(7.9, 7.008, 12), offset = V3(0, 3.504, 0) },
-			{ name = "Belt", meshId = 79470088816517, size = V3(5, 0.1, 12), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 71616383391365, size = V3(5.875, 0.045, 10.293), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 79470088816517, size = V3(5, 0.1, 12), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 71616383391365,
+				size = V3(5.875, 0.045, 10.293),
+				offset = V3(0, 1.343, -0.153),
+			},
 			{ name = "Rollers", meshId = 100124805556860, size = V3(5.9, 0.407, 11.407), offset = V3(0, 0.5, 0) },
 			{ name = "SawBlade", meshId = 105278917546675, size = V3(3.406, 3.406, 0.374), offset = V3(0, 2.44, 0.35) },
 		},
@@ -99,7 +93,7 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 120733386966709,
 		pieces = {
 			{ name = "Body", meshId = 115352495869068, size = V3(7.9, 7.288, 14), offset = V3(0, 3.644, 0) },
-			{ name = "Belt", meshId = 139811009092137, size = V3(5, 0.1, 14), offset = V3(0, 0.33, 0) },
+			{ name = "Belt", meshId = 139811009092137, size = V3(5, 0.1, 14), offset = V3(0, 0.21, 0) },
 			{
 				name = "ArrowDecal",
 				meshId = 112648169356270,
@@ -119,8 +113,13 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 76000687397316,
 		pieces = {
 			{ name = "Body", meshId = 93421084152103, size = V3(9.9, 9.57, 16), offset = V3(0, 4.785, 0) },
-			{ name = "Belt", meshId = 122001219822338, size = V3(5, 0.1, 16), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 97534746945740, size = V3(5.875, 0.045, 14.293), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 122001219822338, size = V3(5, 0.1, 16), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 97534746945740,
+				size = V3(5.875, 0.045, 14.293),
+				offset = V3(0, 1.343, -0.153),
+			},
 			{ name = "Rollers", meshId = 93317397092855, size = V3(5.9, 0.407, 15.407), offset = V3(0, 0.5, 0) },
 			{ name = "SawBlade", meshId = 73060656632976, size = V3(4.356, 4.356, 0.374), offset = V3(0, 2.92, 0.35) },
 		},
@@ -134,7 +133,7 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 86626741100071,
 		pieces = {
 			{ name = "Body", meshId = 106669780577580, size = V3(9.9, 9.68, 18), offset = V3(0, 4.84, 0) },
-			{ name = "Belt", meshId = 105997146156742, size = V3(5, 0.1, 18), offset = V3(0, 0.33, 0) },
+			{ name = "Belt", meshId = 105997146156742, size = V3(5, 0.1, 18), offset = V3(0, 0.21, 0) },
 			{
 				name = "ArrowDecal",
 				meshId = 110256564557891,
@@ -154,7 +153,7 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 132542206758505,
 		pieces = {
 			{ name = "Body", meshId = 123176708762563, size = V3(9.9, 8.98, 26), offset = V3(0, 4.49, 0) },
-			{ name = "Belt", meshId = 134657591217029, size = V3(5, 0.1, 26), offset = V3(0, 0.33, 0) },
+			{ name = "Belt", meshId = 134657591217029, size = V3(5, 0.1, 26), offset = V3(0, 0.21, 0) },
 			{
 				name = "ArrowDecal",
 				meshId = 138487741009210,
@@ -163,7 +162,7 @@ local ASSETS: { [string]: Asset } = {
 			},
 			{ name = "Rollers", meshId = 110422189957775, size = V3(5.9, 0.407, 25.407), offset = V3(0, 0.5, 0) },
 			{ name = "SawBlade", meshId = 115802333263725, size = V3(5.306, 5.306, 0.374), offset = V3(0, 3.4, 0.35) },
-			{ name = "Glow", meshId = 114169088509905, size = V3(7.08, 6.36, 20.51), offset = V3(0, 5.96, 0) },
+			{ name = "Glow", meshId = 114169088509905, size = V3(7.08, 6.36, 20.51), offset = V3(0, 5.96, -0.155) },
 		},
 		points = {
 			arbor = V3(0, 3.4, 0.35),
@@ -175,8 +174,13 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 128302073238305,
 		pieces = {
 			{ name = "Body", meshId = 139485036599751, size = V3(8.21, 6.92, 8), offset = V3(-0.155, 3.46, 0) },
-			{ name = "Belt", meshId = 115448717961056, size = V3(5, 0.1, 8), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 113894795100118, size = V3(5.875, 0.045, 1.093), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 115448717961056, size = V3(5, 0.1, 8), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 113894795100118,
+				size = V3(5.875, 0.045, 1.093),
+				offset = V3(0, 1.343, -3.403),
+			},
 			{ name = "Rollers", meshId = 84416832568991, size = V3(5.9, 4.007, 7.407), offset = V3(0, 2.3, 0) },
 			{ name = "CutterHead", meshId = 85226167018473, size = V3(4.7, 1.27, 1.27), offset = V3(0, 4.05, 0) },
 		},
@@ -190,8 +194,13 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 73706656679263,
 		pieces = {
 			{ name = "Body", meshId = 99523857231670, size = V3(7.9, 7.88, 10), offset = V3(0, 3.94, 0) },
-			{ name = "Belt", meshId = 84630483083532, size = V3(5, 0.1, 10), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 106971447046383, size = V3(5.875, 0.045, 9.093), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 84630483083532, size = V3(5, 0.1, 10), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 106971447046383,
+				size = V3(5.875, 0.045, 9.093),
+				offset = V3(0, 1.343, -0.153),
+			},
 			{ name = "Rollers", meshId = 118736500953369, size = V3(5.9, 4.967, 9.407), offset = V3(0, 2.78, 0) },
 			{ name = "CutterHead", meshId = 110350458529864, size = V3(4.7, 1.27, 1.27), offset = V3(0, 5.01, 0) },
 		},
@@ -205,8 +214,13 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 135902969044789,
 		pieces = {
 			{ name = "Body", meshId = 95941118078808, size = V3(7.9, 10.32, 12), offset = V3(0, 5.16, 0) },
-			{ name = "Belt", meshId = 79470088816517, size = V3(5, 0.1, 12), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 83223296721881, size = V3(5.875, 0.045, 11.093), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 79470088816517, size = V3(5, 0.1, 12), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 83223296721881,
+				size = V3(5.875, 0.045, 11.093),
+				offset = V3(0, 1.343, -0.153),
+			},
 			{ name = "Rollers", meshId = 108851068260356, size = V3(5.9, 5.927, 11.407), offset = V3(0, 3.26, 0) },
 			{ name = "CutterHead", meshId = 99962089066042, size = V3(4.7, 1.27, 1.27), offset = V3(0, 5.97, 0) },
 		},
@@ -220,7 +234,7 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 99269663197315,
 		pieces = {
 			{ name = "Body", meshId = 140368307046506, size = V3(7.9, 8.84, 16), offset = V3(0, 4.42, 0) },
-			{ name = "Belt", meshId = 122001219822338, size = V3(5, 0.1, 16), offset = V3(0, 0.33, 0) },
+			{ name = "Belt", meshId = 122001219822338, size = V3(5, 0.1, 16), offset = V3(0, 0.21, 0) },
 			{
 				name = "ArrowDecal",
 				meshId = 117725368152383,
@@ -241,7 +255,7 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 86450593926500,
 		pieces = {
 			{ name = "Body", meshId = 82676669720780, size = V3(6.686, 8.38, 56), offset = V3(0, 4.19, 0) },
-			{ name = "Belt", meshId = 139694883139382, size = V3(5, 0.1, 56), offset = V3(0, 0.33, 0) },
+			{ name = "Belt", meshId = 139694883139382, size = V3(5, 0.1, 56), offset = V3(0, 0.21, 0) },
 			{
 				name = "ArrowDecal",
 				meshId = 111005337162220,
@@ -261,8 +275,13 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 105676684351431,
 		pieces = {
 			{ name = "Body", meshId = 103732749952811, size = V3(6, 1.32, 4), offset = V3(0, 0.66, 0) },
-			{ name = "Belt", meshId = 72953111751969, size = V3(5, 0.1, 4), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 90697262252511, size = V3(5.875, 0.045, 1.093), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 72953111751969, size = V3(5, 0.1, 4), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 90697262252511,
+				size = V3(5.875, 0.045, 1.093),
+				offset = V3(0, 1.343, -0.153),
+			},
 			{ name = "Rollers", meshId = 91466161753932, size = V3(5.9, 0.407, 3.407), offset = V3(0, 0.5, 0) },
 		},
 	},
@@ -272,8 +291,13 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 71808845784840,
 		pieces = {
 			{ name = "Body", meshId = 121102816278486, size = V3(6, 1.32, 8), offset = V3(0, 0.66, 0) },
-			{ name = "Belt", meshId = 115448717961056, size = V3(5, 0.1, 8), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 90697262252511, size = V3(5.875, 0.045, 1.093), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 115448717961056, size = V3(5, 0.1, 8), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 90697262252511,
+				size = V3(5.875, 0.045, 1.093),
+				offset = V3(0, 1.343, -0.153),
+			},
 			{ name = "Rollers", meshId = 123259738546019, size = V3(5.9, 0.407, 7.407), offset = V3(0, 0.5, 0) },
 		},
 	},
@@ -283,8 +307,13 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 126304153360911,
 		pieces = {
 			{ name = "Body", meshId = 73545583088683, size = V3(6, 1.32, 16), offset = V3(0, 0.66, 0) },
-			{ name = "Belt", meshId = 122001219822338, size = V3(5, 0.1, 16), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 90697262252511, size = V3(5.875, 0.045, 1.093), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 122001219822338, size = V3(5, 0.1, 16), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 90697262252511,
+				size = V3(5.875, 0.045, 1.093),
+				offset = V3(0, 1.343, -0.153),
+			},
 			{ name = "Rollers", meshId = 93317397092855, size = V3(5.9, 0.407, 15.407), offset = V3(0, 0.5, 0) },
 		},
 	},
@@ -294,10 +323,15 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 99790914584808,
 		pieces = {
 			{ name = "Body", meshId = 134980836676411, size = V3(6, 1.82, 8), offset = V3(0, 0.91, 0) },
-			{ name = "Belt", meshId = 115448717961056, size = V3(5, 0.1, 8), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 122822891842924, size = V3(5.875, 0.045, 2.986), offset = V3(0, 1.343, 0) },
+			{ name = "Belt", meshId = 115448717961056, size = V3(5, 0.1, 8), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 122822891842924,
+				size = V3(5.875, 0.045, 2.986),
+				offset = V3(0, 1.343, -1.1),
+			},
 			{ name = "Rollers", meshId = 123259738546019, size = V3(5.9, 0.407, 7.407), offset = V3(0, 0.5, 0) },
-			{ name = "Lever", meshId = 103684402243704, size = V3(0.22, 1.135, 1.099), offset = V3(2.7, 2.388, -3) },
+			{ name = "Lever", meshId = 103684402243704, size = V3(0.22, 1.135, 1.099), offset = V3(2.7, 2.362, -2.97) },
 		},
 		points = {
 			lever_pivot = V3(2.7, 1.82, -3),
@@ -309,7 +343,7 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 97607742935828,
 		pieces = {
 			{ name = "Body", meshId = 117039337469037, size = V3(7, 1.32, 7), offset = V3(0.5, 0.66, -0.5) },
-			{ name = "Belt", meshId = 113546975286857, size = V3(6.5, 0.1, 6.5), offset = V3(0.75, 0.33, -0.75) },
+			{ name = "Belt", meshId = 113546975286857, size = V3(6.5, 0.1, 6.5), offset = V3(0.75, 0.21, -0.75) },
 			{
 				name = "ArrowDecal",
 				meshId = 138942464537519,
@@ -329,8 +363,8 @@ local ASSETS: { [string]: Asset } = {
 		source = "tld1",
 		modelAssetId = 138533752658757,
 		pieces = {
-			{ name = "Body", meshId = 116590874132562, size = V3(8, 2.009, 8.055), offset = V3(0, 1.004, -0.027) },
-			{ name = "Belt", meshId = 92661088659948, size = V3(7, 0.1, 8), offset = V3(0, 0.33, 0) },
+			{ name = "Body", meshId = 116590874132562, size = V3(8, 2.009, 8.055), offset = V3(0, 1.005, -0.028) },
+			{ name = "Belt", meshId = 92661088659948, size = V3(7, 0.1, 8), offset = V3(0, 0.21, 0) },
 			{
 				name = "ArrowDecal",
 				meshId = 113894795100118,
@@ -346,14 +380,14 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 90596669614644,
 		pieces = {
 			{ name = "Body", meshId = 89409509121237, size = V3(6, 2.02, 4.394), offset = V3(0, 0.31, 0.197) },
-			{ name = "Belt", meshId = 112639701527136, size = V3(5, 0.1, 2.5), offset = V3(0, 0.33, -0.75) },
+			{ name = "Belt", meshId = 112639701527136, size = V3(5, 0.1, 2.5), offset = V3(0, 0.21, -0.75) },
 			{
 				name = "ArrowDecal",
 				meshId = 91366713649077,
 				size = V3(5.875, 0.045, 1.093),
 				offset = V3(0, 1.343, -0.75),
 			},
-			{ name = "Rollers", meshId = 86020839494315, size = V3(5.9, 0.407, 1.407), offset = V3(0, 0.5, -0.75) },
+			{ name = "Rollers", meshId = 86020839494315, size = V3(5.9, 0.407, 1.407), offset = V3(0, 0.5, -1) },
 		},
 	},
 	SwitchBelt = {
@@ -362,15 +396,20 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 91698403492350,
 		pieces = {
 			{ name = "Body", meshId = 134774202798715, size = V3(12, 1.32, 8), offset = V3(0, 0.66, 0) },
-			{ name = "Belt", meshId = 89756778448978, size = V3(12, 0.1, 7.5), offset = V3(0, 0.33, -0.2) },
+			{ name = "Belt", meshId = 89756778448978, size = V3(12, 0.1, 7.5), offset = V3(0, 0.21, -0.25) },
 			{
 				name = "ArrowDecal",
 				meshId = 115037553348084,
 				size = V3(8.386, 0.045, 7.637),
 				offset = V3(0, 1.343, -0.2),
 			},
-			{ name = "Rollers", meshId = 136667181767213, size = V3(11.407, 0.407, 7.153), offset = V3(0, 0.5, -0.2) },
-			{ name = "Gate", meshId = 113470506420777, size = V3(2.779, 1, 2.368), offset = V3(-1, 1.22, 2.3) },
+			{
+				name = "Rollers",
+				meshId = 136667181767213,
+				size = V3(11.407, 0.407, 7.153),
+				offset = V3(0, 0.5, -0.127),
+			},
+			{ name = "Gate", meshId = 113470506420777, size = V3(2.779, 1, 2.368), offset = V3(1.26, 1.22, 2.295) },
 		},
 		points = {
 			GateHinge = V3(0, 0.72, 3.35),
@@ -382,9 +421,14 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 86778935130463,
 		pieces = {
 			{ name = "Body", meshId = 109275806413936, size = V3(6, 3.32, 8), offset = V3(0, 1.66, 0) },
-			{ name = "Belt", meshId = 98887369971807, size = V3(5, 2.1, 8), offset = V3(0, 1.33, 0) },
-			{ name = "ArrowDecal", meshId = 126887593045235, size = V3(5.875, 0.318, 1.093), offset = V3(0, 2.343, 0) },
-			{ name = "Rollers", meshId = 90906606656930, size = V3(5.9, 2.199, 7.407), offset = V3(0, 1.396, 0) },
+			{ name = "Belt", meshId = 98887369971807, size = V3(5, 2.1, 8), offset = V3(0, 1.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 126887593045235,
+				size = V3(5.875, 0.318, 1.093),
+				offset = V3(0, 2.304, -0.153),
+			},
+			{ name = "Rollers", meshId = 90906606656930, size = V3(5.9, 2.199, 7.407), offset = V3(0, 1.5, 0) },
 		},
 	},
 	BeltSupport = {
@@ -392,7 +436,7 @@ local ASSETS: { [string]: Asset } = {
 		source = "tld1",
 		modelAssetId = 139146603427790,
 		pieces = {
-			{ name = "Body", meshId = 135923007231029, size = V3(6, 2.125, 1.055), offset = V3(0, 1.062, 0.028) },
+			{ name = "Body", meshId = 135923007231029, size = V3(6, 2.125, 1.055), offset = V3(0, 1.063, 0.028) },
 		},
 	},
 	WoodDetector = {
@@ -401,7 +445,7 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 115322700999486,
 		pieces = {
 			{ name = "Body", meshId = 115084242039300, size = V3(8, 8.806, 4), offset = V3(0, 4.403, 0) },
-			{ name = "Belt", meshId = 72953111751969, size = V3(5, 0.1, 4), offset = V3(0, 0.33, 0) },
+			{ name = "Belt", meshId = 72953111751969, size = V3(5, 0.1, 4), offset = V3(0, 0.21, 0) },
 			{ name = "Rollers", meshId = 91466161753932, size = V3(5.9, 0.407, 3.407), offset = V3(0, 0.5, 0) },
 			{ name = "Lamp", meshId = 81734615468033, size = V3(0.42, 0.3, 0.42), offset = V3(0, 8.18, 0) },
 		},
@@ -415,7 +459,7 @@ local ASSETS: { [string]: Asset } = {
 		modelAssetId = 122136909587197,
 		pieces = {
 			{ name = "Body", meshId = 77144912159181, size = V3(1.6, 1.9, 1.6), offset = V3(0, 0.95, 0) },
-			{ name = "Arm", meshId = 85325867332742, size = V3(6.6, 0.86, 0.9), offset = V3(3.3, 1.82, 0) },
+			{ name = "Arm", meshId = 85325867332742, size = V3(6.6, 0.86, 0.9), offset = V3(3.3, 1.5, 0) },
 		},
 		points = {
 			pivot = V3(0, 1.82, 0),
@@ -448,10 +492,15 @@ local ASSETS: { [string]: Asset } = {
 		source = "tld1",
 		modelAssetId = 77290455540922,
 		pieces = {
-			{ name = "Body", meshId = 124635139968707, size = V3(8.6, 8.8, 10), offset = V3(0, 4.4, 0.002) },
-			{ name = "Belt", meshId = 121687094617487, size = V3(5, 0.1, 10), offset = V3(0, 0.33, 0) },
-			{ name = "ArrowDecal", meshId = 106971447046383, size = V3(5.875, 0.045, 9.093), offset = V3(0, 1.343, 0) },
-			{ name = "Rollers", meshId = 111156364093830, size = V3(5.9, 0.407, 9.707), offset = V3(0, 0.5, 0) },
+			{ name = "Body", meshId = 124635139968707, size = V3(8.6, 8.8, 10), offset = V3(0, 4.4, 0) },
+			{ name = "Belt", meshId = 121687094617487, size = V3(5, 0.1, 10), offset = V3(0, 0.21, 0) },
+			{
+				name = "ArrowDecal",
+				meshId = 106971447046383,
+				size = V3(5.875, 0.045, 9.093),
+				offset = V3(0, 1.343, -0.153),
+			},
+			{ name = "Rollers", meshId = 111156364093830, size = V3(5.9, 0.407, 9.707), offset = V3(0, 0.5, 0.15) },
 			{
 				name = "FurnaceDoor",
 				meshId = 79585722300617,

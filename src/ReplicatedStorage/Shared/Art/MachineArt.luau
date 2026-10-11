@@ -1386,9 +1386,9 @@ function MachineArt.SetSwitchSide(model: Model, side: number)
 	local s = if side == -1 then -1 else 1
 	if MachineSkin.Wears(model) then
 		-- The mesh paddle is built thrown toward +X; flipping it turns it a
-		-- quarter turn about its hinge so it throws toward -X.
+		-- 100 degrees about its hinge (twice its 50 degree lean) so it throws toward -X.
 		local hinge = MachineMeshes.Point("SwitchBelt", "GateHinge") or Vector3.new(0, DECK_TOP, 3.35)
-		MachineSkin.Swing(model, "Gate", hinge, "Y", if s == 1 then 0 else -math.pi / 2)
+		MachineSkin.Swing(model, "Gate", hinge, "Y", if s == 1 then 0 else math.rad(100))
 		model:SetAttribute("GateSide", s)
 		return
 	end
