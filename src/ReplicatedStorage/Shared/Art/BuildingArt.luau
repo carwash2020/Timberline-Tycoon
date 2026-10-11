@@ -3486,6 +3486,11 @@ function BuildingArt.SkyForgeCourt(): Model
 	faceGui(orders, "OrderBoard")
 	Kit.signText(orders, "ORDERS", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
 	Kit.part(model, "Trough", V3(6, 1.6, 2), CF(8, 1.6, -2), Palette.StoneBase, MAT.Slate)
+	-- The court's name board (6 x 1.4 x 0.3, the size of the Blender Sign piece, so a
+	-- mesh dressing can snap onto it): brass, on the back wall's face, its text on the
+	-- -Z face so it reads from the open front. Two short words, cream-dark on brass.
+	local nameBoard = dBox(model, "Sign", V3(6, 1.4, 0.3), CF(0, 6.4, 11.05), Palette.Brass, MAT.Wood)
+	Kit.signText(nameBoard, "SKY FORGE", Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
 	spot(floor, "KeeperSpot", CF(0, 1, -6))
 	return model
 end

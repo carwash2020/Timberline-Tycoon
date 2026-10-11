@@ -373,8 +373,10 @@ return function(t)
 		local PlotData = s.loader:shared("PlotData")
 		local BlueprintModels = s.loader:shared("BlueprintModels")
 		local sweeper = BlueprintModels.Build(PlotData.Blueprint("WoodSweeper"), false)
-		-- Snug beside a straight belt: the sweeper's centre 3 studs off the belt's.
-		sweeper:PivotTo(CFrame.new(-3, 0, 0))
+		-- Snug beside a straight belt: the sweeper's centre 3.8 studs off the belt's
+		-- (was 3: the TLD-1 straight is a 6.0 plate, not 4; its edge is at 3.0 and the
+		-- sweeper's base is 1.6 wide).
+		sweeper:PivotTo(CFrame.new(-3.8, 0, 0))
 		s.Service._poseSweeper(sweeper, true)
 		t.eq(sweeper:GetAttribute("Swept"), true, "posed down")
 		local belt = s.MachineArt.BuildBelt("ConveyorStraight", false)
@@ -392,7 +394,8 @@ return function(t)
 		t.ok(rod[1][2] >= arm[1][2] - 1e-3 and rod[2][2] <= arm[2][2] + 1e-3, "the rod is level with the arm")
 		-- A 2-wide log centred on the deck with its face on the bar.
 		local logLo = arm[2][1]
-		t.ok(logLo > -1.5 and logLo + 2 < 1.5, "the bar's face leaves room for a log on the deck")
+		-- Deck half-width 2.5 (was 1.5): the TLD-1 channel is 5.0 wide.
+		t.ok(logLo > -2.5 and logLo + 2 < 2.5, "the bar's face leaves room for a log on the deck")
 		-- Nothing of the sweeper passes through the near guard rail or the deck.
 		for _, p in ipairs(belt:GetDescendants()) do
 			if p:IsA("BasePart") and (p.Name == "GuardRail" or p.Name == "Conveyor") then

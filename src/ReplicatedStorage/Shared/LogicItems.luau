@@ -433,6 +433,8 @@ local items: { Item } = {
 local SLOTS = { "Body", "Indicator", "Moving", "LabelFace" }
 
 local MeshKit = require(script.Parent.Art.MeshKit)
+local MachineMeshes = require(script.Parent.Art.MachineMeshes)
+local MachineSkin = require(script.Parent.Art.MachineSkin)
 
 local known: { [string]: boolean } = {}
 for _, item in ipairs(items) do
@@ -473,9 +475,92 @@ end
 -- handle, button cap, hatch door or plate top. LabelFace carries the gate
 -- label. A missing model, or one with none of those slots, keeps the part
 -- build and is logged once.
+
+-- The Blender pieces of MachineMeshes, mapped onto the same slots: Lamp is the
+-- Indicator; Cap, Handle, Leaf, Plate, Toggle and Arm are the Moving piece.
+-- Every other box stays as the collider (see-through), exactly as with a
+-- template. A moving piece with a hinge carries its pose as attributes
+-- (MachineSkin.PoseAbout); the Button cap and the Pressure Plate just drop.
+local SLOT_OF: { [string]: string } = {
+	Body = "Body",
+	Lamp = "Indicator",
+	Cap = "Moving",
+	Handle = "Moving",
+	Leaf = "Moving",
+	Plate = "Moving",
+	Toggle = "Moving",
+	Arm = "Moving",
+}
+
+local function applyMachineMeshes(model: Model, id: string, ghost: boolean?): boolean
+	if MachineMeshes.Get(id) == nil then
+		return false
+	end
+	local root = model:FindFirstChild("Root")
+	if root == nil or not root:IsA("BasePart") then
+		return false
+	end
+	local skin = MachineSkin.Prepare(id, ghost)
+	if skin == nil then
+		return false
+	end
+	-- Mesh origin: the footprint's ground centre, 0.1 under the Root slab.
+	local frame = root.CFrame * CFrame.new(0, -0.1, 0)
+	local pose = MachineMeshes.Pose(id)
+	local lit = Color3.fromHex(ACCENT[id] or GLOW)
+	for _, part in ipairs(skin.parts) do
+		local piece = MachineMeshes.Piece(id, part.Name)
+		local slot = SLOT_OF[part.Name]
+		if piece == nil or slot == nil then
+			part:Destroy()
+			continue
+		end
+		part.Name = slot
+		part:SetAttribute("LogicMesh", true)
+		part.CFrame = frame * CFrame.new(piece.offset)
+		part.Parent = model
+		if slot == "Moving" or slot == "Indicator" then
+			part:SetAttribute("RestOffset", root.CFrame:ToObjectSpace(part.CFrame))
+		end
+		if slot == "Indicator" then
+			part:SetAttribute("LitColor", lit)
+			part.Color = lit
+		end
+		if slot == "Moving" and pose ~= nil and pose.piece == piece.name then
+			part:SetAttribute("PoseHinge", root.CFrame:PointToObjectSpace(frame * pose.hinge))
+			part:SetAttribute("PoseAxis", pose.axis)
+			part:SetAttribute("PoseOn", pose.on)
+			part:SetAttribute("PoseOff", pose.off)
+			-- Built in the "off" pose (lever back, hatch shut, boom parked).
+			MachineSkin.PoseAbout(model, part, false)
+		end
+	end
+	model:SetAttribute("MeshAsset", id)
+	local indicator = model:FindFirstChild("Indicator")
+	if indicator and indicator:IsA("BasePart") then
+		for _, child in ipairs(model:GetChildren()) do
+			if child:IsA("BasePart") and child:GetAttribute("LogicMesh") ~= true then
+				local light = child:FindFirstChildOfClass("PointLight")
+				if light and light.Parent ~= indicator then
+					light.Parent = indicator
+				end
+			end
+		end
+	end
+	for _, child in ipairs(model:GetChildren()) do
+		if child:IsA("BasePart") and child ~= root and child:GetAttribute("LogicMesh") ~= true then
+			child.Transparency = 1
+		end
+	end
+	return true
+end
+
 local function applyMeshes(model: Model, id: string, ghost: boolean?): boolean
 	if not known[id] then
 		return false
+	end
+	if applyMachineMeshes(model, id, ghost) then
+		return true
 	end
 	local template = findTemplate(id)
 	local root = model:FindFirstChild("Root")
@@ -568,6 +653,10 @@ end
 local function dress(model: Model, id: string)
 	local text = MARK[id]
 	if text == nil then
+		return
+	end
+	-- The Blender gates carry their symbol as raised geometry on the +Z face.
+	if model:GetAttribute("MeshAsset") ~= nil then
 		return
 	end
 	local host = model:FindFirstChild("LabelFace")

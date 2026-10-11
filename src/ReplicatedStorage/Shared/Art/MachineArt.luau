@@ -27,6 +27,8 @@ local AutomationLogic = require(script.Parent.Parent.AutomationLogic)
 local PlanerLogic = require(script.Parent.Parent.PlanerLogic)
 local BuildingArt = require(script.Parent.BuildingArt)
 local Kit = require(script.Parent.Kit)
+local MachineMeshes = require(script.Parent.MachineMeshes)
+local MachineSkin = require(script.Parent.MachineSkin)
 local Palette = require(script.Parent.Palette)
 local SawmillLogic = require(script.Parent.Parent.SawmillLogic)
 local SkyBinLogic = require(script.Parent.Parent.SkyBinLogic)
@@ -106,12 +108,22 @@ end
 -- The cut board on the +X side of a sawmill or a planer: the size readout,
 -- the limit under it, four 48 px buttons (X-, X+, Y-, Y+) and the prompt
 -- that opens the screen panel. Front is the big face (5.6 x 2.8 studs).
-function MachineArt.AddPanel(model: Model, w: number, objectText: string, actionText: string, limit: string)
+function MachineArt.AddPanel(
+	model: Model,
+	w: number,
+	objectText: string,
+	actionText: string,
+	limit: string,
+	at: Vector3?
+)
+	-- `at` is the board's centre (the TLD-1 layouts set it inside the mesh's
+	-- frame); without it the board stands just outside the wall, as before.
+	local centre = at or Vector3.new(w / 2 + 0.3, 3.4, 0.2)
 	local panel = part(
 		model,
 		"Panel",
 		Vector3.new(5.6, 2.8, 0.25),
-		CFrame.lookAt(Vector3.new(w / 2 + 0.3, 3.4, 0.2), Vector3.new(w / 2 + 8, 3.4, 0.2)),
+		CFrame.lookAt(centre, centre + Vector3.new(8, 0, 0)),
 		PANEL,
 		Enum.Material.Wood,
 		false,
@@ -204,6 +216,11 @@ end
 -- part budget MachineArt.Budget(tier)): 2 braces and posts, 3 a stack and a
 -- plate, 4 a boiler with a dome and gauge, 5 a gantry and lamps. Every tier
 -- also carries a TierSign with its name. Looks only; nothing here collides.
+export type TierOptions = {
+	meshed: boolean?, -- the machine wears its Blender body: the tier look is in the mesh, only the sign stays
+	sign: CFrame?, -- where the TierSign stands (the default sits on the part-built roof)
+}
+
 function MachineArt.TierDetail(
 	model: Model,
 	tier: number,
@@ -211,10 +228,12 @@ function MachineArt.TierDetail(
 	d: number,
 	roofBottom: number,
 	name: string,
-	ghost: boolean
+	ghost: boolean,
+	options: TierOptions?
 )
 	local top = roofBottom + 0.28
-	if tier >= 2 then
+	local meshed = options ~= nil and options.meshed == true
+	if tier >= 2 and not meshed then
 		for _, sx in ipairs({ -1, 1 }) do
 			for _, sz in ipairs({ -1, 1 }) do
 				lookPart(
@@ -229,7 +248,7 @@ function MachineArt.TierDetail(
 			end
 		end
 	end
-	if tier >= 3 then
+	if tier >= 3 and not meshed then
 		local stack = Kit.cylinder(
 			model,
 			"Stack",
@@ -264,7 +283,7 @@ function MachineArt.TierDetail(
 			ghost
 		)
 	end
-	if tier >= 4 then
+	if tier >= 4 and not meshed then
 		local boiler = Kit.cylinder(
 			model,
 			"Boiler",
@@ -299,7 +318,7 @@ function MachineArt.TierDetail(
 			ghost
 		)
 	end
-	if tier >= 5 then
+	if tier >= 5 and not meshed then
 		lookPart(
 			model,
 			"Gantry",
@@ -342,7 +361,7 @@ function MachineArt.TierDetail(
 		model,
 		"TierSign",
 		Vector3.new(3.4, 0.9, 0.2),
-		CFrame.new(0, top + 0.5, d / 2 - 0.5),
+		if options and options.sign then options.sign else CFrame.new(0, top + 0.5, d / 2 - 0.5),
 		PANEL,
 		Enum.Material.Wood,
 		ghost
@@ -412,34 +431,98 @@ function MachineArt.AimBelt(model: Model, speed: number?)
 	end
 end
 
--- `ghost` is the placement preview: nothing collides and there are no buttons.
-function MachineArt.Build(millId: string, ghost: boolean?): Model?
-	local mill = ItemCatalog.GetSawmill(millId)
-	if not mill then
-		return nil
+-- The gameplay parts of a TLD-1 sawmill or planer, row by row from
+-- MachineMeshes.Layout (the shipped stats.json gameplay_parts): the deck
+-- band that carries wood, the walls and roof a player is stopped by, the
+-- portal guards, the intake sensor. Nothing here moves into a mesh. Without
+-- the meshes the same parts are the look (walls, roof, rails, a belt);
+-- with them MachineSkin.Commit turns the visible ones see-through and they
+-- keep colliding.
+type FrameLook = {
+	wall: Color3,
+	wallMaterial: Enum.Material,
+	roof: Color3,
+	roofMaterial: Enum.Material,
+}
+
+type Frame = { panelAt: Vector3?, blockageAt: Vector3?, roofY: number }
+
+local function buildFrame(model: Model, layout: MachineMeshes.Layout, preview: boolean, look: FrameLook): Frame
+	local frame: Frame = { panelAt = nil, blockageAt = nil, roofY = 0 }
+	for _, row in ipairs(layout.parts) do
+		local cf = CFrame.new(row.pos)
+		local name = row.name
+		if name == "Root" then
+			local root = part(model, "Root", row.size, cf, WOOD, Enum.Material.Wood, true, false)
+			root.Transparency = 1
+			model.PrimaryPart = root
+		elseif name == "Conveyor" then
+			-- LookVector +Z (a half turn; Lune's lookAt disagrees with Roblox).
+			local belt = part(
+				model,
+				"Conveyor",
+				row.size,
+				cf * CFrame.Angles(0, math.pi, 0),
+				BELT,
+				Enum.Material.Metal,
+				preview,
+				true
+			)
+			if not preview then
+				inGroup(belt, BELT_GROUP)
+			end
+		elseif name == "GuardRail" then
+			local rail = part(model, "GuardRail", row.size, cf, WOOD_DARK, Enum.Material.Wood, preview, true)
+			if not preview then
+				touchless(rail)
+			end
+		elseif name == "Wall" then
+			local wall = part(model, "Wall", row.size, cf, look.wall, look.wallMaterial, preview, true)
+			if not preview then
+				touchless(wall)
+			end
+		elseif name == "Roof" then
+			local roof = part(model, "Roof", row.size, cf, look.roof, look.roofMaterial, preview, true)
+			if not preview then
+				inGroup(roof, MILL_GROUP)
+			end
+			frame.roofY = row.pos.Y
+		elseif name == "FeedGuard" or name == "BladeGuard" then
+			-- Invisible: players stop, a log on the belt passes through (Mill group).
+			local guard = part(model, name, row.size, cf, WOOD, Enum.Material.SmoothPlastic, preview, true)
+			guard.Transparency = 1
+			guard.CastShadow = false
+			if not preview then
+				inGroup(guard, MILL_GROUP)
+			end
+		elseif name == "Intake" then
+			-- The log is pushed in over the infeed section. The box is tall
+			-- enough that a log lying on the ground overlaps it.
+			local intake = part(model, "Intake", row.size, cf, WOOD, Enum.Material.SmoothPlastic, true, false)
+			intake.Transparency = 1
+			intake.CanCollide = false
+			intake.CanTouch = false
+			intake.CanQuery = false
+		elseif name == "Panel" then
+			frame.panelAt = row.pos
+		elseif name == "Blockage" then
+			frame.blockageAt = row.pos
+		end
 	end
-	local preview = ghost == true
-	local w, d = mill.width, mill.depth
-	local frame = Kit.hex(mill.color)
-	local model = Kit.model(mill.id)
-	-- Thickest log this mill accepts, in studs. The belt is that wide plus
-	-- a margin; the rails stand just outside it.
-	local logDia = mill.maxWidth * GameConfig.WoodUnit
-	local beltTop = 0.72
-	local beltH = 0.32
-	local beltY = beltTop - beltH / 2
-	local beltW = logDia + 0.55
-	local beltLen = math.max(3, d - 1.8)
+	local output = Instance.new("Attachment")
+	output.Name = "Output"
+	-- LookVector points out the front (+Z), where the planks spawn.
+	output.CFrame = CFrame.lookAt(layout.output, layout.output + Vector3.new(0, 0, 5))
+	output.Parent = model.PrimaryPart
+	return frame
+end
 
-	local root =
-		part(model, "Root", Vector3.new(w, 0.2, d), CFrame.new(0, 0.1, 0), WOOD, Enum.Material.Wood, true, false)
-	root.Transparency = 1
-	model.PrimaryPart = root
-
+-- The plank deck under the part-built art (the meshes bring their own plate).
+local function fallbackDeck(model: Model, layout: MachineMeshes.Layout, preview: boolean)
 	local deck = part(
 		model,
 		"Deck",
-		Vector3.new(w - 0.4, 0.4, d - 0.4),
+		Vector3.new(layout.footprint.X - 0.4, 0.4, layout.footprint.Y - 0.4),
 		CFrame.new(0, 0.2, 0),
 		WOOD,
 		Enum.Material.WoodPlanks,
@@ -449,151 +532,73 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	if not preview then
 		touchless(deck)
 	end
+end
 
-	-- LookVector +Z (a half turn; Lune's lookAt disagrees with Roblox).
-	-- Length runs along Z, from the infeed to the outfeed.
-	local belt = part(
-		model,
-		"Conveyor",
-		Vector3.new(beltW, beltH, beltLen),
-		CFrame.new(0, beltY, 0) * CFrame.Angles(0, math.pi, 0),
-		BELT,
-		Enum.Material.Metal,
-		preview,
-		true
-	)
-	if not preview then
-		inGroup(belt, BELT_GROUP)
-		MachineArt.AimBelt(model)
+-- Where a mesh machine's TierSign stands: on the ridge, at the Blockage
+-- board's height, toward the outfeed so the two signs do not overlap.
+local function ridgeSign(id: string): CFrame
+	local body = MachineMeshes.Piece(id, "Body")
+	local top = if body then body.size.Y else 6
+	return CFrame.new(0, top + 0.7, 1.9)
+end
+
+-- `ghost` is the placement preview: nothing collides and there are no buttons.
+function MachineArt.Build(millId: string, ghost: boolean?): Model?
+	local mill = ItemCatalog.GetSawmill(millId)
+	local layout = MachineMeshes.Layout(millId)
+	if not mill or not layout then
+		return nil
 	end
-
+	local preview = ghost == true
+	local model = Kit.model(mill.id)
+	local skin = MachineSkin.Prepare(mill.id, preview)
 	local tier = math.clamp(mill.tier, 1, 5)
-	local roofBottom = math.max(beltTop + logDia + 2.4, 5.4)
-	local wallH = roofBottom - 0.4
-	local wallY = 0.4 + wallH / 2
-	for _, side in ipairs({ -1, 1 }) do
-		local wall = part(
-			model,
-			"Wall",
-			Vector3.new(0.65, wallH, d - 1.2),
-			CFrame.new(side * (w / 2 - 0.5), wallY, 0),
-			frame,
-			WALL_MATERIAL[tier],
-			preview,
-			true
-		)
-		local rail = part(
-			model,
-			"GuardRail",
-			Vector3.new(0.28, 1.35, beltLen - 0.4),
-			CFrame.new(side * (logDia / 2 + 0.55), 0.4 + 0.75, 0),
-			WOOD_DARK,
-			Enum.Material.Wood,
-			preview,
-			true
-		)
-		if not preview then
-			touchless(wall)
-			touchless(rail)
+	local frame = buildFrame(model, layout, preview, {
+		wall = Kit.hex(mill.color),
+		wallMaterial = WALL_MATERIAL[tier],
+		roof = if tier >= 3 then ROOF_COLOR[tier] else Kit.hex(mill.color),
+		roofMaterial = ROOF_MATERIAL[tier],
+	})
+	if skin == nil then
+		fallbackDeck(model, layout, preview)
+	end
+	local beltTop = AutomationLogic.DeckTop
+	local arbor = MachineMeshes.Point(mill.id, "arbor") or Vector3.new(0, 2.6, 0.35)
+
+	if skin == nil then
+		-- Disc in the XY plane (its X axis, the axle, runs along Z) so a log
+		-- fed along the belt passes through it once. TownFX spins that axle.
+		local bladeD = (arbor.Y - beltTop) * 2
+		local bladeCf = CFrame.new(arbor) * CFrame.Angles(0, math.pi / 2, 0)
+		local blade = Kit.cylinder(model, "SawBlade", 0.22, bladeD, bladeCf, BLADE, Enum.Material.Metal)
+		if preview then
+			blade.Transparency = 0.45
+			blade.CanCollide = false
+			blade.CanQuery = false
+			blade.CanTouch = false
+		else
+			Kit.decor(blade)
+			CollectionService:AddTag(blade, "SawBlade")
 		end
 	end
 
-	-- Invisible end walls: players stop, a log on the belt passes through
-	-- (Mill group). They meet the roof so there is no gap to jump.
-	for _, endZ in ipairs({ -(d / 2 - 0.85), d / 2 - 0.85 }) do
-		local gate = part(
+	if not preview then
+		MachineArt.AddPanel(
 			model,
-			"FeedGuard",
-			Vector3.new(w - 1.7, wallH, 0.45),
-			CFrame.new(0, wallY, endZ),
-			WOOD,
-			Enum.Material.Wood,
-			preview,
-			true
+			layout.footprint.X,
+			mill.displayName,
+			"Set the cut",
+			SawmillLogic.RangeText(mill),
+			frame.panelAt
 		)
-		gate.Transparency = 1
-		gate.CastShadow = false
-		if not preview then
-			inGroup(gate, MILL_GROUP)
-		end
-	end
-
-	local roof = part(
-		model,
-		"Roof",
-		Vector3.new(w, 0.36, d - 0.2),
-		CFrame.new(0, roofBottom + 0.1, 0),
-		if tier >= 3 then ROOF_COLOR[tier] else frame,
-		ROOF_MATERIAL[tier],
-		preview,
-		true
-	)
-	if not preview then
-		inGroup(roof, MILL_GROUP)
-	end
-
-	-- Disc in the XY plane (its X axis, the axle, runs along Z) so a log
-	-- fed along the belt passes through it once. TownFX spins that axle.
-	local bladeD = math.max(logDia + 1.2, 3.4)
-	local bladeCf = CFrame.new(0, beltTop + bladeD / 2, 0.35) * CFrame.Angles(0, math.pi / 2, 0)
-	local blade = Kit.cylinder(model, "SawBlade", 0.22, bladeD, bladeCf, BLADE, Enum.Material.Metal)
-	if preview then
-		blade.Transparency = 0.45
-		blade.CanCollide = false
-		blade.CanQuery = false
-		blade.CanTouch = false
-	else
-		Kit.decor(blade)
-		CollectionService:AddTag(blade, "SawBlade")
-	end
-	local guard = part(
-		model,
-		"BladeGuard",
-		Vector3.new(bladeD + 0.8, bladeD + 0.6, 1.3),
-		CFrame.new(0, beltTop + bladeD / 2, 0.35),
-		WOOD,
-		Enum.Material.SmoothPlastic,
-		preview,
-		true
-	)
-	guard.Transparency = 1
-	guard.CastShadow = false
-	if not preview then
-		inGroup(guard, MILL_GROUP)
-	end
-
-	-- The log is pushed in from the back (-Z). The box is tall enough that a
-	-- log lying on the ground overlaps it.
-	local intake = part(
-		model,
-		"Intake",
-		Vector3.new(math.max(4, w - 3), 5, 5),
-		CFrame.new(0, 2.6, -d / 2 + 0.4),
-		WOOD,
-		Enum.Material.SmoothPlastic,
-		true,
-		false
-	)
-	intake.Transparency = 1
-	intake.CanCollide = false
-	intake.CanTouch = false
-	intake.CanQuery = false
-
-	local output = Instance.new("Attachment")
-	output.Name = "Output"
-	-- LookVector points out the front (+Z), where the planks spawn.
-	output.CFrame = CFrame.lookAt(Vector3.new(0, 1.6, d / 2 + 1), Vector3.new(0, 1.6, d / 2 + 6))
-	output.Parent = root
-
-	if not preview then
-		MachineArt.AddPanel(model, w, mill.displayName, "Set the cut", SawmillLogic.RangeText(mill))
 		-- Above the roof, facing the infeed and the outfeed. Hidden until
 		-- a piece won't fit; the text stays off with the board.
+		local at = frame.blockageAt or Vector3.new(0, frame.roofY + 1.3, 0)
 		local sign = part(
 			model,
 			"Blockage",
 			Vector3.new(3.6, 1.15, 0.2),
-			CFrame.new(0, roofBottom + 1.05, 0),
+			CFrame.new(at),
 			Kit.hex("#7A2A22"),
 			Enum.Material.Wood,
 			false,
@@ -612,7 +617,25 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 		CollectionService:AddTag(model, "Sawmill")
 	end
 
-	MachineArt.TierDetail(model, tier, w, d, roofBottom, mill.tierName, preview)
+	MachineArt.TierDetail(
+		model,
+		tier,
+		layout.footprint.X,
+		layout.footprint.Y,
+		frame.roofY - 0.1,
+		mill.tierName,
+		preview,
+		{
+			meshed = skin ~= nil,
+			sign = if skin ~= nil then ridgeSign(mill.id) else nil,
+		}
+	)
+	if skin ~= nil then
+		MachineSkin.Commit(model, skin, CFrame.identity)
+	end
+	if not preview then
+		MachineArt.AimBelt(model)
+	end
 	model:SetAttribute("MillId", mill.id)
 	model:SetAttribute("Tier", mill.tier)
 	model:SetAttribute("TierName", mill.tierName)
@@ -674,6 +697,9 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 	end
 	local preview = ghost == true
 	local model = Kit.model(machine.id)
+	local skin = MachineSkin.Prepare(machine.id, preview)
+	local meshed = skin ~= nil
+	local layout = MachineMeshes.Layout(machine.id)
 	local fp = ChopSawLogic.Footprint()
 	local baseAt = ChopSawLogic.BaseCenter()
 	local bladeAt = ChopSawLogic.BladeCenter()
@@ -717,11 +743,31 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 		ghostPart(infeed)
 	end
 
+	-- Deck rails (TLD-1): wood on the roller deck stays on it. Invisible
+	-- under the mesh, wooden rails without it.
+	for _, row in ipairs(if layout then layout.parts else {}) do
+		if row.name == "GuardRail" then
+			local rail = part(
+				model,
+				"GuardRail",
+				Vector3.new(row.size.X, row.size.Y, ChopSawLogic.TableLength() + ChopSawLogic.BaseZ),
+				CFrame.new(row.pos),
+				WOOD_DARK,
+				Enum.Material.Wood,
+				preview,
+				true
+			)
+			if not preview then
+				touchless(rail)
+			end
+		end
+	end
+
 	local legH = tableAt.Y - ChopSawLogic.TableThick / 2
 	local inset = ChopSawLogic.Leg
 	local halfW = ChopSawLogic.TableWidth / 2 - inset
 	local halfL = ChopSawLogic.TableLength() / 2 - inset
-	for _, x in ipairs({ -halfW, halfW }) do
+	for _, x in ipairs(if meshed then {} else { -halfW, halfW }) do
 		for _, z in ipairs({ -halfL, halfL }) do
 			local leg = Kit.part(
 				model,
@@ -767,9 +813,14 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 		guard.CanQuery = true
 		guard:SetAttribute("Damage", true)
 	end
+	if meshed then
+		-- The mesh's own cabin is the look; this box stays as the damage zone.
+		guard.Transparency = 1
+		guard.CastShadow = false
+	end
 
 	local stripeZ = -ChopSawLogic.GuardZ / 2 - ChopSawLogic.StripeThick / 2
-	for _, y in ipairs({ -ChopSawLogic.GuardY / 4, ChopSawLogic.GuardY / 4 }) do
+	for _, y in ipairs(if meshed then {} else { -ChopSawLogic.GuardY / 4, ChopSawLogic.GuardY / 4 }) do
 		local stripe = Kit.part(
 			model,
 			"Stripe",
@@ -788,20 +839,22 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 		end
 	end
 
-	local blade = Kit.cylinder(
-		model,
-		"SawBlade",
-		ChopSawLogic.BladeThick,
-		ChopSawLogic.BladeDiameter,
-		CFrame.new(bladeAt) * CFrame.Angles(0, math.pi / 2, 0),
-		BLADE,
-		Enum.Material.Metal
-	)
-	if preview then
-		ghostPart(blade)
-	else
-		Kit.decor(blade)
-		CollectionService:AddTag(blade, "SawBlade")
+	if not meshed then
+		local blade = Kit.cylinder(
+			model,
+			"SawBlade",
+			ChopSawLogic.BladeThick,
+			ChopSawLogic.BladeDiameter,
+			CFrame.new(bladeAt) * CFrame.Angles(0, math.pi / 2, 0),
+			BLADE,
+			Enum.Material.Metal
+		)
+		if preview then
+			ghostPart(blade)
+		else
+			Kit.decor(blade)
+			CollectionService:AddTag(blade, "SawBlade")
+		end
 	end
 
 	local plane = Instance.new("Attachment")
@@ -826,6 +879,14 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 
 	if not preview then
 		local panelCf = CFrame.new(baseAt.X + ChopSawLogic.BaseX / 2 + ChopSawLogic.PanelBoardX / 2, baseAt.Y, baseAt.Z)
+		if layout then
+			-- The board sits in the cabin's brass frame (TLD-1 panel_face).
+			for _, row in ipairs(layout.parts) do
+				if row.name == "Panel" then
+					panelCf = CFrame.new(row.pos)
+				end
+			end
+		end
 		local panel = Kit.part(
 			model,
 			"Panel",
@@ -890,6 +951,16 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 
 		local signX = baseAt.X + ChopSawLogic.BaseX / 2 + ChopSawLogic.PanelBoardX / 2
 		local signCf = CFrame.new(signX, baseAt.Y + ChopSawLogic.SignLift, baseAt.Z) * CFrame.Angles(0, -math.pi / 2, 0)
+		if meshed then
+			-- Just outside the cabin's widest side, over the board.
+			local body = MachineMeshes.Piece(machine.id, "Body")
+			local side = if body then body.size.X / 2 else 3.343
+			signCf = CFrame.new(
+				side + ChopSawLogic.RootY / 2,
+				panelCf.Y + ChopSawLogic.PanelBoardY / 2 + 0.7,
+				panelCf.Z
+			) * CFrame.Angles(0, -math.pi / 2, 0)
+		end
 		local sign = Kit.part(
 			model,
 			"PriceSign",
@@ -904,6 +975,9 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 		CollectionService:AddTag(model, "ChopSaw")
 	end
 
+	if skin ~= nil then
+		MachineSkin.Commit(model, skin, CFrame.identity)
+	end
 	model:SetAttribute("MachineId", machine.id)
 	model:SetAttribute("Shop", machine.shop)
 	model:SetAttribute("Price", machine.priceCash)
@@ -975,254 +1049,148 @@ local PLANER_MATERIAL = {
 
 function MachineArt.BuildPlaner(planerId: string, ghost: boolean?): Model?
 	local machine, def = PlanerLogic.Get(planerId)
-	if not machine or not def then
+	local layout = MachineMeshes.Layout(planerId)
+	if not machine or not def or not layout then
 		return nil
 	end
 	local preview = ghost == true
 	local tier = math.clamp(def.tier, 1, 4)
-	local w, d = def.width, def.depth
-	local frame = PLANER_BODY[tier]
+	local d = layout.footprint.Y
 	local model = Kit.model(machine.id)
-	local u = GameConfig.WoodUnit
-	local widest = math.max(def.maxX, def.maxY) * u
-	local beltTop = 0.72
-	local beltH = 0.32
-	local beltW = widest + 0.55
-	local beltLen = math.max(3, d - 1.2)
-	local hoodBottom = beltTop + widest + 0.8
+	local skin = MachineSkin.Prepare(machine.id, preview)
+	local frame = buildFrame(model, layout, preview, {
+		wall = PLANER_BODY[tier],
+		wallMaterial = PLANER_MATERIAL[tier],
+		roof = ROOF_COLOR[math.min(tier + 1, 5)],
+		roofMaterial = PLANER_MATERIAL[tier],
+	})
+	local channel = AutomationLogic.Channel
+	local hoodBottom = frame.roofY - 0.8
+	local cutter = MachineMeshes.Point(machine.id, "cutter") or Vector3.new(0, hoodBottom - 0.3, 0)
 
-	local root =
-		part(model, "Root", Vector3.new(w, 0.2, d), CFrame.new(0, 0.1, 0), WOOD, Enum.Material.Wood, true, false)
-	root.Transparency = 1
-	model.PrimaryPart = root
-
-	local deck = part(
-		model,
-		"Deck",
-		Vector3.new(w - 0.4, 0.4, d - 0.4),
-		CFrame.new(0, 0.2, 0),
-		WOOD,
-		Enum.Material.WoodPlanks,
-		preview,
-		true
-	)
-	if not preview then
-		touchless(deck)
-	end
-	local belt = part(
-		model,
-		"Conveyor",
-		Vector3.new(beltW, beltH, beltLen),
-		CFrame.new(0, beltTop - beltH / 2, 0) * CFrame.Angles(0, math.pi, 0),
-		BELT,
-		Enum.Material.Metal,
-		preview,
-		true
-	)
-	if not preview then
-		inGroup(belt, BELT_GROUP)
-		MachineArt.AimBelt(model)
-	end
-	for _, side in ipairs({ -1, 1 }) do
-		local wall = part(
-			model,
-			"Wall",
-			Vector3.new(0.6, hoodBottom + 0.6 - 0.4, d - 1.2),
-			CFrame.new(side * (beltW / 2 + 0.5), 0.4 + (hoodBottom + 0.6 - 0.4) / 2, 0),
-			frame,
-			PLANER_MATERIAL[tier],
-			preview,
-			true
-		)
-		local rail = part(
-			model,
-			"GuardRail",
-			Vector3.new(0.25, 0.9, beltLen - 0.4),
-			CFrame.new(side * (beltW / 2 + 0.1), beltTop + 0.35, 0),
-			WOOD_DARK,
-			Enum.Material.Wood,
-			preview,
-			true
-		)
-		if not preview then
-			touchless(wall)
-			touchless(rail)
+	if skin == nil then
+		fallbackDeck(model, layout, preview)
+		-- Two feed rollers and the cutter head, axles across the belt (X).
+		for i, z in ipairs({ -d * 0.22, 0, d * 0.22 }) do
+			local roller = Kit.cylinder(
+				model,
+				if i == 2 then "CutterHead" else "Roller",
+				channel,
+				if i == 2 then 1.1 else 0.8,
+				CFrame.new(0, if i == 2 then cutter.Y else cutter.Y - 0.15, z),
+				if i == 2 then BLADE else IRON,
+				Enum.Material.Metal
+			)
+			if preview then
+				roller.Transparency = 0.45
+			end
+			Kit.decor(roller)
 		end
 	end
-	-- The hood over the rollers: players stop at it, a plank on the belt passes under.
-	local hood = part(
-		model,
-		"Roof",
-		Vector3.new(beltW + 2.0, 0.4, d - 1.0),
-		CFrame.new(0, hoodBottom + 0.8, 0),
-		ROOF_COLOR[math.min(tier + 1, 5)],
-		PLANER_MATERIAL[tier],
-		preview,
-		true
-	)
-	if not preview then
-		inGroup(hood, MILL_GROUP)
-	end
-	-- Two feed rollers and the cutter head, axles across the belt (X).
-	for i, z in ipairs({ -d * 0.22, 0, d * 0.22 }) do
-		local roller = Kit.cylinder(
-			model,
-			if i == 2 then "CutterHead" else "Roller",
-			beltW,
-			if i == 2 then 1.1 else 0.8,
-			CFrame.new(0, beltTop + (if i == 2 then widest + 0.45 else widest + 0.3), z),
-			if i == 2 then BLADE else IRON,
-			Enum.Material.Metal
-		)
-		if preview then
-			roller.Transparency = 0.45
-		end
-		Kit.decor(roller)
-	end
-	local gate = part(
-		model,
-		"BladeGuard",
-		Vector3.new(beltW + 1.0, hoodBottom + 0.2, 1.2),
-		CFrame.new(0, (hoodBottom + 0.2) / 2 + 0.4, 0),
-		WOOD,
-		Enum.Material.SmoothPlastic,
-		preview,
-		true
-	)
-	gate.Transparency = 1
-	gate.CastShadow = false
-	if not preview then
-		inGroup(gate, MILL_GROUP)
-	end
-	for _, endZ in ipairs({ -(d / 2 - 0.6), d / 2 - 0.6 }) do
-		local feed = part(
-			model,
-			"FeedGuard",
-			Vector3.new(beltW + 1.6, hoodBottom + 0.8, 0.4),
-			CFrame.new(0, 0.4 + (hoodBottom + 0.8) / 2, endZ),
-			WOOD,
-			Enum.Material.Wood,
-			preview,
-			true
-		)
-		feed.Transparency = 1
-		feed.CastShadow = false
-		if not preview then
-			inGroup(feed, MILL_GROUP)
-		end
-	end
-	local intake = part(
-		model,
-		"Intake",
-		Vector3.new(math.max(3, beltW), 4, 4),
-		CFrame.new(0, 2.2, -d / 2 + 0.4),
-		WOOD,
-		Enum.Material.SmoothPlastic,
-		true,
-		false
-	)
-	intake.Transparency = 1
-	intake.CanCollide = false
-	intake.CanTouch = false
-	intake.CanQuery = false
-	local output = Instance.new("Attachment")
-	output.Name = "Output"
-	output.CFrame = CFrame.lookAt(Vector3.new(0, 1.6, d / 2 + 1), Vector3.new(0, 1.6, d / 2 + 6))
-	output.Parent = root
 
-	-- Tier detail: 2 posts, 3 a steam pipe and a plate, 4 a gantry and lamps.
+	-- Tier detail on the part-built art: 2 posts, 3 a steam pipe and a plate,
+	-- 4 a gantry and lamps. The meshes carry the tier look themselves.
 	local top = hoodBottom + 1.0
-	if tier >= 2 then
-		for _, sx in ipairs({ -1, 1 }) do
-			for _, sz in ipairs({ -1, 1 }) do
-				lookPart(
-					model,
-					"Post",
-					Vector3.new(0.5, hoodBottom + 0.6, 0.5),
-					CFrame.new(sx * (beltW / 2 + 1.1), (hoodBottom + 0.6) / 2, sz * (d / 2 - 0.4)),
-					WOOD_DARK,
-					Enum.Material.Wood,
-					preview
-				)
+	if skin == nil then
+		local sideX = channel / 2 + 1.1
+		if tier >= 2 then
+			for _, sx in ipairs({ -1, 1 }) do
+				for _, sz in ipairs({ -1, 1 }) do
+					lookPart(
+						model,
+						"Post",
+						Vector3.new(0.5, hoodBottom + 0.6, 0.5),
+						CFrame.new(sx * sideX, (hoodBottom + 0.6) / 2, sz * (d / 2 - 0.4)),
+						WOOD_DARK,
+						Enum.Material.Wood,
+						preview
+					)
+				end
 			end
 		end
-	end
-	if tier >= 3 then
-		local pipe = Kit.cylinder(
-			model,
-			"SteamPipe",
-			2.4,
-			0.7,
-			CFrame.new(0, top + 0.6, d / 5) * CFrame.Angles(0, 0, math.pi / 2),
-			BRASS,
-			Enum.Material.Metal
-		)
-		if preview then
-			pipe.Transparency = 0.45
-		end
-		Kit.decor(pipe)
-		lookPart(
-			model,
-			"MakerPlate",
-			Vector3.new(1.4, 0.7, 0.12),
-			CFrame.new(0, hoodBottom + 0.3, d / 2 - 0.45),
-			BRASS,
-			Enum.Material.Metal,
-			preview
-		)
-	end
-	if tier >= 4 then
-		lookPart(
-			model,
-			"Gantry",
-			Vector3.new(beltW + 2.8, 0.45, 0.45),
-			CFrame.new(0, top + 2.6, 0),
-			Kit.hex("#E0A030"),
-			Enum.Material.DiamondPlate,
-			preview
-		)
-		for _, sx in ipairs({ -1, 1 }) do
+		if tier >= 3 then
+			local pipe = Kit.cylinder(
+				model,
+				"SteamPipe",
+				2.4,
+				0.7,
+				CFrame.new(0, top + 0.6, d / 5) * CFrame.Angles(0, 0, math.pi / 2),
+				BRASS,
+				Enum.Material.Metal
+			)
+			if preview then
+				pipe.Transparency = 0.45
+			end
+			Kit.decor(pipe)
 			lookPart(
 				model,
-				"GantryLeg",
-				Vector3.new(0.4, 2.6, 0.4),
-				CFrame.new(sx * (beltW / 2 + 1.3), top + 1.3, 0),
+				"MakerPlate",
+				Vector3.new(1.4, 0.7, 0.12),
+				CFrame.new(0, hoodBottom + 0.3, d / 2 - 0.45),
+				BRASS,
+				Enum.Material.Metal,
+				preview
+			)
+		end
+		if tier >= 4 then
+			lookPart(
+				model,
+				"Gantry",
+				Vector3.new(channel + 2.8, 0.45, 0.45),
+				CFrame.new(0, top + 2.6, 0),
 				Kit.hex("#E0A030"),
 				Enum.Material.DiamondPlate,
 				preview
 			)
-			local lamp = lookPart(
-				model,
-				"Lamp",
-				Vector3.new(0.45, 0.45, 0.45),
-				CFrame.new(sx * (beltW / 2 + 1.3), top + 2.3, 0.6),
-				Kit.hex("#FFE2A0"),
-				Enum.Material.Neon,
-				preview
-			)
-			if not preview then
-				local light = Instance.new("PointLight")
-				light.Range = 12
-				light.Brightness = 1.1
-				light.Shadows = false
-				light.Color = Kit.hex("#FFD59A")
-				light.Parent = lamp
+			for _, sx in ipairs({ -1, 1 }) do
+				lookPart(
+					model,
+					"GantryLeg",
+					Vector3.new(0.4, 2.6, 0.4),
+					CFrame.new(sx * (channel / 2 + 1.3), top + 1.3, 0),
+					Kit.hex("#E0A030"),
+					Enum.Material.DiamondPlate,
+					preview
+				)
+				local lamp = lookPart(
+					model,
+					"Lamp",
+					Vector3.new(0.45, 0.45, 0.45),
+					CFrame.new(sx * (channel / 2 + 1.3), top + 2.3, 0.6),
+					Kit.hex("#FFE2A0"),
+					Enum.Material.Neon,
+					preview
+				)
+				if not preview then
+					local light = Instance.new("PointLight")
+					light.Range = 12
+					light.Brightness = 1.1
+					light.Shadows = false
+					light.Color = Kit.hex("#FFD59A")
+					light.Parent = lamp
+				end
 			end
 		end
 	end
-	local sign = lookPart(
-		model,
-		"TierSign",
-		Vector3.new(3.0, 0.8, 0.2),
-		CFrame.new(0, hoodBottom + 1.4, d / 2 - 0.4),
-		PANEL,
-		Enum.Material.Wood,
-		preview
-	)
+	local signCf = if skin ~= nil then ridgeSign(machine.id) else CFrame.new(0, hoodBottom + 1.4, d / 2 - 0.4)
+	local sign = lookPart(model, "TierSign", Vector3.new(3.0, 0.8, 0.2), signCf, PANEL, Enum.Material.Wood, preview)
 	if not preview then
 		Kit.signText(sign, string.upper(machine.tierName or machine.displayName), Kit.hex("#F3E6C8"))
-		MachineArt.AddPanel(model, w, machine.displayName, "Set the planing size", PlanerLogic.RangeText(def))
+		MachineArt.AddPanel(
+			model,
+			layout.footprint.X,
+			machine.displayName,
+			"Set the planing size",
+			PlanerLogic.RangeText(def),
+			frame.panelAt
+		)
 		CollectionService:AddTag(model, PlanerLogic.Tag)
+	end
+	if skin ~= nil then
+		MachineSkin.Commit(model, skin, CFrame.identity)
+	end
+	if not preview then
+		MachineArt.AimBelt(model)
 	end
 	model:SetAttribute("PlanerId", machine.id)
 	model:SetAttribute("MachineId", machine.id)
@@ -1273,6 +1241,7 @@ type DeckOptions = {
 	cross: boolean?, -- the collider follows the model's Side (Switch Belt)
 	width: number?, -- plate width across the run (default 6.0)
 	rollers: boolean?, -- false leaves the rollers off (a short flat lip)
+	meshed: boolean?, -- the Blender mesh is the look: only the collider band and the rails (invisible) are built
 	collars: { number }?, -- which ends get brass port collars (-1, 1); default both
 	-- A pitched run's tan(pitch). Each part slides along the run so its own
 	-- centre line meets the vertical seams with the flat lips (not only the
@@ -1297,24 +1266,37 @@ local function deck(model: Model, frame: CFrame, length: number, preview: boolea
 	local function len(height: number): number
 		return length + height * shear
 	end
-	local plate = part(
-		model,
-		"Plate",
-		sized(plateW, PLATE_T, len(PLATE_T)),
-		-- (Pitched, the plate rides 0.05 up so its low corner stays above ground.)
-		at(0, PLATE_T / 2 + (if shear ~= 0 then 0.05 else 0), 0),
-		TLD.plate,
-		Enum.Material.Concrete,
-		preview,
-		true
-	)
-	if not preview then
-		touchless(plate)
+	local meshed = o.meshed == true
+	if not meshed then
+		local plate = part(
+			model,
+			"Plate",
+			sized(plateW, PLATE_T, len(PLATE_T)),
+			-- (Pitched, the plate rides 0.05 up so its low corner stays above ground.)
+			at(0, PLATE_T / 2 + (if shear ~= 0 then 0.05 else 0), 0),
+			TLD.plate,
+			Enum.Material.Concrete,
+			preview,
+			true
+		)
+		if not preview then
+			touchless(plate)
+		end
+		local pan = part(
+			model,
+			"Pan",
+			sized(CHANNEL, 0.1, len(0.1)),
+			at(0, 0.33, 0),
+			TLD.pan,
+			Enum.Material.Metal,
+			preview,
+			false
+		)
+		pan.CastShadow = false
 	end
-	local pan =
-		part(model, "Pan", sized(CHANNEL, 0.1, len(0.1)), at(0, 0.33, 0), TLD.pan, Enum.Material.Metal, preview, false)
-	pan.CastShadow = false
-	local n = if o.rollers == false then 0 else math.max(1, math.floor(length / AutomationLogic.RollerPitch + 1e-6))
+	local n = if meshed or o.rollers == false
+		then 0
+		else math.max(1, math.floor(length / AutomationLogic.RollerPitch + 1e-6))
 	for i = 0, n - 1 do
 		local along = -length / 2 + 0.5 + i * AutomationLogic.RollerPitch
 		local cf = at(0, 0.5, along) * (if alongX then CFrame.Angles(0, math.pi / 2, 0) else CFrame.identity)
@@ -1341,6 +1323,9 @@ local function deck(model: Model, frame: CFrame, length: number, preview: boolea
 			)
 			if not preview then
 				touchless(r)
+			end
+			if meshed then
+				continue
 			end
 			local cap = part(
 				model,
@@ -1399,6 +1384,14 @@ function MachineArt.SetSwitchSide(model: Model, side: number)
 		return
 	end
 	local s = if side == -1 then -1 else 1
+	if MachineSkin.Wears(model) then
+		-- The mesh paddle is built thrown toward +X; flipping it turns it a
+		-- quarter turn about its hinge so it throws toward -X.
+		local hinge = MachineMeshes.Point("SwitchBelt", "GateHinge") or Vector3.new(0, DECK_TOP, 3.35)
+		MachineSkin.Swing(model, "Gate", hinge, "Y", if s == 1 then 0 else -math.pi / 2)
+		model:SetAttribute("GateSide", s)
+		return
+	end
 	-- Hinge at the back rail; the paddle runs back toward the infeed on the
 	-- side it throws away from, at 45 degrees.
 	local hinge = CFrame.new(0, DECK_TOP + 0.5, 3.35)
@@ -1410,30 +1403,43 @@ end
 
 -- The Lane W line pieces (TLD-1 footprints): Switch Belt 12 x 8, Tilted
 -- Belt 6 x 8 rising 2.0, Belt Support 6 x 2, Wood Detector 8 x 4.
-local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: boolean)
+local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: boolean, meshed: boolean)
 	local origin = CFrame.new(0, 0, 0)
+	local lineOpts: DeckOptions = { meshed = meshed }
 	if def.shape == "switch" then
 		-- Entry run on -Z (z -4 to -1.5), then the cross run (x -6 to 6,
 		-- z -1.5 to 3.5) that carries wood out of whichever side is set.
-		deck(model, origin * CFrame.new(0, 0, -2.75), 2.5, preview)
+		deck(model, origin * CFrame.new(0, 0, -2.75), 2.5, preview, lineOpts)
 		local crossFrame = origin * CFrame.new(0, 0, 1.0)
-		local left =
-			deck(model, crossFrame * CFrame.new(-3, 0, 0), 6, preview, { rails = false, alongX = true, cross = true })
-		local right =
-			deck(model, crossFrame * CFrame.new(3, 0, 0), 6, preview, { rails = false, alongX = true, cross = true })
+		local left = deck(
+			model,
+			crossFrame * CFrame.new(-3, 0, 0),
+			6,
+			preview,
+			{ rails = false, alongX = true, cross = true, meshed = meshed }
+		)
+		local right = deck(
+			model,
+			crossFrame * CFrame.new(3, 0, 0),
+			6,
+			preview,
+			{ rails = false, alongX = true, cross = true, meshed = meshed }
+		)
 		left.Name = "Conveyor"
 		right.Name = "Conveyor"
 		-- A strip of plate behind the cross run, under the back rail.
-		part(
-			model,
-			"Plate",
-			Vector3.new(12, PLATE_T, 0.5),
-			CFrame.new(0, PLATE_T / 2, 3.75),
-			TLD.plate,
-			Enum.Material.Concrete,
-			preview,
-			false
-		)
+		if not meshed then
+			part(
+				model,
+				"Plate",
+				Vector3.new(12, PLATE_T, 0.5),
+				CFrame.new(0, PLATE_T / 2, 3.75),
+				TLD.plate,
+				Enum.Material.Concrete,
+				preview,
+				false
+			)
+		end
 		-- Back rail full width; front rails from the channel out to each side.
 		local back = part(
 			model,
@@ -1463,18 +1469,20 @@ local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: b
 				touchless(front)
 			end
 		end
-		local gate = part(
-			model,
-			"Gate",
-			Vector3.new(0.14, 1.0, 2.8),
-			CFrame.new(),
-			TLD.brass,
-			Enum.Material.Metal,
-			preview,
-			false
-		)
-		gate.CastShadow = true
-		MachineArt.SetSwitchSide(model, 1)
+		if not meshed then
+			local gate = part(
+				model,
+				"Gate",
+				Vector3.new(0.14, 1.0, 2.8),
+				CFrame.new(),
+				TLD.brass,
+				Enum.Material.Metal,
+				preview,
+				false
+			)
+			gate.CastShadow = true
+			MachineArt.SetSwitchSide(model, 1)
+		end
 	elseif def.shape == "tilted" then
 		-- A flat lip at each port face (deck top 0.72 at the low end, 0.72 +
 		-- rise at the high end, vertical end faces flush with the footprint)
@@ -1490,14 +1498,23 @@ local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: b
 		local mid = (DECK_TOP + DECK_TOP + rise) / 2
 		local pos = Vector3.new(0, mid, 0) - up * DECK_TOP
 		local frame = CFrame.fromMatrix(pos, Vector3.new(1, 0, 0), up, forward)
-		deck(model, frame, slopeRun / math.cos(theta), preview, { collars = {}, shear = math.tan(theta) })
+		deck(
+			model,
+			frame,
+			slopeRun / math.cos(theta),
+			preview,
+			{ collars = {}, shear = math.tan(theta), meshed = meshed }
+		)
 		local low = origin * CFrame.new(0, 0, -run / 2 + lip / 2)
 		local high = origin * CFrame.new(0, rise, run / 2 - lip / 2)
-		deck(model, low, lip, preview, { rollers = false, collars = { -1 } })
-		deck(model, high, lip, preview, { rollers = false, collars = { 1 } })
+		deck(model, low, lip, preview, { rollers = false, collars = { -1 }, meshed = meshed })
+		deck(model, high, lip, preview, { rollers = false, collars = { 1 }, meshed = meshed })
 		-- An iron rail clamp over each seam where the pitched rails meet the
 		-- lips' rails, so the joint reads as one rail with no lip or step.
-		for _, seam in ipairs({ { z = -slopeRun / 2, y = 0 }, { z = slopeRun / 2, y = rise } }) do
+		local seams: { { z: number, y: number } } = if meshed
+			then {}
+			else { { z = -slopeRun / 2, y = 0 }, { z = slopeRun / 2, y = rise } }
+		for _, seam in ipairs(seams) do
 			for _, sx in ipairs({ -1, 1 }) do
 				local clamp = part(
 					model,
@@ -1513,7 +1530,7 @@ local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: b
 			end
 		end
 		-- Trestle: timber posts under the plate, the high lip and the middle.
-		for _, z in ipairs({ 0, run / 2 - lip / 2 }) do
+		for _, z in ipairs(if meshed then {} else { 0, run / 2 - lip / 2 }) do
 			-- The pitched plate's underside at z (it runs through `pos`).
 			-- (The post reaches the high edge of its top, so it never shows a gap.)
 			-- (+ the pitched plate's 0.05 lift, measured upright.)
@@ -1549,31 +1566,33 @@ local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: b
 				touchless(post)
 			end
 		end
-		part(
-			model,
-			"Saddle",
-			Vector3.new(PLATE_W, 0.2, 1.06),
-			CFrame.new(0, lift - 0.1, 0),
-			TLD.iron,
-			Enum.Material.Metal,
-			preview,
-			false
-		)
-		local brace = part(
-			model,
-			"Brace",
-			Vector3.new(0.18, 0.18, 1.0),
-			CFrame.new(0, 0, 0),
-			TLD.iron,
-			Enum.Material.Metal,
-			preview,
-			false
-		)
-		local len = math.sqrt(5.2 * 5.2 + 1.4 * 1.4)
-		brace.Size = Vector3.new(len, 0.18, 0.18)
-		brace.CFrame = CFrame.new(0, 1.0, 0) * CFrame.Angles(0, 0, math.atan2(1.4, 5.2))
+		if not meshed then
+			part(
+				model,
+				"Saddle",
+				Vector3.new(PLATE_W, 0.2, 1.06),
+				CFrame.new(0, lift - 0.1, 0),
+				TLD.iron,
+				Enum.Material.Metal,
+				preview,
+				false
+			)
+			local brace = part(
+				model,
+				"Brace",
+				Vector3.new(0.18, 0.18, 1.0),
+				CFrame.new(0, 0, 0),
+				TLD.iron,
+				Enum.Material.Metal,
+				preview,
+				false
+			)
+			local len = math.sqrt(5.2 * 5.2 + 1.4 * 1.4)
+			brace.Size = Vector3.new(len, 0.18, 0.18)
+			brace.CFrame = CFrame.new(0, 1.0, 0) * CFrame.Angles(0, 0, math.atan2(1.4, 5.2))
+		end
 	elseif def.shape == "detector" then
-		deck(model, origin, def.depth, preview)
+		deck(model, origin, def.depth, preview, lineOpts)
 		-- The arch: iron legs outside the plate, a beam with a brass rim and
 		-- a SignCream face, a small brass filter pip, a lamp under the beam.
 		for _, sx in ipairs({ -1, 1 }) do
@@ -1598,46 +1617,48 @@ local function buildLinePiece(model: Model, def: ItemCatalog.BeltDef, preview: b
 			preview,
 			true
 		)
-		part(
-			model,
-			"ArchRim",
-			Vector3.new(3.3, 1.5, 0.08),
-			CFrame.new(0, 8.15, -0.39),
-			TLD.brass,
-			Enum.Material.Metal,
-			preview,
-			false
-		)
-		part(
-			model,
-			"Face",
-			Vector3.new(3.0, 1.2, 0.06),
-			CFrame.new(0, 8.15, -0.45),
-			TLD.cream,
-			Enum.Material.SmoothPlastic,
-			preview,
-			false
-		)
-		part(
-			model,
-			"FilterPip",
-			Vector3.new(0.3, 0.3, 0.06),
-			CFrame.new(1.15, 8.15, -0.5),
-			TLD.brass,
-			Enum.Material.Metal,
-			preview,
-			false
-		)
-		part(
-			model,
-			"Lamp",
-			Vector3.new(0.42, 0.3, 0.42),
-			CFrame.new(0, 7.73, 0),
-			TLD.iron,
-			Enum.Material.SmoothPlastic,
-			preview,
-			false
-		)
+		if not meshed then
+			part(
+				model,
+				"ArchRim",
+				Vector3.new(3.3, 1.5, 0.08),
+				CFrame.new(0, 8.15, -0.39),
+				TLD.brass,
+				Enum.Material.Metal,
+				preview,
+				false
+			)
+			part(
+				model,
+				"Face",
+				Vector3.new(3.0, 1.2, 0.06),
+				CFrame.new(0, 8.15, -0.45),
+				TLD.cream,
+				Enum.Material.SmoothPlastic,
+				preview,
+				false
+			)
+			part(
+				model,
+				"FilterPip",
+				Vector3.new(0.3, 0.3, 0.06),
+				CFrame.new(1.15, 8.15, -0.5),
+				TLD.brass,
+				Enum.Material.Metal,
+				preview,
+				false
+			)
+			part(
+				model,
+				"Lamp",
+				Vector3.new(0.42, 0.3, 0.42),
+				CFrame.new(0, 7.73, 0),
+				TLD.iron,
+				Enum.Material.SmoothPlastic,
+				preview,
+				false
+			)
+		end
 		-- Where the detector looks: over the deck, inside the arch.
 		local eye = part(
 			model,
@@ -1661,7 +1682,9 @@ function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
 	local preview = ghost == true
 	local w, d = def.width, def.depth
 	local model = Kit.model(machine.id)
-	local beltTop = 0.72
+	local skin = MachineSkin.Prepare(machine.id, preview)
+	local meshed = skin ~= nil
+	local beltTop = DECK_TOP
 	local beltH = 0.32
 	local beltY = beltTop - beltH / 2
 	local root =
@@ -1669,9 +1692,12 @@ function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
 	root.Transparency = 1
 	model.PrimaryPart = root
 
-	local function band(name: string, size: Vector3, at: Vector3, turn: number)
+	-- A band that carries wood: 5.0 across (the channel), top face on the
+	-- deck top, aimed along its own +Z.
+	local function band(size: Vector3, at: Vector3, turn: number)
 		local cf = CFrame.new(at) * CFrame.Angles(0, turn, 0)
-		local b = part(model, name, size, cf, BELT, Enum.Material.Metal, preview, true)
+		local b = part(model, "Conveyor", size, cf, BELT, Enum.Material.Metal, preview, true)
+		b.Transparency = 1
 		if not preview then
 			inGroup(b, BELT_GROUP)
 		end
@@ -1683,8 +1709,8 @@ function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
 			"GuardRail",
 			size,
 			CFrame.new(at) * CFrame.Angles(0, turn, 0),
-			BELT_WOOD,
-			Enum.Material.Wood,
+			TLD.rail,
+			Enum.Material.Metal,
 			preview,
 			true
 		)
@@ -1693,61 +1719,62 @@ function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
 		end
 		return r
 	end
-	local function leg(at: Vector3)
-		lookPart(
-			model,
-			"Leg",
-			Vector3.new(0.35, beltY - 0.15, 0.35),
-			CFrame.new(at.X, (beltY - 0.15) / 2, at.Z),
-			WOOD_DARK,
-			Enum.Material.Wood,
-			preview
-		)
+	-- The plate under the part-built look (the meshes bring their own).
+	local function plate(size: Vector3, at: Vector3)
+		if not meshed then
+			local p = part(model, "Plate", size, CFrame.new(at), TLD.plate, Enum.Material.Concrete, preview, true)
+			if not preview then
+				touchless(p)
+			end
+		end
 	end
 	local FRONT = math.pi -- LookVector +Z (see MachineArt.Build)
 	local RIGHT = -math.pi / 2 -- LookVector +X
+	local railH = RAIL_TOP - PLATE_T
+	local railY = (RAIL_TOP + PLATE_T) / 2
 	local line = def.shape == "switch" or def.shape == "tilted" or def.shape == "support" or def.shape == "detector"
 	if line then
-		buildLinePiece(model, def, preview)
+		buildLinePiece(model, def, preview, meshed)
 	elseif def.shape == "straight" then
-		local bw = w - 1.0
-		band("Conveyor", Vector3.new(bw, beltH, d - 0.2), Vector3.new(0, beltY, 0), FRONT)
-		for _, side in ipairs({ -1, 1 }) do
-			rail(Vector3.new(0.25, 0.9, d - 0.2), Vector3.new(side * (bw / 2 + 0.12), beltTop + 0.3, 0), 0)
-			leg(Vector3.new(side * (bw / 2), 0, d / 2 - 0.6))
-			leg(Vector3.new(side * (bw / 2), 0, -d / 2 + 0.6))
-		end
+		deck(model, CFrame.new(), d, preview, { meshed = meshed })
 	elseif def.shape == "turn" then
-		-- Entry stub (+Z), the corner square (+X) and the exit stub (+X), 4 x 4.
-		local bw = 3
-		band("Conveyor", Vector3.new(bw, beltH, 0.6), Vector3.new(0, beltY, -w / 2 + 0.3), FRONT)
-		band("Conveyor", Vector3.new(bw, beltH, bw), Vector3.new(0, beltY, 0), RIGHT)
-		band("Conveyor", Vector3.new(bw, beltH, 0.6), Vector3.new(w / 2 - 0.3, beltY, 0), RIGHT)
-		-- Rails: the two outer sides of the bend.
-		rail(Vector3.new(0.25, 0.9, bw + 0.2), Vector3.new(-bw / 2 - 0.12, beltTop + 0.3, 0), 0)
-		rail(Vector3.new(bw + 0.2, 0.9, 0.25), Vector3.new(0, beltTop + 0.3, bw / 2 + 0.12), 0)
-		leg(Vector3.new(-bw / 2, 0, -bw / 2))
-		leg(Vector3.new(bw / 2, 0, bw / 2))
+		-- Three 5.0 bands like today (reference LINE-STANDARD.md section 4):
+		-- the entry stub (-Z, aimed +Z), the corner square (aimed +X) and
+		-- the exit stub (+X, aimed +X). The bend centre is (4, -4); the
+		-- channel runs 1.5 to 6.5 from it.
+		local c = CHANNEL
+		local stub = d / 2 - c / 2
+		band(Vector3.new(c, beltH, stub), Vector3.new(0, beltY, -d / 2 + stub / 2), FRONT)
+		band(Vector3.new(c, beltH, c), Vector3.new(0, beltY, 0), RIGHT)
+		band(Vector3.new(c, beltH, stub), Vector3.new(w / 2 - stub / 2, beltY, 0), RIGHT)
+		-- Rails: the outer sides of the bend, and the inner corner.
+		local out = c / 2 + 0.2
+		rail(Vector3.new(0.4, railH, 6.9), Vector3.new(-out, railY, -0.55), 0)
+		rail(Vector3.new(6.9, railH, 0.4), Vector3.new(0.55, railY, out), 0)
+		rail(Vector3.new(0.4, railH, stub), Vector3.new(out, railY, -d / 2 + stub / 2), 0)
+		rail(Vector3.new(stub, railH, 0.4), Vector3.new(w / 2 - stub / 2, railY, -out), 0)
+		plate(Vector3.new(PLATE_W, PLATE_T, d - 1), Vector3.new(0, PLATE_T / 2, -0.5))
+		plate(Vector3.new(1.0, PLATE_T, PLATE_W), Vector3.new(w / 2 - 0.5, PLATE_T / 2, 0))
 	else
-		-- Funnel: an 8-wide mouth for the first half, narrowing to 3 over the
-		-- second, with two angled walls that squeeze the wood onto the narrow belt.
-		local mouthLen = d / 2
-		band("Conveyor", Vector3.new(w - 0.6, beltH, mouthLen), Vector3.new(0, beltY, -d / 4), FRONT)
-		band("Conveyor", Vector3.new(3, beltH, d / 2), Vector3.new(0, beltY, d / 4), FRONT)
-		local run = d / 2
-		local across = w / 2 - 0.3 - 1.6
-		local length = math.sqrt(run * run + across * across)
-		local angle = math.atan2(across, run)
+		-- Funnel: a 7-wide mouth at -Z, a taper, then the standard 5.0 belt
+		-- by z = 1. Mouth rails at x +-3.7, angled rails squeeze the wood in.
+		band(Vector3.new(7, beltH, 3), Vector3.new(0, beltY, -2.5), FRONT)
+		band(Vector3.new(6, beltH, 2), Vector3.new(0, beltY, 0), FRONT)
+		band(Vector3.new(CHANNEL, beltH, 3), Vector3.new(0, beltY, 2.5), FRONT)
+		local angle = math.atan2(1, 2)
 		for _, side in ipairs({ -1, 1 }) do
-			rail(
-				Vector3.new(0.25, 1.1, length),
-				Vector3.new(side * ((w / 2 + 1.5) / 2 - 0.1), beltTop + 0.4, d / 4),
-				-side * angle
-			)
-			rail(Vector3.new(0.25, 0.9, mouthLen), Vector3.new(side * (w / 2 - 0.2), beltTop + 0.3, -d / 4), 0)
+			rail(Vector3.new(0.4, railH, 3), Vector3.new(side * 3.7, railY, -2.5), 0)
+			rail(Vector3.new(0.4, railH, math.sqrt(5)), Vector3.new(side * 3.2, railY, 0), -side * angle)
+			rail(Vector3.new(0.4, railH, 3), Vector3.new(side * (CHANNEL / 2 + 0.2), railY, 2.5), 0)
 		end
-		leg(Vector3.new(-w / 2 + 0.6, 0, -d / 2 + 0.6))
-		leg(Vector3.new(w / 2 - 0.6, 0, -d / 2 + 0.6))
+		plate(Vector3.new(w, PLATE_T, 5), Vector3.new(0, PLATE_T / 2, -1.5))
+		plate(Vector3.new(PLATE_W, PLATE_T, 3), Vector3.new(0, PLATE_T / 2, 2.5))
+	end
+	if skin ~= nil then
+		MachineSkin.Commit(model, skin, CFrame.identity)
+		if def.shape == "switch" then
+			MachineArt.SetSwitchSide(model, 1)
+		end
 	end
 	if not preview then
 		MachineArt.AimBelt(model)

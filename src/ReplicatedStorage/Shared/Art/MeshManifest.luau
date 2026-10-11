@@ -23,9 +23,14 @@
 --   kit      the building kit's meshes (a player's own plot)
 --   blender  ids only the Blender registry supplies (BlenderAssets.MeshIds;
 --            empty while its ids are 0, so nothing changes in game)
+--   machines the plot machines and logic pieces (MachineMeshes: sawmills,
+--            planers, the chop saw, belts, the furnace, the stall, the
+--            bench and every Sparkworks piece; machine meshes are cloned
+--            when a plot builds, so these load last)
 
 local AxeModels = require(script.Parent.AxeModels)
 local BlenderAssets = require(script.Parent.BlenderAssets)
+local MachineMeshes = require(script.Parent.MachineMeshes)
 local RockModels = require(script.Parent.RockModels)
 local ItemMeshData = require(script.Parent.Parent.ItemMeshData)
 local KitMeshData = require(script.Parent.Parent.KitMeshData)
@@ -137,6 +142,11 @@ function MeshManifest.Groups(town: boolean?): { Group }
 	end)
 	add("blender", function(out)
 		for _, id in ipairs(BlenderAssets.MeshIds()) do
+			table.insert(out, { id = id, hull = false })
+		end
+	end)
+	add("machines", function(out)
+		for _, id in ipairs(MachineMeshes.MeshIds()) do
 			table.insert(out, { id = id, hull = false })
 		end
 	end)
