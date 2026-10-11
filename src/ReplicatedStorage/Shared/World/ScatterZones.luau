@@ -19,7 +19,7 @@ export type Zone = {
 }
 
 ScatterZones.Zones = {
-	{ id = "town", kind = "town", center = Vector2.new(0, 90), radius = 180, density = 0.35 },
+	{ id = "town", kind = "town", center = Vector2.new(0, 90), radius = 300, density = 0.35 },
 	{ id = "starter", kind = "forest", center = Vector2.new(0, -180), radius = 100, density = 0.8 },
 	{ id = "hills", kind = "forest", center = Vector2.new(-500, 110), radius = 150, density = 0.7 },
 	{ id = "meadow-east", kind = "meadow", center = Vector2.new(300, -40), radius = 80, density = 0.4 },
