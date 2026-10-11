@@ -4,6 +4,22 @@
 
 Last updated 8 October 2026 (V1 map remake, branch `phase-2/v1-b-world`). The layout plan is `MAP_V1.md`. The labelled picture is `previews/v1-b/00-overview.png`.
 
+## V1: no ButtonR2 anywhere (branch `phase-2/v1-no-buttonr2`, 11 October 2026, draft PR)
+
+Connor's instruction: remove every use of `Enum.KeyCode.ButtonR2` and move Xbox extras off the right trigger. The engine fires `Tool.Activated` on RT by itself (it cannot be remapped from script), and any script that binds or sinks RT breaks chopping. Now no file under `src/` names the button (`tests/NoButtonR2.spec.luau` scans all of it, no exemption list).
+
+| Action | Context | Old Xbox key | New Xbox key | Why that key |
+| --- | --- | --- | --- | --- |
+| Chop / swing (axe, hammer, picks) | tool in hand | RT (engine) | RT (engine) | Unchanged. `Tool.Activated` fires on RT by itself; CutController now listens only to that (and the mouse). Pacing (cooldown, Keen multiplier) is the same `clickSwing` path. |
+| Select a placed piece (BuilderTools) | empty hands | RT (CAS bind) | RB (`ButtonR1`) | Free in that context; RB only means Push inside the placer, which BuilderTools already yields to. Still unbound while a tool is held (LB + RB unequips). |
+| Wire pick (WireTool, BUILD) | wiring | RT (CAS bind) | RB (`ButtonR1`) | X is Cut, B is Done in that list; the placer is not up, so RB is free (`InputKit.WireSafe`). |
+| Grab / drag wood and boxes (DragController) | empty hands, held | RT (InputBegan read) | RB, held (`ButtonR1`) | RB was "further" while holding; that stays on D-pad up (D-pad down and LB are nearer). X would clash with world prompts (Interact/Talk/Buy), so not X. |
+| Place a blueprint (InputKit target table) | placer | RT (table only) | A (`ButtonA`) | The real binding was already A (`PlaceControlsLogic`); the table now says what the game does. RB stays Push there. |
+
+- Hints now say RB for these: wiring bar "RB pick · X cut · B done", `{grab}` is "hold RB", the drag line "Hold RB on wood to drag it", the holding line "LT + left stick: turn · D-pad: reach". RT stays in the chop hint and `{click}` ("RT to swing", "press RT"): that is the tool's own button.
+- PC and phone inputs are unchanged.
+- Studio checks: PHASE2_NOTES.md "No ButtonR2 (Xbox remap)".
+
 ## Lane R: Bayou and Red Mesa (branch `phase-2/v1-r-regions`, 11 October 2026, draft PR)
 
 The two reserved regions are filled. Each has its own wood and one rare find, a signpost that says what it needs, and a small build of part-made art (built-in materials, the Art Director palette, no uploads). Numbers: `Shared/Regions/BayouData`, `MesaData`; rules: `MudLogic`, `QuarryLogic`, `RegionItems`, `RegionScatter`; art: `Shared/Art/RegionArt`; server: `RegionService`, started by `RegionBoot.server.luau`.
@@ -417,7 +433,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 ## Open items
 
 1. **Studio verification** of everything above: none of it has been seen in Studio. Checklists are in PHASE2_NOTES.md (Land Office, boxed truck and pad flow, free first respawns, Xbox controls, owner menu, the hammer, real stores and doors, Old Hank, felling, tutorial and pop-ups, first sale at the sawmill).
-2. **Connor must give both UserIds (Elucidhealer618 and Catman9732) for `AdminLogic.OwnerUserIds`;** it is empty, so owner tools only work in Studio until then.
+2. **Owner UserIds:** `AdminLogic.OwnerUserIds` holds Elucidhealer618's id (5682024709). The second owner (Catman9732, Xbox) is still blank until Connor sends that id.
 3. **If axes or trees still show as plain parts:** send the `[MapBuilder] build check:` and `[MeshKit]` Output lines; the likely fix is asset permissions in Creator Hub (PHASE2_NOTES.md, "Blender meshes are back on"). Send the `[Load]` lines if loading is still slow (the summary line `[Load] ready for play at +X s; fully built at +Y s` first; next win: terrain prebake, HANDOFF.md section 12).
 4. **Not reproduced without Studio:** signs/roof/buildings sinking (build-check print and ground snap shipped), backward-walking NPCs, the flat blue ground at night near spawn, smoke at the cursor.
 5. **Questions for Connor:** should Cabin, Warehouse and the other free-to-place pieces become bought blueprints? Should blueprints spawn in the world? A real trade window? Lanternwood economy numbers (MORNING_HANDOFF.md)? Badge IDs? Is the Rustbucket recall fee of $5 OK? A real day counter, and weather following game time? Should region/grove toasts wait for the tutorial to end? More trees near plots (done for the town, see Trees in the spawn area)? Should Higher players get a fuller town (needs a per-player tree layer, not just a tier switch)? Install Blender here (uploads still need Connor's account)?

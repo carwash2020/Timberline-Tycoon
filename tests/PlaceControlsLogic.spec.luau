@@ -144,6 +144,5 @@ return function(t)
 		for _, keys in pairs(Controls.AllKeys()) do
 			t.ok(keys ~= "Thumbstick2" and keys ~= "ButtonR2", "AllKeys " .. tostring(keys))
 		end
-		t.eq(Controls.Forbidden, { "ButtonR2" })
 	end)
 end

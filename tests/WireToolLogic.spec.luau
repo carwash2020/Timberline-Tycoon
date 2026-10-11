@@ -114,22 +114,22 @@ return function(t)
 		t.ok(Logic.TapPx >= InputKit.MinTouchPx, "the pick radius is a touch target")
 	end)
 
-	t.test("InputKit.WireBinds: RT picks, X cuts, B leaves, and no key is used twice", function()
+	t.test("InputKit.WireBinds: RB picks, X cuts, B leaves, and no key is used twice", function()
 		local by = {}
 		for _, bind in ipairs(InputKit.WireBinds) do
 			by[bind.action] = bind
 		end
-		t.eq(by.Pick.gamepad, Enum.KeyCode.ButtonR2)
+		t.eq(by.Pick.gamepad, Enum.KeyCode.ButtonR1, "RB picks: the right trigger is never bound")
 		t.eq(by.Cut.gamepad, Enum.KeyCode.ButtonX)
 		t.eq(by.Done.gamepad, Enum.KeyCode.ButtonB)
 		t.eq(by.Done.gamepad, InputKit.Actions.Cancel.gamepad, "B is the same Cancel everywhere")
 		t.ok(InputKit.WireSafe(InputKit.WireBinds))
 		t.ok(not InputKit.WireSafe({
-			{ action = "A", gamepad = Enum.KeyCode.ButtonR2 },
-			{ action = "B", gamepad = Enum.KeyCode.ButtonR2 },
+			{ action = "A", gamepad = Enum.KeyCode.ButtonR1 },
+			{ action = "B", gamepad = Enum.KeyCode.ButtonR1 },
 		}))
 		t.ok(not InputKit.WireSafe({
-			{ action = "A", gamepad = Enum.KeyCode.ButtonR2, keyboard = Enum.KeyCode.X },
+			{ action = "A", gamepad = Enum.KeyCode.ButtonR1, keyboard = Enum.KeyCode.X },
 			{ action = "B", gamepad = Enum.KeyCode.ButtonB, keyboard = Enum.KeyCode.X },
 		}))
 	end)

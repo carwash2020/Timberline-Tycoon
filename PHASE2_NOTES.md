@@ -3556,3 +3556,32 @@ Xbox
 13. Walk into a new area (any badge area): if today's jobs include "Discover a new area" it finishes; Rook pays on the hand-in.
 14. Phone: the job board ends above the jump button (Close | Take on one row).
 15. Gate signs: nothing changes until the map lane tags them (see PR Cross-lane requests).
+## No ButtonR2 (Xbox remap) (branch `phase-2/v1-no-buttonr2`, 11 October 2026)
+
+Why: the engine fires `Tool.Activated` for the equipped tool on the right trigger, and that cannot be remapped from script. Binding the trigger through ContextActionService sinks it and stops chopping, so the game never binds, sinks or reads it. `tests/NoButtonR2.spec.luau` fails if the token appears anywhere under `src/` (code, key tables, strings, comments).
+
+What changed, per action:
+
+| Action | Context | Old Xbox key | New Xbox key | Why that key |
+| --- | --- | --- | --- | --- |
+| Chop / swing (axe, hammer, picks) | tool in hand | RT (engine) | RT (engine) | Unchanged. `Tool.Activated` fires on RT by itself; CutController now listens only to that (and the mouse). Pacing (cooldown, Keen multiplier) is the same `clickSwing` path. |
+| Select a placed piece (BuilderTools) | empty hands | RT (CAS bind) | RB (`ButtonR1`) | Free in that context; RB only means Push inside the placer, which BuilderTools already yields to. Still unbound while a tool is held (LB + RB unequips). |
+| Wire pick (WireTool, BUILD) | wiring | RT (CAS bind) | RB (`ButtonR1`) | X is Cut, B is Done in that list; the placer is not up, so RB is free (`InputKit.WireSafe`). |
+| Grab / drag wood and boxes (DragController) | empty hands, held | RT (InputBegan read) | RB, held (`ButtonR1`) | RB was "further" while holding; that stays on D-pad up (D-pad down and LB are nearer). X would clash with world prompts (Interact/Talk/Buy), so not X. |
+| Place a blueprint (InputKit target table) | placer | RT (table only) | A (`ButtonA`) | The real binding was already A (`PlaceControlsLogic`); the table now says what the game does. RB stays Push there. |
+
+Other edits: `CutController` no longer reads the trigger in `InputBegan` (only the mouse click is a fallback there; the pad swings through `Tool.Activated`, then `clickSwing`, so the cooldown and the Keen multiplier (`TemperLogic.CooldownMultiplier`) apply as before). `DragController` drops RB from the push keys (`GrabLogic.PadAction`); D-pad up is further, D-pad down and LB are nearer. `PlaceControlsLogic.Forbidden` is gone (nothing left to forbid). Hints: `HintLogic` GRAB and the drag and holding lines, `WireTool` bar text.
+
+Specs changed only where the remap required: InputKit, GrabLogic (RB is no push), HintLogic and TutorialData (`hold RB`), WireToolLogic (RB picks), PlotUIPlans and PlaceControlsLogic (no trigger needle; Place is A), BuilderSelect (RB), and CutController (the three tests that pinned a trigger `InputBegan` read became two: a gamepad `Activated` chops the nearest section once, and a raw trigger key press is ignored).
+
+Not remapped without losing something: nothing was dropped. One side effect: RB is also half of the default backpack's unequip chord (LB + RB). With an axe out the grab shows its "put your axe away to drag" toast once (the same one the old trigger showed); with hands empty the chord does nothing.
+
+### Studio checklist (Xbox unless noted)
+
+1. Equip the axe, aim at a tree, RT: it swings and chops exactly as before, one chop per press, and holding RT keeps chopping at the axe's cooldown. A Keen axe still swings faster than the same axe untempered.
+2. Hands empty, BUILD mode, aim the centre dot at a placed piece, RB: it selects (RB again deselects). Aim at nothing, RB: nothing.
+3. Wire tool: aim at a switch, RB picks it; aim at a lamp, RB wires; X cuts; B leaves. The bar reads "RB pick · X cut · B done".
+4. Hands empty, aim at a loose log, hold RB: it lifts; D-pad up and down move it, D-pad left/right turn, LT + left stick tips; release RB drops it. The hint reads "Hold RB on wood to drag it".
+5. Blueprint placer: A places, RB and LB slide the ghost, B cancels; RB does not also grab.
+6. With the axe out, RB shows the "put your axe away to drag" toast and RT still chops.
+7. PC (click, E, R, Q) and phone (taps, hold to drag, PLACE button): unchanged.

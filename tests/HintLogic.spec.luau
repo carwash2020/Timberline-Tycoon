@@ -338,9 +338,9 @@ return function(t)
 		t.eq(HintLogic.Expand("{Unequip} first.", "console"), "Press LB + RB first.")
 		t.eq(HintLogic.Expand("Then {grab} on a log.", "desktop"), "Then click and hold on a log.")
 		t.eq(HintLogic.Expand("Then {grab} on a log.", "phone"), "Then tap and hold on a log.")
-		t.eq(HintLogic.Expand("Then {grab} on a log.", "console"), "Then hold RT on a log.")
+		t.eq(HintLogic.Expand("Then {grab} on a log.", "console"), "Then hold RB on a log.")
 		t.eq(HintLogic.Expand("{Grab} on a log.", "phone"), "Tap and hold on a log.")
-		t.eq(HintLogic.Expand("{Grab} on a log.", "console"), "Hold RT on a log.")
+		t.eq(HintLogic.Expand("{Grab} on a log.", "console"), "Hold RB on a log.")
 		for _, device in ipairs(HintLogic.Devices) do
 			t.ok(not HintLogic.HasToken(HintLogic.Expand("{unequip} {Grab}", device)), device)
 		end
@@ -358,7 +358,7 @@ return function(t)
 		for _, context in ipairs({ "tooLong", "tooHard", "driving", "build", "chop" }) do
 			t.eq(HintLogic.Quiet(context, 99), false, context)
 		end
-		t.ok(string.find(HintLogic.PickV2("console", "drag"), "RT", 1, true), "the pad grabs with RT")
+		t.ok(string.find(HintLogic.PickV2("console", "drag"), "RB", 1, true), "the pad grabs with RB (RT is the axe's)")
 		-- The idle drag line only lasts its first IdleHintSeconds.
 		t.eq(HintLogic.Quiet("drag", 0, 0), false)
 		t.eq(HintLogic.Quiet("drag", 0, HintLogic.IdleHintSeconds - 1), false)
