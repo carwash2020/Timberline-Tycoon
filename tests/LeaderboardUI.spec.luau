@@ -321,6 +321,6 @@ return function(t)
 		t.eq(SettingsUI.BackTarget("game"), nil, "from the game list B closes the card")
 		t.eq(SettingsUI.BackTarget("nope"), nil)
 		local Logic = loader:shared("SettingsLogic")
-		t.eq(Logic.Tabs, { "game", "visitors", "board" })
+		t.eq(Logic.Tabs, { "game", "visitors", "board", "codes" }) -- "codes" added with the redeem box
 	end)
 end
