@@ -39,6 +39,7 @@ local WeatherService = {}
 WeatherService.StrikeEvery = { 20, 50 } -- seconds between bolts in a storm
 WeatherService.FirstStrikeAfter = { 6, 16 } -- the first one comes sooner
 WeatherService.StrikeRadius = { 40, 250 } -- studs from the chosen player
+WeatherService.StrikeTries = 60 -- random points tried for open ground before a bolt is skipped
 WeatherService.WarnSeconds = 1.1 -- the air crackles this long before a bolt
 WeatherService.MinStormIntensity = 0.4 -- no bolts while the storm is still rolling in
 
@@ -148,7 +149,10 @@ function WeatherService.StrikePoint(near: Vector3): Vector3?
 			and z > strip.z0 + EDGE_MARGIN
 			and z < strip.z1 - EDGE_MARGIN
 	end
-	for _ = 1, 10 do
+	-- Most ground near town is flat (plots, roads, the ring map's yards): only
+	-- about one try in eight lands on open ground there. Ten tries missed a
+	-- quarter of the bolts; sixty miss about one in three thousand.
+	for _ = 1, WeatherService.StrikeTries do
 		local a = rand(0, math.pi * 2)
 		local r = rand(radius[1], radius[2])
 		local x, z = near.X + math.cos(a) * r, near.Z + math.sin(a) * r

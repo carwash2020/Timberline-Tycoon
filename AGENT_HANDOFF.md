@@ -17,7 +17,7 @@ disagree about merge state, check `git log origin/main` and fix the stale one.
 - Standing instruction: open a PR for each change, subscribe to it, **merge when CI is green** (squash,
   pass `expectedHeadSha`). Commits: `phase-2: <what>`. Never put a model name in commits or PRs.
 - Owner tools are for Connor only (Elucidhealer618; Xbox Catman9732). The server never trusts a client
-  `IsOwner`. Still needed from him: the two numeric UserIds for `AdminLogic.OwnerUserIds`.
+  `IsOwner`. `AdminLogic.OwnerUserIds` holds Elucidhealer618 (5682024709); the second id (Catman9732) is still needed from him.
 - Verify with `./scripts/check.sh` (about 10 minutes; StyLua, Selene, luau-lsp strict, Lune specs,
   ECONOMY.md and ECONOMY_V1.md current). CI runs the same script, one run per push event plus one per PR.
   After a balance change re-run `lune run tools/economy` and `tools/economy1` and commit the reports.
@@ -106,6 +106,6 @@ boxes; #110 vehicle meshes; #111 NPCs face you; #112 drop the axe with B / Q; #1
 
 1. Get Connor's Studio results on the list above, starting with Talk / Buy (the live regression).
 2. Fix whatever the Output lines show; keep each fix minimal and add a spec that reproduces it.
-3. When he sends the UserIds, set `AdminLogic.OwnerUserIds` and test the owner hub.
+3. When he sends Catman9732's UserId, add it to `AdminLogic.OwnerUserIds` and test the owner hub.
 4. Then the cleanups in STATUS.md's open items: `ForestFiller` speed, vehicle leftovers, mesh permissions.
 5. Keep STATUS.md current in the same PR as any change that moves it, and fix its stale "not merged" lines.

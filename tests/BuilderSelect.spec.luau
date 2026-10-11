@@ -1,5 +1,5 @@
 --!nocheck
--- Gamepad select (R2, screen centre) and a mouse click hit the same piece.
+-- Gamepad select (RB, screen centre) and a mouse click hit the same piece.
 return function(t)
 	local Enum = t.roblox.Enum
 	local Instance = t.roblox.Instance
@@ -124,7 +124,7 @@ return function(t)
 		t.ok(string.find(src, "Enum.ScreenInsets.CoreUISafeInsets", 1, true))
 		t.ok(string.find(src, "UITheme.Bottom()", 1, true))
 		t.ok(string.find(src, "BuilderBar.Layout", 1, true))
-		t.ok(string.find(src, "Enum.KeyCode.ButtonR2", 1, true))
+		t.ok(string.find(src, "Enum.KeyCode.ButtonR1", 1, true), "select is on RB; the right trigger is never bound")
 	end)
 
 	t.test("glass does not block the aim: the piece behind it is aimed at, else the glass wall itself", function()
@@ -252,7 +252,7 @@ return function(t)
 		t.eq(inset + bar.Position.Y.Offset, 141)
 	end)
 
-	t.test("the R2 select bind exists only while no tool is held", function()
+	t.test("the RB select bind exists only while no tool is held", function()
 		local binds = {}
 		local function signal()
 			return {
@@ -302,14 +302,14 @@ return function(t)
 		})
 		local B = l:load("StarterPlayer/StarterPlayerScripts/BuilderTools")
 		B.WatchTools()
-		t.ok(binds.BuilderSelect, "build tools open: R2 selects")
+		t.ok(binds.BuilderSelect, "build tools open: RB selects")
 		local tool = Instance.new("Tool")
 		tool.Parent = char
 		B.WatchTools()
-		t.eq(binds.BuilderSelect, nil, "axe in hand: R2 is untouched")
+		t.eq(binds.BuilderSelect, nil, "axe in hand: RB is untouched (LB + RB unequips)")
 		t.eq(B.SelectBound(), false)
 		tool.Parent = nil
 		B.WatchTools()
-		t.ok(binds.BuilderSelect, "axe away: R2 selects again")
+		t.ok(binds.BuilderSelect, "axe away: RB selects again")
 	end)
 end

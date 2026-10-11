@@ -301,10 +301,14 @@ return function(t)
 		t.eq(GrabLogic.KeyAction("R", true), nil)
 	end)
 
-	t.test("gamepad: D-pad or RB/LB push and pull, D-pad left/right turn", function()
+	t.test("gamepad: D-pad up/down and LB push and pull, D-pad left/right turn", function()
 		t.eq({ GrabLogic.PadAction("DPadUp") }, { nil, 1 })
 		t.eq({ GrabLogic.PadAction("DPadDown") }, { nil, -1 })
-		t.eq({ GrabLogic.PadAction("ButtonR1") }, { nil, 1 })
+		t.eq(
+			{ GrabLogic.PadAction("ButtonR1") },
+			{},
+			"RB is the grab (it replaced the right trigger), so it is no push"
+		)
 		t.eq({ GrabLogic.PadAction("ButtonL1") }, { nil, -1 })
 		t.eq({ GrabLogic.PadAction("DPadLeft") }, { { kind = "yaw", steps = 1 } })
 		t.eq({ GrabLogic.PadAction("DPadRight") }, { { kind = "yaw", steps = -1 } })
@@ -379,14 +383,14 @@ return function(t)
 		t.eq(GrabLogic.CanPressPad({ userId = OTHER, ownerId = ME }), false)
 	end)
 
-	t.test("PadPressAccepted: a handled R2 still grabs, a handled click does not, the placer owns R2", function()
+	t.test("PadPressAccepted: a handled RB still grabs, a handled click does not, the placer owns RB", function()
 		-- processed, trigger, selecting, placing
 		t.eq(GrabLogic.PadPressAccepted(false, true, false, false), true)
 		t.eq(GrabLogic.PadPressAccepted(true, true, false, false), true, "a bound action marked it handled")
 		t.eq(GrabLogic.PadPressAccepted(true, true, true, false), false, "a menu has the pad selection")
 		t.eq(GrabLogic.PadPressAccepted(true, false, false, false), false, "a handled mouse click is a button's")
 		t.eq(GrabLogic.PadPressAccepted(false, false, false, false), true)
-		t.eq(GrabLogic.PadPressAccepted(true, true, false, true), false, "placing: R2 is Place, not Grab")
+		t.eq(GrabLogic.PadPressAccepted(true, true, false, true), false, "placing: RB slides the ghost, not Grab")
 		t.eq(GrabLogic.PadPressAccepted(false, true, false, true), false)
 		t.eq(GrabLogic.PadPressAccepted(false, false, false, true), true, "the mouse still grabs")
 	end)
