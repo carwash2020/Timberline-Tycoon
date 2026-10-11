@@ -416,3 +416,17 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 - Toolchain via Rokit (`bash scripts/cloud-setup.sh` on Linux). `lune run tests/run [Name]` runs one spec. `bash tools/preview/shoot.sh <scene>` renders a scene to `preview/` for art or world changes.
 - `./scripts/check.sh` takes several minutes (WorldPlan.spec alone is about a minute); run it in the background or with a long timeout, since foreground commands time out near 600 s.
 - Do not use `pkill -f` patterns that match your own shell.
+
+
+## Lane E: NPCs, Foreman, stage events (branch `phase-2/v1-e-npcs-ui`, 11 October 2026, draft PR)
+
+Partial lane: what landed and what did not.
+
+Landed:
+- Five Blender NPCs wired through MeshKit (Hermit, Old Tolly, Cap'n Moss, Old Hank, the Foreman): `TownModels` rows with the uploaded ids, 74 new `MeshTemplates/<id>.model.json` files, `NPCMeshes.AssetId` (display name to model id). The part-built NPC stays when an id is 0, a template is missing or a mesh fails; a miss sets the `MeshFallback` attribute and warns once per asset. Never InsertService.
+- The Foreman is Rook Calloway (`ForemanData`, `NPCData` id `Foreman`), on the mill's MillForemanSpot pad facing the road. A finished daily goal is now OWED, not paid: `DailyService.TurnIn` (remote `ForemanTurnIn`, RateLimiter 2/s, distance to Rook checked on the server) pays every finished unpaid goal plus the all-done bonus (`daily.bonusOwed`) through EconomyService.AddCash; a full wallet leaves the remainder owed; anything still owed is paid at the UTC reset; the streak moves the moment the third goal finishes. `DailyUI` is his job board (opened when his talk box closes; the old corner button is kept hidden); it starts again in `Client`.
+- `StageOf.Pending` and `MilestoneService.CheckStages`: "Stage:S1".."Stage:S8" in `profile.onboarding` (no new save field), one `LogProgressionCompleteEvent("Stages", "Sn")` per stage per player, marked before logged.
+- `DialogueData.GusCharter` / `GusLine` for every charter step; Gus's talk shows the step line first (`SkyQuestStep` attribute).
+
+Not done (open): visitArea goal (needs a save field and a BadgeService call), day counter, climate vignette, gate-sign state text, region toast wiring, Field Guide stamps, tutorial skip flag rework, NPC remake to under 60 parts, HUD renders at 667x375 and 1920x1080, NextGoal/V1Stages changes.
+Previews: `previews/v1-e/foreman-layout-*-PART-BUILT.png` are the part-built fallbacks for layout and facing only. The NPC GLBs are not in the pack (only stats.json), so there are no mesh renders.

@@ -3505,3 +3505,15 @@ Xbox
 3. Icon drafts and uploads (his).
 4. Default used: stage badges (S4, S8) are not added until E's stage events land.
 5. Default used: names show as Roblox usernames (what `LeaderboardService` caches), not display names.
+
+
+## Lane E: Studio checklist (11 October 2026)
+
+1. PC: walk to the sawmill yard, west of the office door. Rook Calloway (hard hat, green plaid, clipboard) faces the road. Press E: a two-line box, then the job board opens. Esc closes it.
+2. Finish a daily job: a toast says Rook has the cash, and your wallet does not change. Talk to Rook, press Take: the wallet rises once. Press Take again quickly: nothing more.
+3. Finish all three: the streak shows at once; Rook owes the bonus; Take pays jobs and bonus together.
+4. Phone (667x375): the job board shows three goals, Take and Close without scrolling; the calendar is hidden; every button is at least 44 px.
+5. Xbox: Talk (X), then the board opens with Close or Take selected; B closes it; DPadUp does nothing and raises no error.
+6. During Murph's tutorial: Rook says to finish with Murph first and no board opens.
+7. Output: no `[Client] DailyUI failed to start`. With the five NPC meshes loading, Hermit, Old Tolly, Cap'n Moss, Old Hank and Rook should show their Blender meshes; check `[MeshKit]` and `[NPCMeshes]` lines for misses (each asset warns once).
+8. Talk to Gus: his first line follows your charter step.
