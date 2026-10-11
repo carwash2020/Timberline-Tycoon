@@ -43,6 +43,7 @@ return function(t)
 		local fired = {}
 		local loader = t.loader({
 			mocks = {
+				SecretService = {}, -- (a real module now: MapBuilder starts it)
 				AetherService = {
 					V1Init = function(ctx)
 						table.insert(fired, { "aether", ctx })

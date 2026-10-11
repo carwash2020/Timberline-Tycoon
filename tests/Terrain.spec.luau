@@ -21,13 +21,15 @@ return function(t)
 	-- moved 55 studs north, so its lane is a little shorter). The shelves
 	-- are flat at their own height, and each lane is a sample.
 	local HEIGHT_FINGERPRINT = {
-		n = 7452,
-		sum = 91540.457826682541054,
-		wsum = -263.176912142538754,
-		sq = 9517106.587789362296462,
-		lo = -13.781769507273463,
-		hi = 205.783118277429935,
+		n = 7717,
+		sum = 78809.014072032601689,
+		wsum = 65.174283287859936,
+		sq = 5271638.948245392180979,
+		lo = -48.000000000000000,
+		hi = 161.576039893993112,
 	}
+	-- Ring map (WorldHalf 1000): the grid is 64 x 64 over the 2000-stud square (it was
+	-- over the old 3000), the coast sample stops at the wall, and the roads are the ring's.
 	local function heightFingerprint()
 		local n, sum, wsum, sq, lo, hi = 0, 0, 0, 0, math.huge, -math.huge
 		local function add(x, z)
@@ -41,7 +43,7 @@ return function(t)
 		end
 		for i = 0, 63 do
 			for k = 0, 63 do
-				add(-1490 + i * 47.3 + (k % 7) * 1.7, -1490 + k * 47.3 + (i % 5) * 2.3)
+				add(-990 + i * 31.5 + (k % 7) * 1.7, -990 + k * 31.5 + (i % 5) * 2.3)
 			end
 		end
 		for _, road in ipairs(WorldLayout.Roads) do
@@ -64,7 +66,7 @@ return function(t)
 				add(x, z)
 			end
 		end
-		for x = 600, 1200, 31 do
+		for x = 600, 1000, 31 do
 			for z = -800, -200, 31 do
 				add(x, z)
 			end
