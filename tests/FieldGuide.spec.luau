@@ -238,8 +238,10 @@ return function(t)
 			emberwood = 4,
 			phantomwood = 5,
 			lumenwood = 5,
+			bogcypress = 3, -- Lane R: hardness 8
+			ironwood = 5, -- Lane R: hardness 18
 		}
-		t.eq(#WoodData.All(), 10)
+		t.eq(#WoodData.All(), 12)
 		for _, wood in ipairs(WoodData.All()) do
 			local marks = FieldGuide.HardnessMarks(wood.v2.hardness)
 			t.eq(marks, expect[wood.id], wood.id)

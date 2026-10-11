@@ -70,6 +70,7 @@ local MODULES = {
 	"QualityPickerUI",
 	"QuestUI",
 	"QuickMenuUI",
+	"RegionFX",
 	"SaveSlotUI",
 	"SawmillController",
 	"SettingsUI",
@@ -384,6 +385,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "LifeFX",
 		get = function()
 			return require(script.Parent.LifeFX)
+		end,
+	},
+	{
+		name = "RegionFX",
+		get = function()
+			return require(script.Parent.RegionFX)
 		end,
 	},
 	{

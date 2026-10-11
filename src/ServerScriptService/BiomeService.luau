@@ -4,6 +4,10 @@
 --   * Tracks the biome each player stands in, on the Biome attribute (the
 --     client names it when they arrive).
 --   * Snowfields: walking is slower without the Insulated Coat.
+--   * The Bayou: mud discs slow walking to 0.6x without Wader Boots (a disc
+--     check in the WalkSpeed step below, Shared/Regions/MudLogic).
+--   * The Bayou (S2) and Red Mesa (S4) are stage gated: their wood waits for
+--     the stage (BiomeData.needsStage, StageOf).
 --   * The Volcano: the ground burns without Heat Boots.
 --   * Chopping a biome's trees needs that biome's gear (CanChop, called by
 --     GameServer's ChopTree): Heat Boots on the Volcano, a Lantern in the
@@ -23,6 +27,8 @@ local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ProfileService = require(script.Parent.ProfileService)
 local SprintLogic = require(ReplicatedStorage.Shared.SprintLogic)
 local RegionLogic = require(ReplicatedStorage.Shared.RegionLogic)
+local MudLogic = require(ReplicatedStorage.Shared.Regions.MudLogic)
+local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldClock = require(script.Parent.WorldClock)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
@@ -54,6 +60,20 @@ end
 -- Whether the player may chop a tree of `wood`, and what to tell them if not.
 function BiomeService.CanChop(player: Player, wood: { biome: string, displayName: string }): (boolean, string?)
 	local rules = BiomeData.Rules(BiomeData.Get(wood.biome), gearSet(player))
+	-- A stage-gated biome (the Bayou, Red Mesa): the wood waits for the stage.
+	local need = BiomeData.StageNeeded(wood.biome)
+	if need > 0 then
+		local profile = ProfileService.GetProfile(player)
+		if profile == nil or StageOf.Current(profile) < need then
+			local gate = BiomeData.Gate(wood.biome)
+			return false,
+				string.format(
+					"%s is too tough for you yet. %s.",
+					wood.displayName,
+					if gate.words ~= "" then gate.words else "Come back stronger"
+				)
+		end
+	end
 	if rules.canChop then
 		return true, nil
 	end
@@ -92,6 +112,10 @@ local function update(player: Player)
 	local pos = root.Position
 	local biome = BiomeData.At(pos.X, pos.Z, pos.Y)
 	local biomeId = if biome then biome.id else ""
+	if biomeId == "" then
+		-- The Bayou and Red Mesa are reserved regions, not areas (BiomeData.region).
+		biomeId = BiomeData.RegionAt(pos.X, pos.Z) or ""
+	end
 	if biomeId == "" and WorldLayout.InNorthStrip(pos.X, pos.Z) then
 		biomeId = "strip"
 	end
@@ -110,8 +134,11 @@ local function update(player: Player)
 
 	local gear = gearSet(player)
 	local rules = BiomeData.Rules(biome, gear)
+	-- The Bayou's mud: 0.6x inside a mud disc without Wader Boots. The road,
+	-- the log landing and the boardwalk are dry (MudLogic.IsDry).
+	local mud = MudLogic.Factor(pos.X, pos.Z, gear)
 	local speed = SprintLogic.Speed(
-		StarterPlayer.CharacterWalkSpeed * rules.speedFactor,
+		StarterPlayer.CharacterWalkSpeed * rules.speedFactor * mud,
 		player:GetAttribute("Sprinting") == true,
 		player:GetAttribute("SuperRun") == true
 	)

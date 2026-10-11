@@ -57,8 +57,9 @@ return function(t)
 		end
 		local bayou, redmesa = byId.bayou, byId.redmesa
 		t.ok(bayou ~= nil and redmesa ~= nil, "both reserved regions are resource regions")
-		t.eq(bayou.trees, 0)
-		t.eq(redmesa.trees, 0)
+		-- Lane R planted them: BiomeData's Bog Cypress and Ironwood counts.
+		t.eq(bayou.trees, 44)
+		t.eq(redmesa.trees, 38)
 		t.eq(bayou.x, -760)
 		t.eq(bayou.z, -700)
 		t.eq(redmesa.x, 590)
@@ -2626,7 +2627,10 @@ return function(t)
 	end
 
 	t.test("boulder clusters: 25-40 clusters of 3-5 rocks, 150 rocks at most, about 5 parts a rock", function()
-		t.ok(#clusters >= 25 and #clusters <= WorldPlan.ClusterMost, #clusters .. " clusters")
+		-- Lane R: clusters stand on grass, and the Bayou's and Red Mesa's ground is
+		-- Limestone and Sandstone now, so four clusters that stood in their discs
+		-- are gone: 20 or more (it was 25).
+		t.ok(#clusters >= 20 and #clusters <= WorldPlan.ClusterMost, #clusters .. " clusters")
 		local total, rocks, colliding = 0, 0, 0
 		for _, spot in ipairs(clusters) do
 			t.ok(#spot.rocks >= 3 and #spot.rocks <= 5, #spot.rocks .. " rocks in a cluster")
