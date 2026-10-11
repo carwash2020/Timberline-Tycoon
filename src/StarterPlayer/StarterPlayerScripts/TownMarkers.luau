@@ -322,7 +322,7 @@ function TownMarkers.Build(marker: Marker, phone: boolean): BillboardGui
 	local faceCorner = Instance.new("UICorner")
 	faceCorner.CornerRadius = UDim.new(0.3, 0)
 	faceCorner.Parent = face
-	outline(face, C.Ink, 2)
+	outline(face, C.Cream, 2) -- a cream rim: the dark face stays readable against forest and shade (first-screen fix)
 	face.Parent = edge
 
 	-- Lengths in the face's height, as fractions of its width.

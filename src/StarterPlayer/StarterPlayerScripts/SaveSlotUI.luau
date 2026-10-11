@@ -58,6 +58,7 @@ local closeButton: GuiObject? = nil
 local baseButton: UITheme.Button? = nil
 local saveButton: UITheme.Button? = nil
 local savedLabel: TextLabel? = nil
+local screenGui: ScreenGui? = nil
 
 local function send(action: string, index: number, extra: boolean | string)
 	Net.Remote("SlotAction"):FireServer(action, index, extra)
@@ -86,11 +87,13 @@ end
 local function rowButton(parent: Instance, text: string, style: string, order: number, fn: () -> ())
 	local button = UITheme.Button({
 		text = text,
-		size = Vector2.new(96, 44),
+		size = Vector2.new(SaveSlotLogic.Panel.ButtonW, SaveSlotLogic.Panel.ButtonH),
 		style = style,
 		textSize = 15,
 	})
 	button.root.LayoutOrder = order
+	button.root.AnchorPoint = Vector2.new(1, 0)
+	button.root.Position = UDim2.new(1, -SaveSlotLogic.Panel.CardInset, 0, SaveSlotLogic.Panel.NameTop)
 	button.root.Parent = parent
 	button.face.Activated:Connect(fn)
 	if firstPick == nil then
@@ -156,7 +159,38 @@ local function refreshSave()
 	end
 end
 
+-- Sizes the panel for the screen and the mode (SaveSlotLogic.Layout): the
+-- join pick has no Unload / Save now row, so the cards sit right under the
+-- note; the panel is never taller than the screen.
+local function applyLayout()
+	local p, gui, rows = panel, screenGui, list
+	if not p or not gui or not rows then
+		return
+	end
+	local scale = math.max(UITheme.Scale(), 0.01)
+	local view = gui.AbsoluteSize / scale
+	if view.X <= 0 or view.Y <= 0 then
+		return -- not laid out yet
+	end
+	local fit = SaveSlotLogic.Layout(view.X, view.Y, picking, math.max(#summaries, SaveSlotLogic.Count))
+	local P = SaveSlotLogic.Panel
+	p.Size = UDim2.fromOffset(fit.width, fit.height)
+	rows.Position = UDim2.fromOffset(12, fit.rowsTop)
+	rows.Size = UDim2.new(1, -24, 0, fit.rowsHeight)
+	rows.ScrollBarThickness = if fit.scrolls then 6 else 0
+	local half = math.floor((fit.width - 24 - 8) / 2)
+	local base, save = baseButton, saveButton
+	if base then
+		base.root.Size = UDim2.fromOffset(half, base.root.Size.Y.Offset)
+	end
+	if save then
+		save.root.Position = UDim2.fromOffset(12 + half + 8, P.ControlsTop)
+		save.root.Size = UDim2.fromOffset(half, save.root.Size.Y.Offset)
+	end
+end
+
 local function fill()
+	applyLayout()
 	refreshBase()
 	refreshSave()
 	local holder = list
@@ -188,16 +222,19 @@ local function fill()
 		end
 	end
 	for _, slot in ipairs(summaries) do
+		local P = SaveSlotLogic.Panel
 		local card = Instance.new("Frame")
 		card.Name = "Slot" .. slot.index
 		card.LayoutOrder = slot.index
-		card.Size = UDim2.new(1, 0, 0, 148)
+		card.Size = UDim2.new(1, 0, 0, P.Card)
 		card.BackgroundColor3 = if slot.active then C.PaperDark else C.Paper
 		card.BorderSizePixel = 0
 		UITheme.corner(card, 10)
 		UITheme.stroke(card, if slot.active then C.GreenEdge else C.Bark, 2)
 		card.Parent = holder
 
+		-- The name and its PLAY / LOAD button side by side (a fingertip tall),
+		-- the facts under them: one compact block, so every card fits.
 		local nameBox = Instance.new("TextBox")
 		nameBox.Name = "Name"
 		nameBox.BackgroundColor3 = C.Cream
@@ -207,8 +244,8 @@ local function fill()
 		nameBox.TextColor3 = C.Ink
 		nameBox.ClearTextOnFocus = false
 		nameBox.TextXAlignment = Enum.TextXAlignment.Left
-		nameBox.Size = UDim2.new(1, -16, 0, 44)
-		nameBox.Position = UDim2.fromOffset(8, 6)
+		nameBox.Size = UDim2.new(1, -(P.CardInset * 3 + P.ButtonW), 0, P.ButtonH)
+		nameBox.Position = UDim2.fromOffset(P.CardInset, P.NameTop)
 		nameBox.Text = slot.name
 		nameBox.PlaceholderText = SaveSlotLogic.DefaultName(slot.index)
 		UITheme.corner(nameBox, 8)
@@ -222,56 +259,48 @@ local function fill()
 		end)
 
 		local detail = Instance.new("TextLabel")
+		detail.Name = "Detail"
 		detail.BackgroundTransparency = 1
 		detail.Font = UITheme.Fonts.Body
-		detail.TextSize = 15
 		detail.TextXAlignment = Enum.TextXAlignment.Left
+		detail.TextYAlignment = Enum.TextYAlignment.Top
 		detail.TextColor3 = C.Ink
-		detail.Size = UDim2.new(1, -16, 0, 20)
-		detail.Position = UDim2.fromOffset(8, 52)
 		local saved = SaveSlotLogic.SavedText(slot.lastPlayed, now)
 		local plotText = JoinPickLogic.PlotText(slot.hasPlot == true, slot.pieces or 0)
-		if slot.fresh then
-			detail.Text = "Empty  ·  " .. saved
-		else
-			detail.Text =
-				string.format("%s  ·  %s  ·  %s  ·  %s", Util.formatCash(slot.cash), slot.axeName, plotText, saved)
+		local facts = if slot.fresh
+			then "Empty  ·  " .. saved
+			else string.format(
+				"%s  ·  %s  ·  %s  ·  %s",
+				Util.formatCash(slot.cash),
+				slot.axeName,
+				plotText,
+				saved
+			)
+		if slot.active and picking then
+			facts = JoinPickLogic.ActiveBadge(true) .. "  ·  " .. facts -- "Last played"
 		end
+		detail.Text = facts
 		detail.TextWrapped = true
 		detail.TextSize = 13
-		detail.Size = UDim2.new(1, -16, 0, 36)
+		detail.Size = UDim2.new(1, -P.CardInset * 2, 0, P.DetailHeight)
+		detail.Position = UDim2.fromOffset(P.CardInset, P.DetailTop)
 		detail.Parent = card
-
-		local buttons = Instance.new("Frame")
-		buttons.BackgroundTransparency = 1
-		buttons.Size = UDim2.new(1, -16, 0, 44)
-		buttons.Position = UDim2.fromOffset(8, 98)
-		UITheme.list(buttons, 8, true)
-		buttons.Parent = card
 
 		local playLabel = JoinPickLogic.PlayLabel(picking, slot.fresh, slot.active)
 		if slot.active and not picking then
 			local here = Instance.new("TextLabel")
+			here.Name = "Here"
+			here.AnchorPoint = Vector2.new(1, 0)
+			here.Position = UDim2.new(1, -P.CardInset, 0, P.NameTop)
 			here.BackgroundTransparency = 1
 			here.Font = UITheme.Fonts.Heading
 			here.TextSize = 16
 			here.TextColor3 = C.GreenEdge
-			here.Size = UDim2.fromOffset(160, 44)
+			here.Size = UDim2.fromOffset(P.ButtonW, P.ButtonH)
 			here.Text = JoinPickLogic.ActiveBadge(false)
-			here.Parent = buttons
+			here.Parent = card
 		elseif playLabel ~= nil and picking then
-			if slot.active then
-				local badge = Instance.new("TextLabel")
-				badge.BackgroundTransparency = 1
-				badge.Font = UITheme.Fonts.Body
-				badge.TextSize = 14
-				badge.TextColor3 = C.GreenEdge
-				badge.Size = UDim2.fromOffset(110, 44)
-				badge.Text = JoinPickLogic.ActiveBadge(true)
-				badge.LayoutOrder = 0
-				badge.Parent = buttons
-			end
-			local play = rowButton(buttons, playLabel, "buy", 1, function()
+			local play = rowButton(card, playLabel, "buy", 1, function()
 				send("play", slot.index, true)
 			end)
 			-- The last-played save is always playable; another one obeys the cooldown.
@@ -279,7 +308,7 @@ local function fill()
 			play.face.Active = not blocked
 			play.face.AutoButtonColor = not blocked
 		elseif playLabel ~= nil then
-			local load = rowButton(buttons, playLabel, "buy", 1, function()
+			local load = rowButton(card, playLabel, "buy", 1, function()
 				local what = if slot.fresh then "Start a new game on" else "Load"
 				showConfirm(
 					"load",
@@ -306,6 +335,7 @@ setOpen = function(on: boolean)
 		return -- the join pick stays up until a save is chosen
 	end
 	p.Visible = on
+	HUD.HoldHint("SaveSlotUI", on) -- the hint bar never draws over this panel
 	local x = closeButton
 	if x then
 		x.Visible = not picking
@@ -347,6 +377,7 @@ end
 function SaveSlotUI.Start()
 	local gui = UITheme.Screen("SaveSlotUI", UITheme.Layers.SaveSlot)
 	gui.Parent = UITheme.PlayerGui()
+	screenGui = gui
 
 	local button = HUD.SideButton({
 		name = "Saves",
@@ -364,7 +395,7 @@ function SaveSlotUI.Start()
 	outer.Name = "Saves"
 	outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	outer.Position = UDim2.fromScale(0.5, 0.5)
-	outer.Size = UDim2.fromOffset(360, 360)
+	outer.Size = UDim2.fromOffset(SaveSlotLogic.Panel.Width, 360) -- applyLayout sizes it
 	outer.BackgroundColor3 = C.Paper
 	outer.BorderSizePixel = 0
 	outer.Visible = false
@@ -414,7 +445,7 @@ function SaveSlotUI.Start()
 		style = "bark",
 		textSize = 14,
 	})
-	base.root.Position = UDim2.fromOffset(12, 90)
+	base.root.Position = UDim2.fromOffset(12, SaveSlotLogic.Panel.ControlsTop)
 	base.root.Visible = false
 	base.root.Parent = outer
 	baseButton = base
@@ -440,7 +471,7 @@ function SaveSlotUI.Start()
 		style = "buy",
 		textSize = 14,
 	})
-	saveNow.root.Position = UDim2.fromOffset(184, 90)
+	saveNow.root.Position = UDim2.fromOffset(184, SaveSlotLogic.Panel.ControlsTop)
 	saveNow.root.Parent = outer
 	saveButton = saveNow
 	saveNow.face.Activated:Connect(function()
@@ -465,7 +496,7 @@ function SaveSlotUI.Start()
 	saved.TextColor3 = C.Ink
 	saved.TextXAlignment = Enum.TextXAlignment.Right
 	saved.Size = UDim2.new(1, -24, 0, 18)
-	saved.Position = UDim2.fromOffset(12, 142)
+	saved.Position = UDim2.fromOffset(12, SaveSlotLogic.Panel.SavedTop)
 	saved.Text = ""
 	saved.Parent = outer
 	savedLabel = saved
@@ -474,8 +505,8 @@ function SaveSlotUI.Start()
 	rows.Name = "Rows"
 	rows.BackgroundTransparency = 1
 	rows.BorderSizePixel = 0
-	rows.Position = UDim2.fromOffset(12, 164)
-	rows.Size = UDim2.new(1, -24, 1, -176)
+	rows.Position = UDim2.fromOffset(12, 88) -- applyLayout moves it
+	rows.Size = UDim2.new(1, -24, 1, -100)
 	rows.CanvasSize = UDim2.fromOffset(0, 0)
 	rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	rows.ScrollBarThickness = 6
@@ -582,6 +613,12 @@ function SaveSlotUI.Start()
 		end
 	end)
 
+	UITheme.WatchLayout(function()
+		local p = panel
+		if p and p.Visible then
+			applyLayout()
+		end
+	end)
 	task.defer(considerPick) -- the attribute may have arrived before this screen started
 	task.spawn(function()
 		while panel do

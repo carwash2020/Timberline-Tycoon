@@ -3773,6 +3773,28 @@ Xbox (controller)
 
 Fallback (only if Murph's prompt is slow)
 8. If the log says "Murph's Talk prompt never streamed in", Murph's card must also show "I'm at my camp by the fire. Follow the amber arrow..." (it appears after 15 s). Tell Claude: that means the model did not stream in even as Persistent.
+## First screen UI fix (branch `phase-2/fix-first-screen-ui`, 11 October 2026)
+
+What and why are in STATUS.md. Rules: `Shared/JoinPickLogic` (`AutoPick`, `TutorialWaits`, `HintHidden`), `Shared/SaveSlotLogic` (`Panel`, `Layout`), `HudLayout` (`MarkTextLeft`, `ClearOfRects`), `HudRules.BadgesButton`, `Shared/TextAnchor.Probes`. Composites (not Studio screenshots) are in `previews/fix-first-screen/`.
+
+### Studio checks
+
+PC (963x478 window, keyboard and mouse)
+1. New profile with no save (or a profile with one played save): join. Good: no Saves panel at all, you load straight into the world, the tutorial card says "Chop down a tree", and the hint bar shows. A profile with a plot goes straight to the pad picker.
+2. A profile with two or three played saves: join. Good: the Saves panel opens alone (no tutorial card, no hint bar, no beacon behind it), the three cards sit right under the one-line note with no empty gap, every PLAY button is visible without scrolling, the panel is not taller than the window. Press PLAY on Save 2: the world loads, then the tutorial card and hint bar appear.
+3. Press SAVES in the world: the panel opens with the Unload base / Save now row, the hint bar hides while it is open, and the cards scroll if the window is short. Esc closes it and the hint comes back.
+4. First screen after the pick: BADGES is not in the left column while the tutorial runs (it shows again after the tutorial); the tutorial card has no empty outlined circle (Murph's portrait appears once he streams in); if an empty outlined box is still there, send a screenshot (it may be Roblox's chat window).
+5. Look at SAVES and BUILD: the label starts to the right of the icon and no letter is under it.
+6. Walk so the beacon ("20 studs") would be behind the SAVES button: it slides left of the button or hides; it is never cut off.
+7. SELL LOGS over the sell station: solid, with a cream rim, readable against the forest.
+8. Walk past Old Bram by the shop (he paces x -17, z 50 to 66): his name tag is whole or hidden, never half cut by the wall.
+
+Phone (667x375)
+9. Same joins as checks 1 and 2 with taps: PLAY is at least 44 px tall, three cards fit, nothing is under the jump button, the hint bar is gone while the picker is up. The BADGES button is hidden during the tutorial.
+10. MENU, then SAVES: the panel opens, the hint hides, the list scrolls with a finger.
+
+Xbox (controller)
+11. Join with two played saves: the gold selection ring starts on a PLAY button, D-pad up and down moves between the three, A plays it, B does nothing on the join picker (there is no way out but a choice) and closes the SAVES panel when opened later.
 
 ## Grab on the right trigger (Xbox)
 

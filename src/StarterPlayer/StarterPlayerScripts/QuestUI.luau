@@ -33,9 +33,11 @@ local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
+local JoinPickLogic = require(ReplicatedStorage.Shared.JoinPickLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local HudLayout = require(script.Parent.HudLayout)
 local HudNav = require(script.Parent.HudNav)
 local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
@@ -485,7 +487,7 @@ local function updateBeacon()
 	if not gui then
 		return
 	end
-	local step = beaconStep()
+	local step = if JoinPickLogic.TutorialWaits(player:GetAttribute("SlotPick")) then nil else beaconStep()
 	local from = rootPosition()
 	local target = if step and from then beaconTarget(step, from) else nil
 	local d = if target and from then (target.Position - from).Magnitude else 0
@@ -493,6 +495,26 @@ local function updateBeacon()
 	if target then
 		gui.Adornee = target
 		gui.StudsOffsetWorldSpace = Vector3.new(0, target.Size.Y / 2 + 4, 0)
+		-- Never cut off behind a HUD button (the "20 st..." under SAVES): slide
+		-- it clear of the HUD's boxes, or hide it if no slide helps.
+		local camera = workspace.CurrentCamera
+		if gui.Enabled and camera then
+			local at, onScreen = camera:WorldToViewportPoint(target.Position + gui.StudsOffsetWorldSpace)
+			if onScreen then
+				local w, h = gui.Size.X.Offset, gui.Size.Y.Offset
+				local box: HudLayout.Rect =
+					{ left = at.X - w / 2, top = at.Y - h / 2, right = at.X + w / 2, bottom = at.Y + h / 2 }
+				local view = camera.ViewportSize
+				local bounds: HudLayout.Rect = { left = 0, top = 0, right = view.X, bottom = view.Y }
+				local HUD = require(script.Parent.HUD)
+				local shift = HudLayout.ClearOfRects(box, HUD.Obstacles(), bounds, 6)
+				if shift == nil then
+					gui.Enabled = false
+				else
+					gui.SizeOffset = Vector2.new(shift / w, 0)
+				end
+			end
+		end
 	end
 	local label = distanceLabel
 	if target and label then
@@ -505,6 +527,17 @@ end
 ---------------------------------------------------------------------------
 
 local function refresh()
+	if JoinPickLogic.TutorialWaits(player:GetAttribute("SlotPick")) then
+		-- The save picker is up: the tutorial starts after the pick, so no
+		-- tracker, no Murph card and no beacon until then.
+		local hold = tracker
+		if hold then
+			hold.Visible = false
+		end
+		hideSpeech(false)
+		updateBeacon()
+		return
+	end
 	local index, step = currentStep()
 	local nextText = player:GetAttribute("NextGoal")
 	local showingNext = step == nil and type(nextText) == "string" and nextText ~= ""
@@ -672,6 +705,9 @@ local function portrait(parent: Instance): ViewportFrame
 	view.LightColor = Color3.fromRGB(255, 240, 220)
 	UITheme.corner(view, 20)
 	UITheme.stroke(view, C.Amber, 2)
+	-- Hidden until his head is in it: an empty outlined circle on the card is
+	-- noise (the first screen showed one before Murph streamed in).
+	view.Visible = false
 	view.Parent = parent
 	task.spawn(function()
 		-- Bounded: a missing map must not leave this thread waiting forever.
@@ -689,6 +725,7 @@ local function portrait(parent: Instance): ViewportFrame
 		camera.CFrame = CFrame.lookAt(eye, head.Position + Vector3.new(0, 0.05, 0))
 		camera.Parent = view
 		view.CurrentCamera = camera
+		view.Visible = true
 	end)
 	return view
 end
@@ -1053,6 +1090,7 @@ function QuestUI.Start()
 		QuestUI.ApplyKey(input.KeyCode)
 	end)
 	player:GetAttributeChangedSignal("TutorialStep"):Connect(refresh)
+	player:GetAttributeChangedSignal("SlotPick"):Connect(refresh)
 	player:GetAttributeChangedSignal("TutorialProgress"):Connect(refresh)
 	player:GetAttributeChangedSignal("NextGoal"):Connect(refresh)
 	player:GetAttributeChangedSignal("NextGoalBeacon"):Connect(refresh)
