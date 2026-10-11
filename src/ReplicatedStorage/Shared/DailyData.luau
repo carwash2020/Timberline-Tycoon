@@ -503,20 +503,23 @@ function DailyData.CountV2(goal: Goal, event: EventV2, amount: number?, sale: Sa
 end
 
 -- The DailyGoals player attribute (attributes can't hold tables):
--- "kind,target,progress,reward,wood,done;..." with wood "-" when unused.
+-- "kind,target,progress,reward,wood,done,paid;..." with wood "-" when
+-- unused. `paid` is 0 only for a finished goal the Sawmill Foreman has not
+-- paid yet (ForemanData.Owed); a text with no `paid` field reads as paid.
 function DailyData.Encode(goals: { Goal }): string
 	local parts: { string } = {}
 	for _, g in ipairs(goals) do
 		table.insert(
 			parts,
 			string.format(
-				"%s,%d,%d,%d,%s,%d",
+				"%s,%d,%d,%d,%s,%d,%d",
 				g.kind,
 				g.target,
 				g.progress,
 				g.reward,
 				g.wood or "-",
-				if g.done then 1 else 0
+				if g.done then 1 else 0,
+				if g.paid == false then 0 else 1
 			)
 		)
 	end
@@ -525,7 +528,9 @@ end
 
 function DailyData.Decode(text: string): { Goal }
 	local goals: { Goal } = {}
-	for kind, target, progress, reward, wood, done in string.gmatch(text, "(%a+),(%d+),(%d+),(%d+),([%w%-]+),([01])") do
+	for kind, target, progress, reward, wood, done, paid in
+		string.gmatch(text, "(%a+),(%d+),(%d+),(%d+),([%w%-]+),([01]),?([01]?)")
+	do
 		if table.find(KINDS, kind :: any) or table.find(KINDS_V2, kind :: any) then
 			table.insert(goals, {
 				kind = kind :: any,
@@ -534,6 +539,7 @@ function DailyData.Decode(text: string): { Goal }
 				reward = tonumber(reward) or 0,
 				wood = if wood ~= "-" then wood else nil,
 				done = done == "1",
+				paid = if paid == "0" then false else nil,
 			})
 		end
 	end

@@ -665,7 +665,7 @@ safely(
 	remote.ResetTutorial,
 	remote.TutorialSeen
 )
-safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop)
+safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop, remote.ForemanTurnIn)
 safely("EventService.InitEvent", EventService.InitEvent, notify)
 safely("BiomeService.Init", BiomeService.Init, notify)
 safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)

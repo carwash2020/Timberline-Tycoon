@@ -14,6 +14,7 @@ Net.RemoteNames = {
 	"DropAxe", -- client -> server: (axeUid)
 	"BuyItem", -- client -> server: (category, itemId); the result comes back as a Notify toast
 	"SkipTutorial", -- client -> server: ()
+	"ForemanTurnIn", -- client -> server: () hand the day's finished jobs in to Rook Calloway, the Sawmill Foreman; he must be within reach (DailyService)
 	"EquipItem", -- client -> server: (category, itemId) switch to something you own (a truck)
 	"AdminRun", -- client -> server: (request) the owner menu; the server refuses anyone but the owner (AdminService)
 	"AdminResult", -- server -> client: (ok, text) what the owner menu request did or why it was refused (AdminService)

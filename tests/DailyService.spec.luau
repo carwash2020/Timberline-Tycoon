@@ -56,6 +56,7 @@ return function(t)
 		return {
 			Daily = Daily,
 			DailyData = loader:shared("DailyData"),
+			GameConfig = loader:shared("GameConfig"),
 			profile = profile,
 			player = player,
 			toasts = toasts,
@@ -155,17 +156,95 @@ return function(t)
 		error("no player got a wood goal in 60 tries")
 	end)
 
-	t.test("each goal pays; all three pay the bonus and start a streak", function()
+	-- The foreman pays (V1 Lane E): a finished goal is owed until it is
+	-- handed in, and the streak still moves the moment the third one is done.
+	t.test("each goal is owed, not paid; all three owe the bonus and start a streak", function()
 		local s = setup()
 		finishAll(s)
 		local rewards = 3 * s.DailyData.Tiers[1].reward
-		t.eq(s.profile.cash, rewards + s.DailyData.Bonus(1, 1))
-		t.eq(s.profile.daily.streak, 1)
+		t.eq(s.profile.cash, 0, "nothing paid until Rook is visited")
+		t.eq(s.profile.daily.bonusOwed, s.DailyData.Bonus(1, 1))
+		for _, goal in ipairs(s.profile.daily.goals) do
+			t.eq(goal.paid, false)
+		end
+		t.eq(s.profile.daily.streak, 1, "the streak counts without a visit")
 		t.eq(s.player.attrs.DailyStreak, 1)
-		t.ok(string.find(s.toasts[#s.toasts], "All daily goals done") ~= nil)
+		t.ok(string.find(s.toasts[#s.toasts], "All daily jobs done") ~= nil)
+		finishAll(s) -- more events the same day change nothing
+		t.eq(s.profile.cash, 0)
+		local credited = s.Daily.TurnIn(s.player)
+		t.eq(credited, rewards + s.DailyData.Bonus(1, 1))
+		t.eq(s.profile.cash, rewards + s.DailyData.Bonus(1, 1))
+		t.eq(s.profile.daily.bonusOwed, 0)
+	end)
+
+	t.test("a second hand-in pays nothing more", function()
+		local s = setup()
+		finishAll(s)
+		s.Daily.TurnIn(s.player)
 		local cash = s.profile.cash
-		finishAll(s) -- more events the same day pay nothing more
+		local again = s.Daily.TurnIn(s.player)
+		t.eq(again, 0)
 		t.eq(s.profile.cash, cash)
+	end)
+
+	t.test("a goal finished after a hand-in is owed on its own", function()
+		local s = setup()
+		local first = s.profile.daily.goals[1]
+		s.Daily.Event(s.player, "treeFelled", 0)
+		first.progress = first.target - 1
+		finishAll(s)
+		s.Daily.TurnIn(s.player)
+		t.eq(s.profile.cash, 3 * s.DailyData.Tiers[1].reward + s.DailyData.Bonus(1, 1))
+	end)
+
+	t.test("a full wallet keeps the remainder owed, and the next hand-in pays it", function()
+		local s = setup()
+		finishAll(s)
+		local GameConfig = s.GameConfig
+		s.profile.cash = GameConfig.CashCap - 10
+		local owed = 3 * s.DailyData.Tiers[1].reward + s.DailyData.Bonus(1, 1)
+		local credited, left = s.Daily.TurnIn(s.player)
+		t.eq(credited, 10)
+		t.eq(left, owed - 10)
+		t.eq(s.profile.daily.bonusOwed, owed - 10)
+		s.profile.cash = 0
+		local more = s.Daily.TurnIn(s.player)
+		t.eq(more, owed - 10)
+		t.eq(s.profile.daily.bonusOwed, 0)
+	end)
+
+	t.test("what is still owed is paid once at the reset, days later too", function()
+		local s = setup()
+		finishAll(s)
+		local owed = 3 * s.DailyData.Tiers[1].reward + s.DailyData.Bonus(1, 1)
+		s.clock.now += 3 * DAY
+		s.Daily.Event(s.player, "treeFelled", 0) -- the rejoin rolls the new day
+		-- The daily-return calendar paid its own day-1 reward on top (not the foreman's).
+		local login = s.profile.cash - owed
+		t.ok(login >= 0 and login < owed, "the owed jobs were paid at the reset")
+		t.eq(s.profile.daily.streak, 0, "a missed day still breaks the streak")
+		s.Daily.Event(s.player, "treeFelled", 0)
+		t.eq(s.profile.cash, owed + login, "paid once")
+	end)
+
+	t.test("migrated finished goals pay nothing on the first hand-in", function()
+		local s = setup()
+		for _, goal in ipairs(s.profile.daily.goals) do
+			goal.done = true
+			goal.paid = true -- ProfileSchema.Migrate: the old loop already paid it
+		end
+		t.eq(s.Daily.TurnIn(s.player), 0)
+		t.eq(s.profile.cash, 0)
+	end)
+
+	t.test("the hand-in is refused while the tutorial runs", function()
+		local s = setup({ tutorialDone = false })
+		finishAll(s)
+		t.eq(s.Daily.TurnIn(s.player), 0)
+		t.eq(s.profile.cash, 0)
+		s.profile.tutorialDone = true
+		t.ok(s.Daily.TurnIn(s.player) > 0)
 	end)
 
 	t.test("finishing on consecutive days grows the streak and the bonus", function()
@@ -178,6 +257,7 @@ return function(t)
 		local before = s.profile.cash
 		finishAll(s)
 		t.eq(s.profile.daily.streak, 2)
+		s.Daily.TurnIn(s.player)
 		t.eq(s.profile.cash - before, 3 * s.DailyData.Tiers[1].reward + s.DailyData.Bonus(1, 2))
 		t.eq(s.profile.daily.bestStreak, 2)
 	end)
@@ -208,13 +288,14 @@ return function(t)
 		end
 	end)
 
-	t.test("during the tutorial goals still count and pay, without a toast", function()
+	t.test("during the tutorial goals still count and are owed, without a toast", function()
 		local s = setup({ tutorialDone = false })
 		finishAll(s)
 		for _, goal in ipairs(s.profile.daily.goals) do
 			t.ok(goal.done)
 		end
-		t.eq(s.profile.cash, 3 * s.DailyData.Tiers[1].reward + s.DailyData.Bonus(1, 1), "every reward and the bonus")
+		t.eq(s.profile.cash, 0, "nothing paid yet")
+		t.eq(s.profile.daily.bonusOwed, s.DailyData.Bonus(1, 1), "the bonus is owed")
 		t.eq(s.profile.daily.streak, 1)
 		t.eq(s.DailyData.Decode(s.player.attrs.DailyGoals), s.profile.daily.goals, "DailyUI still gets the progress")
 		t.eq(s.toasts, {})
@@ -227,8 +308,8 @@ return function(t)
 		s.profile.tutorialDone = true -- QuestService finishes it
 		finishAll(s)
 		t.eq(#s.toasts, 2, "the goal, then the day")
-		t.ok(string.find(s.toasts[1], "Daily goal done", 1, true) ~= nil)
-		t.ok(string.find(s.toasts[2], "All daily goals done", 1, true) ~= nil)
+		t.ok(string.find(s.toasts[1], "Daily job done", 1, true) ~= nil)
+		t.ok(string.find(s.toasts[2], "All daily jobs done", 1, true) ~= nil)
 	end)
 
 	t.test("the midnight roll toasts only once the tutorial's done", function()
@@ -352,7 +433,7 @@ return function(t)
 		t.eq(back.profile.daily.streak, 4)
 	end)
 
-	t.test("v2: every goal finishes on the v2 events; each pays, then the v2 bonus", function()
+	t.test("v2: every goal finishes on the v2 events; each is owed, then the v2 bonus is paid at the hand-in", function()
 		local kinds = {}
 		for userId = 1, 40 do
 			local s = setup({ loop = 2, userId = userId })
@@ -365,9 +446,10 @@ return function(t)
 				t.eq(goal.progress, goal.target)
 			end
 			local rewards = 3 * s.DailyData.TiersV2[1].reward
-			t.eq(s.profile.cash, rewards + s.DailyData.Bonus(1, 1, 2), "v2 rewards and bonus")
+			t.eq(s.profile.cash, 0, "owed, not paid")
+			t.eq(s.Daily.TurnIn(s.player), rewards + s.DailyData.Bonus(1, 1, 2), "v2 rewards and bonus")
 			t.eq(s.profile.daily.streak, 1)
-			t.ok(string.find(s.toasts[#s.toasts], "All daily goals done") ~= nil)
+			t.ok(string.find(s.toasts[#s.toasts - 1], "All daily jobs done") ~= nil)
 		end
 		for _, kind in ipairs(t.shared("DailyData").KindsV2) do
 			t.ok(kinds[kind], kind .. " comes up across 40 players")
