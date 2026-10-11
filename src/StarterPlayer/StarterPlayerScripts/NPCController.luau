@@ -50,6 +50,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
+local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
 local DialogueFlow = require(ReplicatedStorage.Shared.DialogueFlow)
 local ForemanData = require(ReplicatedStorage.Shared.ForemanData)
 local HeadLook = require(ReplicatedStorage.Shared.HeadLook)
@@ -377,6 +378,10 @@ local function onTalk(rig: Rig)
 	local line = takeLine(rig)
 	if line then
 		table.insert(lines, line)
+	end
+	if npc.id == "Gus" then
+		-- His charter's step first (SkyQuestService sets SkyQuestStep).
+		table.insert(lines, 1, DialogueData.GusLine(player:GetAttribute("SkyQuestStep") :: string?))
 	end
 	local isForeman = npc.id == ForemanData.Id
 	if isForeman then
