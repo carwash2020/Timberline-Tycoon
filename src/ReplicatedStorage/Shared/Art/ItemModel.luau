@@ -27,6 +27,7 @@ local BlueprintModels = require(script.Parent.Parent.BlueprintModels)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Kit)
 local MachineArt = require(script.Parent.MachineArt)
+local MachineSkin = require(script.Parent.MachineSkin)
 local PlotData = require(script.Parent.Parent.PlotData)
 local TruckArt = require(script.Parent.TruckArt)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
@@ -211,12 +212,22 @@ local function buildRaw(kind: string, itemId: string): (Model?, CFrame, boolean)
 			return AxeArt.Build(def), AXE_TURN, false
 		end
 	elseif kind == "Sawmill" or kind == "Machine" then
+		-- The chop saw's display is cropped part by part, so it is the part build
+		-- (the Blender mesh is the whole 56 stud deck).
+		local plain = itemId == "ChopSaw"
+		if plain then
+			MachineSkin.Disabled = true
+		end
 		local model = MachineArt.BuildAny(itemId)
+		MachineSkin.Disabled = false
 		if model then
-			if itemId == "ChopSaw" then
+			if plain then
 				cropChopSaw(model)
 			end
-			return model, CFrame.identity, false
+			-- TLD-1 mills and planers run along the feed (8 x 12 and longer): turned so
+			-- their length lies across the window, like a truck.
+			local long = kind == "Sawmill" or (model:GetAttribute("PlanerId") ~= nil)
+			return model, if long then VEHICLE_TURN else CFrame.identity, false
 		end
 	elseif kind == "Blueprint" then
 		for _, bp in ipairs(PlotData.Blueprints) do

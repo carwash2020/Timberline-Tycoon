@@ -25,10 +25,15 @@
 --            empty while its ids are 0, so nothing changes in game)
 --   backlog  the uploaded backlog assets a builder wires today
 --            (BacklogModels.Wired: shops, gates and the Robux crate)
+--   machines the plot machines and logic pieces (MachineMeshes: sawmills,
+--            planers, the chop saw, belts, the furnace, the stall, the
+--            bench and every Sparkworks piece; machine meshes are cloned
+--            when a plot builds, so these load last)
 
 local AxeModels = require(script.Parent.AxeModels)
 local BacklogModels = require(script.Parent.BacklogModels)
 local BlenderAssets = require(script.Parent.BlenderAssets)
+local MachineMeshes = require(script.Parent.MachineMeshes)
 local RockModels = require(script.Parent.RockModels)
 local ItemMeshData = require(script.Parent.Parent.ItemMeshData)
 local KitMeshData = require(script.Parent.Parent.KitMeshData)
@@ -145,6 +150,11 @@ function MeshManifest.Groups(town: boolean?): { Group }
 	end)
 	add("backlog", function(out)
 		for _, id in ipairs(BacklogModels.MeshIds(BacklogModels.Wired)) do
+			table.insert(out, { id = id, hull = false })
+		end
+	end)
+	add("machines", function(out)
+		for _, id in ipairs(MachineMeshes.MeshIds()) do
 			table.insert(out, { id = id, hull = false })
 		end
 	end)
