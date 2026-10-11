@@ -30,6 +30,9 @@ function TownMeshes.ResetFallbacks()
 end
 
 local function noteFallback(target: Instance, assetId: string)
+	if MeshKit.WasPending() then
+		return -- a mesh is still on its way: the swap (MeshKit.Attempt) dresses it later
+	end
 	if BacklogModels.Get(assetId) == nil then
 		return -- only the Blender backlog is tracked; older assets stay as they were
 	end
@@ -472,8 +475,7 @@ end
 -- is built): off, Dress and Adorn leave the part-built buildings as they are.
 TownMeshes.Enabled = true
 
--- True when the meshes replaced the decoration. False keeps the parts.
-function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boolean
+local function dressNow(model: Model, assetId: string, options: Options?): boolean
 	if not TownMeshes.Enabled then
 		return false
 	end
@@ -535,12 +537,22 @@ function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boo
 	end)
 	retire(model, fresh)
 	model:SetAttribute("TownMesh", assetId)
+	model:SetAttribute("MeshFallback", nil)
 	return true
+end
+
+-- True when the meshes replaced the decoration. False keeps the parts. Never
+-- waits for a mesh: if one is still loading the parts stay, and the dressing
+-- is done again when it lands (MeshKit.Attempt).
+function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boolean
+	return MeshKit.Attempt(model, function()
+		return dressNow(model, assetId, options)
+	end, true)
 end
 
 -- Visuals parented under `parent` (a parking slot is a part, not a model).
 -- The painted bay stays: lines, the number, and its light are gameplay.
-function TownMeshes.Adorn(parent: Instance, assetId: string, pivot: CFrame): boolean
+local function adornNow(parent: Instance, assetId: string, pivot: CFrame): boolean
 	if not TownMeshes.Enabled then
 		return false
 	end
@@ -576,7 +588,18 @@ function TownMeshes.Adorn(parent: Instance, assetId: string, pivot: CFrame): boo
 		end
 		part.Parent = parent
 	end
+	if #made > 0 then
+		pcall(function()
+			parent:SetAttribute("MeshFallback", nil)
+		end)
+	end
 	return #made > 0
+end
+
+function TownMeshes.Adorn(parent: Instance, assetId: string, pivot: CFrame): boolean
+	return MeshKit.Attempt(parent, function()
+		return adornNow(parent, assetId, pivot)
+	end)
 end
 
 return TownMeshes

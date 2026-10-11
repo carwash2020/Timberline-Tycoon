@@ -66,8 +66,7 @@ local function trunkFoot(model: Model, root: BasePart?): Vector3?
 	return Vector3.new(p.X, low, p.Z)
 end
 
--- True when the model is now meshed. False leaves it untouched.
-function TreeMeshes.Apply(model: Model, def: WoodDef, skel: Skeleton): boolean
+local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 	local crown = TreeModels.Crown(def.id)
 	if #crown == 0 then
 		return false
@@ -191,6 +190,15 @@ function TreeMeshes.Apply(model: Model, def: WoodDef, skel: Skeleton): boolean
 	destroyAll(drop)
 	model:SetAttribute("TreeMesh", true)
 	return true
+end
+
+-- True when the model is now meshed. False leaves it untouched. Never waits
+-- for a mesh: a tree whose meshes are still loading stays part-built and is
+-- dressed when they land (MeshKit.Attempt).
+function TreeMeshes.Apply(model: Model, def: WoodDef, skel: Skeleton): boolean
+	return MeshKit.Attempt(model, function()
+		return applyNow(model, def, skel)
+	end)
 end
 
 return TreeMeshes

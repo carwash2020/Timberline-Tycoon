@@ -158,7 +158,21 @@ end
 -- added (shell, then coins). The body becomes invisible. The uploaded crate
 -- mesh when it loads; otherwise the open crate of coins built from parts.
 function RobuxBoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart }
-	local meshed = dressMesh(parent, body, spec)
+	-- Never waits for the crate mesh: while it loads the open crate of parts
+	-- stands, and the mesh replaces it when it lands (MeshKit.Attempt).
+	local partBuilt: { BasePart }? = nil
+	local meshed = MeshKit.Attempt(parent, function(): { BasePart }?
+		local made = dressMesh(parent, body, spec)
+		if made and partBuilt then
+			for _, old in ipairs(partBuilt) do
+				if old.Parent then
+					old:Destroy()
+				end
+			end
+			partBuilt = nil
+		end
+		return made
+	end)
 	if meshed then
 		return meshed
 	end
@@ -307,6 +321,7 @@ function RobuxBoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { Base
 		table.insert(added, coin)
 	end
 	contents.Parent = parent
+	partBuilt = added
 	return added
 end
 

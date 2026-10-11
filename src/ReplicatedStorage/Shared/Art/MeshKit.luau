@@ -13,6 +13,17 @@
 -- BlockAfter failures in a row with not one success, the kit stops asking
 -- (each miss is slow) and says so once.
 --
+-- NEVER BLOCKS (12 October 2026, Connor's Studio log: "4. The shops done in
+-- 300.2s", "meshes: 476 of 685 loaded ... (timed out)"). The world build called
+-- Create for every piece and Create yielded in CreateMeshPartAsync, one mesh
+-- after another, behind 24 preload workers that already held the asset
+-- quota. Now Create on an uncached mesh returns nil at once (the caller keeps
+-- its part-built art, exactly as for a failed load), asks for the mesh in the
+-- background (Request) and, when the caller ran inside MeshKit.Attempt,
+-- remembers to run the same dress step again when the mesh has arrived (the
+-- swap: batched, a few milliseconds a frame, Pump). CreateAwait is the old
+-- yielding call, for background threads only (tests/BuildBudget.spec fences
+-- who may call it).
 -- Each meshId is loaded once per server. Later uses clone that MeshPart.
 -- Loads run side by side: MeshKit.Preload takes a list of ids and loads them
 -- a couple of dozen at a time (Shared/WorkPool), and a Create for an id that
@@ -37,6 +48,48 @@ MeshKit.Override = nil :: OverrideFn?
 local masters: { [number]: MeshPart } = {}
 local failed: { [number]: boolean } = {}
 local inflight: { [number]: boolean } = {} -- ids being loaded right now (a second asker waits)
+
+-- The swap queue's state (see "The swap queue" below).
+type Waiter = {
+	remaining: number,
+	dead: boolean,
+	tries: number,
+	alive: Instance?,
+	attempt: () -> any,
+}
+
+local waiting: { [number]: { Waiter } } = {}
+local ready: { Waiter } = {}
+local readyHead = 1
+local draining = false
+local collecting: { [number]: boolean }? = nil
+local swapped, swapSkipped, swapRetried = 0, 0, 0
+local requested: { [number]: boolean } = {} -- ids asked for in the background
+local requestQueue: { { id: number, fidelity: Enum.CollisionFidelity } } = {}
+local requestHead = 1
+local requestActive = 0
+
+-- Injectable for specs (Lune has no `task`, and a spec wants to hold a load).
+MeshKit.Scheduler = {
+	spawn = function(fn: () -> ())
+		-- (a spec's stub `task` may lack spawn)
+		if type(task) == "table" and type(task.spawn) == "function" then
+			task.spawn(fn)
+		else
+			fn()
+		end
+	end,
+	wait = function()
+		if type(task) == "table" and type(task.wait) == "function" then
+			task.wait()
+		end
+	end,
+	clock = os.clock,
+}
+-- Replaces the AssetService call (specs only): (meshId, collision) -> (part, why).
+MeshKit.EngineLoad = nil :: ((number, Enum.CollisionFidelity) -> (MeshPart?, string?))?
+MeshKit.RequestConcurrency = 24 -- background loads started by Create misses at once
+MeshKit.SwapBudget = 0.004 -- seconds of dressing per Pump (one frame's slice)
 
 -- Lune has no AssetService. Remember that so every tree doesn't pay for the miss.
 local noAssetService = false
@@ -163,6 +216,16 @@ function MeshKit.Reset()
 	blocked = false
 	firstError = nil
 	table.clear(failedIds)
+	table.clear(waiting)
+	table.clear(ready)
+	readyHead = 1
+	draining = false
+	collecting = nil
+	swapped, swapSkipped, swapRetried = 0, 0, 0
+	table.clear(requested)
+	table.clear(requestQueue)
+	requestHead = 1
+	requestActive = 0
 end
 
 local function finish(part: MeshPart, name: string, size: Vector3, collision: Enum.CollisionFidelity): MeshPart
@@ -207,6 +270,10 @@ end
 
 -- (part, nil) or (nil, why). `why` is the engine's own error text.
 local function fromAssetService(meshId: number, collision: Enum.CollisionFidelity): (MeshPart?, string?)
+	local custom = MeshKit.EngineLoad
+	if custom then
+		return custom(meshId, collision)
+	end
 	if noAssetService then
 		return nil, "no AssetService"
 	end
@@ -286,6 +353,148 @@ local function remember(meshId: number, part: MeshPart)
 	masters[meshId] = part
 end
 
+-- The swap queue ------------------------------------------------------------
+-- A dress step that missed only because a mesh was still loading is a Waiter:
+-- it waits for every mesh it missed, then runs again from `ready`, a few
+-- milliseconds per Pump. A mesh that FAILED cancels its waiters (the part-built
+-- art is the answer for good).
+
+local function falsy(result: any): boolean
+	return result == nil or result == false or result == 0
+end
+
+local function missesOf(set: { [number]: boolean }): { number }
+	local ids: { number } = {}
+	for id in pairs(set) do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	return ids
+end
+
+local function startDrain()
+	if draining then
+		return
+	end
+	draining = true
+	MeshKit.Scheduler.spawn(function()
+		while readyHead <= #ready do
+			MeshKit.Pump()
+			if readyHead <= #ready then
+				MeshKit.Scheduler.wait()
+			end
+		end
+		draining = false
+	end)
+end
+
+-- Registers `attempt` to run again once every id in `ids` has loaded. Nothing
+-- is registered when an id already failed (the fallback is final).
+local function schedule(alive: Instance?, attempt: () -> any, ids: { number }, tries: number)
+	local waiter: Waiter = { remaining = 0, dead = false, tries = tries, alive = alive, attempt = attempt }
+	for _, id in ipairs(ids) do
+		if failed[id] then
+			return
+		end
+		if not masters[id] then
+			waiter.remaining += 1
+			local list = waiting[id]
+			if not list then
+				list = {}
+				waiting[id] = list
+			end
+			table.insert(list, waiter)
+		end
+	end
+	if waiter.remaining == 0 then
+		table.insert(ready, waiter)
+		startDrain()
+	end
+end
+
+-- Called when an id has loaded or failed.
+local function resolved(meshId: number)
+	local list = waiting[meshId]
+	if not list then
+		return
+	end
+	waiting[meshId] = nil
+	local any = false
+	for _, waiter in ipairs(list) do
+		if failed[meshId] then
+			waiter.dead = true
+		else
+			waiter.remaining -= 1
+			if waiter.remaining == 0 and not waiter.dead then
+				table.insert(ready, waiter)
+				any = true
+			end
+		end
+	end
+	if any then
+		startDrain()
+	end
+end
+
+-- Runs ready swaps until `budget` seconds are spent (at least one runs).
+-- Returns how many ran. The drain loop calls this once a frame; specs call it.
+function MeshKit.Pump(budget: number?): number
+	local limit = budget or MeshKit.SwapBudget
+	local clock = MeshKit.Scheduler.clock
+	local startedAt = clock()
+	local ran = 0
+	while readyHead <= #ready do
+		local waiter = ready[readyHead]
+		ready[readyHead] = nil :: any
+		readyHead += 1
+		local keep = waiter.alive == nil or waiter.alive.Parent ~= nil
+		if keep and not waiter.dead then
+			ran += 1
+			local mine: { [number]: boolean } = {}
+			local outer = collecting
+			collecting = mine
+			local ok, result = pcall(waiter.attempt)
+			collecting = outer
+			if not ok then
+				warn("[MeshKit] a swapped-in mesh step failed: " .. tostring(result))
+			elseif falsy(result) then
+				swapRetried += 1
+				if next(mine) ~= nil and waiter.tries < 3 then
+					schedule(waiter.alive, waiter.attempt, missesOf(mine), waiter.tries + 1)
+				end
+			else
+				swapped += 1
+			end
+		else
+			swapSkipped += 1
+		end
+		if clock() - startedAt >= limit then
+			break
+		end
+	end
+	if readyHead > #ready then
+		table.clear(ready)
+		readyHead = 1
+	end
+	return ran
+end
+
+export type SwapStats = { waiting: number, ready: number, swapped: number, skipped: number, retried: number }
+
+function MeshKit.SwapStats(): SwapStats
+	local count = 0
+	for _, list in pairs(waiting) do
+		count += #list
+	end
+	return {
+		waiting = count,
+		ready = #ready - readyHead + 1,
+		swapped = swapped,
+		skipped = swapSkipped,
+		retried = swapRetried,
+	}
+end
+
 -- Makes sure `meshId`'s master is cached: true if it is (now), false if the
 -- load failed. Safe to call from many threads at once: the first one loads,
 -- the others wait for it.
@@ -307,15 +516,62 @@ local function ensure(meshId: number, fidelity: Enum.CollisionFidelity): boolean
 	inflight[meshId] = nil
 	if okLoad and made then
 		remember(meshId, made)
+		resolved(meshId)
 		return true
 	end
 	failed[meshId] = true
+	resolved(meshId)
 	return false
 end
 
--- A MeshPart named `name` at `size`, or nil. Never throws.
--- `collision` defaults to Box. Pass Hull for a shape a box would get wrong.
-function MeshKit.Create(meshId: number, name: string, size: Vector3, collision: Enum.CollisionFidelity?): MeshPart?
+local function pumpRequests()
+	while requestActive < MeshKit.RequestConcurrency and requestHead <= #requestQueue do
+		local item = requestQueue[requestHead]
+		requestQueue[requestHead] = nil :: any
+		requestHead += 1
+		requestActive += 1
+		MeshKit.Scheduler.spawn(function()
+			pcall(ensure, item.id, item.fidelity)
+			requestActive -= 1
+			pumpRequests()
+		end)
+	end
+	if requestHead > #requestQueue then
+		table.clear(requestQueue)
+		requestHead = 1
+	end
+end
+
+-- Asks for `meshId` in the background (a Create miss does this). Never yields.
+function MeshKit.Request(meshId: number, fidelity: Enum.CollisionFidelity?)
+	if masters[meshId] or failed[meshId] or inflight[meshId] or requested[meshId] then
+		return
+	end
+	requested[meshId] = true
+	table.insert(requestQueue, { id = meshId, fidelity = fidelity or Enum.CollisionFidelity.Box })
+	pumpRequests()
+end
+
+-- True while `meshId` is on its way (asked for, not cached, not failed).
+function MeshKit.IsPending(meshId: number): boolean
+	return (masters[meshId] :: MeshPart?) == nil
+		and not failed[meshId]
+		and (inflight[meshId] == true or requested[meshId] == true)
+end
+
+-- True inside an Attempt when a Create missed only because a mesh is still on
+-- its way: the caller's fallback is temporary, so it must not warn.
+function MeshKit.WasPending(): boolean
+	return collecting ~= nil and next(collecting) ~= nil
+end
+
+local function create(
+	meshId: number,
+	name: string,
+	size: Vector3,
+	collision: Enum.CollisionFidelity?,
+	blocking: boolean
+): MeshPart?
 	if type(meshId) ~= "number" or meshId == 0 or meshId ~= meshId then
 		return nil
 	end
@@ -344,6 +600,24 @@ function MeshKit.Create(meshId: number, name: string, size: Vector3, collision: 
 
 	-- The engine's import pivot (CreateMeshPartAsync) beats a template,
 	-- which only has the mesh id. The template is the fallback.
+	if not blocking then
+		-- Not cached: never wait for it. The caller keeps its part-built art;
+		-- the mesh is asked for in the background and, inside an Attempt, the
+		-- dress step runs again when it lands.
+		MeshKit.Request(meshId, fidelity)
+		if failed[meshId] then
+			return nil
+		end
+		local after = masters[meshId]
+		if after then
+			return finish(after:Clone(), name, size, fidelity)
+		end
+		local seen = collecting
+		if seen then
+			seen[meshId] = true
+		end
+		return nil
+	end
 	if not ensure(meshId, fidelity) then
 		return nil
 	end
@@ -352,6 +626,58 @@ function MeshKit.Create(meshId: number, name: string, size: Vector3, collision: 
 		return nil
 	end
 	return finish(loaded:Clone(), name, size, fidelity)
+end
+
+-- A MeshPart named `name` at `size`, or nil. Never throws and NEVER YIELDS:
+-- an uncached mesh is nil now (part-built art stays) and loads in the
+-- background. `collision` defaults to Box. Pass Hull for a shape a box would
+-- get wrong.
+function MeshKit.Create(meshId: number, name: string, size: Vector3, collision: Enum.CollisionFidelity?): MeshPart?
+	return create(meshId, name, size, collision, false)
+end
+
+-- The old yielding Create. Only for background threads and player actions
+-- (tests/BuildBudget.spec lists who may call it); never on the world build.
+function MeshKit.CreateAwait(meshId: number, name: string, size: Vector3, collision: Enum.CollisionFidelity?): MeshPart?
+	return create(meshId, name, size, collision, true)
+end
+
+-- Runs a dress step (it calls Create, may fail, and leaves the part-built art
+-- alone when it does). If it failed only because meshes were still loading,
+-- the same step runs again, in the background and a few ms a frame, once they
+-- have arrived: the swap. `alive` is the model being dressed; a step whose
+-- model has been removed by then is dropped. `inBuildFrame`: the step writes
+-- absolute coordinates (a model built at the origin and moved after), so the
+-- swap puts the model back where it was built, dresses it, and moves it on
+-- again. Returns what the step returned.
+function MeshKit.Attempt<T>(alive: Instance?, attempt: () -> T, inBuildFrame: boolean?): T
+	local outer = collecting
+	local mine: { [number]: boolean } = {}
+	collecting = mine
+	local ok, result = pcall(attempt)
+	collecting = outer
+	if not ok then
+		error(result, 0)
+	end
+	if falsy(result) and next(mine) ~= nil then
+		local again: () -> any = attempt
+		if inBuildFrame == true and alive ~= nil and alive:IsA("Model") then
+			local model = alive :: Model
+			local built = model:GetPivot()
+			again = function(): any
+				local now = model:GetPivot()
+				model:PivotTo(built)
+				local okRetry, value = pcall(attempt)
+				model:PivotTo(now)
+				if not okRetry then
+					error(value, 0)
+				end
+				return value
+			end
+		end
+		schedule(alive, again, missesOf(mine), 1)
+	end
+	return result :: T
 end
 
 export type Entry = { id: number, hull: boolean? }
@@ -417,6 +743,21 @@ function MeshKit.Preload(entries: { Entry }, options: { concurrency: number?, ti
 		timedOut = result.timedOut,
 		seconds = os.clock() - startedAt,
 	}
+end
+
+-- Preload on its own thread: returns at once, `onDone` (if any) gets the
+-- result when the join ends. The way the start path asks for meshes.
+function MeshKit.PreloadAsync(
+	entries: { Entry },
+	options: { concurrency: number?, timeout: number? }?,
+	onDone: ((PreloadResult) -> ())?
+)
+	MeshKit.Scheduler.spawn(function()
+		local result = MeshKit.Preload(entries, options)
+		if onDone then
+			onDone(result)
+		end
+	end)
 end
 
 -- True when `meshId` is cached (a clone is instant).

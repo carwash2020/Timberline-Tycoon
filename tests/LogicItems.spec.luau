@@ -96,4 +96,26 @@ return function(t)
 		t.eq(LogicItems.FellBack("GateAnd"), false)
 		LogicItems.InstallMesh("GateAnd", nil)
 	end)
+
+	t.test("Glow Wire has no mesh art: part-built by design, silent, said once at debug level", function()
+		LogicItems.InstallMesh(nil)
+		local said = {}
+		LogicItems.DebugSink = function(line)
+			table.insert(said, line)
+		end
+		local model = Models.Build(PlotData.Blueprint("GlowWire"), false)
+		Models.Build(PlotData.Blueprint("GlowWire"), false)
+		LogicItems.DebugSink = nil
+		t.eq(#said, 1, "one debug line, however many are built")
+		t.ok(string.find(said[1], "GlowWire", 1, true))
+		t.ok(string.find(said[1], "(debug)", 1, true))
+		t.eq(LogicItems.FellBack("GlowWire"), true, "still counts as part-built")
+		t.eq(model:FindFirstChild("Body"), nil)
+		t.ok(model:FindFirstChild("Part1"), "the boxes are the look")
+		t.eq(model:FindFirstChild("Part1").Transparency, 0)
+		-- A piece that has mesh art and loses it still warns (its own path).
+		local MachineMeshes = t.shared("Art/MachineMeshes")
+		t.eq(MachineMeshes.Get("GlowWire"), nil, "no MachineMeshes row for it")
+		t.ok(MachineMeshes.Get("Lever") ~= nil, "the lever has one")
+	end)
 end

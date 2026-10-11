@@ -229,8 +229,10 @@ function ItemMeshes.LoadAsync()
 		for _, def in ipairs(defs) do
 			-- MeshKit does the loading: both CreateMeshPartAsync forms, a
 			-- retry, and a warning with the engine's error when it fails.
+			-- CreateAwait yields, which is fine here: LoadAsync only ever runs
+			-- on its own thread (PlotService.Init spawns it).
 			local numeric = tonumber(string.match(def.meshId, "%d+"))
-			local mesh = if numeric then MeshKit.Create(numeric, def.name, def.size) else nil
+			local mesh = if numeric then MeshKit.CreateAwait(numeric, def.name, def.size) else nil
 			if not mesh then
 				good = false
 				break
