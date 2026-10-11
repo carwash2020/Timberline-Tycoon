@@ -5,15 +5,27 @@ return function(t)
 	local DailyData = t.shared("DailyData")
 
 	local function goal(done, paid, reward)
-		return { kind = "fell", target = 4, progress = if done then 4 else 1, reward = reward or 15, done = done, paid = paid }
+		return {
+			kind = "fell",
+			target = 4,
+			progress = if done then 4 else 1,
+			reward = reward or 15,
+			done = done,
+			paid = paid,
+		}
 	end
 
 	t.test("owed is every finished unpaid goal plus the bonus", function()
-		local total, waiting = ForemanData.Owed({ goal(true, false, 15), goal(true, true, 30), goal(false, nil, 75) }, 40)
+		local total, waiting =
+			ForemanData.Owed({ goal(true, false, 15), goal(true, true, 30), goal(false, nil, 75) }, 40)
 		t.eq(total, 55)
 		t.eq(waiting, 1)
 		t.eq(ForemanData.Owed({}, nil), 0)
-		t.eq(ForemanData.Owed({ goal(true, nil, 30) }, 0), 0, "a goal with no paid flag is the old loop's: already paid")
+		t.eq(
+			ForemanData.Owed({ goal(true, nil, 30) }, 0),
+			0,
+			"a goal with no paid flag is the old loop's: already paid"
+		)
 	end)
 
 	t.test("the countdown counts to the UTC reset, never 'tomorrow'", function()

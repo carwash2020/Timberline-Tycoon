@@ -1,10 +1,15 @@
 --!strict
--- DailyUI: daily goals and the streak (rules in Shared/DailyData).
---   * A "Daily goals 1/3" button under the cash plaque (top right, in
---     HUD.UnderCash), with the streak. It waits until Murph's tutorial is
---     done (HudRules.DailyButton), so the first minute has one objective;
---     the goals still count meanwhile, quietly (DailyService).
---   * Tapping it opens the day's goals (one of the corner's popups, under
+-- DailyUI: Rook Calloway's job board: the day's goals, what he owes, and
+-- the streak (rules in Shared/DailyData and Shared/ForemanData).
+--   * NPCController opens it (DailyUI.OpenForeman) when Rook's talk box
+--     closes, so the goals come from the Foreman, not a HUD button. The
+--     old corner button is kept off screen (the Foreman replaces it;
+--     UITheme no longer has its size). The panel has a "Take $N" button
+--     that fires ForemanTurnIn: the server checks he is within reach and
+--     pays what is owed once (DailyService.TurnIn).
+--   * The goals still count during Murph's tutorial, quietly
+--     (DailyService); Rook sends you back to Murph until it ends.
+--   * It opens the day's goals (one of the corner's popups, under
 --     it): progress bars, each goal's reward, the bonus for finishing them
 --     all, and the time until new goals.
 --   * On a gamepad, DPadUp opens and closes it too (HUD.PadShortcut), and
@@ -23,6 +28,8 @@ local UserInputService = game:GetService("UserInputService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local EventData = require(ReplicatedStorage.Shared.EventData)
+local ForemanData = require(ReplicatedStorage.Shared.ForemanData)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
 local HudNav = require(script.Parent.HudNav)
@@ -34,6 +41,7 @@ local DailyUI = {}
 
 local player = Players.LocalPlayer
 local goalsOpen = false
+local foremanMode = false -- opened at Rook: the Take button shows
 local focus: GuiObject? = nil
 
 local INK = UITheme.Colors.Ink
@@ -47,6 +55,7 @@ local AMBER = UITheme.Colors.Amber
 type GoalRow = { frame: Frame, text: TextLabel, reward: TextLabel, fill: Frame }
 
 local button: TextButton? = nil
+local takeButton: TextButton? = nil -- "Take $N": hands the finished jobs in to Rook
 local buttonSlot: Frame? = nil -- on a phone, what holds the button and its hit area in the corner
 local panel: Frame? = nil
 
@@ -62,6 +71,7 @@ end
 
 function DailyUI._close()
 	goalsOpen = false
+	foremanMode = false
 	local card = panel
 	if card then
 		card.Visible = false
@@ -81,6 +91,7 @@ end
 local goalRows: { GoalRow } = {}
 local calendarCells: { { frame: Frame, label: TextLabel } } = {}
 local calendarNote: TextLabel? = nil
+local calendarFrame: Frame? = nil -- hidden on a phone so the panel fits 375 px
 local eventHeading: TextLabel? = nil -- the seasonal event's goals (EventGoals / EventInfo), hidden outside one
 local eventLines: TextLabel? = nil
 local footer: TextLabel? = nil
@@ -114,6 +125,10 @@ end
 
 local function bestAxeTier(): number
 	return (player:GetAttribute("BestAxeTier") :: number?) or 1
+end
+
+local function bonusOwed(): number
+	return (player:GetAttribute("DailyBonusOwed") :: number?) or 0
 end
 
 local function timeLeft(): string
@@ -215,6 +230,14 @@ end
 local function refresh()
 	refreshCalendar()
 	refreshEvent()
+	local roomy = not UITheme.Compact()
+	local cal, note = calendarFrame, calendarNote
+	if cal then
+		cal.Visible = roomy
+	end
+	if note then
+		note.Visible = roomy
+	end
 	local list = goals()
 	local done = 0
 	for _, goal in ipairs(list) do
@@ -224,7 +247,7 @@ local function refresh()
 	end
 	local b = button
 	if b then
-		b.Visible = HudRules.DailyButton(player:GetAttribute("TutorialStep"), #list)
+		b.Visible = false -- the Foreman's panel replaces the corner button
 		local slot = buttonSlot
 		if slot then
 			slot.Visible = b.Visible
@@ -239,10 +262,8 @@ local function refresh()
 			b.Size = UDim2.fromOffset(52, 36)
 			b.TextSize = UITheme.Size.TextMin
 		else
-			local spec = UITheme.Sized("DailyButton")
-			local size = spec.size or Vector2.new(200, 30)
-			b.Size = UDim2.fromOffset(size.X, size.Y)
-			b.TextSize = spec.text
+			b.Size = UDim2.fromOffset(200, 30)
+			b.TextSize = UITheme.Size.TextMin
 		end
 		local holder = buttonSlot
 		if holder then
@@ -263,10 +284,17 @@ local function refresh()
 				then "  " .. DailyData.ProgressText(goal)
 				else string.format("  (%d/%d)", goal.progress, goal.target)
 			row.text.Text = (if goal.done then "✓ " else "") .. DailyData.GoalText(goal) .. progress
-			row.reward.Text = "+" .. Util.formatCash(goal.reward)
+			row.reward.Text = if goal.done and goal.paid ~= false then "paid" else "+" .. Util.formatCash(goal.reward)
+			row.reward.TextColor3 = if goal.done and goal.paid ~= false then PAPER_DARK else GREEN
 			row.fill.Size = UDim2.fromScale(math.clamp(goal.progress / math.max(1, goal.target), 0, 1), 1)
 			row.fill.BackgroundColor3 = if goal.done then GREEN else AMBER
 		end
+	end
+	local owed = ForemanData.Owed(list, bonusOwed())
+	local take = takeButton
+	if take then
+		take.Visible = owed > 0 and foremanMode
+		take.Text = "Take " .. Util.formatCash(owed)
 	end
 	local f = footer
 	if f then
@@ -288,6 +316,22 @@ local function refresh()
 	end
 end
 
+-- Rook's panel: NPCController calls it as his talk box closes. During the
+-- tutorial there is nothing to show (his line sent you back to Murph).
+function DailyUI.OpenForeman()
+	if ((player:GetAttribute("TutorialStep") :: number?) or 0) > 0 then
+		return
+	end
+	local card = panel
+	local close = if card then card:FindFirstChild("Close") else nil
+	if not card or not close or not close:IsA("GuiObject") then
+		return
+	end
+	foremanMode = true
+	DailyUI._open(close)
+	refresh()
+end
+
 local function build()
 	-- The goals panel's screen: over the side buttons (it can drop over
 	-- them), under the shop.
@@ -296,7 +340,8 @@ local function build()
 	-- A corner pill: on a phone 36 tall, with a fingertip-tall hit area
 	-- round it (UITheme.HitPad). It grows with its text, so there the pad
 	-- goes beside it, in a slot that holds both in the corner's line.
-	local spec = UITheme.Sized("DailyButton")
+	local spec: { size: Vector2?, text: number, hit: number? } =
+		{ size = Vector2.new(200, 30), text = UITheme.Size.TextMin }
 	local size = spec.size or Vector2.new(200, 30)
 	local b = Instance.new("TextButton")
 	b.Name = "DailyButton"
@@ -375,6 +420,24 @@ local function build()
 	end)
 	HUD.Popup(p, close)
 
+	local take = Instance.new("TextButton")
+	take.Name = "Take"
+	take.LayoutOrder = 5 -- under the three goals
+	take.Size = UDim2.new(1, 0, 0, UITheme.Size.Tap)
+	take.BackgroundColor3 = GREEN
+	take.TextColor3 = CREAM
+	take.Font = UITheme.Fonts.Black
+	take.TextSize = 16
+	take.AutoButtonColor = true
+	take.Visible = false
+	corner(take, 8)
+	take.Parent = p
+	take.Activated:Connect(function()
+		-- The server checks Rook is within reach and pays once; this only asks.
+		Net.Remote("ForemanTurnIn"):FireServer()
+	end)
+	takeButton = take
+
 	text(p, "TODAY'S GOALS", UITheme.Sized("DailyHeading").text, UITheme.Fonts.Black, 1).TextColor3 = BARK
 	for i = 1, DailyData.GoalsPerDay do
 		local row = Instance.new("Frame")
@@ -444,6 +507,7 @@ local function build()
 		label.Parent = cell
 		table.insert(calendarCells, { frame = cell, label = label })
 	end
+	calendarFrame = calendar
 	calendarNote = text(p, "", UITheme.Sized("DailyCountdown").text, UITheme.Fonts.Body, 13)
 	local heading = text(p, "", UITheme.Sized("DailyHeading").text, UITheme.Fonts.Black, 14)
 	heading.TextColor3 = AMBER
@@ -496,6 +560,7 @@ function DailyUI.Start()
 		"DailyGoals",
 		"DailyStreak",
 		"DailyResetAt",
+		"DailyBonusOwed",
 		"DailyLoginDay",
 		"EventGoals",
 		"EventInfo",

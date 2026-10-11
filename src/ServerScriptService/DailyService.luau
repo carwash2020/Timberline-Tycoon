@@ -101,6 +101,7 @@ local function publish(player: Player, profile: Profile)
 	local daily = profile.daily
 	player:SetAttribute("DailyGoals", DailyData.Encode(daily.goals))
 	player:SetAttribute("DailyStreak", daily.streak)
+	player:SetAttribute("DailyBonusOwed", daily.bonusOwed or 0) -- the streak bonus (or a full wallet's remainder) Rook still owes
 	player:SetAttribute("DailyResetAt", DailyData.NextReset(clock()))
 	player:SetAttribute("DailyLoginDay", daily.loginDay or 0) -- the calendar day paid today (1..7)
 end

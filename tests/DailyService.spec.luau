@@ -433,28 +433,31 @@ return function(t)
 		t.eq(back.profile.daily.streak, 4)
 	end)
 
-	t.test("v2: every goal finishes on the v2 events; each is owed, then the v2 bonus is paid at the hand-in", function()
-		local kinds = {}
-		for userId = 1, 40 do
-			local s = setup({ loop = 2, userId = userId })
-			for _, goal in ipairs(s.profile.daily.goals) do
-				kinds[goal.kind] = true
+	t.test(
+		"v2: every goal finishes on the v2 events; each is owed, then the v2 bonus is paid at the hand-in",
+		function()
+			local kinds = {}
+			for userId = 1, 40 do
+				local s = setup({ loop = 2, userId = userId })
+				for _, goal in ipairs(s.profile.daily.goals) do
+					kinds[goal.kind] = true
+				end
+				finishAllV2(s)
+				for _, goal in ipairs(s.profile.daily.goals) do
+					t.ok(goal.done, goal.kind)
+					t.eq(goal.progress, goal.target)
+				end
+				local rewards = 3 * s.DailyData.TiersV2[1].reward
+				t.eq(s.profile.cash, 0, "owed, not paid")
+				t.eq(s.Daily.TurnIn(s.player), rewards + s.DailyData.Bonus(1, 1, 2), "v2 rewards and bonus")
+				t.eq(s.profile.daily.streak, 1)
+				t.ok(string.find(s.toasts[#s.toasts - 1], "All daily jobs done") ~= nil)
 			end
-			finishAllV2(s)
-			for _, goal in ipairs(s.profile.daily.goals) do
-				t.ok(goal.done, goal.kind)
-				t.eq(goal.progress, goal.target)
+			for _, kind in ipairs(t.shared("DailyData").KindsV2) do
+				t.ok(kinds[kind], kind .. " comes up across 40 players")
 			end
-			local rewards = 3 * s.DailyData.TiersV2[1].reward
-			t.eq(s.profile.cash, 0, "owed, not paid")
-			t.eq(s.Daily.TurnIn(s.player), rewards + s.DailyData.Bonus(1, 1, 2), "v2 rewards and bonus")
-			t.eq(s.profile.daily.streak, 1)
-			t.ok(string.find(s.toasts[#s.toasts - 1], "All daily jobs done") ~= nil)
 		end
-		for _, kind in ipairs(t.shared("DailyData").KindsV2) do
-			t.ok(kinds[kind], kind .. " comes up across 40 players")
-		end
-	end)
+	)
 
 	t.test("v2: a sale counts toward each goal by what it measures", function()
 		local found = 0
