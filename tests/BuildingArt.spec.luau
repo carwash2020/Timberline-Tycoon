@@ -287,7 +287,8 @@ return function(t)
 			-- The Dealership's showroom polish (the same kit): the hall's signs, lanterns, beams and
 			-- floor take the whole hall from 215 to 347 parts; its interior has the 400-part budget in
 			-- StoreInterior.Dealership.spec, so the shop's cap moves 250 to 400 (the vehicles are the lot's).
-			local budget = ({ ToolShed = 400, HearthAndHome = 250, Dealership = 400 })[shop.kind]
+			-- General Store: the same kit (tier stands, signs, ties, lamps, stock corner) takes its whole shop from 250 to 302 parts (interior 189, its own 400 budget in StoreInterior.HearthAndHome.spec); cap 250 to 350.
+			local budget = ({ ToolShed = 400, HearthAndHome = 350, Dealership = 400 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
