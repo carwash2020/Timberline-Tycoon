@@ -96,6 +96,7 @@ local eventHeading: TextLabel? = nil -- the seasonal event's goals (EventGoals /
 local eventLines: TextLabel? = nil
 local footer: TextLabel? = nil
 local countdown: TextLabel? = nil
+local tomorrow: TextLabel? = nil -- tomorrow's first goal, greyed out
 
 local corner = UITheme.corner
 
@@ -314,6 +315,15 @@ local function refresh()
 	if c then
 		c.Text = timeLeft()
 	end
+	local nextDay = tomorrow
+	if nextDay then
+		-- The roll is a pure function of user id and day, so tomorrow's first
+		-- goal is known now (the server rolls the same list at the reset).
+		local day = DailyData.Day(os.time()) + 1
+		local first = DailyData.Roll(player.UserId, day, bestAxeTier(), if loop == 2 then 2 else nil)[1]
+		nextDay.Text = if first then "Tomorrow: " .. DailyData.GoalText(first) else ""
+		nextDay.Visible = first ~= nil
+	end
 end
 
 -- Rook's panel: NPCController calls it as his talk box closes. During the
@@ -519,6 +529,9 @@ local function build()
 	local c = text(p, "", UITheme.Sized("DailyCountdown").text, UITheme.Fonts.Body, 11)
 	c.TextColor3 = BARK
 	countdown = c
+	local tm = text(p, "", UITheme.Sized("DailyCountdown").text, UITheme.Fonts.Body, 12)
+	tm.TextColor3 = Color3.fromRGB(140, 128, 110) -- greyed: not today's, not yet
+	tomorrow = tm
 
 	local function toggle()
 		if p.Visible then

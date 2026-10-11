@@ -248,6 +248,8 @@ export type Profile = {
 		cuts: number, -- v2: cuts made through trunks and logs
 	},
 	tutorialDone: boolean,
+	-- True when they pressed Skip (slot field; tutorialDone is also true).
+	tutorialSkipped: boolean,
 	tutorialStep: number, -- index into TutorialData.Steps (QuestService)
 	tutorialProgress: number, -- count toward the current step
 	-- Which v2 step list tutorialStep was saved against (TutorialData.OrderV2).
@@ -390,6 +392,7 @@ local TEMPLATE: Profile = {
 	npcFriendship = { Murph = 0, Millie = 0, Tink = 0 },
 	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0, volumeSold = 0, cuts = 0 },
 	tutorialDone = false,
+	tutorialSkipped = false,
 	tutorialStep = 1,
 	tutorialProgress = 0,
 	tutorialOrder = 0,
@@ -884,6 +887,7 @@ local function applySlotFields(record: any)
 	if type(record.plot) ~= "table" then
 		record.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} }
 	end
+	record.tutorialSkipped = record.tutorialSkipped == true
 	record.plot.squares = squareList(record.plot.squares)
 	record.plot.wires = WireLogic.Clean(record.plot.wires)
 	record.plot.switches = WireLogic.CleanSwitches(record.plot.switches)
