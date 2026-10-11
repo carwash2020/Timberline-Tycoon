@@ -63,6 +63,7 @@ local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
 local NPCTalkService = require(script.Parent.NPCTalkService)
 local PickupGrace = require(script.Parent.PickupGrace)
+local IdleService = require(script.Parent.IdleService)
 local JoinSync = require(script.Parent.JoinSync)
 local LoadState = require(script.Parent.LoadState)
 local PlaceCheck = require(script.Parent.PlaceCheck)
@@ -1304,6 +1305,14 @@ end
 
 local joinedAt: { [Player]: number } = {}
 
+-- The idle kick (IdleService, Shared/IdleLogic): every remote counts as
+-- activity (RateLimiter.OnRequest); the client's IdlePing sends this one
+-- for keys, taps and sticks that fire no other remote.
+IdleService.Init({ notify = notify })
+remote.Activity.OnServerEvent:Connect(function(player: Player)
+	RateLimiter.Allow(player, "Activity") -- counts the activity; the budget only keeps it from being spammed
+end)
+
 remote.ClientReady.OnServerEvent:Connect(function(player: Player)
 	if not RateLimiter.Allow(player, "ClientReady") then
 		return
@@ -1643,6 +1652,7 @@ local function onPlayerAdded(player: Player)
 	player:SetAttribute("ProfileLoaded", true)
 	joinLap("ready (ProfileLoaded)")
 	LoadState.PlayerCanPlay(player.Name)
+	IdleService.Start(player) -- the idle clock starts when they can play
 	print(
 		string.format(
 			"[Load] %s can play: %.1fs after joining, server up %.0fs",
@@ -1787,20 +1797,24 @@ local function onPlayerRemoving(player: Player)
 	hooked[player] = nil
 	joinedAt[player] = nil
 	JoinSync.Forget(player)
+	IdleService.Stop(player)
 	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
 	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models go; the axes stay in the save
 	safely("BlueprintService.PlayerRemoving", BlueprintService.PlayerRemoving, player) -- dropped plans stay in the save too
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
 	safely("PaintService.PlayerRemoving", PaintService.PlayerRemoving, player)
-	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	safely("SaveSlotService.PlayerRemoving", SaveSlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
 	safely("GateService.PlayerRemoving", GateService.PlayerRemoving, player)
 	safely("LeaderboardService.PlayerRemoving", LeaderboardService.PlayerRemoving, player) -- reads the score now, before the release
-	-- Playtime, the truck's loose wood and left-behind logs. Before the
-	-- release, and again (as a no-op) from the final save if shutdown
-	-- already committed them.
+	-- The order of a leave: 1. commit everything the save needs (playtime,
+	-- the truck's loose wood, left-behind logs, the plot's loose wood and
+	-- slabs; LeaveCommit runs each step once, and the shutdown save runs the
+	-- same steps from OnLastSave), 2. take the plot down and free the pad
+	-- (PlotService.PlayerRemoving: nothing in it is still needed by the
+	-- save), 3. release the save session, which writes the profile.
 	safely("LeaveCommit.Flush", LeaveCommit.Flush, player)
+	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)

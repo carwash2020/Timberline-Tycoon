@@ -3644,6 +3644,23 @@ Not remapped without losing something: nothing was dropped. One side effect: RB 
 6. With the axe out, RB shows the "put your axe away to drag" toast and RT still chops.
 7. PC (click, E, R, Q) and phone (taps, hold to drag, PLACE button): unchanged.
 
+## V1 hardening: saves and the server (branch `phase-2/v1-hardening-saves`, 11 October 2026)
+
+What changed: see STATUS.md "V1 launch hardening". Studio keeps saves only with "Enable Studio Access to API Services" on and the place published once; otherwise ProfileStore uses a mock store and the save checks below cannot be seen.
+
+### Studio checklist
+
+1. PC: join, chop a tree, press Save now (SAVES panel), stop the playtest, play again: the cash and the tree count are kept.
+2. PC, two servers (Test > Clients and Servers, or a live server plus Studio): join the same account on a second server. The first server's player is kicked with "Your save was opened on another server. Please rejoin." and the second keeps the save. The second join may wait up to about 45 s on the loading card while the first lets go; that is expected. Never two copies playing.
+3. Shut the server down while a plot has loose logs and slabs on it (Shut Down All Servers in Creator Hub, or stop Studio with API access on): rejoin and the loose wood is back on the plot (it was committed by the shutdown save).
+4. Leave with your base up, then join as a second account: your pad is free and the next player can pick it, no leftover models. (PC; same on a phone and on Xbox since it is server-side.)
+5. Idle kick, PC: in Studio the kick is off. To see it, run `workspace:SetAttribute("IdleScale", 0.02)` in the command bar before you join, stand still: after about 6 s of grace nothing happens, at about 22 s a toast says you will be removed in 2 minutes, at about 24 s you are removed with "You were removed after 20 minutes of no activity. Your progress is saved. Rejoin to keep playing." Moving, pressing any key or typing in chat at any point resets it. Set the attribute to nil afterwards.
+6. Idle kick, phone (667x375): same with the attribute set; a tap anywhere, or moving the thumbstick, resets the countdown (the tap counts even when a menu swallows it).
+7. Idle kick, Xbox: same; any button or a stick move resets it. Nothing here binds a button (no R2).
+8. A player in the first five minutes after they can play (tutorial) is never warned or removed, even with IdleScale on: stand still through Murph's first lines at scale 0.02 and confirm no toast before about 6 s, and none at all if you act.
+9. Max players: `print(game.Players.MaxPlayers)` in the command bar shows 12; PlaceCheck prints OK, or names "Game Settings > Places > Max Players = 12" (LAUNCH.md has the step). A 13th player on a live server still gets a plot (two spare pads).
+10. Failed load: with API access off the mock store is used and loads always work, so this one is covered by `tests/ProfileService.spec.luau` only. On a live server with the DataStore down the join ends after at most 150 s with "Timberline Tycoon couldn't load your save right now. Your progress is safe. Please rejoin." and nothing is written.
+
 ## V1 launch hardening: settings, analytics, launch extras (branch `phase-2/v1-hardening-settings`, 11 October 2026)
 
 What changed is in STATUS.md (the found / added table). Previews: `previews/v1-hardening/`.

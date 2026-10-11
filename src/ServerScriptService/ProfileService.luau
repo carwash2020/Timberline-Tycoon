@@ -15,8 +15,10 @@
 -- quietly uses an in-memory mock store, so data won't persist between tests.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Backoff = require(ReplicatedStorage.Shared.Backoff)
 local LeaveCommit = require(script.Parent.LeaveCommit)
 local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileStore = require(script.Parent.Vendor.ProfileStore)
@@ -40,17 +42,65 @@ local store = ProfileStore.New(STORE_NAME, ProfileSchema.Template)
 
 local sessions: { [Player]: any } = {}
 
+-- A load that did not finish cleanly is marked here, by the Player instance,
+-- and nothing may write for it: a failed load or a save that broke while it
+-- was being prepared must never reach the DataStore, or an empty or
+-- half-migrated copy could replace the real save. The mark is per Player
+-- instance, so a rejoin (a new instance) starts clean.
+local unsaveable: { [Player]: string } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Longest a join waits for the save. ProfileStore alone retries for as long
+-- as the player stays (and it spends up to ~45 s asking another server to
+-- let go before it takes the save over), so this is a ceiling that leaves
+-- room for that, then tells the player to rejoin instead of leaving them on
+-- the loading card for good.
+ProfileService.LoadBudgetSec = 150
+
+-- A manual save (a slot change, a purchase, Save now) that did not land is
+-- tried again on this schedule; the 2-minute autosave is the backstop.
+ProfileService.SaveRetry = { base = 2, cap = 15, maxTries = 4, budget = 40 } :: Backoff.Options
+local SAVE_CONFIRM_SEC = 12 -- how long one try may take before it counts as failed
+
+local function deepCopy(value: any): any
+	if type(value) ~= "table" then
+		return value
+	end
+	local copy = {}
+	for key, inner in pairs(value) do
+		copy[key] = deepCopy(inner)
+	end
+	return copy
+end
+
+-- Why a player's save may not be written (nil when it may).
+function ProfileService.Unsaveable(player: Player): string?
+	return unsaveable[player]
+end
+
 -- Starts the player's save session. Yields until the save is loaded:
 -- ProfileStore keeps retrying and, if another server still holds the save
 -- (the player just hopped servers), asks it to let go and then takes over.
--- Returns (profile, nil) on success, or (nil, "left" | "failed").
+-- Only one copy is ever loaded: a second join gets the save only after the
+-- first server's session has ended, and that server then kicks its player.
+-- Returns (profile, nil) on success, or (nil, "left" | "failed"). On
+-- "failed" nothing was kept: the player is marked unsaveable and no session
+-- is left running that could write.
 function ProfileService.LoadProfile(player: Player): (Profile?, string?)
-	local session = store:StartSessionAsync(KEY_PREFIX .. player.UserId, {
-		Cancel = function()
-			return player.Parent ~= Players
-		end,
-	})
+	local startedAt = os.clock()
+	local started, session = pcall(function(): any
+		return store:StartSessionAsync(KEY_PREFIX .. player.UserId, {
+			Cancel = function()
+				return player.Parent ~= Players or os.clock() - startedAt > ProfileService.LoadBudgetSec
+			end,
+		})
+	end)
+	if not started then
+		warn(string.format("[ProfileService] starting %s's save failed: %s", player.Name, tostring(session)))
+		unsaveable[player] = "start"
+		return nil, if player.Parent ~= Players then "left" else "failed"
+	end
 	if session == nil then
+		unsaveable[player] = "load"
 		return nil, if player.Parent ~= Players then "left" else "failed"
 	end
 
@@ -60,12 +110,25 @@ function ProfileService.LoadProfile(player: Player): (Profile?, string?)
 	-- counts as 1. The field is a number, so the stand-in is 1, not nil.
 	-- A new profile already has the field, copied from the template, so
 	-- it starts on the current map.
-	local hadWorldVersion = session.Data.worldVersion ~= nil
-	session:Reconcile()
-	if not hadWorldVersion then
-		session.Data.worldVersion = 1
+	local pristine = deepCopy(session.Data)
+	local prepared, why = pcall(function()
+		local hadWorldVersion = session.Data.worldVersion ~= nil
+		session:Reconcile()
+		if not hadWorldVersion then
+			session.Data.worldVersion = 1
+		end
+		ProfileSchema.Migrate(session.Data)
+	end)
+	if not prepared then
+		-- A half-migrated table must not be written back over the real
+		-- save. Put back what the DataStore gave us, end the session
+		-- (which writes exactly that) and refuse to play on it.
+		warn(string.format("[ProfileService] %s's save could not be prepared: %s", player.Name, tostring(why)))
+		unsaveable[player] = "migrate"
+		session.Data = pristine
+		session:EndSession()
+		return nil, if player.Parent ~= Players then "left" else "failed"
 	end
-	ProfileSchema.Migrate(session.Data)
 
 	-- The player may have left while we were waiting on the DataStore.
 	if player.Parent ~= Players then
@@ -80,6 +143,7 @@ function ProfileService.LoadProfile(player: Player): (Profile?, string?)
 		sessions[player] = nil
 		if player.Parent == Players and not ProfileStore.IsClosing then
 			-- Another server took the save over; this copy must stop playing.
+			unsaveable[player] = "taken"
 			player:Kick("Your save was opened on another server. Please rejoin.")
 		end
 	end)
@@ -112,11 +176,11 @@ function ProfileService.ProcessPurchaseAsync(
 	grant: (Profile) -> ()
 ): Enum.ProductPurchaseDecision
 	-- The receipt can arrive before the save has loaded.
-	while sessions[player] == nil and player.Parent == Players do
+	while sessions[player] == nil and player.Parent == Players and unsaveable[player] == nil do
 		task.wait()
 	end
 	local session = sessions[player]
-	if session == nil or not session:IsActive() then
+	if session == nil or unsaveable[player] ~= nil or not session:IsActive() then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	if ProfileSchema.RecordPurchase(session.Data, purchaseId) then
@@ -152,20 +216,45 @@ function ProfileService.ProcessPurchaseAsync(
 	return Enum.ProductPurchaseDecision.NotProcessedYet
 end
 
--- Writes the session now (a slot change). ProfileStore retries. No-op if
--- the session already ended.
+-- Writes the session now (a slot change). If the write does not land (the
+-- DataStore is throttled or down) it is tried again with a growing wait
+-- (Shared/Backoff). No-op if the session already ended or the load failed.
 function ProfileService.Save(player: Player)
 	local session = sessions[player]
-	if session ~= nil and session:IsActive() then
-		session:Save()
+	if session == nil or unsaveable[player] ~= nil or not session:IsActive() then
+		return
 	end
+	task.spawn(function()
+		Backoff.Retry(
+			function(): boolean
+				if not session:IsActive() then
+					return true -- the final save has it
+				end
+				local before = session.LastSavedData
+				session:Save()
+				local waited = 0
+				while session:IsActive() and session.LastSavedData == before and waited < SAVE_CONFIRM_SEC do
+					task.wait(0.25)
+					waited += 0.25
+				end
+				return not session:IsActive() or session.LastSavedData ~= before
+			end,
+			function(seconds: number)
+				task.wait(seconds)
+			end,
+			ProfileService.SaveRetry,
+			function(): boolean
+				return sessions[player] ~= session or ProfileStore.IsClosing
+			end
+		)
+	end)
 end
 
 -- Final save + release of the session lock. Call when the player leaves.
 function ProfileService.ReleaseProfile(player: Player)
 	local session = sessions[player]
 	sessions[player] = nil
-	if session ~= nil then
+	if session ~= nil and unsaveable[player] == nil then
 		session:EndSession()
 	end
 end

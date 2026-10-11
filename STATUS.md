@@ -21,6 +21,14 @@ key (deriving it from a full plot is awaiting Connor, it would raise cash packs 
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
 the old ones), no Robux price in code.
 
+## V1 launch hardening: saves and the server (branch `phase-2/v1-hardening-saves`, 11 October 2026, draft PR)
+
+Launch hardening items 1 (save safety) and 4 (server). Audit first; only the gaps were filled. Studio checks: PHASE2_NOTES.md "V1 hardening: saves and the server".
+
+- Already there, untouched: session locking and takeover, load and final-save retries with backoff, parallel BindToClose saves, autosave every 120 s (all in the vendored ProfileStore, used through `ProfileService`), `LeaveCommit` (once-only commit that the shutdown save also runs), `ProfileSchema.Migrate` (idempotent) with the four old-save fixtures in `tests/fixtures/saves` and `V1Migration.spec`, `JoinSync`, Max Players 12 (`GameConfig.MaxPlayers`, `default.project.json`, `PlaceCheck`, LAUNCH.md), plot teardown and pad freeing on leave (`PlotService.PlayerRemoving`).
+- Added: `Shared/Backoff` (pure) used by `ProfileService.Save` to retry a manual save that did not land (2, 4, 8 s, then the autosave); a 150 s ceiling on the join's save load (then the player is told to rejoin, never left on the loading card); `StartSessionAsync` and `Reconcile`/`Migrate` wrapped, so a failed load or a save that cannot be prepared is put back as the DataStore gave it, its session ended, and the player marked unsaveable (`ProfileService.Unsaveable`): nothing is ever written for it; `Shared/IdleLogic` + `IdleService` + client `IdlePing` (warn at 18 min, remove at 20, never in the first 5 minutes after they can play; any remote, chat, movement or key/tap/click/stick counts; off in Studio unless `workspace` has an `IdleScale` attribute); the leave order is now commit (`LeaveCommit.Flush`), then the plot comes down (`PlotService.PlayerRemoving`), then the save is released, and the plot's loose wood is a `LeaveCommit` step (`PlotService.CommitLoose`), so a shutdown save that beats `PlayerRemoving` includes it too.
+- New remote `Activity` (client to server, no data, 2/s budget, the client sends at most one in 30 s). Specs: `Backoff`, `IdleLogic`, `IdleService`, `ProfileService` (new), `PlotService` (leave order).
+
 ## V1 launch hardening: settings, analytics, launch extras (branch `phase-2/v1-hardening-settings`, 11 October 2026, draft PR)
 
 Items 5, 6 and 8 of the hardening list. The audit came first; only what was missing was added.
