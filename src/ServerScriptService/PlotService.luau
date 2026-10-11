@@ -2834,8 +2834,8 @@ function PlotService.Init(
 	-- The kit's meshes load side by side in the background (Studio, 7 October
 	-- 2026: loading them one at a time held this Init for 10.7 s). With the
 	-- start-up preload they are already cached and this is instant. If they
-	-- are late the pads are built part-built after a short bounded wait and
-	-- dressed when the meshes land: the server never waits on an asset fetch.
+	-- are late the pads are built part-built and dressed when the meshes
+	-- land: the server never waits on an asset fetch.
 	local gates = (options and options.gates) or ReadyGates.new()
 	local lateShells = false
 	task.spawn(function()
@@ -2845,9 +2845,12 @@ function PlotService.Init(
 			PlotService.RedrawLate()
 		end
 	end)
-	if not gates.Wait("itemMeshes", 3) then
+	-- No wait at all (12 October 2026: the server build must not wait on an
+	-- asset): if the meshes are not in this instant the pads are built
+	-- part-built and dressed when they land.
+	if not gates.IsReady("itemMeshes") then
 		lateShells = true
-		print("[Load] PlotService: the plot kit's meshes are not in after 3 s; the pads are built part-built for now")
+		print("[Load] PlotService: the plot kit's meshes are not in yet; the pads are built part-built for now")
 	end
 	local folder = Instance.new("Folder")
 	folder.Name = "Plots"
