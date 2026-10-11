@@ -107,7 +107,7 @@ Connor's instruction: remove every use of `Enum.KeyCode.ButtonR2` and move Xbox 
 | Grab / drag wood and boxes (DragController) | empty hands, held | RT (InputBegan read) | RB, held (`ButtonR1`) | RB was "further" while holding; that stays on D-pad up (D-pad down and LB are nearer). X would clash with world prompts (Interact/Talk/Buy), so not X. |
 | Place a blueprint (InputKit target table) | placer | RT (table only) | A (`ButtonA`) | The real binding was already A (`PlaceControlsLogic`); the table now says what the game does. RB stays Push there. |
 
-- Hints now say RB for these: wiring bar "RB pick · X cut · B done", `{grab}` is "hold RB", the drag line "Hold RB on wood to drag it", the holding line "LT + left stick: turn · D-pad: reach". RT stays in the chop hint and `{click}` ("RT to swing", "press RT"): that is the tool's own button.
+- Hints now say RB for these: wiring bar "RB pick · X cut · B done", `{grab}` was "hold RB" and the drag line "Hold RB on wood to drag it" (both now RT, see "Grab on the right trigger"), the holding line "LT + left stick: turn · D-pad: reach". RT stays in the chop hint and `{click}` ("RT to swing", "press RT"): that is the tool's own button.
 - PC and phone inputs are unchanged.
 - Studio checks: PHASE2_NOTES.md "No ButtonR2 (Xbox remap)".
 
@@ -600,3 +600,7 @@ From Connor's Studio log:
 - **Camera speed** dropped (above).
 - **Murph's Talk prompt.** NPCs the tutorial depends on (Murph, Old Hank) carry `persistent = true` in `NPCData`; `NPCService` sets ModelStreamingMode Persistent from it (Murph was already; Old Hank is new). `QuestUI` now waits for the prompt with a bounded `WaitForChild` (`QuestUI.TalkWait`, 15 s) and, on a miss, warns and shows a line in Murph's card telling the player to follow the arrow to his camp.
 - Studio checks: PHASE2_NOTES.md "Startup errors".
+
+## Grab on the right trigger (Xbox)
+
+Connor's call: the pad's grab goes back to the right trigger (RT), the same button as chop, because most players put the axe away to carry. The rule is still that no code BINDS the trigger. `DragController` READS it (an `InputBegan`, never a ContextActionService bind), and only with empty hands: `GrabLogic.PadGrabAllowed(toolOut, placing)` is false with a tool in hand (the engine fires `Tool.Activated` on RT, which is the swing, and the grab ignores it, so no toast and no grab) and false while the placer is up. RB no longer grabs: it stays the builder's select, the wire pick and the placer's push. The key is named once in the source, as `GrabLogic.PadGrabKey` (InputKit's key table and DragController read it from there). `tests/NoButtonR2.spec` fails on any other mention of the button, on a second use, and on any ContextActionService line that takes the key. Hints say RT now ("hold RT", "Hold RT on wood to drag it"). PC and phone are unchanged.
