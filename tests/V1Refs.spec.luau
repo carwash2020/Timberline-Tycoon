@@ -214,6 +214,21 @@ return function(t)
 		end
 	end)
 
+	t.test("the five off-sale ids and every badge id are still 0 (Connor pastes them, never code)", function()
+		local StoreData = t.shared("StoreData")
+		local BadgeData = t.shared("BadgeData")
+		local ids = StoreData.CreatorIds
+		for _, key in ipairs({ "TowService", "TimberClassic", "PaintShop" }) do
+			t.eq(ids.Passes[key], 0, key)
+		end
+		for _, key in ipairs({ "DoubleWood", "InstantDelivery" }) do
+			t.eq(ids.Products[key], 0, key)
+		end
+		for key, id in pairs(BadgeData.Ids) do
+			t.eq(id, 0, "badge " .. key)
+		end
+	end)
+
 	t.test("no Robux price is written in code (a price comes from Roblox's live answer)", function()
 		for _, path in ipairs(all) do
 			for line in string.gmatch(code(path), "[^\n]+") do
