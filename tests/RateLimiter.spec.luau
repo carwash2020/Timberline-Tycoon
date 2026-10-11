@@ -77,6 +77,7 @@ return function(t)
 			BoardData = true,
 			AdminResult = true,
 			AdminAccess = true,
+			CodeResult = true, -- server -> client: the Codes tab's answer
 		}
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then
@@ -112,6 +113,7 @@ return function(t)
 			FerryBoard = 1,
 			Blast = 1,
 			VisitPlot = 1,
+			PlotModerate = 2,
 		}
 		for name, limit in pairs(budgets) do
 			t.eq(burst(limiter, fakePlayer(), name, limit + 3), limit, name)

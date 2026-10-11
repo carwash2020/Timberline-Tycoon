@@ -55,6 +55,11 @@ export type Pass = {
 	-- changes the save for good, like the Timber Classic truck).
 	kind: string?,
 	revocable: boolean?,
+	-- Region rules (Shared/PolicyLogic). Neither is set on any item today:
+	-- nothing sold is a paid random item or tradable. Set one and the item
+	-- is hidden and refused where PolicyService restricts it.
+	paidRandom: boolean?,
+	tradable: boolean?,
 }
 
 export type Product = {
@@ -72,6 +77,8 @@ export type Product = {
 	cash: number?,
 	packMinutes: number?,
 	boostHours: number?, -- timed boosts: how long
+	paidRandom: boolean?, -- a random-reward item sold for Robux (hidden where PolicyService restricts it)
+	tradable: boolean?, -- could be traded between players (hidden where trading is not allowed)
 }
 
 StoreData.Passes = {

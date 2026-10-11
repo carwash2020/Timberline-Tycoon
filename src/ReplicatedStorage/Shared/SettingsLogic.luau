@@ -6,10 +6,10 @@
 
 local SettingsLogic = {}
 
--- The Settings card. "visitors" is the plot permission list and "board"
--- the opt-in lifetime-earnings leaderboard. B on either tab returns to
+-- The Settings card. "visitors" is the plot permission list, "board"
+-- the opt-in lifetime-earnings leaderboard and "codes" the redeem box. B on either tab returns to
 -- "game"; B again closes the card.
-SettingsLogic.Tabs = { "game", "visitors", "board" }
+SettingsLogic.Tabs = { "game", "visitors", "board", "report", "codes" }
 
 function SettingsLogic.HasTab(name: string): boolean
 	return table.find(SettingsLogic.Tabs, name) ~= nil
@@ -29,6 +29,7 @@ export type Settings = {
 	graphics: Graphics, -- the old four-way tier override: kept so old saves load, no longer shown or used (quality replaced it)
 	quality: Quality,
 	cameraShake: boolean,
+	cameraSensitivity: number, -- 0.25 to 2, 1 = the device's own camera speed (SettingsLogic.Sensitivity)
 	uiScale: UIScale,
 	showTips: boolean,
 	showOnBoard: boolean, -- opt-in: submit lifetime earnings to the leaderboard (off until the player says so)
@@ -42,6 +43,7 @@ export type Key =
 	| "graphics"
 	| "quality"
 	| "cameraShake"
+	| "cameraSensitivity"
 	| "uiScale"
 	| "showTips"
 	| "showOnBoard"
@@ -54,6 +56,7 @@ SettingsLogic.Defaults = {
 	graphics = "auto" :: Graphics,
 	quality = "unset" :: Quality,
 	cameraShake = true,
+	cameraSensitivity = 1,
 	uiScale = "normal" :: UIScale,
 	showTips = true,
 	showOnBoard = false,
@@ -74,6 +77,7 @@ SettingsLogic.Attributes = {
 	graphics = "SettingGraphics",
 	quality = SettingsLogic.QualityAttribute,
 	cameraShake = "SettingCameraShake",
+	cameraSensitivity = "SettingCameraSensitivity",
 	uiScale = "SettingUIScale",
 	showTips = "SettingShowTips",
 	showOnBoard = SettingsLogic.BoardAttribute,
@@ -82,6 +86,32 @@ SettingsLogic.Attributes = {
 local GRAPHICS: { [string]: boolean } = { auto = true, low = true, medium = true, high = true }
 local SCALES: { [string]: boolean } = { small = true, normal = true, large = true }
 local QUALITIES: { [string]: boolean } = { unset = true, low = true, high = true }
+
+-- Camera sensitivity: a multiplier on the device's own camera speed. The
+-- Settings row steps through Steps; the server clamps whatever it is sent.
+SettingsLogic.Sensitivity = { min = 0.25, max = 2, step = 0.25 }
+
+local function sensitivity(n: unknown, fallback: number): number
+	if type(n) ~= "number" or n ~= n then
+		return fallback
+	end
+	return math.clamp(n, SettingsLogic.Sensitivity.min, SettingsLogic.Sensitivity.max)
+end
+
+-- The next Settings step: up by one step, back to the lowest after the highest.
+function SettingsLogic.NextSensitivity(current: number): number
+	local r = SettingsLogic.Sensitivity
+	local nextValue = math.floor(sensitivity(current, 1) / r.step + 0.5) * r.step + r.step
+	if nextValue > r.max + 1e-9 then
+		return r.min
+	end
+	return nextValue
+end
+
+-- The camera speed to write when the device's own is `base`.
+function SettingsLogic.ApplySensitivity(base: number, multiplier: unknown): number
+	return base * sensitivity(multiplier, 1)
+end
 
 local function volume(n: unknown, fallback: number): number
 	if type(n) ~= "number" or n ~= n or n == math.huge or n == -math.huge or n < 0 or n > 1 then
@@ -113,6 +143,7 @@ function SettingsLogic.Sanitize(raw: any): Settings
 		music = if s.music == nil then d.music else s.music == true,
 		sfx = if s.sfx == nil then d.sfx else s.sfx == true,
 		musicVolume = volume(s.musicVolume, d.musicVolume),
+		cameraSensitivity = sensitivity(s.cameraSensitivity, d.cameraSensitivity),
 		sfxVolume = volume(s.sfxVolume, d.sfxVolume),
 		graphics = graphics :: Graphics,
 		quality = quality :: Quality,
@@ -151,6 +182,13 @@ function SettingsLogic.Set(settings: Settings, key: string, value: unknown): boo
 		else
 			settings.sfxVolume = value
 		end
+		return true
+	elseif key == "cameraSensitivity" then
+		-- A real number is clamped into range; anything else (NaN, a string) is refused.
+		if type(value) ~= "number" or value ~= value then
+			return false
+		end
+		settings.cameraSensitivity = sensitivity(value, 1)
 		return true
 	elseif key == "graphics" then
 		if type(value) ~= "string" or not GRAPHICS[value] then

@@ -196,6 +196,19 @@ function NPCTalkService.Left(player: Player)
 	end
 end
 
+-- Whether `player` is in a conversation with any NPC right now (for things
+-- that must not pop up over a dialogue box).
+function NPCTalkService.IsTalking(player: Player): boolean
+	for _, list in pairs(talks) do
+		for _, talker in ipairs(list) do
+			if talker.userId == player.UserId then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 -- Who `model` is talking to now (a UserId), for the specs and the admin.
 function NPCTalkService.TalkingWith(model: Model): number?
 	local list = talks[model]

@@ -32,6 +32,7 @@ local HazardService = require(script.Parent.HazardService)
 local HermitService = require(script.Parent.HermitService)
 local LogicService = require(script.Parent.LogicService)
 local PermissionService = require(script.Parent.PermissionService)
+local PolicyGate = require(script.Parent.PolicyGate)
 local DailyService = require(script.Parent.DailyService)
 local AdminService = require(script.Parent.AdminService)
 local DevCommands = require(script.Parent.DevCommands)
@@ -54,11 +55,15 @@ local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NewsService = require(script.Parent.NewsService)
+local GameAnalytics = require(script.Parent.GameAnalytics)
+local CodeService = require(script.Parent.CodeService)
+local FavoriteService = require(script.Parent.FavoriteService)
 local PaintService = require(script.Parent.PaintService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
 local NPCTalkService = require(script.Parent.NPCTalkService)
 local PickupGrace = require(script.Parent.PickupGrace)
+local IdleService = require(script.Parent.IdleService)
 local JoinSync = require(script.Parent.JoinSync)
 local LoadState = require(script.Parent.LoadState)
 local PlaceCheck = require(script.Parent.PlaceCheck)
@@ -644,6 +649,8 @@ end
 -- loop that runs (MapBuilder published it before the map was built).
 local activeLoop = CoreLoop.Active()
 safely("MilestoneService.Init", MilestoneService.Init, notify, activeLoop)
+safely("CodeService.Init", CodeService.Init, remote.RedeemCode, remote.CodeResult, notify)
+safely("FavoriteService.Init", FavoriteService.Init, notify)
 safely("AxeService.Init", AxeService.Init, notify)
 safely("BlueprintService.Init", BlueprintService.Init, notify, {
 	UseBlueprint = remote.UseBlueprint,
@@ -753,6 +760,7 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlotShown = remote.PlotShown,
 	BaseAction = remote.BaseAction,
 	VisitPlot = remote.VisitPlot,
+	PlotModerate = remote.PlotModerate,
 }, notify, { gates = LoadState.Gates })
 -- The pads, the Land Office counter and the plot picker's data exist now (or
 -- Init failed and warned: nothing will make them appear, so do not wait).
@@ -1060,6 +1068,12 @@ BootReport.StartStubs({
 		end,
 	},
 	{
+		name = "PolicyGate",
+		init = function()
+			PolicyGate.Init()
+		end,
+	},
+	{
 		name = "PermissionService",
 		init = function()
 			if PermissionService.Init then
@@ -1238,6 +1252,13 @@ remote.NewsSeen.OnServerEvent:Connect(function(player: Player)
 	NewsService.Seen(player)
 end)
 
+remote.StoreOpened.OnServerEvent:Connect(function(player: Player)
+	if not RateLimiter.Allow(player, "StoreOpened") then
+		return
+	end
+	GameAnalytics.Store(player, "StoreOpened")
+end)
+
 remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, value: unknown)
 	if not RateLimiter.Allow(player, "SaveSetting") then
 		return
@@ -1293,6 +1314,14 @@ local function resendState(player: Player)
 end
 
 local joinedAt: { [Player]: number } = {}
+
+-- The idle kick (IdleService, Shared/IdleLogic): every remote counts as
+-- activity (RateLimiter.OnRequest); the client's IdlePing sends this one
+-- for keys, taps and sticks that fire no other remote.
+IdleService.Init({ notify = notify })
+remote.Activity.OnServerEvent:Connect(function(player: Player)
+	RateLimiter.Allow(player, "Activity") -- counts the activity; the budget only keeps it from being spammed
+end)
 
 remote.ClientReady.OnServerEvent:Connect(function(player: Player)
 	if not RateLimiter.Allow(player, "ClientReady") then
@@ -1633,6 +1662,7 @@ local function onPlayerAdded(player: Player)
 	player:SetAttribute("ProfileLoaded", true)
 	joinLap("ready (ProfileLoaded)")
 	LoadState.PlayerCanPlay(player.Name)
+	IdleService.Start(player) -- the idle clock starts when they can play
 	print(
 		string.format(
 			"[Load] %s can play: %.1fs after joining, server up %.0fs",
@@ -1645,6 +1675,7 @@ local function onPlayerAdded(player: Player)
 	safely("MilestoneService.Start", MilestoneService.Start, player, profile)
 	safely("QuestService.Start", QuestService.Start, player, profile)
 	safely("NewsService.Start", NewsService.Start, player, profile)
+	safely("FavoriteService.Start", FavoriteService.Start, player, profile)
 	safely("DailyService.Start", DailyService.Start, player, profile)
 	safely("EventService.Start", EventService.Start, player, profile)
 	safely("ShopService.PlayerJoined", ShopService.PlayerJoined, player, profile)
@@ -1670,6 +1701,7 @@ end
 -- pass would write an empty load.
 local function savePlaytime(player: Player)
 	MilestoneService.Stop(player)
+	FavoriteService.Stop(player)
 end
 
 local function saveTruckLoad(player: Player)
@@ -1775,20 +1807,24 @@ local function onPlayerRemoving(player: Player)
 	hooked[player] = nil
 	joinedAt[player] = nil
 	JoinSync.Forget(player)
+	IdleService.Stop(player)
 	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
 	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models go; the axes stay in the save
 	safely("BlueprintService.PlayerRemoving", BlueprintService.PlayerRemoving, player) -- dropped plans stay in the save too
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
 	safely("PaintService.PlayerRemoving", PaintService.PlayerRemoving, player)
-	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	safely("SaveSlotService.PlayerRemoving", SaveSlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
 	safely("GateService.PlayerRemoving", GateService.PlayerRemoving, player)
 	safely("LeaderboardService.PlayerRemoving", LeaderboardService.PlayerRemoving, player) -- reads the score now, before the release
-	-- Playtime, the truck's loose wood and left-behind logs. Before the
-	-- release, and again (as a no-op) from the final save if shutdown
-	-- already committed them.
+	-- The order of a leave: 1. commit everything the save needs (playtime,
+	-- the truck's loose wood, left-behind logs, the plot's loose wood and
+	-- slabs; LeaveCommit runs each step once, and the shutdown save runs the
+	-- same steps from OnLastSave), 2. take the plot down and free the pad
+	-- (PlotService.PlayerRemoving: nothing in it is still needed by the
+	-- save), 3. release the save session, which writes the profile.
 	safely("LeaveCommit.Flush", LeaveCommit.Flush, player)
+	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)

@@ -46,8 +46,11 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	PlotShown = 2, -- the join picker is on screen: starts its timeout (PlotService.Shown)
 	BaseAction = 2, -- the Bases panel: pack, bring out, start fresh (PlotService.BaseAction; the change also has a cooldown)
 	SaveSetting = 4,
+	StoreOpened = 1, -- analytics: the Robux store opened (GameAnalytics)
+	RedeemCode = 1, -- the Codes tab (CodeService; it also locks a player out after a run of wrong codes)
 	SetQuality = 2, -- the join screen's choice, or the Settings row (QualityService)
 	ClientReady = 2, -- the client's join handshake: once, with a retry (JoinSync)
+	Activity = 2, -- the client saw a key, tap, click or stick move (IdleService); it sends at most one in 30 s
 	Grab = 6, -- v2 loop (V2_PLAN.md §12)
 	Release = 6,
 	Chop = 6, -- v2 loop: a swing at a section (SectionTrees; the axe's cooldown is checked too)
@@ -65,6 +68,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	ExpandLand = 1, -- buy the next plot square
 	SetPermission = 4, -- one flag for one visitor
 	VisitPlot = 1, -- go to a friend's plot (PlotService.Visit)
+	PlotModerate = 2, -- kick, ban or unban on your own plot (PlotService.Moderate)
 	Wire = 4, -- connect a port, or cut a wire
 	TollPay = 1, -- pay the toll
 	FerryBoard = 1, -- board the ferry
@@ -118,10 +122,22 @@ local function addStrike(player: Player, remoteName: string)
 end
 
 -- True if this request should be processed.
+-- Every remote a player sends passes through Allow, so IdleService listens
+-- here: any request, even one over budget, shows the player is at the
+-- controls. The listener must not yield.
+local requestListener: ((Player, string) -> ())? = nil
+
+function RateLimiter.OnRequest(listener: ((Player, string) -> ())?)
+	requestListener = listener
+end
+
 function RateLimiter.Allow(player: Player, remoteName: string): boolean
 	local limit = LIMITS[remoteName]
 	if limit == nil then
 		return false
+	end
+	if requestListener ~= nil then
+		requestListener(player, remoteName)
 	end
 	local perPlayer = buckets[player]
 	if perPlayer == nil then

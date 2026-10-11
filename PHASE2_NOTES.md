@@ -3679,3 +3679,75 @@ Exploit spot checks (Studio command bar, as a normal player)
     `PlaceBlueprint`, `Grab`, `BoxOpen`, `SetPermission`: nothing changes, no red text in Output.
 14. Fire `BuyItem:FireServer("Axe", "SteelAxe")` 50 times in a loop: you get at most three tries a second, never a kick for
     ordinary mashing; a 200-per-second loop for five seconds kicks you with "Disconnected: too many requests."
+
+## V1 hardening: saves and the server (branch `phase-2/v1-hardening-saves`, 11 October 2026)
+
+What changed: see STATUS.md "V1 launch hardening". Studio keeps saves only with "Enable Studio Access to API Services" on and the place published once; otherwise ProfileStore uses a mock store and the save checks below cannot be seen.
+
+### Studio checklist
+
+1. PC: join, chop a tree, press Save now (SAVES panel), stop the playtest, play again: the cash and the tree count are kept.
+2. PC, two servers (Test > Clients and Servers, or a live server plus Studio): join the same account on a second server. The first server's player is kicked with "Your save was opened on another server. Please rejoin." and the second keeps the save. The second join may wait up to about 45 s on the loading card while the first lets go; that is expected. Never two copies playing.
+3. Shut the server down while a plot has loose logs and slabs on it (Shut Down All Servers in Creator Hub, or stop Studio with API access on): rejoin and the loose wood is back on the plot (it was committed by the shutdown save).
+4. Leave with your base up, then join as a second account: your pad is free and the next player can pick it, no leftover models. (PC; same on a phone and on Xbox since it is server-side.)
+5. Idle kick, PC: in Studio the kick is off. To see it, run `workspace:SetAttribute("IdleScale", 0.02)` in the command bar before you join, stand still: after about 6 s of grace nothing happens, at about 22 s a toast says you will be removed in 2 minutes, at about 24 s you are removed with "You were removed after 20 minutes of no activity. Your progress is saved. Rejoin to keep playing." Moving, pressing any key or typing in chat at any point resets it. Set the attribute to nil afterwards.
+6. Idle kick, phone (667x375): same with the attribute set; a tap anywhere, or moving the thumbstick, resets the countdown (the tap counts even when a menu swallows it).
+7. Idle kick, Xbox: same; any button or a stick move resets it. Nothing here binds a button (no R2).
+8. A player in the first five minutes after they can play (tutorial) is never warned or removed, even with IdleScale on: stand still through Murph's first lines at scale 0.02 and confirm no toast before about 6 s, and none at all if you act.
+9. Max players: `print(game.Players.MaxPlayers)` in the command bar shows 12; PlaceCheck prints OK, or names "Game Settings > Places > Max Players = 12" (LAUNCH.md has the step). A 13th player on a live server still gets a plot (two spare pads).
+10. Failed load: with API access off the mock store is used and loads always work, so this one is covered by `tests/ProfileService.spec.luau` only. On a live server with the DataStore down the join ends after at most 150 s with "Timberline Tycoon couldn't load your save right now. Your progress is safe. Please rejoin." and nothing is written.
+
+## V1 launch hardening: settings, analytics, launch extras (branch `phase-2/v1-hardening-settings`, 11 October 2026)
+
+What changed is in STATUS.md (the found / added table). Previews: `previews/v1-hardening/`.
+
+### Studio checklist
+
+PC (keyboard and mouse)
+1. Open Settings (the round button left of the cash plaque). The five tabs GAME, VISIT, BOARD, REPORT, CODES sit on one row. Click "Camera speed": it steps 100%, 125% ... 200%, then 25%. Move the mouse in a free-look camera: the speed follows. Rejoin: the value is kept.
+2. Click Music volume and Effects volume: the music and effect loudness follow; "Graphics: Lower" and "Graphics: Higher" switch the dressing at once (box windows, scenery).
+3. CODES tab: type `PLACEHOLDER-DISABLED` and press Enter or REDEEM: "That code isn't valid." and no cash. Type nothing: "Type a code first." (Real codes: ask Connor to add one in `ServerScriptService/CodeData.luau`, enabled, with a UTC expiry, then redeem it once for the cash, again for "You already used that code.", on a second save slot too.) Six wrong codes quickly: "Too many tries..." for about 30 s.
+4. REPLAY TUTORIAL: first tap changes to "TAP AGAIN TO REPLAY", second tap restarts the tutorial. Finish the first step: Murph says nothing about cash and your wallet does not change. (A first-time player's first run still pays.)
+5. Play 10 minutes (Studio: or lower `FavoriteLogic.AfterSeconds` for the test) with the tutorial finished: one toast "Enjoying Timberline Tycoon? Tap the star..." once. Rejoin and wait: it never comes again. Talk to a keeper when the 10 minutes pass: the toast waits until you leave the dialogue.
+6. Open the Robux store and close it; start a purchase prompt and cancel; Output must show no red text. (Roblox shows `StoreOpened`, `PurchasePrompted`, `PurchaseCompleted` under Analytics > Custom events after about a day; economy events under Economy; funnel steps under Funnels.)
+7. Place your first sawmill, saw, planer, bin or belt: no visible change (it is the "First machine placed" funnel step, once per player).
+8. Open What's new from Settings: every line reads whole (nothing cut off).
+
+Phone (667 x 375, landscape)
+9. The Settings card ends above the jump button (it does not cover it) and scrolls with a finger. Every row, tab and the code box is easy to hit with a thumb.
+10. CODES tab: tap the box, the keyboard appears, type, tap REDEEM. The answer shows under the button and as a toast.
+11. Camera speed: drag the camera with a thumb at 25% and at 200%. If nothing changes on a phone, the engine ignores the setting for touch; tell Claude (the row would then be hidden on touch-only devices).
+
+Xbox (controller)
+12. D-pad right opens Settings; the selection ring is on GAME. The stick or D-pad walks the tabs and rows; A presses; B on CODES, BOARD or VISIT returns to GAME, B again closes.
+13. CODES tab: A on the code box opens the Xbox keyboard; type a code, confirm, then A on REDEEM. The ring is visible on the box and the button.
+14. Camera speed row: A steps it; the right stick turns the camera faster or slower to match.
+15. No button does anything on the right trigger (RT still only chops).
+
+## V1 hardening: moderation and policy (branch `phase-2/v1-hardening-moderation`, 11 October 2026)
+
+What and why are in STATUS.md. Rules: `Shared/TextFilterLogic`, `Shared/ModerationLogic`, `Shared/PolicyLogic`, `PermissionLogic.Ban`; services `TextFilter`, `PolicyGate`, `PlotService.Moderate`. Previews: `previews/v1-hardening-mod/`.
+
+### Studio checks
+
+Needs two players: Studio "Test" with 2 or more players, or a live server with a friend. Ann owns a plot, Bob visits.
+
+PC (keyboard and mouse)
+1. Ann: Settings (Esc menu button or the SETTINGS button), VISITORS. Pick Bob, scroll down: "THIS PLAYER, ON YOUR PLOT" has Kick and Ban. Good: both rows are full width and easy to click, and Bob's name is on the person row above.
+2. Bob stands on Ann's plot. Ann presses Kick: Bob is moved just north of the yard, Ann sees "Sent Bob off your plot. They can't come back for 2 minutes.", Bob sees "Ann sent you off their plot. You can try again in 2 minutes." Bob walks back on: he is moved off again. Bob's Settings > Visitors > Visit Ann says "sent you off ... a moment ago". After 2 minutes he can visit.
+3. Ann presses Ban: the label changes to "Tap again: ban from my plot"; pressing anything else resets it. Tap again: Bob is off the plot, Ann sees "Banned Bob from your plot...", Bob sees "Ann banned you from their plot. You can't visit or build there." Bob tries Visit Ann, walks on, tries to open a door or place a piece with Ann's build and interact ticked for Anyone: every one is refused.
+4. Ann's VISITORS shows "BANNED FROM YOUR PLOT" with "Unban Bob". Press it: Bob can visit again. Ann leaves and rejoins (or reloads the save slot): a ban that was not lifted is still there.
+5. Ann can't kick or ban herself or the game owner (a toast says why). A ban stays after Bob leaves the server (it is by user id) and shows in the Unban list under his user name.
+6. REPORT tab: appears while at least one other player is in the server. Pick Bob, pick a reason: "Report sent to Roblox. Thank you." Good: Roblox received a report (check the account's report history, or the Roblox menu does not complain). If it says "Couldn't send that report", tell Connor and what Studio printed.
+7. Alone in a server: the REPORT tab is not there at all.
+
+Phone (667x375)
+8. Same flow with taps: every row is at least 44 px tall, nothing is cut off at the card's edge, the card scrolls with a finger. Kick, Ban (two taps), Unban and the REPORT tab work. The jump button and thumbstick never sit on a row.
+
+Xbox (controller)
+9. Open Settings with D-pad right (or the SETTINGS tile in the View menu). Down to VISITORS, A. Pick a person with A. Down through the toggles to Kick / Ban: the gold selection ring follows the stick and D-pad. Ban needs A twice. B goes back to GAME, B again closes. REPORT: A on the tab, pick a player and a reason with A. Nothing uses RT.
+
+Policy (any device)
+10. Open the Robux store (the board, the shelf, or the STORE button): it looks exactly as before, every card, price and Coming soon line unchanged. No paid random item is sold, so nothing is hidden; the specs cover the hiding and the refusal.
+11. Output: no red errors from `[PolicyGate]` or `[TextFilter]` during join. A warning "policy lookup failed" in Studio without API access is expected; the strict default then applies, which hides nothing today.
+12. Rename a save to something rude: it shows as hashes or the default name, never as typed (Studio may not filter without an experience; the live server does).

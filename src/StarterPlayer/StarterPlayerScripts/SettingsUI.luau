@@ -4,7 +4,10 @@
 -- or Roblox's top-left menu). Music and sound effects have a mute and a
 -- volume stepper; graphics (Lower or Higher quality, the same choice the join
 -- screen asks for: QualityPickerUI), camera shake, UI scale and tips apply at once
--- and save (SaveSetting, and SetQuality for the graphics choice). Reset tutorial asks twice, then ResetTutorial.
+-- and save (SaveSetting, and SetQuality for the graphics choice). Camera speed
+-- steps 25% to 200% (the device's own camera speed times it). Replay tutorial
+-- asks twice, then ResetTutorial (the server pays no step cash again). The
+-- Codes tab is the redeem box (RedeemCode; the server answers on CodeResult).
 -- Visitors is the plot permission list, with a Visit button for each
 -- player in the server whose plot lets you in (PlotService.Visit checks it
 -- again). Leaderboard is the opt-in
@@ -20,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local LeaderboardLogic = require(ReplicatedStorage.Shared.LeaderboardLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
+local ModerationLogic = require(ReplicatedStorage.Shared.ModerationLogic)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local QualityProfile = require(ReplicatedStorage.Shared.QualityProfile)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
@@ -47,6 +51,29 @@ local C = UITheme.Colors
 local F = UITheme.Fonts
 
 local SCALES = { "small", "normal", "large" }
+
+-- The device's own camera speeds, read once, so the multiplier never stacks on itself.
+local baseCamera: { [string]: number } = {}
+
+-- Writes the camera speed (mouse and gamepad stick) as the device's own times
+-- `multiplier`. Each write is guarded: a build that doesn't expose a property
+-- just leaves that input alone. Phone touch uses the engine's own speed.
+local function applyCameraSensitivity(multiplier: unknown)
+	local ok, settings = pcall(function(): any
+		return UserSettings():GetService("UserGameSettings")
+	end)
+	if not ok or settings == nil then
+		return
+	end
+	for _, name in ipairs({ "MouseSensitivity", "GamepadCameraSensitivity" }) do
+		pcall(function()
+			if baseCamera[name] == nil then
+				baseCamera[name] = settings[name]
+			end
+			settings[name] = SettingsLogic.ApplySensitivity(baseCamera[name], multiplier)
+		end)
+	end
+end
 
 local function cycle(list: { string }, current: string): string
 	for i, name in ipairs(list) do
@@ -98,7 +125,8 @@ function SettingsUI.Start()
 	UITheme.padding(card.face, inset, inset, inset, inset)
 	card.outer.Name = "Settings"
 	card.outer.Visible = false
-	card.outer.Size = UDim2.fromOffset(280, 300)
+	card.outer.Size = UDim2.fromOffset(340, 300)
+	local cardWidth = 340 -- five tabs on one row (GAME, VISIT, BOARD, REPORT, CODES)
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "Rows"
 	scroll.BackgroundTransparency = 1
@@ -122,12 +150,15 @@ function SettingsUI.Start()
 
 	local rowSpec = UITheme.Sized("SettingsToggle")
 	local rowSize = rowSpec.size or Vector2.new(248, 44)
+	local rowW = 308 -- rows and tabs: the card's 340 less its padding
 	local tap = math.max(rowSize.Y, PermissionLogic.Tap, UITheme.Size.Tap)
 	local firstFace: GuiButton? = nil
+	local fitCard: () -> ()
 	local resetArmed = false
 	local restartArmedUntil = 0
 	local tabName = "game"
 	local visitorTarget = PermissionLogic.Anyone
+	local banArmed: string? = nil
 	local gameRows: { GuiObject } = {}
 
 	local function makeButton(
@@ -135,12 +166,13 @@ function SettingsUI.Start()
 		name: string,
 		text: string,
 		style: string,
-		onPress: () -> ()
+		onPress: () -> (),
+		width: number?
 	): UITheme.Button
 		local button = UITheme.Button({
 			name = name,
 			text = text,
-			size = Vector2.new(rowSize.X, tap),
+			size = Vector2.new(width or rowW, tap),
 			style = style,
 			textSize = rowSpec.text,
 		})
@@ -166,9 +198,48 @@ function SettingsUI.Start()
 	UITheme.list(visitors, 6)
 	visitors.Parent = scroll
 
+	-- The Codes tab: a box, a Redeem button and the server's answer. The text is
+	-- sent as typed; the server normalises, checks and rate limits it.
+	local codes = Instance.new("Frame")
+	codes.Name = "Codes"
+	codes.BackgroundTransparency = 1
+	codes.Size = UDim2.fromScale(1, 0)
+	codes.AutomaticSize = Enum.AutomaticSize.Y
+	codes.Visible = false
+	codes.LayoutOrder = 55
+	UITheme.list(codes, 6)
+	codes.Parent = scroll
+	local codesHead = UITheme.label(codes, "REDEEM A CODE", F.Black, 14, C.Bark)
+	codesHead.Size = UDim2.new(1, 0, 0, 18)
+	local codeBox = Instance.new("TextBox")
+	codeBox.Name = "CodeBox"
+	codeBox.LayoutOrder = 2
+	codeBox.Size = UDim2.fromOffset(rowW, tap)
+	codeBox.BackgroundColor3 = C.Cream
+	codeBox.BorderSizePixel = 0
+	codeBox.Font = F.Bold
+	codeBox.TextSize = 16
+	codeBox.TextColor3 = C.Ink
+	codeBox.PlaceholderText = "TYPE A CODE"
+	codeBox.PlaceholderColor3 = C.Muted
+	codeBox.Text = ""
+	codeBox.ClearTextOnFocus = false
+	codeBox.TextXAlignment = Enum.TextXAlignment.Left
+	UITheme.corner(codeBox, UITheme.Radius)
+	UITheme.stroke(codeBox, C.Bark, 2)
+	UITheme.padding(codeBox, 0, 10, 0, 10)
+	codeBox.Parent = codes
+	local codeStatus = UITheme.label(codes, "", F.Bold, 14, C.Ink)
+	codeStatus.Name = "Status"
+	codeStatus.LayoutOrder = 4
+	codeStatus.TextWrapped = true
+	codeStatus.AutomaticSize = Enum.AutomaticSize.Y
+	codeStatus.Size = UDim2.new(1, 0, 0, 18)
+
 	local gameTab: UITheme.Button
 	local visitorTab: UITheme.Button
 	local boardTab: UITheme.Button
+	local codesTab: UITheme.Button
 	local boardPanel: LeaderboardUI.Panel
 
 	local function permissions(): { [string]: PermissionLogic.Row }
@@ -188,13 +259,26 @@ function SettingsUI.Start()
 				end
 			end
 		end
+		local banned: { [string]: boolean } = {}
+		for _, ban in ipairs(PermissionLogic.DecodeBans(player:GetAttribute("PlotBans"))) do
+			banned[tostring(ban.userId)] = true
+		end
+		for id in pairs(banned) do
+			seen[id] = true -- a banned person has no toggles: they are listed under BANNED
+		end
 		for key in pairs(permissions()) do
 			if not seen[key] and PermissionLogic.Target(key) == key then
 				seen[key] = true
 				table.insert(list, { id = key, label = "Player " .. key })
 			end
 		end
-		return list
+		local kept: { { id: string, label: string } } = {}
+		for _, entry in ipairs(list) do
+			if not banned[entry.id] then
+				table.insert(kept, entry)
+			end
+		end
+		return kept
 	end
 
 	-- Players here who own a plot and whose visit flag lets you in. Their
@@ -214,7 +298,10 @@ function SettingsUI.Start()
 		return PermissionLogic.VisitList(candidates, player.UserId)
 	end
 
-	local function rebuildVisitors()
+	local rebuildVisitors: () -> ()
+
+	rebuildVisitors = function()
+		banArmed = if banArmed == visitorTarget then banArmed else nil
 		for _, child in ipairs(visitors:GetChildren()) do
 			if child:IsA("GuiObject") then
 				child:Destroy()
@@ -274,21 +361,183 @@ function SettingsUI.Start()
 				end
 			)
 		end
+		-- Owner moderation: kick (sends them off for a few minutes) and ban
+		-- (saved; they can't visit or build). The server checks you own the
+		-- plot and that they are on it; this is only the intent.
+		local targetId = tonumber(visitorTarget)
+		if targetId then
+			local modHead =
+				UITheme.label(visitors, "THIS PLAYER, ON YOUR PLOT", F.Black, if tenFoot() then 18 else 14, C.Bark)
+			modHead.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+			makeButton(visitors, "Kick", "Kick from my plot", "skip", function()
+				Net.Remote("PlotModerate"):FireServer("kick", targetId)
+			end)
+			local armed = banArmed == visitorTarget
+			makeButton(
+				visitors,
+				"Ban",
+				if armed then "Tap again: ban from my plot" else "Ban from my plot",
+				if armed then "buy" else "skip",
+				function()
+					if banArmed == visitorTarget then
+						banArmed = nil
+						Net.Remote("PlotModerate"):FireServer("ban", targetId)
+					else
+						banArmed = visitorTarget
+						rebuildVisitors()
+					end
+				end
+			)
+		end
+		local bans = PermissionLogic.DecodeBans(player:GetAttribute("PlotBans"))
+		if #bans > 0 then
+			local banHead =
+				UITheme.label(visitors, "BANNED FROM YOUR PLOT", F.Black, if tenFoot() then 18 else 14, C.Bark)
+			banHead.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+			for _, ban in ipairs(bans) do
+				local who = ban
+				makeButton(visitors, "Unban" .. who.userId, "Unban " .. who.name, "skip", function()
+					Net.Remote("PlotModerate"):FireServer("unban", who.userId)
+				end)
+			end
+		end
+	end
+
+	-- Report a player: Roblox's own report (Players:ReportAbuse) for one
+	-- person in this server. The tab is hidden where the call does not exist
+	-- and while nobody else is here, never shown dead. The game keeps nothing
+	-- of what is reported.
+	local reportPanel = Instance.new("Frame")
+	reportPanel.Name = "Report"
+	reportPanel.BackgroundTransparency = 1
+	reportPanel.Size = UDim2.fromScale(1, 0)
+	reportPanel.AutomaticSize = Enum.AutomaticSize.Y
+	reportPanel.Visible = false
+	reportPanel.LayoutOrder = 60
+	UITheme.list(reportPanel, 6)
+	reportPanel.Parent = scroll
+	local reportTab: UITheme.Button
+	local reportTarget: Player? = nil
+	local reportNote: string? = nil
+
+	local function reportApi(): boolean
+		local ok, has = pcall(function()
+			return type((Players :: any).ReportAbuse) == "function"
+		end)
+		return ok and has == true
+	end
+
+	local function reportShown(): boolean
+		return ModerationLogic.ReportShown(reportApi(), #Players:GetPlayers() - 1)
+	end
+
+	local function nameOf(other: Player): string
+		return if other.DisplayName ~= "" then other.DisplayName else other.Name
+	end
+
+	local function rebuildReport()
+		for _, child in ipairs(reportPanel:GetChildren()) do
+			if child:IsA("GuiObject") then
+				child:Destroy()
+			end
+		end
+		local head =
+			UITheme.label(reportPanel, ModerationLogic.ReportTitle, F.Black, if tenFoot() then 18 else 14, C.Bark)
+		head.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+		if reportTarget ~= nil and reportTarget.Parent ~= Players then
+			reportTarget = nil
+		end
+		local target = reportTarget
+		if reportNote then
+			local note = UITheme.label(reportPanel, reportNote, F.Bold, if tenFoot() then 18 else 14, C.Ink)
+			note.TextWrapped = true
+			note.Size = UDim2.new(1, 0, 0, if tenFoot() then 44 else 36)
+		end
+		if target == nil then
+			local ask =
+				UITheme.label(reportPanel, "Who are you reporting?", F.Bold, if tenFoot() then 18 else 14, C.Ink)
+			ask.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+			for _, other in ipairs(Players:GetPlayers()) do
+				if other ~= player then
+					local who = other
+					makeButton(reportPanel, "Pick" .. who.UserId, nameOf(who), "skip", function()
+						reportTarget = who
+						reportNote = nil
+						rebuildReport()
+					end)
+				end
+			end
+			return
+		end
+		local why = UITheme.label(
+			reportPanel,
+			"Why report " .. nameOf(target) .. "?",
+			F.Bold,
+			if tenFoot() then 18 else 14,
+			C.Ink
+		)
+		why.TextWrapped = true
+		why.Size = UDim2.new(1, 0, 0, if tenFoot() then 44 else 36)
+		for _, reason in ipairs(ModerationLogic.ReportReasons) do
+			local picked = reason
+			makeButton(reportPanel, "Reason" .. picked.id, picked.label, "skip", function()
+				local who = reportTarget
+				if who == nil or who.Parent ~= Players then
+					reportTarget = nil
+					rebuildReport()
+					return
+				end
+				local sent = pcall(function()
+					(Players :: any):ReportAbuse(who, picked.id, "")
+				end)
+				reportNote = if sent then ModerationLogic.ReportSent else ModerationLogic.ReportFailed
+				reportTarget = nil
+				rebuildReport()
+			end)
+		end
+		makeButton(reportPanel, "ReportBack", "Pick someone else", "bark", function()
+			reportTarget = nil
+			rebuildReport()
+		end)
+	end
+
+	-- The card is 300 tall; on a short touch screen it is cut to end above the jump
+	-- button (the bottom-right 90 px), and the rows scroll inside it.
+	fitCard = function()
+		local cam = workspace.CurrentCamera
+		local vp = if cam then cam.ViewportSize else Vector2.zero
+		local height = 300
+		if vp.Y > 0 and math.min(vp.X, vp.Y) < UITheme.CompactEdge then
+			local top = card.outer.AbsolutePosition.Y
+			height = math.clamp(math.floor((vp.Y - 98 - top) / math.max(UITheme.Scale(), 0.05)), 190, 300)
+		end
+		card.outer.Size = UDim2.fromOffset(cardWidth, height)
 	end
 
 	local function showTab(name: string)
 		if not SettingsLogic.HasTab(name) then
 			return
 		end
+		if name == "report" and not reportShown() then
+			name = "game"
+		end
 		tabName = name
 		local visitorsOn = name == "visitors"
 		local boardOn = name == "board"
+		local codesOn = name == "codes"
+		local reportOn = name == "report"
 		for _, rowRoot in ipairs(gameRows) do
-			rowRoot.Visible = not visitorsOn and not boardOn
+			rowRoot.Visible = not visitorsOn and not boardOn and not codesOn and not reportOn
 		end
 		visitors.Visible = visitorsOn
+		codes.Visible = codesOn
+		codesTab:SetStyle(if codesOn then "buy" else "skip")
+		reportPanel.Visible = reportOn
+		reportTab.root.Visible = reportShown()
+		reportTab:SetStyle(if reportOn then "buy" else "skip")
 		boardPanel.root.Visible = boardOn
-		card.outer.Size = UDim2.fromOffset(if boardOn then LeaderboardLogic.CardWidth(tenFoot()) else 280, 300)
+		cardWidth = if boardOn then LeaderboardLogic.CardWidth(tenFoot()) else 340
+		fitCard()
 		gameTab:SetStyle(if name == "game" then "buy" else "skip")
 		visitorTab:SetStyle(if visitorsOn then "buy" else "skip")
 		boardTab:SetStyle(if boardOn then "buy" else "skip")
@@ -299,6 +548,17 @@ function SettingsUI.Start()
 			boardPanel:Show()
 			if UITheme.Device() == "console" then
 				GuiService.SelectedObject = boardPanel:First()
+			end
+		elseif codesOn then
+			if UITheme.Device() == "console" then
+				GuiService.SelectedObject = codeBox
+			end
+		elseif reportOn then
+			reportTarget, reportNote = nil, nil
+			rebuildReport()
+			local first = reportPanel:FindFirstChildWhichIsA("GuiButton", true)
+			if first and UITheme.Device() == "console" then
+				GuiService.SelectedObject = first
 			end
 		elseif visitorsOn then
 			rebuildVisitors()
@@ -311,18 +571,36 @@ function SettingsUI.Start()
 		end
 	end
 
-	gameTab = makeButton(scroll, "TabGame", "GAME", "buy", function()
-		showTab("game")
-	end)
-	gameTab.root.LayoutOrder = 1
-	visitorTab = makeButton(scroll, "TabVisitors", "VISITORS", "skip", function()
-		showTab("visitors")
-	end)
-	visitorTab.root.LayoutOrder = 2
-	boardTab = makeButton(scroll, "TabBoard", "LEADERBOARD", "skip", function()
-		showTab("board")
-	end)
-	boardTab.root.LayoutOrder = 3
+	-- The five tabs share one row (each 44 tall; REPORT only while the moderation
+	-- flow is on), so the card keeps room for the settings under them on a short
+	-- phone screen. The card is 340 wide for it; labels are short.
+	local tabStrip = Instance.new("Frame")
+	tabStrip.Name = "Tabs"
+	tabStrip.LayoutOrder = 1
+	tabStrip.BackgroundTransparency = 1
+	tabStrip.Size = UDim2.new(1, 0, 0, tap + UITheme.ButtonDrop)
+	UITheme.list(tabStrip, 4, true)
+	tabStrip.Parent = scroll
+	local tabWidth = math.floor((rowW - 4 * 4) / 5)
+	local function tabButton(name: string, text: string, style: string, order: number, tab: string): UITheme.Button
+		local button = makeButton(scroll, name, text, style, function()
+			showTab(tab)
+		end, tabWidth)
+		button.root.LayoutOrder = order
+		button.root.Parent = tabStrip
+		local pad = button.face:FindFirstChildOfClass("UIPadding")
+		if pad then
+			pad.PaddingLeft = UDim.new(0, 2)
+			pad.PaddingRight = UDim.new(0, 2)
+		end
+		return button
+	end
+	gameTab = tabButton("TabGame", "GAME", "buy", 1, "game")
+	visitorTab = tabButton("TabVisitors", "VISIT", "skip", 2, "visitors")
+	boardTab = tabButton("TabBoard", "BOARD", "skip", 3, "board")
+	reportTab = tabButton("TabReport", "REPORT", "skip", 4, "report")
+	reportTab.root.Visible = reportShown()
+	codesTab = tabButton("TabCodes", "CODES", "skip", 5, "codes")
 	firstFace = gameTab.face
 
 	local musicFace: TextButton
@@ -333,6 +611,7 @@ function SettingsUI.Start()
 	local shakeFace: TextButton
 	local scaleFace: TextButton
 	local tipsFace: TextButton
+	local sensitivityFace: TextButton
 	local resetFace: TextButton
 	local restartFace: TextButton
 
@@ -365,6 +644,8 @@ function SettingsUI.Start()
 		UITheme.SetUserScale(SettingsLogic.ScaleMultiplier(scaleName))
 		local tips = player:GetAttribute("SettingShowTips")
 		HUD.SetTips(tips ~= false)
+		local sensitivity = player:GetAttribute("SettingCameraSensitivity")
+		applyCameraSensitivity(sensitivity)
 		local music = player:GetAttribute("SettingMusic")
 		if type(music) == "boolean" then
 			SoundData.MusicEnabled = music
@@ -385,11 +666,14 @@ function SettingsUI.Start()
 		shakeFace.Text = if shake == false then "CAMERA SHAKE: OFF" else "CAMERA SHAKE: ON"
 		scaleFace.Text = "UI scale  " .. string.upper(scaleName)
 		tipsFace.Text = if tips == false then "TIPS: OFF" else "TIPS: ON"
+		sensitivityFace.Text = "Camera speed  "
+			.. percent(if type(sensitivity) == "number" then sensitivity else 1)
+			.. "  ±"
 		musicFace.Text = if SoundData.MusicEnabled then "MUSIC: ON" else "MUSIC: OFF"
 		musicVolFace.Text = "Music volume  " .. percent(SoundData.MusicVolume) .. "  ±"
 		sfxFace.Text = if SoundData.SfxEnabled then "SOUND FX: ON" else "SOUND FX: OFF"
 		sfxVolFace.Text = "Effects volume  " .. percent(SoundData.SfxVolume) .. "  ±"
-		resetFace.Text = if resetArmed then "TAP AGAIN TO RESET" else "RESET TUTORIAL"
+		resetFace.Text = if resetArmed then "TAP AGAIN TO REPLAY" else "REPLAY TUTORIAL"
 		local restart = SettingsLogic.RestartRow(
 			player:GetAttribute("ActiveSlot"),
 			player:GetAttribute("SlotPick") == true,
@@ -451,13 +735,20 @@ function SettingsUI.Start()
 		save("uiScale", nextName)
 		applyAll()
 	end)
+	sensitivityFace = row("cameraSensitivity", "Camera speed  100%  ±", function()
+		local current = player:GetAttribute("SettingCameraSensitivity")
+		local nextValue = SettingsLogic.NextSensitivity(if type(current) == "number" then current else 1)
+		player:SetAttribute("SettingCameraSensitivity", nextValue) -- the server sets it too; this keeps the row snappy
+		save("cameraSensitivity", nextValue)
+		applyAll()
+	end)
 	tipsFace = row("tips", "TIPS: ON", function()
 		local on = player:GetAttribute("SettingShowTips") == false
 		HUD.SetTips(on)
 		save("showTips", on)
 		applyAll()
 	end)
-	resetFace = row("reset", "RESET TUTORIAL", function()
+	resetFace = row("reset", "REPLAY TUTORIAL", function()
 		if not resetArmed then
 			resetArmed = true
 			applyAll()
@@ -469,7 +760,7 @@ function SettingsUI.Start()
 		end
 		resetArmed = false
 		Net.Remote("ResetTutorial"):FireServer()
-		HUD.Toast("Tutorial reset.")
+		HUD.Toast("Replaying the tutorial. No extra cash this time.")
 		card.outer.Visible = false
 		applyAll()
 	end)
@@ -507,17 +798,44 @@ function SettingsUI.Start()
 		applyAll()
 	end)
 
+	local lastCode = 0
+	local function redeem()
+		local text = codeBox.Text
+		if text == "" or os.clock() - lastCode < 1 then
+			return
+		end
+		lastCode = os.clock()
+		codeStatus.Text = "Checking..."
+		Net.Remote("RedeemCode"):FireServer(text)
+	end
+	local redeemButton = makeButton(codes, "Redeem", "REDEEM", "buy", redeem)
+	redeemButton.root.LayoutOrder = 3
+	codeBox.FocusLost:Connect(function(enterPressed: boolean)
+		if enterPressed then
+			redeem()
+		end
+	end)
+	Net.Remote("CodeResult").OnClientEvent:Connect(function(ok: unknown, message: unknown)
+		codeStatus.Text = if type(message) == "string" then message else ""
+		codeStatus.TextColor3 = if ok == true then C.Confirm else C.Ink
+		if ok == true then
+			codeBox.Text = ""
+		end
+	end)
+
 	for _, attr in pairs(SettingsLogic.Attributes) do
 		player:GetAttributeChangedSignal(attr):Connect(applyAll)
 	end
 	for _, attr in ipairs({ "ActiveSlot", "SlotPick", "SlotCooldownUntil" }) do
 		player:GetAttributeChangedSignal(attr):Connect(applyAll)
 	end
-	player:GetAttributeChangedSignal("PlotPermissions"):Connect(function()
-		if tabName == "visitors" then
-			rebuildVisitors()
-		end
-	end)
+	for _, attr in ipairs({ "PlotPermissions", "PlotBans" }) do
+		player:GetAttributeChangedSignal(attr):Connect(function()
+			if tabName == "visitors" then
+				rebuildVisitors()
+			end
+		end)
+	end
 	local function refreshPeople()
 		if tabName == "visitors" and card.outer.Visible then
 			rebuildVisitors()
@@ -537,11 +855,30 @@ function SettingsUI.Start()
 			watchPlayer(other)
 		end
 	end
+	-- The REPORT tab follows who is here (a leaver is still listed for a
+	-- moment during PlayerRemoving, so look again a frame later).
+	local function refreshReport()
+		task.defer(function()
+			local shown = reportShown()
+			reportTab.root.Visible = shown
+			if tabName == "report" then
+				if shown then
+					rebuildReport()
+				else
+					showTab("game")
+				end
+			end
+		end)
+	end
 	Players.PlayerAdded:Connect(function(other: Player)
 		watchPlayer(other)
 		refreshPeople()
+		refreshReport()
 	end)
-	Players.PlayerRemoving:Connect(refreshPeople)
+	Players.PlayerRemoving:Connect(function()
+		refreshPeople()
+		refreshReport()
+	end)
 	applyAll()
 
 	local function toggle()
@@ -557,7 +894,13 @@ function SettingsUI.Start()
 		return SettingsUI.OpensOnPad(open.Visible, BlueprintPlacer.Active())
 	end, toggle)
 	local SETTINGS_NAV = "SettingsNav"
+	UITheme.WatchLayout(function()
+		fitCard()
+	end)
 	card.outer:GetPropertyChangedSignal("Visible"):Connect(function()
+		if card.outer.Visible then
+			fitCard()
+		end
 		if not card.outer.Visible then
 			ContextActionService:UnbindAction(SETTINGS_NAV)
 			if tabName ~= "game" then
