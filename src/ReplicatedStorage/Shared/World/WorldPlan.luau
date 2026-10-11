@@ -799,7 +799,7 @@ function WorldPlan.RegionTrees(): { TreeSpot }
 							break
 						end
 					end
-					if near and apart and TreeFill.Ground(x, z) then
+					if near and apart and TreeFill.GroundFor(zone, x, z) then
 						table.insert(placed, Vector2.new(x, z))
 						table.insert(out, {
 							woodId = woodId,

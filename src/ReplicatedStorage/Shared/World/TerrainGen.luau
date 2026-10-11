@@ -1288,7 +1288,8 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 		return TerrainGen.GravelMaterial
 	end
 	-- Lane R's two regions. The Bayou's floor is Limestone tinted #4E4A36; Red
-	-- Mesa is Sandstone with Sand patches and a Rock rim.
+	-- Mesa is Sandstone with worn Ground patches and a Rock rim (no Sand: the
+	-- forest keeps its trees off sand, and the mesa has trees).
 	local bdx, bdz = x - BAYOU_REGION.x, z - BAYOU_REGION.z
 	if bdx * bdx + bdz * bdz < BAYOU_REGION.radius * BAYOU_REGION.radius then
 		return "Limestone"
@@ -1299,7 +1300,7 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 		if md2 > (MESA_REGION.radius - 12) ^ 2 then
 			return "Rock"
 		end
-		return if noise(x / 18, z / 18, 6.1) > 0.35 then "Sand" else "Sandstone"
+		return if noise(x / 18, z / 18, 6.1) > 0.35 then "Ground" else "Sandstone"
 	end
 	local lot = WorldLayout.ParkingLot
 	if x > lot.x0 and x < lot.x1 and z > lot.z0 and z < lot.z1 then

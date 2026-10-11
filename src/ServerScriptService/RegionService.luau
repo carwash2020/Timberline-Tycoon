@@ -363,10 +363,10 @@ function RegionService.Build(parent: Instance, ground: RegionArt.Ground): Folder
 	local mesa = Instance.new("Folder")
 	mesa.Name = "RedMesa"
 	mesa.Parent = folder
-	RegionArt.QuarryFace(mesa, ground)
+	local quarryModel = RegionArt.QuarryFace(mesa, ground)
 	RegionArt.MesaLanterns(mesa, ground)
-	RegionArt.Overlook(mesa, ground)
-	RegionArt.Arch(mesa, ground)
+	local overlookModel = RegionArt.Overlook(mesa, ground)
+	local archModel = RegionArt.Arch(mesa, ground)
 	RegionArt.Butte(mesa, ground)
 	scatter(mesa, "mesa", ground)
 
@@ -429,6 +429,19 @@ function RegionService.Build(parent: Instance, ground: RegionArt.Ground): Folder
 		end
 	end
 	folder.Parent = parent
+	-- The boot log's budget line (Lane R, phone budgets): parts a region holds.
+	print(
+		string.format(
+			"[RegionService] built: Bayou %d parts (boardwalk %d, Bait Shack %d), Red Mesa %d parts (quarry %d, overlook %d, arch %d)",
+			RegionArt.PartCount(bayou),
+			RegionArt.PartCount(walk),
+			RegionArt.PartCount(shack),
+			RegionArt.PartCount(mesa),
+			RegionArt.PartCount(quarryModel),
+			RegionArt.PartCount(overlookModel),
+			RegionArt.PartCount(archModel)
+		)
+	)
 	return folder
 end
 

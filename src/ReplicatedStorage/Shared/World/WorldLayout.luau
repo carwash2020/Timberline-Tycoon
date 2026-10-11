@@ -1440,12 +1440,15 @@ function WorldLayout.TreeBlocked(x: number, z: number): boolean
 	if ldx * ldx + ldz * ldz < WorldLayout.LandingClear * WorldLayout.LandingClear then
 		return true
 	end
-	-- Lane R: the Bait Shack, boardwalk and log landing, the quarry, butte,
-	-- overlook, arch and truck lot.
-	if BayouData.Blocked(x, z) or MesaData.Blocked(x, z) then
-		return true
-	end
 	return false
+end
+
+-- Lane R: ground the Bayou's and Red Mesa's own builds stand on (the Bait Shack,
+-- boardwalk and log landing; the quarry, butte, overlook, arch and truck lot).
+-- No region tree is planted or regrown there. Only the two regions' tree zones
+-- ask (TreeFill.GroundFor), so no other tree's spot moves.
+function WorldLayout.RegionBuildBlocked(x: number, z: number): boolean
+	return BayouData.Blocked(x, z) or MesaData.Blocked(x, z)
 end
 
 return WorldLayout

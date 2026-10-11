@@ -98,6 +98,8 @@ TreeGen.Budgets = {
 	phantomwood = 44,
 	lumenwood = 40,
 	lanternwood = 48, -- tightened after a part-count pass
+	bogcypress = 44, -- Lane R
+	ironwood = 44, -- Lane R
 } :: { [string]: number }
 TreeGen.DefaultBudget = 48
 
