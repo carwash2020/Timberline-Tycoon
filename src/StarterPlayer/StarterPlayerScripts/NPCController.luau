@@ -49,7 +49,10 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
+local DailyData = require(ReplicatedStorage.Shared.DailyData)
+local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
 local DialogueFlow = require(ReplicatedStorage.Shared.DialogueFlow)
+local ForemanData = require(ReplicatedStorage.Shared.ForemanData)
 local HeadLook = require(ReplicatedStorage.Shared.HeadLook)
 local NPCAnim = require(ReplicatedStorage.Shared.NPCAnim)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
@@ -376,6 +379,22 @@ local function onTalk(rig: Rig)
 	if line then
 		table.insert(lines, line)
 	end
+	if npc.id == "Gus" then
+		-- His charter's step first (SkyQuestService sets SkyQuestStep).
+		table.insert(lines, 1, DialogueData.GusLine(player:GetAttribute("SkyQuestStep") :: string?))
+	end
+	local isForeman = npc.id == ForemanData.Id
+	if isForeman then
+		-- Rook says what he owes, in two short lines; the job board opens
+		-- when the box closes (Take pays through the ForemanTurnIn remote).
+		lines = ForemanData.Lines({
+			tutorial = ((player:GetAttribute("TutorialStep") :: number?) or 0) > 0,
+			goals = DailyData.Decode((player:GetAttribute("DailyGoals") :: string?) or ""),
+			bonusOwed = (player:GetAttribute("DailyBonusOwed") :: number?) or 0,
+			streak = (player:GetAttribute("DailyStreak") :: number?) or 0,
+			countdown = ForemanData.Countdown((player:GetAttribute("DailyResetAt") :: number?) or 0, os.time()),
+		})
+	end
 	local opened = DialogueUI.Talk({
 		id = npc.id,
 		name = npc.name,
@@ -384,6 +403,14 @@ local function onTalk(rig: Rig)
 		model = rig.model,
 		onClose = function()
 			rig.lastPrompt = os.clock() -- the cooldown counts from the end of the talk
+			if isForeman then
+				local ok, board = pcall(function()
+					return require(script.Parent.DailyUI)
+				end)
+				if ok then
+					board.OpenForeman()
+				end
+			end
 		end,
 	})
 	if not opened then

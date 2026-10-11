@@ -585,11 +585,11 @@ function BuilderTools.PrimarySelected(): Model?
 	return if pick then pick.model else nil
 end
 
--- ButtonR2: a ray through the middle of the screen, then the same select
--- (or copy-confirm) path a mouse click uses. Pass unless that ray hits a
--- placed piece or copy mode is confirming, so an axe swing still sees R2.
--- A tool in hand always passes: CutController skips the swing when this
--- bind sinks the button.
+-- ButtonR1 (RB; the right trigger is the tool's and is never bound): a ray
+-- through the middle of the screen, then the same select (or copy-confirm)
+-- path a mouse click uses. Pass unless that ray hits a placed piece or copy
+-- mode is confirming, so DragController still sees RB for a grab. A tool in
+-- hand always passes: LB + RB unequips it, and RB must not select then.
 function BuilderTools.OnSelect(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
 	if inputState ~= Enum.UserInputState.Begin or BlueprintPlacer.Active() then
 		return Enum.ContextActionResult.Pass
@@ -685,9 +685,8 @@ local function keysOpen(): boolean
 	return #selected > 0 and cluster ~= nil and cluster.Visible and not BlueprintPlacer.Active()
 end
 
--- R2 belongs to the axe while a Tool is in hand. A bound action marks the
--- press as handled even when it passes it on, and CutController ignores
--- handled presses, so the select bind exists only while hands are empty.
+-- LB + RB unequips the tool in hand, so the select bind exists only while
+-- hands are empty (a bound action also marks the press as handled).
 local selectBound = false
 
 local function syncSelectBind()
@@ -703,7 +702,7 @@ local function syncSelectBind()
 			BuilderTools.OnSelect,
 			false,
 			Enum.ContextActionPriority.High.Value,
-			Enum.KeyCode.ButtonR2
+			Enum.KeyCode.ButtonR1
 		)
 	end
 end

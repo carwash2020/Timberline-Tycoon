@@ -25,7 +25,8 @@
 --     the ray nil, so a tap did nothing unless a section was already
 --     inside the axe's few studs (no toast). With no finger stored, the
 --     mouse location is the fallback (on a touch screen it follows the
---     finger). A gamepad has no pointer: ButtonR2 or the trigger, and the
+--     finger). A gamepad has no pointer: the tool's own Activated (the
+--     right trigger; no script binds or reads it), and the
 --     nearest section within the axe's reach. Crystal nodes (tag Node)
 --     are mined as before (MineNode). One click is one swing: Activated
 --     and the key that caused it share a short gap.
@@ -43,7 +44,6 @@
 -- amber too far or too hard), checked 30 times a second (15 on low).
 
 local CollectionService = game:GetService("CollectionService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -815,16 +815,16 @@ function CutController.Start()
 			lastTap = Vector2.new(input.Position.X, input.Position.Y)
 			return
 		end
-		-- A button already took the click. MouseButton1 and the trigger
-		-- also swing here: Tool.Activated does not always arrive (click to
-		-- move, a Studio camera), and that used to be a silent miss.
-		-- R2 is no button's click: a bound action marks it handled even when
-		-- it passes it on. Only a menu with the pad selection keeps it.
-		local trigger = input.KeyCode == Enum.KeyCode.ButtonR2
-		if gameProcessed and not (trigger and GuiService.SelectedObject == nil) then
+		-- A button already took the click. MouseButton1 also swings here:
+		-- Tool.Activated does not always arrive (click to move, a Studio
+		-- camera), and that used to be a silent miss. The gamepad's right
+		-- trigger swings only through Tool.Activated (the engine fires it by
+		-- itself); no script binds or reads that button, and Activated
+		-- paces through clickSwing's cooldown and the Keen multiplier.
+		if gameProcessed then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or trigger then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			clickSwing()
 		end
 	end)

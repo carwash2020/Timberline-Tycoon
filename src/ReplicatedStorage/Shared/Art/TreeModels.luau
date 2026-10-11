@@ -8,7 +8,7 @@
 local TreeModels = {}
 
 export type CrownPiece = {
-	name: string, -- Leaves or Facet, so wind sway still finds them
+	name: string, -- Leaves, Facet or Knees (Bog Cypress), so wind sway still finds them
 	meshId: number,
 	size: Vector3,
 	section: number?, -- Facet_Section_3 rides section 3 when that section exists
@@ -24,6 +24,11 @@ local sections: { [string]: { number } } = {
 	maple = { 109577497643149, 85178015121629, 115635347945305 },
 	palmwood = { 101525114127541, 94025013138140, 93227720333749 },
 	emberwood = { 71905033591284, 84579932172929, 138240165712362 },
+	-- Uploaded 2026-10-08 (backlog batch 7), Approved. Lanternwood is live;
+	-- Bog Cypress and Ironwood wait for their woods (job 11).
+	lanternwood = { 136660817437574, 135281497863554, 87140397645792 },
+	bogcypress = { 83558961407178, 110249215661913, 107634601841802 },
+	ironwood = { 86692571898747, 119571685053021, 105909881859734 },
 }
 
 local crowns: { [string]: { CrownPiece } } = {
@@ -86,7 +91,38 @@ local crowns: { [string]: { CrownPiece } } = {
 		{ name = "Facet", meshId = 95420384468440, size = Vector3.new(13.155, 5.241, 17.51), section = nil },
 		{ name = "Facet", meshId = 122106124846170, size = Vector3.new(0.12, 2.448, 0.491), section = 3 },
 	},
+	lanternwood = {
+		{ name = "Leaves", meshId = 74852802256577, size = Vector3.new(10.742, 15.705, 10.994), section = nil }, -- Leaves_A
+		{ name = "Leaves", meshId = 94956340093681, size = Vector3.new(10.367, 15.705, 10.837), section = nil }, -- Leaves_B
+		{ name = "Leaves", meshId = 128030653306315, size = Vector3.new(10.351, 15.705, 11.046), section = nil }, -- Leaves_C
+		{ name = "Facet", meshId = 77541843783000, size = Vector3.new(8.82, 3.255, 9.62), section = nil }, -- Facet_A
+		{ name = "Facet", meshId = 78866606456939, size = Vector3.new(9.02, 3.255, 9.62), section = nil }, -- Facet_B
+		{ name = "Facet", meshId = 107318817308273, size = Vector3.new(9.52, 3.255, 9.62), section = nil }, -- Facet_C
+		{ name = "Facet", meshId = 110698433190691, size = Vector3.new(2.228, 0.64, 2.228), section = 3 }, -- Facet_Section_3
+	},
+	bogcypress = {
+		{ name = "Leaves", meshId = 107660429917167, size = Vector3.new(15.76, 11.7, 16.491), section = nil }, -- Leaves_A
+		{ name = "Leaves", meshId = 91909069757240, size = Vector3.new(16.192, 11.7, 16.294), section = nil }, -- Leaves_B
+		{ name = "Leaves", meshId = 74932466556952, size = Vector3.new(16.139, 11.7, 16.067), section = nil }, -- Leaves_C
+		{ name = "Facet", meshId = 115537392745552, size = Vector3.new(16.566, 13.578, 16.04), section = nil }, -- Facet_A
+		{ name = "Facet", meshId = 114283715407034, size = Vector3.new(16.517, 13.568, 16.04), section = nil }, -- Facet_B
+		{ name = "Facet", meshId = 88258520272457, size = Vector3.new(16.452, 13.582, 16.04), section = nil }, -- Facet_C
+		-- Knees_A, _B and _C are the same mesh id: one piece stands for all three.
+		{ name = "Knees", meshId = 123534069756661, size = Vector3.new(9.32, 3.36, 9.23), section = nil },
+	},
+	ironwood = {
+		{ name = "Leaves", meshId = 96390979620997, size = Vector3.new(23.283, 19.25, 13.66), section = nil }, -- Leaves_A
+		{ name = "Leaves", meshId = 118595199539854, size = Vector3.new(23.507, 19.25, 13.615), section = nil }, -- Leaves_B
+		{ name = "Leaves", meshId = 124471066184904, size = Vector3.new(22.907, 19.25, 13.315), section = nil }, -- Leaves_C
+		{ name = "Facet", meshId = 94998985796939, size = Vector3.new(9.737, 7.029, 6.995), section = nil }, -- Facet_A
+		{ name = "Facet", meshId = 113121369608961, size = Vector3.new(9.614, 7.116, 7.1), section = nil }, -- Facet_B
+		{ name = "Facet", meshId = 126069617401030, size = Vector3.new(9.768, 7.056, 7.089), section = nil }, -- Facet_C
+	},
 }
+
+-- Bog Cypress knees stand around the trunk foot: the mesh's pivot is the
+-- ground and its bounds run y -0.76 to 2.6, so its middle is 0.92 up.
+TreeModels.KneesCentreY = 0.92
 
 function TreeModels.SectionMesh(woodId: string, sectionId: number): number
 	local list = sections[woodId]

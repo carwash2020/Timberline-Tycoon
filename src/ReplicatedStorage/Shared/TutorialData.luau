@@ -339,6 +339,20 @@ function TutorialData.ForLoop(loop: number): { Step }
 	return if loop == 2 then TutorialData.StepsV2 else TutorialData.Steps
 end
 
+-- The joy beat when the tutorial is finished (not skipped): a banner, a
+-- chime and client confetti (QuestUI.JoyBeat). The banner's second line is
+-- the player's next goal (the NextGoal attribute), so the end of the lessons
+-- always shows where to go.
+TutorialData.JoyTitle = "LESSONS DONE!"
+TutorialData.JoySub = "The forest is yours. Next: %s"
+TutorialData.JoySeconds = 3.2
+TutorialData.JoyConfetti = 36
+
+function TutorialData.JoyLine(nextGoal: unknown): string
+	local goal = if type(nextGoal) == "string" and nextGoal ~= "" then nextGoal else "sell wood and buy a better axe"
+	return string.format(TutorialData.JoySub, goal)
+end
+
 -- The line Murph says once the last step is done (both loops).
 TutorialData.Farewell =
 	"That's the lot! Sell wood at the sawmill up north, and grab a better axe at Tink's Tool Shed. Bigger logs and planks pay more."
@@ -353,6 +367,19 @@ function TutorialData.TotalReward(loop: number?): number
 	local total = 0
 	for _, step in ipairs(TutorialData.ForLoop(loop or 1)) do
 		total += step.rewardCash or 0
+	end
+	return total
+end
+
+-- The starter cash a player who skips on step `fromIndex` is paid: every
+-- step's cash from that step on, the steps they were about to earn it from.
+-- (A skip pays it once, in one lump; the finished steps already paid.)
+function TutorialData.SkipCash(loop: number?, fromIndex: number): number
+	local total = 0
+	for i, step in ipairs(TutorialData.ForLoop(loop or 1)) do
+		if i >= fromIndex then
+			total += step.rewardCash or 0
+		end
 	end
 	return total
 end

@@ -4,7 +4,7 @@
 --   * PlotUI's WIRE button (BUILD mode) starts it. Lines between wired
 --     pieces on your own plot show for the whole of BUILD mode, at most
 --     WireToolLogic.MaxLines thin Neon parts, reused.
---   * Phone: tap a piece. PC: click it. Xbox: aim the crosshair, RT picks,
+--   * Phone: tap a piece. PC: click it. Xbox: aim the crosshair, RB picks,
 --     X cuts, B leaves (InputKit.WireBinds). Buttons CUT and DONE are 48 px
 --     tall for touch and the help line is 18 px on a TV.
 --   * Pick a switch, then tap lamps and doors to wire them (each tap is
@@ -153,7 +153,7 @@ local function refreshBar()
 		text = lesson .. "  " .. text
 	end
 	if UITheme.Device() == "console" then
-		text ..= "  RT pick · X cut · B done"
+		text ..= "  RB pick · X cut · B done"
 	end
 	b.label.Text = text
 end

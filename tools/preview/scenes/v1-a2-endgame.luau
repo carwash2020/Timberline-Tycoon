@@ -196,7 +196,7 @@ return {
 				{ pos = { 0, 9, -34 }, target = { 0, 5, 0 }, fov = 55, label = "forge" },
 				{ pos = { GX - 9, 7.5, -32 }, target = { GX - 4, 4.5, -2 }, fov = 50, label = "gate" },
 				{ pos = { IX + 6, 9, 21 }, target = { IX, 5.5, 0 }, fov = 50, label = "isle" },
-				{ pos = { PX + 2, 6.5, 19 }, target = { PX + 4.5, 3.5, 0 }, fov = 50, label = "trophies" },
+				{ pos = { PX + 6, 10.5, -17 }, target = { PX + 4.5, 4, 0 }, fov = 45, label = "trophies" },
 				-- Behind the window shots: Bram and the anvil left of the window
 				-- (phone: the window's left edge is 41% across; PC: 27%).
 				{ pos = { -3, 7.5, -27 }, target = { -11, 4, 2 }, fov = 50, label = "ui-phone" },

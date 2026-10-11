@@ -60,6 +60,12 @@ export type Stats = {
 	failedIds: { number },
 }
 
+-- True once an engine-less run (Lune) has found there is no AssetService:
+-- a miss then is not worth a warning.
+function MeshKit.NoEngine(): boolean
+	return noAssetService
+end
+
 function MeshKit.Stats(): Stats
 	return {
 		loaded = loadedCount,

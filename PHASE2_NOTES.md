@@ -3446,6 +3446,18 @@ Small fixes after the end game PR (#132).
 3. **Keen.** Temper an axe Keen I and chop a tree: the swings come about 8% faster than the same axe before (III about 22%). Keen on one axe does not speed another axe. Swap axes in the hotbar and back. Hold the chop button (PC mouse, phone, Xbox RT is unchanged) to check the pace.
 4. **Boot.** Join: the Sky Forge opens at the anvil, Gus's "Gus's Charter" prompt is on the town station, and the Output has no "[V1Boot]" warnings.
 
+## V1 backlog meshes (branch `phase-2/v1-backlog-meshes`, 10 October 2026)
+
+What changed: see STATUS.md. Output tags to send back: `[MeshKit]` (misses) and `[TownMeshes]` (one line per backlog asset that kept its parts).
+
+Studio checks (PC, phone 667x375, Xbox: same walk, nothing here is input-bound):
+1. Output on server start: no `[MeshKit] mesh ... did not load` and no `[TownMeshes] ... keeping the part build`. If one appears, the id's asset needs its permission opened for this experience (see "Creator Hub: mesh permissions").
+2. Odds and Ends, Sparkworks, Land Office, a gate kiosk (each gate's glow keeps its colour) and the Arrival Arch: roof, walls and sign sit on the ground, nothing sunk or floating, the sign text still reads and faces the street, the counter still works, nothing blocks a door.
+3. Tool Shed Robux shelf: each gold crate is the new mesh, the item's name reads on the cream window, hovering still shows your own price, crates sit on the table with no gap or overlap.
+4. Lanternwood trees (Ferry Island): trunk, crown and the lantern pods match the sections, nothing floats, felling still works.
+5. Turn the templates off (rename `MeshTemplates` in Studio): the shops and crates fall back to the part build and the Output says so once per asset.
+
+Awaiting Connor: the Robux table mesh does not fit the shelf layout (it is a single 2.5 high table with a back sign; `RobuxShelf` stands two rows with a 1.0 riser on a 3.9 top). Default: the part-built table stays. Say which wins and the shelf constants change to match.
 
 
 ## Map remake finish (Lane B, PR #121, 10 and 11 October 2026)
@@ -3567,3 +3579,54 @@ Xbox
 4. Prices are unchanged (the Lane F and W proposals). The belt pieces, sweeper and lasers are still PROPOSALS.
 5. The shop is part-built. When the uploaded Sparkworks mesh (PR #136) lands, it Dresses over this build the way the other shops do.
 6. A map chip and a street sign for it were left out so the spawn view stays as it is. Say if you want one.
+
+
+## Lane E: Studio checklist (11 October 2026)
+
+1. PC: walk to the sawmill yard, west of the office door. Rook Calloway (hard hat, green plaid, clipboard) faces the road. Press E: a two-line box, then the job board opens. Esc closes it.
+2. Finish a daily job: a toast says Rook has the cash, and your wallet does not change. Talk to Rook, press Take: the wallet rises once. Press Take again quickly: nothing more.
+3. Finish all three: the streak shows at once; Rook owes the bonus; Take pays jobs and bonus together.
+4. Phone (667x375): the job board shows three goals, Take and Close without scrolling; the calendar is hidden; every button is at least 44 px.
+5. Xbox: Talk (X), then the board opens with Close or Take selected; B closes it; DPadUp does nothing and raises no error.
+6. During Murph's tutorial: Rook says to finish with Murph first and no board opens.
+7. Output: no `[Client] DailyUI failed to start`. With the five NPC meshes loading, Hermit, Old Tolly, Cap'n Moss, Old Hank and Rook should show their Blender meshes; check `[MeshKit]` and `[NPCMeshes]` lines for misses (each asset warns once).
+8. Talk to Gus: his first line follows your charter step.
+
+### Lane E round 2: more Studio checks
+
+9. Walk into the Snow without a Coat: the screen edges frost and a toast says "Cold hurts here. Find a campfire or wear a Coat." once ever. Put the Coat on: it clears. Same with heat and the Heat Boots.
+10. A "Day N" sits under the clock (hidden during the tutorial). Rejoin: it keeps counting; a second save slot of the same account shares it (account-wide field).
+11. Sell a wood you have never sold: Rosa's toast with a small cash reward. Sell it again: nothing. Field Guide header shows Stamps and Secrets.
+12. Skip the tutorial on step 1 (two taps): the toast names the starter cash and the wallet gains it once. Finish it instead: a banner, chime and confetti name your next goal.
+13. Walk into a new area (any badge area): if today's jobs include "Discover a new area" it finishes; Rook pays on the hand-in.
+14. Phone: the job board ends above the jump button (Close | Take on one row).
+15. Gate signs: nothing changes until the map lane tags them (see PR Cross-lane requests).
+## No ButtonR2 (Xbox remap) (branch `phase-2/v1-no-buttonr2`, 11 October 2026)
+
+Why: the engine fires `Tool.Activated` for the equipped tool on the right trigger, and that cannot be remapped from script. Binding the trigger through ContextActionService sinks it and stops chopping, so the game never binds, sinks or reads it. `tests/NoButtonR2.spec.luau` fails if the token appears anywhere under `src/` (code, key tables, strings, comments).
+
+What changed, per action:
+
+| Action | Context | Old Xbox key | New Xbox key | Why that key |
+| --- | --- | --- | --- | --- |
+| Chop / swing (axe, hammer, picks) | tool in hand | RT (engine) | RT (engine) | Unchanged. `Tool.Activated` fires on RT by itself; CutController now listens only to that (and the mouse). Pacing (cooldown, Keen multiplier) is the same `clickSwing` path. |
+| Select a placed piece (BuilderTools) | empty hands | RT (CAS bind) | RB (`ButtonR1`) | Free in that context; RB only means Push inside the placer, which BuilderTools already yields to. Still unbound while a tool is held (LB + RB unequips). |
+| Wire pick (WireTool, BUILD) | wiring | RT (CAS bind) | RB (`ButtonR1`) | X is Cut, B is Done in that list; the placer is not up, so RB is free (`InputKit.WireSafe`). |
+| Grab / drag wood and boxes (DragController) | empty hands, held | RT (InputBegan read) | RB, held (`ButtonR1`) | RB was "further" while holding; that stays on D-pad up (D-pad down and LB are nearer). X would clash with world prompts (Interact/Talk/Buy), so not X. |
+| Place a blueprint (InputKit target table) | placer | RT (table only) | A (`ButtonA`) | The real binding was already A (`PlaceControlsLogic`); the table now says what the game does. RB stays Push there. |
+
+Other edits: `CutController` no longer reads the trigger in `InputBegan` (only the mouse click is a fallback there; the pad swings through `Tool.Activated`, then `clickSwing`, so the cooldown and the Keen multiplier (`TemperLogic.CooldownMultiplier`) apply as before). `DragController` drops RB from the push keys (`GrabLogic.PadAction`); D-pad up is further, D-pad down and LB are nearer. `PlaceControlsLogic.Forbidden` is gone (nothing left to forbid). Hints: `HintLogic` GRAB and the drag and holding lines, `WireTool` bar text.
+
+Specs changed only where the remap required: InputKit, GrabLogic (RB is no push), HintLogic and TutorialData (`hold RB`), WireToolLogic (RB picks), PlotUIPlans and PlaceControlsLogic (no trigger needle; Place is A), BuilderSelect (RB), and CutController (the three tests that pinned a trigger `InputBegan` read became two: a gamepad `Activated` chops the nearest section once, and a raw trigger key press is ignored).
+
+Not remapped without losing something: nothing was dropped. One side effect: RB is also half of the default backpack's unequip chord (LB + RB). With an axe out the grab shows its "put your axe away to drag" toast once (the same one the old trigger showed); with hands empty the chord does nothing.
+
+### Studio checklist (Xbox unless noted)
+
+1. Equip the axe, aim at a tree, RT: it swings and chops exactly as before, one chop per press, and holding RT keeps chopping at the axe's cooldown. A Keen axe still swings faster than the same axe untempered.
+2. Hands empty, BUILD mode, aim the centre dot at a placed piece, RB: it selects (RB again deselects). Aim at nothing, RB: nothing.
+3. Wire tool: aim at a switch, RB picks it; aim at a lamp, RB wires; X cuts; B leaves. The bar reads "RB pick · X cut · B done".
+4. Hands empty, aim at a loose log, hold RB: it lifts; D-pad up and down move it, D-pad left/right turn, LT + left stick tips; release RB drops it. The hint reads "Hold RB on wood to drag it".
+5. Blueprint placer: A places, RB and LB slide the ghost, B cancels; RB does not also grab.
+6. With the axe out, RB shows the "put your axe away to drag" toast and RT still chops.
+7. PC (click, E, R, Q) and phone (taps, hold to drag, PLACE button): unchanged.
