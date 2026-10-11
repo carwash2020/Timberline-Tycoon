@@ -70,6 +70,26 @@ end
 -- Ground a tree may grow on: dry, `roadClearance` (6) studs off the roads,
 -- flatter than `maxSlope` (0.75), not in town or the volcano's crater.
 -- ForestService asks a little more of it for a giant Elder.
+-- The strips (x0, x1) south of the pull-through bays (the long and longest
+-- rigs' bays), a bay's width and 5 studs either side.
+local cachedPullLanes: { { number } }? = nil
+local function pullThroughLanes(): { { number } }
+	local cached = cachedPullLanes
+	if cached then
+		return cached
+	end
+	local lanes: { { number } } = {}
+	cachedPullLanes = lanes -- (Town() does not ask for good ground; this guards the loop anyway)
+	local town = WorldPlan.Town()
+	for i, size in ipairs(town.parkingSizes) do
+		if size.Z >= WorldPlan.ParkingBays.long.Z then
+			local cf = town.parkingSlots[i]
+			table.insert(lanes, { cf.X - size.X / 2 - 5, cf.X + size.X / 2 + 5 })
+		end
+	end
+	return lanes
+end
+
 function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxSlope: number?): boolean
 	if WorldLayout.FlatWeight(x, z) > 0.9 then
 		return false
@@ -82,9 +102,12 @@ function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxS
 	end
 	-- The pull-through bays face south: no tree stands in the lanes ahead of
 	-- them down to z -150 (the Starter Forest now reaches up to the lot).
-	local lot = WorldLayout.ParkingLot
-	if x > lot.x0 - 6 and x < lot.x1 + 6 and z < lot.z0 and z > -150 then
-		return false
+	if z > -150 and z < WorldLayout.ParkingLot.z0 then
+		for _, lane in ipairs(pullThroughLanes()) do
+			if x > lane[1] and x < lane[2] then
+				return false
+			end
+		end
 	end
 	if TerrainGen.RoadClearance(x, z) < (roadClearance or 6) then
 		return false
@@ -158,11 +181,12 @@ function firstTrees(): { TreeSpot }
 	if cachedFirst then
 		return cachedFirst
 	end
-	-- These 322 were placed on the narrower roads, before the mill road,
-	-- the lot loop, the junction flares, the cliff rings and the hollow
-	-- pools. Place them that way, then sit each trunk on the ground as it
-	-- is now. X and Z never move (saves and stakes may point at them).
-	TerrainGen.SetLegacyLayout(true)
+	-- Ring map (WorldVersion 2): the first batch is placed on the map as it
+	-- is, not on the old narrower roads and the one lawn. (It was placed on
+	-- that old layout so saved trees kept their X and Z; the ring map is a new
+	-- world with new saves' trees, and the old layout's flat ground put
+	-- grove trees on the homesteads' pads.) The legacy switch stays for the
+	-- rollback to v1.
 	local out: { TreeSpot } = {}
 	local taken: { Vector3 } = {}
 	local function build(): any
@@ -236,6 +260,16 @@ function firstTrees(): { TreeSpot }
 				and TerrainGen.HeightAt(x, z) < 70
 				-- Ring map: not by the river, whose banks the footbridge needs clear.
 				and WorldLayout.PolylineDistance(Vector2.new(x, z), WorldLayout.River.points) > 90
+			if ok then
+				-- Nor on the forest's open lanes (the lighthouse's view, the grove's trail): the
+				-- grove's extra trees (TreeFill) keep off them.
+				for _, lane in ipairs(WorldLayout.Forest.lanes) do
+					if WorldLayout.SegmentDistance(Vector2.new(x, z), lane.a, lane.b) < lane.half + 30 then
+						ok = false
+						break
+					end
+				end
+			end
 			if ok then
 				for _, biome in ipairs(BiomeData.All()) do
 					local area = biome.area
@@ -1245,6 +1279,7 @@ function WorldPlan.Scenery(): { ScenerySpot }
 	-- The first 322 trees: the country stands come after the scenery and
 	-- keep off it, so it is 8+ studs off every tree all the same.
 	local trees = firstTrees()
+	local groves = WorldPlan.GroveDiscs()
 	local boulders = WorldPlan.Boulders()
 	local signs = WorldPlan.RoadSigns(function(): string
 		return ""
@@ -1293,6 +1328,13 @@ function WorldPlan.Scenery(): { ScenerySpot }
 		for _, t in ipairs(trees) do
 			local dx, dz = x - t.position.X, z - t.position.Z
 			if dx * dx + dz * dz < (r + 8) ^ 2 then
+				return nil
+			end
+		end
+		-- Nor a wild grove's whole disc: its extra trees (TreeFill) need the room.
+		for _, g in ipairs(groves) do
+			local dx, dz = x - g.cx, z - g.cz
+			if dx * dx + dz * dz < (g.radius + r + 4) ^ 2 then
 				return nil
 			end
 		end
