@@ -1287,6 +1287,20 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 	if onRoad > 0 then
 		return TerrainGen.GravelMaterial
 	end
+	-- Lane R's two regions. The Bayou's floor is Limestone tinted #4E4A36; Red
+	-- Mesa is Sandstone with Sand patches and a Rock rim.
+	local bdx, bdz = x - BAYOU_REGION.x, z - BAYOU_REGION.z
+	if bdx * bdx + bdz * bdz < BAYOU_REGION.radius * BAYOU_REGION.radius then
+		return "Limestone"
+	end
+	local mdx, mdz = x - MESA_REGION.x, z - MESA_REGION.z
+	local md2 = mdx * mdx + mdz * mdz
+	if md2 < MESA_REGION.radius * MESA_REGION.radius then
+		if md2 > (MESA_REGION.radius - 12) ^ 2 then
+			return "Rock"
+		end
+		return if noise(x / 18, z / 18, 6.1) > 0.35 then "Sand" else "Sandstone"
+	end
 	local lot = WorldLayout.ParkingLot
 	if x > lot.x0 and x < lot.x1 and z > lot.z0 and z < lot.z1 then
 		return TerrainGen.GravelMaterial
@@ -1445,6 +1459,10 @@ TerrainGen.MaterialColors = {
 	Slate = Color3.fromRGB(91, 86, 80), -- #5B5650
 	CrackedLava = Color3.fromRGB(255, 106, 30), -- #FF6A1E
 	Cobblestone = Color3.fromRGB(156, 149, 138), -- #9C958A
+	-- The Bayou's floor, mud discs and channel beds (Builder amendment 1, the
+	-- Art Director's value) and Red Mesa's red sandstone (nothing else uses it).
+	Limestone = Color3.fromRGB(78, 74, 54), -- #4E4A36
+	Sandstone = Color3.fromRGB(200, 100, 60), -- #C8643C
 	-- Every road, path and street (GravelMaterial).
 	Asphalt = Color3.fromRGB(168, 164, 156), -- #A8A49C
 } :: { [string]: Color3 }

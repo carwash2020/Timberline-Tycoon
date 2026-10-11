@@ -34,6 +34,8 @@ return function(t)
 		"LuxFX",
 		"TownMarkers",
 		"LifeFX",
+		-- Lane R: the Bayou's fireflies.
+		"RegionFX",
 	}
 
 	-- These loops decide gameplay. Throttling them would change the outcome.

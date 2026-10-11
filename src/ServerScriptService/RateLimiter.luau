@@ -83,6 +83,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	LogicSet = 4,
 	MineAction = 8, -- Lane M: a mining intent, about 8 a second
 	CraftAction = 2, -- Lane M: a craft intent, about 2 a second
+	RegionAction = 3, -- Lane R: a quarry swing, a find or the Bait Shack counter (ProximityPrompts; not remotes)
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic

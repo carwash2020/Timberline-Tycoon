@@ -26,11 +26,25 @@ return function(t)
 	end)
 
 	t.test("woods get harder and pay more per log up the list", function()
-		local woods = WoodData.All()
+		-- The stage-gated region woods (Lane R: the Bayou's and Red Mesa's) sit
+		-- at the end of the list so the detector filter's saved indices keep
+		-- still (LaneW W6); they are ordered by stage, not by HP, so the climb
+		-- is checked over the woods before them.
+		local woods = {}
+		for _, wood in ipairs(WoodData.All()) do
+			if BiomeData.StageNeeded(wood.biome) == 0 then
+				table.insert(woods, wood)
+			end
+		end
 		for i = 2, #woods do
 			t.ok(woods[i].treeHP > woods[i - 1].treeHP, woods[i].id .. " HP")
 			t.ok(woods[i].hardness >= woods[i - 1].hardness, woods[i].id .. " hardness")
 			t.ok(woods[i].pricePerLog > woods[i - 1].pricePerLog, woods[i].id .. " price")
+		end
+		for _, wood in ipairs(WoodData.All()) do
+			if BiomeData.StageNeeded(wood.biome) > 0 then
+				t.ok(wood.treeHP > 0 and wood.pricePerLog > 0, wood.id .. " numbers")
+			end
 		end
 	end)
 

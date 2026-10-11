@@ -684,6 +684,8 @@ step("5. The trees", function()
 		-- The Petrified Reach, planned after the fingerprint trees, so none of
 		-- those move.
 		collect(WorldPlan.ReachTrees(), true)
+		-- Bog Cypress in the Bayou and Ironwood on Red Mesa (Lane R).
+		collect(WorldPlan.RegionTrees(), false)
 		breathe()
 		loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
 		if yielding then

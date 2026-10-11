@@ -36,6 +36,7 @@ local TreeGen = modules:shared("TreeGen")
 local SectionLogic = modules:shared("SectionLogic")
 local SawmillLogic = modules:shared("SawmillLogic")
 local SellLogic = modules:shared("SellLogic")
+local StageOf = modules:shared("StageOf")
 
 local TutorialData = modules:shared("TutorialData")
 local TutorialGrove = modules:shared("TutorialGrove")
@@ -410,6 +411,23 @@ end
 -- One load of `wood`: (seconds, cash, $/u³) for a perfect player, or nil.
 -- Logs, or planks when a mill you own can take some of the tree and the
 -- extra time still pays. Milled pieces are bucked down to the mill's length.
+-- The ladder stage a kit reaches: the best axe rung owned and the biome gear,
+-- as StageOf.FromProgress reads a save.
+local function stageOfKit(owned): number
+	local stage = 1
+	for rung, axe in ipairs(ItemCatalog.AxeLadder()) do
+		if owned[axe.id] then
+			stage = math.max(stage, StageOf.AxeStage[rung] or 1)
+		end
+	end
+	for gearId, gearStage in pairs(StageOf.GearStage) do
+		if owned[gearId] then
+			stage = math.max(stage, gearStage)
+		end
+	end
+	return stage
+end
+
 local function loadCycle(axe, wood, owned, cash: number?)
 	local b = BiomeData.Get(wood.biome)
 	if b.requiresGear and not owned[b.requiresGear] then
@@ -422,6 +440,10 @@ local function loadCycle(axe, wood, owned, cash: number?)
 	end
 	-- The Gondola Pass is a $30,000 quest turn-in (GondolaPass), not a shelf price.
 	if b.access == "gondola" and not owned.GondolaPass then
+		return nil
+	end
+	-- The Bayou (S2) and Red Mesa (S4) wait for their stage (BiomeData.needsStage).
+	if b.needsStage and stageOfKit(owned) < b.needsStage then
 		return nil
 	end
 	local cap, tripSec, fee, _, bedLen = haulFor(b, owned)
@@ -665,10 +687,17 @@ local function simulate()
 		owned[pick.id] = true
 		events[pick.id] = t
 		local after, wood, axe, label = bestRate(owned, cash)
-		table.insert(
-			steps,
-			{ item = pick, price = price, at = t, before = rate, after = after, wood = wood, axe = axe, label = label }
-		)
+		table.insert(steps, {
+			item = pick,
+			price = price,
+			at = t,
+			before = rate,
+			after = after,
+			wood = wood,
+			axe = axe,
+			label = label,
+			kit = table.clone(owned),
+		})
 	end
 	local finalRate, finalWood, finalAxe, finalLabel = bestRate(owned)
 	if not events.thousand then
@@ -868,17 +897,17 @@ line("| Wood | Log $/u³ | Plank $/u³ | $ / tree as logs | $ / tree as planks |
 line("|---|---|---|---|---|---|")
 for _, wood in ipairs(WOODS) do
 	local v = TREES[wood.id].mean.volume
+	-- Bog Cypress and Ironwood (Lane R) have no §17 estimate.
 	local plan = PLAN_PER_TREE[wood.id]
 	line(
 		string.format(
-			"| %s | %s | %s | %s | %s | %s / %s |",
+			"| %s | %s | %s | %s | %s | %s |",
 			wood.displayName,
 			tostring(wood.v2.logPrice),
 			tostring(wood.v2.plankPrice),
 			money(v * wood.v2.logPrice),
 			money(v * wood.v2.plankPrice),
-			money(plan[1]),
-			money(plan[2])
+			if plan then money(plan[1]) .. " / " .. money(plan[2]) else "none"
 		)
 	)
 end
@@ -1011,6 +1040,76 @@ for _, biome in ipairs(BiomeData.All()) do
 end
 line()
 
+-- Region woods (Lane R): Bog Cypress waits for S2, Ironwood for S4. Each
+-- wood's $/h is the ideal model's (before EFFICIENCY) with the kit owned at
+-- the first buying-path step that reaches its stage with a sawmill owned, and has to sit in the
+-- Designer's band (13:35 room values). Both bands are the printed model's, so
+-- the check below fails the run (and CI's --check) when a number drifts.
+local REGION_BANDS = {
+	bogcypress = { 9000, 11000 },
+	ironwood = { 28000, 34000 },
+}
+local regionFailed = false
+line("## Region woods (Bayou and Red Mesa)")
+line()
+line(
+	"Each wood waits for its stage (BiomeData.needsStage; StageOf: the best axe rung or the biome gear). $/h is the ideal model's before EFFICIENCY, with the kit owned at the first buying-path step that reaches the stage with a sawmill owned. The Designer's band holds that number; \"best there\" is the buying path's best wood at the same step (a real player's, after EFFICIENCY)."
+)
+line()
+line(
+	"| Wood | Stage | Step | Kit's best wood, real $/h | This wood, ideal $/h | This wood, real $/h | Band (ideal) | In band |"
+)
+line("|---|---|---|---|---|---|---|---|")
+for _, woodId in ipairs({ "bogcypress", "ironwood" }) do
+	local wood = WoodData.Get(woodId)
+	local need = BiomeData.Get(wood.biome).needsStage
+	local row = nil
+	for _, step in ipairs(steps) do
+		if stageOfKit(step.kit) >= need and bestMill(step.kit) ~= nil then
+			row = step
+			break
+		end
+	end
+	local band = REGION_BANDS[woodId]
+	if row then
+		local axe = bestAxeFor(row.kit, wood)
+		local secs, value = loadCycle(axe, wood, row.kit, nil)
+		local ideal = if secs and value > 0 then value / secs * 3600 else 0
+		local ok = ideal >= band[1] and ideal <= band[2]
+		if not ok then
+			regionFailed = true
+			print(
+				string.format(
+					"REGION WOOD: %s is %s/h ideal, outside %s to %s",
+					wood.displayName,
+					money(ideal),
+					money(band[1]),
+					money(band[2])
+				)
+			)
+		end
+		line(
+			string.format(
+				"| %s | S%d | %s (%s) | %s | %s | %s | %s to %s | %s |",
+				wood.displayName,
+				need,
+				row.item.displayName,
+				duration(row.at),
+				money(row.after),
+				money(ideal),
+				money(ideal * EFFICIENCY),
+				money(band[1]),
+				money(band[2]),
+				if ok then "yes" else "NO"
+			)
+		)
+	else
+		regionFailed = true
+		line(string.format("| %s | S%d | never | - | - | - | - | NO |", wood.displayName, need))
+	end
+end
+line()
+
 line("## Lux Axe (Robux)")
 line()
 line(
@@ -1071,7 +1170,7 @@ for _, row in ipairs(guards) do
 		guardFailed = true
 	end
 end
-if guardFailed then
+if guardFailed or regionFailed then
 	process.exit(1)
 end
 

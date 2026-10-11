@@ -3469,3 +3469,32 @@ Small fixes after the end game PR (#132).
 3. Stand at the spawn and look east: the lighthouse lamp on the sand is in view.
 4. Footbridge west of Pine Bend over the river, both docks, the lighthouse: nothing floats or is sunk.
 5. Starter Forest: the north edge stops at the truck lot's pull-outs; trucks pull through south.
+
+## Bayou and Red Mesa (Lane R, branch `phase-2/v1-r-regions`, 11 October 2026)
+
+What changed, in the order a player meets it: the signposts at the road ends read `BAYOU / bog cypress / Needs Stage 2: the Steel Axe` and `RED MESA / ironwood / Needs Stage 4: the Cobalt Axe`. Stage is `StageOf.Current`: the best axe rung or the biome gear, or Lane E's `Stage:Sn` key. Chopping the region wood below the stage says so in a toast (`BiomeService.CanChop`).
+
+### Studio checks (Connor), Lane R
+
+PC (keyboard and mouse):
+1. Drive BayouRoad to its end. Good: the signpost faces back down the road, three lines, text reads left to right, nothing mirrored.
+2. Walk into the Bayou without Wader Boots. Good: inside a brown mud disc you slow to about 0.6x; on the road, the log landing and the boardwalk you do not. A toast shows the Bayou's name once (the first time on a slot). Walk the boardwalk loop: full speed, no snagging on posts or rails.
+3. Chop a Bog Cypress with a Rusty Axe. Good: a toast says it is too tough and names Stage 2. With the Steel Axe it fells and logs, planks and sells like any wood.
+4. Bait Shack: stand at the counter with $2,000 and 20 u³ of Bog Cypress planks laid beside it, press E on the "Wader Boots" prompt. Good: $2,000 and the planks go, the boots are worn from then on and the mud no longer slows you. Short of cash or planks nothing is taken and the toast says what is missing.
+5. Wade depth: walk the Bayou's low ground and pools. Good: ankle to shin deep at most (the 3-stud channel depth is unverified, AR6). Tell me if you want real terrain channels.
+6. Red Mesa: drive MesaRoad to its end, park in the truck lot. Good: eight sandstone faces along the east rim, a prompt "Quarry a slab" on each (Stage 4 only). One press gives one slab beside the node that you carry like a log; the face goes quiet for 60 s, then fills back in. At 24 loose slabs it refuses. A slab sells for $0 and the ore chute refuses it. Rejoin: slabs on your plot are still there.
+7. Butte and overlook: walk up the 6-wide ramp to the overlook deck (no sliding, the rails keep you on); climb the three truss ladders on the butte's east face to the top (+45). Good: you can reach the top on foot, the plinth sign reads "Something rare lives here" and the Look around prompt shows that line and nothing else. Same for the Bayou's stump plinth near (-780, -780).
+8. Mist: stand in the Bayou. Good: a gentle mist, thicker than the open country, lifting when you leave (it is a FogZone, not an Atmosphere).
+9. Run the economy: `lune run tools/economy` prints no GUARD or REGION WOOD line.
+
+Phone (667x375 emulator, then a real phone):
+10. Drive each road on the Lower quality setting. Good: no stutter at the junction or in the region (AR1: Connor on a real device). Prompts (Quarry a slab, Wader Boots, Look around) are tappable and clear of the thumbstick and jump button; holding the quarry prompt for 0.6 s works by touch.
+
+Xbox:
+11. Same three prompts: Interact is ButtonX for the quarry and the finds, Buy is ButtonX at the counter. The selection ring lands on them; B closes the shop toast; nothing binds ButtonR2.
+
+### Rules held
+
+- Server owns it: no remotes; prompts call `RegionService` handlers that check rate (`RegionAction`, 3 a second), distance, stage and ownership. Cash only through `EconomyService.SpendCash`; the planks go through `HandInWood`; the slab through `BuildMaterials.ReturnSlab` (24 cap). New save data: only `guideStamps` keys with the `Region:` prefix (no `ProfileSchema` field, no Migrate).
+- Budgets (spec and printed by `tests/RegionArt.spec`): boardwalk 47 of 60, Bait Shack 26 of 40, overlook 19 of 30, arch 28 of 60, scatter pieces at most 10 parts and looks only, 4 and 2 lights at Range 16 or less with shadows off, 44 and 38 trees, regions 500 or more apart.
+

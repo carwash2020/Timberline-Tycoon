@@ -336,6 +336,18 @@ ItemCatalog.Gear = {
 		biome = "volcano",
 		color = "#B5472A",
 	},
+	-- The Bayou's own item (Lane R). Bought at the Bait Shack, not Hearth & Home:
+	-- $2,000 plus 20 u³ of cypress planks (RegionService). It takes away the
+	-- mud's 0.6x slowdown, in the Bayou only.
+	WaderBoots = {
+		id = "WaderBoots",
+		displayName = "Wader Boots",
+		effect = "Wade through the Bayou's mud at full speed",
+		priceCash = 2000,
+		biome = "bayou",
+		color = "#6B5A3A",
+		quest = true,
+	},
 	-- The Gondola Pass. A quest turn-in, not a shelf item.
 	GondolaPass = {
 		id = "GondolaPass",

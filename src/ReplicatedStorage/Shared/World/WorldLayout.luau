@@ -8,7 +8,9 @@
 --
 -- Axes: +X is east, +Z is north. The sawmill hub is at (0, 110).
 
+local BayouData = require(script.Parent.Parent.Regions.BayouData)
 local BiomeData = require(script.Parent.Parent.BiomeData)
+local MesaData = require(script.Parent.Parent.Regions.MesaData)
 local PlotData = require(script.Parent.Parent.PlotData)
 
 local WorldLayout = {}
@@ -1436,6 +1438,11 @@ function WorldLayout.TreeBlocked(x: number, z: number): boolean
 	local lx, lz = WorldLayout.FerryLanding()
 	local ldx, ldz = x - lx, z - lz
 	if ldx * ldx + ldz * ldz < WorldLayout.LandingClear * WorldLayout.LandingClear then
+		return true
+	end
+	-- Lane R: the Bait Shack, boardwalk and log landing, the quarry, butte,
+	-- overlook, arch and truck lot.
+	if BayouData.Blocked(x, z) or MesaData.Blocked(x, z) then
 		return true
 	end
 	return false

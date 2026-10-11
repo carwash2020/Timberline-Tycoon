@@ -404,10 +404,11 @@ return function(t)
 		local text = fs.readFile("ECONOMY.md")
 		t.ok(string.find(text, "68 s", 1, true) ~= nil)
 		t.ok(string.find(text, "5.4 min", 1, true) ~= nil)
-		t.ok(string.find(text, "17.8 min", 1, true) ~= nil)
-		t.ok(string.find(text, "50.7 min", 1, true) ~= nil)
+		t.ok(string.find(text, "15.4 min", 1, true) ~= nil)
+		t.ok(string.find(text, "48.2 min", 1, true) ~= nil)
 		-- Coat gate, modelled mill and planer bonuses, and the $7,600 step.
-		t.ok(string.find(text, "31.5 h", 1, true) ~= nil)
+		-- Lane R: Bog Cypress (S2) and Ironwood (S4) joined the model: 15.4 min (was 17.8), 48.2 min (was 50.7), 31.4 h (was 31.5), all inside their ranges.
+		t.ok(string.find(text, "31.4 h", 1, true) ~= nil)
 	end)
 
 	t.test("kit meshes: fidelity is chosen per mesh, and a shared col loads once", function()
