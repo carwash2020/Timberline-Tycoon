@@ -50,6 +50,7 @@ local MODULES = {
 	"HoverTagUI",
 	"HudLayout",
 	"HudNav",
+	"IdlePing",
 	"HudRules",
 	"LeaderboardUI",
 	"LifeFX",
@@ -462,6 +463,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "SprintController",
 		get = function()
 			return require(script.Parent.SprintController)
+		end,
+	},
+	{
+		name = "IdlePing", -- tells the server the player is at the controls (the idle kick)
+		get = function()
+			return require(script.Parent.IdlePing)
 		end,
 	},
 	{

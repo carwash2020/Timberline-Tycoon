@@ -75,6 +75,7 @@ local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
+local LeaveCommit = require(script.Parent.LeaveCommit)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
@@ -2468,6 +2469,38 @@ function PlotService.Reload(player: Player, profile: Profile): boolean
 	return true
 end
 
+-- Leaving (or a shutdown) with the base on its pad: the loose wood and slabs
+-- go into the profile the same way an unload does (ingots stay with Lane M's
+-- own save). If the pile is too big to hold, it is left alone and the older
+-- ground-load save keeps the wood. Runs once per player: it is a LeaveCommit
+-- step (so the shutdown save, which beats PlayerRemoving, still includes the
+-- plot's loose wood) and PlayerRemoving calls it again as a no-op.
+local looseCommitted: { [Player]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+function PlotService.CommitLoose(player: Player)
+	if looseCommitted[player] then
+		return
+	end
+	looseCommitted[player] = true
+	local slot = slotOf[player]
+	local profile = ProfileService.GetProfile(player)
+	local loose = looseService()
+	if slot and profile and profile.plot and loose ~= nil then
+		local ok, err = (pcall :: any)(loose.Collect, player, slot, profile, false)
+		if not ok then
+			warn("[PlotService] loose wood not saved on leave: " .. tostring(err))
+		end
+	end
+end
+
+-- First in the list, so it runs before the truck's wood is taken (the order
+-- the leave always had).
+LeaveCommit.Add("plotLoose", PlotService.CommitLoose)
+
+-- The owner is gone and their save is committed (GameServer runs
+-- LeaveCommit.Flush first): take the base down and free the pad for the
+-- next player. Nothing here writes the profile except CommitLoose, which
+-- has already run, so tearing the models down loses nothing.
 function PlotService.PlayerRemoving(player: Player)
 	-- Drop the timer first, so a timeout can't assign a pad after they leave.
 	pickingUntil[player] = nil
@@ -2480,19 +2513,7 @@ function PlotService.PlayerRemoving(player: Player)
 	forgetFill(player)
 	expanding[player] = nil
 	rescues[player] = nil
-	-- Leaving with the base on its pad: the loose wood and slabs go into the
-	-- save the same way an unload does (ingots stay with Lane M's own save). If
-	-- the pile is too big to hold, it is left alone and the older ground-load
-	-- save keeps the wood.
-	local slot = slotOf[player]
-	local profile = ProfileService.GetProfile(player)
-	local loose = looseService()
-	if slot and profile and profile.plot and loose ~= nil then
-		local ok, err = (pcall :: any)(loose.Collect, player, slot, profile, false)
-		if not ok then
-			warn("[PlotService] loose wood not saved on leave: " .. tostring(err))
-		end
-	end
+	PlotService.CommitLoose(player) -- a no-op after the LeaveCommit step; a spec or a stray path gets it here
 	release(player)
 end
 

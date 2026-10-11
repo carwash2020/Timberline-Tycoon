@@ -316,6 +316,7 @@ return function(t)
 		end
 		return {
 			P = PlotService,
+			loader = loader,
 			config = loader:shared("GameConfig"),
 			PlotData = PlotData,
 			newPlayer = newPlayer,
@@ -2714,6 +2715,100 @@ return function(t)
 			t.eq(s.lastToast(), "Your base is not on a pad right now.")
 		end
 	)
+
+	-- Leaving: the save is committed first (LeaveCommit), then the plot comes
+	-- down and the pad is free for the next player. The loose wood and slabs
+	-- on the plot go into the profile as part of that commit.
+	local function leaveWorld()
+		local events = {}
+		local s, ann, profile, calls = baseWorld({
+			cash = 100000,
+			loose = {
+				Scan = function()
+					return { pieces = 0, sections = 0, unsaveable = 0 }
+				end,
+				Collect = function(_, _, prof)
+					table.insert(events, "collect")
+					prof.plot.loose =
+						{ { w = "oak", k = "log", bed = "Plot", at = { 1, 2, 3, 0, 0, 0 }, s = { { 1, 1, 1 } } } }
+					return true
+				end,
+				Restore = function()
+					return 0, 0
+				end,
+				RestoreStranded = function()
+					return 0, 0
+				end,
+			},
+		})
+		local clear = s.P.Hooks.clearPads
+		s.P.Hooks.clearPads = function(record)
+			table.insert(events, "teardown")
+			clear(record)
+		end
+		return s, ann, profile, calls, events
+	end
+
+	t.test(
+		"leaving: the loose wood is committed to the save, then the plot comes down, then the pad is free",
+		function()
+			local s, ann, profile, _, events = leaveWorld()
+			local Commit = s.loader:server("LeaveCommit")
+			t.eq(s.plot(1):GetAttribute("OwnerId"), 1, "the base is up")
+			-- GameServer's order: Flush, then the plot, then the release.
+			Commit.Flush(ann)
+			t.eq(events, { "collect" }, "committed first, with the plot still standing")
+			t.eq(#s.items(1), 2, "the models are still there while the save is committed")
+			s.P.PlayerRemoving(ann)
+			t.eq(events, { "collect", "teardown" }, "save first, teardown second, and wood collected once")
+			t.eq(#s.items(1), 0, "the base is down")
+			t.eq(s.plot(1):GetAttribute("OwnerId"), nil, "the pad is free")
+			t.eq(ann.attrs.PlotSlot, nil)
+			t.eq(#profile.plot.loose, 1, "the loose wood rides in the profile")
+			t.eq(#profile.plot.placed, 2, "and the build itself is untouched")
+			local bob = s.newPlayer(2, "Bob")
+			s.claim(bob, 1)
+			t.eq(bob.attrs.PlotSlot, 1, "the next player gets the freed pad")
+		end
+	)
+
+	t.test("a shutdown save that beats PlayerRemoving still commits the plot's loose wood, once", function()
+		local s, ann, profile, _, events = leaveWorld()
+		local Commit = s.loader:server("LeaveCommit")
+		Commit.Flush(ann) -- ProfileStore's OnLastSave on shutdown
+		Commit.Flush(ann)
+		t.eq(events, { "collect" })
+		t.eq(#profile.plot.loose, 1)
+		s.P.PlayerRemoving(ann) -- the leave arrives later: it only tears down
+		t.eq(events, { "collect", "teardown" })
+	end)
+
+	t.test("leaving without a commit step having run still collects first, then tears down", function()
+		local s, ann, _, _, events = leaveWorld()
+		s.P.PlayerRemoving(ann)
+		t.eq(events, { "collect", "teardown" })
+		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
+	end)
+
+	t.test("a player with no base on a pad leaves cleanly: nothing to collect, nothing to free", function()
+		local s, _, _, _, events = leaveWorld()
+		local bob = s.newPlayer(2, "Bob")
+		s.P.PlayerRemoving(bob)
+		t.eq(events, {})
+		t.eq(s.plot(1):GetAttribute("OwnerId"), 1, "Ann's pad is not touched")
+	end)
+
+	t.test("GameServer commits the save before it takes the plot down", function()
+		local fs = require("@lune/fs")
+		local server = fs.readFile("src/ServerScriptService/GameServer.server.luau")
+		local at = string.find(server, "local function onPlayerRemoving", 1, true)
+		local flush = string.find(server, 'safely("LeaveCommit.Flush"', at, true)
+		local plot = string.find(server, 'safely("PlotService.PlayerRemoving"', at, true)
+		local release = string.find(server, "ProfileService.ReleaseProfile(player)", at, true)
+		t.ok(flush ~= nil and plot ~= nil and release ~= nil)
+		t.ok(flush < plot, "commit, then the plot comes down")
+		t.ok(plot < release, "and the save session is released last")
+	end)
 
 	t.test("visitors on the plot are set down outside it before it comes down", function()
 		local s, ann = baseWorld()

@@ -48,6 +48,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	SaveSetting = 4,
 	SetQuality = 2, -- the join screen's choice, or the Settings row (QualityService)
 	ClientReady = 2, -- the client's join handshake: once, with a retry (JoinSync)
+	Activity = 2, -- the client saw a key, tap, click or stick move (IdleService); it sends at most one in 30 s
 	Grab = 6, -- v2 loop (V2_PLAN.md §12)
 	Release = 6,
 	Chop = 6, -- v2 loop: a swing at a section (SectionTrees; the axe's cooldown is checked too)
@@ -118,10 +119,22 @@ local function addStrike(player: Player, remoteName: string)
 end
 
 -- True if this request should be processed.
+-- Every remote a player sends passes through Allow, so IdleService listens
+-- here: any request, even one over budget, shows the player is at the
+-- controls. The listener must not yield.
+local requestListener: ((Player, string) -> ())? = nil
+
+function RateLimiter.OnRequest(listener: ((Player, string) -> ())?)
+	requestListener = listener
+end
+
 function RateLimiter.Allow(player: Player, remoteName: string): boolean
 	local limit = LIMITS[remoteName]
 	if limit == nil then
 		return false
+	end
+	if requestListener ~= nil then
+		requestListener(player, remoteName)
 	end
 	local perPlayer = buckets[player]
 	if perPlayer == nil then

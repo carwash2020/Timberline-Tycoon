@@ -40,6 +40,7 @@ Net.RemoteNames = {
 	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
 	"SetQuality", -- client -> server: ("low" | "high") the Lower / Higher graphics choice, from the join screen or Settings (QualityService)
 	"ClientReady", -- client -> server: () every controller has started and its handlers are connected; the server then lets the player in and sends state again (JoinSync)
+	"Activity", -- client -> server: () the player pressed a key, tapped, clicked or moved a stick; sent at most once in 30 s so an idle player is not removed (IdleService)
 	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)
 	"TutorialSeen", -- client -> server: ("build" | "land") the player opened the hammer's blueprint list or the Land panel (QuestService)
 	"Grab", -- client -> server: (part, hitPos) take hold of a loose piece of wood (v2 loop: GrabService)
