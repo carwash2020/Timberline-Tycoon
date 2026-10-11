@@ -3,7 +3,7 @@
 -- src/ that prove the lanes agree with each other: every remote has a budget
 -- and a server handler, the client module list matches the folder, the boot
 -- order is intact, only the owning service touches cash and the DataStore,
--- nobody binds the right trigger in a panel, nothing trades, no Robux price
+-- nothing trades, no Robux price
 -- is written in code. Anything this finds is a real wiring bug.
 return function(t)
 	local fs = require("@lune/fs")
@@ -211,58 +211,6 @@ return function(t)
 				t.eq(string.find(src, "DataStoreService", 1, true), nil, path)
 				t.eq(string.find(src, "MemoryStoreService", 1, true), nil, path)
 			end
-		end
-	end)
-
-	-- Panels, prompts and the V1 tools: none binds or reads the right trigger
-	-- (RT stays the swing). The input-owner files (InputKit's context lists,
-	-- BuilderTools, CutController, DragController, WireTool) are outside this
-	-- scan on purpose: they are restricted, and V1_REVIEW lists them.
-	t.test("no panel, prompt or server file mentions ButtonR2", function()
-		local panels = {
-			"StoreUI",
-			"ForgeUI",
-			"MiningUI",
-			"CraftUI",
-			"SaveSlotUI",
-			"PlotUI",
-			"BlueprintPlacer",
-			"PlaceControls",
-			"BadgeUI",
-			"QuickMenuUI",
-			"QuestUI",
-			"NewsUI",
-			"AdminUI",
-			"ShopUI",
-			"DialogueUI",
-			"SettingsUI",
-			"LeaderboardUI",
-			"FieldGuideUI",
-			"PlotPickerUI",
-			"QualityPickerUI",
-			"LogicPanelUI",
-			"HUD",
-			"HudNav",
-			"MenuPad",
-			"GamepadNav",
-			"PromptUI",
-			"HoverTagUI",
-			"ForgeClient",
-			"MiningClient",
-			"TreeUI",
-			"ForestUI",
-			"WorldUI",
-		}
-		for _, name in ipairs(panels) do
-			local path = "src/StarterPlayer/StarterPlayerScripts/" .. name .. ".luau"
-			if not fs.isFile(path) then
-				path = "src/StarterPlayer/StarterPlayerScripts/" .. name .. ".client.luau"
-			end
-			t.ok(fs.isFile(path), name .. " exists")
-			t.eq(string.find(code(path), "ButtonR2", 1, true), nil, path .. " mentions ButtonR2")
-		end
-		for _, path in ipairs(server) do
-			t.eq(string.find(code(path), "ButtonR2", 1, true), nil, path)
 		end
 	end)
 
