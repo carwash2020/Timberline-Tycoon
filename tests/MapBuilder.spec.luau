@@ -131,6 +131,8 @@ return function(t)
 						-- The tutorial oaks carry a fixed seed and stay mature. A
 						-- world site is { boot = true }; forgetting that still fails.
 						local tutorial = type(opts) == "table" and opts.seed ~= nil
+						s.spawnKinds = s.spawnKinds or {}
+						table.insert(s.spawnKinds, if tutorial then "tutorial" else "world")
 						if not tutorial then
 							s.sectionBoot = (s.sectionBoot ~= false) and opts ~= nil and opts.boot == true
 							s.groupsFirst = (s.groupsFirst ~= false) and s.groups == true
@@ -513,16 +515,66 @@ return function(t)
 			s.refreshedAfterForest == s.sectionSpawned - #sky.lumenwood,
 			"...after the last tree of the forest (the isles' lumenwood is planted later, by the deferred sky)"
 		)
-		-- Nearest the sawmill first: the forest comes in as a spiral out, not in plan order.
-		local hub = t.shared("World/WorldLayout").Sawmill
-		local last, ordered = -1, true
-		for _, p in ipairs(s.forestOrder) do
-			local d = (p.X - hub.X) ^ 2 + (p.Z - hub.Z) ^ 2
-			ordered = ordered and d >= last
-			last = d
-		end
-		t.ok(ordered, "world trees are planted nearest the sawmill first")
 		t.eq(s.sectionWoods.lumenwood >= #sky.lumenwood, true)
+	end)
+
+	t.test("v2: the forest comes in the order a player meets it, batch by batch, nearest the spawn first", function()
+		-- A fresh plan (the shared one is cached by other specs, so it would hand
+		-- everything over at once): the first batch (WorldPlan.FirstTrees) goes in
+		-- before the rest is even planned, then the town's trees, the first thing
+		-- the planner hands over, then the rest as it is planned.
+		local fresh = t.loader({ isolated = true }):load("ReplicatedStorage/Shared/World/WorldPlan")
+		local s = build({
+			loop = 2,
+			worldPlan = {
+				Trees = fresh.Trees,
+				FirstTrees = fresh.FirstTrees,
+			},
+		})
+		local spawn = t.shared("World/WorldLayout").Spawn
+		local function d2(p)
+			return (p.X - spawn.X) ^ 2 + (p.Z - spawn.Z) ^ 2
+		end
+		local firstN = fresh.FirstTreeCount()
+		local townN = 0
+		local townAt, planAt = {}, {}
+		for _, spot in ipairs(fresh.Trees()) do
+			planAt[tostring(spot.position)] = true
+			if spot.zone and string.sub(spot.zone.id, 1, 5) == "town:" then
+				townN += 1
+				townAt[tostring(spot.position)] = true
+			end
+		end
+		t.ok(townN > 0, "the plan has town trees")
+		-- The tutorial's first tree stands from the first moment, before any world tree:
+		-- the three oaks west of the spawn are planted synchronously, before the world
+		-- opens, so the first chop never waits for the forest.
+		local TutorialGrove = t.shared("TutorialGrove")
+		for i = 1, #TutorialGrove.Trees do
+			t.eq(s.spawnKinds[i], "tutorial", "tree " .. i .. " is a tutorial oak")
+		end
+		t.ok(s.tutorialBeforeSellArea, "...and they are in before SellArea")
+		-- (The deferred queue plants the town's greenery trees in the same frames:
+		-- only the plan's own trees count here.)
+		local order = {}
+		for _, p in ipairs(s.forestOrder) do
+			if planAt[tostring(p)] then
+				table.insert(order, p)
+			end
+		end
+		t.eq(#order, #fresh.Trees(), "every tree of the plan is planted once")
+		local last, ordered = -1, true
+		for i = 1, firstN do
+			ordered = ordered and d2(order[i]) >= last
+			last = d2(order[i])
+		end
+		t.ok(ordered, "the first batch is planted nearest the spawn first")
+		last, ordered = -1, true
+		for i = firstN + 1, firstN + townN do
+			ordered = ordered and d2(order[i]) >= last and townAt[tostring(order[i])] == true
+			last = d2(order[i])
+		end
+		t.ok(ordered, "then the town's trees, nearest the spawn first, before any of the far forest")
 	end)
 
 	t.test("a live server (no Studio override) builds the v2 loop's section trees", function()

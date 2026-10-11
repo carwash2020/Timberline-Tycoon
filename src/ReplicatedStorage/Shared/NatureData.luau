@@ -140,13 +140,36 @@ function NatureData.Assemble(scatter: { Zone }?, plan: { Zone }, rooms: { Zone }
 	return out
 end
 
+-- Whether the plan's slow part is worked out. The real WorldPlan answers
+-- TreesReady (the cave points of interest are placed against every tree, and
+-- asking for them first costs seconds on the spot); a spec stub with no such
+-- method is always ready.
+function NatureData.PlanReady(plan: any): boolean
+	if type(plan) ~= "table" or type(plan.TreesReady) ~= "function" then
+		return true
+	end
+	return plan.TreesReady() == true
+end
+
+-- What FromWorldPlan worked out for each plan, so asking again is a lookup,
+-- not a rebuild. A result without the caves (the plan was not ready) is kept
+-- only until it is.
+local fromPlan: { [any]: { zones: { Zone }, complete: boolean } } = setmetatable({}, { __mode = "k" }) :: any
+
 -- Map a WorldPlan-shaped table (the real module, or a spec stub) into zones.
--- Missing methods are skipped. No coordinates are written here.
-function NatureData.FromWorldPlan(plan: any): { Zone }
+-- Missing methods are skipped. No coordinates are written here. Worked out
+-- once per plan (see above); the second value says whether the caves are in
+-- (false while the plan's trees are not ready: ask again later).
+function NatureData.FromWorldPlan(plan: any): ({ Zone }, boolean)
 	local zones: { Zone } = {}
 	if type(plan) ~= "table" then
-		return zones
+		return zones, true
 	end
+	local known = fromPlan[plan]
+	if known and (known.complete or not NatureData.PlanReady(plan)) then
+		return known.zones, known.complete
+	end
+	local complete = NatureData.PlanReady(plan)
 	if type(plan.GroveDiscs) == "function" then
 		for i, disc in ipairs(plan.GroveDiscs()) do
 			table.insert(zones, {
@@ -202,7 +225,7 @@ function NatureData.FromWorldPlan(plan: any): { Zone }
 			})
 		end
 	end
-	if type(plan.PointsOfInterest) == "function" then
+	if complete and type(plan.PointsOfInterest) == "function" then
 		for _, poi in ipairs(plan.PointsOfInterest()) do
 			if poi.kind == "Cave" and typeof(poi.cframe) == "CFrame" then
 				local p = poi.cframe.Position
@@ -253,7 +276,8 @@ function NatureData.FromWorldPlan(plan: any): { Zone }
 			end
 		end
 	end
-	return zones
+	fromPlan[plan] = { zones = zones, complete = complete }
+	return zones, complete
 end
 
 -- Rooms from UndergroundData (B). Each room needs id, center, radius.

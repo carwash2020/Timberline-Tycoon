@@ -291,18 +291,27 @@ end
 -- 1 in the open, 0 under a roof, in a cave, the tunnel or the grotto.
 local rainCover = 1
 local shelterZones: { NatureData.Zone }? = nil
+local shelterComplete = false
 
+-- The zones that keep rain off: scatter and underground rooms, and the plan's
+-- (NatureData.FromWorldPlan). The plan's cave points of interest are placed
+-- against every tree, so until WorldPlan's trees are worked out (ForestFiller
+-- does that, a slice a frame, after the player is in) the zones are the rest,
+-- and the caves join the moment they are ready. This never asks WorldPlan for
+-- the trees itself: that is seconds of work and froze the client (and Start).
 local function shelterZonesNow(): { NatureData.Zone }
 	local cached = shelterZones
-	if cached then
+	if cached and (shelterComplete or not NatureData.PlanReady(WorldPlan)) then
 		return cached
 	end
 	local scatter = NatureData.TryModule(ReplicatedStorage.Shared:FindFirstChild("ScatterZones"))
 	local under = NatureData.TryModule(ReplicatedStorage.Shared:FindFirstChild("UndergroundData"))
 	local rooms = if type(under) == "table" then NatureData.FromRooms(under.Rooms) else nil
 	local rows = if type(scatter) == "table" then scatter.Zones else nil
-	local made = NatureData.Assemble(rows, NatureData.FromWorldPlan(WorldPlan), rooms)
+	local planZones, complete = NatureData.FromWorldPlan(WorldPlan)
+	local made = NatureData.Assemble(rows, planZones, rooms)
 	shelterZones = made
+	shelterComplete = complete
 	return made
 end
 
@@ -883,7 +892,17 @@ function WeatherController.Start()
 		rainSound = s
 	end
 
-	aurora = buildAurora()
+	-- The aurora looks up the Snowfields' zone (the zone list is worked out on
+	-- first ask): off Start's path, so nothing it does can hold the client's
+	-- start-up, whatever it costs.
+	task.defer(function()
+		local ok, built = pcall(buildAurora)
+		if ok then
+			aurora = built
+		else
+			warn("[WeatherController] aurora not built: " .. tostring(built))
+		end
+	end)
 	watchMapEmitters()
 
 	task.spawn(function()
