@@ -25,6 +25,24 @@ return function(t)
 		end
 	end)
 
+	t.test("the Bayou and Red Mesa are named regions with first-visit toasts", function()
+		for _, c in ipairs({
+			{ disc = "bayou", id = "bayou", name = "The Bayou", biome = "bayou" },
+			{ disc = "mesa", id = "redmesa", name = "Red Mesa", biome = "mesa" },
+		}) do
+			local d = BiomeData.RegionDiscs[c.disc]
+			local place = here(d.x, d.z, 0)
+			t.ok(place, c.id .. " has a place")
+			t.eq(place.id, c.id)
+			t.eq(place.biomeId, c.biome)
+			t.eq(place.displayName, c.name)
+			local toast = RegionLogic.Toast(place.id)
+			t.ok(toast and string.find(toast, c.name, 1, true) ~= nil, c.id .. " has a toast naming it")
+			local outside = here(d.x + d.radius + 40, d.z, 0)
+			t.ok(outside == nil or outside.base ~= c.id, "outside the disc is not " .. c.id)
+		end
+	end)
+
 	t.test("the beach and the river banks are places of their own", function()
 		local coast = t.load("ReplicatedStorage/Shared/World/WorldLayout").Coast
 		local strand = here(coast.shoreX - 20, 0, 0)

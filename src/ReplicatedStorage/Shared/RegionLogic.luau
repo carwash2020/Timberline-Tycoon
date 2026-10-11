@@ -20,7 +20,7 @@ local WorldLayout = require(script.Parent.World.WorldLayout)
 
 local RegionLogic = {}
 
-export type Shape = "plains" | "hills" | "plateau" | "cone" | "hollow" | "beach" | "banks" | "sky" | "underground"
+export type Shape = "plains" | "hills" | "plateau" | "cone" | "hollow" | "beach" | "banks" | "sky" | "underground" | "swamp" | "mesa"
 
 export type RegionDef = {
 	id: string,
@@ -204,6 +204,26 @@ local function buildRegions(): { RegionDef }
 			bleed = { "conifer" },
 		},
 		{
+			id = "bayou",
+			displayName = "The Bayou",
+			blurb = "a sunken swamp · bogcypress, mud slows you without Wader Boots",
+			shape = "swamp",
+			palette = "murk and moss",
+			biomeId = "bayou",
+			species = {},
+			bleed = {},
+		},
+		{
+			id = "redmesa",
+			displayName = "Red Mesa",
+			blurb = "red sandstone flats · ironwood and quarry stone",
+			shape = "mesa",
+			palette = "red sandstone",
+			biomeId = "mesa",
+			species = {},
+			bleed = {},
+		},
+		{
 			id = "sky",
 			displayName = "Aether Isles",
 			blurb = "the isles above the Skyroot · lumenwood",
@@ -236,7 +256,14 @@ end
 
 -- Centres for the discs BiomeData owns, plus the reach, the sky's floor
 -- and the places that aren't discs.
+local REGION_DISC_OF = { bayou = "bayou", redmesa = "mesa" } -- region id -> BiomeData.RegionDiscs key
+
 local function centerOf(id: string): (number, number, number, number?)
+	local reserved = REGION_DISC_OF[id]
+	if reserved then
+		local d = BiomeData.RegionDiscs[reserved]
+		return d.x, d.z, d.radius, nil
+	end
 	if id == "reach" then
 		local x, z, r = reachDisc()
 		return x, z, r, nil
@@ -359,6 +386,14 @@ local function discAt(x: number, z: number, y: number?): RegionDef?
 	-- The reach is tested before the hollow so its pocket wins on the
 	-- ridge's far side (the discs don't overlap; the order is the rule).
 	for _, id in ipairs(DISC_IDS) do
+		local cx, cz, r = centerOf(id)
+		if dist(x, z, cx, cz) <= r then
+			return BY_ID[id]
+		end
+	end
+	-- The Bayou and Red Mesa are reserved discs outside the stand list (no
+	-- filler species of their own).
+	for id in pairs(REGION_DISC_OF) do
 		local cx, cz, r = centerOf(id)
 		if dist(x, z, cx, cz) <= r then
 			return BY_ID[id]
