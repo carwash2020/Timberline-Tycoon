@@ -554,7 +554,9 @@ end
 
 -- True while `meshId` is on its way (asked for, not cached, not failed).
 function MeshKit.IsPending(meshId: number): boolean
-	return masters[meshId] == nil and failed[meshId] == nil and (inflight[meshId] == true or requested[meshId] == true)
+	return (masters[meshId] :: MeshPart?) == nil
+		and not failed[meshId]
+		and (inflight[meshId] == true or requested[meshId] == true)
 end
 
 -- True inside an Attempt when a Create missed only because a mesh is still on
