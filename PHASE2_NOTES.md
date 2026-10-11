@@ -3704,7 +3704,7 @@ What changed is in STATUS.md (the found / added table). Previews: `previews/v1-h
 ### Studio checklist
 
 PC (keyboard and mouse)
-1. Open Settings (the round button left of the cash plaque). The five tabs GAME, VISIT, BOARD, REPORT, CODES sit on one row. Click "Camera speed": it steps 100%, 125% ... 200%, then 25%. Move the mouse in a free-look camera: the speed follows. Rejoin: the value is kept.
+1. Open Settings (the round button left of the cash plaque). The five tabs GAME, VISIT, BOARD, REPORT, CODES sit on one row. (The Camera speed row was removed on 11 October: see Startup errors.)
 2. Click Music volume and Effects volume: the music and effect loudness follow; "Graphics: Lower" and "Graphics: Higher" switch the dressing at once (box windows, scenery).
 3. CODES tab: type `PLACEHOLDER-DISABLED` and press Enter or REDEEM: "That code isn't valid." and no cash. Type nothing: "Type a code first." (Real codes: ask Connor to add one in `ServerScriptService/CodeData.luau`, enabled, with a UTC expiry, then redeem it once for the cash, again for "You already used that code.", on a second save slot too.) Six wrong codes quickly: "Too many tries..." for about 30 s.
 4. REPLAY TUTORIAL: first tap changes to "TAP AGAIN TO REPLAY", second tap restarts the tutorial. Finish the first step: Murph says nothing about cash and your wallet does not change. (A first-time player's first run still pays.)
@@ -3716,12 +3716,12 @@ PC (keyboard and mouse)
 Phone (667 x 375, landscape)
 9. The Settings card ends above the jump button (it does not cover it) and scrolls with a finger. Every row, tab and the code box is easy to hit with a thumb.
 10. CODES tab: tap the box, the keyboard appears, type, tap REDEEM. The answer shows under the button and as a toast.
-11. Camera speed: drag the camera with a thumb at 25% and at 200%. If nothing changes on a phone, the engine ignores the setting for touch; tell Claude (the row would then be hidden on touch-only devices).
+11. (Camera speed was removed.)
 
 Xbox (controller)
 12. D-pad right opens Settings; the selection ring is on GAME. The stick or D-pad walks the tabs and rows; A presses; B on CODES, BOARD or VISIT returns to GAME, B again closes.
 13. CODES tab: A on the code box opens the Xbox keyboard; type a code, confirm, then A on REDEEM. The ring is visible on the box and the button.
-14. Camera speed row: A steps it; the right stick turns the camera faster or slower to match.
+14. (Camera speed was removed.)
 15. No button does anything on the right trigger (RT still only chops).
 
 ## V1 hardening: moderation and policy (branch `phase-2/v1-hardening-moderation`, 11 October 2026)
@@ -3752,6 +3752,27 @@ Policy (any device)
 11. Output: no red errors from `[PolicyGate]` or `[TextFilter]` during join. A warning "policy lookup failed" in Studio without API access is expected; the strict default then applies, which hides nothing today.
 12. Rename a save to something rude: it shows as hashes or the default name, never as typed (Studio may not filter without an experience; the live server does).
 
+## Startup errors (branch `phase-2/fix-startup-errors`, 11 October 2026)
+
+What and why are in STATUS.md. Claude can't run Studio: nothing below has been seen in Studio.
+
+### Studio checks
+
+PC (keyboard and mouse)
+1. Join a fresh save and read Output. Good: no "Insufficient permissions to set MouseSensitivity / GamepadCameraSensitivity", no "[GameAnalytics] progression S1 failed: Unable to cast string to int", no "[QuestUI] Murph's Talk prompt never streamed in".
+2. Open Settings. Good: there is no "Camera speed" row; every other row is where it was; the camera still turns normally with the mouse.
+3. Walk to Murph's camp straight after joining and from far away. Good: the Talk prompt shows (E), pressing it opens his dialogue; walk far off and come back, it still works.
+4. Walk to Old Hank at the Land Office from far away. Good: his Talk prompt appears at once.
+5. Rejoin a save that already finished stage S1: still no analytics error (Stage S2 and later send their number as the level; in Studio the analytics service may say nothing at all, which is fine).
+
+Phone (667x375)
+6. Same as 1 to 4 with taps: Settings has no Camera speed row, the Talk prompt is tappable and at least 44 px, dragging with a thumb turns the camera as before.
+
+Xbox (controller)
+7. Same as 1 to 4: Settings has no Camera speed row, the right stick turns the camera as before, X talks to Murph and Old Hank, B closes the dialogue.
+
+Fallback (only if Murph's prompt is slow)
+8. If the log says "Murph's Talk prompt never streamed in", Murph's card must also show "I'm at my camp by the fire. Follow the amber arrow..." (it appears after 15 s). Tell Claude: that means the model did not stream in even as Persistent.
 ## First screen UI fix (branch `phase-2/fix-first-screen-ui`, 11 October 2026)
 
 What and why are in STATUS.md. Rules: `Shared/JoinPickLogic` (`AutoPick`, `TutorialWaits`, `HintHidden`), `Shared/SaveSlotLogic` (`Panel`, `Layout`), `HudLayout` (`MarkTextLeft`, `ClearOfRects`), `HudRules.BadgesButton`, `Shared/TextAnchor.Probes`. Composites (not Studio screenshots) are in `previews/fix-first-screen/`.

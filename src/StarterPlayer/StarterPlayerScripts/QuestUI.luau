@@ -979,20 +979,32 @@ local function build()
 end
 
 -- "Talk" on Murph repeats the current line (or a goodbye once done).
--- The prompt is built with the model (NPCService), so it streams in with
--- him. This only connects to it: no WaitForChild, and no second prompt.
+-- The prompt is built with the model (NPCService), and Murph's model is
+-- Persistent, so it normally arrives with him. A streamed model can still show
+-- up a moment before its children, so the prompt is waited for (WaitForChild,
+-- bounded by QuestUI.TalkWait) and, if it never comes, the player is told in
+-- Murph's card where to go instead of nothing happening. No second prompt.
+QuestUI.TalkWait = 15 -- seconds to wait for Murph's Talk prompt
+QuestUI.TalkFallback =
+	"I'm at my camp by the fire. Follow the amber arrow, then press the Talk button when you're close."
 local murphHooked = false
 -- Murph's onboarding tips (NPCData) were a bubble on his first hello. They
 -- now open in the same dialogue box the first time a new player talks to him
 -- on the first step, ahead of the step's line.
 local tipsGiven = false
 
-local function hookMurph(model: Instance): boolean
-	if murphHooked or not model:IsA("Model") or model:GetAttribute("NPCId") ~= "Murph" then
-		return false
+-- Murph's Talk prompt, waited for (a bounded WaitForChild); nil when it never
+-- streams in.
+function QuestUI.WaitForTalk(model: Instance, timeout: number?): ProximityPrompt?
+	local found = model:WaitForChild("Talk", timeout or QuestUI.TalkWait)
+	if found and found:IsA("ProximityPrompt") then
+		return found
 	end
-	local prompt = model:FindFirstChild("Talk")
-	if not (prompt and prompt:IsA("ProximityPrompt")) then
+	return nil
+end
+
+local function hookMurph(model: Instance, prompt: ProximityPrompt): boolean
+	if murphHooked or not model:IsA("Model") or model:GetAttribute("NPCId") ~= "Murph" then
 		return false
 	end
 	murphHooked = true
@@ -1031,15 +1043,20 @@ local function hookMurph(model: Instance): boolean
 	return true
 end
 
+local watched: { [Instance]: boolean } = {}
+
 local function watchMurph(model: Instance)
-	if hookMurph(model) or not model:IsA("Model") or model:GetAttribute("NPCId") ~= "Murph" then
+	if murphHooked or watched[model] or not model:IsA("Model") or model:GetAttribute("NPCId") ~= "Murph" then
 		return
 	end
-	-- The tag can replicate a moment before the prompt.
-	local childConn: RBXScriptConnection? = nil
-	childConn = model.ChildAdded:Connect(function()
-		if hookMurph(model) and childConn then
-			childConn:Disconnect()
+	watched[model] = true
+	task.spawn(function()
+		local prompt = QuestUI.WaitForTalk(model)
+		if prompt then
+			hookMurph(model, prompt)
+		elseif not murphHooked then
+			warn("[QuestUI] Murph's Talk prompt never streamed in")
+			say(QuestUI.TalkFallback)
 		end
 	end)
 end
@@ -1047,9 +1064,6 @@ end
 local function setupMurph()
 	for _, model in ipairs(CollectionService:GetTagged("NPC")) do
 		watchMurph(model)
-		if murphHooked then
-			return
-		end
 	end
 	local conn: RBXScriptConnection? = nil
 	conn = CollectionService:GetInstanceAddedSignal("NPC"):Connect(function(model: Instance)
@@ -1058,9 +1072,11 @@ local function setupMurph()
 			conn:Disconnect()
 		end
 	end)
-	task.delay(30, function()
-		if not murphHooked then
-			warn("[QuestUI] Murph's Talk prompt never streamed in")
+	-- Murph's model itself never showed up: say so, the same way.
+	task.delay(QuestUI.TalkWait * 2, function()
+		if not murphHooked and next(watched) == nil then
+			warn("[QuestUI] Murph never streamed in")
+			say(QuestUI.TalkFallback)
 		end
 	end)
 end

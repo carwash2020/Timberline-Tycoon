@@ -165,7 +165,6 @@ return function(t)
 			'row("musicVolume"',
 			'row("sfx"',
 			'row("sfxVolume"',
-			'row("cameraSensitivity"',
 			'row("graphics"',
 			'row("reset", "REPLAY TUTORIAL"',
 			'Net.Remote("ResetTutorial")',
@@ -174,6 +173,11 @@ return function(t)
 		}) do
 			t.ok(string.find(ui, needle, 1, true), needle .. " is in the Settings card")
 		end
+		t.eq(
+			string.find(ui, 'row("cameraSensitivity"', 1, true),
+			nil,
+			"no camera speed row: that setting is not ours to write"
+		)
 		t.ok(string.find(ui, "InputKit.Actions.Cancel.gamepad", 1, true), "B closes")
 		t.ok(string.find(ui, "UITheme.Size.Tap", 1, true), "every tap target is at least the 44 px tap size")
 		t.eq(string.find(ui, "ButtonR2", 1, true), nil)

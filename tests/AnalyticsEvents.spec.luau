@@ -102,8 +102,60 @@ return function(t)
 		t.ok(not GA.FunnelStep(player, flags, 1, "Joined"), "marked before the call")
 		t.ok(not GA.Store(player, "StoreOpened", nil), "reports failure instead of throwing")
 		t.ok(not GA.Economy(player, "Source", 5, 5, { Name = "Gameplay" }, "logs"))
-		t.ok(not GA.Progression(player, "Stages", "S1"))
+		t.ok(not GA.Progression(player, "Stages", 1, "S1"))
 	end)
+
+	t.test(
+		"every event the wrapper sends has the argument types Roblox casts: ints for steps and levels, strings for names",
+		function()
+			local log, service = recorder(false)
+			local GA = t.loader({ services = { AnalyticsService = service } }):server("GameAnalytics")
+			local player = { UserId = 1 }
+			t.ok(GA.FunnelStep(player, {}, 3, "First sale"))
+			t.ok(GA.Store(player, "StoreOpened", nil))
+			t.ok(GA.Economy(player, "Source", 40, 140, { Name = "Gameplay" }, "logs"))
+			t.ok(GA.Progression(player, "Stages", 1, "S1"))
+			t.ok(GA.Progression(player, "SkyCharter", 4))
+			local function isInt(v)
+				return type(v) == "number" and v == v and v % 1 == 0
+			end
+			local seen = {}
+			for _, row in ipairs(log) do
+				seen[row.name] = true
+				local a = row.args
+				if row.name == "funnel" then
+					-- (player, step: int, stepName: string)
+					t.ok(isInt(a[2]), "funnel step is an int")
+					t.eq(type(a[3]), "string", "funnel step name is a string")
+				elseif row.name == "progress" then
+					-- (player, path: string, level: int, levelName: string?)
+					t.eq(type(a[2]), "string", "progression path is a string")
+					t.ok(isInt(a[3]), "progression level is an int, never 'S1'")
+					t.ok(a[4] == nil or type(a[4]) == "string", "level name is a string")
+				elseif row.name == "economy" then
+					-- (player, flow, currency: string, amount, endingBalance, transaction: string, sku: string)
+					t.eq(type(a[3]), "string")
+					t.eq(type(a[4]), "number")
+					t.eq(type(a[5]), "number")
+					t.eq(type(a[6]), "string")
+					t.eq(type(a[7]), "string")
+				elseif row.name == "custom" then
+					-- (player, eventName: string, value: number?, fields: table?)
+					t.eq(type(a[2]), "string")
+					t.ok(a[3] == nil or type(a[3]) == "number")
+				end
+			end
+			for _, name in ipairs({ "funnel", "custom", "economy", "progress" }) do
+				t.ok(seen[name], name .. " was sent and checked")
+			end
+			-- Bad types are dropped before they reach the service.
+			local before = #log
+			t.ok(not GA.Progression(player, "Stages", "S1" :: any))
+			t.ok(not GA.Progression(player, "Stages", 1.5))
+			t.ok(not GA.FunnelStep(player, {}, "2" :: any, "Bad"))
+			t.eq(#log, before, "nothing sent")
+		end
+	)
 
 	t.test("GameAnalytics sends economy events with the source name and no player data", function()
 		local log, service = recorder(false)
