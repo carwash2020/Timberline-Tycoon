@@ -660,13 +660,15 @@ return function(t)
 		t.eq(#named(w.fires, "Chop"), 1, "a Gui button already took it")
 	end)
 
-	t.test("ButtonR2 fires Chop at the nearest section without Activated", function()
-		local Enum = roblox.Enum
+	-- The right trigger swings through the engine's own Tool.Activated; no
+	-- script binds or reads that button (specs/NoButtonR2). These replace the
+	-- three tests that pinned a ButtonR2 InputBegan read.
+	t.test("a gamepad Activated (the right trigger) fires Chop at the nearest section", function()
 		local w = swingWorld()
 		w.input("Gamepad1")
 		w.hit(nil)
 		w.radius({ w.section })
-		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, false)
+		w.activate()
 		w.land()
 		local chops = named(w.fires, "Chop")
 		t.eq(#chops, 1)
@@ -674,29 +676,19 @@ return function(t)
 		t.eq(#w.rays, 0, "no pointer")
 	end)
 
-	t.test("ButtonR2 swings an equipped axe even when a bound action marked the press handled", function()
+	t.test("a gamepad's raw trigger press is not read: only Activated swings, once", function()
 		local Enum = roblox.Enum
 		local w = swingWorld()
 		w.input("Gamepad1")
 		w.hit(nil)
 		w.radius({ w.section })
-		-- Xbox: BuilderSelect was bound on R2, so the engine reported processed.
-		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, true)
-		t.eq(#named(w.fires, "Swing"), 1, "the swing starts")
+		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, false)
 		w.land()
-		t.eq(#named(w.fires, "Chop"), 1)
-	end)
-
-	t.test("ButtonR2 does not swing while a menu holds the pad selection", function()
-		local Enum = roblox.Enum
-		local w = swingWorld()
-		w.input("Gamepad1")
-		w.hit(nil)
-		w.radius({ w.section })
-		w.gui.SelectedObject = {}
-		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, true)
+		t.eq(#named(w.fires, "Swing"), 0, "the script ignores the trigger key itself")
+		w.activate()
+		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, false)
 		w.land()
-		t.eq(#named(w.fires, "Swing"), 0)
+		t.eq(#named(w.fires, "Chop"), 1, "Activated swings once")
 	end)
 
 	t.test("a gamepad prefers the section ahead of the camera over a nearer one behind", function()

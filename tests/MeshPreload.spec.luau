@@ -34,7 +34,11 @@ return function(t)
 			end
 		end
 		t.eq(#byName.murph.entries + #byName.npcs.entries, count, "every NPC mesh, none twice")
-		t.eq(pieces, 153, "nine townsfolk of 17 pieces: the 153 serial loads that took 60 s")
+		t.eq(
+			pieces,
+			153 + 86,
+			"nine townsfolk of 17 pieces (153 serial loads that took 60 s), plus the five Blender NPCs"
+		)
 	end)
 
 	t.test("no mesh id appears twice in the whole manifest, and none is zero", function()
