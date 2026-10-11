@@ -3774,3 +3774,17 @@ Phone (667x375)
 
 Xbox (controller)
 11. Join with two played saves: the gold selection ring starts on a PLAY button, D-pad up and down moves between the three, A plays it, B does nothing on the join picker (there is no way out but a choice) and closes the SAVES panel when opened later.
+
+## Grab on the right trigger (Xbox)
+
+Supersedes the RB grab in "No ButtonR2 (Xbox remap)". The grab is the right trigger again, read only with empty hands; RB is select, wire pick and push only. See STATUS.md "Grab on the right trigger".
+
+Studio checks (Xbox; PC and phone unchanged):
+1. Axe equipped, RT on a tree: chops as before, held RT repeats at cooldown. No grab, no "put your axe away" toast.
+2. Axe put away (hands empty), aim the dot at a loose log, hold RT: it lifts. D-pad up/down move it, D-pad left/right turn it, LT + left stick tips it; release RT drops it. The hint reads "Hold RT on wood to drag it".
+3. Equip the axe while holding a log: the log drops as before; RT then swings, it does not re-grab.
+4. Placer up (BUILD blueprint): RT does not grab; A places, RB/LB slide.
+5. Empty hands, BUILD, dot on a placed piece, RB: still selects it (RB is not the grab).
+6. Wire tool: RB still picks, X cuts, B leaves.
+7. Tutorial: Murph's drag step says "hold RT on a log".
+8. Chop with a Keen axe still follows the cooldown (RT chop path unchanged).

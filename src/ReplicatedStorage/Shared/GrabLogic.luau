@@ -519,9 +519,22 @@ function GrabLogic.LockStays(facts: LockFacts): boolean
 		and facts.focused ~= false
 end
 
+-- The pad's grab button: the right trigger, read (never bound) and only while
+-- no tool is in hand. With a tool out the engine fires Tool.Activated on the
+-- same trigger and that is the swing, so the grab must ignore it then. This
+-- is the one place in the source that names the key (the no-trigger-bind spec pins
+-- that); DragController and InputKit take it from here.
+GrabLogic.PadGrabKey = Enum.KeyCode.ButtonR2
+
+-- Whether a press of PadGrabKey starts a grab: only with empty hands (the
+-- trigger is the axe's swing otherwise) and not while the placer is up.
+function GrabLogic.PadGrabAllowed(toolOut: boolean, placing: boolean): boolean
+	return not toolOut and not placing
+end
+
 -- A gamepad button while holding: a turn, or a hold-distance direction
 -- (+1 further while held, -1 nearer). D-pad left/right turn, D-pad up/down
--- and LB pull nearer. RB is the grab itself (held), not a push. (Tipping is the left stick, with LT held.)
+-- and LB pull nearer. RB is no grab and no push here. (Tipping is the left stick, with LT held.)
 function GrabLogic.PadAction(keyName: string): (Turn?, number?)
 	if keyName == "DPadLeft" then
 		return { kind = "yaw", steps = 1 }, nil
@@ -535,10 +548,10 @@ function GrabLogic.PadAction(keyName: string): (Turn?, number?)
 	return nil, nil
 end
 
--- Whether the drag hold takes an InputBegan press. A bound action marks
--- RB handled even when it passes it on (the builder's select bind), and a
--- bumper is no button's click, so a handled RB still counts unless a menu
--- holds the pad selection. While the placer is up RB slides the ghost: no grab.
+-- Whether the drag hold takes an InputBegan press. `trigger` is the pad's
+-- grab button (PadGrabKey): a trigger is no GUI button's click, so it still
+-- counts when something marked it handled, unless a menu holds the pad
+-- selection. While the placer is up there is no grab (the ghost owns the pad).
 function GrabLogic.PadPressAccepted(processed: boolean, trigger: boolean, selecting: boolean, placing: boolean): boolean
 	if trigger and placing then
 		return false
