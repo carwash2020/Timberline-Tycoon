@@ -41,6 +41,14 @@ return function(t)
 				if name == "Net" then
 					return fakeNet
 				end
+				if name == "ModulesReady" then
+					return {
+						Mark = function() end,
+						Wait = function()
+							return true
+						end,
+					}
+				end
 				if name == "JoinFlow" then
 					return { ClientReadyTries = 30, ClientReadyEvery = 3 }
 				end
@@ -168,6 +176,38 @@ return function(t)
 		-- MODULE_WAIT for each missing module in turn.
 		t.ok(string.find(source, "local deadline = os.clock() + MODULE_WAIT", 1, true), "a shared deadline")
 		t.ok(string.find(source, "local left = deadline - os.clock()", 1, true), "each wait gets what is left")
+	end)
+
+	-- The other .client scripts start on their own, maybe before every
+	-- sibling has arrived: CraftUI and ForgeUI require siblings straight
+	-- away and a missing one failed them (and the HUD) for good. Client says
+	-- when all are in, and each of them waits for that before its first
+	-- require of a sibling.
+	t.test("Client marks the folder ready and every other .client script waits for it", function()
+		local fs = require("@lune/fs")
+		local folder = "src/StarterPlayer/StarterPlayerScripts"
+		local client = fs.readFile(folder .. "/Client.client.luau")
+		local marks = string.find(client, "ModulesReady.Mark(folder)", 1, true)
+		local loop = string.find(client, "WaitForChild(name, left)", 1, true)
+		local firstRequire = string.find(client, "require(script.Parent.", 1, true)
+		t.ok(marks and loop and marks > loop, "it marks the folder after the wait loop")
+		t.ok(marks and firstRequire and marks < firstRequire, "and before any controller is required")
+		local checked = 0
+		for _, entry in ipairs(fs.readDir(folder)) do
+			if string.match(entry, "%.client%.luau$") and entry ~= "Client.client.luau" then
+				local source = fs.readFile(folder .. "/" .. entry)
+				local firstSibling = string.find(source, "require(script.Parent", 1, true)
+				if firstSibling then
+					local waits = string.find(source, "ModulesReady.Wait(script.Parent", 1, true)
+					t.ok(
+						waits ~= nil and waits < firstSibling,
+						entry .. " waits for ModulesReady before requiring a sibling"
+					)
+					checked += 1
+				end
+			end
+		end
+		t.ok(checked >= 2, "MiningClient and ForgeClient are both checked")
 	end)
 
 	-- A module whose top level errors (a broken sibling, a missing remote)
