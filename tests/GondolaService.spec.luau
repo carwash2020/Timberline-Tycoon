@@ -709,6 +709,8 @@ return function(t)
 			end
 		end
 		t.ok(found, "the requirement is written on the sign")
+		t.eq(sign:GetAttribute("GateId"), "sky", "WorldUI repaints it as the sky gate")
+		t.ok(sign:FindFirstChild("State", true) ~= nil, "with a State label")
 		local at = sign:GetPivot().Position
 		local flat = Vector3.new(at.X - 100, 0, at.Z + 40)
 		t.ok(flat.Magnitude > 7.5, "clear of the 10 x 10 platform and its steps")

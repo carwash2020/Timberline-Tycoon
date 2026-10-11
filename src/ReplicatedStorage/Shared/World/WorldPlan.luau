@@ -42,7 +42,7 @@ export type TreeSpot = {
 	zone: TreeZone?,
 }
 export type Placement = { name: string, cframe: CFrame, seed: number }
-export type Sign = { text: string, cframe: CFrame, lit: boolean? } -- lit: gooseneck lamps (TWN-07)
+export type Sign = { text: string, cframe: CFrame, lit: boolean?, gateId: string? } -- lit: gooseneck lamps (TWN-07)
 export type Fence = { length: number, cframe: CFrame }
 
 local function hashString(s: string): number
@@ -2365,7 +2365,7 @@ function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
 			end
 		end
 		if spot then
-			table.insert(out, { text = text(biomeId), cframe = spot })
+			table.insert(out, { text = text(biomeId), cframe = spot, gateId = biomeId })
 		end
 	end
 	besideRoad("SnowRoad", "snow", "snow")
@@ -2388,7 +2388,7 @@ function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
 			end
 		end
 		if spot then
-			table.insert(out, { text = text("grove"), cframe = spot })
+			table.insert(out, { text = text("grove"), cframe = spot, gateId = "grove" })
 		end
 	end
 	return out
