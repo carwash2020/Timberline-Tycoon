@@ -16,6 +16,7 @@
 -- requires its siblings directly), MODULE_WAIT seconds for all of them
 -- together. The list is every module in this folder (Client.spec checks
 -- it).
+local ModulesReady = require(game:GetService("ReplicatedStorage").Shared.ModulesReady)
 local MODULES = {
 	"AdminUI",
 	"AmbientLife",
@@ -108,6 +109,10 @@ do
 			end
 		end
 	end
+	-- MiningClient and ForgeClient run on their own and wait for this before
+	-- their first require (a half-synced folder cached CraftUI and others as
+	-- failed). Set it even after a timeout: they would only hang otherwise.
+	ModulesReady.Mark(folder)
 end
 
 local Players = game:GetService("Players")

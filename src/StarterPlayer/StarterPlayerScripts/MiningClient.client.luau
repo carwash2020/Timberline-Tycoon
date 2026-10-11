@@ -7,6 +7,14 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ModulesReady = require(ReplicatedStorage.Shared.ModulesReady)
+
+-- This script starts on its own, maybe before every sibling has arrived in
+-- PlayerScripts: wait for Client to say they are all in.
+if not ModulesReady.Wait(script.Parent) then
+	warn("[MiningClient] PlayerScripts' modules were not all in after the wait; trying anyway")
+end
+
 local CraftUI = require(script.Parent.CraftUI)
 local MiningUI = require(script.Parent.MiningUI)
 
