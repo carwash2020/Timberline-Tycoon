@@ -169,6 +169,7 @@ return function(t)
 						sellPieces = s.pieces,
 						plantSeeds = s.seeds,
 						sellFiguredVolume = s.figured,
+						visitNewArea = 1, -- Discover a new area: one
 					})[goal.kind]
 					t.eq(goal.target, expected, goal.kind .. " at tier " .. tier)
 					if goal.kind == "sellWoodVolume" then

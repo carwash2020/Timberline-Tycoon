@@ -75,6 +75,23 @@ function StageOf.Current(profile: unknown): number
 	return math.clamp(math.max(keys, StageOf.FromProgress(profile)), 1, StageOf.Count)
 end
 
+-- The stages (1..n, in order) the player has reached that have no "Stage:Sn"
+-- key yet: what MilestoneService writes and logs next. A veteran with no
+-- keys gets every stage up to theirs once; a second call returns none.
+function StageOf.Pending(profile: unknown): { number }
+	local out: { number } = {}
+	if type(profile) ~= "table" or type((profile :: any).onboarding) ~= "table" then
+		return out
+	end
+	local onboarding = (profile :: any).onboarding
+	for n = 1, StageOf.Current(profile) do
+		if onboarding[StageOf.Key(n)] ~= true then
+			table.insert(out, n)
+		end
+	end
+	return out
+end
+
 -- A real player's wood income per hour at each stage ($/h), for scaling
 -- cash packs. Anchored on the economy model: about $4.9k/h at S2 and
 -- $115k/h at S6, the rest spaced between and past them.
