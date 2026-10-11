@@ -23,8 +23,11 @@
 --   kit      the building kit's meshes (a player's own plot)
 --   blender  ids only the Blender registry supplies (BlenderAssets.MeshIds;
 --            empty while its ids are 0, so nothing changes in game)
+--   backlog  the uploaded backlog assets a builder wires today
+--            (BacklogModels.Wired: shops, gates and the Robux crate)
 
 local AxeModels = require(script.Parent.AxeModels)
+local BacklogModels = require(script.Parent.BacklogModels)
 local BlenderAssets = require(script.Parent.BlenderAssets)
 local RockModels = require(script.Parent.RockModels)
 local ItemMeshData = require(script.Parent.Parent.ItemMeshData)
@@ -137,6 +140,11 @@ function MeshManifest.Groups(town: boolean?): { Group }
 	end)
 	add("blender", function(out)
 		for _, id in ipairs(BlenderAssets.MeshIds()) do
+			table.insert(out, { id = id, hull = false })
+		end
+	end)
+	add("backlog", function(out)
+		for _, id in ipairs(BacklogModels.MeshIds(BacklogModels.Wired)) do
 			table.insert(out, { id = id, hull = false })
 		end
 	end)

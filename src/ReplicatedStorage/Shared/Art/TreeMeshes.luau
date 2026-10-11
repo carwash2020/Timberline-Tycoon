@@ -47,6 +47,25 @@ local function sectionById(model: Model, id: number): BasePart?
 	return nil
 end
 
+-- Ground point under the trunk: the primary section's axis at the lowest
+-- underside of any section. Nil with no sections.
+local function trunkFoot(model: Model, root: BasePart?): Vector3?
+	if not root then
+		return nil
+	end
+	local low = math.huge
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d.Name == "Section" then
+			low = math.min(low, d.CFrame.Position.Y - d.Size.Y / 2)
+		end
+	end
+	if low == math.huge then
+		return nil
+	end
+	local p = root.CFrame.Position
+	return Vector3.new(p.X, low, p.Z)
+end
+
 -- True when the model is now meshed. False leaves it untouched.
 function TreeMeshes.Apply(model: Model, def: WoodDef, skel: Skeleton): boolean
 	local crown = TreeModels.Crown(def.id)
@@ -123,10 +142,18 @@ function TreeMeshes.Apply(model: Model, def: WoodDef, skel: Skeleton): boolean
 	end
 
 	local root = model.PrimaryPart
+	local foot = trunkFoot(model, root)
 	for _, visual in ipairs(visuals) do
 		local mesh = visual.mesh
 		local host = if visual.section then sectionById(model, visual.section) else root
 		local at = if visual.section and host then host.CFrame.Position else center
+		if mesh.Name == "Knees" and foot then
+			-- Around the trunk foot, not the crown. An authored pivot is the ground.
+			at = foot
+			if mesh:GetAttribute("MeshPivot") ~= "authored" then
+				at += Vector3.new(0, TreeModels.KneesCentreY * scale, 0)
+			end
+		end
 		mesh.CFrame = CFrame.new(at)
 		mesh.Anchored = true
 		mesh.Parent = model

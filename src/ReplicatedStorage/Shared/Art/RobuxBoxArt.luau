@@ -10,7 +10,9 @@
 -- coin parts in Contents. No price is ever printed on it: the hover tag
 -- shows the player's own Robux price.
 
+local BacklogModels = require(script.Parent.BacklogModels)
 local Kit = require(script.Parent.Kit)
+local MeshKit = require(script.Parent.MeshKit)
 
 local RobuxBoxArt = {}
 
@@ -64,9 +66,102 @@ function RobuxBoxArt.PileHeight(key: string?): number
 	return 0.8
 end
 
+-- The uploaded crate (BacklogModels "RobuxBox": Body, Glow, Badge). Its
+-- Collision piece is the box it was modelled in (2.7 x 2.5 x 2.7); the three
+-- pieces are scaled so that box is `body`, which keeps the shelf spacing.
+-- The item's name goes on the cream window pane. Nil (and nothing made)
+-- when any mesh is missing, so the part-built crate below stays.
+local function dressMesh(parent: Instance, body: BasePart, spec: Spec): { BasePart }?
+	local asset = BacklogModels.Get("RobuxBox")
+	if not asset then
+		return nil
+	end
+	local fit = asset.pieces[#asset.pieces]
+	for _, piece in ipairs(asset.pieces) do
+		if piece.name == "Collision" then
+			fit = piece
+		end
+	end
+	local k = Vector3.new(body.Size.X / fit.size.X, body.Size.Y / fit.size.Y, body.Size.Z / fit.size.Z)
+	local made: { MeshPart } = {}
+	for _, piece in ipairs(asset.pieces) do
+		if piece.name ~= "Collision" then
+			local size = Vector3.new(piece.size.X * k.X, piece.size.Y * k.Y, piece.size.Z * k.Z)
+			local part = MeshKit.Create(piece.meshId, piece.name, size)
+			if not part then
+				for _, old in ipairs(made) do
+					old:Destroy()
+				end
+				return nil
+			end
+			MeshKit.Visual(part, piece.meshId)
+			MeshKit.Fidelity(
+				part,
+				if piece.name == "Body" then Enum.RenderFidelity.Automatic else Enum.RenderFidelity.Performance
+			)
+			table.insert(made, part)
+		end
+	end
+	if #made == 0 then
+		return nil
+	end
+	body.Transparency = 1
+	body.CastShadow = false
+	local root = body.CFrame * CFrame.new(0, -body.Size.Y / 2, 0)
+	local added: { BasePart } = {}
+	for _, part in ipairs(made) do
+		if part:GetAttribute("MeshPivot") == "authored" then
+			part:PivotTo(root)
+		else
+			part.CFrame = root * CFrame.new(0, part.Size.Y / 2, 0)
+		end
+		part.Anchored = body.Anchored
+		part.Parent = parent
+		local weld = Instance.new("WeldConstraint")
+		weld.Name = "Weld"
+		weld.Part0 = body
+		weld.Part1 = part
+		weld.Parent = part
+		if part.Name == "Glow" then
+			part.Material = Enum.Material.Neon
+			part.Color = RobuxBoxArt.SignCream
+			part:SetAttribute("MeshGlow", true)
+			local gui = Instance.new("SurfaceGui")
+			gui.Name = "NameMark"
+			gui.Face = Enum.NormalId.Front
+			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			gui.PixelsPerStud = 80
+			gui.LightInfluence = 0
+			gui.Parent = part
+			local label = Instance.new("TextLabel")
+			label.Name = "Name"
+			label.BackgroundTransparency = 1
+			label.Size = UDim2.fromScale(1, 1)
+			label.Font = Enum.Font.FredokaOne
+			label.Text = spec.name
+			label.TextScaled = true
+			label.TextColor3 = RobuxBoxArt.SignInk
+			label.Parent = gui
+			local pad = Instance.new("UIPadding")
+			pad.PaddingLeft = UDim.new(0.06, 0)
+			pad.PaddingRight = UDim.new(0.06, 0)
+			pad.PaddingTop = UDim.new(0.12, 0)
+			pad.PaddingBottom = UDim.new(0.12, 0)
+			pad.Parent = label
+		end
+		table.insert(added, part)
+	end
+	return added
+end
+
 -- Dresses `body` (a class S box part) as the crate. Returns every part
--- added (shell, then coins). The body becomes invisible.
+-- added (shell, then coins). The body becomes invisible. The uploaded crate
+-- mesh when it loads; otherwise the open crate of coins built from parts.
 function RobuxBoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart }
+	local meshed = dressMesh(parent, body, spec)
+	if meshed then
+		return meshed
+	end
 	local size = body.Size
 	local W, H, D = size.X, size.Y, size.Z
 	local f, t = RobuxBoxArt.Floor, RobuxBoxArt.Wall

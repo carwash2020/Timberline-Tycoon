@@ -3310,6 +3310,15 @@ function BuildingArt.GateKiosk(accent: Color3): Model
 	}, CFrame.identity)
 	local strip = Kit.part(model, "GlowStrip", V3(6, 0.15, 0.1), CF(0, 7.2, -2.2), accent, MAT.Neon)
 	Kit.decor(strip, false)
+	-- The uploaded GateKiosk meshes (backlog); a missing mesh keeps the parts.
+	if TownMeshes.Dress(model, "GateKiosk") then
+		-- Each gate keeps its own colour on the glow, as the strip had it.
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == "Glow" and d:GetAttribute("VisualMesh") == true then
+				d.Color = accent
+			end
+		end
+	end
 	return model
 end
 
@@ -3354,6 +3363,8 @@ function BuildingArt.OddsAndEnds(): Model
 	barrel(model, CF(3.2, 0.2, -5.5), rng, false, Palette.TrailDirt)
 	local sign = dBox(model, "Sign", V3(4.2, 1.4, 0.2), CF(0, 6.2, -4.4), Palette.TrailDirt, MAT.Wood)
 	Kit.signText(sign, "CHARGES", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	-- The uploaded OddsAndEnds meshes (backlog); a missing mesh keeps the parts.
+	TownMeshes.Dress(model, "OddsAndEnds")
 	return model
 end
 
@@ -3380,6 +3391,8 @@ function BuildingArt.Sparkworks(): Model
 	board.CanCollide = false
 	board.CanQuery = false
 	board.CanTouch = false
+	-- The uploaded Sparkworks meshes (backlog); a missing mesh keeps the parts.
+	TownMeshes.Dress(model, "Sparkworks")
 	return model
 end
 
@@ -3430,6 +3443,8 @@ function BuildingArt.ArrivalArch(): Model
 	Kit.part(model, "Lintel", V3(12, 1.2, 2), CF(0, 12.4, 0), hex("#E8E2D0"), MAT.Marble)
 	local band = Kit.part(model, "Band", V3(8, 0.2, 0.3), CF(0, 11.5, -1.05), Palette.StarfallGlow, MAT.Neon)
 	Kit.decor(band, false)
+	-- The uploaded ArrivalArch meshes (backlog); a missing mesh keeps the parts.
+	TownMeshes.Dress(model, "ArrivalArch")
 	return model
 end
 
@@ -3444,6 +3459,8 @@ function BuildingArt.LandOffice(): Model
 	Kit.part(model, "Roof", V3(19, 0.4, 15), CF(0, 8.8, 0), Palette.RoofSlate, MAT.Slate)
 	local sign = dBox(model, "Sign", V3(8, 1.6, 0.2), CF(0, 6.4, -7.1), Palette.Brass, MAT.Wood)
 	Kit.signText(sign, "LAND OFFICE", Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	-- The uploaded LandOffice meshes (backlog); a missing mesh keeps the parts.
+	TownMeshes.Dress(model, "LandOffice")
 	return model
 end
 
