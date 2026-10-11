@@ -46,6 +46,16 @@ export type BiomeDef = {
 	-- What a gate sign for the biome says, in words (no price: a price shows
 	-- in the prompt). Only biomes with a quest gate carry one.
 	gateWords: string?,
+	-- The V1 ladder stage (StageOf, 1 to 8) a player must have reached to
+	-- work this biome's wood or its unique finds. Only the Bayou (S2) and Red
+	-- Mesa (S4) carry one. They need no gear, so Rules is unchanged.
+	needsStage: number?,
+	-- A reserved region (WorldLayout.ReservedRegions id) that stands in for
+	-- `area`. The Bayou and Red Mesa have no `area`: WorldPlan, TerrainGen and
+	-- TreeFill key whole families of exclusions off every area, and the reserved
+	-- discs already keep those families out. WorldPlan.RegionTrees plants their
+	-- `trees`; BiomeService names the biome from the region.
+	region: string?,
 }
 
 -- What a biome does to a player right now (BiomeData.Rules).
@@ -64,10 +74,13 @@ export type Hazard = {
 
 -- Ferry Island. The disc matches WorldLayout.Island; this module does not
 -- require WorldLayout (that require would cycle). A spec locks the two.
-BiomeData.FerryCenterX = 1395
-BiomeData.FerryCenterZ = -760
-BiomeData.FerryRadius = 70
-BiomeData.FerryHaulStuds = 1644 -- sawmill (0, 110) is about 1644 studs away
+-- Centres are the V1 ring map (MAP_V1.md). haulStuds are the ring map's
+-- drives from the sawmill (Oct 8, ring map), each within 20% of the
+-- straight line the spec checks.
+BiomeData.FerryCenterX = 930
+BiomeData.FerryCenterZ = -50
+BiomeData.FerryRadius = 55
+BiomeData.FerryHaulStuds = 990 -- sawmill (0, 110) is about 944 studs away; the drive is longer
 BiomeData.PalmCount = 30
 BiomeData.LanternwoodCount = 6
 BiomeData.FerrySand = "#E4C98A"
@@ -77,8 +90,8 @@ local biomes: { BiomeDef } = {
 		id = "starter",
 		displayName = "Starter Forest",
 		access = "truck",
-		haulStuds = 190,
-		area = { x = 0, z = -110, radius = 90 }, -- south of spawn
+		haulStuds = 260,
+		area = { x = 8, z = -178, radius = 143 }, -- south of spawn
 		ground = { color = "#64B838", material = "Grass" },
 		trees = { oak = 70, birch = 26 },
 	},
@@ -86,8 +99,8 @@ local biomes: { BiomeDef } = {
 		id = "hills",
 		displayName = "The Hills",
 		access = "truck",
-		haulStuds = 400,
-		area = { x = -420, z = 110, radius = 170 }, -- west
+		haulStuds = 420,
+		area = { x = -500, z = 110, radius = 150 }, -- west
 		ground = { color = "#529E30", material = "LeafyGrass" },
 		trees = { pine = 80, maple = 50 },
 	},
@@ -95,10 +108,10 @@ local biomes: { BiomeDef } = {
 		id = "snow",
 		displayName = "Snowfields",
 		access = "truck",
-		haulStuds = 1200,
+		haulStuds = 650,
 		slowdown = { amount = 0.15, removedBy = "InsulatedCoat" },
 		exposure = { gear = "InsulatedCoat", dps = 4, graceSec = 8 },
-		area = { x = 0, z = 1240, radius = 200 }, -- far north
+		area = { x = 0, z = 720, radius = 115 }, -- the peak, inside the ring
 		ground = { color = "#E8F0F5", material = "Snow" },
 		trees = { frostwood = 70 },
 	},
@@ -106,11 +119,11 @@ local biomes: { BiomeDef } = {
 		id = "volcano",
 		displayName = "The Volcano",
 		access = "truck",
-		haulStuds = 1600,
+		haulStuds = 700,
 		requiresGear = "HeatBoots",
 		hazards = { "lava", "ash storms" },
 		exposure = { gear = "HeatBoots", dps = 6, graceSec = 6 },
-		area = { x = 1100, z = 1180, radius = 220 }, -- the far north-east corner
+		area = { x = 450, z = 500, radius = 125 }, -- north-east, past the tunnel
 		ground = { color = "#2B2522", material = "Basalt" },
 		trees = { emberwood = 60 },
 	},
@@ -139,9 +152,38 @@ local biomes: { BiomeDef } = {
 		haulStuds = 800,
 		requiresGear = "Lantern",
 		nightOnly = true,
-		area = { x = -565, z = -455, radius = 120 }, -- hidden south-west, no road
+		area = { x = 10, z = -720, radius = 80 }, -- the ravine, south of town
 		ground = { color = "#3B2E4F", material = "LeafyGrass" },
 		trees = { phantomwood = 22 },
+	},
+	{
+		-- Lane R. The swamp basin (WorldLayout.Bayou: centre (-760, -700),
+		-- radius 140, sunk 7; Shared/Regions/BayouData). A stage gate, no gear: the mud slowdown is a
+		-- MudZones disc check (Shared/Regions/MudLogic), not a biome-wide
+		-- slowdown, so `slowdown` stays nil. The drive is the ring road to the
+		-- -135 degree vertex and BayouRoad (about 1,110 studs as the crow flies).
+		id = "bayou",
+		displayName = "Bayou",
+		access = "truck",
+		haulStuds = 1330,
+		needsStage = 2,
+		gateWords = "Needs Stage 2: the Steel Axe",
+		region = "bayou",
+		ground = { color = "#4E4A36", material = "Limestone" },
+		trees = { bogcypress = 44 },
+	},
+	{
+		-- Lane R. Red Mesa (WorldLayout.RedMesa: centre (590, -790), radius
+		-- 115). Sandstone for the building kit is quarried here (SlabData).
+		id = "mesa",
+		displayName = "Red Mesa",
+		access = "truck",
+		haulStuds = 1200,
+		needsStage = 4,
+		gateWords = "Needs Stage 4: the Cobalt Axe",
+		region = "redmesa",
+		ground = { color = "#C8643C", material = "Sandstone" },
+		trees = { ironwood = 38 },
 	},
 	{
 		-- V1 finale, high above the map, reached up the trunk of the Skyroot.
@@ -158,7 +200,7 @@ local biomes: { BiomeDef } = {
 		-- gondola leaves from a station by the sawmill (the model counts the
 		-- Sky Bin as a short walk from it); a second station at the Skyroot's
 		-- foot is the way back up for anyone who falls.
-		area = { x = -1050, z = 1050, radius = 170, y = 650 },
+		area = { x = 680, z = 280, radius = 100, y = 650 },
 		trees = { lumenwood = 12 },
 		nodes = { SkyShard = 8 },
 	},
@@ -197,10 +239,34 @@ function BiomeData.Gate(biomeId: string): GateInfo
 	return { needs = needs, words = def.gateWords or "" }
 end
 
+-- The stage a biome asks for (StageOf), or 0 for an open one.
+function BiomeData.StageNeeded(biomeId: string): number
+	local def = byId[biomeId]
+	return if def and def.needsStage then def.needsStage else 0
+end
+
 -- True if the biome exists in the world today (it has an area).
 function BiomeData.IsOpen(biomeId: string): boolean
 	local def = byId[biomeId]
 	return def ~= nil and def.area ~= nil
+end
+
+-- The two reserved regions as biomes (they carry `region`, not `area`): the
+-- id of the one whose disc holds (x, z), or nil. The discs mirror
+-- WorldLayout.Bayou and .RedMesa (a spec locks them).
+BiomeData.RegionDiscs = {
+	bayou = { x = -760, z = -700, radius = 140 },
+	mesa = { x = 590, z = -790, radius = 115 },
+} :: { [string]: { x: number, z: number, radius: number } }
+
+function BiomeData.RegionAt(x: number, z: number): string?
+	for id, d in pairs(BiomeData.RegionDiscs) do
+		local dx, dz = x - d.x, z - d.z
+		if dx * dx + dz * dz <= d.radius * d.radius then
+			return id
+		end
+	end
+	return nil
 end
 
 -- The biome a world position is in, or nil for the open country between.

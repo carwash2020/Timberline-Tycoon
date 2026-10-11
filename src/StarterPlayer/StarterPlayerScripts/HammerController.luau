@@ -315,8 +315,11 @@ end
 -- starting on the colour the piece wears. Picking one tells the server, which
 -- checks the owner, the reach and the colour again; the palette stays open so
 -- a few colours can be tried, and shows the one just picked straight away.
+local PAINT_ALL = "#all" -- the palette's last row: the same colour on every piece of this type
+
 local function openPaint(bp: PlotData.Blueprint, uid: string, wearing: string)
 	local shown = wearing
+	local armed = false -- Paint all asks twice: the first press says how many, the second does it
 	local shop: ShopUI.Shop = {
 		building = nil,
 		promptText = "",
@@ -327,9 +330,50 @@ local function openPaint(bp: PlotData.Blueprint, uid: string, wearing: string)
 			for _, swatch in ipairs(KitPaint.Palette) do
 				table.insert(ids, swatch.id)
 			end
+			table.insert(ids, PAINT_ALL)
 			return ids
 		end,
 		view = function(paintId: string): ShopUI.RowView
+			if paintId == PAINT_ALL then
+				-- Lane F: every piece of this type on your plot wears the colour just picked.
+				local count = 0
+				for _, item in ipairs(BlueprintPlacer.MyPlaced()) do
+					if item.blueprintId == bp.id and KitPaint.Of(item) ~= shown then
+						count += 1
+					end
+				end
+				local swatchNow = KitPaint.Get(shown) :: KitPaint.Swatch
+				local ready = count > 0
+				return {
+					name = "Paint all " .. bp.displayName,
+					own = nil,
+					detail = if ready
+						then string.format(
+							"Every %s on your plot wears %s. Free. One undo.",
+							bp.displayName,
+							swatchNow.name
+						)
+						else string.format("Every %s already wears %s.", bp.displayName, swatchNow.name),
+					color = if swatchNow.color ~= "" then Color3.fromHex(swatchNow.color) else WOOD,
+					dim = not ready,
+					button = if armed then KitPaint.AllConfirm(bp.displayName, count, 0) else "Paint all",
+					state = if not ready then "locked" elseif armed then "bark" else "buy",
+					onClick = function()
+						if not ready then
+							HUD.Toast(KitPaint.AllMessage("none", bp.displayName) or "Nothing to paint.")
+							return
+						end
+						if not armed then
+							armed = true
+							ShopUI.Refresh()
+							return
+						end
+						armed = false
+						Net.Remote("PaintAllType"):FireServer(bp.id, shown)
+						ShopUI.Refresh()
+					end,
+				}
+			end
 			local swatch = KitPaint.Get(paintId) :: KitPaint.Swatch
 			local on = paintId == shown
 			return {
@@ -347,6 +391,7 @@ local function openPaint(bp: PlotData.Blueprint, uid: string, wearing: string)
 						return
 					end
 					shown = paintId
+					armed = false
 					Net.Remote("PaintPiece"):FireServer(uid, paintId)
 					ShopUI.Refresh()
 				end,

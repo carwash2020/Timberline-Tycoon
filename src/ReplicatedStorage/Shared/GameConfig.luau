@@ -92,9 +92,9 @@ local GameConfig = {
 	-- Which map a save was written on. Missing counts as 1. Migrate parks a
 	-- truck and its ground wood when the save is behind this, then writes
 	-- this number exactly (an older server can write a lower one again).
-	-- Lane B raises it when the map moves. Lane F restores strandedLoad and
+	-- Lane B raised it to 2 for the V1 ring map (Oct 8). Lane F restores strandedLoad and
 	-- does not change this.
-	WorldVersion = 1,
+	WorldVersion = 2,
 	-- The uploaded town meshes (TownMeshes.Dress). KILL SWITCH: set false and
 	-- republish and the town is the part-built art again (nothing else
 	-- changes). In Studio, set the workspace attribute TownMeshes to

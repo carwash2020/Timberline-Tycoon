@@ -468,4 +468,63 @@ return function(t)
 			t.eq(w.profile.cash, 980, "the third spawn costs $20: 5% of $400")
 		end
 	)
+
+	-- Lane F: a truck that falls out of the world comes back on its own pad.
+	t.test(
+		"fallen truck: below the world it is put back on its pad, stopped; above the line it is left alone",
+		function()
+			local w = setup()
+			local VehicleService = w.VehicleService
+			local model = VehicleService.SpawnTruck(w.player, "Rustbucket")
+			t.ok(model ~= nil)
+			local home = model:GetPivot().Position
+			t.eq(VehicleService.RescueFallen(w.player), false, "on its pad: nothing to do")
+			model:PivotTo(CFrame.new(home.X + 400, -300, home.Z))
+			t.eq(VehicleService.RescueFallen(w.player), true)
+			local back = model:GetPivot().Position
+			t.ok(back.Y > -50, "back above the ground")
+			t.ok(math.abs(back.X - home.X) < 30 and math.abs(back.Z - home.Z) < 30, "on its own pad")
+			t.eq(VehicleService.RescueFallen(w.player), false, "once is enough")
+			local other = { UserId = 99, Name = "Nobody", SetAttribute = function() end }
+			t.eq(VehicleService.RescueFallen(other), false, "a player with no truck")
+		end
+	)
+
+	t.test(
+		"the recall button is told the fee: free while a spawn is free, then the price, never stranding a broke player",
+		function()
+			local w = setup()
+			local CoreLoop = w.loader:shared("CoreLoop")
+			w.world:SetAttribute(CoreLoop.ActiveAttribute, 2)
+			w.loader:shared("GameConfig").TruckRecallCooldown = 0
+			local shown = {}
+			w.player.SetAttribute = function(_, name, value)
+				shown[name] = value
+			end
+			w.profile.cash = 1000
+			w.profile.ownedTrucks = { "Rustbucket" }
+			w.profile.equippedTruck = "Rustbucket"
+			t.ok(w.VehicleService.Recall(w.player))
+			t.eq(shown.RecallFee, 0, "one spawn done: the next is still free")
+			t.ok(w.VehicleService.Recall(w.player))
+			t.eq(shown.RecallFee, 5, "after the free spawns the Rustbucket's recall is $5")
+			w.profile.cash = 4
+			w.VehicleService.PublishRecallFee(w.player)
+			t.eq(shown.RecallFee, 0, "under $5 the recall is free: a broke player is never stranded")
+			local cash = w.profile.cash
+			t.ok(w.VehicleService.Recall(w.player))
+			t.eq(w.profile.cash, cash, "and it takes nothing")
+			w.profile.cash = 1000
+			w.VehicleService.Hooks.freeRecall = function()
+				return true
+			end
+			w.VehicleService.PublishRecallFee(w.player)
+			t.eq(shown.RecallFee, 0, "Tow Service makes it free")
+			w.VehicleService.Hooks.freeRecall = nil
+			w.VehicleService.PublishRecallFee(w.player)
+			t.eq(shown.RecallFee, 5)
+			t.ok(w.VehicleService.Recall(w.player))
+			t.eq(w.profile.cash, 995, "$5 is charged once, through EconomyService")
+		end
+	)
 end

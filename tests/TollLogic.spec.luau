@@ -8,7 +8,7 @@ return function(t)
 
 	t.test("Crossed is only a northbound move onto the line inside the strip", function()
 		local line = WorldLayout.TollLineZ
-		t.eq(line, 1574)
+		t.eq(line, 894) -- Oct 8, ring map: the toll folds inside the 2000-stud square (was 1574)
 		t.ok(TollLogic.Crossed(line - 20, line + 20, 0))
 		t.ok(TollLogic.Crossed(line - 1, line, WorldLayout.TollLineX0))
 		t.ok(TollLogic.Crossed(line - 1, line, WorldLayout.TollLineX1))
@@ -19,9 +19,9 @@ return function(t)
 	end)
 
 	t.test("a 40-stud jump in one tick is blocked", function()
-		-- prevZ 1554 to newZ 1594 crosses 1574 without a sample in between.
-		t.ok(TollLogic.Crossed(1554, 1594, 0))
-		local moved = TollLogic.MoveAssembly({ Vector3.new(0, 8, 1594) })
+		-- prevZ 874 to newZ 914 crosses 894 without a sample in between.
+		t.ok(TollLogic.Crossed(874, 914, 0))
+		local moved = TollLogic.MoveAssembly({ Vector3.new(0, 8, 914) })
 		local land = TollLogic.Landing()
 		t.eq(moved[1].X, land.X)
 		t.eq(moved[1].Z, land.Z)
@@ -61,11 +61,11 @@ return function(t)
 	end)
 
 	t.test("southbound moves are always allowed", function()
-		t.ok(not TollLogic.Crossed(1594, 1554, 0))
-		t.ok(not TollLogic.Crossed(1800, 1400, 0))
+		t.ok(not TollLogic.Crossed(914, 874, 0))
+		t.ok(not TollLogic.Crossed(980, 700, 0))
 		t.ok(not TollLogic.Crossed(WorldLayout.TollLineZ, WorldLayout.TollLineZ - 1, 0))
-		t.ok(not TollLogic.Crossed(1900, 1000, WorldLayout.TollLineX0))
-		t.ok(not TollLogic.Crossed(1900, 1000, WorldLayout.TollLineX1))
+		t.ok(not TollLogic.Crossed(1000, 500, WorldLayout.TollLineX0))
+		t.ok(not TollLogic.Crossed(1000, 500, WorldLayout.TollLineX1))
 	end)
 
 	t.test("a tap is a fresh payment only once the last window has run out", function()

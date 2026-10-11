@@ -31,14 +31,16 @@ return function(t)
 	-- showroom lawn and the town re-laid with its shops spaced out.
 	t.test("the first layer places exactly what it did before the cover layer", function()
 		local want = {
-			[20] = { 1547, 94876266, 762690791 },
-			[60] = { 1940, 86165282, 640746976 },
-			[85] = { 2412, 24405130, 738578852 },
+			-- Ring map: re-sampled for the 2000-stud square and its roads, pads and hills.
+			[20] = { 1166, 79772042, 62325975 },
+			[60] = { 1477, 81395303, 903926765 },
+			[85] = { 1832, 103508628, 974201479 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0
-			for cx = -23, 22, 3 do
-				for cz = -23, 22, 3 do
+			-- Ring map: 16 x 16 cells over the 2000-stud square (cells -15 to 15, it was -23 to 22 by 3).
+			for cx = -15, 15, 2 do
+				for cz = -15, 15, 2 do
 					for _, s in ipairs(EnvironmentData.DecorSpots(cx, cz, at(v))) do
 						n += 1
 						sx = (sx + math.floor(s.x * 100) * 7 + math.floor(s.z * 100) * 13 + s.variant) % 1000000007
@@ -57,8 +59,8 @@ return function(t)
 	-- and town) across the whole map.
 	local function meadowCells()
 		local out = {}
-		for cx = -23, 22 do
-			for cz = -23, 22 do
+		for cx = -16, 15 do
+			for cz = -16, 15 do
 				local x, z = (cx + 0.5) * 64, (cz + 0.5) * 64
 				if
 					EnvironmentData.DecorBiomeAt(x, z) == "meadow"
@@ -74,7 +76,8 @@ return function(t)
 
 	t.test("the open country is at least 1.5x as dense per cell, and greener", function()
 		local cells = meadowCells()
-		t.ok(#cells > 500, "a real sample: " .. #cells)
+		-- Ring map: 200 (it was 500): the square is 44% of the old area.
+		t.ok(#cells > 200, "a real sample: " .. #cells)
 		local first, both, kinds = 0, 0, {}
 		for _, c in ipairs(cells) do
 			local a = EnvironmentData.DecorSpots(c[1], c[2], at(60))

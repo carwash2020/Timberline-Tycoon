@@ -57,6 +57,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local FallenLogic = require(ReplicatedStorage.Shared.FallenLogic)
 local FallLogic = require(ReplicatedStorage.Shared.FallLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
@@ -199,6 +200,9 @@ export type Hooks = {
 	onBed: ((Piece) -> Player?)?,
 	onPlot: ((Piece) -> boolean)?,
 	onRemoved: ((Piece, string) -> ())?,
+	-- Lane F: where an owned piece that fell out of the world goes back to (its
+	-- owner's plot), or nil when there is nowhere (no pad): then it is left.
+	recover: ((Piece) -> CFrame?)?,
 }
 WoodService.Hooks = {} :: Hooks
 
@@ -1506,6 +1510,29 @@ function WoodService.Falling(): number
 	return #falls
 end
 
+local lastRecovered: { [string]: number } = {}
+
+-- Puts a fallen piece back at its owner's plot (hooks.recover says where),
+-- stopped, released from any hand. A piece whose owner has no pad stays put
+-- (nothing to come back to), and one rescued a moment ago waits its turn.
+function WoodService.Recover(p: Piece, now: number): boolean
+	local where = WoodService.Hooks.recover
+	if where == nil or not FallenLogic.MayRecover(now, lastRecovered[p.uid]) then
+		return false
+	end
+	local cf = where(p)
+	if cf == nil then
+		return false
+	end
+	lastRecovered[p.uid] = now
+	GrabService.ReleasePiece(p.model, "fell")
+	p.model:PivotTo(cf)
+	WoodService.Physics.SetVelocity(p.root, Vector3.zero, Vector3.zero)
+	p.lastGood = cf
+	p.lastGoodAt = now
+	return true
+end
+
 -- Lost below the isles, aged out, unowned, capped (see the header). Once
 -- a second (GameServer's clock), or by hand in the specs.
 function WoodService.Tick(now: number)
@@ -1520,6 +1547,13 @@ function WoodService.Tick(now: number)
 		end
 		if p.sky and p.root.CFrame.Position.Y < WoodService.SkyFloor - WoodService.CloudsBelow then
 			WoodService.Remove(p, "clouds")
+			continue
+		end
+		-- Lane F: an owned piece that fell through the ground or toward the
+		-- destroy height comes back at its owner's plot (never lost). Sky wood
+		-- is the isles' own rule (clouds, above).
+		if not p.sky and p.ownerId ~= 0 and FallenLogic.Fell(p.root.CFrame.Position.Y) then
+			WoodService.Recover(p, now)
 			continue
 		end
 		if p.selling then

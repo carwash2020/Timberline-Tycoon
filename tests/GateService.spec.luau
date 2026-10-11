@@ -83,14 +83,14 @@ return function(t)
 		-- for "not sitting in this truck".
 		local loose = Instance.new("Part")
 		humanoid.SeatPart = loose
-		put(1560)
+		put(WorldLayout.TollLineZ - 14)
 		Gate.Step(1000)
 
 		-- Sit, pay, and cross. The sample has to follow them while seated.
 		Gate.TollPaidUntil[player.UserId] = 2000
 		humanoid.SeatPart = seat
 		seat.Occupant = humanoid
-		put(1700)
+		put(WorldLayout.TollLineZ + 66)
 		Gate.Step(1001)
 		t.ok(root.CFrame.Position.Z > WorldLayout.TollLineZ, "the paid crossing stands")
 		local stayed = root.CFrame.Position.Z
@@ -109,11 +109,11 @@ return function(t)
 		Gate.Notify = function(_, message)
 			table.insert(heard, message)
 		end
-		root.CFrame = CFrame.new(4, 80, 1560)
+		root.CFrame = CFrame.new(4, 80, WorldLayout.TollLineZ - 14)
 		root.AssemblyLinearVelocity = Vector3.new(0, 12, 90)
 		root.AssemblyAngularVelocity = Vector3.new(0, 3, 0)
 		Gate.Step(1)
-		root.CFrame = CFrame.new(4, 80, 1700)
+		root.CFrame = CFrame.new(4, 80, WorldLayout.TollLineZ + 66)
 		Gate.Step(2)
 		local land = root.CFrame.Position
 		t.ok(land.Z < WorldLayout.TollLineZ, "still north")
@@ -161,9 +161,9 @@ return function(t)
 			seat.CFrame = at
 		end
 
-		put(1560)
+		put(WorldLayout.TollLineZ - 14)
 		Gate.Step(1)
-		put(1700)
+		put(WorldLayout.TollLineZ + 66)
 		Gate.Step(2)
 		t.eq(vehicle:GetPivot().Position, TollLogic.Landing())
 	end)
@@ -176,14 +176,14 @@ return function(t)
 		local sibling = Instance.new("Part")
 		sibling.Name = "Stack"
 		sibling.Anchored = true
-		sibling.CFrame = CFrame.new(30, 8, 1400)
+		sibling.CFrame = CFrame.new(30, 8, WorldLayout.TollLineZ - 174)
 		sibling.Parent = pile
 		pile.PrimaryPart = sibling
 		local stayed = sibling.CFrame
 		local plank = Instance.new("Part")
 		plank.Name = "Plank"
 		plank.Anchored = false
-		plank.CFrame = CFrame.new(4, 80, 1700)
+		plank.CFrame = CFrame.new(4, 80, WorldLayout.TollLineZ + 66)
 		plank.Parent = pile
 		plank.AssemblyRootPart = plank
 		Gate.RescueHit(plank)
@@ -280,14 +280,14 @@ return function(t)
 	t.test("a player who paid crosses; the window carries the crossing and leaving clears it", function()
 		local Gate, players = boot()
 		local player, root = atBooth(players, 35)
-		root.CFrame = CFrame.new(0, 40, 1560)
+		root.CFrame = CFrame.new(0, 40, WorldLayout.TollLineZ - 14)
 		Gate.Step(10)
 		t.eq(Gate.Pay(player, 10), "far", "the booth is 22 studs off the deck, not at x 0")
 		root.CFrame = CFrame.new(WorldLayout.BoothX, 40, WorldLayout.BoothZ)
 		t.eq(Gate.Pay(player, 10), "paid")
-		root.CFrame = CFrame.new(0, 40, 1560)
+		root.CFrame = CFrame.new(0, 40, WorldLayout.TollLineZ - 14)
 		Gate.Step(11)
-		root.CFrame = CFrame.new(0, 40, 1700)
+		root.CFrame = CFrame.new(0, 40, WorldLayout.TollLineZ + 66)
 		Gate.Step(12)
 		t.ok(root.CFrame.Position.Z > WorldLayout.TollLineZ, "paid: stays north")
 		Gate.PlayerRemoving(player)

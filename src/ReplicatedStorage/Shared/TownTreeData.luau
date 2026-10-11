@@ -84,7 +84,7 @@ TownTreeData.Empty = {
 	{ name = "SellArea", x0 = -60, z0 = 80, x1 = 60, z1 = 140 },
 	{ name = "SpawnLane", x0 = -18, z0 = 8, x1 = 18, z1 = 100 },
 	-- A few steps clear of every shop door: the front of each one.
-	{ name = "DealershipDoor", x0 = 170, z0 = 62, x1 = 210, z1 = 104 },
+	{ name = "DealershipDoor", x0 = 170, z0 = 62, x1 = 210, z1 = 107.4 },
 	{ name = "ToolShedDoor", x0 = -108, z0 = 78, x1 = -60, z1 = 94 },
 	{ name = "GeneralStoreDoor", x0 = -126, z0 = 148, x1 = -74, z1 = 166 },
 } :: { Rect }
@@ -95,7 +95,7 @@ TownTreeData.Empty = {
 TownTreeData.Buildings = {
 	{ name = "ToolShed", x0 = -125, z0 = 87, x1 = -43, z1 = 149 },
 	{ name = "GeneralStore", x0 = -147, z0 = 158, x1 = -53, z1 = 211 },
-	{ name = "Showroom", x0 = 178, z0 = 90, x1 = 337, z1 = 160 },
+	{ name = "Showroom", x0 = 178, z0 = 93.4, x1 = 337, z1 = 163.4 },
 	{ name = "Sawmill", x0 = -32, z0 = 95, x1 = 33, z1 = 139 },
 	{ name = "SellStation", x0 = 37, z0 = 94, x1 = 84, z1 = 129 },
 	{ name = "GondolaStation", x0 = -49, z0 = 140, x1 = -30, z1 = 159 },
@@ -117,7 +117,7 @@ TownTreeData.Lanes = {
 	-- The lighthouse's lamp stays in view from the spawn pad (WorldPlan.Lighthouse,
 	-- tests/WorldPlan.spec): no trunk within 10 studs of the line from the pad's
 	-- eye to the lamp. 11 here; the spec compares the lamp's place.
-	{ name = "LighthouseSight", ax = 0, az = 40, bx = 1203, bz = 236, half = 11 },
+	{ name = "LighthouseSight", ax = 0, az = 40, bx = 780, bz = -240, half = 11 },
 } :: { Lane }
 TownTreeData.GondolaStation = { x = -40, z = 150 } -- WorldPlan.TownGondolaSpot (the spec compares)
 TownTreeData.GondolaLaneLength = 280
@@ -151,37 +151,40 @@ local function cluster(id: string, cx: number, cz: number, radius: number, want:
 	return { id = id, cx = cx, cz = cz, radius = radius, want = want, tier = tier, why = why }
 end
 
+-- Ring map (10 October): twelve centres moved (12 to 107 studs) off the new East Link,
+-- the yards of Birch Side and East Meadow, and the gondola's east run, to the nearest
+-- ground that plants every tree.
 TownTreeData.Sites = {
 	-- low: the budget every server plants.
-	cluster("padSW1", -39, -11, 16, 4, "low", "south-west of the spawn pad, west of the Forest Path"),
-	cluster("padSW3", -70, -26, 16, 3, "low", "the meadow between the Forest Path and the Hills Road"),
+	cluster("padSW1", -59, 25, 16, 4, "low", "south-west of the spawn pad, west of the Forest Path"),
+	cluster("padSW3", -106, 10, 16, 3, "low", "the meadow between the Forest Path and the Hills Road"),
 	cluster("strip1", 149, 129, 16, 4, "low", "west of the showroom hall, past the Land Office, by the loading pad"),
-	cluster("strip2", 164, 153, 16, 3, "low", "west of the showroom hall, its north-west corner"),
-	cluster("forecourt", 320, 79, 16, 2, "low", "in front of the showroom, by its east end"),
+	cluster("strip2", 152, 205, 16, 3, "low", "west of the showroom hall, its north-west corner"),
+	cluster("forecourt", 316, 67, 16, 2, "low", "in front of the showroom, by its east end"),
 	cluster("west1", -152, 145, 16, 3, "low", "the town's west edge, by the Tool Shed and the General Store"),
 	cluster("west2", -172, 172, 16, 4, "low", "the town's west edge, north of the Hills Road"),
 	cluster("west4", -167, 121, 16, 3, "low", "the town's west edge, by the Hills Road"),
-	cluster("mill", 30, 158, 16, 3, "low", "behind the sawmill, in the gap in the pine band"),
+	cluster("mill", 106, 234, 16, 3, "low", "behind the sawmill, in the gap in the pine band"),
 	cluster("north1", -93, 233, 16, 4, "low", "north of the General Store, west of the Snow Road"),
 	cluster("north2", -60, 230, 16, 3, "low", "north of the gondola station, along the Snow Road"),
 	cluster("snowE", 39, 218, 16, 4, "low", "east of the Snow Road where the Mill Road meets it"),
 	cluster("back1", 257, 179, 16, 4, "low", "behind the showroom hall"),
 	cluster("back2", 288, 190, 16, 4, "low", "behind the showroom hall, east of the middle"),
-	cluster("east1", 369, 129, 16, 3, "low", "east of the showroom hall"),
-	cluster("roadS", 266, -40, 16, 3, "low", "south of the plot road, east of the lot"),
+	cluster("east1", 389, 125, 16, 3, "low", "east of the showroom hall"),
+	cluster("roadS", 246, -76, 16, 3, "low", "south of the plot road, east of the lot"),
 	-- medium: a roomier device.
-	cluster("west3", -182, 145, 16, 3, "medium", "the town's west edge, further out"),
-	cluster("north3", -120, 257, 16, 3, "medium", "north-west of the General Store"),
+	cluster("west3", -210, 141, 16, 3, "medium", "the town's west edge, further out"),
+	cluster("north3", -140, 245, 16, 3, "medium", "north-west of the General Store"),
 	cluster("snowE2", 66, 209, 16, 2, "medium", "east of the Snow Road, north of the Mill Road"),
-	cluster("back3", 230, 188, 16, 3, "medium", "behind the showroom hall, west end"),
+	cluster("back3", 226, 216, 16, 3, "medium", "behind the showroom hall, west end"),
 	cluster("east2", 351, 156, 16, 3, "medium", "behind the showroom hall's east end"),
 	cluster("roadS2", 239, -31, 16, 3, "medium", "south of the plot road"),
-	cluster("roadS3", 293, -31, 16, 3, "medium", "south of the plot road, further east"),
+	cluster("roadS3", 201, -59, 16, 3, "medium", "south of the plot road, further east"),
 	-- high: the fullest town.
 	cluster("ne", 385, 48, 16, 3, "high", "the north-east, past the showroom"),
 	cluster("eastLotA", 256, 23, 16, 2, "high", "east of the lot, beside the plot road"),
 	cluster("eastLotB", 217, 23, 16, 2, "high", "east of the lot, by the turnaround"),
-	cluster("northFar2", 45, 262, 16, 4, "high", "north, east of the Snow Road"),
+	cluster("northFar2", 61, 294, 16, 4, "high", "north, east of the Snow Road"),
 }
 
 -- How many trees each tier plants: a tier plants its own sites and every

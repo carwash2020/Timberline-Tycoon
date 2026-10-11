@@ -346,6 +346,49 @@ return function(t)
 		t.eq(s.Wood.Get(p.uid), nil)
 	end)
 
+	-- Lane F: owned wood that falls out of the world (through the ground, toward the
+	-- destroy height) comes back at its owner's plot instead of being lost.
+	t.test("fallen wood: an owned piece below the world comes back at its owner's plot, stopped, once", function()
+		local s = setup()
+		local p = s.log(1, 4, 2, Vector3.new(0, -120, 0))
+		local backAt = CFrame.new(40, 6, 10)
+		local asked = 0
+		s.Wood.Hooks.recover = function(piece)
+			asked += 1
+			t.eq(piece.ownerId, 1)
+			return backAt
+		end
+		s.Wood.Tick(s.now)
+		t.eq(asked, 1)
+		t.ok((p.root.CFrame.Position - backAt.Position).Magnitude < 3, "back at the plot")
+		t.eq(s.velocities[p.root].linear, Vector3.zero, "and stopped")
+		t.ok(s.Wood.Get(p.uid) ~= nil, "still a live piece")
+		-- Still below the line a moment later (the move did not take): not thrown every frame.
+		p.root.CFrame = CFrame.new(0, -120, 0)
+		s.Wood.Tick(s.now + 1)
+		t.eq(asked, 1, "waits RecoverGapSec before another rescue")
+		s.Wood.Tick(s.now + 3)
+		t.eq(asked, 2, "then it is brought back again")
+		s.Wood.Hooks.recover = nil
+	end)
+
+	t.test("fallen wood: nobody's wood, wood above the line, and an owner with no pad are left alone", function()
+		local s = setup()
+		local asked = 0
+		s.Wood.Hooks.recover = function()
+			asked += 1
+			return nil -- no pad: nowhere to come back to
+		end
+		local ownerless = s.log(1, 4, 2, Vector3.new(0, -120, 0), { ownerId = 0 })
+		local fine = s.log(1, 4, 2, Vector3.new(0, 20, 0))
+		local padless = s.log(1, 4, 2, Vector3.new(0, -120, 0))
+		s.Wood.Tick(s.now)
+		t.eq(asked, 1, "only the owned piece below the line asks")
+		t.ok(s.Wood.Get(ownerless.uid) ~= nil and s.Wood.Get(fine.uid) ~= nil and s.Wood.Get(padless.uid) ~= nil)
+		t.eq(fine.root.CFrame.Position.Y, 20, "wood above the line is never moved")
+		s.Wood.Hooks.recover = nil
+	end)
+
 	t.test("touched wood never ages: held, or on its owner's bed; plot wood keeps its owner", function()
 		local s = setup()
 		local p = s.log(1, 4, 2)

@@ -87,7 +87,7 @@ return function(t)
 				local n = if folder then #folder:GetChildren() else 0
 				if n == last then
 					still += 1
-					if still > 40 then
+					if still > 150 then
 						return f
 					end
 				else
@@ -180,7 +180,7 @@ return function(t)
 	t.test("it builds exactly the plan round the camera, all of it decoration", function()
 		for _, tier in ipairs({ "high", "low" }) do
 			local w = world(tier)
-			local at = Vector3.new(800, 8, -600) -- south forest, off the homesteads
+			local at = Vector3.new(125, 8, -510) -- south forest, off the homesteads
 			w.look(at)
 			w.ForestFiller.Start()
 			t.eq(#w.heartbeat, 1, "it steps on Heartbeat")
@@ -193,7 +193,8 @@ return function(t)
 			t.eq(near, wantNear, tier .. ": filler parts")
 			t.eq(far, wantFar, tier .. ": stand-in parts")
 			t.eq(tufts, wantTufts, tier .. ": grass tuft parts")
-			t.ok(near > 1000, tier .. ": " .. near .. " filler parts round you")
+			-- Ring map: 250 (it was 1,000): the thickest forest left is thinner.
+			t.ok(near > 250, tier .. ": " .. near .. " filler parts round you")
 			t.ok(tufts > 0, tier .. ": " .. tufts .. " tuft parts round you")
 			t.eq(#bad, 0, "parts that aren't decoration: " .. table.concat(bad, ", "))
 		end
@@ -215,7 +216,7 @@ return function(t)
 				ready = true
 			end
 		end
-		w.look(Vector3.new(800, 8, -600))
+		w.look(Vector3.new(125, 8, -510))
 		w.ForestFiller.Start()
 		t.ok(waits >= 20, "it waited")
 		w.onWait = nil
@@ -226,7 +227,7 @@ return function(t)
 
 	t.test("it spreads the work over frames, nearest cells first", function()
 		local w = world("high")
-		local at = Vector3.new(800, 8, -600)
+		local at = Vector3.new(125, 8, -510)
 		w.look(at)
 		w.ForestFiller.Start()
 		local seen, firstFar = 0, nil
@@ -250,17 +251,18 @@ return function(t)
 			end
 			seen = #cells
 		end
-		t.ok(seen > 30, seen .. " cells in 30 frames")
+		-- Ring map: 15 (it was 30): fewer cells hold trees.
+		t.ok(seen > 15, seen .. " cells in 30 frames")
 		t.ok(nearestFirst, "the nearest trees come first")
 		t.eq(firstFar, nil, "no stand-in before the trees round you")
 	end)
 
 	t.test("moving the camera swaps cells in and out; the totals follow it", function()
 		local w = world("low")
-		w.look(Vector3.new(800, 8, -600))
+		w.look(Vector3.new(125, 8, -510))
 		w.ForestFiller.Start()
 		w.settle(4000)
-		local to = Vector3.new(200, 8, 500) -- the north forest
+		local to = Vector3.new(100, 8, 400) -- the north forest
 		w.look(to)
 		w.settle(4000)
 		local near, far = count(w.folder())
@@ -273,14 +275,14 @@ return function(t)
 
 	t.test("a crown between the camera and its focus fades, and comes back", function()
 		local w = world("high")
-		local at = Vector3.new(800, 8, -600)
+		local at = Vector3.new(125, 8, -510)
 		w.look(at)
 		w.ForestFiller.Start()
 		w.settle(4000)
 		-- A filler tree the camera actually built: look through its crown.
 		local tree
-		for cx = 24, 26 do
-			for cz = -20, -18 do
+		for cx = 1, 6 do
+			for cz = -18, -14 do
 				for _, spot in ipairs(w.WorldPlan.FillerCellTrees(cx, cz)) do
 					local dx, dz = spot.x - at.X, spot.z - at.Z
 					if dx * dx + dz * dz < 80 * 80 then

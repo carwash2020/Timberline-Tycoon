@@ -214,4 +214,51 @@ return function(t)
 		t.eq(own.Parent, nil)
 		t.eq(world.profile.mining.ropes, 1)
 	end)
+
+	t.test("furniture: the bench grants one placeable piece and takes the ingots in the same block", function()
+		local world = setup()
+		world.stand(Vector3.new(0, 0, 4))
+		local granted = {}
+		world.Crafting.Hooks.canGrant = function(_, id)
+			return id == "GoldChest", nil
+		end
+		world.Crafting.Hooks.grant = function(player, id, source)
+			table.insert(granted, { player = player, id = id, source = source })
+			return true, nil
+		end
+		local gold1 = piece(world.folder, "Ingot", "Gold", world.player.UserId, Vector3.new(1, 0, 0))
+		local gold2 = piece(world.folder, "Ingot", "Gold", world.player.UserId, Vector3.new(-1, 0, 0))
+		local iron1 = piece(world.folder, "Ingot", "Iron", world.player.UserId, Vector3.new(0, 0, 1))
+		local iron2 = piece(world.folder, "Ingot", "Iron", world.player.UserId, Vector3.new(0, 0, -1))
+		t.eq(world.Crafting.Craft(world.player, "GoldChest"), true)
+		t.eq(#granted, 1)
+		t.eq({ granted[1].id, granted[1].source }, { "GoldChest", "craft" })
+		for _, ingot in ipairs({ gold1, gold2, iron1, iron2 }) do
+			t.eq(ingot.Parent, nil, "every ingot was taken")
+		end
+		t.eq(world.profile.mining.crafted.GoldChest, 1)
+	end)
+
+	t.test("furniture: a grant that cannot happen takes nothing", function()
+		local world = setup()
+		world.stand(Vector3.new(0, 0, 4))
+		local ingots = {
+			piece(world.folder, "Ingot", "Gold", world.player.UserId, Vector3.new(1, 0, 0)),
+			piece(world.folder, "Ingot", "Gold", world.player.UserId, Vector3.new(-1, 0, 0)),
+			piece(world.folder, "Ingot", "Iron", world.player.UserId, Vector3.new(0, 0, 1)),
+			piece(world.folder, "Ingot", "Iron", world.player.UserId, Vector3.new(0, 0, -1)),
+		}
+		t.eq(world.Crafting.Craft(world.player, "GoldChest"), false, "no grant hook bound: refused")
+		world.Crafting.Hooks.canGrant = function()
+			return false, "full"
+		end
+		world.Crafting.Hooks.grant = function()
+			error("must not be called")
+		end
+		t.eq(world.Crafting.Craft(world.player, "GoldChest"), false, "a full stock: refused")
+		for _, ingot in ipairs(ingots) do
+			t.ok(ingot.Parent ~= nil, "the ingots are still there")
+		end
+		t.eq(world.profile.mining.crafted.GoldChest, nil)
+	end)
 end

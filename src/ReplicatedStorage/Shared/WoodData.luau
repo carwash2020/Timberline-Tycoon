@@ -304,6 +304,40 @@ local woods: { WoodDef } = {
 		trunkHeight = 18,
 		foliageSize = 15,
 	},
+	{
+		-- Bayou (Lane R). Unlocked by the S2 stage event. Appended after
+		-- lumenwood so the detector filter's indices (saved by index) keep still. v1 numbers are a
+		-- PROPOSAL (the v1 loop is a rollback only); the v2 row is the live one.
+		id = "bogcypress",
+		displayName = "Bog Cypress",
+		treeHP = 320,
+		hardness = 18,
+		logsPerTree = 6,
+		pricePerLog = 14,
+		biome = "bayou",
+		respawnSec = 150,
+		silhouette = "broadleaf",
+		leafColor = hexColor("#6E8B3D"),
+		trunkColor = hexColor("#5B4A3A"),
+		trunkHeight = 14,
+		foliageSize = 9,
+	},
+	{
+		-- Red Mesa (Lane R). Unlocked by the S4 stage event.
+		id = "ironwood",
+		displayName = "Ironwood",
+		treeHP = 1000,
+		hardness = 60,
+		logsPerTree = 8,
+		pricePerLog = 60,
+		biome = "mesa",
+		respawnSec = 270,
+		silhouette = "broadleaf",
+		leafColor = hexColor("#7A8F5A"),
+		trunkColor = hexColor("#3B3433"),
+		trunkHeight = 10,
+		foliageSize = 12,
+	},
 }
 
 -- Designer knob (B02). A plank's $/u³ is the plan's price (V2_PLAN §2b)
@@ -330,6 +364,8 @@ WoodData.PlanPlank = {
 	emberwood = 80,
 	phantomwood = 54,
 	lumenwood = 90,
+	bogcypress = 60, -- Bayou (Lane R)
+	ironwood = 70, -- Red Mesa (Lane R)
 } :: { [string]: number }
 
 -- Rarer woods pay more, and so does milling them: the further you go for a
@@ -445,6 +481,26 @@ local V2: { [string]: WoodV2 } = {
 		lifespan = { 3, 6 },
 		core = "#C8B5F0",
 		coreMaterial = "Foil",
+	},
+	-- Bayou (Lane R): log value 6, plank plan 60, hardness 8 (Designer, 13:35).
+	bogcypress = {
+		logPrice = 6,
+		plankPrice = WoodData.ScaledPlank(6, WoodData.PlanPlank.bogcypress),
+		hardness = 8,
+		growSec = 420,
+		lifespan = { 3, 6 },
+		core = "#B89A6E",
+		coreMaterial = "Wood",
+	},
+	-- Red Mesa (Lane R): log value 14, plank plan 70, hardness 18.
+	ironwood = {
+		logPrice = 14,
+		plankPrice = WoodData.ScaledPlank(14, WoodData.PlanPlank.ironwood),
+		hardness = 18,
+		growSec = 900,
+		lifespan = { 3, 6 },
+		core = "#8C5A3C",
+		coreMaterial = "Wood",
 	},
 	lumenwood = {
 		logPrice = boosted("lumenwood", 25),
@@ -678,6 +734,58 @@ local SHAPES: { [string]: TreeShape } = {
 		leafColors = { "#7A4FD0", "#6A3FC0", "#9468E0", "#5A34A8" },
 		bark = "#2A2138",
 		glow = "#55F2E0",
+	},
+	-- Bog Cypress (Lane R): a tall buttressed trunk, a narrow crown of moss.
+	bogcypress = {
+		height = { 26, 34 },
+		trunkThickness = 2.2,
+		trunkLength = 14,
+		trunkSegments = 3,
+		taper = 0.88,
+		leader = true,
+		maxDepth = 2,
+		splitChance = { 0.8, 0.5 },
+		minSplits = 1,
+		maxSplits = 2,
+		branchAngle = 28,
+		twistiness = 6,
+		firstBranchLength = 6,
+		lengthDecay = { 0.5, 0.7 },
+		thicknessDecay = 0.55,
+		minThickness = 0.55,
+		canopy = "clusters",
+		leafSize = 6,
+		clusterParts = { 3, 4 },
+		flares = 6,
+		maxSections = 14,
+		leafColors = { "#6E8B3D", "#5E7A33", "#7F9C4A", "#8DA856" },
+		bark = "#5B4A3A",
+	},
+	-- Ironwood (Lane R): short, dense, wind-bent, a flat dark crown.
+	ironwood = {
+		height = { 20, 26 },
+		trunkThickness = 2.4,
+		trunkLength = 7,
+		trunkSegments = 2,
+		taper = 0.9,
+		maxDepth = 2,
+		splitChance = { 1.0, 0.7 },
+		minSplits = 2,
+		maxSplits = 3,
+		branchAngle = 44,
+		elbow = 12,
+		twistiness = 14,
+		firstBranchLength = 6,
+		lengthDecay = { 0.6, 0.8 },
+		thicknessDecay = 0.64,
+		minThickness = 0.6,
+		canopy = "clusters",
+		leafSize = 7,
+		clusterParts = { 3, 4 },
+		flares = 5,
+		maxSections = 12,
+		leafColors = { "#7A8F5A", "#6A7F4C", "#8CA06A", "#5E7340" },
+		bark = "#3B3433",
 	},
 	-- Tall, pale, layered light.
 	lumenwood = {

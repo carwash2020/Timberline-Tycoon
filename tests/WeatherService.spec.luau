@@ -129,10 +129,10 @@ return function(t)
 	t.test("strike points: near the player, on the ground, never in town or the plots", function()
 		local WeatherService = setup()
 		local spots = {
-			Vector3.new(0, 1, -110), -- Starter Forest, right by town
+			Vector3.new(0, 1, -180), -- Starter Forest
 			Vector3.new(0, 1, 60), -- in town
-			Vector3.new(-420, 10, 110), -- the Hills
-			Vector3.new(0, 30, 1240), -- the Snowfields
+			Vector3.new(-500, 10, 200), -- the Hills, off the road
+			Vector3.new(80, 30, 760), -- the Snowfields, off the north road
 		}
 		for _, near in ipairs(spots) do
 			local found = 0
@@ -146,7 +146,9 @@ return function(t)
 					t.ok(math.abs(p.Y - TerrainGen.HeightAt(p.X, p.Z)) < 0.01, "on the terrain")
 				end
 			end
-			t.ok(found > 150, string.format("usually finds ground near (%.0f, %.0f): %d", near.X, near.Z, found))
+			-- Ring map (Oct 10): 140 of 200 (it was 150). East Meadow now sits 380 east of
+			-- town, so its yard takes a little more of the ring round the spawn.
+			t.ok(found > 140, string.format("usually finds ground near (%.0f, %.0f): %d", near.X, near.Z, found))
 		end
 	end)
 

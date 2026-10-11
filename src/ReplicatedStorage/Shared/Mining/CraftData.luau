@@ -1,6 +1,7 @@
 --!strict
--- CraftData: the bench recipes. Furniture stays enabled = false until
--- base systems can grant a box. No recipe costs Robux.
+-- CraftData: the bench recipes. The two furniture recipes are on now that
+-- PlotService.GrantPiece can grant a placeable piece (Lane F). No recipe costs
+-- Robux.
 
 local CraftData = {}
 
@@ -71,7 +72,7 @@ local LIST: { Recipe } = {
 	{
 		id = "CopperLampPost",
 		name = "Copper Lamp Post",
-		enabled = false,
+		enabled = true,
 		needs = {
 			{ kind = "ingot", ore = "Copper", n = 3 },
 			{ kind = "chunk", ore = "Coal", n = 1 },
@@ -81,7 +82,7 @@ local LIST: { Recipe } = {
 	{
 		id = "GoldChest",
 		name = "Gold-banded Chest",
-		enabled = false,
+		enabled = true,
 		needs = {
 			{ kind = "ingot", ore = "Gold", n = 2 },
 			{ kind = "ingot", ore = "Iron", n = 2 },

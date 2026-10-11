@@ -32,6 +32,8 @@ local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local SparkworksStock = require(ReplicatedStorage.Shared.SparkworksStock)
+local StockIds = require(ReplicatedStorage.Shared.StockIds)
 local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
@@ -764,6 +766,18 @@ local function deliver(player: Player, profile: any, box: BoxGrant, axe: ItemCat
 			publishStock(player, profile)
 			notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", machine.displayName))
 		end
+	elseif box.kind == "Logic" then
+		-- A Sparkworks piece: it waits in stock like a boxed machine, and the
+		-- hammer places it for nothing (the shelf price was the one price).
+		local bp = PlotLogic.Blueprint(box.itemId)
+		if bp and StockIds.IsLogic(bp.id) then
+			if type(profile.sawmillStock) ~= "table" then
+				profile.sawmillStock = {}
+			end
+			table.insert(profile.sawmillStock, bp.id)
+			publishStock(player, profile)
+			notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", bp.displayName))
+		end
 	elseif box.kind == "Blueprint" then
 		local bp = PlotLogic.Blueprint(box.itemId)
 		if bp then
@@ -937,6 +951,14 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		if refusal then
 			notify(player, refusal)
 			return fail("alreadyOwned")
+		end
+		if not hasLand(profile) then
+			return fail("needsLand")
+		end
+	elseif box.kind == "Logic" then
+		-- Only what SparkworksStock lists, in the v2 loop, on a player with land.
+		if loop ~= 2 or SparkworksStock.Get(box.itemId) == nil or PlotLogic.Blueprint(box.itemId) == nil then
+			return fail("locked")
 		end
 		if not hasLand(profile) then
 			return fail("needsLand")

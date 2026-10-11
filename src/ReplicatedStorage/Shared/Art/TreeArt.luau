@@ -220,6 +220,9 @@ local DUST: { [string]: Color3 } = {
 	sky = Color3.fromRGB(236, 228, 198),
 	-- Ferry shore, not the palm coast's sand and not the forest's earth.
 	ferryisle = Color3.fromRGB(214, 196, 150),
+	-- Lane R: the Bayou's dark silt, Red Mesa's red sandstone grit.
+	bayou = Color3.fromRGB(92, 82, 58),
+	mesa = Color3.fromRGB(200, 124, 84),
 }
 
 function TreeArt.DustColor(def: WoodDef): Color3

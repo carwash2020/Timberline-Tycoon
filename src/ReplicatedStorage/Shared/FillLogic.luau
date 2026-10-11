@@ -3,6 +3,7 @@
 -- One wood, planks only. The first wood locks the piece. Units are u³.
 -- Excess stays a plank; it is never turned into cash.
 
+local BuildCost = require(script.Parent.BuildCost)
 local GameConfig = require(script.Parent.GameConfig)
 
 local FillLogic = {}
@@ -53,8 +54,55 @@ function FillLogic.Accept(
 	return true, nil
 end
 
+-- A sandstone slab or an ingot offered to a piece (Lane F). `ore` is the
+-- ingot's ore id. Same rules as a plank for who may use it: yours, and not
+-- in anyone's hands.
+export type Material = {
+	uid: string,
+	kind: string, -- "slab" | "ingot"
+	ore: string?,
+	ownerId: number,
+	held: boolean,
+}
+
+-- Whether this slab or ingot may go into the piece. `need` is what the
+-- piece takes in all, `missing` what it still lacks (BuildCost). A part
+-- the piece does not take, or has enough of, is refused and stays a part.
+function FillLogic.AcceptMaterial(
+	need: BuildCost.Need,
+	missing: BuildCost.Need,
+	offer: Material,
+	ownerId: number
+): (boolean, string?)
+	if offer.kind == "slab" then
+		if need.slabs <= 0 then
+			return false, "noslab"
+		end
+		if missing.slabs <= 0 then
+			return false, "full"
+		end
+	elseif offer.kind == "ingot" then
+		local ore = offer.ore
+		if type(ore) ~= "string" or need.ingots[ore] == nil then
+			return false, "noingot"
+		end
+		if missing.ingots[ore] == nil then
+			return false, "full"
+		end
+	else
+		return false, "noslab"
+	end
+	if offer.held then
+		return false, "held"
+	end
+	if offer.ownerId ~= ownerId or offer.ownerId == 0 then
+		return false, "owner"
+	end
+	return true, nil
+end
+
 -- Every reason Accept can return. A missing message is a bug.
-FillLogic.Reasons = { "built", "logs", "held", "owner", "empty", "wood" }
+FillLogic.Reasons = { "built", "logs", "held", "owner", "empty", "wood", "noslab", "noingot", "full" }
 
 -- Player text for a refusal. `pieceName` and `woodName` are display names.
 function FillLogic.Message(reason: string?, pieceName: string?, woodName: string?): string?
@@ -72,6 +120,12 @@ function FillLogic.Message(reason: string?, pieceName: string?, woodName: string
 		return "That plank is too small to use."
 	elseif reason == "built" then
 		return string.format("This %s is already built.", piece)
+	elseif reason == "noslab" then
+		return string.format("The %s doesn't take sandstone slabs.", piece)
+	elseif reason == "noingot" then
+		return string.format("The %s doesn't take that ingot.", piece)
+	elseif reason == "full" then
+		return string.format("The %s has all of that already.", piece)
 	end
 	return nil
 end

@@ -20,6 +20,7 @@ local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlotData = require(script.Parent.PlotData)
 local ShelfLayout = require(script.Parent.ShelfLayout)
 local ShopLogic = require(script.Parent.ShopLogic)
+local SparkworksStock = require(script.Parent.SparkworksStock)
 local TruckLayout = require(script.Parent.TruckLayout)
 
 local StoreStock = {}
@@ -173,9 +174,50 @@ local function lampSlot(): Slot
 	}
 end
 
+-- The Sparkworks counter (Lane F): the logic pieces (SparkworksStock) and Lane
+-- W's line pieces (a Machine whose shop is "Sparkworks": Switch Belt, Tilted
+-- Belt, Belt Support, Wood Detector), each at its one price. A logic piece is
+-- kind "Logic": buying one puts it in the player's stock, like a boxed machine,
+-- and placing it is free. The shop's building and shelves are Lane C's, so
+-- StoreStock.All (the interior shops' budget) does not list these.
+local function sparkworksSlots(): { Slot }
+	local out: { Slot } = {}
+	for _, machine in ipairs(ItemCatalog.MachineList()) do
+		if machine.shop == "Sparkworks" then
+			table.insert(out, {
+				slotId = "sparkworks-" .. machine.id,
+				shop = "Sparkworks",
+				itemKind = "Machine",
+				itemId = machine.id,
+				displayName = machine.displayName,
+				respawnSec = GameConfig.BoxRespawnSec,
+				limited = false,
+				color = machine.color,
+			})
+		end
+	end
+	table.sort(out, function(a, b)
+		return a.itemId < b.itemId
+	end)
+	for _, row in ipairs(SparkworksStock.List()) do
+		table.insert(out, {
+			slotId = "sparkworks-" .. row.id,
+			shop = "Sparkworks",
+			itemKind = "Logic",
+			itemId = row.id,
+			displayName = row.displayName,
+			respawnSec = GameConfig.BoxRespawnSec,
+			limited = false,
+			color = "#C9A24A",
+		})
+	end
+	return out
+end
+
 local BY_SHOP: { [string]: { Slot } } = {
 	ToolShed = {},
 	HearthAndHome = {},
+	Sparkworks = {},
 }
 
 local function build()
@@ -195,6 +237,9 @@ local function build()
 		table.insert(BY_SHOP.HearthAndHome, slot)
 	end
 	table.insert(BY_SHOP.HearthAndHome, lampSlot())
+	for _, slot in ipairs(sparkworksSlots()) do
+		table.insert(BY_SHOP.Sparkworks, slot)
+	end
 end
 
 build()
@@ -240,7 +285,18 @@ function StoreStock.Find(kind: string, itemId: string): Slot?
 			return slot
 		end
 	end
+	-- The Sparkworks counter's pieces sit outside the interior shops' list.
+	for _, slot in ipairs(BY_SHOP.Sparkworks) do
+		if slot.itemKind == kind and slot.itemId == itemId then
+			return slot
+		end
+	end
 	return nil
+end
+
+-- The Sparkworks counter's stock, in shelf order.
+function StoreStock.Sparkworks(): { Slot }
+	return BY_SHOP.Sparkworks
 end
 
 -- What the server charges. A limited item ignores every other number.
@@ -259,6 +315,8 @@ function StoreStock.UnitPrice(kind: string, itemId: string, limited: boolean, lo
 	elseif kind == "Machine" then
 		local machine = ItemCatalog.GetMachine(itemId)
 		return if machine then machine.priceCash else nil
+	elseif kind == "Logic" then
+		return SparkworksStock.Price(itemId)
 	elseif kind == "Blueprint" then
 		local bp = nil
 		for _, item in ipairs(PlotData.Blueprints) do

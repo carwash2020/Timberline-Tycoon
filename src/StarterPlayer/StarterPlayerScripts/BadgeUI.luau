@@ -106,7 +106,8 @@ function BadgeUI.Start()
 
 	local function panelHeight(): number
 		-- Under the corner, inside a 375-tall phone, with room to scroll.
-		return if UITheme.IsPhone() then 200 else 280
+		-- 25 badges: a PC panel is tall enough for eight rows at once.
+		return if UITheme.IsPhone() then 200 else 420
 	end
 
 	local function layout()

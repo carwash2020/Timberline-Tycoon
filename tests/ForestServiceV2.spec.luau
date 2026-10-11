@@ -352,6 +352,9 @@ return function(t)
 		local a = s.player(1, "Ada")
 		local b = s.player(2, "Bo")
 		local c = s.player(3, "Cy")
+		-- Ring map: the dice put it at (60, -160), good ground in the Starter Forest (the
+		-- middle 0.5 now lands on Birch Side's yard).
+		s.rolls = { 0.5, 0.05121, 0.17852 } -- (the wood first, as before)
 		local uid = s.Forest.WakeElder("starter")
 		t.ok(uid, "an Elder wakes")
 		local rec = s.trees[uid]

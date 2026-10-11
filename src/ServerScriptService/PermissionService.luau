@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
+local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local RateLimiter = require(script.Parent.RateLimiter)
 
 local PermissionService = {}
@@ -77,7 +78,8 @@ function PermissionService.Can(player: Player, ownerId: number, flag: string): b
 	if not profile then
 		return false
 	end
-	return PermissionLogic.Allows(profile.permissions, userId, flag)
+	-- Lane F: the one edit-rights rule (PlotService.CanEdit's pure twin).
+	return PlotLogic.CanEdit(profile.permissions, userId, ownerId, flag)
 end
 
 function PermissionService.Init(remoteEvent: RemoteEvent?)

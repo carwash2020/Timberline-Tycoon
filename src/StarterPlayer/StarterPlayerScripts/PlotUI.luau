@@ -116,7 +116,7 @@ local function ownsBlueprint(id: string): boolean
 end
 
 local function entries(): { BlueprintBook.Entry }
-	return BlueprintBook.Filter(BlueprintBook.Entries(myBook(), myStock()), filter)
+	return BlueprintBook.Filter(BlueprintBook.Entries(myBook(), myStock(), true), filter)
 end
 
 -- A box in stock, or a store unlock you learned, places for free. The table

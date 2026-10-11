@@ -24,6 +24,7 @@ local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlotData = require(script.Parent.PlotData)
 local SellLogic = require(script.Parent.SellLogic)
+local StockIds = require(script.Parent.StockIds)
 
 local SawmillLogic = {}
 
@@ -473,7 +474,7 @@ end
 function SawmillLogic.DecodeStock(text: string): { string }
 	local out: { string } = {}
 	for id in string.gmatch(text, "[^,]+") do
-		if ItemCatalog.GetSawmill(id) or ItemCatalog.GetMachine(id) then
+		if ItemCatalog.GetSawmill(id) or ItemCatalog.GetMachine(id) or StockIds.Has(id) then
 			table.insert(out, id)
 		end
 	end

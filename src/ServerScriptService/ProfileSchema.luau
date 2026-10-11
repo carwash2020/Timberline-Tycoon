@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
+local BuildCost = require(ReplicatedStorage.Shared.BuildCost)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local EventData = require(ReplicatedStorage.Shared.EventData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -40,7 +41,7 @@ export type PlacedItem = {
 	y: number?, -- base height; missing means the ground
 	wood: string?, -- filled wood; missing means the authored look
 	paint: string?, -- a KitPaint id (kit pieces only); missing means natural
-	fill: { units: number }?, -- kit blueprint still taking planks; missing means built
+	fill: { units: number, slabs: number?, ingots: { [string]: number }? }?, -- kit blueprint still taking planks, slabs, ingots; missing means built
 	paid: number?, -- fee charged to place a kit piece; missing means the legacy price
 	len: number?, -- resized length; missing means the base. woodUnits is not saved
 	lenX: number?,
@@ -738,13 +739,9 @@ local function cleanPlot(plot: any)
 					item.lenZ = nil
 				end
 				if item.fill ~= nil then
-					local units = if type(item.fill) == "table" then item.fill.units else nil
-					local need = EditLogic.Units(bp, item)
-					if type(units) ~= "number" or units ~= units or units < 0 or units >= need then
-						item.fill = nil
-					else
-						item.fill = { units = units }
-					end
+					-- Planks, slabs and ingots, each inside what the piece needs. A
+					-- piece that has everything it needs is finished: no fill.
+					item.fill = BuildCost.CleanFill(bp, item)
 				end
 				if item.paid ~= nil and (type(item.paid) ~= "number" or item.paid ~= item.paid or item.paid < 0) then
 					item.paid = nil

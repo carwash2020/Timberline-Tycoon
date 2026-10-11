@@ -374,11 +374,12 @@ return function(t)
 		-- What this guards against: low's cap with high's unload radius.
 		local stale = table.clone(QualityBudgets.Low)
 		stale.DecorUnloadRadius = QualityBudgets.High.DecorUnloadRadius
-		local bare = bareNearby(stale, walks[1][2], walks[1][3])
-		-- The drive to the Hills crosses open country the shelves took out of
-		-- the old lawn, so this mis-set cap leaves less bare than it used to.
-		-- It is still well above a low budget that unloads on time.
-		t.ok(bare > 0.08, string.format("unload past 260 on low: %.1f%% bare", bare * 100))
+		-- Ring map (Oct 10): the Hills are 500 studs from the spawn and the drive
+		-- there no longer leaves the stale cap any bare ground (0%), so the guard
+		-- walks the Phantom Grove loop instead: 6% bare with the stale cap, against
+		-- a low budget that unloads on time (checked above to be under 10%).
+		local bare = bareNearby(stale, walks[3][2], walks[3][3])
+		t.ok(bare > 0.05, string.format("unload past 260 on low: %.1f%% bare", bare * 100))
 	end)
 
 	t.test("decoration cells unload a little past where they load", function()

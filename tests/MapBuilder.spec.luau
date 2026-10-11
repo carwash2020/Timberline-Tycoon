@@ -146,6 +146,8 @@ return function(t)
 					end,
 				},
 				NodeService = { Spawn = function() end },
+				UndergroundBuilder = { Build = function() end },
+				SecretService = { V1Init = function() end },
 				WorldClock = {
 					Start = function()
 						s.clockStarted = true
@@ -211,11 +213,11 @@ return function(t)
 		t.eq(s.loaded, {}, "MapBuilder loads no character (it used to, at +6.5 s, before the save and the pads)")
 	end
 
-	-- Palms and the north-strip stands. Lanternwood is planted only once
+	-- Palms, the north-strip stands and Lane R's region woods. Lanternwood is planted only once
 	-- WoodData has the row (B12).
 	local function extraTrees(WorldPlan)
 		local WoodData = t.shared("WoodData")
-		local n = #WorldPlan.StripTrees() + #WorldPlan.FerryPalms()
+		local n = #WorldPlan.StripTrees() + #WorldPlan.FerryPalms() + #WorldPlan.RegionTrees()
 		if WoodData.Get("lanternwood") then
 			n += #WorldPlan.Lanternwood()
 		end
@@ -669,6 +671,10 @@ return function(t)
 		for _, id in ipairs({ "hills", "snow", "volcano", "sky", "grove" }) do
 			road[WorldPlan.BiomeSignText(id)] = true
 		end
+		-- Lane R's two road ends are road signs too: the Bayou and Red Mesa are
+		-- biomes now, so their posts read like the others' (name, wood, stage).
+		road[WorldPlan.BiomeSignText("bayou")] = true
+		road[WorldPlan.BiomeSignText("mesa")] = true
 		local boards, solidBoards = 0, 0
 		for _, model in ipairs(s.map:GetChildren()) do
 			if model.Name == "Signpost" then
@@ -687,7 +693,7 @@ return function(t)
 				end
 			end
 		end
-		t.eq(solidBoards, 7, "the four road signs and the three gate signs")
+		t.eq(solidBoards, 9, "the four road signs, the three gate signs and the Bayou and Red Mesa ends")
 		t.ok(boards >= 8, boards .. " signposts")
 		-- One flume per chute, along WorldPlan.ChuteFlume (out off the isle).
 		local flumes = {}
@@ -884,8 +890,11 @@ return function(t)
 			end
 			-- Phase 12's wider roads and cliff rings took the flat spots the
 			-- scenery used to claim. WorldPlan.spec uses the same floor.
-			t.ok(total >= 2500 and total <= 5000, total .. " scenery parts")
-			t.ok(solidTotal >= 1000 and solidTotal < total, solidTotal .. " of them solid")
+			-- Ring map: 1,500 parts and 800 solid (it was 2,500 and 1,000), as WorldPlan.spec.
+			-- Lane R: the Bayou's and Red Mesa's grounds are Limestone and Sandstone now
+			-- (scenery and boulders stand on grass), so the floor is 1,400 (was 1,500).
+			t.ok(total >= 1400 and total <= 5000, total .. " scenery parts")
+			t.ok(solidTotal >= 800 and solidTotal < total, solidTotal .. " of them solid")
 		end
 	)
 

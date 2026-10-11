@@ -126,4 +126,70 @@ function KitPaint.Message(reason: string?): string?
 	return nil
 end
 
+---------------------------------------------------------------------------
+-- Paint all of this type (Lane F). One press repaints every piece with a
+-- blueprint id on a plot the painter may edit. Paint stays free
+-- (PriceEach 0, PROPOSAL), so the summed price is still worked out here and
+-- charged once if Connor ever sets one.
+---------------------------------------------------------------------------
+
+KitPaint.PriceEach = 0
+
+export type AllPlan = {
+	uids: { string },
+	count: number,
+	price: number,
+}
+
+KitPaint.AllReasons = { "piece", "color", "none" } :: { string }
+
+-- Which placed pieces would change. `lookup` finds a blueprint by id
+-- (PlotLogic.Blueprint). Pieces that already wear the colour are left out.
+function KitPaint.AllPlan(
+	placed: { any },
+	lookup: (string) -> Blueprint?,
+	pieceId: unknown,
+	paintId: unknown
+): (AllPlan?, string?)
+	if type(pieceId) ~= "string" or not KitPaint.CanPaint(lookup(pieceId)) then
+		return nil, "piece"
+	end
+	if not KitPaint.Valid(paintId) then
+		return nil, "color"
+	end
+	local want = KitPaint.Clean(paintId) or KitPaint.Natural
+	local uids: { string } = {}
+	for _, item in ipairs(placed) do
+		if item.blueprintId == pieceId and KitPaint.Of(item) ~= want then
+			table.insert(uids, item.uid)
+		end
+	end
+	if #uids == 0 then
+		return nil, "none"
+	end
+	return { uids = uids, count = #uids, price = #uids * KitPaint.PriceEach }, nil
+end
+
+-- The line a refused or finished paint-all reads. `name` is the piece's name.
+function KitPaint.AllMessage(reason: string?, name: string?): string?
+	local piece = if type(name) == "string" and name ~= "" then name else "piece"
+	if reason == "piece" then
+		return "That piece can't be painted."
+	elseif reason == "color" then
+		return "That isn't one of the colours."
+	elseif reason == "none" then
+		return string.format("Every %s already wears that colour.", piece)
+	end
+	return nil
+end
+
+-- The confirm text on the "Paint all" button: what it will do, one price.
+function KitPaint.AllConfirm(name: string, count: number, price: number): string
+	local noun = if count == 1 then name else name .. "s"
+	if price > 0 then
+		return string.format("Paint %d %s for $%d?", count, noun, price)
+	end
+	return string.format("Paint %d %s? Free.", count, noun)
+end
+
 return KitPaint

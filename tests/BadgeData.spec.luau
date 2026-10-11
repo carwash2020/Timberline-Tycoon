@@ -27,7 +27,7 @@ return function(t)
 		t.eq(BadgeData.IsLive(1), true)
 	end)
 
-	t.test("the list is the three firsts, the places, and the rare woods", function()
+	t.test("the list is the three firsts, the places, the rare woods and Lane X's eight", function()
 		t.eq(keys(), {
 			"FirstSale",
 			"FirstTruck",
@@ -46,7 +46,16 @@ return function(t)
 			"WoodGloamwood",
 			"WoodLumenwood",
 			"WoodLanternwood",
+			"AreaBayou",
+			"AreaMesa",
+			"WoodCypress",
+			"WoodIronwood",
+			"FirstBuild",
+			"Homestead",
+			"Stonemason",
+			"Millionaire",
 		})
+		t.eq(#keys(), 25, "25 badges in all")
 		t.eq(BadgeData.Get("WoodGloamwood").woodId, "phantomwood")
 		-- Lanternwood is its own wood. The glow placeholder stays lumenwood.
 		t.eq(GameConfig.NightGlowWoodId, "lumenwood")
@@ -68,6 +77,36 @@ return function(t)
 			t.eq(BadgeData.Ids[key], 0, key)
 			t.eq(BadgeData.IsLive(BadgeData.RobloxId(key)), false, key)
 		end
+	end)
+
+	t.test("the eight new badges: names, triggers and thresholds", function()
+		t.eq(BadgeData.Get("AreaBayou").name, "The Bayou")
+		t.eq(BadgeData.Get("AreaMesa").name, "Red Mesa")
+		t.eq(BadgeData.Get("WoodCypress").woodId, "bogcypress")
+		t.eq(BadgeData.Get("WoodIronwood").woodId, "ironwood")
+		t.eq(BadgeData.ForWood("bogcypress"), { "WoodCypress" })
+		t.eq(BadgeData.ForWood("ironwood"), { "WoodIronwood" })
+		t.eq(BadgeData.HomesteadPieces, 40)
+		t.eq(BadgeData.MillionaireEarned, 1000000)
+		t.eq(BadgeData.KeysFor("area", { id = "bayou" }), { "AreaBayou" })
+		t.eq(BadgeData.KeysFor("area", { id = "mesa" }), { "AreaMesa" })
+		t.eq(BadgeData.KeysFor("area", { id = "redmesa" }), { "AreaMesa" })
+		t.eq(BadgeData.KeysFor("area", { id = "AreaBayou" }), { "AreaBayou" })
+		t.eq(BadgeData.KeysFor("build", { id = "Wall4", count = 1 }), { "FirstBuild" })
+		t.eq(BadgeData.KeysFor("build", { id = "Wall4", count = 39 }), { "FirstBuild" })
+		t.eq(BadgeData.KeysFor("build", { id = "Wall4", count = 40 }), { "FirstBuild", "Homestead" })
+		t.eq(BadgeData.KeysFor("build", { id = "SandWall4", count = 1 }), { "FirstBuild", "Stonemason" })
+		t.eq(BadgeData.KeysFor("build", { id = "SandWall4" }), { "Stonemason" }, "the id alone is a sandstone piece")
+		t.eq(BadgeData.KeysFor("build", { id = "Wall4", count = 0 }), {})
+		t.eq(BadgeData.KeysFor("build", nil), {})
+		t.eq(BadgeData.KeysFor("earned", { count = 999999 }), {})
+		t.eq(BadgeData.KeysFor("earned", { count = 1000000 }), { "Millionaire" })
+		t.eq(BadgeData.KeysFor("earned", nil), {})
+		local WorldLayout = t.shared("World/WorldLayout")
+		local b, m = WorldLayout.Bayou, WorldLayout.RedMesa
+		t.eq(BadgeData.AreasAt(b.x, 0, b.z), { "AreaBayou" })
+		t.eq(BadgeData.AreasAt(m.x, 40, m.z), { "AreaMesa" })
+		t.eq(BadgeData.AreasAt(b.x + b.radius + 30, 0, b.z), {}, "past the Bayou's edge")
 	end)
 
 	t.test("rows show locked and earned, and the wire form drops unknown keys", function()
@@ -96,24 +135,30 @@ return function(t)
 		t.eq(BadgeData.KeysFor("area", { id = "AreaCave" }), { "AreaCave" })
 		t.eq(BadgeData.KeysFor("area", { id = "toll" }), { "AreaToll" })
 		t.eq(BadgeData.KeysFor("nope", nil), {})
-		t.eq(BadgeData.AreasAt(0, 30, 1240), { "AreaSnow" })
-		t.eq(BadgeData.AreasAt(0, 20, -110), { "AreaStarter" })
-		t.eq(BadgeData.AreasAt(-420, 20, 110), { "AreaHills" })
-		t.eq(BadgeData.AreasAt(-565, 20, -455), { "AreaGrove" })
-		t.eq(BadgeData.AreasAt(-1050, 700, 1050), { "AreaSky" })
-		t.eq(BadgeData.AreasAt(-1050, 0, 1050), {})
-		-- The cave on the Volcano is Cinder Cave, not the Secret Cave.
-		t.eq(BadgeData.AreasAt(1010, 40, 1110), { "AreaVolcano" })
-		-- The Secret Cave room is built, so standing in it records the visit.
-		t.eq(BadgeData.AreasAt(-765, 20, -655), { "AreaCave" })
-		-- Ferry Island's disc is built (the ferry reaches it).
-		t.eq(BadgeData.AreasAt(1395, 12, -760), { "AreaFerry" })
-		t.eq(BadgeData.AreasAt(1395 + 80, 12, -760), {}, "past the island's edge")
+		local BiomeData = t.shared("BiomeData")
+		local WorldLayout = t.shared("World/WorldLayout")
+		local RegionLogic = t.shared("RegionLogic")
+		local function disc(id, y)
+			local area = BiomeData.Get(id).area
+			return BadgeData.AreasAt(area.x, y or 30, area.z)
+		end
+		t.eq(disc("snow"), { "AreaSnow" })
+		t.eq(disc("starter"), { "AreaStarter" })
+		t.eq(disc("hills"), { "AreaHills" })
+		t.eq(disc("grove"), { "AreaGrove" })
+		t.eq(disc("sky", 700), { "AreaSky" })
+		t.eq(disc("sky", 0), {})
+		t.eq(disc("volcano"), { "AreaVolcano" })
+		local rx, rz = RegionLogic.ReachCenter()
+		t.eq(BadgeData.AreasAt(rx, 20, rz), { "AreaCave" })
+		local island = WorldLayout.Island
+		t.eq(BadgeData.AreasAt(island.x, 12, island.z), { "AreaFerry" })
+		t.eq(BadgeData.AreasAt(island.x + island.radius + 20, 12, island.z), {}, "past the island's edge")
 		t.eq(BadgeData.AreasAt(9000, 0, 9000), {})
 		-- The North Strip trigger is the box north of the bridge, not the deck.
-		t.eq(BadgeData.AreasAt(0, 40, 1700), { "AreaToll" })
-		t.eq(BadgeData.AreasAt(0, 40, 1590), {})
-		t.eq(BadgeData.AreasAt(22, 20, 1566), {})
+		t.eq(BadgeData.AreasAt(0, 40, 960), { "AreaToll" })
+		t.eq(BadgeData.AreasAt(0, 40, WorldLayout.BridgeCenterZ), {})
+		t.eq(BadgeData.AreasAt(WorldLayout.BoothX, 20, WorldLayout.BoothZ), {})
 	end)
 
 	t.test("the open bind is a 44 px menu key, not world interact", function()

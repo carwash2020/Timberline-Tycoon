@@ -213,6 +213,7 @@ return function(t)
 			end,
 		})
 		owner = player(1, V3.zero)
+		toastPlayer = owner -- Players:GetPlayerByUserId(1): the plot's owner is online
 		Sawmill.Set(owner, "mill-1", "x", 1)
 		t.eq(mill:GetAttribute("CutX"), 1.2)
 		t.eq(mill:GetAttribute("CutY"), 0.6)
@@ -220,6 +221,17 @@ return function(t)
 		local other = player(2, V3.zero)
 		Sawmill.Set(other, "mill-1", "x", 1)
 		t.eq(mill:GetAttribute("CutX"), 1.2, "someone else can't change it")
+		-- Lane F: PlotService.CanEdit's rule. A friend with Interact may; it is saved on the owner's plot.
+		profile.permissions = { ["2"] = { interact = true } }
+		Sawmill.Set(other, "mill-1", "x", 1)
+		t.eq(mill:GetAttribute("CutX"), 1.4, "a friend with Interact may step the cut")
+		t.eq(profile.plot.placed[1].data.x, 1.4, "saved on the owner's plot")
+		profile.permissions = { ["2"] = { grab = true } }
+		Sawmill.Set(other, "mill-1", "x", -1)
+		t.eq(mill:GetAttribute("CutX"), 1.4, "a friend without Interact may not")
+		profile.permissions = nil
+		Sawmill.Set(owner, "mill-1", "x", -1)
+		t.eq(mill:GetAttribute("CutX"), 1.2)
 		owner = player(1, V3.new(80, 0, 0))
 		Sawmill.Set(owner, "mill-1", "y", 1)
 		t.eq(mill:GetAttribute("CutY"), 0.6, "too far away")
@@ -672,6 +684,46 @@ return function(t)
 		t.eq(belt.piece.selling, true, "the next one goes in once the bucket has refilled")
 		belt.mill:Destroy()
 		Sawmill._reset()
+	end)
+
+	-- Connor's decision 12 (Oct 8): hand-fed wood counts the same as belt-fed. The
+	-- value is identical: the same log in gives the same planks out, both ways.
+	t.test("hand-fed equals belt-fed: the same log gives the same planks, in the same sizes, either way", function()
+		local function planks(lastInteracted)
+			local r = run("Millmaster200", { lastInteracted = lastInteracted, woodId = "oak", boost = 1.2 })
+			r.tick(0)
+			r.tick(Sawmill.Settle)
+			r.finish()
+			local out = {}
+			for _, info in ipairs(r.spawned) do
+				table.insert(out, {
+					woodId = info.woodId,
+					size = { info.size.X, info.size.Y, info.size.Z },
+					ownerId = info.ownerId,
+					figure = info.figure,
+					boost = info.boost,
+					mill = info.mill,
+					board = info.board,
+				})
+			end
+			r.mill:Destroy()
+			Sawmill._reset()
+			return out
+		end
+		local byHand = planks(0) -- touched a moment ago: hand-fed
+		local byBelt = planks(-100) -- untouched for ages: came by belt
+		t.ok(#byHand > 0, "hand-fed cut planks")
+		t.eq(#byBelt, #byHand, "the same number of planks")
+		t.eq(
+			byBelt,
+			byHand,
+			"every plank identical: wood, size, owner, boost and mill bonus (rare wood stays manual, GAME_DESIGN 9)"
+		)
+		local total = 0
+		for _, p in ipairs(byHand) do
+			total += p.size[2]
+		end
+		t.ok(total > 0, "and they have length")
 	end)
 
 	t.test(
