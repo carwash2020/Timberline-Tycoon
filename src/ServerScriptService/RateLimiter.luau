@@ -65,6 +65,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	ExpandLand = 1, -- buy the next plot square
 	SetPermission = 4, -- one flag for one visitor
 	VisitPlot = 1, -- go to a friend's plot (PlotService.Visit)
+	PlotModerate = 2, -- kick, ban or unban on your own plot (PlotService.Moderate)
 	Wire = 4, -- connect a port, or cut a wire
 	TollPay = 1, -- pay the toll
 	FerryBoard = 1, -- board the ferry

@@ -3643,3 +3643,31 @@ Not remapped without losing something: nothing was dropped. One side effect: RB 
 5. Blueprint placer: A places, RB and LB slide the ghost, B cancels; RB does not also grab.
 6. With the axe out, RB shows the "put your axe away to drag" toast and RT still chops.
 7. PC (click, E, R, Q) and phone (taps, hold to drag, PLACE button): unchanged.
+
+## V1 hardening: moderation and policy (branch `phase-2/v1-hardening-moderation`, 11 October 2026)
+
+What and why are in STATUS.md. Rules: `Shared/TextFilterLogic`, `Shared/ModerationLogic`, `Shared/PolicyLogic`, `PermissionLogic.Ban`; services `TextFilter`, `PolicyGate`, `PlotService.Moderate`. Previews: `previews/v1-hardening-mod/`.
+
+### Studio checks
+
+Needs two players: Studio "Test" with 2 or more players, or a live server with a friend. Ann owns a plot, Bob visits.
+
+PC (keyboard and mouse)
+1. Ann: Settings (Esc menu button or the SETTINGS button), VISITORS. Pick Bob, scroll down: "THIS PLAYER, ON YOUR PLOT" has Kick and Ban. Good: both rows are full width and easy to click, and Bob's name is on the person row above.
+2. Bob stands on Ann's plot. Ann presses Kick: Bob is moved just north of the yard, Ann sees "Sent Bob off your plot. They can't come back for 2 minutes.", Bob sees "Ann sent you off their plot. You can try again in 2 minutes." Bob walks back on: he is moved off again. Bob's Settings > Visitors > Visit Ann says "sent you off ... a moment ago". After 2 minutes he can visit.
+3. Ann presses Ban: the label changes to "Tap again: ban from my plot"; pressing anything else resets it. Tap again: Bob is off the plot, Ann sees "Banned Bob from your plot...", Bob sees "Ann banned you from their plot. You can't visit or build there." Bob tries Visit Ann, walks on, tries to open a door or place a piece with Ann's build and interact ticked for Anyone: every one is refused.
+4. Ann's VISITORS shows "BANNED FROM YOUR PLOT" with "Unban Bob". Press it: Bob can visit again. Ann leaves and rejoins (or reloads the save slot): a ban that was not lifted is still there.
+5. Ann can't kick or ban herself or the game owner (a toast says why). A ban stays after Bob leaves the server (it is by user id) and shows in the Unban list under his user name.
+6. REPORT tab: appears while at least one other player is in the server. Pick Bob, pick a reason: "Report sent to Roblox. Thank you." Good: Roblox received a report (check the account's report history, or the Roblox menu does not complain). If it says "Couldn't send that report", tell Connor and what Studio printed.
+7. Alone in a server: the REPORT tab is not there at all.
+
+Phone (667x375)
+8. Same flow with taps: every row is at least 44 px tall, nothing is cut off at the card's edge, the card scrolls with a finger. Kick, Ban (two taps), Unban and the REPORT tab work. The jump button and thumbstick never sit on a row.
+
+Xbox (controller)
+9. Open Settings with D-pad right (or the SETTINGS tile in the View menu). Down to VISITORS, A. Pick a person with A. Down through the toggles to Kick / Ban: the gold selection ring follows the stick and D-pad. Ban needs A twice. B goes back to GAME, B again closes. REPORT: A on the tab, pick a player and a reason with A. Nothing uses RT.
+
+Policy (any device)
+10. Open the Robux store (the board, the shelf, or the STORE button): it looks exactly as before, every card, price and Coming soon line unchanged. No paid random item is sold, so nothing is hidden; the specs cover the hiding and the refusal.
+11. Output: no red errors from `[PolicyGate]` or `[TextFilter]` during join. A warning "policy lookup failed" in Studio without API access is expected; the strict default then applies, which hides nothing today.
+12. Rename a save to something rude: it shows as hashes or the default name, never as typed (Studio may not filter without an experience; the live server does).
