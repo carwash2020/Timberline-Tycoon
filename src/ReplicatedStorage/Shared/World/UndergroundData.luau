@@ -134,7 +134,7 @@ UndergroundData.MineMouth = { x = 150, z = -150, width = 16, height = 16 }
 UndergroundData.Ramp = {
 	width = 16,
 	height = 14,
-	top = 3.2, -- the ground at the door (TerrainGen.HeightAt(150, -143) is within a stud)
+	top = 1.5, -- the ground at the door (TerrainGen.HeightAt(150, -143) is 1.44; it was 3.2 before the river and pads moved)
 	doorZ = -143, -- the door's front plane, where the walk-in starts
 	landing = 15, -- level studs from the door, under the arch (the arch is 15 deep)
 	cover = 6, -- studs of rock the hill keeps over the bore's roof
