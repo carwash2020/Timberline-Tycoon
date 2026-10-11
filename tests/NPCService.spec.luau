@@ -67,6 +67,25 @@ return function(t)
 		t.eq(murph:GetAttribute("NPCId"), "Murph")
 	end)
 
+	t.test("every NPC the tutorial depends on is Persistent, so its Talk prompt is never streamed out", function()
+		local NPCService, NPCData = service()
+		local map = fakeMap()
+		NPCService.Init(map)
+		local needed = { Murph = true, OldHank = true }
+		for id in pairs(needed) do
+			t.ok(NPCData.Get(id).persistent, id .. " is flagged persistent in NPCData")
+			local m = map:FindFirstChild(id) or map.Townsfolk:FindFirstChild(id)
+			t.ok(m, id .. " built")
+			t.eq(m.ModelStreamingMode, Enum.ModelStreamingMode.Persistent, id)
+			t.ok(m:FindFirstChild("Talk"), id .. " carries its Talk prompt on the model")
+		end
+		for _, npc in ipairs(NPCData.All()) do
+			if not needed[npc.id] then
+				t.ok(not npc.persistent, npc.id .. " is not flagged")
+			end
+		end
+	end)
+
 	t.test("everyone else: Atomic, tagged, in Townsfolk", function()
 		local NPCService, NPCData = service()
 		local map = fakeMap()
@@ -74,7 +93,7 @@ return function(t)
 		local folder = map:FindFirstChild("Townsfolk")
 		t.ok(folder, "Townsfolk folder")
 		for _, npc in ipairs(NPCData.All()) do
-			if npc.id ~= "Murph" then
+			if npc.id ~= "Murph" and not npc.persistent then
 				local m = folder:FindFirstChild(npc.id)
 				t.ok(m, npc.id .. " missing")
 				t.eq(m.ModelStreamingMode, Enum.ModelStreamingMode.Atomic)
@@ -340,7 +359,10 @@ return function(t)
 			if npc.id ~= "Murph" then
 				local m = folder:FindFirstChild(npc.id)
 				t.ok(m, npc.id .. " was built by its step")
-				t.eq(m.ModelStreamingMode, Enum.ModelStreamingMode.Atomic)
+				t.eq(
+					m.ModelStreamingMode,
+					if npc.persistent then Enum.ModelStreamingMode.Persistent else Enum.ModelStreamingMode.Atomic
+				)
 				t.ok(m:FindFirstChild("Talk"), npc.id .. " has Talk")
 			end
 		end

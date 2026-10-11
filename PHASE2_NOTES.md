@@ -1,5 +1,49 @@
 # Phase 2+ build notes
 
+## Server audit: game-breaking and long-loading bugs (11 October 2026, branch `phase-2/fix-server-audit`)
+
+Method: read GameServer's init order and a new player's first 60 seconds (PlayerAdded, save, gates, stream, character,
+ClientReady), every `WaitForChild` and `task.wait` on the server, every Heartbeat connection and `GetDescendants`; then
+timed the pure build code in Lune (numbers are Lune on a shared machine, so use the ratios; Roblox is about as fast or a
+little faster). Severity: **blocks play**, **long load**, **hitch**, **minor**.
+
+| # | Severity | Where | Evidence | Status |
+|---|---|---|---|---|
+| 1 | long load | `TerrainBuilder.Build`, `MapBuilder` "3. Terrain" (MapBuilder.server.luau:199) | 100 chunks at 0.44 to 0.54 s each (the heights are 66 x 66 `HeightAt` plus 64 x 64 water per chunk): about 45 to 55 s of CPU before the "terrain" gate, and every later step and the first player waited for it | **Fixed**: staged build, near chunks first (7 chunks, about 3 s), the rest in the background |
+| 2 | long load | `TerrainGen.WaterLevelAt` called from `writeChunk` | recomputed `HeightAt` for every column; with `WaterLevelFor(x, z, h)` the height-plus-water part of a chunk takes 40 to 55 % less | **Fixed** (WaterLevelAt kept, same answers: spec) |
+| 3 | long load | `GameServer.server.luau` PlayerAdded connected at the very end | the save's DataStore round trip (seconds, or about 45 s when another server still holds it) only began after the world and every service; it now overlaps them | **Fixed**: `ProfileService.Prefetch` / `PrefetchLeft` |
+| 4 | minor | `SkyForgeService.luau` 318/359/599, `MiningService.luau` 845/856/883 | both looked for `Workspace/Plots`; PlotService makes `TimberlineMap/Plots`. Relic trophies never built, mining's plot origin and placed-count never found a plot, and a thread waited 120 s | **Fixed** |
+| 5 | blocks play (a feature) | `BaseBoot.server.luau:10` | `WaitForChild("Remotes", 60)`, but GameServer creates the Remotes folder only after the world is built (GameServer.server.luau:146); on a slow cold build SaveNow, Paint all, stage unlocks, fallen-piece rescue never start | **Not touched: fix-load-meshes lane.** Suggest creating the Remotes folder before `WaitForChild("TimberlineMap")`, or waiting without a timeout. With fix 1 the world gate comes much sooner, so it is rarer |
+| 6 | hitch | `RegionWake.pass` (RegionWake.luau:61) | every 0.75 s: 2 `GetAttribute` and a `GetPivot` for each of about 1,400 trees, and trees are re-parented into ServerStorage right after planting if nobody is near | Not changed (works as designed; measure in Studio before touching) |
+| 7 | hitch | `DialogueService.watchKeepers` (DialogueService.luau:258) | `Workspace:GetDescendants()` once, plus a `DescendantAdded` Lua callback for every instance ever added (the forest alone adds about 60,000) | Not changed: about 30 to 60 ms in total, spread over the forest planting. A tag or the map folder would remove it |
+| 8 | hitch | `SkyForgeService.V1Init` (SkyForgeService.luau:593) | `TimberlineMap.DescendantAdded` plus a pass over the whole map for `TemperSpot` attachments | Not changed, same cost class as 7 |
+| 9 | minor | `GameServer.server.luau:1337` | the `ClientReady` handler is connected after the services, so a handshake before then is heard on the client's next repeat (every 3 s) | Not changed (bounded: the client repeats 30 times) |
+| 10 | minor | `TerrainBuilder.SettleTown` | the town chunks (up to 4) are written 2 to 5 times while the engine's drawn ground is measured: about 3 to 5 s, now the main part of the first stage | Not changed: it calibrates the whole world against the engine; shrinking it needs a Studio run |
+| 11 | info | `WorldPlan.Trees` | 11.5 s of CPU in Lune; already time-sliced after the world gate (12 ms a frame), planned once (cached) | OK |
+| 12 | info | `PlotService.Init` itemMeshes wait 3 s, NPCService mesh waits | bounded; mesh loading is the fix-load-meshes lane | Not touched |
+
+Checked and fine: every `WaitForChild` on the server has a timeout and a handling of nil; the world plan functions are
+cached (second call 0.000 s); the town and tutorial grove are in the pre-world path (0.4 s); GondolaService's stations are
+in the ready path; the load ceiling from #148 (`LoadBudgetSec` 150) and the gates' 90 s wait both bound the join.
+
+**What the terrain stages mean in play.** Players can walk into ground that is not written yet only past about 230 studs
+from the sawmill, and the background writes outward at about a 64-stud block a frame (the first 25 to 40 s), after the plot
+pads' ground (150 studs round each pad). A plot claimed in the first seconds lands on its pad's slab (a part), the ground
+under it follows within a few seconds. The caves are carved last. `FallenLogic` already returns anything that falls out of
+the world.
+
+**Studio checks (what good looks like).**
+
+1. PC, new server: Output shows `[Load] ... 3. Terrain took ~Ns` (the near chunks only, a few seconds), then `world ready
+   for players`, `[Load] ... can play` and a long way later `the rest of the terrain is written (Ns in the background)` and
+   `[Load] ... everything is built`. The first player stands on the ground at the spawn well before the last line.
+2. Walk or drive out of town in the first minute: the ground is there ahead of you (no void, no falling). Tell Claude if you
+   ever see sky through the ground; the writing order is `TerrainBuilder.Order`.
+3. Claim a plot in the first 20 seconds: you stand on your pad, the grass round it is there.
+4. The Town ground line still reads `good` (y = 0.0x).
+5. Join, leave within a second of joining, rejoin: no "save opened on another server" kick (the early-leave release).
+6. Phone and Xbox: nothing visible changes except the shorter wait; the loading card should drop in about half the time.
+
 ## Lane F: building and blueprints (10 October 2026, branch `phase-2/v1-f-base-systems`)
 
 What changed: `BuildCost` (fill = units + slabs + ingots, atomic take), `BuildMaterials`, `FillLogic`, `PlotFill`, `PlotLogic` (SellPlan refunds, kit-part cap), `EditRights` and `PlotService.CanEdit` at every edit site, `KitPieces` (new four unlocked), `BlueprintBook` (stage-locked rows, Free marks, granted and Sparkworks stock), `StageOf`, `FurnitureData`, `StockIds`, `SaveNowLogic`, `LooseSave` / `LooseService`, `FallenLogic`, `PlaceControlsLogic` / `PlaceControls`, `KitPaint` / `EditLogic.PaintAll`, `StoreStock.Sparkworks`, `BaseBoot.server`.
@@ -3704,7 +3748,7 @@ What changed is in STATUS.md (the found / added table). Previews: `previews/v1-h
 ### Studio checklist
 
 PC (keyboard and mouse)
-1. Open Settings (the round button left of the cash plaque). The five tabs GAME, VISIT, BOARD, REPORT, CODES sit on one row. Click "Camera speed": it steps 100%, 125% ... 200%, then 25%. Move the mouse in a free-look camera: the speed follows. Rejoin: the value is kept.
+1. Open Settings (the round button left of the cash plaque). The five tabs GAME, VISIT, BOARD, REPORT, CODES sit on one row. (The Camera speed row was removed on 11 October: see Startup errors.)
 2. Click Music volume and Effects volume: the music and effect loudness follow; "Graphics: Lower" and "Graphics: Higher" switch the dressing at once (box windows, scenery).
 3. CODES tab: type `PLACEHOLDER-DISABLED` and press Enter or REDEEM: "That code isn't valid." and no cash. Type nothing: "Type a code first." (Real codes: ask Connor to add one in `ServerScriptService/CodeData.luau`, enabled, with a UTC expiry, then redeem it once for the cash, again for "You already used that code.", on a second save slot too.) Six wrong codes quickly: "Too many tries..." for about 30 s.
 4. REPLAY TUTORIAL: first tap changes to "TAP AGAIN TO REPLAY", second tap restarts the tutorial. Finish the first step: Murph says nothing about cash and your wallet does not change. (A first-time player's first run still pays.)
@@ -3716,12 +3760,12 @@ PC (keyboard and mouse)
 Phone (667 x 375, landscape)
 9. The Settings card ends above the jump button (it does not cover it) and scrolls with a finger. Every row, tab and the code box is easy to hit with a thumb.
 10. CODES tab: tap the box, the keyboard appears, type, tap REDEEM. The answer shows under the button and as a toast.
-11. Camera speed: drag the camera with a thumb at 25% and at 200%. If nothing changes on a phone, the engine ignores the setting for touch; tell Claude (the row would then be hidden on touch-only devices).
+11. (Camera speed was removed.)
 
 Xbox (controller)
 12. D-pad right opens Settings; the selection ring is on GAME. The stick or D-pad walks the tabs and rows; A presses; B on CODES, BOARD or VISIT returns to GAME, B again closes.
 13. CODES tab: A on the code box opens the Xbox keyboard; type a code, confirm, then A on REDEEM. The ring is visible on the box and the button.
-14. Camera speed row: A steps it; the right stick turns the camera faster or slower to match.
+14. (Camera speed was removed.)
 15. No button does anything on the right trigger (RT still only chops).
 
 ## V1 hardening: moderation and policy (branch `phase-2/v1-hardening-moderation`, 11 October 2026)
@@ -3775,3 +3819,60 @@ Xbox (controller)
 8. Same as 1 to 3 with the controller: the chop (RT) works on the first oak; the selection ring and B closing panels are untouched by this change.
 
 If a number is off, send the `[Load]` lines and the `loadLine` lines from the server (`first forest trees planted`, `forest planned`, `forest planted`).
+## Startup errors (branch `phase-2/fix-startup-errors`, 11 October 2026)
+
+What and why are in STATUS.md. Claude can't run Studio: nothing below has been seen in Studio.
+
+### Studio checks
+
+PC (keyboard and mouse)
+1. Join a fresh save and read Output. Good: no "Insufficient permissions to set MouseSensitivity / GamepadCameraSensitivity", no "[GameAnalytics] progression S1 failed: Unable to cast string to int", no "[QuestUI] Murph's Talk prompt never streamed in".
+2. Open Settings. Good: there is no "Camera speed" row; every other row is where it was; the camera still turns normally with the mouse.
+3. Walk to Murph's camp straight after joining and from far away. Good: the Talk prompt shows (E), pressing it opens his dialogue; walk far off and come back, it still works.
+4. Walk to Old Hank at the Land Office from far away. Good: his Talk prompt appears at once.
+5. Rejoin a save that already finished stage S1: still no analytics error (Stage S2 and later send their number as the level; in Studio the analytics service may say nothing at all, which is fine).
+
+Phone (667x375)
+6. Same as 1 to 4 with taps: Settings has no Camera speed row, the Talk prompt is tappable and at least 44 px, dragging with a thumb turns the camera as before.
+
+Xbox (controller)
+7. Same as 1 to 4: Settings has no Camera speed row, the right stick turns the camera as before, X talks to Murph and Old Hank, B closes the dialogue.
+
+Fallback (only if Murph's prompt is slow)
+8. If the log says "Murph's Talk prompt never streamed in", Murph's card must also show "I'm at my camp by the fire. Follow the amber arrow..." (it appears after 15 s). Tell Claude: that means the model did not stream in even as Persistent.
+## First screen UI fix (branch `phase-2/fix-first-screen-ui`, 11 October 2026)
+
+What and why are in STATUS.md. Rules: `Shared/JoinPickLogic` (`AutoPick`, `TutorialWaits`, `HintHidden`), `Shared/SaveSlotLogic` (`Panel`, `Layout`), `HudLayout` (`MarkTextLeft`, `ClearOfRects`), `HudRules.BadgesButton`, `Shared/TextAnchor.Probes`. Composites (not Studio screenshots) are in `previews/fix-first-screen/`.
+
+### Studio checks
+
+PC (963x478 window, keyboard and mouse)
+1. New profile with no save (or a profile with one played save): join. Good: no Saves panel at all, you load straight into the world, the tutorial card says "Chop down a tree", and the hint bar shows. A profile with a plot goes straight to the pad picker.
+2. A profile with two or three played saves: join. Good: the Saves panel opens alone (no tutorial card, no hint bar, no beacon behind it), the three cards sit right under the one-line note with no empty gap, every PLAY button is visible without scrolling, the panel is not taller than the window. Press PLAY on Save 2: the world loads, then the tutorial card and hint bar appear.
+3. Press SAVES in the world: the panel opens with the Unload base / Save now row, the hint bar hides while it is open, and the cards scroll if the window is short. Esc closes it and the hint comes back.
+4. First screen after the pick: BADGES is not in the left column while the tutorial runs (it shows again after the tutorial); the tutorial card has no empty outlined circle (Murph's portrait appears once he streams in); if an empty outlined box is still there, send a screenshot (it may be Roblox's chat window).
+5. Look at SAVES and BUILD: the label starts to the right of the icon and no letter is under it.
+6. Walk so the beacon ("20 studs") would be behind the SAVES button: it slides left of the button or hides; it is never cut off.
+7. SELL LOGS over the sell station: solid, with a cream rim, readable against the forest.
+8. Walk past Old Bram by the shop (he paces x -17, z 50 to 66): his name tag is whole or hidden, never half cut by the wall.
+
+Phone (667x375)
+9. Same joins as checks 1 and 2 with taps: PLAY is at least 44 px tall, three cards fit, nothing is under the jump button, the hint bar is gone while the picker is up. The BADGES button is hidden during the tutorial.
+10. MENU, then SAVES: the panel opens, the hint hides, the list scrolls with a finger.
+
+Xbox (controller)
+11. Join with two played saves: the gold selection ring starts on a PLAY button, D-pad up and down moves between the three, A plays it, B does nothing on the join picker (there is no way out but a choice) and closes the SAVES panel when opened later.
+
+## Grab on the right trigger (Xbox)
+
+Supersedes the RB grab in "No ButtonR2 (Xbox remap)". The grab is the right trigger again, read only with empty hands; RB is select, wire pick and push only. See STATUS.md "Grab on the right trigger".
+
+Studio checks (Xbox; PC and phone unchanged):
+1. Axe equipped, RT on a tree: chops as before, held RT repeats at cooldown. No grab, no "put your axe away" toast.
+2. Axe put away (hands empty), aim the dot at a loose log, hold RT: it lifts. D-pad up/down move it, D-pad left/right turn it, LT + left stick tips it; release RT drops it. The hint reads "Hold RT on wood to drag it".
+3. Equip the axe while holding a log: the log drops as before; RT then swings, it does not re-grab.
+4. Placer up (BUILD blueprint): RT does not grab; A places, RB/LB slide.
+5. Empty hands, BUILD, dot on a placed piece, RB: still selects it (RB is not the grab).
+6. Wire tool: RB still picks, X cuts, B leaves.
+7. Tutorial: Murph's drag step says "hold RT on a log".
+8. Chop with a Keen axe still follows the cooldown (RT chop path unchanged).

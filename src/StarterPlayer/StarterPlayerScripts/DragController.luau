@@ -15,11 +15,12 @@
 --     ContextActionService action under the thumbstick's, and never in the
 --     thumbstick's corner). Move it to drag; lift it to drop. While holding,
 --     a row of buttons (- + Turn Tip) works with another finger.
---   * Gamepad: hold RB to grab what the centre dot points at; let go to
+--   * Gamepad: hold RT (empty hands; with an axe out RT swings it) to grab
+--     what the centre dot points at; let go to
 --     drop. While holding: D-pad up/down (or LB, nearer) push and pull, D-pad
 --     left/right turn, and hold L2 to hang the piece in the air and turn it
 --     with the LEFT (movement) stick (left/right spins it, up/down tips it)
---     without letting go of RB; the right stick keeps the camera. While L2
+--     without letting go of RT; the right stick keeps the camera. While L2
 --     is down the left stick does not walk you (it is sunk, and the
 --     humanoid is held still), and the lock lets go the instant L2 is up,
 --     the piece is dropped, a menu opens or the window loses focus
@@ -1022,11 +1023,18 @@ function DragController.Start()
 	watchTag(SHOP_TAG)
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		-- RB (the pad's grab; RT is the axe's and is never read here) is no
-		-- button's click: a bound action (the builder's select) marks it
-		-- handled even when it passes it on. Only a menu with the pad
+		-- The pad's grab is the right trigger, READ here and never bound (a
+		-- bind would sink it and the axe could not swing). With a tool in
+		-- hand the same trigger is the swing, Tool.Activated's, so it is
+		-- ignored then; only empty hands grab. Only a menu with the pad
 		-- selection keeps it.
-		local trigger = input.KeyCode == Enum.KeyCode.ButtonR1
+		local trigger = input.KeyCode == GrabLogic.PadGrabKey
+		if trigger then
+			local char = player.Character
+			if char == nil or not GrabLogic.PadGrabAllowed(toolOut(char), BlueprintPlacer.Active()) then
+				return
+			end
+		end
 		if
 			not GrabLogic.PadPressAccepted(
 				processed,
@@ -1039,7 +1047,7 @@ function DragController.Start()
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			grab("mouse", nil)
-		elseif input.KeyCode == Enum.KeyCode.ButtonR1 then
+		elseif trigger then
 			grab("pad", nil)
 		end
 	end)
@@ -1050,7 +1058,7 @@ function DragController.Start()
 		end
 		if
 			(input.UserInputType == Enum.UserInputType.MouseButton1 and h.device == "mouse")
-			or (input.KeyCode == Enum.KeyCode.ButtonR1 and h.device == "pad")
+			or (input.KeyCode == GrabLogic.PadGrabKey and h.device == "pad")
 		then
 			drop(true)
 		end

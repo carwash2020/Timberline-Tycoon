@@ -196,12 +196,28 @@ print(
 		.. " studs"
 )
 
+-- Staged (server audit, 11 October 2026): the whole terrain took 30 to 55 s and
+-- the first player waited for all of it. Now the chunks round the town are
+-- written here (the "terrain" gate) and the rest follows in the background
+-- after the world gate, the plot pads' ground first (terrainFinish below).
+local terrainFinish: (() -> number)? = nil
 step("3. Terrain", function()
-	terrainSeconds = TerrainBuilder.Build(function(done: number, total: number)
+	local seconds, finish = TerrainBuilder.Build(function(done: number, total: number)
 		if done % 24 == 0 or done == total then
 			print(string.format("[MapBuilder] Terrain %d/%d", done, total))
 		end
-	end)
+	end, {
+		nearRadius = TerrainBuilder.NearRadius,
+		firstSpots = PlotData.Slots,
+		sliceSeconds = function(): number
+			-- Nobody is in yet: take more of each frame. Once a player can play, the same share as the forest.
+			return if LoadState.Gates.IsReady("firstPlayer")
+				then TerrainBuilder.BackgroundSliceSeconds
+				else TerrainBuilder.SliceSeconds
+		end,
+	})
+	terrainSeconds = seconds
+	terrainFinish = finish
 end)
 LoadState.Gates.Set("terrain")
 LoadState.Stage("terrain")
@@ -1459,6 +1475,28 @@ sellArea.Parent = map
 print(string.format("[MapBuilder] World built in %.1fs (terrain %.1fs)", builtSeconds, terrainSeconds))
 print("[MapBuilder] meshes after the build: " .. MeshKit.Report())
 loadLine(string.format("world ready for players (terrain %.1fs); the forest plants next", terrainSeconds))
+
+-- The rest of the terrain (the chunks past the town), a block a frame, the
+-- plot pads' ground first. "terrainFull" opens when it and the caves are in.
+if terrainFinish then
+	local finishTerrain = terrainFinish
+	terrainFinish = nil
+	LoadState.Track("terrain")
+	task.spawn(function()
+		local ok, result = xpcall(finishTerrain, traceback)
+		if ok then
+			loadLine(string.format("the rest of the terrain is written (%.1fs in the background)", result :: number))
+		else
+			failedSteps += 1
+			workspace:SetAttribute("MapBuildFailures", failedSteps)
+			warn(string.format("[MapBuilder] the rest of the terrain failed:\n%s", tostring(result)))
+		end
+		LoadState.Gates.Set("terrainFull")
+		LoadState.Finish("terrain")
+	end)
+else
+	LoadState.Gates.Set("terrainFull")
+end
 
 -- The forest, now the players can come in: planned, then planted a frame's
 -- worth at a time, nearest the sawmill first. The night-only woods are

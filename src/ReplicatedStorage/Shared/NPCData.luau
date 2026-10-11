@@ -83,6 +83,7 @@ export type NPC = {
 	promptLift: number?, -- Talk's UIOffset Y, so it sits above a shop or pad prompt
 	shop: string?, -- a counter keeper's shop id (ShopHoursLogic). Nil for everyone else.
 	tutorialQuiet: boolean?, -- QuestUI owns Murph's Talk (his tutorial line and tips open the same dialogue box)
+	persistent: boolean?, -- the tutorial depends on them (Murph, Old Hank): ModelStreamingMode Persistent, never streamed out, so the Talk prompt is always there
 	tips: { string }?, -- onboarding, the first time a new player meets them
 	greetings: { string },
 	lines: { string },
@@ -115,6 +116,7 @@ NPCData.List = {
 		idle = "sip",
 		work = "chop",
 		tutorialQuiet = true,
+		persistent = true,
 		promptLift = 0,
 		tips = {
 			"I'm Murph. Chop a tree, haul the wood, sell it at the mill.",
@@ -795,6 +797,7 @@ NPCData.List = {
 		-- sleeps. His Talk prompt opens the plot purchase (PlotService
 		-- hooks it); what he sells, and his price talk, is PlotSalesmanData.
 		id = PlotSalesmanData.Id,
+		persistent = true,
 		name = PlotSalesmanData.Name,
 		role = PlotSalesmanData.Role,
 		spot = {

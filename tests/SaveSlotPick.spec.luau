@@ -58,9 +58,14 @@ return function(t)
 				return onBase[player] == true
 			end,
 		})
-		local function newPlayer(userId)
+		-- `saves` played saves (default 2: the picker only opens for two or more;
+		-- one or none loads straight in, JoinPickLogic.AutoPick).
+		local function newPlayer(userId, saves)
 			local data = Util.deepCopy(Schema.Template)
 			Schema.Migrate(data)
+			for index = 1, (saves or 2) do
+				data.slots[index] = { lastPlayed = 100 + index, fresh = false }
+			end
 			local who = { UserId = userId, Name = "P" .. userId, attrs = {} }
 			function who:SetAttribute(key, value)
 				self.attrs[key] = value
@@ -95,6 +100,46 @@ return function(t)
 		-- JoinSync sends the slots again: still one pick, not a second.
 		h.Service.PlayerJoined(who)
 		t.eq(who.attrs.SlotPick, true)
+	end)
+
+	t.test("a brand new profile (no played save) loads straight in: no picker, the plot is asked at once", function()
+		local h = boot()
+		local who, data = h.newPlayer(1, 0)
+		h.Service.PlayerJoined(who)
+		t.eq(who.attrs.SlotPick, nil, "no picker was ever raised")
+		t.eq(h.Service.IsPicking(who), false)
+		t.eq(h.order, { "chosen" }, "the pad question and nothing else")
+		t.eq(data.activeSlot, 1)
+		h.Service.PlayerJoined(who)
+		t.eq(h.order, { "chosen" }, "a JoinSync resend does not ask again")
+	end)
+
+	t.test("a single played save, the one last played, loads straight in too", function()
+		local h = boot()
+		local who = h.newPlayer(1, 1)
+		h.Service.PlayerJoined(who)
+		t.eq(who.attrs.SlotPick, nil)
+		t.eq(h.order, { "chosen" })
+	end)
+
+	t.test(
+		"one played save that is NOT the last-played slot still shows the picker (a swap spends the cooldown)",
+		function()
+			local h = boot()
+			local who, data = h.newPlayer(1, 0)
+			data.slots[2] = { lastPlayed = 50, fresh = false }
+			h.Service.PlayerJoined(who)
+			t.eq(who.attrs.SlotPick, true)
+			t.eq(#h.order, 0)
+		end
+	)
+
+	t.test("two played saves: the picker opens and nothing is chosen for the player", function()
+		local h = boot()
+		local who = h.newPlayer(1, 2)
+		h.Service.PlayerJoined(who)
+		t.eq(who.attrs.SlotPick, true)
+		t.eq(#h.order, 0)
 	end)
 
 	t.test("playing the last-played save changes nothing and asks its plot for a pad", function()

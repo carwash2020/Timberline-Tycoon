@@ -22,6 +22,55 @@ key (deriving it from a full plot is awaiting Connor, it would raise cash packs 
 pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
 the old ones), no Robux price in code.
 
+## Server audit: game-breaking and long-loading bugs (branch `phase-2/fix-server-audit`, 11 October 2026, draft PR)
+
+Goal: a new player playable within about 15 s of joining. Traced the server boot and a new player's first 60 seconds end to
+end; measured the pure build code in Lune. Full findings (severity, file:line, evidence, status): PHASE2_NOTES.md "Server
+audit". Fixed here:
+
+- **Long load: the terrain.** The "terrain" gate sat behind all 100 chunks (about 0.54 s a chunk in Lune, 54 s; most of the
+  wait for a first player). `TerrainBuilder.Build` now takes `{ nearRadius, firstSpots, sliceSeconds }`: the chunks touching a
+  230-stud disc round the sawmill block (the spawn, shops, sell area, Murph, the tutorial grove), the rest comes back as
+  `finish`, which MapBuilder runs after the world gate in 16-column blocks (about 1/16 of a chunk, one a frame), the
+  plot pads' ground first, then outward, the caves last. New gate `terrainFull`; `LoadState.Track("terrain")` keeps "fully
+  built" honest. `TerrainGen.WaterLevelFor(x, z, h)` stops `WaterLevelAt` recomputing the height the builder already has
+  (about a third of the time of writing the terrain).
+- **Long load: the save.** GameServer connected PlayerAdded only after the world and every service, so the DataStore
+  load began then. `ProfileService.Prefetch` (PlayerAdded at the top of GameServer) starts it on arrival; `LoadProfile`
+  picks it up; `PrefetchLeft` releases the session of a player who left before the join flow had it.
+- **Plots lookups.** `SkyForgeService` and `MiningService` looked for `Workspace/Plots`; PlotService builds
+  `TimberlineMap/Plots`. Trophies never appeared, mining never found a plot, and a thread waited 120 s.
+- Not done, in other lanes or too risky for today: see the PHASE2_NOTES list (BaseBoot's 60 s wait for Remotes is the
+  fix-load-meshes lane; the town settle at the start of the terrain, about 4 s, is left alone).
+
+## First screen UI fix (branch `phase-2/fix-first-screen-ui`, 11 October 2026, draft PR)
+
+Connor's bug report PART B items 10 and 11 (PC window 963x478, phone 667x375, Xbox). Nothing seen in Studio yet; the
+previews are composites (the engine viewer cannot draw UI): `previews/fix-first-screen/` (`before-*`, `after-*`,
+`closeup-*`, `markers-sell-logs.png`, made by `python3 tools/preview/first_screen_ui.py`). Studio checks: PHASE2_NOTES.md
+"First screen UI fix".
+
+- **Join flow.** The save picker only opens when two or more saves have been played (`JoinPickLogic.AutoPick`); a brand
+  new profile or a single save loads straight in (`SaveSlotService.PlayerJoined` plays it and asks for its pad). One played
+  save that is not the last-played slot still shows the picker (a swap would spend the 120 s cooldown). The tutorial
+  (tracker, Murph's card, the beacon) waits for the pick (`JoinPickLogic.TutorialWaits`, `QuestUI`).
+- **Saves panel layout.** `SaveSlotLogic.Layout` / `Panel`: the panel is as tall as its cards, never taller than the screen;
+  while joining there is no Unload base / Save now row, so the cards sit right under the note (no empty gap); a card is one
+  94 px block (name and a 44 px PLAY side by side, facts under them) so all three fit on 963x478 and 667x375, and the list
+  scrolls on a window too short for the SAVES panel's extra row.
+- **Hint bar.** The bottom row (hint and load chip) hides while the picker is up and while the SAVES panel is open
+  (`HUD.HoldHint`, `JoinPickLogic.HintHidden`).
+- **HUD overlap.** BADGES waits for the end of the tutorial (`HudRules.BadgesButton`); Murph's portrait circle stays hidden
+  until his head is in it; side buttons with a mark start their label after the mark and left-aligned
+  (`HudLayout.MarkTextLeft`); the tutorial beacon slides clear of HUD boxes or hides (`HudLayout.ClearOfRects`,
+  `HUD.Obstacles`) instead of being cut off behind SAVES; the town markers have a cream rim (SELL LOGS was a dark blob
+  on dark forest); an NPC's name tag hides whole if any of its ends or its top is behind a wall (`TextAnchor.Probes`).
+- **Not found / not reproduced.** The "S behind the icon" and the "empty outlined box" could not be traced to one cause by
+  reading the code (the old label math put the text clear of the mark at 110 px); the box may be Roblox's own chat window.
+  Studio checks 7 and 9 ask Connor to confirm or send a screenshot.
+- **Awaiting Connor** (defaults used): picker only with 2+ played saves; the tutorial text starts after the pick; BADGES
+  hidden while the tutorial runs.
+
 ## V1 hardening: exploit guards and performance (branch `phase-2/v1-hardening-guards`, 11 October 2026, draft PR)
 
 Launch items 2 and 3. Audit first, then only what was missing.
@@ -61,7 +110,7 @@ Items 5, 6 and 8 of the hardening list. The audit came first; only what was miss
 
 | Piece | Found on main | Added or fixed here |
 | --- | --- | --- |
-| Settings card, music and sound volume, graphics (Lower / Higher via `QualityProfile`), camera shake, UI scale, tips, Restart save, What's new, controller and touch handling | all there (`SettingsLogic`, `SettingsUI`, `QualityService`) | Camera speed row (`cameraSensitivity`, 25% to 200%, saved in `settings`, server-clamped), a CODES tab, the four tabs on one row, the card cut to end above the jump button on a phone |
+| Settings card, music and sound volume, graphics (Lower / Higher via `QualityProfile`), camera shake, UI scale, tips, Restart save, What's new, controller and touch handling | all there (`SettingsLogic`, `SettingsUI`, `QualityService`) | a CODES tab (the Camera speed row was dropped on 11 October, see Startup errors below), the four tabs on one row, the card cut to end above the jump button on a phone |
 | Tutorial replay | "RESET TUTORIAL" two-press row + `QuestService.Reset` | Renamed REPLAY TUTORIAL. **Bug fixed:** a replay paid every step's `rewardCash` again; now `tutorialReplay` pays nothing (spec) |
 | Save fields | `settings` table sanitised in `ProfileSchema.Migrate` | no new field: the new setting is a key in `settings` (idempotent, specced); flags for funnel, codes and the reminder live in the existing account-wide `onboarding` table |
 | Funnel analytics | `MilestoneService` funnel (Joined, First chop, First sale, Claimed a plot, ...) once per player, `LogProgressionCompleteEvent` stages | `GameAnalytics` wrapper (pcall, once-ever flags), `First machine placed` step (appended: number 13), `Shared/AnalyticsEvents` (pure names, sku and amount checks) |
@@ -73,7 +122,7 @@ Items 5, 6 and 8 of the hardening list. The audit came first; only what was miss
 
 - **Codes.** Rewards are cash (through `EconomyService.AddCash`, so the wallet cap clamps it; a full wallet refuses without using the code) or a free crafted furniture piece (`PlotService.GrantPiece`). `CodeLogic.ValidReward` refuses any other shape, so a Robux or paid reward cannot exist. One use per player ever: `onboarding["Code:<id>"]`. Expiry is a UTC date, good through 23:59:59 UTC, compared on the server's clock; an unreadable date counts as expired. Six wrong codes in a minute lock the box for 30 s; the remote is rate limited at one a second. `CodeData` lives under ServerScriptService on purpose (nothing in ReplicatedStorage reaches a client). It ships with only `PLACEHOLDER-DISABLED` (disabled): **no real codes exist yet.**
 - **Favorite reminder.** Roblox has no API that favorites an experience (`AvatarEditorService:PromptSetFavorite` is for avatar assets, `SocialService` only prompts invites), so it is a toast pointing at the star on the game's page.
-- **Camera speed.** Written to `UserGameSettings.MouseSensitivity` and `GamepadCameraSensitivity` (each guarded, the device's own value read once). Phone touch camera uses the engine's own speed; Studio check 3 in PHASE2_NOTES finds out whether the engine honours it.
+- **Camera speed (dropped).** It wrote the player's own game settings, which scripts may not do ("Insufficient permissions", repeated). We run Roblox's default camera, which has no supported hook to scale its input, so the row is hidden and the `settings.cameraSensitivity` save field stays, harmless (default 1, still sanitized). `NoUserGameSettingsWrites.spec` fails if any source names those engine properties.
 - Previews (composites of the UITheme layout, not engine shots; made by `python3 tools/preview/v1h_settings.py`): `previews/v1-hardening/settings-{game,scrolled,bottom,codes}-{667x375,1920x1080}.png`.
 - Studio checks: PHASE2_NOTES.md "V1 launch hardening".
 
@@ -108,7 +157,7 @@ Connor's instruction: remove every use of `Enum.KeyCode.ButtonR2` and move Xbox 
 | Grab / drag wood and boxes (DragController) | empty hands, held | RT (InputBegan read) | RB, held (`ButtonR1`) | RB was "further" while holding; that stays on D-pad up (D-pad down and LB are nearer). X would clash with world prompts (Interact/Talk/Buy), so not X. |
 | Place a blueprint (InputKit target table) | placer | RT (table only) | A (`ButtonA`) | The real binding was already A (`PlaceControlsLogic`); the table now says what the game does. RB stays Push there. |
 
-- Hints now say RB for these: wiring bar "RB pick · X cut · B done", `{grab}` is "hold RB", the drag line "Hold RB on wood to drag it", the holding line "LT + left stick: turn · D-pad: reach". RT stays in the chop hint and `{click}` ("RT to swing", "press RT"): that is the tool's own button.
+- Hints now say RB for these: wiring bar "RB pick · X cut · B done", `{grab}` was "hold RB" and the drag line "Hold RB on wood to drag it" (both now RT, see "Grab on the right trigger"), the holding line "LT + left stick: turn · D-pad: reach". RT stays in the chop hint and `{click}` ("RT to swing", "press RT"): that is the tool's own button.
 - PC and phone inputs are unchanged.
 - Studio checks: PHASE2_NOTES.md "No ButtonR2 (Xbox remap)".
 
@@ -593,3 +642,15 @@ Landed after the first push:
 
 The five NPC GLBs (`assets/glb/backlog/npcs/<Name>/<Name>.glb`, from `phase-2/v1-glb-sources`) are in, and `previews/v1-e/real-mesh-*.png` are rendered with the real meshes (front = the dialogue pose facing the player, side, back; Rook at the mill pad facing the road; Murph beside them as a Studio-verified calibration figure). Tooling: `python3 tools/preview/npc_preview_meshes.py` writes `preview/npc-meshes.json` from the `TownModels` rows, then `PREVIEW_MESHES=preview/npc-meshes.json bash tools/preview/shoot.sh v1-e-npcs`. The viewer gained an opt-in manifest key `turn` (degrees): the GLBs' front is -Z and the game's import turns them a half turn (`TownModels.NpcMeshYaw`), so the NPC preview entries carry `turn: 180`; without it every NPC (Murph included) renders backwards.
 Findings: every piece id, name and size in the five `TownModels` rows matches its GLB node (bounding boxes within 0.02) and has a `MeshTemplates` file; all five stand upright on their ground, face the player, hold their props (lanterns for the Hermit and Cap'n Moss, a pen for Old Tolly, none for Hank, a hand tool for Rook); no floating, sinking, clipping or mis-scaling seen, so no wiring change was needed. The part-built `foreman-layout-*-PART-BUILT.png` stay as the labelled fallback shots. Landmarks (booth, dock, cave, Land Office) are not built in this scene: each NPC stands on a grass patch at the real spot's height.
+
+## Startup errors (branch `phase-2/fix-startup-errors`, 11 October 2026)
+
+From Connor's Studio log:
+- **Analytics progression.** `LogProgressionCompleteEvent` takes `(player, path: string, level: number, levelName: string?)`; we passed the stage name as the level, so Roblox failed with "Unable to cast string to int". `GameAnalytics.Progression(player, path, level, levelName)` now sends the stage number as the level and "S1" as its name; the Sky Charter steps (`SkyQuestService`) go through it too. Non-whole levels and non-int funnel steps are dropped before the call. Every call stays in a pcall. The funnel, custom and economy argument orders were checked against the API and were right. `AnalyticsEvents.spec` asserts the type of every argument of every event.
+- **Camera speed** dropped (above).
+- **Murph's Talk prompt.** NPCs the tutorial depends on (Murph, Old Hank) carry `persistent = true` in `NPCData`; `NPCService` sets ModelStreamingMode Persistent from it (Murph was already; Old Hank is new). `QuestUI` now waits for the prompt with a bounded `WaitForChild` (`QuestUI.TalkWait`, 15 s) and, on a miss, warns and shows a line in Murph's card telling the player to follow the arrow to his camp.
+- Studio checks: PHASE2_NOTES.md "Startup errors".
+
+## Grab on the right trigger (Xbox)
+
+Connor's call: the pad's grab goes back to the right trigger (RT), the same button as chop, because most players put the axe away to carry. The rule is still that no code BINDS the trigger. `DragController` READS it (an `InputBegan`, never a ContextActionService bind), and only with empty hands: `GrabLogic.PadGrabAllowed(toolOut, placing)` is false with a tool in hand (the engine fires `Tool.Activated` on RT, which is the swing, and the grab ignores it, so no toast and no grab) and false while the placer is up. RB no longer grabs: it stays the builder's select, the wire pick and the placer's push. The key is named once in the source, as `GrabLogic.PadGrabKey` (InputKit's key table and DragController read it from there). `tests/NoButtonR2.spec` fails on any other mention of the button, on a second use, and on any ContextActionService line that takes the key. Hints say RT now ("hold RT", "Hold RT on wood to drag it"). PC and phone are unchanged.

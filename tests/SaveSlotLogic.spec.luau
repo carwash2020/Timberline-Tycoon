@@ -630,4 +630,49 @@ return function(t)
 		t.eq(SaveSlotLogic.Perform(data, "load", 1, 9_000, Schema.Template, guidFactory(), world.hooks), true)
 		t.eq(data.plot.placed[1].uid, "x", "and it comes back with it, uid for uid")
 	end)
+
+	t.test("the save panel fits 963 x 478 and 667 x 375 (UIScale units), picker and SAVES button", function()
+		local Logic = t.shared("SaveSlotLogic")
+		local P = Logic.Panel
+		-- The screen's offsets at those windows: size / UITheme.ScaleFor (0.85 and 0.78 on a small window).
+		local windows = { { 963 / 0.85, (478 - 36) / 0.85 }, { 667 / 0.78125, (375 - 36) / 0.78125 } } -- less the top bar
+		for _, w in ipairs(windows) do
+			for _, picking in ipairs({ true, false }) do
+				local fit = Logic.Layout(w[1], w[2], picking, 3)
+				local where = string.format("%dx%d picking=%s", w[1], w[2], tostring(picking))
+				t.ok(fit.height <= w[2] - 2 * P.Margin, where .. ": the panel is shorter than the screen")
+				t.ok(fit.width <= w[1] - 2 * P.Margin, where .. ": and narrower")
+				t.ok(fit.rowsTop + fit.rowsHeight <= fit.height, where .. ": the rows stay inside the panel")
+				if picking then
+					t.eq(fit.scrolls, false, where .. ": all three saves are visible, PLAY on each")
+					t.eq(fit.controls, false, where .. ": no Unload / Save now row")
+					t.eq(
+						fit.rowsTop,
+						P.NoteTop + P.NoteHeight + 4,
+						where .. ": the cards sit right under the note, no empty gap"
+					)
+				else
+					t.eq(fit.controls, true)
+					t.ok(fit.rowsTop >= P.SavedTop + P.SavedHeight, where .. ": the cards start under the controls")
+				end
+				-- A card's PLAY / LOAD button is a fingertip and lies inside the card.
+				t.ok(P.ButtonH >= 44 and P.NameTop + P.ButtonH <= P.Card, where .. ": a 44 px button inside the card")
+				t.ok(P.DetailTop + P.DetailHeight <= P.Card, where .. ": the facts fit in the card")
+			end
+		end
+	end)
+
+	t.test("the picker's panel hugs its cards: no more height than they need", function()
+		local Logic = t.shared("SaveSlotLogic")
+		local P = Logic.Panel
+		local roomy = Logic.Layout(1400, 900, true, 3)
+		t.eq(roomy.height, roomy.rowsTop + 3 * P.Card + 2 * P.CardGap + P.Pad)
+		t.eq(roomy.scrolls, false)
+		-- A window too short for the SAVES panel's rows scrolls them; the panel never grows past the screen.
+		local short = Logic.Layout(700, 300, false, 3)
+		t.eq(short.scrolls, true)
+		t.ok(short.height <= 300 - 2 * P.Margin or short.height == short.rowsTop + P.Card + P.Pad)
+		-- Narrow screens narrow the panel.
+		t.eq(Logic.Layout(300, 500, true, 3).width, 300 - 2 * P.Margin)
+	end)
 end
