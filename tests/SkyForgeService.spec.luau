@@ -102,7 +102,7 @@ return function(t)
 			globals = {
 				task = { spawn = function() end },
 				workspace = {
-					FindFirstChild = function()
+					FindFirstChild = opts.findFirstChild or function()
 						return nil -- no plots here: the trophy step is skipped
 					end,
 				},
@@ -155,6 +155,39 @@ return function(t)
 			distance = 3,
 		}
 	end
+
+	t.test("the owner's plot is found where PlotService builds it: TimberlineMap/Plots", function()
+		local asked = {}
+		local plot = {
+			IsA = function(_, kind)
+				return kind == "Model"
+			end,
+			GetAttribute = function(_, key)
+				return if key == "OwnerId" then 7 else nil
+			end,
+			FindFirstChild = function(_, name)
+				table.insert(asked, name)
+				return nil
+			end,
+		}
+		local plots = {
+			GetChildren = function()
+				return { plot }
+			end,
+		}
+		local map = {
+			FindFirstChild = function(_, name)
+				return if name == "Plots" then plots else nil
+			end,
+		}
+		local w = setup({
+			findFirstChild = function(_, name)
+				return if name == "TimberlineMap" then map else nil -- (there is no Workspace/Plots)
+			end,
+		})
+		w.S.BuildTrophies(w.player)
+		t.ok(table.find(asked, "SignPost") ~= nil, "the trophy step reached the plot (it looked for the sign post)")
+	end)
 
 	t.test("tempering charges the exact cost and stamps the grade; nothing else moves", function()
 		local w = setup({ shards = 20, pieces = { piece("g1", "phantomwood", 20), piece("g2", "phantomwood", 15) } })

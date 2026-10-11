@@ -97,7 +97,12 @@ return function(t)
 				BuildingArt = buildingArt,
 				WorldPlan = worldPlan,
 				TerrainBuilder = {
-					Build = options.terrain or function(onProgress)
+					NearRadius = 230,
+					SliceSeconds = 0.03,
+					BackgroundSliceSeconds = 0.012,
+					Build = options.terrain and function(onProgress, buildOptions)
+						return options.terrain(onProgress, buildOptions, s)
+					end or function(onProgress)
 						onProgress(24, 24)
 						return 1.25
 					end,
@@ -1133,5 +1138,55 @@ return function(t)
 		t.ok(s.map:FindFirstChild("Boulders"), "the boulders still built")
 		t.ok(s.map:FindFirstChild("Scenery"), "the scenery still built")
 		t.ok(s.map:FindFirstChild("Backdrop"), "the backdrop still built")
+	end)
+
+	-- Server audit (11 October 2026): the terrain is staged. Build returns once the
+	-- chunks round the town are written and hands back the rest; the world gate
+	-- (and so the first player) no longer waits for it.
+	t.test("the rest of the terrain is written after SellArea goes in, not before", function()
+		local finished = { n = 0 }
+		local s = build({
+			terrain = function(_onProgress, options, state)
+				t.ok(type(options) == "table" and type(options.nearRadius) == "number", "the build is staged")
+				t.ok(type(options.firstSpots) == "table" and #options.firstSpots > 0, "the pad ground goes first")
+				return 2,
+					function()
+						finished.n += 1
+						finished.sellAreaIn = state.sellAreaIn()
+						return 7
+					end
+			end,
+		})
+		t.eq(s.warnings, {})
+		lastStepsRan(s)
+		t.eq(finished.n, 1, "the second stage ran once")
+		t.eq(finished.sellAreaIn, true, "after the world gate, so the first player is not held for it")
+		local line = builtLine(s)
+		t.ok(
+			line ~= nil and string.find(line, "terrain 2.0s", 1, true) ~= nil,
+			"the world line counts the near stage: " .. tostring(line)
+		)
+		local said = false
+		for _, p in ipairs(s.prints) do
+			if string.find(p, "the rest of the terrain is written", 1, true) then
+				said = true
+			end
+		end
+		t.ok(said, "a [Load] line says the rest is in")
+		t.eq(s.workspace:GetAttribute("MapBuildFailures"), 0)
+	end)
+
+	t.test("a failing second terrain stage is one counted failure; SellArea and spawning are untouched", function()
+		local s = build({
+			terrain = function()
+				return 2, function()
+					error("a bad chunk")
+				end
+			end,
+		})
+		t.eq(#s.warnings, 1)
+		t.ok(string.find(s.warnings[1], "the rest of the terrain failed", 1, true), s.warnings[1])
+		lastStepsRan(s)
+		t.eq(s.workspace:GetAttribute("MapBuildFailures"), 1)
 	end)
 end
