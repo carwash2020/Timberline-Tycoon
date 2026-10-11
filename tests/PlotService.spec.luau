@@ -156,6 +156,7 @@ return function(t)
 					GetProfile = function(player)
 						return profiles[player]
 					end,
+					Save = function() end,
 				},
 				RateLimiter = {
 					Allow = function()
@@ -271,6 +272,7 @@ return function(t)
 			"SellPlaced",
 			"UpgradePlot",
 			"VisitPlot",
+			"PlotModerate",
 			"WorldFX",
 			"PlotShown",
 			"BaseAction",
@@ -3165,5 +3167,185 @@ return function(t)
 		limited.P.Place(dan, "Wall4", 4, 4, 0)
 		limited.P.PaintAllType(dan, "Wall4", "tan")
 		t.eq(dprofile.plot.placed[1], nil, "a rate-limited player cannot even place")
+	end)
+
+	-- Plot moderation: kick and ban from your own plot, owner only, server
+	-- validated. A ban is saved in the slot's permissions.
+	-- The eject spot: just north of the yard (as the visit-off sweep above).
+	local function ejected(s, p, i)
+		local c = s.PlotData.Slots[i]
+		return p.root.Position.X == c.X and p.root.Position.Z == c.Y + 48
+	end
+
+	local function away(p)
+		p.standOn(nil)
+	end
+
+	t.test("kick: the owner sends a visitor off the plot; they can't walk back for a while; both are told", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		bob.standOn(1)
+		t.ok(s.P.Moderate(ann, "kick", 2))
+		t.ok(ejected(s, bob, 1), "bob is off the yard")
+		local told = {}
+		for _, m in ipairs(s.toasts) do
+			told[m] = true
+		end
+		t.ok(told["Sent Bob off your plot. They can't come back for 2 minutes."], "the owner is told")
+		t.ok(told["Ann sent you off their plot. You can try again in 2 minutes."], "the visitor is told")
+		t.eq(profile.permissions["2"], nil, "a kick saves nothing")
+		-- He tries to return by the Settings list, and by walking.
+		t.eq(s.P.Visit(bob, 1), false)
+		t.eq(s.lastToast(), "Ann sent you off their plot a moment ago. Try again later.")
+		bob.standOn(1)
+		s.P.VisitStep({ ann, bob })
+		t.ok(ejected(s, bob, 1), "the sweep puts him off again")
+		-- Two minutes later he may.
+		s.advance(121)
+		t.ok(s.P.Visit(bob, 1))
+	end)
+
+	t.test("kick needs them to be on your plot, and only an owner with a plot can kick", function()
+		local s = setup()
+		local ann = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		local cat = s.newPlayer(3, "Cat")
+		s.claim(ann, 1)
+		away(bob)
+		t.eq(s.P.Moderate(ann, "kick", 2), false)
+		t.eq(s.lastToast(), "They aren't on your plot right now.")
+		bob.standOn(1)
+		t.eq(s.P.Moderate(cat, "kick", 2), false, "Cat has no plot")
+		t.eq(s.lastToast(), "You need a plot to do that.")
+		t.ok(onPlot(s, bob.root.Position, 1), "bob was not moved by a stranger")
+		t.eq(s.P.Moderate(ann, "kick", 1), false, "not yourself")
+		t.eq(s.lastToast(), "That's you.")
+		for _, junk in ipairs({ "2", -1, 0, 1.5, 0 / 0, math.huge, {}, true }) do
+			t.eq(s.P.Moderate(ann, "kick", junk), false, tostring(junk))
+		end
+		for _, junk in ipairs({ "nuke", 1, {}, true }) do
+			t.eq(s.P.Moderate(ann, junk, 2), false, tostring(junk))
+		end
+	end)
+
+	t.test("kicking is rate limited by the RateLimiter", function()
+		local s = setup({ rate = false })
+		local ann = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		bob.standOn(1)
+		t.eq(s.P.Moderate(ann, "kick", 2), false)
+		t.ok(onPlot(s, bob.root.Position, 1), "nothing happened")
+	end)
+
+	t.test("ban: saved on the slot, the visitor is put off, and visit, build and doors all refuse them", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		profile.permissions = { anyone = { build = true, interact = true, visit = true } }
+		bob.standOn(1)
+		t.ok(s.P.Moderate(ann, "ban", 2))
+		local Perm = t.shared("PermissionLogic")
+		t.ok(Perm.IsBanned(profile.permissions, 2), "saved in the slot's permissions")
+		t.eq(profile.permissions["2"].bannedName, "Bob")
+		t.ok(ejected(s, bob, 1), "off the plot at once")
+		local told = {}
+		for _, m in ipairs(s.toasts) do
+			told[m] = true
+		end
+		t.ok(told["Ann banned you from their plot. You can't visit or build there."], "the banned player is told")
+		t.ok(told["Banned Bob from your plot. Settings, Visitors lists your bans so you can undo it."])
+		-- Visit by the list or a teleport request.
+		t.eq(s.P.Visit(bob, 1), false)
+		t.eq(s.lastToast(), "Ann has banned you from their plot.")
+		-- The sweep keeps him off even though "anyone" may visit.
+		bob.standOn(1)
+		s.P.VisitStep({ ann, bob })
+		t.ok(ejected(s, bob, 1))
+		-- Even with "anyone: build", he can't build, and the shared rule says no to every flag.
+		bob.standOn(1)
+		s.P.Place(bob, "Bench", 20, 0, 0)
+		t.eq(#profile.plot.placed, 0, "a banned player can't place on the plot")
+		for _, flag in ipairs(Perm.Flags) do
+			t.eq(Perm.Allows(profile.permissions, 2, flag), false, flag)
+		end
+		local PlotLogic = t.shared("PlotLogic")
+		t.eq(PlotLogic.CanEdit(profile.permissions, 2, 1, "interact"), false, "doors need interact")
+		t.eq(bobProfile.cash, 100000, "nothing was spent")
+		-- Other visitors are unaffected.
+		local cat = s.newPlayer(3, "Cat")
+		cat.standOn(nil)
+		t.ok(s.P.Visit(cat, 1))
+	end)
+
+	t.test(
+		"a ban is in the saved permissions (it survives Migrate), the owner sees the list, and unban lifts it",
+		function()
+			local s = setup()
+			local ann, profile = s.newPlayer(1, "Ann")
+			local bob = s.newPlayer(2, "Bob")
+			s.claim(ann, 1)
+			t.ok(s.P.Moderate(ann, "ban", 2))
+			local Schema = t.loader():server("ProfileSchema")
+			local saved = t.shared("Util").deepCopy(profile)
+			Schema.Migrate(saved)
+			t.ok(t.shared("PermissionLogic").IsBanned(saved.permissions, 2), "Migrate keeps the ban")
+			t.eq(ann.attrs.PlotBans, "2:Bob", "the owner sees the list")
+			away(bob)
+			t.eq(s.P.Visit(bob, 1), false)
+			t.ok(s.P.Moderate(ann, "unban", 2))
+			t.eq(ann.attrs.PlotBans, "")
+			t.ok(s.P.Visit(bob, 1), "after an unban he may visit again")
+			t.eq(s.P.Moderate(ann, "unban", 2), false, "not banned any more")
+			t.eq(s.lastToast(), "They aren't banned from your plot.")
+		end
+	)
+
+	t.test("a player who is not in the server can be banned by id, and a toggle can't lift the ban", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		t.ok(s.P.Moderate(ann, "ban", 987654))
+		local Perm = t.shared("PermissionLogic")
+		t.ok(Perm.IsBanned(profile.permissions, 987654))
+		t.eq(Perm.Set(profile.permissions, "987654", "visit", true), false, "the Settings toggle can't lift a ban")
+		t.eq(s.P.Moderate(ann, "ban", 987654), false, "already banned")
+		t.eq(s.lastToast(), "They are already banned from your plot.")
+	end)
+
+	t.test("the game's owner can't be kicked or banned from a plot", function()
+		local s = setup()
+		local ann = s.newPlayer(1, "Ann")
+		local connor = s.newPlayer(5682024709, "Elucidhealer618")
+		s.claim(ann, 1)
+		connor.standOn(1)
+		t.eq(s.P.Moderate(ann, "kick", 5682024709), false)
+		t.eq(s.P.Moderate(ann, "ban", 5682024709), false)
+		t.eq(s.lastToast(), "You can't do that to the game's owner.")
+	end)
+
+	t.test("the ban list is capped and says so", function()
+		local s = setup()
+		local ann = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		local Perm = t.shared("PermissionLogic")
+		for i = 1, Perm.MaxBans do
+			t.ok(s.P.Moderate(ann, "ban", 1000 + i), tostring(i))
+		end
+		t.eq(s.P.Moderate(ann, "ban", 5000), false)
+		t.ok(string.find(s.lastToast(), "ban list is full", 1, true) ~= nil)
+	end)
+
+	t.test("the remote is bound and goes through the same checks", function()
+		local s = setup()
+		local ann = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		bob.standOn(1)
+		s.remotes.PlotModerate.OnServerEvent.fn(ann, "kick", 2)
+		t.ok(ejected(s, bob, 1))
 	end)
 end

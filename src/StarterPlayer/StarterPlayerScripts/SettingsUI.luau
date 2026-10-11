@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local LeaderboardLogic = require(ReplicatedStorage.Shared.LeaderboardLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
+local ModerationLogic = require(ReplicatedStorage.Shared.ModerationLogic)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local QualityProfile = require(ReplicatedStorage.Shared.QualityProfile)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
@@ -128,6 +129,7 @@ function SettingsUI.Start()
 	local restartArmedUntil = 0
 	local tabName = "game"
 	local visitorTarget = PermissionLogic.Anyone
+	local banArmed: string? = nil
 	local gameRows: { GuiObject } = {}
 
 	local function makeButton(
@@ -188,13 +190,26 @@ function SettingsUI.Start()
 				end
 			end
 		end
+		local banned: { [string]: boolean } = {}
+		for _, ban in ipairs(PermissionLogic.DecodeBans(player:GetAttribute("PlotBans"))) do
+			banned[tostring(ban.userId)] = true
+		end
+		for id in pairs(banned) do
+			seen[id] = true -- a banned person has no toggles: they are listed under BANNED
+		end
 		for key in pairs(permissions()) do
 			if not seen[key] and PermissionLogic.Target(key) == key then
 				seen[key] = true
 				table.insert(list, { id = key, label = "Player " .. key })
 			end
 		end
-		return list
+		local kept: { { id: string, label: string } } = {}
+		for _, entry in ipairs(list) do
+			if not banned[entry.id] then
+				table.insert(kept, entry)
+			end
+		end
+		return kept
 	end
 
 	-- Players here who own a plot and whose visit flag lets you in. Their
@@ -214,7 +229,10 @@ function SettingsUI.Start()
 		return PermissionLogic.VisitList(candidates, player.UserId)
 	end
 
-	local function rebuildVisitors()
+	local rebuildVisitors: () -> ()
+
+	rebuildVisitors = function()
+		banArmed = if banArmed == visitorTarget then banArmed else nil
 		for _, child in ipairs(visitors:GetChildren()) do
 			if child:IsA("GuiObject") then
 				child:Destroy()
@@ -274,19 +292,164 @@ function SettingsUI.Start()
 				end
 			)
 		end
+		-- Owner moderation: kick (sends them off for a few minutes) and ban
+		-- (saved; they can't visit or build). The server checks you own the
+		-- plot and that they are on it; this is only the intent.
+		local targetId = tonumber(visitorTarget)
+		if targetId then
+			local modHead =
+				UITheme.label(visitors, "THIS PLAYER, ON YOUR PLOT", F.Black, if tenFoot() then 18 else 14, C.Bark)
+			modHead.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+			makeButton(visitors, "Kick", "Kick from my plot", "skip", function()
+				Net.Remote("PlotModerate"):FireServer("kick", targetId)
+			end)
+			local armed = banArmed == visitorTarget
+			makeButton(
+				visitors,
+				"Ban",
+				if armed then "Tap again: ban from my plot" else "Ban from my plot",
+				if armed then "buy" else "skip",
+				function()
+					if banArmed == visitorTarget then
+						banArmed = nil
+						Net.Remote("PlotModerate"):FireServer("ban", targetId)
+					else
+						banArmed = visitorTarget
+						rebuildVisitors()
+					end
+				end
+			)
+		end
+		local bans = PermissionLogic.DecodeBans(player:GetAttribute("PlotBans"))
+		if #bans > 0 then
+			local banHead =
+				UITheme.label(visitors, "BANNED FROM YOUR PLOT", F.Black, if tenFoot() then 18 else 14, C.Bark)
+			banHead.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+			for _, ban in ipairs(bans) do
+				local who = ban
+				makeButton(visitors, "Unban" .. who.userId, "Unban " .. who.name, "skip", function()
+					Net.Remote("PlotModerate"):FireServer("unban", who.userId)
+				end)
+			end
+		end
+	end
+
+	-- Report a player: Roblox's own report (Players:ReportAbuse) for one
+	-- person in this server. The tab is hidden where the call does not exist
+	-- and while nobody else is here, never shown dead. The game keeps nothing
+	-- of what is reported.
+	local reportPanel = Instance.new("Frame")
+	reportPanel.Name = "Report"
+	reportPanel.BackgroundTransparency = 1
+	reportPanel.Size = UDim2.fromScale(1, 0)
+	reportPanel.AutomaticSize = Enum.AutomaticSize.Y
+	reportPanel.Visible = false
+	reportPanel.LayoutOrder = 60
+	UITheme.list(reportPanel, 6)
+	reportPanel.Parent = scroll
+	local reportTab: UITheme.Button
+	local reportTarget: Player? = nil
+	local reportNote: string? = nil
+
+	local function reportApi(): boolean
+		local ok, has = pcall(function()
+			return type((Players :: any).ReportAbuse) == "function"
+		end)
+		return ok and has == true
+	end
+
+	local function reportShown(): boolean
+		return ModerationLogic.ReportShown(reportApi(), #Players:GetPlayers() - 1)
+	end
+
+	local function nameOf(other: Player): string
+		return if other.DisplayName ~= "" then other.DisplayName else other.Name
+	end
+
+	local function rebuildReport()
+		for _, child in ipairs(reportPanel:GetChildren()) do
+			if child:IsA("GuiObject") then
+				child:Destroy()
+			end
+		end
+		local head =
+			UITheme.label(reportPanel, ModerationLogic.ReportTitle, F.Black, if tenFoot() then 18 else 14, C.Bark)
+		head.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+		if reportTarget ~= nil and reportTarget.Parent ~= Players then
+			reportTarget = nil
+		end
+		local target = reportTarget
+		if reportNote then
+			local note = UITheme.label(reportPanel, reportNote, F.Bold, if tenFoot() then 18 else 14, C.Ink)
+			note.TextWrapped = true
+			note.Size = UDim2.new(1, 0, 0, if tenFoot() then 44 else 36)
+		end
+		if target == nil then
+			local ask =
+				UITheme.label(reportPanel, "Who are you reporting?", F.Bold, if tenFoot() then 18 else 14, C.Ink)
+			ask.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+			for _, other in ipairs(Players:GetPlayers()) do
+				if other ~= player then
+					local who = other
+					makeButton(reportPanel, "Pick" .. who.UserId, nameOf(who), "skip", function()
+						reportTarget = who
+						reportNote = nil
+						rebuildReport()
+					end)
+				end
+			end
+			return
+		end
+		local why = UITheme.label(
+			reportPanel,
+			"Why report " .. nameOf(target) .. "?",
+			F.Bold,
+			if tenFoot() then 18 else 14,
+			C.Ink
+		)
+		why.TextWrapped = true
+		why.Size = UDim2.new(1, 0, 0, if tenFoot() then 44 else 36)
+		for _, reason in ipairs(ModerationLogic.ReportReasons) do
+			local picked = reason
+			makeButton(reportPanel, "Reason" .. picked.id, picked.label, "skip", function()
+				local who = reportTarget
+				if who == nil or who.Parent ~= Players then
+					reportTarget = nil
+					rebuildReport()
+					return
+				end
+				local sent = pcall(function()
+					(Players :: any):ReportAbuse(who, picked.id, "")
+				end)
+				reportNote = if sent then ModerationLogic.ReportSent else ModerationLogic.ReportFailed
+				reportTarget = nil
+				rebuildReport()
+			end)
+		end
+		makeButton(reportPanel, "ReportBack", "Pick someone else", "bark", function()
+			reportTarget = nil
+			rebuildReport()
+		end)
 	end
 
 	local function showTab(name: string)
 		if not SettingsLogic.HasTab(name) then
 			return
 		end
+		if name == "report" and not reportShown() then
+			name = "game"
+		end
 		tabName = name
 		local visitorsOn = name == "visitors"
 		local boardOn = name == "board"
+		local reportOn = name == "report"
 		for _, rowRoot in ipairs(gameRows) do
-			rowRoot.Visible = not visitorsOn and not boardOn
+			rowRoot.Visible = not visitorsOn and not boardOn and not reportOn
 		end
 		visitors.Visible = visitorsOn
+		reportPanel.Visible = reportOn
+		reportTab.root.Visible = reportShown()
+		reportTab:SetStyle(if reportOn then "buy" else "skip")
 		boardPanel.root.Visible = boardOn
 		card.outer.Size = UDim2.fromOffset(if boardOn then LeaderboardLogic.CardWidth(tenFoot()) else 280, 300)
 		gameTab:SetStyle(if name == "game" then "buy" else "skip")
@@ -299,6 +462,13 @@ function SettingsUI.Start()
 			boardPanel:Show()
 			if UITheme.Device() == "console" then
 				GuiService.SelectedObject = boardPanel:First()
+			end
+		elseif reportOn then
+			reportTarget, reportNote = nil, nil
+			rebuildReport()
+			local first = reportPanel:FindFirstChildWhichIsA("GuiButton", true)
+			if first and UITheme.Device() == "console" then
+				GuiService.SelectedObject = first
 			end
 		elseif visitorsOn then
 			rebuildVisitors()
@@ -323,6 +493,11 @@ function SettingsUI.Start()
 		showTab("board")
 	end)
 	boardTab.root.LayoutOrder = 3
+	reportTab = makeButton(scroll, "TabReport", "REPORT", "skip", function()
+		showTab("report")
+	end)
+	reportTab.root.LayoutOrder = 4
+	reportTab.root.Visible = reportShown()
 	firstFace = gameTab.face
 
 	local musicFace: TextButton
@@ -513,11 +688,13 @@ function SettingsUI.Start()
 	for _, attr in ipairs({ "ActiveSlot", "SlotPick", "SlotCooldownUntil" }) do
 		player:GetAttributeChangedSignal(attr):Connect(applyAll)
 	end
-	player:GetAttributeChangedSignal("PlotPermissions"):Connect(function()
-		if tabName == "visitors" then
-			rebuildVisitors()
-		end
-	end)
+	for _, attr in ipairs({ "PlotPermissions", "PlotBans" }) do
+		player:GetAttributeChangedSignal(attr):Connect(function()
+			if tabName == "visitors" then
+				rebuildVisitors()
+			end
+		end)
+	end
 	local function refreshPeople()
 		if tabName == "visitors" and card.outer.Visible then
 			rebuildVisitors()
@@ -537,11 +714,30 @@ function SettingsUI.Start()
 			watchPlayer(other)
 		end
 	end
+	-- The REPORT tab follows who is here (a leaver is still listed for a
+	-- moment during PlayerRemoving, so look again a frame later).
+	local function refreshReport()
+		task.defer(function()
+			local shown = reportShown()
+			reportTab.root.Visible = shown
+			if tabName == "report" then
+				if shown then
+					rebuildReport()
+				else
+					showTab("game")
+				end
+			end
+		end)
+	end
 	Players.PlayerAdded:Connect(function(other: Player)
 		watchPlayer(other)
 		refreshPeople()
+		refreshReport()
 	end)
-	Players.PlayerRemoving:Connect(refreshPeople)
+	Players.PlayerRemoving:Connect(function()
+		refreshPeople()
+		refreshReport()
+	end)
 	applyAll()
 
 	local function toggle()

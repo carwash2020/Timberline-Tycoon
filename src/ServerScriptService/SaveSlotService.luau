@@ -29,6 +29,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local TextFilter = require(script.Parent.TextFilter)
 
 local SaveSlotService = {}
 
@@ -51,34 +52,6 @@ local armedUntil: { [Player]: number } = {}
 local awaiting: { [Player]: boolean } = {} -- joined, has not picked a save yet
 local chosen: { [Player]: boolean } = {} -- picked one this visit
 local performing: { [Player]: boolean } = {} -- a load or a reset is running right now (Save now waits)
-
--- Text other players can read. PublicChat is the broadcast context.
--- A failure returns nil so the caller stores the default name instead.
-local function broadcastName(fromUserId: number, text: string): string?
-	local ok, service = pcall(function()
-		return game:GetService("TextService")
-	end)
-	if not ok or (typeof(service) ~= "Instance" and type(service) ~= "table") then
-		return nil
-	end
-	local filter = (service :: any).FilterStringAsync
-	if type(filter) ~= "function" then
-		return nil
-	end
-	local filteredOk, result = pcall(function()
-		return filter(service, text, fromUserId, Enum.TextFilterContext.PublicChat)
-	end)
-	if not filteredOk or result == nil or type(result.GetNonChatStringForBroadcastAsync) ~= "function" then
-		return nil
-	end
-	local readOk, publicText = pcall(function()
-		return result:GetNonChatStringForBroadcastAsync()
-	end)
-	if not readOk or type(publicText) ~= "string" then
-		return nil
-	end
-	return publicText
-end
 
 local function publish(player: Player)
 	local profile = ProfileService.GetProfile(player)
@@ -199,7 +172,9 @@ local function onAction(player: Player, action: unknown, index: unknown, extra: 
 		-- Filter before the name is stored or sent. The yield is inside
 		-- the filter, so nothing is published until it comes back.
 		local cleaned = SaveSlotLogic.CleanName(extra)
-		local publicText = if cleaned then broadcastName(player.UserId, cleaned) else nil
+		local publicText = if cleaned
+			then TextFilter.TryBroadcast(cleaned, player.UserId, SaveSlotLogic.NameLimit)
+			else nil
 		local profile = ProfileService.GetProfile(player)
 		if not profile then
 			return
