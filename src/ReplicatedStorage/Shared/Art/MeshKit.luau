@@ -72,14 +72,15 @@ local requestActive = 0
 -- Injectable for specs (Lune has no `task`, and a spec wants to hold a load).
 MeshKit.Scheduler = {
 	spawn = function(fn: () -> ())
-		if task then
+		-- (a spec's stub `task` may lack spawn)
+		if type(task) == "table" and type(task.spawn) == "function" then
 			task.spawn(fn)
 		else
 			fn()
 		end
 	end,
 	wait = function()
-		if task then
+		if type(task) == "table" and type(task.wait) == "function" then
 			task.wait()
 		end
 	end,
