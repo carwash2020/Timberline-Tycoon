@@ -102,7 +102,12 @@ function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxS
 	end
 	-- The pull-through bays face south: no tree stands in the lanes ahead of
 	-- them down to z -150 (the Starter Forest now reaches up to the lot).
-	if z > -150 and z < WorldLayout.ParkingLot.z0 then
+	local lot = WorldLayout.ParkingLot
+	-- And the bays' pull-out strip along the lot's south edge (the Starter Forest reaches it).
+	if z < lot.z0 and z > lot.z0 - WorldPlan.ParkingPullOut - 4 and x > lot.x0 - 4 and x < lot.x1 + 4 then
+		return false
+	end
+	if z > -150 and z < lot.z0 then
 		for _, lane in ipairs(pullThroughLanes()) do
 			if x > lane[1] and x < lane[2] then
 				return false

@@ -2423,16 +2423,16 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 60810855, "the first 322 trees moved, changed wood or changed order")
+		t.eq(h, 904070929, "the first 322 trees moved, changed wood or changed order")
 		local function at(i, woodId, biome, x, z)
 			local tree = trees[i]
 			t.eq(tree.woodId, woodId)
 			t.eq(tree.biome, biome)
 			t.ok(math.abs(tree.position.X - x) < 0.01 and math.abs(tree.position.Z - z) < 0.01, "tree " .. i)
 		end
-		at(1, "birch", "starter", 13.32, -109.42)
-		at(161, "emberwood", "volcano", 1026.22, 1000.44)
-		at(FIRST, "pine", "wild", -827.12, 642.62)
+		at(1, "birch", "starter", 22.84, -179.0)
+		at(161, "emberwood", "volcano", 508.15, 486.41)
+		at(FIRST, "birch", "wild", 747.08, 411.5)
 	end)
 
 	t.test("country stands: 150-200 new trees after the first 322, in stands of 4-9", function()
@@ -2473,11 +2473,11 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 459520806, "the country stands moved, changed wood or changed order")
+		t.eq(h, 651551197, "the country stands moved, changed wood or changed order")
 		t.eq(trees[FIRST + 1].woodId, "oak")
-		t.ok((trees[FIRST + 1].position - Vector3.new(89.8205, -1.1982, 433.2526)).Magnitude < 0.01, "tree 323")
+		t.ok((trees[FIRST + 1].position - Vector3.new(-280.44458, 7.8335595, -2.88238)).Magnitude < 0.01, "tree 323")
 		t.ok(
-			(trees[lastStand].position - Vector3.new(-483.75803, -4.0118666, -997.43835)).Magnitude < 0.01,
+			(trees[lastStand].position - Vector3.new(597.05841, 65.1379623, 942.26074)).Magnitude < 0.01,
 			"the last stand"
 		)
 	end)

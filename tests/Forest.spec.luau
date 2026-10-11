@@ -1007,7 +1007,7 @@ return function(t)
 			-- Re-sampled when the homesteads left the one lawn, and again when the
 			-- lighthouse moved to (1203, 236). The searches still read the grass
 			-- under each rock; the shelves moved a few clusters.
-			t.eq(h, 901717980, "a cluster or landmark moved")
+			t.eq(h, 834672020, "a cluster or landmark moved")
 		end
 	)
 
