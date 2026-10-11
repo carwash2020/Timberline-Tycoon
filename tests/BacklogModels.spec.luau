@@ -91,7 +91,11 @@ return function(t)
 			end
 			t.ok(#BacklogModels.Ids() == #BacklogModels.All)
 		end
-		t.eq(count, 109, "every uploaded backlog asset (112 less the three trees)")
+		t.eq(
+			count,
+			104,
+			"every uploaded backlog asset (112 less the three trees and the five NPCs, which TownModels holds)"
+		)
 	end)
 
 	t.test("the held-back five are not here, and no id clashes with a TownModels row", function()
@@ -142,8 +146,8 @@ return function(t)
 		t.eq(TownModels.Get("Lantern").category, "environment", "the env lantern is not the held one")
 		t.eq(TownModels.Get("GearLantern").category, "gear")
 		t.eq(TownModels.Get("StoreBoard").category, "environment", "the old board stays until approved")
-		t.eq(BacklogModels.Get("Hermit").category, "npc")
-		t.eq(TownModels.Get("Hermit"), nil, "NPCs belong to the NPC lane")
+		t.eq(BacklogModels.Get("Hermit"), nil, "NPCs belong to the NPC lane")
+		t.ok(TownModels.Get("Hermit") ~= nil, "and the NPC lane has them")
 		t.eq(TownModels.Get("NoSuchThing"), nil)
 	end)
 
