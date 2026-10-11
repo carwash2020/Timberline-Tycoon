@@ -90,7 +90,7 @@ local function writeChunk(terrain: Terrain, x0: number, z0: number, nx: number, 
 				math.abs(heights[i + 1][k + 2] - heights[i + 1][k])
 			) / (2 * VOXEL)
 			srow[k] = TerrainGen.SurfaceMaterial(x, z, h, slope)
-			local w = TerrainGen.WaterLevelAt(x, z)
+			local w = TerrainGen.WaterLevelFor(x, z, h)
 			local hw = h + lift
 			local ww = if w then w + lift else nil
 			wrow[k] = ww or NO_WATER
@@ -383,15 +383,102 @@ end
 -- How long Build writes chunks before it yields a frame.
 TerrainBuilder.SliceSeconds = 0.03
 
--- Builds the whole world's terrain. `onProgress(done, total)` is called
--- after each chunk. Returns how many seconds it took.
-function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
+-- Staged build (server audit, 11 October 2026). Writing all 100 chunks took
+-- 30 to 55 s, and the first player waited for every one of them (the
+-- "terrain" gate sat behind the whole world). Now Build can return once the
+-- chunks round the town are written (the chunks that touch a disc of
+-- NearRadius studs round the sawmill: the spawn, the shops, the sell area,
+-- Murph's camp, the tutorial grove) and hand back `finish`, which writes the
+-- rest in small blocks a frame at a time while players already play, the
+-- plot pads' ground first, then outward from the sawmill, and carves the
+-- caves last.
+TerrainBuilder.NearRadius = 230
+TerrainBuilder.SubColumns = 16 -- voxel columns a side per background block (64 studs): about 1/16 of a chunk, so no frame stalls
+TerrainBuilder.BackgroundSliceSeconds = 0.012 -- the same share of a frame the forest planter and the deferred queue take
+TerrainBuilder.SpotReach = 150 -- studs: blocks this close to a `firstSpots` point (a plot pad) go first
+
+export type Options = {
+	nearRadius: number?, -- stage the build: only the chunks touching this disc round the sawmill block
+	firstSpots: { Vector2 }?, -- x, z points whose ground goes first after the near chunks (the plot pads)
+	sliceSeconds: (() -> number)?, -- the background slice, asked before each frame (default BackgroundSliceSeconds)
+}
+
+local function hub(): Vector3
+	return WorldLayout.Sawmill
+end
+
+-- Whether a job's rectangle touches the disc of `radius` studs round the sawmill.
+function TerrainBuilder.Touches(job: Job, radius: number): boolean
+	local at = hub()
+	local cx = math.clamp(at.X, job.x0, job.x0 + job.nx * VOXEL)
+	local cz = math.clamp(at.Z, job.z0, job.z0 + job.nz * VOXEL)
+	local dx, dz = cx - at.X, cz - at.Z
+	return dx * dx + dz * dz <= radius * radius
+end
+
+-- Every job cut into blocks of at most `columns` voxel columns a side.
+function TerrainBuilder.Split(jobs: { Job }, columns: number): { Job }
+	local out: { Job } = {}
+	local at = hub()
+	for _, job in ipairs(jobs) do
+		local ox = 0
+		while ox < job.nx do
+			local sx = math.min(columns, job.nx - ox)
+			local oz = 0
+			while oz < job.nz do
+				local sz = math.min(columns, job.nz - oz)
+				local x0 = job.x0 + ox * VOXEL
+				local z0 = job.z0 + oz * VOXEL
+				local mx, mz = x0 + sx * VOXEL / 2 - at.X, z0 + sz * VOXEL / 2 - at.Z
+				table.insert(out, { x0 = x0, z0 = z0, nx = sx, nz = sz, dist = math.sqrt(mx * mx + mz * mz) })
+				oz += sz
+			end
+			ox += sx
+		end
+	end
+	return out
+end
+
+-- Puts blocks in the order they are written: those within SpotReach of a
+-- `spots` point first, then the rest, each nearest the sawmill first.
+function TerrainBuilder.Order(blocks: { Job }, spots: { Vector2 }?): { Job }
+	local key: { [Job]: number } = {}
+	for _, block in ipairs(blocks) do
+		local k = block.dist
+		for _, spot in ipairs(spots or {}) do
+			local dx = math.max(block.x0 - spot.X, 0, spot.X - (block.x0 + block.nx * VOXEL))
+			local dz = math.max(block.z0 - spot.Y, 0, spot.Y - (block.z0 + block.nz * VOXEL))
+			if dx <= TerrainBuilder.SpotReach and dz <= TerrainBuilder.SpotReach then
+				k -= 1e6
+				break
+			end
+		end
+		key[block] = k
+	end
+	table.sort(blocks, function(a: Job, b: Job): boolean
+		local ka, kb = key[a], key[b]
+		if ka ~= kb then
+			return ka < kb
+		end
+		if a.x0 ~= b.x0 then
+			return a.x0 < b.x0
+		end
+		return a.z0 < b.z0
+	end)
+	return blocks
+end
+
+-- Builds the world's terrain. `onProgress(done, total)` is called after
+-- each chunk. Returns how many seconds it took and, when `options.nearRadius`
+-- left chunks for later, `finish`: call it (it yields) to write them and
+-- carve the caves; it returns its own seconds.
+function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Options?): (number, (() -> number)?)
 	local started = os.clock()
 	local terrain = workspace.Terrain
 	setLook(terrain)
 	if terrain:GetAttribute("Prebuilt") == true then
 		reportTown(terrain)
-		return 0
+		return 0, nil
 	end
 	terrain:Clear()
 	local jobs = TerrainBuilder.Jobs()
@@ -417,31 +504,79 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
 		)
 	)
 	workspace:SetAttribute("TerrainShift", math.floor(shift * 100 + 0.5) / 100)
-	local sliceStart = os.clock()
-	for index, job in ipairs(jobs) do
+	local nearRadius = if options then options.nearRadius else nil
+	local near: { Job } = {}
+	local later: { Job } = {}
+	for _, job in ipairs(jobs) do
 		if not done[job] then
+			if nearRadius == nil or TerrainBuilder.Touches(job, nearRadius) then
+				table.insert(near, job)
+			else
+				table.insert(later, job)
+			end
+		end
+	end
+	local total = #jobs
+	local finished = 0
+	for _ in pairs(done) do
+		finished += 1
+	end
+	local sliceStart = os.clock()
+	for _, job in ipairs(near) do
+		local ok, err = pcall(function(): any
+			writeChunk(terrain, job.x0, job.z0, job.nx, job.nz, shift)
+			return nil
+		end)
+		if not ok then
+			warn(string.format("[TerrainBuilder] chunk at (%d, %d) failed: %s", job.x0, job.z0, tostring(err)))
+		end
+		-- A frame's worth of chunks, then a yield (the server stays alive),
+		-- not a frame per chunk: a chunk takes less than a frame to write
+		-- on a fast machine, and the idle frames were pure waiting (LOAD-01).
+		if os.clock() - sliceStart >= TerrainBuilder.SliceSeconds then
+			task.wait()
+			sliceStart = os.clock()
+		end
+		finished += 1
+		if onProgress then
+			onProgress(finished, total)
+		end
+	end
+	if #later == 0 then
+		TerrainBuilder.Carve(terrain, shift)
+		reportTown(terrain)
+		return os.clock() - started, nil
+	end
+	reportTown(terrain)
+	local nearSeconds = os.clock() - started
+	local function finish(): number
+		local finishStarted = os.clock()
+		local blocks =
+			TerrainBuilder.Order(TerrainBuilder.Split(later, TerrainBuilder.SubColumns), options and options.firstSpots)
+		local frameStart = os.clock()
+		for _, block in ipairs(blocks) do
 			local ok, err = pcall(function(): any
-				writeChunk(terrain, job.x0, job.z0, job.nx, job.nz, shift)
+				writeChunk(terrain, block.x0, block.z0, block.nx, block.nz, shift)
 				return nil
 			end)
 			if not ok then
-				warn(string.format("[TerrainBuilder] chunk at (%d, %d) failed: %s", job.x0, job.z0, tostring(err)))
+				warn(string.format("[TerrainBuilder] block at (%d, %d) failed: %s", block.x0, block.z0, tostring(err)))
 			end
-			-- A frame's worth of chunks, then a yield (the server stays alive),
-			-- not a frame per chunk: a chunk takes less than a frame to write
-			-- on a fast machine, and the idle frames were pure waiting (LOAD-01).
-			if os.clock() - sliceStart >= TerrainBuilder.SliceSeconds then
+			local slice = if options and options.sliceSeconds
+				then options.sliceSeconds()
+				else TerrainBuilder.BackgroundSliceSeconds
+			if os.clock() - frameStart >= slice then
 				task.wait()
-				sliceStart = os.clock()
+				frameStart = os.clock()
 			end
 		end
+		TerrainBuilder.Carve(terrain, shift)
 		if onProgress then
-			onProgress(index, #jobs)
+			onProgress(total, total)
 		end
+		return os.clock() - finishStarted
 	end
-	TerrainBuilder.Carve(terrain, shift)
-	reportTown(terrain)
-	return os.clock() - started
+	return nearSeconds, finish
 end
 
 -- Second pass: air out the caves, the passages and the truck tunnel.

@@ -314,8 +314,16 @@ end
 -- is forged, and gone when the plot is let go.
 local TROPHY = "RelicTrophies"
 
+-- PlotService builds the pads in TimberlineMap/Plots, not Workspace/Plots (this
+-- looked in the wrong place, and waited 120 s for a folder that never came:
+-- server audit, 11 October 2026).
+local function plotsFolder(): Instance?
+	local map = workspace:FindFirstChild("TimberlineMap")
+	return (if map then map:FindFirstChild("Plots") else nil) or workspace:FindFirstChild("Plots")
+end
+
 local function plotOf(userId: number): Model?
-	local plots = workspace:FindFirstChild("Plots")
+	local plots = plotsFolder()
 	if not plots then
 		return nil
 	end
@@ -356,7 +364,7 @@ function SkyForgeService.BuildTrophies(player: Player)
 end
 
 local function watchPlots()
-	local plots = workspace:FindFirstChild("Plots")
+	local plots = plotsFolder()
 	if not plots then
 		return
 	end
@@ -596,7 +604,10 @@ function SkyForgeService.V1Init(ctx: Ctx?)
 		end
 	end)
 	task.spawn(function()
-		workspace:WaitForChild("Plots", 120)
+		local map = workspace:WaitForChild("TimberlineMap", 120)
+		if map then
+			map:WaitForChild("Plots", 120)
+		end
 		watchPlots()
 	end)
 	local function joined(player: Player)

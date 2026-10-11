@@ -7,11 +7,14 @@ return function(t)
 			mocks = { ProfileService = {} },
 			services = {
 				AnalyticsService = {
-					LogProgressionCompleteEvent = function(_, player, path, name)
+					LogProgressionCompleteEvent = function(_, player, path, level, name)
 						if failing then
 							error("analytics is down")
 						end
-						table.insert(logged, { player = player.UserId, path = path, name = name })
+						-- Roblox casts the level to an int: a string fails.
+						assert(type(level) == "number" and level % 1 == 0, "level must be an int")
+						assert(type(name) == "string", "level name must be a string")
+						table.insert(logged, { player = player.UserId, path = path, name = name, level = level })
 					end,
 					LogOnboardingFunnelStepEvent = function() end,
 					LogCustomEvent = function() end,
@@ -41,6 +44,7 @@ return function(t)
 		Milestone.Start(player, profile)
 		t.eq(#logged, 1)
 		t.eq(logged[1].name, "S1")
+		t.eq(logged[1].level, 1, "the level is the stage number, an int")
 		t.eq(profile.onboarding["Stage:S1"], true)
 		Milestone.Mark(player, "First chop")
 		Milestone.CashEarned(player, 5)

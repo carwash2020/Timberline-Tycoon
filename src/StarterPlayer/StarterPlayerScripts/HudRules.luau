@@ -59,6 +59,12 @@ function HudRules.DailyButton(step: unknown, goals: number): boolean
 	return goals > 0 and not HudRules.TutorialRunning(step)
 end
 
+-- The BADGES button (BadgeUI) waits until the tutorial's done, so the left
+-- column holds only the Field Guide and the tutorial card while it runs.
+function HudRules.BadgesButton(step: unknown): boolean
+	return not HudRules.TutorialRunning(step)
+end
+
 -- What the Daily Goals button says: `done` of `total` goals and the
 -- `streak` (days in a row with every goal done; not shown at 0):
 -- "DAILY GOALS  1/3  ·  5-day streak". On a phone, where the corner's

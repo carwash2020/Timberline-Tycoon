@@ -4,8 +4,7 @@
 -- or Roblox's top-left menu). Music and sound effects have a mute and a
 -- volume stepper; graphics (Lower or Higher quality, the same choice the join
 -- screen asks for: QualityPickerUI), camera shake, UI scale and tips apply at once
--- and save (SaveSetting, and SetQuality for the graphics choice). Camera speed
--- steps 25% to 200% (the device's own camera speed times it). Replay tutorial
+-- and save (SaveSetting, and SetQuality for the graphics choice). Replay tutorial
 -- asks twice, then ResetTutorial (the server pays no step cash again). The
 -- Codes tab is the redeem box (RedeemCode; the server answers on CodeResult).
 -- Visitors is the plot permission list, with a Visit button for each
@@ -52,28 +51,10 @@ local F = UITheme.Fonts
 
 local SCALES = { "small", "normal", "large" }
 
--- The device's own camera speeds, read once, so the multiplier never stacks on itself.
-local baseCamera: { [string]: number } = {}
-
--- Writes the camera speed (mouse and gamepad stick) as the device's own times
--- `multiplier`. Each write is guarded: a build that doesn't expose a property
--- just leaves that input alone. Phone touch uses the engine's own speed.
-local function applyCameraSensitivity(multiplier: unknown)
-	local ok, settings = pcall(function(): any
-		return UserSettings():GetService("UserGameSettings")
-	end)
-	if not ok or settings == nil then
-		return
-	end
-	for _, name in ipairs({ "MouseSensitivity", "GamepadCameraSensitivity" }) do
-		pcall(function()
-			if baseCamera[name] == nil then
-				baseCamera[name] = settings[name]
-			end
-			settings[name] = SettingsLogic.ApplySensitivity(baseCamera[name], multiplier)
-		end)
-	end
-end
+-- No camera speed row: scripts may not write the player's own game settings
+-- ("Insufficient permissions"), and the default camera has no supported hook
+-- to scale its input. The saved settings.cameraSensitivity field stays
+-- (harmless, 1 by default).
 
 local function cycle(list: { string }, current: string): string
 	for i, name in ipairs(list) do
@@ -611,7 +592,6 @@ function SettingsUI.Start()
 	local shakeFace: TextButton
 	local scaleFace: TextButton
 	local tipsFace: TextButton
-	local sensitivityFace: TextButton
 	local resetFace: TextButton
 	local restartFace: TextButton
 
@@ -644,8 +624,6 @@ function SettingsUI.Start()
 		UITheme.SetUserScale(SettingsLogic.ScaleMultiplier(scaleName))
 		local tips = player:GetAttribute("SettingShowTips")
 		HUD.SetTips(tips ~= false)
-		local sensitivity = player:GetAttribute("SettingCameraSensitivity")
-		applyCameraSensitivity(sensitivity)
 		local music = player:GetAttribute("SettingMusic")
 		if type(music) == "boolean" then
 			SoundData.MusicEnabled = music
@@ -666,9 +644,6 @@ function SettingsUI.Start()
 		shakeFace.Text = if shake == false then "CAMERA SHAKE: OFF" else "CAMERA SHAKE: ON"
 		scaleFace.Text = "UI scale  " .. string.upper(scaleName)
 		tipsFace.Text = if tips == false then "TIPS: OFF" else "TIPS: ON"
-		sensitivityFace.Text = "Camera speed  "
-			.. percent(if type(sensitivity) == "number" then sensitivity else 1)
-			.. "  ±"
 		musicFace.Text = if SoundData.MusicEnabled then "MUSIC: ON" else "MUSIC: OFF"
 		musicVolFace.Text = "Music volume  " .. percent(SoundData.MusicVolume) .. "  ±"
 		sfxFace.Text = if SoundData.SfxEnabled then "SOUND FX: ON" else "SOUND FX: OFF"
@@ -733,13 +708,6 @@ function SettingsUI.Start()
 		local nextName = cycle(SCALES, current)
 		UITheme.SetUserScale(SettingsLogic.ScaleMultiplier(nextName))
 		save("uiScale", nextName)
-		applyAll()
-	end)
-	sensitivityFace = row("cameraSensitivity", "Camera speed  100%  ±", function()
-		local current = player:GetAttribute("SettingCameraSensitivity")
-		local nextValue = SettingsLogic.NextSensitivity(if type(current) == "number" then current else 1)
-		player:SetAttribute("SettingCameraSensitivity", nextValue) -- the server sets it too; this keeps the row snappy
-		save("cameraSensitivity", nextValue)
 		applyAll()
 	end)
 	tipsFace = row("tips", "TIPS: ON", function()

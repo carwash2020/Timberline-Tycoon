@@ -417,16 +417,17 @@ function ForestFiller.Start()
 		waitUntilPlaying()
 		-- WorldPlan's plan, a step a frame (each is cached for the next).
 		local started = os.clock()
-		-- WorldPlan.Trees alone is seconds of work: it pauses on a time slice
-		-- (8 ms a frame) so the client keeps drawing while it plans. The other
-		-- steps are short and get a frame each.
+		-- Every step pauses on a time slice (8 ms a frame) so the client keeps
+		-- drawing while it plans, and gets a frame to itself after it.
 		local planSlice = TimeSlice.new({ budget = PLAN_SLICE })
 		for i, step in ipairs(WorldPlan.FillerSteps) do
 			local ok, err = pcall(function(): any
 				if step == WorldPlan.Trees then
 					WorldPlan.Trees(planSlice.step)
 				else
-					step()
+					-- Every step's loops hand the frame back on the slice too
+					-- (Scenery alone is seconds of work), same result.
+					WorldPlan.WithPause(planSlice.step, step)
 				end
 				return nil
 			end)

@@ -17,11 +17,14 @@
 -- other goes through the same Perform as a swap (cooldown, commit, rebuild).
 -- Either way the chosen save then asks for a pad if it owns a plot
 -- (hooks.chosen, or the rebuild). A player already standing on a base this
--- session (hooks.onBase) is never asked.
+-- session (hooks.onBase) is never asked. The picker opens only when two or
+-- more saves have been played; a new profile or a single save is played
+-- straight away (JoinPickLogic.AutoPick), which then asks for its pad.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local JoinPickLogic = require(ReplicatedStorage.Shared.JoinPickLogic)
 local SaveNowLogic = require(ReplicatedStorage.Shared.SaveNowLogic)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -220,6 +223,14 @@ end
 function SaveSlotService.PlayerJoined(player: Player)
 	local onBase = hooks.onBase
 	if not chosen[player] and not awaiting[player] and not (onBase ~= nil and onBase(player)) then
+		-- Only a real choice opens the picker: a new profile or a single save
+		-- loads straight in (JoinPickLogic.AutoPick), then asks for its pad.
+		local profile = ProfileService.GetProfile(player)
+		local auto = if profile then JoinPickLogic.AutoPick(SaveSlotLogic.Summary(profile)) else nil
+		if auto ~= nil then
+			finishPick(player, true) -- publish() inside: SlotPick is never raised
+			return
+		end
 		awaiting[player] = true
 	end
 	publish(player)

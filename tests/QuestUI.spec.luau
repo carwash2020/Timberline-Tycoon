@@ -315,4 +315,49 @@ return function(t)
 		t.eq(QuestUI.ApplyKey(roblox.Enum.KeyCode.Escape), "close")
 		t.eq(gui.SelectedObject, nil)
 	end)
+
+	t.test("Murph's Talk prompt is waited for with a bounded WaitForChild, and a miss is said out loud", function()
+		t.ok(QuestUI.TalkWait > 0 and QuestUI.TalkWait <= 60, "a bounded wait")
+		local asked
+		local prompt = {
+			IsA = function(_, class)
+				return class == "ProximityPrompt"
+			end,
+		}
+		local model = {
+			WaitForChild = function(_, name, timeout)
+				asked = { name = name, timeout = timeout }
+				return prompt
+			end,
+		}
+		t.eq(QuestUI.WaitForTalk(model), prompt)
+		t.eq(asked.name, "Talk")
+		t.eq(asked.timeout, QuestUI.TalkWait, "the timeout is passed on")
+		local missing = {
+			WaitForChild = function()
+				return nil
+			end,
+		}
+		t.eq(QuestUI.WaitForTalk(missing, 1), nil, "a prompt that never comes is nil, not an error")
+		local wrong = {
+			WaitForChild = function()
+				return {
+					IsA = function()
+						return false
+					end,
+				}
+			end,
+		}
+		t.eq(QuestUI.WaitForTalk(wrong), nil, "a child named Talk that is not a prompt is refused")
+		-- The failure is visible: a warning and a line on Murph's card.
+		local fs = require("@lune/fs")
+		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
+		t.ok(string.find(src, "say(QuestUI.TalkFallback)", 1, true), "the fallback is shown")
+		t.eq(
+			string.find(src, 'model:FindFirstChild("Talk")', 1, true),
+			nil,
+			"no one-shot FindFirstChild for the prompt"
+		)
+		t.ok(#QuestUI.TalkFallback > 20, "the fallback says where to go")
+	end)
 end

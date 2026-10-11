@@ -445,13 +445,12 @@ function NPCService.Init(mapFolder: Instance, options: InitOptions?)
 		local builtAt = os.clock()
 		local ok, err = pcall(function()
 			local model = build(npc, find)
-			if npc.id == "Murph" then
-				model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-				model.Parent = mapFolder
-			else
-				model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-				model.Parent = folder
-			end
+			-- Persistent for the NPCs the tutorial depends on (Murph, Old
+			-- Hank): never streamed out, so their Talk prompt is always there.
+			model.ModelStreamingMode = if npc.persistent
+				then Enum.ModelStreamingMode.Persistent
+				else Enum.ModelStreamingMode.Atomic
+			model.Parent = if npc.id == "Murph" then mapFolder else folder
 		end)
 		if not ok then
 			warn(string.format("[NPCService] couldn't build %s: %s", npc.id, tostring(err)))

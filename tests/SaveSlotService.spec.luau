@@ -161,6 +161,8 @@ return function(t)
 		t.eq(harness.SaveSlot.SaveNow(who, "1", 50), false)
 		t.eq(harness.SaveSlot.SaveNow(who, nil, 50), false)
 		t.eq(harness.SaveSlot.SaveNow(who, {}, 50), false)
+		data.slots[1] = { lastPlayed = 1, fresh = false } -- two played saves: the picker opens
+		data.slots[2] = { lastPlayed = 2, fresh = false }
 		harness.SaveSlot.PlayerJoined(who) -- joined, has not picked a save yet
 		t.eq(harness.SaveSlot.SaveNow(who, data.activeSlot, 50), false, "the join pick is still up")
 		t.eq(truckSaves, 0)

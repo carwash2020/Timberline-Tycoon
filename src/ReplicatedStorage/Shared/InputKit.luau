@@ -26,6 +26,8 @@
 -- The console safe area is ScreenInsets.CoreUISafeInsets. It is not a
 -- fraction of the screen.
 
+local GrabLogic = require(script.Parent.GrabLogic)
+
 local InputKit = {}
 
 InputKit.MinTouchPx = 44
@@ -104,7 +106,7 @@ InputKit.Target = {
 		{ action = "Pull", gamepad = Enum.KeyCode.ButtonL1 }, -- and nearer
 	},
 	drag = {
-		{ action = "Grab", gamepad = Enum.KeyCode.ButtonR1 }, -- held; RT is the axe's
+		{ action = "Grab", gamepad = GrabLogic.PadGrabKey }, -- the right trigger, held, with empty hands only (a tool in hand: it swings)
 		{ action = "Yaw", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.DPadLeft },
 		{ action = "Yaw", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.DPadRight },
 		{ action = "Lock", gamepad = Enum.KeyCode.ButtonL2 }, -- hang it in the air; the left stick then turns and tips it (and walks nobody)
