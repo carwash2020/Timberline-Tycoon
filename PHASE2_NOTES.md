@@ -3911,3 +3911,16 @@ Studio checks (Xbox; PC and phone unchanged):
 6. Wire tool: RB still picks, X cuts, B leaves.
 7. Tutorial: Murph's drag step says "hold RT on a log".
 8. Chop with a Keen axe still follows the cooldown (RT chop path unchanged).
+
+## Client boot and first minute audit (11 October 2026)
+
+The findings table (severity, file, evidence, status) is in STATUS.md "Client boot and first minute audit". What changed in code (the filler plan freeze, the first-322-trees freeze and the `TreeFill` gaps were found at the same time as `fix-client-freeze` and landed there, #155; this PR measured them again on top of it: worst gap between pause offers 53 ms in every filler step):
+- `TreeCosmetics`: at most `PerPass` (24) trees dressed per pass, `clearAccent` only for a tree that was looked at, a tree with no crown is searched 5 times and then left, weak tables (a streamed-out tree is no longer held), `Pass` and `Tracked` for the spec (`tests/TreeCosmetics.spec`).
+- `LightingController`, `CarryController` and `WeatherController`: bounded waits for `TimberlineMap` (and the sell area).
+
+Studio checks (what good looks like; nothing here has been seen in Studio):
+1. PC, new server: join, wait for the loading card to fade, walk and look around for 30 s. No frame stall of a second or more while `[Load] client ForestFiller plan took N s` runs (#155's slicing; this PR only re-measured it).
+2. Phone (667x375, Lower): stand still among trees for a minute: no hitch every half second (before: a pulse from `TreeCosmetics` walking every tree's descendants).
+3. Phone: stand still in the Starter Forest for a minute, then walk 600 studs and back. The Developer Console memory (Client memory, "Instances" and "Lua heap") does not keep climbing with the trees streamed in and out (before: every tree stayed referenced).
+4. PC, Higher: seasonal tint and maple / frostwood motes still appear on trees near you within a second or two of arriving; a felled stump gets no mote and causes no hitch.
+5. Xbox: same as 1; nothing about input changed.

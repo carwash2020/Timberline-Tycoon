@@ -573,7 +573,10 @@ local function watchGlows()
 		trackLamp(lamp)
 	end
 	task.spawn(function()
-		local map = workspace:WaitForChild("TimberlineMap")
+		local map = workspace:WaitForChild("TimberlineMap", 120) -- bounded: a bare wait warns of an infinite yield
+		if not map then
+			return
+		end
 		-- Parts stream in and out: track them as they come and go.
 		map.DescendantAdded:Connect(function(d: Instance)
 			if d:IsA("BasePart") and GLOW_NAMES[d.Name] then

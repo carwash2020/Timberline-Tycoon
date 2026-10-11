@@ -862,7 +862,10 @@ end
 
 local function watchMapEmitters()
 	task.spawn(function()
-		local map = workspace:WaitForChild("TimberlineMap")
+		local map = workspace:WaitForChild("TimberlineMap", 120) -- bounded: a bare wait warns of an infinite yield
+		if not map then
+			return
+		end
 		map.DescendantAdded:Connect(trackMapEmitter)
 		map.DescendantRemoving:Connect(function(d: Instance)
 			if d:IsA("ParticleEmitter") then
