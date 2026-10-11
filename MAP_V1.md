@@ -180,7 +180,7 @@ The ravine's real reward is 2 Sky Shards once A2's grant exists. Explorer badge 
 
 ## Bayou and Red Mesa
 
-Reserved for Lane R. This lane lays the ground, the roads and the anchors. No trees, scatter or unique items.
+Lane B laid the ground, the roads and the anchors; Lane R filled them (STATUS.md "Lane R").
 
 Bayou centre (−760, −700), radius 140. The basin is flat and sunk 7 studs (inside the 6–8 band) under the broad ground at its centre. BayouRoad is 28 wide, from the ring vertex (−424, −344) to (−692, −612), and ends in a junction of radius 32 with a signpost reading BAYOU.
 
@@ -195,12 +195,12 @@ Anchors on `WorldPlan` (Lane R reads these):
 | MudZones | (−820, −640) r20, (−680, −760) r22, (−740, −640) r18, (−700, −800) r22 |
 | BaitShackSpot | (−720, −660) |
 | BayouLogLanding | (−800, −700), 40 × 30 |
-| SlabNodes | 8 points on the mesa's north rim, 8 studs in from the edge |
+| SlabNodes | 8 points on the mesa's east rim, 8 studs in from the edge (angles 4 to 53 degrees from +X; Lane R moved them off the junction, `MesaData.QuarryNodes`) |
 | MesaTruckLot | (620, −770), 40 × 30 |
 | UniqueItemSpawn | one in the Bayou at (−780, −780), one on the mesa at (590, −860) |
 | LeaderboardBoard | CFrame (−50, 0, 92), facing south onto MainStreet, between GondolaPath x −37.5 and ToolShedFloor x −62 |
 
-Resource regions (a wood biome, or one of these two) are at least 500 studs apart centre to centre. A pair under 700 keeps 70 trees or fewer combined. Bayou and Red Mesa have 0 trees, so they pass. The Lanternwood grotto stays at (−240, −420): its nearest corner is about 416 studs from the Bayou edge, past the 100-stud gap, so it was not moved.
+Resource regions (a wood biome, or one of these two) are at least 500 studs apart centre to centre. A pair under 700 keeps 70 trees or fewer combined. Lane R planted 44 Bog Cypress and 38 Ironwood (`WorldPlan.RegionTrees`); Mesa plus Gloam Hollow is 60, under the 70 cap. The Lanternwood grotto stays at (−240, −420): its nearest corner is about 416 studs from the Bayou edge, past the 100-stud gap, so it was not moved.
 
 ## Not in this plan
 

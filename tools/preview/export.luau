@@ -528,6 +528,7 @@ local function export(name: string, def)
 		texts = texts,
 		cameras = built.cameras,
 		lighting = built.lighting,
+		nightLighting = built.nightLighting,
 		fov = built.fov,
 		shadowRadius = built.shadowRadius,
 		background = built.background,

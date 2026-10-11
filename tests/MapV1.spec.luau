@@ -185,7 +185,8 @@ return function(t)
 		t.eq(mesaJoin.at, mesaRoad.points[#mesaRoad.points])
 		local signed = {}
 		for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
-			signed[sign.text] = true
+			-- The first line names the place (Lane R added the woods and the stage below it).
+			signed[string.match(sign.text, "^[^\n]+") :: string] = true
 		end
 		t.eq(signed.BAYOU, true)
 		t.eq(signed["RED MESA"], true)

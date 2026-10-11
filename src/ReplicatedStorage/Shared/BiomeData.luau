@@ -46,6 +46,16 @@ export type BiomeDef = {
 	-- What a gate sign for the biome says, in words (no price: a price shows
 	-- in the prompt). Only biomes with a quest gate carry one.
 	gateWords: string?,
+	-- The V1 ladder stage (StageOf, 1 to 8) a player must have reached to
+	-- work this biome's wood or its unique finds. Only the Bayou (S2) and Red
+	-- Mesa (S4) carry one. They need no gear, so Rules is unchanged.
+	needsStage: number?,
+	-- A reserved region (WorldLayout.ReservedRegions id) that stands in for
+	-- `area`. The Bayou and Red Mesa have no `area`: WorldPlan, TerrainGen and
+	-- TreeFill key whole families of exclusions off every area, and the reserved
+	-- discs already keep those families out. WorldPlan.RegionTrees plants their
+	-- `trees`; BiomeService names the biome from the region.
+	region: string?,
 }
 
 -- What a biome does to a player right now (BiomeData.Rules).
@@ -147,6 +157,35 @@ local biomes: { BiomeDef } = {
 		trees = { phantomwood = 22 },
 	},
 	{
+		-- Lane R. The swamp basin (WorldLayout.Bayou: centre (-760, -700),
+		-- radius 140, sunk 7; Shared/Regions/BayouData). A stage gate, no gear: the mud slowdown is a
+		-- MudZones disc check (Shared/Regions/MudLogic), not a biome-wide
+		-- slowdown, so `slowdown` stays nil. The drive is the ring road to the
+		-- -135 degree vertex and BayouRoad (about 1,110 studs as the crow flies).
+		id = "bayou",
+		displayName = "Bayou",
+		access = "truck",
+		haulStuds = 1330,
+		needsStage = 2,
+		gateWords = "Needs Stage 2: the Steel Axe",
+		region = "bayou",
+		ground = { color = "#4E4A36", material = "Limestone" },
+		trees = { bogcypress = 44 },
+	},
+	{
+		-- Lane R. Red Mesa (WorldLayout.RedMesa: centre (590, -790), radius
+		-- 115). Sandstone for the building kit is quarried here (SlabData).
+		id = "mesa",
+		displayName = "Red Mesa",
+		access = "truck",
+		haulStuds = 1200,
+		needsStage = 4,
+		gateWords = "Needs Stage 4: the Cobalt Axe",
+		region = "redmesa",
+		ground = { color = "#C8643C", material = "Sandstone" },
+		trees = { ironwood = 38 },
+	},
+	{
 		-- V1 finale, high above the map, reached up the trunk of the Skyroot.
 		id = "sky",
 		displayName = "Aether Isles",
@@ -200,10 +239,34 @@ function BiomeData.Gate(biomeId: string): GateInfo
 	return { needs = needs, words = def.gateWords or "" }
 end
 
+-- The stage a biome asks for (StageOf), or 0 for an open one.
+function BiomeData.StageNeeded(biomeId: string): number
+	local def = byId[biomeId]
+	return if def and def.needsStage then def.needsStage else 0
+end
+
 -- True if the biome exists in the world today (it has an area).
 function BiomeData.IsOpen(biomeId: string): boolean
 	local def = byId[biomeId]
 	return def ~= nil and def.area ~= nil
+end
+
+-- The two reserved regions as biomes (they carry `region`, not `area`): the
+-- id of the one whose disc holds (x, z), or nil. The discs mirror
+-- WorldLayout.Bayou and .RedMesa (a spec locks them).
+BiomeData.RegionDiscs = {
+	bayou = { x = -760, z = -700, radius = 140 },
+	mesa = { x = 590, z = -790, radius = 115 },
+} :: { [string]: { x: number, z: number, radius: number } }
+
+function BiomeData.RegionAt(x: number, z: number): string?
+	for id, d in pairs(BiomeData.RegionDiscs) do
+		local dx, dz = x - d.x, z - d.z
+		if dx * dx + dz * dz <= d.radius * d.radius then
+			return id
+		end
+	end
+	return nil
 end
 
 -- The biome a world position is in, or nil for the open country between.
