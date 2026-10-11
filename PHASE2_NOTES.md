@@ -3946,3 +3946,16 @@ Studio checks (what good looks like; nothing here has been seen in Studio):
 3. Phone: stand still in the Starter Forest for a minute, then walk 600 studs and back. The Developer Console memory (Client memory, "Instances" and "Lua heap") does not keep climbing with the trees streamed in and out (before: every tree stayed referenced).
 4. PC, Higher: seasonal tint and maple / frostwood motes still appear on trees near you within a second or two of arriving; a felled stump gets no mote and causes no hitch.
 5. Xbox: same as 1; nothing about input changed.
+
+## Store interiors: the kit and the Tool Shed (branch `phase-2/store-interiors-polish`, 12 October 2026)
+
+Studio checks (nothing here has been seen in Studio; the renders are `tools/preview` scenes with the roof off):
+
+1. **PC, Tool Shed.** Walk in. Good looks like: warm wood beams overhead and lanterns that are warm, not white; a big sign over each table ("AXES & BELTS", "MACHINES") and a small sign over each group (AXES, BELT KIT, SAWMILLS, PLANERS & SAW) that you can read from the door; every box on a coloured stand with a small flag "T2".. "T8" on a brass post over it (the colour goes brown-honey, green, sage, blue, purple, red, gold, orange, ice as the tier rises); a brass CHECKOUT plaque on the counter's front with Tink behind it on a green mat. Aim the mouse at a stand or a flag: the same name and price tag as for the box. No light is blinding at noon or at night; the lamps do not wash out the signs.
+2. **Locks.** On a new save, axes above the next one show a dark chip "NEEDS <previous axe>" and a grey stand and flag; buy the next axe and the stand turns to its tier colour and the chip goes. The Hearth & Home boots, coat and lantern follow your stage the same way once that store is done (the rule is in `StoreTier`, display only: the shop and the server decide every buy).
+3. **Phone (667 x 375).** From the aisle, the flags ("T5") and the group signs read without zooming; the header signs read from the door; the aisle is still wide enough to carry a box (10 studs, unchanged). Taps on the Browse and Buy prompts are as before.
+4. **Xbox.** The selection ring and the hover tag work on a stand, a flag and a box. Nothing new is bound to a button (NoButtonR2.spec).
+5. **Stock corner.** Two crates and two barrels stand in the west back corner. With meshes loaded they are the real models; if a mesh is slow they show as plain parts first and swap (no hitch).
+6. **Frame rate** in the Tool Shed on a phone at Low quality: about 245 interior parts, 8 lanterns (shadows off).
+
+What changed for other stores: `ShopInterior` now only dispatches to `Shared/Art/ShopInteriors/<Store>.luau`; Hearth & Home, Sparkworks and the Dealership are the old interiors moved unchanged until their agents restyle them. `ShopInterior.SteppedUnit` is now `ShopKit.SteppedUnit` (re-exported), so every store's plinths already become tier stands (colour, flag, lock chip, hover tag); that is the one look change to those three stores before their own pass.
