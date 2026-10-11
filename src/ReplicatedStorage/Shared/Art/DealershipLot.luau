@@ -25,6 +25,7 @@ local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local Kit = require(script.Parent.Kit)
 local ShowroomLight = require(script.Parent.Parent.ShowroomLight)
+local StoreTier = require(script.Parent.Parent.StoreTier)
 local TruckArt = require(script.Parent.TruckArt)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
 local VehicleLogic = require(script.Parent.Parent.VehicleLogic)
@@ -59,6 +60,23 @@ DealershipLot.Aisle = 14 -- the clear central walkway between the rows' plinths
 DealershipLot.PlinthHeight = 1.2
 DealershipLot.BlockHeight = 0.3 -- the accent-coloured block a vehicle's box stands on
 DealershipLot.BlockMargin = 0.25 -- the block is this much bigger than the box all round
+
+-- The tier stand each plinth wears (store polish; display only, the catalog has no
+-- vehicle tier: StoreTier ranks a vehicle by price within its kind). The plinth's
+-- front band and aisle-edge stripe are in the tier colour, and a T-flag on a brass
+-- post stands beside the box (the same parts as ShopKit.TierStand makes for a
+-- shelf: TierPost, TierBacking, TierFlag, and a LockChip when StoreTier.LockOf
+-- names a lock, none for a vehicle today).
+DealershipLot.FlagSize = Vector3.new(3.4, 2.0, 0.2)
+DealershipLot.ChipSize = Vector3.new(5.0, 1.0, 0.16)
+DealershipLot.FlagYaw = math.rad(12) -- the flag is turned this far, so it never stands edge-on to the aisle
+DealershipLot.FlagHeight = 5.0 -- the flag's middle, above the plinth's top
+DealershipLot.BandHeight = 0.55
+local BRASS = Color3.fromRGB(201, 162, 74)
+-- A display vehicle's Neon lenses are never near-white (ShopKit.NearWhite, luma 0.86): the live
+-- trucks' pale headlamp lens (#FFE9B0) blows out in a lit hall, so the display copy wears warm amber.
+DealershipLot.MaxNeonLuma = 0.86
+DealershipLot.DisplayLens = Color3.fromRGB(255, 205, 125)
 
 -- The vehicles on show: ItemBox.Showroom, the one list.
 local ORDER = ItemBox.Showroom
@@ -254,6 +272,13 @@ local function prep(model: Model, category: string, id: string)
 		if d:IsA("BasePart") then
 			d.Anchored = true
 			Kit.decor(d)
+			local c = d.Color
+			if
+				d.Material == Enum.Material.Neon
+				and 0.299 * c.R + 0.587 * c.G + 0.114 * c.B > DealershipLot.MaxNeonLuma
+			then
+				d.Color = DealershipLot.DisplayLens
+			end
 		end
 	end
 end
@@ -341,10 +366,14 @@ function DealershipLot.Build(): Model
 	local oz = -depth / 2
 	for _, bay in ipairs(layout.bays) do
 		local cx, cz = bay.x, oz + bay.z
-		local color = paintOf(bay.kind, bay.id)
+		local paint = paintOf(bay.kind, bay.id)
+		local tier = StoreTier.Of(bay.kind, bay.id)
+		local lock = StoreTier.LockOf(bay.kind, bay.id)
+		-- The stand's colour: its tier's, else the vehicle's own paint.
+		local color = if tier then StoreTier.Color(tier) else paint
 
-		-- The plinth: a slab you can walk up onto, a stripe of the vehicle's
-		-- paint along its front edge, a lamp post at the back corner.
+		-- The plinth: a slab you can walk up onto, a stripe of the stand's tier colour
+		-- along its front edge, a lamp post at the back corner.
 		local slab = Kit.part(
 			lot,
 			"Plinth",
@@ -364,6 +393,34 @@ function DealershipLot.Build(): Model
 			Enum.Material.SmoothPlastic
 		)
 		Kit.decor(stripe, false)
+		-- The tier band on the plinth's aisle face (a hair proud of it, never past the
+		-- aisle line the spec pins), so the stand's colour reads from across the hall.
+		local band = Kit.part(
+			lot,
+			"PlinthBand",
+			Vector3.new(bay.width - 0.6, DealershipLot.BandHeight, 0.14),
+			CFrame.new(cx, top - DealershipLot.BandHeight / 2 - 0.15, cz + aisleSide * (bay.depth / 2 - 0.062)),
+			color,
+			Enum.Material.SmoothPlastic
+		)
+		Kit.decor(band, false)
+		local function standPart(p: BasePart, role: string)
+			p:SetAttribute("StandRole", role)
+			p:SetAttribute("StandKind", bay.kind)
+			p:SetAttribute("StandItem", bay.id)
+			p:SetAttribute("StandOpen", color)
+			pcall(function()
+				CollectionService:AddTag(p, "StoreStand")
+			end)
+		end
+		if tier then
+			stripe:SetAttribute("StandTier", tier)
+			band:SetAttribute("StandTier", tier)
+		end
+		if lock then
+			standPart(stripe, "base")
+			standPart(band, "base")
+		end
 		local postX, postZ = cx - bay.width / 2 + 0.7, cz - aisleSide * (bay.depth / 2 - 0.7)
 		Kit.decor(
 			Kit.part(
@@ -456,6 +513,55 @@ function DealershipLot.Build(): Model
 		}
 		HoverTag.Mark(slab, hover)
 		HoverTag.Mark(spot, hover)
+		-- The T-flag on its post, beside the box (west of it, inside the plinth), turned
+		-- to the west and the aisle; the lock chip over it when a lock names one.
+		if tier then
+			local yaw = CFrame.Angles(0, -aisleSide * DealershipLot.FlagYaw, 0)
+			local fx = cx - bay.box.X / 2 - 2.2
+			local fz = cz + aisleSide * (bay.depth / 2 - 1.3)
+			local flagY = top + DealershipLot.FlagHeight
+			local size = DealershipLot.FlagSize
+			local postTop = flagY - size.Y / 2
+			local post = Kit.part(
+				lot,
+				"TierPost",
+				Vector3.new(0.2, postTop - top, 0.2),
+				CFrame.new(fx, (top + postTop) / 2, fz),
+				BRASS,
+				Enum.Material.Metal
+			)
+			Kit.decor(post, false)
+			local at = CFrame.new(fx, flagY, fz) * yaw
+			Kit.decor(
+				Kit.part(lot, "TierBacking", size + Vector3.new(0.24, 0.24, -0.08), at, BRASS, Enum.Material.Metal),
+				false
+			)
+			local flag = Kit.part(lot, "TierFlag", size, at, color, Enum.Material.SmoothPlastic)
+			Kit.decor(flag, false)
+			Kit.signText(flag, StoreTier.Label(tier), StoreTier.InkOn(color), nil, Enum.Font.FredokaOne, 0.2)
+			flag:SetAttribute("StandTier", tier)
+			local tagSpec: HoverTag.Spec = table.clone(hover)
+			tagSpec.anchor = true
+			HoverTag.Mark(flag, tagSpec)
+			local postSpec: HoverTag.Spec = table.clone(hover)
+			postSpec.anchor = false
+			HoverTag.Mark(post, postSpec)
+			if lock then
+				standPart(flag, "flag")
+				local chip = Kit.part(
+					lot,
+					"LockChip",
+					DealershipLot.ChipSize,
+					CFrame.new(fx, flagY + size.Y / 2 + 0.6, fz) * yaw,
+					StoreTier.LockedColor,
+					Enum.Material.SmoothPlastic
+				)
+				Kit.decor(chip, false)
+				Kit.signText(chip, lock.text, StoreTier.LockedInk, nil, Enum.Font.FredokaOne, 0.2)
+				chip:SetAttribute("LockText", lock.text)
+				standPart(chip, "chip")
+			end
+		end
 		if model then
 			hover.anchor = true
 			HoverTag.Mark(model, hover)

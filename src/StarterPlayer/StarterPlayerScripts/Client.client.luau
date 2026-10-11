@@ -79,6 +79,7 @@ local MODULES = {
 	"ShopDoorAnim",
 	"ShopUI",
 	"StorePrices",
+	"StoreStandState",
 	"StoreUI",
 	"SprintController",
 	"SwingPose",
@@ -312,6 +313,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "HoverTagUI",
 		get = function()
 			return require(script.Parent.HoverTagUI)
+		end,
+	},
+	{
+		name = "StoreStandState", -- greys a store stand while its item is locked for you
+		get = function()
+			return require(script.Parent.StoreStandState)
 		end,
 	},
 	{
