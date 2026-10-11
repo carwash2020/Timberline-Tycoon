@@ -6,8 +6,13 @@
 --   * Game code reports what happened with DailyService.Event (the same
 --     moments as the tutorial: trees felled, logs loaded, logs sold, and
 --     from the Living Forest: figured logs sold).
---   * A finished goal pays its reward; finishing all of them pays the
---     streak bonus and extends the streak. A missed day breaks it.
+--   * A finished goal is owed, not paid: Rook Calloway, the Sawmill Foreman
+--     (Shared/ForemanData), pays it when the player hands it in (the
+--     ForemanTurnIn remote, checked against the distance to him). Finishing
+--     all of them extends the streak at once and owes the streak bonus the
+--     same way. Whatever is still owed when the day resets is paid then,
+--     and a wallet at the cap leaves the remainder owed (`bonusOwed`). A
+--     missed day breaks the streak.
 --   * New goals roll at midnight UTC, including for players online then.
 --   * While Murph's tutorial runs (profile.tutorialDone is false, so the
 --     TutorialStep attribute is above 0), goals still count and pay, but
@@ -31,9 +36,11 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
+local ForemanData = require(ReplicatedStorage.Shared.ForemanData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
 local ProfileService = require(script.Parent.ProfileService)
+local RateLimiter = require(script.Parent.RateLimiter)
 local QuestService = require(script.Parent.QuestService)
 
 type Profile = ProfileService.Profile
@@ -94,6 +101,7 @@ local function publish(player: Player, profile: Profile)
 	local daily = profile.daily
 	player:SetAttribute("DailyGoals", DailyData.Encode(daily.goals))
 	player:SetAttribute("DailyStreak", daily.streak)
+	player:SetAttribute("DailyBonusOwed", daily.bonusOwed or 0) -- the streak bonus (or a full wallet's remainder) Rook still owes
 	player:SetAttribute("DailyResetAt", DailyData.NextReset(clock()))
 	player:SetAttribute("DailyLoginDay", daily.loginDay or 0) -- the calendar day paid today (1..7)
 end
@@ -121,14 +129,43 @@ local function claimLogin(player: Player, profile: Profile): boolean
 	return true
 end
 
--- Rolls new goals if the day has changed. Returns true if it did.
+-- Pays everything the foreman owes: each finished goal not yet paid, then
+-- the all-done bonus. Marked paid before the cash moves, so a second call
+-- (a double tap, a hand-in during a sale) pays nothing. A full wallet keeps
+-- the part that did not fit owed. Returns (credited, still owed).
+local function settle(player: Player, profile: Profile, reason: string): (number, number)
+	local daily = profile.daily
+	local total = ForemanData.Owed(daily.goals, daily.bonusOwed)
+	if total <= 0 then
+		return 0, 0
+	end
+	for _, goal in ipairs(daily.goals) do
+		if goal.done and goal.paid == false then
+			goal.paid = true
+		end
+	end
+	daily.bonusOwed = 0
+	local credited, overflow = EconomyService.AddCash(player, total, reason, "daily")
+	if overflow > 0 then
+		daily.bonusOwed = overflow
+	end
+	return credited, overflow
+end
+
+-- Rolls new goals if the day has changed. Returns true if it did. What the
+-- foreman still owed from the old day is paid first.
 local function rollIfNewDay(player: Player, profile: Profile): boolean
 	local daily = profile.daily
 	local today = DailyData.Day(clock())
 	if daily.day == today then
 		return false
 	end
+	local paid = settle(player, profile, "daily jobs, paid at the reset")
+	if paid > 0 then
+		toast(player, profile, string.format("Rook paid your %s for yesterday's jobs.", Util.formatCash(paid)))
+	end
 	daily.day = today
+	daily.areasToday = {}
 	daily.goals = DailyData.Roll(player.UserId, today, profile.bestAxeTier, if loop == 2 then 2 else nil)
 	if daily.lastCompleteDay < today - 1 then
 		daily.streak = 0 -- a whole day went by without finishing: the streak is over
@@ -155,12 +192,12 @@ local function finishDay(player: Player, profile: Profile)
 	daily.lastCompleteDay = today
 	daily.bestStreak = math.max(daily.bestStreak, daily.streak)
 	local bonus = DailyData.Bonus(profile.bestAxeTier, daily.streak, if loop == 2 then 2 else nil)
-	EconomyService.AddCash(player, bonus, string.format("daily bonus, %d-day streak", daily.streak), "daily")
+	daily.bonusOwed = (daily.bonusOwed or 0) + bonus
 	toast(
 		player,
 		profile,
 		string.format(
-			"All daily goals done! +%s. Streak: %d day%s.",
+			"All daily jobs done! Rook owes you %s more. Streak: %d day%s.",
 			Util.formatCash(bonus),
 			daily.streak,
 			if daily.streak == 1 then "" else "s"
@@ -186,12 +223,12 @@ local function progress(player: Player, profile: Profile, addFor: (Goal) -> numb
 				goal.progress = math.min(goal.target, goal.progress + add)
 				if goal.progress >= goal.target then
 					goal.done = true
-					EconomyService.AddCash(player, goal.reward, "daily goal: " .. goal.kind, "daily")
+					goal.paid = false -- Rook pays it when you hand it in
 					toast(
 						player,
 						profile,
 						string.format(
-							"Daily goal done: %s. +%s",
+							"Daily job done: %s. Rook has %s for you.",
 							DailyData.GoalText(goal),
 							Util.formatCash(goal.reward)
 						)
@@ -252,6 +289,28 @@ function DailyService.Event(
 	end)
 end
 
+-- A new area was found (BadgeService.OnNewArea, from GameServer). Counts once
+-- per area per day toward "Discover a new area": a repeated event (Poll re-fires
+-- while a badge award is in flight) finishes the goal once and pays nothing here
+-- (the foreman pays on hand-in).
+function DailyService.Area(player: Player, areaId: string)
+	local profile = ProfileService.GetProfile(player)
+	if not profile or type(areaId) ~= "string" then
+		return
+	end
+	local daily = profile.daily
+	if type(daily.areasToday) ~= "table" then
+		daily.areasToday = {}
+	end
+	progress(player, profile, function(goal: Goal): number
+		if (goal.kind == "visitArea" or goal.kind == "visitNewArea") and daily.areasToday[areaId] ~= true then
+			return 1
+		end
+		return 0
+	end)
+	daily.areasToday[areaId] = true
+end
+
 -- A v2 sale paid `player` (SellService's onSold, per payee per tick): its
 -- u³, the dollars credited, u³ by wood, each piece's u³ and the figured
 -- u³ (DailyData.SaleV2) count toward today's v2 goals. Nothing under the
@@ -271,6 +330,59 @@ function DailyService.WoodSold(player: Player, sale: DailyData.SaleV2)
 	progress(player, profile, function(goal: Goal): number
 		return DailyData.CountV2(goal, "woodSold", nil, sale)
 	end)
+end
+
+-- Hands the day's finished jobs in to Rook: pays what is owed. Returns the
+-- cash credited and the part a full wallet left owed. Nothing during the
+-- tutorial (Rook sends you back to Murph).
+function DailyService.TurnIn(player: Player): (number, number)
+	local profile = ProfileService.GetProfile(player)
+	if not profile or not profile.tutorialDone then
+		return 0, 0
+	end
+	rollIfNewDay(player, profile)
+	local credited, owedLeft = settle(player, profile, "daily jobs, paid by the foreman")
+	publish(player, profile)
+	if credited > 0 then
+		notify(player, string.format("Rook paid you %s.", Util.formatCash(credited)))
+		analytics(player, "DailyPaid", credited)
+	elseif owedLeft > 0 then
+		notify(player, "Your wallet is full. Rook keeps the rest owed.")
+	end
+	QuestService.RefreshNextGoal(player)
+	return credited, owedLeft
+end
+
+-- Whether `player` stands within hand-in reach of Rook (the Foreman model,
+-- tagged NPC): the same reach as his Talk prompt, with a little slack.
+DailyService.Reach = 16
+function DailyService.NearForeman(player: Player): boolean
+	local char = player.Character
+	local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if not hrp or not hrp:IsA("BasePart") then
+		return false
+	end
+	local ok, near = pcall(function(): boolean
+		for _, model in ipairs(game:GetService("CollectionService"):GetTagged("NPC")) do
+			if model:GetAttribute("NPCId") == ForemanData.Id and model:IsA("Model") and model.PrimaryPart then
+				if (model.PrimaryPart.Position - hrp.Position).Magnitude <= DailyService.Reach then
+					return true
+				end
+			end
+		end
+		return false
+	end)
+	return ok and near
+end
+
+local function onTurnIn(player: Player)
+	if not RateLimiter.Allow(player, "ForemanTurnIn") then
+		return
+	end
+	if not DailyService.NearForeman(player) then
+		return
+	end
+	DailyService.TurnIn(player)
 end
 
 -- Call once the player's save has loaded. Today's goals from the other
@@ -310,8 +422,16 @@ end
 -- `notifyFn` shows a toast (GameServer's notify). `clockFn` is for tests.
 -- `activeLoop` is the core loop that runs (CoreLoop.Active(); 1 when not
 -- given).
-function DailyService.Init(notifyFn: (Player, string) -> (), clockFn: (() -> number)?, activeLoop: number?)
+function DailyService.Init(
+	notifyFn: (Player, string) -> (),
+	clockFn: (() -> number)?,
+	activeLoop: number?,
+	turnInRemote: RemoteEvent?
+)
 	notify = notifyFn
+	if turnInRemote then
+		turnInRemote.OnServerEvent:Connect(onTurnIn)
+	end
 	loop = if activeLoop == 2 then 2 else 1
 	if clockFn then
 		clock = clockFn

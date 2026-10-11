@@ -22,6 +22,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	PickUpBlueprint = 4,
 	BuyItem = 3,
 	SkipTutorial = 1,
+	ForemanTurnIn = 2, -- hand the day's jobs in to the Sawmill Foreman (DailyService)
 	ResetTutorial = 1,
 	TutorialSeen = 2, -- the hammer's blueprint list or LAND opened, for the tutorial
 	EquipItem = 2,

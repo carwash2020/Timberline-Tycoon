@@ -276,9 +276,14 @@ local controllers: { { name: string, get: () -> any } } = {
 			return require(script.Parent.FerryController)
 		end,
 	},
-	-- DailyUI stays in MODULES (the file is waited for) but is not started.
-	-- Start calls UITheme.Sized("DailyButton"), and that size is gone, so
-	-- starting it warned in Output. Lane E (Foreman) replaces this module.
+	-- DailyUI is now Rook Calloway's job board (Lane E): it no longer needs
+	-- the removed DailyButton size, so it starts again. NPCController opens it.
+	{
+		name = "DailyUI",
+		get = function()
+			return require(script.Parent.DailyUI)
+		end,
+	},
 	{
 		name = "DialogueUI",
 		get = function()

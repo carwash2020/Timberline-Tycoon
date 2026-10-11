@@ -1814,7 +1814,7 @@ function CharacterArt.Build(spec: Spec): Model
 	model:SetAttribute("TopOffset", ctx.top * s)
 	model:SetAttribute("Height", (headY + ctx.top) * s)
 	-- Uploaded limbs weld onto this rig. A miss keeps the parts above.
-	NPCMeshes.Dress(model, (spec.name:gsub("%s+", "")))
+	NPCMeshes.Dress(model, NPCMeshes.AssetId(spec.name))
 	return model
 end
 

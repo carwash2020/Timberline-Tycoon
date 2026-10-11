@@ -87,6 +87,9 @@ export type DailyState = {
 	-- Cash the all-done bonus still owes. Lane E pays it at the Sawmill
 	-- Foreman. 0 until then.
 	bonusOwed: number,
+	-- Area ids counted toward today's "Discover a new area" goal (reset when
+	-- the day rolls). Missing in older saves, read as empty.
+	areasToday: { [string]: boolean },
 	-- The daily-return calendar (DailyData.LoginStep; absent in older saves,
 	-- read as 0): the calendar day 1..7 last paid, and the UTC day it paid.
 	loginDay: number?,
@@ -245,6 +248,8 @@ export type Profile = {
 		cuts: number, -- v2: cuts made through trunks and logs
 	},
 	tutorialDone: boolean,
+	-- True when they pressed Skip (slot field; tutorialDone is also true).
+	tutorialSkipped: boolean,
 	tutorialStep: number, -- index into TutorialData.Steps (QuestService)
 	tutorialProgress: number, -- count toward the current step
 	-- Which v2 step list tutorialStep was saved against (TutorialData.OrderV2).
@@ -387,6 +392,7 @@ local TEMPLATE: Profile = {
 	npcFriendship = { Murph = 0, Millie = 0, Tink = 0 },
 	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0, volumeSold = 0, cuts = 0 },
 	tutorialDone = false,
+	tutorialSkipped = false,
 	tutorialStep = 1,
 	tutorialProgress = 0,
 	tutorialOrder = 0,
@@ -402,6 +408,7 @@ local TEMPLATE: Profile = {
 		loginDay = 0,
 		lastLoginDay = 0,
 		bonusOwed = 0,
+		areasToday = {},
 	},
 	purchaseIds = {},
 	passes = {},
@@ -828,9 +835,11 @@ local function applyDaily(record: any)
 			loginDay = 0,
 			lastLoginDay = 0,
 			bonusOwed = 0,
+			areasToday = {},
 		}
 		return
 	end
+	daily.areasToday = booleanMap(daily.areasToday)
 	local owed = finiteNumber(daily.bonusOwed, 0)
 	daily.bonusOwed = if owed < 0 then 0 else owed
 	if type(daily.goals) ~= "table" then
@@ -878,6 +887,7 @@ local function applySlotFields(record: any)
 	if type(record.plot) ~= "table" then
 		record.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} }
 	end
+	record.tutorialSkipped = record.tutorialSkipped == true
 	record.plot.squares = squareList(record.plot.squares)
 	record.plot.wires = WireLogic.Clean(record.plot.wires)
 	record.plot.switches = WireLogic.CleanSwitches(record.plot.switches)

@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
+local FieldGuideStamps = require(ReplicatedStorage.Shared.FieldGuideStamps)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
@@ -73,6 +74,14 @@ local function revealed(): { [string]: number }
 	return counts
 end
 
+-- Rosa's stamps and the secrets found (FieldGuideService publishes both).
+local function stampsLine(): string
+	local stamps = ShopLogic.DecodeSet((player:GetAttribute("FieldGuideStamps") :: string?) or "")
+	local stamped, woods = FieldGuideStamps.Count(stamps)
+	local secrets, total = string.match((player:GetAttribute("FieldGuideSecrets") :: string?) or "", "^(%d+),(%d+)$")
+	return FieldGuideStamps.Line(stamped, woods, tonumber(secrets) or 0, tonumber(total) or 5)
+end
+
 local open: (Page) -> ()
 
 local function woodsPage(): ShopUI.Shop
@@ -81,7 +90,7 @@ local function woodsPage(): ShopUI.Shop
 		building = nil,
 		promptText = "",
 		title = "Field Guide",
-		subtitle = FieldGuide.WoodsSubtitle(found()),
+		subtitle = FieldGuide.WoodsSubtitle(found()) .. " " .. stampsLine(),
 		ids = function()
 			local ids = { PAGE_ROW }
 			for _, wood in ipairs(WoodData.All()) do
@@ -312,6 +321,8 @@ function FieldGuideUI.Start()
 	player:GetAttributeChangedSignal("HasFieldGuide"):Connect(refresh)
 	player:GetAttributeChangedSignal("FieldGuide"):Connect(refresh)
 	player:GetAttributeChangedSignal("FieldGuideFigures"):Connect(refresh)
+	player:GetAttributeChangedSignal("FieldGuideStamps"):Connect(refresh)
+	player:GetAttributeChangedSignal("FieldGuideSecrets"):Connect(refresh)
 	refresh()
 end
 

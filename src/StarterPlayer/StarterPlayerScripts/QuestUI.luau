@@ -253,11 +253,11 @@ local function nearestTagged(tag: string, from: Vector3, accept: (Model, BasePar
 	return best
 end
 
--- Whether Skip shows on step `index` (the TutorialStep attribute): from
--- the second step on, so a new player's first second on the screen isn't
--- an invitation to skip (UI-19). It still takes two taps.
+-- Whether Skip shows on step `index` (the TutorialStep attribute): on every
+-- step while the tutorial runs (it was from the second step on, UI-19; V1
+-- makes it skippable everywhere). It still takes two taps.
 function QuestUI.ShowSkip(index: number): boolean
-	return index >= 2
+	return index >= 1 -- every step (Connor): still two taps, so it is never an accident
 end
 
 -- What Skip says after the first press, in the device's word
@@ -276,6 +276,7 @@ QuestUI.BeaconPaths = {
 	plotSign = { "Plots", "Plot_1", "Sign" },
 	landOffice = { "LandOffice", "Counter" },
 	dealership = { "Dealership", "Counter" },
+	gus = { "GondolaTown", "Platform" }, -- the charter keeper's platform (NextGoal.PickV1)
 } :: { [string]: { string } }
 
 -- The fixed part for the beacon `target` under `map` (TimberlineMap), if
@@ -556,10 +557,66 @@ local function refresh()
 			say(TutorialData.MurphLine(step, lastRefresher, if type(cash) == "number" then cash else 0))
 		elseif lastStep > 0 and not skipped then
 			say(if lastRefresher then TutorialData.FarewellBack else TutorialData.Farewell)
+			if not lastRefresher then
+				QuestUI.JoyBeat()
+			end
 		end
 		lastStep = index
 	end
 	updateBeacon()
+end
+
+-- The joy beat at the end of the lessons: a banner with the next goal, a
+-- chime and confetti, about three seconds, over everything but the HUD.
+function QuestUI.JoyBeat()
+	local gui = UITheme.Screen("JoyBeat", UITheme.Layers.Badge)
+	local banner = Instance.new("Frame")
+	banner.AnchorPoint = Vector2.new(0.5, 0)
+	banner.Position = UDim2.fromScale(0.5, 0.14)
+	banner.Size = UDim2.fromOffset(340, 84)
+	banner.BackgroundColor3 = C.Ink
+	banner.BackgroundTransparency = 0.12
+	UITheme.corner(banner, 12)
+	UITheme.stroke(banner, C.Amber, 2)
+	banner.Parent = gui
+	local title = UITheme.label(banner, TutorialData.JoyTitle, F.Black, 24, C.Amber)
+	title.Position = UDim2.fromOffset(0, 6)
+	title.Size = UDim2.new(1, 0, 0, 30)
+	title.TextXAlignment = Enum.TextXAlignment.Center
+	local sub = UITheme.label(banner, TutorialData.JoyLine(player:GetAttribute("NextGoal")), F.Bold, 14, C.Cream)
+	sub.Position = UDim2.fromOffset(8, 40)
+	sub.Size = UDim2.new(1, -16, 0, 38)
+	sub.TextXAlignment = Enum.TextXAlignment.Center
+	sub.TextWrapped = true
+	for i = 1, TutorialData.JoyConfetti do
+		local bit = Instance.new("Frame")
+		bit.AnchorPoint = Vector2.new(0.5, 0.5)
+		bit.Position = UDim2.fromScale(math.random(), 0.05)
+		bit.Size = UDim2.fromOffset(8, 14)
+		bit.BackgroundColor3 = if i % 3 == 0 then C.Cream elseif i % 3 == 1 then C.Amber else C.Money
+		bit.BorderSizePixel = 0
+		bit.Rotation = math.random(0, 180)
+		bit.Parent = gui
+		local fall = TweenService:Create(
+			bit,
+			TweenInfo.new(1.6 + math.random() * 1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+			{
+				Position = UDim2.fromScale(bit.Position.X.Scale + (math.random() - 0.5) * 0.2, 1.05),
+				Rotation = bit.Rotation + math.random(-300, 300),
+			}
+		)
+		fall.Completed:Once(function()
+			bit:Destroy()
+		end)
+		fall:Play()
+	end
+	pcall(function()
+		require(ReplicatedStorage.Shared.SoundData).Play("FigureReveal") -- the chime
+	end)
+	gui.Parent = player:WaitForChild("PlayerGui")
+	task.delay(TutorialData.JoySeconds, function()
+		gui:Destroy()
+	end)
 end
 
 -- The parts QuestUI clones into Murph's portrait. Beard and Beanie are

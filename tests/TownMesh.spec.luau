@@ -625,6 +625,11 @@ return function(t)
 			Gus = 1460,
 			Dale = 1436,
 			OldBram = 1384,
+			Hermit = 1284,
+			OldTolly = 1460,
+			CapnMoss = 1524,
+			OldHank = 1584,
+			Foreman = 1588,
 		}
 		for _, asset in ipairs(TownModels.All) do
 			local cap = if asset.category == "building"
@@ -651,7 +656,8 @@ return function(t)
 		t.ok(1736 <= TownModels.PropTriCap, "MurphsCamp is under the prop cap")
 		t.eq(#TownModels.Ids("environment"), 41)
 		t.eq(#TownModels.Ids("building"), 6)
-		t.eq(#TownModels.Ids("npc"), 9)
+		-- Nine townsfolk, then the five Blender NPCs (Hermit, Old Tolly, Cap'n Moss, Old Hank, the Foreman).
+		t.eq(#TownModels.Ids("npc"), 14)
 	end)
 
 	t.test("I-Budget: props under 300 tris cast no shadow", function()

@@ -3534,3 +3534,25 @@ Xbox
 3. Icon drafts and uploads (his).
 4. Default used: stage badges (S4, S8) are not added until E's stage events land.
 5. Default used: names show as Roblox usernames (what `LeaderboardService` caches), not display names.
+
+
+## Lane E: Studio checklist (11 October 2026)
+
+1. PC: walk to the sawmill yard, west of the office door. Rook Calloway (hard hat, green plaid, clipboard) faces the road. Press E: a two-line box, then the job board opens. Esc closes it.
+2. Finish a daily job: a toast says Rook has the cash, and your wallet does not change. Talk to Rook, press Take: the wallet rises once. Press Take again quickly: nothing more.
+3. Finish all three: the streak shows at once; Rook owes the bonus; Take pays jobs and bonus together.
+4. Phone (667x375): the job board shows three goals, Take and Close without scrolling; the calendar is hidden; every button is at least 44 px.
+5. Xbox: Talk (X), then the board opens with Close or Take selected; B closes it; DPadUp does nothing and raises no error.
+6. During Murph's tutorial: Rook says to finish with Murph first and no board opens.
+7. Output: no `[Client] DailyUI failed to start`. With the five NPC meshes loading, Hermit, Old Tolly, Cap'n Moss, Old Hank and Rook should show their Blender meshes; check `[MeshKit]` and `[NPCMeshes]` lines for misses (each asset warns once).
+8. Talk to Gus: his first line follows your charter step.
+
+### Lane E round 2: more Studio checks
+
+9. Walk into the Snow without a Coat: the screen edges frost and a toast says "Cold hurts here. Find a campfire or wear a Coat." once ever. Put the Coat on: it clears. Same with heat and the Heat Boots.
+10. A "Day N" sits under the clock (hidden during the tutorial). Rejoin: it keeps counting; a second save slot of the same account shares it (account-wide field).
+11. Sell a wood you have never sold: Rosa's toast with a small cash reward. Sell it again: nothing. Field Guide header shows Stamps and Secrets.
+12. Skip the tutorial on step 1 (two taps): the toast names the starter cash and the wallet gains it once. Finish it instead: a banner, chime and confetti name your next goal.
+13. Walk into a new area (any badge area): if today's jobs include "Discover a new area" it finishes; Rook pays on the hand-in.
+14. Phone: the job board ends above the jump button (Close | Take on one row).
+15. Gate signs: nothing changes until the map lane tags them (see PR Cross-lane requests).

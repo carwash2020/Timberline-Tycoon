@@ -12,9 +12,13 @@ local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
+local FieldGuideStamps = require(ReplicatedStorage.Shared.FieldGuideStamps)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
+local SecretLogic = require(ReplicatedStorage.Shared.SecretLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local EconomyService = require(script.Parent.EconomyService)
 local ProfileService = require(script.Parent.ProfileService)
 
 type Profile = ProfileService.Profile
@@ -34,6 +38,56 @@ local function publish(player: Player, profile: Profile)
 	player:SetAttribute("HasFieldGuide", profile.tutorialDone)
 	local forest = profile.forest
 	player:SetAttribute("FieldGuideFigures", ShopLogic.EncodeOwned(if forest then forest.figures else {}))
+	-- Rosa's stamps (woods stamped, and the pages) and the secrets found, for the guide's header.
+	local stamped: { string } = {}
+	for key, on in pairs(profile.guideStamps) do
+		if on == true then
+			table.insert(stamped, key)
+		end
+	end
+	player:SetAttribute("FieldGuideStamps", ShopLogic.EncodeSet(stamped))
+	local secrets, secretTotal = SecretLogic.Count(profile)
+	player:SetAttribute("FieldGuideSecrets", string.format("%d,%d", secrets, secretTotal))
+end
+
+-- Call after a sale with the logs sold by wood id. The first sale of each wood
+-- stamps it, and finishing a biome's woods stamps its page; each pays a small
+-- cash reward through EconomyService (FieldGuideStamps, PROPOSAL amounts).
+function FieldGuideService.Stamp(player: Player, sold: { [string]: number })
+	local profile = ProfileService.GetProfile(player)
+	if not profile or type(sold) ~= "table" then
+		return
+	end
+	if type(profile.guideStamps) ~= "table" then
+		profile.guideStamps = {}
+	end
+	local stamps = profile.guideStamps
+	local fresh = FieldGuideStamps.NewStamps(stamps, sold)
+	if #fresh == 0 then
+		return
+	end
+	local stage = StageOf.Current(profile)
+	for _, id in ipairs(fresh) do
+		stamps[id] = true -- stamped before it pays, so a repeat sale never pays twice
+	end
+	local total = #fresh * FieldGuideStamps.StampReward(stage)
+	local names: { string } = {}
+	for _, id in ipairs(fresh) do
+		local wood = WoodData.Get(id)
+		table.insert(names, if wood then wood.displayName else id)
+	end
+	local pages = FieldGuideStamps.NewPages(stamps)
+	for _, biome in ipairs(pages) do
+		stamps[FieldGuideStamps.PagePrefix .. biome] = true
+		total += FieldGuideStamps.PageReward(stage)
+	end
+	EconomyService.AddCash(player, total, "field guide stamps", "fieldguide")
+	local text = string.format("Rosa stamps your Field Guide: %s. +$%d", table.concat(names, ", "), total)
+	if #pages > 0 then
+		text ..= " A page is complete!"
+	end
+	notify(player, text)
+	publish(player, profile)
 end
 
 -- Call when a player fells a tree of `woodId`.

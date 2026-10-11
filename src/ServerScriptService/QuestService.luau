@@ -6,7 +6,9 @@
 --   * Game code reports what happened with QuestService.Event(player,
 --     event, amount); only the current step's event counts.
 --   * A finished step pays its rewardCash through EconomyService.
---   * The SkipTutorial remote ends it early, without rewards. Saves from
+--   * The SkipTutorial remote ends it early; the skipper is paid the starter
+--     cash of the steps they skipped, once, and tutorialSkipped is saved.
+--     (was: without rewards.) Saves from
 --     before the tutorial that already own a better axe skip it.
 --   * TutorialSeen (client -> server, "build" or "land") reports opening
 --     the hammer's blueprint list or the Land panel; only the current step's event counts.
@@ -40,10 +42,15 @@
 local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ClimateHudLogic = require(ReplicatedStorage.Shared.ClimateHudLogic)
+local DayCounterLogic = require(ReplicatedStorage.Shared.DayCounterLogic)
 local NextGoal = require(ReplicatedStorage.Shared.NextGoal)
+local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local RelicData = require(ReplicatedStorage.Shared.RelicData)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
 local MilestoneService = require(script.Parent.MilestoneService)
@@ -124,7 +131,30 @@ local function refreshNext(player: Player, profile: Profile)
 	local okHour, hour = pcall(function(): number
 		return ShopHoursLogic.Now()
 	end)
-	local goal = NextGoal.Pick(loop, profile.bestAxeTier or 1, found, streak, if okHour then hour else nil)
+	local gear: { [string]: boolean } = {}
+	for _, id in ipairs(if type(profile.gear) == "table" then profile.gear else {}) do
+		gear[id] = true
+	end
+	local relicsDone = true
+	for _, relic in ipairs(RelicData.List) do
+		if not (type(profile.relics) == "table" and profile.relics[relic.id] == true) then
+			relicsDone = false
+		end
+	end
+	local plot: any = profile.plot
+	local hourNow: number = if okHour then hour else 12
+	local goal = NextGoal.PickV1({
+		loop = loop,
+		bestAxeTier = profile.bestAxeTier or 1,
+		gear = gear,
+		found = found,
+		streak = streak,
+		hour = if okHour then hour else nil,
+		night = hourNow >= 20 or hourNow < 5,
+		charterDone = profile.gondolaPass == true or gear.GondolaPass == true,
+		relicsDone = relicsDone,
+		plotFull = type(plot) == "table" and (plot.tier or 1) >= #PlotData.Tiers,
+	})
 	player:SetAttribute("NextGoal", goal.text)
 	player:SetAttribute("NextGoalBeacon", goal.beacon)
 	MilestoneService.Mark(player, "Saw a next goal")
@@ -232,6 +262,31 @@ end
 
 -- Call once the player's save has loaded.
 function QuestService.Start(player: Player, profile: Profile)
+	-- "Day N" under the clock: stamp the world day this save first played.
+	if not (type(profile.dayCounter) == "number" and profile.dayCounter >= 1) then
+		local ok, today = pcall(function(): number
+			return WorldTime.Day(WorldTime.GameNow())
+		end)
+		if ok then
+			profile.dayCounter = DayCounterLogic.Stamp(profile.dayCounter, today)
+		end
+	end
+	if profile.dayCounter >= 1 then
+		player:SetAttribute("FirstWorldDay", profile.dayCounter)
+	end
+	-- The first time cold or heat is on them: one tip, remembered in tipsSeen.
+	pcall(function()
+		player:GetAttributeChangedSignal("ClimateKind"):Connect(function()
+			if type(profile.tipsSeen) ~= "table" then
+				return
+			end
+			local tip = ClimateHudLogic.Tip(player:GetAttribute("ClimateKind"), profile.tipsSeen)
+			if tip then
+				profile.tipsSeen[tip.key] = true
+				notify(player, tip.text)
+			end
+		end)
+	end)
 	if loop == 2 then
 		-- Old v2 saves stored a plot-first index. Once tutorialOrder is
 		-- current, the index already names the right step, so the funnel
@@ -373,6 +428,7 @@ function QuestService.Reset(player: Player)
 	profile.tutorialProgress = 0
 	profile.tutorialRefresher = false
 	profile.tutorialReplay = true
+	profile.tutorialSkipped = false
 	enterStep(player, profile, 1)
 	notify(player, "Tutorial reset. Murph is waiting by the spawn.")
 end
@@ -401,8 +457,24 @@ local function onSkip(player: Player)
 	end
 	local profile = ProfileService.GetProfile(player)
 	if profile and not profile.tutorialDone then
+		-- A skipper still gets the starter cash (the cash of the steps they
+		-- skipped, once) so the first plot and axe are in reach; a replay or a
+		-- returning player's refresher gets nothing extra.
+		local cash = 0
+		if not onRefresher(profile) and profile.tutorialReplay ~= true then
+			cash = TutorialData.SkipCash(loop, math.floor(tonumber(profile.tutorialStep) or 1))
+		end
+		profile.tutorialSkipped = true
 		finish(player, profile, "skipped")
-		notify(player, "Tutorial skipped. Talk to Murph by the spawn any time.")
+		if cash > 0 then
+			EconomyService.AddCash(player, cash, "tutorial: skipped, starter cash", "tutorial")
+			notify(
+				player,
+				string.format("Tutorial skipped. Murph chipped in %s. Talk to him any time.", Util.formatCash(cash))
+			)
+		else
+			notify(player, "Tutorial skipped. Talk to Murph by the spawn any time.")
+		end
 	end
 end
 
