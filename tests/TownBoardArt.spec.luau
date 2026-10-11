@@ -79,7 +79,14 @@ return function(t)
 				count += 1
 			end
 		end
-		t.eq(count, 2, "the board's face and the plaque's")
+		t.eq(count, 3, "the board's face, its back's title and the plaque's")
+		local backs = 0
+		for _, d in ipairs(model:FindFirstChild("Board"):GetChildren()) do
+			if d:IsA("SurfaceGui") and d.Face == t.roblox.Enum.NormalId.Back then
+				backs += 1
+			end
+		end
+		t.eq(backs, 1, "the back is a sign, with no rows on it")
 	end)
 
 	t.test("nothing floats or sinks: the posts reach into the ground, the rest sits on it", function()
@@ -162,6 +169,8 @@ return function(t)
 			end
 		end
 		local L = TownBoardArt.Look
+		t.eq(face(model):FindFirstChild("Rank1").TextColor3, L.Amber)
+		t.eq(face(model):FindFirstChild("Rank4").TextColor3, L.Cream)
 		t.eq(face(model):FindFirstChild("Name1").TextColor3, L.Amber)
 		t.eq(face(model):FindFirstChild("Name3").TextColor3, L.Amber)
 		t.eq(face(model):FindFirstChild("Name4").TextColor3, L.Cream)

@@ -27,8 +27,8 @@ TownBoardArt.Look = {
 	Cream = Color3.fromHex("#F3E7C9"), -- names, title
 	Dim = Color3.fromHex("#D9CBA8"), -- the cash line
 	Amber = Color3.fromHex("#F2C14E"), -- ranks 1 to 3
-	Ink = Color3.fromHex("#2A1F17"), -- rank figure on an amber medal
 	Medal = Color3.fromHex("#5A4636"), -- rank 4 and under
+	MedalTop = Color3.fromHex("#6B5324"), -- ranks 1 to 3 (a warmer brass-dark ring)
 	TimberBrown = Color3.fromHex("#7A5230"), -- posts
 }
 local L = TownBoardArt.Look
@@ -165,7 +165,7 @@ function TownBoardArt.Fill(model: Model, view: TownBoardLogic.View)
 				rank.Text = line.rank
 				name.Text = line.name
 				cash.Text = line.cash
-				rank.TextColor3 = if line.top then L.Ink else L.Cream
+				rank.TextColor3 = if line.top then L.Amber else L.Cream
 				name.TextColor3 = if line.top then L.Amber else L.Cream
 			else
 				rank.Text = ""
@@ -175,7 +175,7 @@ function TownBoardArt.Fill(model: Model, view: TownBoardLogic.View)
 		end
 		local medal = gui:FindFirstChild("Medal" .. i)
 		if medal and medal:IsA("Frame") and line then
-			medal.BackgroundColor3 = if line.top then L.Amber else L.Medal
+			medal.BackgroundColor3 = if line.top then L.MedalTop else L.Medal
 		end
 	end
 	local message = text("Message")
@@ -196,6 +196,8 @@ function TownBoardArt.Build(): Model
 
 	local board = Kit.part(model, "Board", size, CFrame.new(0, fieldY, 0), L.Walnut, Enum.Material.WoodPlanks)
 	buildFace(board)
+	-- The back reads as a sign too (the title in brass), not a blank slab.
+	Kit.signText(board, TownBoardLogic.Title, L.Brass, { Enum.NormalId.Back }, TITLE_FONT, 0.25)
 
 	local outerW = size.X + f * 2
 	for _, y in ipairs({ fieldY + size.Y / 2 + f / 2, fieldY - size.Y / 2 - f / 2 }) do

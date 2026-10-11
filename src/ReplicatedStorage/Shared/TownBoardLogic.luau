@@ -52,14 +52,14 @@ TownBoardLogic.CanvasSize = Vector2.new(1400, 800)
 
 -- Layout on that canvas.
 TownBoardLogic.HeaderH = 150
-TownBoardLogic.RowH = 108
-TownBoardLogic.RowGap = 8
-TownBoardLogic.RowsTop = 190
+TownBoardLogic.RowH = 116
+TownBoardLogic.RowGap = 6
+TownBoardLogic.RowsTop = 176
 TownBoardLogic.ColW = 650
 TownBoardLogic.ColLeft = { 40, 710 }
-TownBoardLogic.Medal = 84 -- rank circle
-TownBoardLogic.NameTextPx = 54
-TownBoardLogic.CashTextPx = 38
+TownBoardLogic.Medal = 92 -- rank circle
+TownBoardLogic.NameTextPx = 60
+TownBoardLogic.CashTextPx = 42
 TownBoardLogic.TitleTextPx = 120
 TownBoardLogic.MessageTextPx = 64
 
@@ -81,8 +81,8 @@ function TownBoardLogic.Slot(i: number): Slot
 		plate = { x = x, y = y, w = TownBoardLogic.ColW, h = h },
 		medal = { x = x + 16, y = y + (h - m) // 2, w = m, h = m },
 		rank = { x = x + 16, y = y + (h - m) // 2, w = m, h = m },
-		name = { x = textX, y = y + 4, w = textW, h = 58 },
-		cash = { x = textX, y = y + 62, w = textW, h = 42 },
+		name = { x = textX, y = y + 4, w = textW, h = 62 },
+		cash = { x = textX, y = y + 66, w = textW, h = 46 },
 	}
 end
 
