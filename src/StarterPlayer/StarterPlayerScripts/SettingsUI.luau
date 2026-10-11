@@ -592,6 +592,7 @@ function SettingsUI.Start()
 	local shakeFace: TextButton
 	local scaleFace: TextButton
 	local tipsFace: TextButton
+	local flashFace: TextButton
 	local resetFace: TextButton
 	local restartFace: TextButton
 
@@ -644,6 +645,12 @@ function SettingsUI.Start()
 		shakeFace.Text = if shake == false then "CAMERA SHAKE: OFF" else "CAMERA SHAKE: ON"
 		scaleFace.Text = "UI scale  " .. string.upper(scaleName)
 		tipsFace.Text = if tips == false then "TIPS: OFF" else "TIPS: ON"
+		local flashOwn = player:GetAttribute(SettingsLogic.ReduceFlashingAttribute) == true
+		local flashForced = not flashOwn and SettingsLogic.ReduceFlashing(false, shake)
+		flashFace.Text = if flashOwn
+			then "REDUCE FLASHING: ON"
+			elseif flashForced then "REDUCE FLASHING: ON (SHAKE OFF)"
+			else "REDUCE FLASHING: OFF"
 		musicFace.Text = if SoundData.MusicEnabled then "MUSIC: ON" else "MUSIC: OFF"
 		musicVolFace.Text = "Music volume  " .. percent(SoundData.MusicVolume) .. "  ±"
 		sfxFace.Text = if SoundData.SfxEnabled then "SOUND FX: ON" else "SOUND FX: OFF"
@@ -701,6 +708,12 @@ function SettingsUI.Start()
 		local on = player:GetAttribute("SettingCameraShake") == false
 		CameraShake.SetEnabled(on)
 		save("cameraShake", on)
+		applyAll()
+	end)
+	flashFace = row("reduceFlashing", "REDUCE FLASHING: OFF", function()
+		local on = player:GetAttribute(SettingsLogic.ReduceFlashingAttribute) ~= true
+		player:SetAttribute(SettingsLogic.ReduceFlashingAttribute, on) -- the server sets it too; this keeps the row snappy
+		save("reduceFlashing", on)
 		applyAll()
 	end)
 	scaleFace = row("scale", "UI scale  NORMAL", function()

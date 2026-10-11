@@ -32,6 +32,7 @@ export type Settings = {
 	cameraSensitivity: number, -- 0.25 to 2, 1 = the device's own camera speed (SettingsLogic.Sensitivity)
 	uiScale: UIScale,
 	showTips: boolean,
+	reduceFlashing: boolean, -- softens full-screen flashes (lightning); also in force while cameraShake is off (SettingsLogic.ReduceFlashing)
 	showOnBoard: boolean, -- opt-in: submit lifetime earnings to the leaderboard (off until the player says so)
 }
 
@@ -46,6 +47,7 @@ export type Key =
 	| "cameraSensitivity"
 	| "uiScale"
 	| "showTips"
+	| "reduceFlashing"
 	| "showOnBoard"
 
 SettingsLogic.Defaults = {
@@ -59,6 +61,7 @@ SettingsLogic.Defaults = {
 	cameraSensitivity = 1,
 	uiScale = "normal" :: UIScale,
 	showTips = true,
+	reduceFlashing = false,
 	showOnBoard = false,
 } :: Settings
 
@@ -67,6 +70,9 @@ SettingsLogic.QualityAttribute = "SettingQuality"
 
 -- The attribute for showOnBoard on its own, for the Leaderboard tab.
 SettingsLogic.BoardAttribute = "SettingShowOnBoard"
+
+-- The attribute for reduceFlashing on its own (SettingsUI, LightingController).
+SettingsLogic.ReduceFlashingAttribute = "SettingReduceFlashing"
 
 -- Player attributes the server mirrors so the client applies them on join.
 SettingsLogic.Attributes = {
@@ -80,6 +86,7 @@ SettingsLogic.Attributes = {
 	cameraSensitivity = "SettingCameraSensitivity",
 	uiScale = "SettingUIScale",
 	showTips = "SettingShowTips",
+	reduceFlashing = SettingsLogic.ReduceFlashingAttribute,
 	showOnBoard = SettingsLogic.BoardAttribute,
 } :: { [Key]: string }
 
@@ -150,6 +157,8 @@ function SettingsLogic.Sanitize(raw: any): Settings
 		cameraShake = if s.cameraShake == nil then d.cameraShake else s.cameraShake == true,
 		uiScale = ui :: UIScale,
 		showTips = if s.showTips == nil then d.showTips else s.showTips == true,
+		-- Only a real `true` turns it on; a missing or odd value is off.
+		reduceFlashing = s.reduceFlashing == true,
 		-- Only a real `true` opts in; a missing or odd value is off.
 		showOnBoard = s.showOnBoard == true,
 	}
@@ -157,7 +166,14 @@ end
 
 -- Writes one key if `value` is legal for it. False leaves `settings` as it was.
 function SettingsLogic.Set(settings: Settings, key: string, value: unknown): boolean
-	if key == "music" or key == "sfx" or key == "cameraShake" or key == "showTips" or key == "showOnBoard" then
+	if
+		key == "music"
+		or key == "sfx"
+		or key == "cameraShake"
+		or key == "showTips"
+		or key == "showOnBoard"
+		or key == "reduceFlashing"
+	then
 		if type(value) ~= "boolean" then
 			return false
 		end
@@ -169,6 +185,8 @@ function SettingsLogic.Set(settings: Settings, key: string, value: unknown): boo
 			settings.cameraShake = value
 		elseif key == "showTips" then
 			settings.showTips = value
+		elseif key == "reduceFlashing" then
+			settings.reduceFlashing = value
 		else
 			settings.showOnBoard = value
 		end
@@ -211,6 +229,38 @@ function SettingsLogic.Set(settings: Settings, key: string, value: unknown): boo
 		return true
 	end
 	return false
+end
+
+-- Reduce flashing. In force when the player turned it on, or while camera
+-- shake is off (the same "calm the screen" choice: shake only switches off
+-- when the attribute is exactly false, as in SettingsUI). Takes the two
+-- attribute values as read, so a missing one means the default (off / on).
+function SettingsLogic.ReduceFlashing(reduceAttr: unknown, shakeAttr: unknown): boolean
+	return reduceAttr == true or shakeAttr == false
+end
+
+-- One full-screen flash (LightingController.Flash) as it should play.
+-- Normal: unchanged. Reduced: a flash that starts after the first one is
+-- dropped (no rapid pair), and the first is a quarter as bright and held
+-- longer, so it is a soft pulse and never a strobe. Returns nil to skip it, else the amount and duration to use.
+SettingsLogic.ReducedFlashScale = 0.25
+SettingsLogic.ReducedFlashSeconds = 0.35
+function SettingsLogic.SoftenFlash(
+	reduce: boolean,
+	amount: number,
+	duration: number,
+	delay: number?
+): { amount: number, duration: number }?
+	if not reduce then
+		return { amount = amount, duration = duration }
+	end
+	if (delay or 0) > 0 then
+		return nil
+	end
+	return {
+		amount = amount * SettingsLogic.ReducedFlashScale,
+		duration = math.max(duration, SettingsLogic.ReducedFlashSeconds),
+	}
 end
 
 -- How much UITheme multiplies its screen scale for this choice.

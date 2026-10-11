@@ -26,10 +26,17 @@ case "${1:-}" in
 esac
 
 if [ "$RUN_LINT" = 1 ]; then
+	# The Roblox type definitions are pinned (scripts/globalTypes.pin: the
+	# luau-lsp tag, kept equal to the luau-lsp version in rokit.toml) and
+	# cached in the repo root (gitignored; CI caches it keyed on the pin). A
+	# cache from another pin is replaced, so changing the pin refreshes it.
 	DEFS=globalTypes.d.luau
-	if [ ! -f "$DEFS" ]; then
-		echo "Downloading Roblox type definitions..."
-		curl -fsSL -o "$DEFS" https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
+	PIN=$(tr -d '[:space:]' <scripts/globalTypes.pin)
+	if [ ! -s "$DEFS" ] || [ "$(cat "$DEFS.pin" 2>/dev/null)" != "$PIN" ]; then
+		echo "Downloading Roblox type definitions (luau-lsp $PIN)..."
+		curl -fsSL -o "$DEFS.tmp" "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/$PIN/scripts/globalTypes.d.luau"
+		mv "$DEFS.tmp" "$DEFS"
+		printf '%s' "$PIN" >"$DEFS.pin"
 	fi
 
 	echo "== StyLua (formatting)"

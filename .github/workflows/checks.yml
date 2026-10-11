@@ -51,6 +51,15 @@ jobs:
           rokit authenticate github --token "$GITHUB_TOKEN" --skip-verify
           rokit install --no-trust-check
 
+      # The Roblox type definitions, pinned in scripts/globalTypes.pin.
+      - name: Cache Roblox type definitions
+        uses: actions/cache@v4
+        with:
+          path: |
+            globalTypes.d.luau
+            globalTypes.d.luau.pin
+          key: globaltypes-v1-${{ hashFiles('scripts/globalTypes.pin') }}
+
       - name: Format, lint, types, economy
         run: ./scripts/check.sh --lint-only
 
