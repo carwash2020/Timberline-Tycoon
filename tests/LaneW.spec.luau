@@ -232,6 +232,9 @@ return function(t)
 			"emberwood",
 			"phantomwood",
 			"lumenwood",
+			-- Lane R's two region woods go on the end (the Bayou's, then Red Mesa's).
+			"bogcypress",
+			"ironwood",
 		})
 		t.eq(s.Automation.FilterMatches(0, "oak"), true)
 		t.eq(s.Automation.FilterMatches(1, woods[1]), true)

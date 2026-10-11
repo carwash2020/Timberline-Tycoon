@@ -54,6 +54,8 @@ Current: **0.50 (a guess)**. For reference, the ideal model earns $32/min on bir
 | Emberwood | The Volcano | 900 | 50 | 8 | $55 | $440 | $49 | 700 studs by truck |
 | Gloamwood | Gloam Hollow | 1200 | 70 | 9 | $65 | $585 | $49 | 800 studs by truck |
 | Lumenwood | Aether Isles | 2000 | 120 | 10 | $120 | $1,200 | $60 | gondola + Cloud Chute |
+| Bog Cypress | Bayou | 320 | 18 | 6 | $14 | $84 | $26 | 1330 studs by truck |
+| Ironwood | Red Mesa | 1000 | 60 | 8 | $60 | $480 | $48 | 1200 studs by truck |
 
 ## Best wood for each axe
 
@@ -96,17 +98,17 @@ The whole world, with a player who always buys whichever upgrade pays for itself
 
 ## Hits to fell one tree
 
-| Axe (damage) | Oak (30 HP, hardness 0) | Birch (60 HP, hardness 0) | Pine (100 HP, hardness 4) | Maple (200 HP, hardness 10) | Palmwood (300 HP, hardness 15) | Frostwood (400 HP, hardness 20) | Emberwood (900 HP, hardness 50) | Gloamwood (1200 HP, hardness 70) | Lumenwood (2000 HP, hardness 120) |
-|---|---|---|---|---|---|---|---|---|---|
-| Rusty Axe (5) | 6 | 12 | 100 | — | — | — | — | — | — |
-| Steel Axe (12) | 3 | 5 | 13 | 100 | — | — | — | — | — |
-| Hardened Axe (25) | 2 | 3 | 5 | 14 | 30 | 80 | — | — | — |
-| Silver Axe (45) | 1 | 2 | 3 | 6 | 10 | 16 | — | — | — |
-| Cobalt Axe (60) | 1 | 1 | 2 | 4 | 7 | 10 | 90 | — | — |
-| Gold Axe (80) | 1 | 1 | 2 | 3 | 5 | 7 | 30 | 120 | — |
-| Obsidian Axe (120) | 1 | 1 | 1 | 2 | 3 | 4 | 13 | 24 | — |
-| Inferno Axe (150*) | 1 | 1 | 1 | 2 | 3 | 4 | 6 | 15 | 67 |
-| Starfall Axe (180*) | 1 | 1 | 1 | 2 | 2 | 3 | 7 | 11 | 12 |
+| Axe (damage) | Oak (30 HP, hardness 0) | Birch (60 HP, hardness 0) | Pine (100 HP, hardness 4) | Maple (200 HP, hardness 10) | Palmwood (300 HP, hardness 15) | Frostwood (400 HP, hardness 20) | Emberwood (900 HP, hardness 50) | Gloamwood (1200 HP, hardness 70) | Lumenwood (2000 HP, hardness 120) | Bog Cypress (320 HP, hardness 18) | Ironwood (1000 HP, hardness 60) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Rusty Axe (5) | 6 | 12 | 100 | — | — | — | — | — | — | — | — |
+| Steel Axe (12) | 3 | 5 | 13 | 100 | — | — | — | — | — | — | — |
+| Hardened Axe (25) | 2 | 3 | 5 | 14 | 30 | 80 | — | — | — | 46 | — |
+| Silver Axe (45) | 1 | 2 | 3 | 6 | 10 | 16 | — | — | — | 12 | — |
+| Cobalt Axe (60) | 1 | 1 | 2 | 4 | 7 | 10 | 90 | — | — | 8 | — |
+| Gold Axe (80) | 1 | 1 | 2 | 3 | 5 | 7 | 30 | 120 | — | 6 | 50 |
+| Obsidian Axe (120) | 1 | 1 | 1 | 2 | 3 | 4 | 13 | 24 | — | 4 | 17 |
+| Inferno Axe (150*) | 1 | 1 | 1 | 2 | 3 | 4 | 6 | 15 | 67 | 3 | 12 |
+| Starfall Axe (180*) | 1 | 1 | 1 | 2 | 2 | 3 | 7 | 11 | 12 | 2 | 9 |
 
 — = can't cut it: the wood's hardness is at least the axe's damage. \* Deals more to some biomes (ItemCatalog `biomeDamage`).
 
@@ -141,7 +143,7 @@ An Elder (1.7× size, 6× HP, 3× logs, always Quilted or Burl) pays each helper
 
 - Swing every 0.8 s; carry 2 logs by hand (GameConfig).
 - Walk 16 studs/s; trucks drive at their top speed (Rustbucket 26, Timber Classic 30, Pickup 30, Scout ATV 40, Flatbed 26, Logging Rig 24 studs/s); boats 26 studs/s.
-- One-way haul to the sawmill in studs, from BiomeData: Starter Forest 260 (truck), The Hills 420 (truck), Snowfields 650 (truck), The Volcano 700 (truck), The Island 900 (boat), Gloam Hollow 800 (truck).
+- One-way haul to the sawmill in studs, from BiomeData: Starter Forest 260 (truck), The Hills 420 (truck), Snowfields 650 (truck), The Volcano 700 (truck), The Island 900 (boat), Gloam Hollow 800 (truck), Bayou 1330 (truck), Red Mesa 1200 (truck).
 - Aether Isles: gondola 40 s each way ($250 a ride), logs carried 30 studs to the Cloud Chute, Sky Bin holds 30.
 - Forged axes cost their cash plus the logs and materials given up (at sell value), plus 1 min per Sky Shard to mine.
 - 15 studs between trees, 20 studs from tree to truck, 0.5 s per prompt press, 8 s to get in/out and park.

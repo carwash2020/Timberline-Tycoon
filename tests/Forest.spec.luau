@@ -1007,7 +1007,9 @@ return function(t)
 			-- Re-sampled when the homesteads left the one lawn, and again when the
 			-- lighthouse moved to (1203, 236). The searches still read the grass
 			-- under each rock; the shelves moved a few clusters.
-			t.eq(h, 834672020, "a cluster or landmark moved")
+			-- Lane R: the Bayou's and Red Mesa's ground is Limestone and Sandstone, so the
+			-- clusters that stood in those two discs are gone (834672020 before).
+			t.eq(h, 932858296, "a cluster or landmark moved")
 		end
 	)
 

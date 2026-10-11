@@ -15,6 +15,8 @@ local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local LandmarkArt = require(script.Parent.Parent.Art.LandmarkArt)
 local RegionLogic = require(script.Parent.Parent.RegionLogic)
+local BayouData = require(script.Parent.Parent.Regions.BayouData)
+local MesaData = require(script.Parent.Parent.Regions.MesaData)
 local TerrainGen = require(script.Parent.TerrainGen)
 local UndergroundData = require(script.Parent.UndergroundData)
 local WoodData = require(script.Parent.Parent.WoodData)
@@ -748,6 +750,70 @@ function WorldPlan.ReachTrees(): { TreeSpot }
 		end
 	end
 	cachedReach = out
+	return out
+end
+
+-- Lane R: the Bayou's Bog Cypress and Red Mesa's Ironwood, as many as the
+-- biome's `trees` say (BiomeData). Like the Petrified Reach's, appended
+-- outside Trees(), so none of the first 322, the stands or the forest move.
+-- Each stands on TreeFill.Ground (off the roads, the footprints of the
+-- region's own build and the ground a truck needs), ten studs apart, and its
+-- zone is the region's disc so a felled one grows back inside it. The Bayou's
+-- cypress stay within BayouData.Budgets.treesNearLanding of the log landing.
+local cachedRegionTrees: { TreeSpot }? = nil
+
+function WorldPlan.RegionTrees(): { TreeSpot }
+	if cachedRegionTrees then
+		return cachedRegionTrees
+	end
+	local TreeFill = require(script.Parent.TreeFill)
+	local out: { TreeSpot } = {}
+	local placed: { Vector2 } = {}
+	for _, biome in ipairs(BiomeData.All()) do
+		local disc = if biome.region then BiomeData.RegionDiscs[biome.id] else nil
+		if disc and biome.trees then
+			local woodIds: { string } = {}
+			for woodId in pairs(biome.trees) do
+				table.insert(woodIds, woodId)
+			end
+			table.sort(woodIds)
+			local zone: TreeZone = { id = biome.id, cx = disc.x, cz = disc.z, radius = disc.radius - 6 }
+			for _, woodId in ipairs(woodIds) do
+				local want = biome.trees[woodId]
+				local rng = Kit.rng(hashString("region trees " .. biome.id .. woodId))
+				local made, tries = 0, 0
+				while made < want and tries < want * 120 do
+					tries += 1
+					local ang = rng:range(0, math.pi * 2)
+					local rad = math.sqrt(rng:next()) * (disc.radius - 8)
+					local x, z = disc.x + math.cos(ang) * rad, disc.z + math.sin(ang) * rad
+					local near = true
+					if biome.id == "bayou" then
+						local l = BayouData.Landing
+						near = (x - l.x) ^ 2 + (z - l.z) ^ 2 <= BayouData.Budgets.treesNearLanding ^ 2
+					end
+					local apart = true
+					for _, q in ipairs(placed) do
+						if (q.X - x) ^ 2 + (q.Y - z) ^ 2 < 10 * 10 then
+							apart = false
+							break
+						end
+					end
+					if near and apart and TreeFill.GroundFor(zone, x, z) then
+						table.insert(placed, Vector2.new(x, z))
+						table.insert(out, {
+							woodId = woodId,
+							position = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z),
+							biome = biome.id,
+							zone = zone,
+						})
+						made += 1
+					end
+				end
+			end
+		end
+	end
+	cachedRegionTrees = out
 	return out
 end
 
@@ -1999,6 +2065,9 @@ function WorldPlan.BiomeSignText(biomeId: string): string
 	if biome.gondola then
 		text ..= "\nGondola to the Aether Isles"
 	end
+	if biome.needsStage and biome.gateWords then
+		text ..= "\n" .. biome.gateWords
+	end
 	return text
 end
 
@@ -2010,11 +2079,10 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 		VolcanoRoad = "volcano",
 		SkyrootRoad = "sky",
 		BayouRoad = "bayou",
-		MesaRoad = "redmesa",
+		MesaRoad = "mesa",
 	}
-	-- Reserved regions are not biomes yet. The post names the place; Lane R
-	-- adds the woods later.
-	local reservedSign = { bayou = "BAYOU", redmesa = "RED MESA" }
+	-- Bayou and Red Mesa are biomes now (Lane R): the post reads like the
+	-- others' (name, wood, and in words the stage it asks for).
 	-- `flat` (at y = 0) set down on the lower post's ground, and whether the
 	-- ground under its posts and middle is level within a stud.
 	local function setDown(flat: CFrame): (CFrame, boolean)
@@ -2060,8 +2128,7 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 				local roadSide = Vector3.new(at.X - side.X, 0, at.Y - side.Y) -- its face toward the road
 				spot = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), roadSide))
 			end
-			local label = reservedSign[biomeId]
-			table.insert(out, { text = if label then label else text(biomeId), cframe = spot :: CFrame })
+			table.insert(out, { text = text(biomeId), cframe = spot :: CFrame })
 		end
 	end
 	return out
@@ -5283,12 +5350,13 @@ WorldPlan.BaitShackSpot = { id = "bait-shack", x = -720, z = -660 } :: PointAnch
 -- A 40 by 30 log landing on the flat basin.
 WorldPlan.BayouLogLanding = { id = "bayou-landing", x = -800, z = -700, sx = 40, sz = 30 } :: BoxAnchor
 
--- Eight ore slabs along the mesa's north rim, 8 studs in from the edge.
+-- Eight slab nodes along the mesa's rim, 8 studs in from the edge (Lane R:
+-- MesaData.QuarryNodes). B first spaced them along the whole +Z rim, which
+-- put three inside MesaRoad's junction circle; they now sit on the east
+-- face, still on the +Z side of the centre and inside the disc.
 local slabNodes: { PointAnchor } = {}
-local slabDx = { -70, -50, -30, -10, 10, 30, 50, 70 }
-for i, dx in ipairs(slabDx) do
-	local inset = math.sqrt(mesa.radius * mesa.radius - dx * dx) - 8
-	table.insert(slabNodes, { id = "slab-" .. tostring(i), x = mesa.x + dx, z = mesa.z + inset })
+for _, node in ipairs(MesaData.QuarryNodes()) do
+	table.insert(slabNodes, { id = node.id, x = node.x, z = node.z })
 end
 WorldPlan.SlabNodes = slabNodes
 
@@ -5305,8 +5373,7 @@ WorldPlan.UniqueItemSpawns = {
 -- ToolShedFloor (x -62).
 WorldPlan.LeaderboardBoard = CFrame.new(-50, 0, 92)
 
--- Biome discs that grow a wood, plus the two reserved regions (0 trees
--- until Lane R). Centre to centre must be at least 500. A pair under 700
+-- Biome discs that grow a wood, plus the two reserved regions (Lane R's). Centre to centre must be at least 500. A pair under 700
 -- keeps 70 trees or fewer between them.
 function WorldPlan.ResourceRegions(): { ResourceRegion }
 	local out: { ResourceRegion } = {}
@@ -5321,8 +5388,19 @@ function WorldPlan.ResourceRegions(): { ResourceRegion }
 			table.insert(out, { id = biome.id, x = area.x, z = area.z, trees = count })
 		end
 	end
-	table.insert(out, { id = bayou.id, x = bayou.x, z = bayou.z, trees = 0 })
-	table.insert(out, { id = mesa.id, x = mesa.x, z = mesa.z, trees = 0 })
+	-- The reserved regions have no `area` (BiomeData.region); their trees are
+	-- the biome's `trees` counts (Lane R: Bog Cypress and Ironwood).
+	for _, region in ipairs({ bayou, mesa }) do
+		local count = 0
+		for _, biome in ipairs(BiomeData.All()) do
+			if biome.region == region.id then
+				for _, n in pairs(biome.trees or {}) do
+					count += n
+				end
+			end
+		end
+		table.insert(out, { id = region.id, x = region.x, z = region.z, trees = count })
+	end
 	return out
 end
 

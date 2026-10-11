@@ -924,6 +924,10 @@ function TreeFill.GroundFor(zone: TreeZone?, x: number, z: number): boolean
 	if zone and string.sub(zone.id, 1, 5) == "town:" then
 		return TreeFill.TownGround(x, z)
 	end
+	-- Lane R: the Bayou's and Red Mesa's trees keep off those regions' own builds.
+	if zone and (zone.id == "bayou" or zone.id == "mesa") and WorldLayout.RegionBuildBlocked(x, z) then
+		return false
+	end
 	return TreeFill.Ground(x, z)
 end
 
