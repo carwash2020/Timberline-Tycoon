@@ -4,6 +4,21 @@
 
 Last updated 8 October 2026 (V1 map remake, branch `phase-2/v1-b-world`). The layout plan is `MAP_V1.md`. The labelled picture is `previews/v1-b/00-overview.png`.
 
+## Sparkworks shop in the world (branch `phase-2/v1-sparkworks-shop`, 11 October 2026, draft PR)
+
+The integration pass found that the automation pieces could not be bought in a normal game: the stock data and the buy path (PR #131) were on main, but the Sparkworks building, its shelves and its keeper were not. They are now.
+
+- **Where**: `WorldPlan.Town().shops` has a fourth shop, `Sparkworks` (title SPARKWORKS, teal accent) at (135, 0, 132), 36 x 36 built (24 x 24 design, `BuildingArt.Scale.Sparkworks` 1.5, roof 39 x 39). East of the Mill Road (its edge is x 113, the roof starts at x 115.5), north of the East Link (z 94), west of the showroom's loading pad (x 160), on flat dry grass. Its front (-Z) faces the East Link; `WorldLayout` `SparkworksPath` (x 129 to 141, z 93 to 114.5) runs from the link's edge to the door and `SparkworksFloor` is the dirt under the walls. `TownTreeData` keeps the building (`Buildings`) and the door (`Empty`) clear of town trees. Two ornamental trees that stood on the site moved to (162, 134) and (164, 150). No economy, price or stage number changed.
+- **Deviation from an older note**: the NPC table below said the Sparkworks keeper would stand on the ferry isle's dock side. A shop on another island would make the automation pieces a ferry trip away, so Juno is in town (see Awaiting Connor in the PR). The row below is updated.
+- **Building**: `BuildingArt.Shop("Sparkworks", ...)` builds the same open-front barn as Hearth & Home (15 stud door, swing leaves, awning, sandwich board reading OPEN ALL DAY) with a slate roof, teal trim, a counter at the back, five spark lamps over their switches on the back wall and a WIRE IT UP board. 173 parts plus 302 for the 21 stocked boxes, inside `StorePartBudget`. Part-built: the uploaded `shops/Sparkworks` mesh is a backlog asset (PR #136), so the shop does not Dress with it.
+- **Shelves**: `StoreStock` has a `Sparkworks` layout: a shelf unit down each side wall (`FittingShelf`, west: the four belt pieces then the first logic pieces; `LogicShelf`, east: the rest), a 10.4 stud aisle, the counter at the back. All 21 pieces (17 logic, 4 belt) fit, none overflow. `ShopInterior` builds the stepped units, two hanging boards and a copper-edged floor. `BoxService.StockMap` stocks it like the other shops.
+- **Boxes**: a Logic box shows its piece's own blueprint model (`ItemModel` handled only the other kinds, so all 17 boxes were identical parcels), is accented spark teal (`BoxLook.Logic`) and opens straight into the buyer's stock (`BoxUnpack.Mode("Logic")` is `stock`, so the hammer places it). Belt pieces still open into a placement ghost.
+- **Keeper**: Juno, "Wire keeper", behind the counter at (135, 0, 146), facing the door, Talk prompt like the other keepers (`NPCData`, `DialogueData` Sparkworks lines are live, `DialogueService` maps Juno to Sparkworks). No hours (`ShopHoursLogic` has no span for it: "Open all day"), so she never sleeps and the door never locks.
+- **Buying**: walk in, pick up a box, carry it to the counter, Talk to Juno, Yes (the same flow as the other three counters). The server charges `StoreStock.UnitPrice`: the one price, in the v2 loop only, on a player with a plot (`needsLand` otherwise), through `EconomyService.SpendCash`.
+- **What's New** now says "Sparkworks sells logic pieces, belts and lasers." / "Up the road past the Land Office. A plot first."
+- **Not done**: no map chip on `TownMarkers` for it, no sign on the street (the name board over the roof is what you see from the East Link), the old demo board (`LogicService.BuildDemo`) is not in the shop (the shelves stand where it would), no uploaded mesh.
+- Specs: `tests/SparkworksShop.spec.luau` (world placement, the shelves, the keeper, the talk box, the box stocking and pay, the buy rules for every piece, What's New). Previews: `previews/v1-sparkworks/`.
+
 ## Lane R: Bayou and Red Mesa (branch `phase-2/v1-r-regions`, 11 October 2026, draft PR)
 
 The two reserved regions are filled. Each has its own wood and one rare find, a signpost that says what it needs, and a small build of part-made art (built-in materials, the Art Director palette, no uploads). Numbers: `Shared/Regions/BayouData`, `MesaData`; rules: `MudLogic`, `QuarryLogic`, `RegionItems`, `RegionScatter`; art: `Shared/Art/RegionArt`; server: `RegionService`, started by `RegionBoot.server.luau`.
@@ -41,7 +56,7 @@ NPC stand spots, weather zones and critter zones (for Lanes E and G; the live mo
 | Old Tolly | folded toll booth, east of the deck near z 940 | south, toward town |
 | Capn Moss | ferry dock (860, 4, 160) | toward the isle (930, −50) |
 | Odds & Ends keeper | snow junction (30, 4, 450) on the new north road, adjusted when the junction is placed | toward the road |
-| Sparkworks keeper | ferry isle dock side | toward the dock |
+| Sparkworks keeper (Juno) | behind the Sparkworks counter in town (135, 0, 146) | toward the door (was: ferry isle dock side; moved into town, see the Sparkworks section) |
 | Fishing scene | pond (−40, 0, −160) | toward the water |
 | Campfire scene | starter edge (40, 0, −80) | toward town |
 | Lookout scene | (40, 8, 820), facing the volcano | toward (450, 500) |
@@ -147,7 +162,7 @@ Not on main (PR #131, draft). Job 10 is done. Previews in `previews/v1-f/`. What
 - `StageOf` names and the lifetime-earned fallback lines (100, 1,000, 5,000, 25,000, 100,000, 400,000, 1,000,000, 2,000,000) are guesses until Lane E's stage keys are the only source.
 - Loose-wood save caps 150 pieces / 300 sections; crafted furniture stock cap 20; fall rescue below Y -80; paint is free.
 - "Free" blueprints are marked on owned store unlocks only (not auto-given, which would free store purchases).
-- Odds & Ends is not stocked (no building; the blasting charge is pay-at-boulder). The Sparkworks shop building and counter do not exist on main: stock data and purchase path are done and tested.
+- Odds & Ends is not stocked (no building; the blasting charge is pay-at-boulder). The Sparkworks shop building, counter and keeper are in the town (see the Sparkworks section at the top).
 - `mining`, `guideStamps` and `dayCounter` are account-wide in code and specs while the brief says per slot. Left as is.
 - Colours: GAD palette still pending; sandstone `#C8643C`, copper `#B87333`.
 - Furniture meshes are not in the lite pack, so furniture renders part-built (job 17).
@@ -164,7 +179,7 @@ Not on main. Wires from #123 now drive belts and machines. Every belt, sawmill, 
 **Awaiting Connor**
 
 - Prices (all PROPOSALS): Switch Belt $150, Tilted Belt $120, Belt Support $40, Wood Detector $200, Wood Sweeper $450, Laser Emitter $380, Laser Receiver $220.
-- The line pieces are sold at Sparkworks (with the sweeper and lasers). Lane F task 16 stocks the Sparkworks counter; until then they show in the Sparkworks list only.
+- The line pieces are sold at Sparkworks (with the sweeper and lasers). The Sparkworks counter in town stocks them (Sparkworks section at the top).
 - `MaxLaserPairs` 8 per plot (proposal).
 - Flip on a Switch Belt is a world prompt (Open key), not a placer key: the placer's Q is Cancel. A placer flip key is a cross-lane request.
 
@@ -284,7 +299,7 @@ Part counts, whole model, Lune (shop cap 250, including the interior):
 | Sawmill | 398 | 402 |
 | Gate kiosk | — | 7 |
 | Odds and Ends | — | 37 |
-| Sparkworks | — | 20 |
+| Sparkworks | — | 20 (the empty demo-board model; the live shop is `BuildingArt.Shop("Sparkworks")`, 173) |
 | Sky Market | — | 10 |
 | Sky turnstile | — | 4 |
 | Plot map | — | 3 |

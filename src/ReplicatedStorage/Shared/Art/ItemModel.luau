@@ -41,6 +41,7 @@ ItemModel.ModelBudget = {
 	Sawmill = 18,
 	Machine = 16,
 	Blueprint = 8,
+	Logic = 8, -- a Sparkworks piece: its real blueprint model, heaviest parts first
 	Gear = 8,
 	Cosmetic = 8,
 	Robux = 4,
@@ -223,6 +224,13 @@ local function buildRaw(kind: string, itemId: string): (Model?, CFrame, boolean)
 			if bp.id == itemId then
 				return BlueprintModels.Build(bp, false), CFrame.identity, false
 			end
+		end
+	elseif kind == "Logic" then
+		-- A Sparkworks piece (StoreStock "Logic" slots) is shown as its blueprint's
+		-- own model, like a plan: a lever shows a lever, a gate shows a gate.
+		local bp = PlotData.Blueprint(itemId)
+		if bp then
+			return BlueprintModels.Build(bp, false), CFrame.identity, false
 		end
 	elseif kind == "Truck" then
 		local def = ItemCatalog.GetTruck(itemId)

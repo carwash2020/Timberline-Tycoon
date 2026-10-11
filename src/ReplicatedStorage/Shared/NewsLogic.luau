@@ -25,7 +25,11 @@ NewsLogic.Entries = {
 		icon = "daily",
 	},
 	{ line = "Temper your axe.", detail = "A hotter edge bites harder.", icon = "temper" },
-	{ line = "Sparkworks logic pieces.", detail = "Wire switches, gates and lamps.", icon = "spark" },
+	{
+		line = "Sparkworks sells logic pieces, belts and lasers.",
+		detail = "Up the road past the Land Office. A plot first.",
+		icon = "spark",
+	},
 	{
 		line = "A sky island, reached by the gondola pass.",
 		detail = "Ride the line up from the pass.",

@@ -177,7 +177,10 @@ return function(t)
 	t.test(
 		"TWN-13: the sawmill and the shops are built 1.5x (the showroom hall at its real size), with no more parts; counters stay waist high",
 		function()
-			t.eq(BuildingArt.Scale, { Sawmill = 1.5, ToolShed = 1.5, Dealership = 1, HearthAndHome = 1.5 })
+			t.eq(
+				BuildingArt.Scale,
+				{ Sawmill = 1.5, ToolShed = 1.5, Dealership = 1, HearthAndHome = 1.5, Sparkworks = 1.5 }
+			) -- (Sparkworks joined the town in phase 2)
 			local function extent(model)
 				local lo, hi
 				for _, p in ipairs(parts(model)) do

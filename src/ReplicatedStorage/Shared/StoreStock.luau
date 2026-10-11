@@ -178,8 +178,9 @@ end
 -- W's line pieces (a Machine whose shop is "Sparkworks": Switch Belt, Tilted
 -- Belt, Belt Support, Wood Detector), each at its one price. A logic piece is
 -- kind "Logic": buying one puts it in the player's stock, like a boxed machine,
--- and placing it is free. The shop's building and shelves are Lane C's, so
--- StoreStock.All (the interior shops' budget) does not list these.
+-- and placing it is free. The shop's building and shelves are BuildingArt's
+-- Sparkworks shop (the SHOPS.Sparkworks lanes below), but StoreStock.All (the
+-- Tool Shed's and Hearth & Home's budget) does not list these.
 local function sparkworksSlots(): { Slot }
 	local out: { Slot } = {}
 	for _, machine in ipairs(ItemCatalog.MachineList()) do
@@ -533,6 +534,38 @@ local SHOPS: { [string]: Shop } = {
 			},
 		},
 		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(33, 1, 29) },
+	},
+	-- Sparkworks: a shelf unit down each side wall and an aisle between them,
+	-- the counter at the back (BuildingArt.sparkworks). The west unit takes the
+	-- four belt and detector fittings first, then the logic pieces as far as
+	-- they go; the east unit takes the rest of the logic pieces. Three boxes
+	-- stand side by side on a 12.2-stud unit.
+	Sparkworks = {
+		lanes = {
+			{
+				name = "FittingShelf",
+				x0 = -17.4,
+				x1 = -5.2,
+				z0 = -16.5,
+				z1 = 8.5, -- short of the counter, whose customer face is at z 10.25
+				y = StoreStock.ShelfTop,
+				step = StoreStock.RowStep,
+				maxRise = StoreStock.MaxRise,
+				kinds = { "Fitting", "Logic" },
+			},
+			{
+				name = "LogicShelf",
+				x0 = 5.2,
+				x1 = 17.4,
+				z0 = -16.5,
+				z1 = 8.5,
+				y = StoreStock.ShelfTop,
+				step = StoreStock.RowStep,
+				maxRise = StoreStock.MaxRise,
+				kinds = { "Logic", "Fitting" },
+			},
+		},
+		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(24, 1, 24) }, -- design size: 36 x 36 once scaled
 	},
 }
 

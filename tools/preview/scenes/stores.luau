@@ -3,7 +3,8 @@
 -- the way BoxService stocks them: every shelf slot gets the real packaged
 -- box (BoxArt, sized by BoxSize), the Robux shelf its gold boxes, and a
 -- six-stud-tall figure carries a medium box down each aisle, so a carried
--- box and the aisle can be judged at a glance. Views: 1 Tool Shed from
+-- box and the aisle can be judged at a glance. (Sparkworks is the fourth shop,
+-- at x -90: views 11 to 15.) Views: 1 Tool Shed from
 -- above, 2 Tool Shed from the door, 3 Hearth & Home from above, 4 Hearth &
 -- Home from the door, 5 Dealership from above, 6 Tool Shed close on the
 -- tables, 7 Hearth & Home close on a shelf, 8 the Tool Shed's counter and
@@ -180,6 +181,46 @@ return {
 		table.insert(
 			cameras,
 			{ pos = { 176, 8, -6 }, target = { 176, 4, 28 }, label = "10 the showroom lobby and counter", fov = 70 }
+		)
+
+		-- Sparkworks (views 11 to 15): the automation shop, stocked from its own
+		-- shelves and Juno behind the counter.
+		local sparkworks = shop("Sparkworks", "SPARKWORKS", C3.fromRGB(46, 139, 139), -90, 0)
+		-- Juno behind the counter, where NPCService stands her.
+		local NPCData = ctx.shared("NPCData")
+		local CharacterArt = ctx.art("CharacterArt")
+		local juno = NPCData.Get("Juno")
+		local keeper = CharacterArt.Build(juno.look)
+		Kit.placeAt(
+			keeper,
+			NPCData.SpotFor(juno, function(_, partName)
+				local part = sparkworks:FindFirstChild(partName)
+				if part then
+					return part.CFrame, part.Size
+				end
+				return nil, nil
+			end)
+		)
+		keeper.Parent = root
+		table.insert(
+			cameras,
+			{ pos = { -90, 96, -30 }, target = { -90, 0, 2 }, label = "11 Sparkworks from above", fov = 60 }
+		)
+		table.insert(
+			cameras,
+			{ pos = { -90, 8, -33 }, target = { -90, 5, 14 }, label = "12 Sparkworks from the door", fov = 85 }
+		)
+		table.insert(
+			cameras,
+			{ pos = { -93, 9, -13 }, target = { -78, 4, -6 }, label = "13 Sparkworks logic shelf, close", fov = 70 }
+		)
+		table.insert(
+			cameras,
+			{ pos = { -87, 9, -13 }, target = { -102, 4, -6 }, label = "14 Sparkworks fittings shelf, close", fov = 70 }
+		)
+		table.insert(
+			cameras,
+			{ pos = { -90, 8, 3 }, target = { -90, 5, 18 }, label = "15 Sparkworks counter and back wall", fov = 75 }
 		)
 
 		return {
