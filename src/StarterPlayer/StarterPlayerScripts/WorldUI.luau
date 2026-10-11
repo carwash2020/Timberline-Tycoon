@@ -30,6 +30,8 @@ local UserInputService = game:GetService("UserInputService")
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local RegionLogic = require(ReplicatedStorage.Shared.RegionLogic)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local ClimateHudLogic = require(ReplicatedStorage.Shared.ClimateHudLogic)
+local DayCounterLogic = require(ReplicatedStorage.Shared.DayCounterLogic)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -115,9 +117,15 @@ local function gearName(id: string): string
 end
 
 -- Entering a named region: the place, its shape and what grows there.
+local shownRegions: { [string]: boolean } = {}
+
 local function onRegionChanged()
-	local line = RegionLogic.Toast((player:GetAttribute("Region") :: string?) or "")
-	if line then
+	local region = (player:GetAttribute("Region") :: string?) or ""
+	local line = RegionLogic.Toast(region)
+	-- Once per region per session; HUD.Toast's NoticePolicy keeps it from
+	-- stacking over dialogue, tutorial steps or another toast.
+	if line and not shownRegions[region] then
+		shownRegions[region] = true
 		local biome = BiomeData.Get((player:GetAttribute("Biome") :: string?) or "")
 		local tier = if biome then groveTier(biome) else nil
 		HUD.Toast(if tier then line .. " · " .. tier.blurb else line, nil, LOW)
@@ -162,6 +170,29 @@ local function buildClock()
 	clockButton = label
 	HudNav.Add(label, { id = "clock" }) -- the HUD's cursor can land on it, but it opens nothing
 
+	-- "Day N" in small type under the clock (DayCounterLogic): the world days
+	-- since this save first played. It is the clock's child, so it hides with it.
+	local dayLabel = Instance.new("TextLabel")
+	dayLabel.Name = "DayCounter"
+	dayLabel.AnchorPoint = Vector2.new(0.5, 0)
+	dayLabel.Position = UDim2.new(0.5, 0, 1, 2)
+	dayLabel.Size = UDim2.fromOffset(92, 16)
+	dayLabel.BackgroundTransparency = 1
+	dayLabel.Font = UITheme.Fonts.Black
+	dayLabel.TextSize = 14
+	dayLabel.TextColor3 = UITheme.Colors.Cream
+	dayLabel.TextStrokeColor3 = UITheme.Colors.Ink
+	dayLabel.TextStrokeTransparency = 0.3
+	dayLabel.Active = false
+	dayLabel.Parent = label
+	local function refreshDay()
+		local text = DayCounterLogic.Label(player:GetAttribute("FirstWorldDay"), WorldTime.Day(WorldTime.GameNow()))
+		dayLabel.Text = text or ""
+		dayLabel.Visible = text ~= nil
+	end
+	refreshDay()
+	player:GetAttributeChangedSignal("FirstWorldDay"):Connect(refreshDay)
+
 	-- Which line it's in (or none) for the device and the tutorial.
 	local function place()
 		local compact = UITheme.Compact()
@@ -191,6 +222,7 @@ local function buildClock()
 	-- Lighting.ClockTime every frame; the label doesn't need to): the
 	-- shared clock, or Studio's ClockOverride, so a tester sees that hour.
 	local function refresh()
+		refreshDay()
 		local text = HudRules.ClockText(Lighting.ClockTime)
 		if label.Text ~= text then
 			label.Text = text
@@ -317,6 +349,57 @@ local function watchGroves()
 	end
 end
 
+-- Cold or heat on you: the screen's edges tint frost blue or heat orange, more
+-- as the exposure meter fills (ClimateHudLogic; HazardService sets the
+-- ClimateKind and Exposure attributes). Four soft edge bands, no input, under
+-- the HUD. The first-time tip is the server's (QuestService, tipsSeen).
+local function buildVignette()
+	local gui = UITheme.Screen("ClimateVignette", UITheme.Layers.World, "device")
+	local bands: { Frame } = {}
+	local EDGE = 0.16 -- of the screen's width or height
+	for i, spec in ipairs({
+		{ pos = UDim2.fromScale(0, 0), size = UDim2.fromScale(1, EDGE), rot = 90 }, -- top
+		{ pos = UDim2.fromScale(0, 1 - EDGE), size = UDim2.fromScale(1, EDGE), rot = 270 }, -- bottom
+		{ pos = UDim2.fromScale(0, 0), size = UDim2.fromScale(EDGE, 1), rot = 0 }, -- left
+		{ pos = UDim2.fromScale(1 - EDGE, 0), size = UDim2.fromScale(EDGE, 1), rot = 180 }, -- right
+	}) do
+		local band = Instance.new("Frame")
+		band.Name = "Edge" .. i
+		band.Position = spec.pos
+		band.Size = spec.size
+		band.BackgroundTransparency = 0
+		band.BorderSizePixel = 0
+		band.Active = false
+		local fade = Instance.new("UIGradient")
+		fade.Rotation = spec.rot
+		-- solid at the screen edge, clear toward the middle
+		fade.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		fade.Parent = band
+		band.Parent = gui
+		table.insert(bands, band)
+	end
+	gui.Enabled = false
+	gui.Parent = player:WaitForChild("PlayerGui")
+	local function refresh()
+		local kind = player:GetAttribute("ClimateKind")
+		local alpha = ClimateHudLogic.Alpha(kind, player:GetAttribute("Exposure"))
+		local rgb = ClimateHudLogic.Color(kind)
+		gui.Enabled = alpha > 0 and rgb ~= nil
+		if rgb then
+			for _, band in ipairs(bands) do
+				band.BackgroundColor3 = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+				band.BackgroundTransparency = 1 - alpha
+			end
+		end
+	end
+	player:GetAttributeChangedSignal("ClimateKind"):Connect(refresh)
+	player:GetAttributeChangedSignal("Exposure"):Connect(refresh)
+	refresh()
+end
+
 function WorldUI.Start()
 	UserInputService.InputBegan:Connect(function(input: InputObject)
 		if input.UserInputState ~= Enum.UserInputState.Begin then
@@ -325,6 +408,7 @@ function WorldUI.Start()
 		WorldUI.ApplyKey(input.KeyCode)
 	end)
 	buildClock()
+	buildVignette()
 	task.spawn(watchSkyBin)
 	watchGroves()
 	player:GetAttributeChangedSignal("Region"):Connect(onRegionChanged)

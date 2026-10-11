@@ -40,10 +40,13 @@
 local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ClimateHudLogic = require(ReplicatedStorage.Shared.ClimateHudLogic)
+local DayCounterLogic = require(ReplicatedStorage.Shared.DayCounterLogic)
 local NextGoal = require(ReplicatedStorage.Shared.NextGoal)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
 local MilestoneService = require(script.Parent.MilestoneService)
@@ -232,6 +235,31 @@ end
 
 -- Call once the player's save has loaded.
 function QuestService.Start(player: Player, profile: Profile)
+	-- "Day N" under the clock: stamp the world day this save first played.
+	if not (type(profile.dayCounter) == "number" and profile.dayCounter >= 1) then
+		local ok, today = pcall(function(): number
+			return WorldTime.Day(WorldTime.GameNow())
+		end)
+		if ok then
+			profile.dayCounter = DayCounterLogic.Stamp(profile.dayCounter, today)
+		end
+	end
+	if profile.dayCounter >= 1 then
+		player:SetAttribute("FirstWorldDay", profile.dayCounter)
+	end
+	-- The first time cold or heat is on them: one tip, remembered in tipsSeen.
+	pcall(function()
+		player:GetAttributeChangedSignal("ClimateKind"):Connect(function()
+			if type(profile.tipsSeen) ~= "table" then
+				return
+			end
+			local tip = ClimateHudLogic.Tip(player:GetAttribute("ClimateKind"), profile.tipsSeen)
+			if tip then
+				profile.tipsSeen[tip.key] = true
+				notify(player, tip.text)
+			end
+		end)
+	end)
 	if loop == 2 then
 		-- Old v2 saves stored a plot-first index. Once tutorialOrder is
 		-- current, the index already names the right step, so the funnel
