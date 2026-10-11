@@ -140,7 +140,11 @@ function BuildMaterials.CapEntries(): ({ LooseCaps.Entry }, { [string]: Instance
 	local byUid: { [string]: Instance } = {}
 	local function add(inst: Instance, inside: boolean)
 		local uid = inst:GetAttribute("Uid")
-		if type(uid) ~= "string" or byUid[uid] ~= nil then
+		if type(uid) ~= "string" then
+			return
+		end
+		local seen: Instance? = byUid[uid]
+		if seen then
 			return
 		end
 		local owner = inst:GetAttribute("OwnerId")

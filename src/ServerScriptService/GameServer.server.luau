@@ -919,7 +919,9 @@ if CoreLoop.V2() then
 	-- V1 hardening: wood riding on a truck bed never ages out and is never
 	-- capped away (WoodService.Tick and its caps read this hook), and the
 	-- other loose parts' caps (slabs, ore, ingots) run on the same second.
-	WoodService.Hooks.onBed = TruckLoad.BedOwner
+	WoodService.Hooks.onBed = function(piece: WoodService.Piece): Player?
+		return TruckLoad.BedOwner(piece :: any)
+	end
 	WoodService.Hooks.afterTick = function()
 		BuildMaterials.EnforceCaps()
 	end
