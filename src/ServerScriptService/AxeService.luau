@@ -305,8 +305,9 @@ end
 
 -- Makes sure the player has exactly one saved `axeId` (a pass axe), and
 -- that its tool is in the Backpack when it isn't lying in the world.
--- A second call does not add another item.
-function AxeService.Ensure(player: Player, axeId: string)
+-- A second call does not add another item. `sessionOnly` (a Studio test
+-- buy) keeps it out of the save, like the /giveaxe command's axes.
+function AxeService.Ensure(player: Player, axeId: string, sessionOnly: boolean?)
 	if not ItemCatalog.GetAxe(axeId) then
 		return
 	end
@@ -319,7 +320,7 @@ function AxeService.Ensure(player: Player, axeId: string)
 		end
 		return
 	end
-	AxeService.Grant(player, axeId, false)
+	AxeService.Grant(player, axeId, sessionOnly == true)
 end
 
 -- Adds a new axe to the player's inventory and Backpack, and returns it

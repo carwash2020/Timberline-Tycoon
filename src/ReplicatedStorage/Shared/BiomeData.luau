@@ -215,6 +215,28 @@ function BiomeData.Get(biomeId: string): BiomeDef?
 	return byId[biomeId]
 end
 
+-- The places the spawn sign (TO THE WOODS) points to: every biome a truck
+-- drives to, that is not night-only (the Gloam Hollow stays a hidden place),
+-- nearest first. The names are the biomes' own displayName and the distance
+-- their haulStuds, so the sign, the region toasts and the economy model never
+-- disagree (WorldPlan builds the sign's lines from this).
+function BiomeData.SignDestinations(): { BiomeDef }
+	local out: { BiomeDef } = {}
+	for _, biome in ipairs(biomes) do
+		if biome.access == "truck" and not biome.nightOnly and (biome.haulStuds or 0) > 0 then
+			table.insert(out, biome)
+		end
+	end
+	table.sort(out, function(a: BiomeDef, b: BiomeDef): boolean
+		local ah, bh = a.haulStuds or 0, b.haulStuds or 0
+		if ah ~= bh then
+			return ah < bh
+		end
+		return a.id < b.id
+	end)
+	return out
+end
+
 function BiomeData.All(): { BiomeDef }
 	return biomes
 end

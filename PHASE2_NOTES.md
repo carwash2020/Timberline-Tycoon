@@ -3796,6 +3796,28 @@ Policy (any device)
 11. Output: no red errors from `[PolicyGate]` or `[TextFilter]` during join. A warning "policy lookup failed" in Studio without API access is expected; the strict default then applies, which hides nothing today.
 12. Rename a save to something rude: it shows as hashes or the default name, never as typed (Studio may not filter without an experience; the live server does).
 
+## Fix: world first look (branch `phase-2/fix-world-first-look`, 11 October 2026)
+
+What and why are in STATUS.md. Renders: `previews/fix-world-first-look/` (`woods-sign-front-1920x1080`, `woods-sign-front-close-1920x1080`, `woods-sign-back-1920x1080`, `woods-sign-from-walk-667x375`; scene `bash tools/preview/shoot.sh first-look [1-5]`, needs `preview/a2-centres.json` from `tools/preview/v1_a2_meshes.py town_centres()`).
+
+### Studio checks
+
+Join as a brand-new player (new Studio profile, or `/timereset` is not needed).
+
+PC (keyboard and mouse)
+1. Press Play. Good: the first screen is morning daylight, the HUD clock reads about 8:00 AM and "Day 1". The town is bright, the sawmill's TIMBERLINE SAWMILL board at the top is readable with its cream text (and cut off only if your window is very short: tell me the window size).
+2. Walk to the TO THE WOODS sign west of the spawn walk. Good: both faces read TO THE WOODS, then six lines, nearest first: Starter Forest 260, The Hills 420, Snowfields 650, The Volcano 700, Red Mesa 1200, Bayou 1330. Nothing overflows the board.
+3. Hotbar of a new $35 player. Good: Rusty Axe, Hammer, Rusty Pick. No Lux Axe.
+4. Stay 16 in-game hours (or `/settime 11pm` as owner, then wait past midnight): the day counter goes to Day 2 after midnight, as before. Leave and rejoin the same server: the clock does not restart at 8:00.
+5. Owner: `/paidgive` the Lux Axe to yourself in the hub (Paid items). Good: it appears and stays after a rejoin. Take it back: it goes.
+6. Studio test buy of the Lux Axe pass (Robux store): the axe appears for the session; stop and Play again: it is not there.
+
+Phone (667x375)
+7. Same first screen: daylight, the sawmill board and the TO THE WOODS sign readable, the six lines legible at arm's length (zoom in with the camera if not; tell me which line is too small).
+8. Hotbar shows three slots (Rusty Axe, Hammer, Rusty Pick), each at least 44 px.
+
+Xbox (controller)
+9. Same: daylight start, the hotbar with the three tools, LB/RB cycles them, no Lux Axe.
 ## Load: meshes never block the build (branch `phase-2/fix-load-meshes`, 12 October 2026)
 
 What changed is in STATUS.md. Watch the Output window during these. New lines: `[MapBuilder] build phases that gate play:`

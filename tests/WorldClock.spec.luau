@@ -126,4 +126,28 @@ return function(t)
 		t.eq(nightDormant.grove, false, "awake at NightStartsAt")
 		t.ok(math.abs(night.ClockTime() - GameConfig.NightStartsAt) < 1e-6)
 	end)
+
+	t.test("StartFresh: a server booted in the small hours opens at 08:00, by day, no grove", function()
+		local WorldClock, _, attributes, dormant = setup(BASE + cycle * 0.05) -- about 1:19 AM, night
+		WorldClock.StartFresh()
+		WorldClock.Start()
+		t.ok(math.abs(WorldClock.ClockTime() - 8) < 1e-6)
+		t.eq(attributes.IsNight, false)
+		t.eq(dormant.grove, true)
+		t.eq(attributes.TimeSpeed, 1)
+	end)
+
+	t.test("StartFresh leaves a clock an owner already set alone, and plain Start keeps the real clock", function()
+		local WorldClock, _, attributes = setup(BASE + cycle / 2)
+		attributes.TimeAnchorReal = BASE + cycle / 2
+		attributes.TimeAnchorGame = BASE + cycle / 4
+		attributes.TimeSpeed = 4
+		WorldClock.StartFresh()
+		t.eq(attributes.TimeAnchorGame, BASE + cycle / 4)
+		t.eq(attributes.TimeSpeed, 4)
+		local Plain, _, plainAttrs = setup(BASE) -- midnight, Start only
+		Plain.Start()
+		t.eq(plainAttrs.TimeAnchorReal, nil, "only StartFresh writes the anchors")
+		t.ok(math.abs(Plain.ClockTime()) < 1e-9)
+	end)
 end

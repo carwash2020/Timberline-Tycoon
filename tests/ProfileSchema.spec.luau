@@ -1399,4 +1399,24 @@ return function(t)
 			t.eq(data.plot.placed, before, "migrating again changes nothing")
 		end
 	)
+
+	t.test("a new profile's loadout: Rusty Axe, Hammer, Rusty Pick; no Lux Axe, no pass, no grant", function()
+		local Schema, data = fresh()
+		Schema.Migrate(data)
+		local ids = {}
+		for _, item in ipairs(data.axes) do
+			table.insert(ids, item.id)
+		end
+		t.eq(ids, { "RustyAxe" }, "one axe: the Rusty Axe")
+		t.eq(data.hammer, true, "every player has the Hammer")
+		t.eq(data.mining.pick, "RustyPick", "the free Rusty Pick")
+		t.eq(data.accountAxes, {}, "no pass axe on the account")
+		t.eq(next(data.passes or {}), nil, "no pass")
+		t.eq(next(data.ownerGrants or {}), nil, "no owner grant")
+		for _, slot in pairs(data.slots) do
+			for _, item in ipairs(slot.axes or {}) do
+				t.ok(item.id ~= "LuxAxe", "no Lux Axe parked in a slot")
+			end
+		end
+	end)
 end

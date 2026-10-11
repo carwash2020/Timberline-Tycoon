@@ -456,6 +456,16 @@ function PaidItems.HasGrant(profile: any, key: string): boolean
 end
 
 -- A pass the save knows: bought and confirmed, or granted by the owner.
+-- Whether a pass's axe is given for this session only (never written to the
+-- save). A Studio session runs as the experience's creator and a purchase
+-- there is a free test buy, so it must not leave the Lux Axe in the save
+-- (SaveSlotLogic.SyncAccountAxes would then keep it on every slot). An owner
+-- grant (mode "grant", the hub's Paid items tab) is the explicit way to keep
+-- one; a real purchase outside Studio is saved.
+function PaidItems.SessionOnlyAxe(isStudio: boolean, mode: string?): boolean
+	return isStudio and mode ~= "grant"
+end
+
 function PaidItems.SaveHasPass(profile: any, key: string): boolean
 	if type(profile) ~= "table" then
 		return false

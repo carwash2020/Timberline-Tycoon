@@ -273,4 +273,16 @@ return function(t)
 		t.eq(PaidItems.SaveHasPass({ passes = { A = false }, ownerGrants = {} }, "A"), false)
 		t.eq(PaidItems.SaveHasPass(nil, "A"), false)
 	end)
+
+	t.test(
+		"a pass axe is session-only in Studio unless the owner granted it (no Studio auto-grant into the save)",
+		function()
+			local PaidItems = load()
+			t.eq(PaidItems.SessionOnlyAxe(true, nil), true, "a Studio session's purchase is a test buy")
+			t.eq(PaidItems.SessionOnlyAxe(true, "purchase"), true)
+			t.eq(PaidItems.SessionOnlyAxe(true, "grant"), false, "an explicit owner grant is kept")
+			t.eq(PaidItems.SessionOnlyAxe(false, "purchase"), false, "a real purchase is saved")
+			t.eq(PaidItems.SessionOnlyAxe(false, nil), false)
+		end
+	)
 end

@@ -63,7 +63,8 @@ local notify: (Player, string) -> () = function(_player: Player, _message: strin
 local clock: () -> number = os.time -- tests replace this
 local owned: { [Player]: { [string]: boolean } } = {} -- passes, per player
 -- GameServer wires this to grant the Lux Axe without a require cycle.
-local onPass: ((Player, string) -> ())? = nil
+-- (the third argument is the mode: nil/"purchase" or "grant")
+local onPass: ((Player, string, string?) -> ())? = nil
 -- GameServer wires this to take the Lux Axe back after an owner revoke.
 local onPassRevoked: ((Player, string) -> ())? = nil
 
@@ -125,11 +126,11 @@ local function setPass(player: Player, key: string, mode: string?)
 	end
 	local hook = onPass
 	if hook then
-		hook(player, key)
+		hook(player, key, mode)
 	end
 end
 
-function MonetizationService.SetPassListener(fn: (Player, string) -> ())
+function MonetizationService.SetPassListener(fn: (Player, string, string?) -> ())
 	onPass = fn
 end
 
@@ -547,8 +548,13 @@ function MonetizationService.PlayerJoined(player: Player, profile: Profile)
 			setPass(player, key, "seed")
 		end
 	end
+	-- Not in Studio: a Studio session runs as the experience's creator, and
+	-- Roblox's answer there is not "this player bought it", so asking would
+	-- hand a new test profile every pass (the Lux Axe on a $35 start). In
+	-- Studio a pass comes from the save, an owner grant (Paid items tab) or a
+	-- test buy, never from the ownership check.
 	for _, pass in ipairs(StoreData.Passes) do
-		if StoreData.IsForSale(pass.id) then
+		if StoreData.IsForSale(pass.id) and not isStudio() then
 			task.spawn(function()
 				if ownsPass(player, pass.id) then
 					setPass(player, pass.key)

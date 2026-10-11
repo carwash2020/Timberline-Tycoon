@@ -642,6 +642,32 @@ return function(t)
 		t.eq(live.profile.passes.DoubleCash, true, "a real purchase still saves the backup")
 	end)
 
+	t.test("the Lux Axe pass shows only for owners: Roblox's ownership answer is not used in Studio", function()
+		local StoreData = t.loader():shared("StoreData")
+		local luxId = 100
+		for i, pass in ipairs(StoreData.Passes) do
+			if pass.key == "LuxAxe" then
+				luxId = 100 + i
+			end
+		end
+		-- Outside Studio a real owner gets it at join.
+		local live = setup({ ownsPass = luxId })
+		t.eq(live.M.HasPass(live.player, "LuxAxe"), true)
+		-- A new profile with no purchase and no grant never has it.
+		local none = setup()
+		t.eq(none.M.HasPass(none.player, "LuxAxe"), false)
+		t.eq(none.player.attrs.Pass_LuxAxe, nil)
+		-- In Studio (the creator's account) the ownership answer is ignored: no auto-grant.
+		local studio = setup({ studio = true, ownsPass = luxId })
+		t.eq(studio.M.HasPass(studio.player, "LuxAxe"), false, "no Studio auto-grant")
+		t.eq(studio.player.attrs.Pass_LuxAxe, nil)
+	end)
+
+	t.test("the Lux Axe in Studio comes only from the save, an owner grant or a test buy", function()
+		local saved = setup({ studio = true, passes = { LuxAxe = true } })
+		t.eq(saved.M.HasPass(saved.player, "LuxAxe"), true, "a saved pass still counts")
+	end)
+
 	t.test("Lane P: cash packs scale with the stage at receipt time, never below the old amount", function()
 		local s1 = setup()
 		t.eq(s1.receipt("Cash1k", "a1"), Enum.ProductPurchaseDecision.PurchaseGranted)

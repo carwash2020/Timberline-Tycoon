@@ -1241,6 +1241,52 @@ return function(t)
 		end
 	)
 
+	t.test("the TO THE WOODS sign lists every place a truck drives to, by the names the regions use", function()
+		local BiomeData = t.load("ReplicatedStorage/Shared/BiomeData")
+		local RegionLogic = t.load("ReplicatedStorage/Shared/RegionLogic")
+		local woods = nil
+		for _, sign in ipairs(town.signs) do
+			if string.find(sign.text, "TO THE WOODS", 1, true) then
+				woods = sign
+			end
+		end
+		t.ok(woods, "the sign exists")
+		local lines = {}
+		for line in string.gmatch(woods.text, "[^\n]+") do
+			table.insert(lines, line)
+		end
+		t.eq(lines[1], "TO THE WOODS")
+		t.eq(
+			woods.text,
+			"TO THE WOODS\n" .. table.concat(WorldPlan.WoodsSignLines(), "\n"),
+			"built from the region data"
+		)
+		local want = BiomeData.SignDestinations()
+		t.eq(#lines - 1, #want, "one line a place")
+		local sawNames = {}
+		for i, biome in ipairs(want) do
+			t.eq(lines[i + 1], string.format("%s %d", biome.displayName, biome.haulStuds), "line " .. i)
+			sawNames[biome.displayName] = true
+			if i > 1 then
+				t.ok(biome.haulStuds >= want[i - 1].haulStuds, "nearest first")
+			end
+			-- The same name the region toast shows, where the biome has a region of its own id.
+			local region = RegionLogic.Get(biome.id)
+			if region then
+				t.eq(region.displayName, biome.displayName, biome.id .. ": sign, biome and region agree")
+			end
+		end
+		-- The ring map's places: the discs and the two stage-gated regions; not
+		-- the night-only hollow, boats or the sky.
+		for _, name in ipairs({ "Starter Forest", "The Hills", "Snowfields", "The Volcano", "Red Mesa", "Bayou" }) do
+			t.ok(sawNames[name], name .. " is on the sign")
+		end
+		t.ok(
+			not sawNames["Gloam Hollow"] and not sawNames["The Island"] and not sawNames["Aether Isles"],
+			"no hidden, boat or sky places"
+		)
+	end)
+
 	t.test("the grove gate is a lit sign at the south exit, and the spawn stays open", function()
 		local found = nil
 		for _, sign in ipairs(town.signs) do

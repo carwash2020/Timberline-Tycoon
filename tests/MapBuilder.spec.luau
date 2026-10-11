@@ -156,6 +156,9 @@ return function(t)
 				UndergroundBuilder = { Build = function() end },
 				SecretService = { V1Init = function() end },
 				WorldClock = {
+					StartFresh = function()
+						s.clockFresh = true
+					end,
 					Start = function()
 						s.clockStarted = true
 						s.clockBeforeSellArea = not sellAreaIn()
@@ -275,6 +278,7 @@ return function(t)
 			t.ok(zone.CanCollide == false and zone.CanQuery == false and zone.Transparency == 1, "a ghost")
 		end
 		t.ok(s.clockStarted, "the clock started")
+		t.ok(s.clockFresh, "a new server opens on a morning (WorldClock.StartFresh)")
 		t.ok(s.clockBeforeSellArea, "the clock (the last build step) starts before SellArea goes in")
 		t.ok(s.tutorialBeforeSellArea, "the tutorial oaks spawn before SellArea goes in")
 		t.ok(s.forestAfterSellArea, "the forest follows SellArea (LOAD-01)")
