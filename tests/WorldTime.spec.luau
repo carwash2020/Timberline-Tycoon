@@ -146,4 +146,27 @@ return function(t)
 		t.eq(WorldTime.Day(cycle), 1)
 		t.eq(WorldTime.Day(cycle * 3 + 10), 3)
 	end)
+
+	t.test("FreshStart: a fresh server opens on a morning of the same world day (first look is daylight)", function()
+		t.eq(GameConfig.StartClockHour, 8)
+		t.ok(not WorldTime.IsNight(GameConfig.StartClockHour), "the start hour is daytime")
+		-- Whatever hour the real clock is on, even in the small hours.
+		for _, offsetHours in ipairs({ 0, 1.3, 7.9, 12, 19.5, 23.99 }) do
+			local real = 1790000000 - (1790000000 % cycle) + WorldTime.SecondsFromMidnight(offsetHours)
+			local start = WorldTime.FreshStart(real, GameConfig.StartClockHour)
+			t.ok(start ~= nil)
+			t.eq(start.real, real)
+			t.eq(start.speed, 1)
+			local game = WorldTime.Scaled(real, start.real, start.game, start.speed)
+			t.ok(math.abs(WorldTime.ClockTime(game) - 8) < 1e-6, "08:00 at the start, real hour " .. offsetHours)
+			t.eq(WorldTime.Day(game), WorldTime.Day(real), "the day number is the real day: nobody's Day N moves")
+			-- And it runs on from there at the normal pace: a day-length later it is 08:00 again.
+			local later = WorldTime.Scaled(real + cycle, start.real, start.game, start.speed)
+			t.ok(math.abs(WorldTime.ClockTime(later) - 8) < 1e-6)
+			t.eq(WorldTime.Day(later), WorldTime.Day(game) + 1)
+		end
+		t.eq(WorldTime.FreshStart(0, 24), nil)
+		t.eq(WorldTime.FreshStart(0, -1), nil)
+		t.eq(WorldTime.FreshStart(0 / 0, 8), nil)
+	end)
 end

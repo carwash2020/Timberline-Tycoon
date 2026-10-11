@@ -1672,6 +1672,17 @@ local function townGondola(): CFrame
 	return facingZ(WorldPlan.TownGondolaSpot, Vector3.new(area.x, 0, area.z))
 end
 
+-- The TO THE WOODS sign's destination lines, "<name>  <distance>", from
+-- BiomeData.SignDestinations (the same names the region toasts show and the
+-- haul distances the economy model uses), nearest first.
+function WorldPlan.WoodsSignLines(): { string }
+	local lines: { string } = {}
+	for _, biome in ipairs(BiomeData.SignDestinations()) do
+		table.insert(lines, string.format("%s  %d", biome.displayName, biome.haulStuds or 0))
+	end
+	return lines
+end
+
 function WorldPlan.Town(): Town
 	local mill = WorldLayout.Sawmill
 	-- At (x, z), turned by `yaw`.
@@ -1811,13 +1822,7 @@ function WorldPlan.Town(): Town
 
 	-- Signs: one by the spawn with every destination, the plots, and SELL
 	-- LOGS HERE by the pad.
-	local distances: { string } = {}
-	for _, id in ipairs({ "starter", "hills", "snow", "volcano" }) do
-		local def = BiomeData.Get(id)
-		if def then
-			table.insert(distances, string.format("%s  %d", def.displayName, def.haulStuds or 0))
-		end
-	end
+	local distances = WorldPlan.WoodsSignLines()
 	-- SELL LOGS HERE (TWN-04) stands upright at the station's south-east
 	-- gate, facing the street: its posts east of the trucks' lane in, north
 	-- of the street, clear of Millie and the props, so the main street's

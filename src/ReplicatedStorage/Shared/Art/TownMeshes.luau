@@ -181,15 +181,18 @@ local function maxAlong(part: BasePart, dir: Vector3): number
 	return maxP
 end
 
--- The sign mesh shares the board's centre, then steps back (at most 0.2)
--- so it does not sit in front of the board's SurfaceGui.
+-- The sign mesh shares the board's centre, then steps back so its face sits
+-- SignFaceGap behind the board's face (never in front of, and never level
+-- with, the board's SurfaceGui: a mesh face level with the text's face hides
+-- it or z-fights it, and the crest board reads as a dark blank plank). At
+-- most 0.2 back, as before.
+TownMeshes.SignFaceGap = 0.04
 local function snapSign(mesh: BasePart, board: BasePart)
 	mesh.CFrame = board.CFrame
 	local look = board.CFrame.LookVector
 	local ahead = maxAlong(mesh, look) - maxAlong(board, look)
-	if ahead > 0 then
-		mesh.CFrame = board.CFrame * CFrame.new(0, 0, math.min(ahead + 0.01, 0.2))
-	end
+	local step = math.clamp(ahead + TownMeshes.SignFaceGap, TownMeshes.SignFaceGap, 0.2)
+	mesh.CFrame = board.CFrame * CFrame.new(0, 0, step)
 end
 
 local function moveGui(from: BasePart, to: BasePart, face: Enum.NormalId?, spinText: number?)

@@ -185,6 +185,20 @@ function WorldTime.GameTimeForHour(gameNow: number, hour: number): number
 	return math.floor(gameNow / cycle) * cycle + WorldTime.SecondsFromMidnight(hour % 24)
 end
 
+-- A fresh server's clock (WorldClock.Start): the anchors that put the sky on
+-- `hour` (GameConfig.StartClockHour, morning) of the SAME world day `realNow`
+-- is in, at normal speed. The day number is untouched (WorldTime.Day is
+-- still the real day), so a returning player's "Day N" and a new player's
+-- stamp (DayCounterLogic) behave as before; only the hour of a server's
+-- first minute changes. Returns the three attribute values, or nil when the
+-- hour is not a number in 0..24 (the table's real, game and speed).
+function WorldTime.FreshStart(realNow: number, hour: number): { real: number, game: number, speed: number }?
+	if not finite(realNow) or type(hour) ~= "number" or hour ~= hour or hour < 0 or hour >= 24 then
+		return nil
+	end
+	return { real = realNow, game = WorldTime.GameTimeForHour(realNow, hour), speed = 1 }
+end
+
 -- The hour the sky shows right now. Pass a unix time to ask about that
 -- moment (tests, the weather). Omit it to read the server clock, which is
 -- what shop hours, night glow and dailies want. In Studio the workspace

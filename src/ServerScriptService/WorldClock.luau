@@ -24,6 +24,7 @@ local RunService = game:GetService("RunService")
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local TreeService = require(script.Parent.TreeService)
 
@@ -81,6 +82,25 @@ function WorldClock.ClockTime(): number
 		return ClockOverride.Apply(clock, workspace:GetAttribute(ClockOverride.Attribute), true)
 	end
 	return clock
+end
+
+-- A fresh server begins in the morning (GameConfig.StartClockHour), not
+-- wherever the real clock happens to be, so a new player's first look is
+-- daylight. It writes the same three workspace attributes /settime does
+-- (WorldTime.FreshStart), so every clock reader follows; the day number
+-- is the real day, so nobody's "Day N" moves. Skipped when an owner (or an
+-- earlier call) has already set the clock.
+function WorldClock.StartFresh()
+	if workspace:GetAttribute(WorldTime.AnchorRealAttribute) ~= nil then
+		return
+	end
+	local start = WorldTime.FreshStart(workspace:GetServerTimeNow(), GameConfig.StartClockHour)
+	if start == nil then
+		return
+	end
+	workspace:SetAttribute(WorldTime.AnchorRealAttribute, start.real)
+	workspace:SetAttribute(WorldTime.AnchorGameAttribute, start.game)
+	workspace:SetAttribute(WorldTime.SpeedAttribute, start.speed)
 end
 
 -- Call after the world's trees are planted (MapBuilder).

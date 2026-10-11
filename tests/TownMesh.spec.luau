@@ -491,6 +491,9 @@ return function(t)
 				t.ok(sign and signMesh, kind .. " sign")
 				t.ok((signMesh.CFrame.Position - sign.CFrame.Position).Magnitude <= 0.25, kind .. " sign centre")
 				t.ok(frontAhead(signMesh, sign) <= 0.02, kind .. " sign mesh is not in front of the text")
+				-- Not level with it either: a coplanar mesh face hides or z-fights the
+				-- board's text (the blank dark crest board on the first screen).
+				t.ok(frontAhead(signMesh, sign) <= -0.03, kind .. " sign mesh face sits behind the text face")
 			end
 			local fence = BuildingArt.Fence(24)
 			local fenceBody = visualNamed(fence, "Body")

@@ -47,6 +47,7 @@ local GameConfig = {
 
 	-- World (biome areas and rules are in BiomeData)
 	DayCycleMinutes = 24, -- one full day and night, real minutes; the same on every server
+	StartClockHour = 8, -- in-game hour a fresh server starts on (morning, the same world day), so a new player's first look is daylight
 	NightStartsAt = 19, -- in-game hour (ClockTime) the night starts
 	NightEndsAt = 5, -- ... and ends; the Gloam Hollow only exists in between
 	LavaDamagePerSecond = 5, -- on the Volcano without Heat Boots (100 health = 20 s)

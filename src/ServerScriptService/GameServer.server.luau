@@ -14,6 +14,7 @@
 local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local AetherService = require(script.Parent.AetherService)
 local AxeService = require(script.Parent.AxeService)
@@ -679,13 +680,19 @@ safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop, remote.F
 safely("EventService.InitEvent", EventService.InitEvent, notify)
 safely("BiomeService.Init", BiomeService.Init, notify)
 safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)
-safely("MonetizationService.SetPassListener", MonetizationService.SetPassListener, function(player: Player, key: string)
-	if key == GameConfig.LuxAxeId then
-		AxeService.Ensure(player, GameConfig.LuxAxeId)
-	elseif key == "TimberClassic" then
-		ShopService.GrantPassTruck(player)
+safely(
+	"MonetizationService.SetPassListener",
+	MonetizationService.SetPassListener,
+	function(player: Player, key: string, mode: string?)
+		if key == GameConfig.LuxAxeId then
+			-- A Studio test buy gives the axe for this session only; it is never
+			-- saved (an owner grant, mode "grant", is the explicit way to keep it).
+			AxeService.Ensure(player, GameConfig.LuxAxeId, PaidItems.SessionOnlyAxe(RunService:IsStudio(), mode))
+		elseif key == "TimberClassic" then
+			ShopService.GrantPassTruck(player)
+		end
 	end
-end)
+)
 -- An owner revoke of a granted pass that is an axe takes the axe back too.
 safely(
 	"MonetizationService.SetPassRevokedListener",

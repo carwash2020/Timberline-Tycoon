@@ -1350,6 +1350,7 @@ step("7. The world's edge", function()
 end)
 
 step("7. The day/night clock", function()
+	WorldClock.StartFresh() -- a new server opens on a morning, not mid-night
 	WorldClock.Start()
 end)
 
