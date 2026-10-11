@@ -3577,7 +3577,7 @@ Xbox
 2. Hours. Default used: open all day, no hours (the keeper never sleeps). One line in `ShopHoursLogic` gives it hours.
 3. The keeper's name and look (Juno, Wire keeper) and her lines are drafts.
 4. Prices are unchanged (the Lane F and W proposals). The belt pieces, sweeper and lasers are still PROPOSALS.
-5. The shop is part-built. When the uploaded Sparkworks mesh (PR #136) lands, it Dresses over this build the way the other shops do.
+5. The shop is part-built: the uploaded Sparkworks mesh is the old 20 x 16 demo building, a different shape. A mesh for this 36 x 36 shop would be a new asset.
 6. A map chip and a street sign for it were left out so the spawn view stays as it is. Say if you want one.
 
 

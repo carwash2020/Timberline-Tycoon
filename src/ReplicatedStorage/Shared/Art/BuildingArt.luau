@@ -1683,8 +1683,8 @@ end
 -- barn as Hearth & Home but with a slate roof, teal trim and a back wall of
 -- lamps and switches. It is open all day (no ShopHoursLogic span), so the
 -- hours board over the door says so. Part-built: the uploaded Sparkworks mesh
--- (BlenderAssets "shops/Sparkworks") is still a backlog asset, so nothing
--- here Dresses with it.
+-- (BlenderAssets "shops/Sparkworks", 20 x 16, the old demo-board building) is
+-- not this 36 x 36 shop's shape, so nothing here Dresses with it.
 BuildingArt.SparkworksHalfWidth = 12
 BuildingArt.SparkworksHalfDepth = 12
 BuildingArt.SparkworksCounterZ = 11.5 -- the counter's middle, final studs from the shop's middle
@@ -2111,7 +2111,7 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 	end
 	addHoursBoard(model, kind)
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
-	if kind ~= "Dealership" and kind ~= "Sparkworks" then -- the hall has no uploaded mesh; Sparkworks' is a backlog asset
+	if kind ~= "Dealership" and kind ~= "Sparkworks" then -- the hall has no uploaded mesh; its mesh is the old 20 x 16 demo building
 		TownMeshes.Dress(model, TownModels.ShopAsset(kind), { scale = BuildingArt.MeshStretch(kind) })
 	end
 	if kind == "ToolShed" or kind == "HearthAndHome" or kind == "Sparkworks" then
