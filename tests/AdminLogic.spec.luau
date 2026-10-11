@@ -27,8 +27,16 @@ return function(t)
 		-- Elucidhealer618 only. The second owner stays out until Connor sends the id.
 		t.eq(#AdminLogic.OwnerUserIds, 1, "only the ids Connor gave are listed")
 		t.eq(AdminLogic.OwnerUserIds[1], 5682024709, "Elucidhealer618")
-		t.eq(owner(5682024709, "User", 0, false, AdminLogic.OwnerUserIds), true, "the listed id is an owner")
-		t.eq(owner(5682024708, "User", 0, false, AdminLogic.OwnerUserIds), false, "a neighbouring id is not")
+		t.eq(
+			AdminLogic.IsOwner(5682024709, "User", 0, false, AdminLogic.OwnerUserIds),
+			true,
+			"the listed id is an owner"
+		)
+		t.eq(
+			AdminLogic.IsOwner(5682024708, "User", 0, false, AdminLogic.OwnerUserIds),
+			false,
+			"a neighbouring id is not"
+		)
 	end)
 
 	t.test("commands parse to a name and words, and only commands do", function()
