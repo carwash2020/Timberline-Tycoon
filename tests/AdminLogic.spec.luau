@@ -23,8 +23,12 @@ return function(t)
 		t.eq(owner(0, "User", 0, false, {}), false, "an unpublished place has creator 0")
 	end)
 
-	t.test("no id is listed in the repository", function()
-		t.eq(#AdminLogic.OwnerUserIds, 0, "ids are pasted by the owner, not committed")
+	t.test("the listed owner ids are exactly the ones Connor gave", function()
+		-- Elucidhealer618 only. The second owner stays out until Connor sends the id.
+		t.eq(#AdminLogic.OwnerUserIds, 1, "only the ids Connor gave are listed")
+		t.eq(AdminLogic.OwnerUserIds[1], 5682024709, "Elucidhealer618")
+		t.eq(owner(5682024709, "User", 0, false, AdminLogic.OwnerUserIds), true, "the listed id is an owner")
+		t.eq(owner(5682024708, "User", 0, false, AdminLogic.OwnerUserIds), false, "a neighbouring id is not")
 	end)
 
 	t.test("commands parse to a name and words, and only commands do", function()
