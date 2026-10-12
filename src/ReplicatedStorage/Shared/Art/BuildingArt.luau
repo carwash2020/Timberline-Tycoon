@@ -1610,7 +1610,8 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
 	end
-	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
+	-- (beside the east post, not in it: the lantern's cap is 0.34 wide each way, the post 0.225)
+	Kit.lantern(model, CF(6.6, 5.5, -HZ + 0.85), 0.75)
 
 	-- Name boards hang on the back wall, facing the door, each above a sample
 	-- of that item on the ledge. No price is printed: aiming at a board or its
@@ -1867,7 +1868,32 @@ local function addHoursBoard(model: Model, shopId: string)
 	if y < clear then
 		y = clear
 	end
-	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, at.Z), SIGN_BOARD, MAT.Wood)
+	-- The General Store's striped awning (ShopFacade) reaches up to 12.7 on the wall over its door:
+	-- the board's bottom edge stays above it, so the two never overlap.
+	if shopId == "HearthAndHome" and y - h / 2 < 12.7 then
+		y = 12.7 + h / 2
+	end
+	-- The board hangs on the wall's outside face, not inside it: if a front wall stands over
+	-- the host at this height, the board's back rests on that wall's front face.
+	local z = at.Z
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") and d.Name == "Wall" then
+			local cf, sz = d.CFrame, d.Size
+			local faceZ = cf.Position.Z - sz.Z / 2
+			if
+				cf.UpVector.Y > 0.99
+				and math.abs(cf.LookVector.Z) > 0.99
+				and math.abs(cf.Position.X - at.X) <= sz.X / 2
+				and y - h / 2 >= cf.Position.Y - sz.Y / 2 - 0.01
+				and y + h / 2 <= cf.Position.Y + sz.Y / 2 + 0.01
+				and faceZ < z + depth / 2
+				and cf.Position.Z + sz.Z / 2 > z - depth / 2
+			then
+				z = faceZ - depth / 2
+			end
+		end
+	end
+	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, z), SIGN_BOARD, MAT.Wood)
 	Kit.decor(board)
 	board:SetAttribute("ShopId", shopId)
 	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do

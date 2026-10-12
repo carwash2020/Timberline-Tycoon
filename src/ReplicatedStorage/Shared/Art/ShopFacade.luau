@@ -209,7 +209,17 @@ local function hearthDressing(model: Model, spec: Spec)
 			TIMBER
 		)
 	end
-	box(model, "Cornice", V3(2 * hw, 0.7, 0.7), CF(0, spec.wallTop - 0.35, fz - 0.15), TIMBER)
+	-- (the cornice stops short of the hours board over the door: 3 studs each side of the middle)
+	local corniceW = hw - 3
+	for _, s in ipairs({ -1, 1 }) do
+		box(
+			model,
+			"Cornice",
+			V3(corniceW, 0.7, 0.7),
+			CF(s * (3 + corniceW / 2), spec.wallTop - 0.35, fz - 0.15),
+			TIMBER
+		)
+	end
 	-- shutters beside each window
 	for _, x in ipairs({ -16, 16 }) do
 		for _, s in ipairs({ -1, 1 }) do
@@ -251,8 +261,8 @@ local function hearthDressing(model: Model, spec: Spec)
 		box(
 			model,
 			"PathStone",
-			V3(4.6, 0.1, 1.8),
-			CF(spec.doorCx + off, gy + 0.05, fz - 3.0 - (i - 1) * 2.2),
+			V3(4.6, 0.1, 1.6),
+			CF(spec.doorCx + off, gy + 0.05, fz - 3.7 - (i - 1) * 2.0),
 			if i % 2 == 0 then hex("#A29A8C") else hex("#938B7E"),
 			MAT.Slate
 		)

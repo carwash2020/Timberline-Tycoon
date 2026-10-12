@@ -535,7 +535,7 @@ export type StandSpec = {
 }
 
 ShopKit.FlagSize = Vector3.new(1.7, 1.0, 0.16)
-ShopKit.ChipSize = Vector3.new(3.0, 0.6, 0.14)
+ShopKit.ChipSize = Vector3.new(2.6, 0.6, 0.14) -- (narrower: from the door the chips of two rows never overlap on the screen)
 ShopKit.FlagYaw = math.rad(40) -- the flag is turned this far to the aisle, so it reads from the door and from the aisle
 
 -- One slot's stand: the PLINTH (the box's block, in the tier colour or, for an

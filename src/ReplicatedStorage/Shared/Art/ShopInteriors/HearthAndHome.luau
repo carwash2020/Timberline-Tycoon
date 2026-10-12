@@ -40,58 +40,15 @@ Hearth.StoreSignY = 12.5 -- the middle of the shop's name board on the back wall
 Hearth.RoofUnder = (10 + 0.4 - 0.25) * 1.5
 Hearth.TopY = Hearth.RoofUnder -- the highest part the interior adds
 
--- What the signs say, from the shop's real stock (ids are ItemCatalog ids; a
--- spec checks every slot of the shop is under exactly one sign).
+-- What the signs say: one header over each unit (every slot of the shop stands in one of the four lanes,
+-- so every item is under exactly one header; a spec checks it). The small category signs the first pass
+-- hung under the headers are gone (Connor: too many signs, too close together): each box carries its own
+-- name tag and each stand its T-badge and unlock label, so the categories added nothing a player needs.
 Hearth.Sections = {
-	{
-		lane = "GearShelf",
-		header = "GEAR",
-		accent = BoxLook.Categories.Gear,
-		subAbove = 3.0,
-		subW = 4.6,
-		subStagger = -1.2, -- toward the aisle, clear of the wall shelving
-		subs = {
-			{
-				text = "WEAR & LIGHT",
-				ids = { "FeatherfallCloak", "Flashlight", "HeatBoots", "InsulatedCoat", "Lantern" },
-			},
-		},
-	},
-	{
-		lane = "PlanIslandW",
-		header = "BUILD PLANS",
-		accent = BoxLook.Categories.Blueprint,
-		subAbove = 2.4, -- no tier flags on the plans, so the sign hangs lower and stays under the header
-		subW = 4.4,
-		subStagger = 3.4,
-		subs = {
-			{ text = "SHED & YARD", ids = { "Shed", "WoodSign", "PaintCan", "Mailbox" } },
-			{ text = "INDOORS", ids = { "PictureWall8", "Table", "Chair" } },
-		},
-	},
-	{
-		lane = "PlanIslandE",
-		header = "HOME PLANS",
-		accent = BoxLook.Categories.Blueprint,
-		subAbove = 2.4,
-		subW = 4.4,
-		subStagger = 3.4,
-		subs = {
-			{ text = "HOME DECOR", ids = { "Bookshelf", "Rug", "Barrel", "Crate" } },
-			{ text = "FIRE & LAMP", ids = { "FirePit", "SparkSwitch", "SparkLamp" } },
-		},
-	},
-	{
-		lane = "LampShelf",
-		header = "LAMPS",
-		accent = BoxLook.Categories.Cosmetic,
-		subAbove = 2.8,
-		subW = 4.6,
-		subStagger = 1.2,
-		subs = {
-			{ text = "LAMP POST", ids = { "LampPost" } },
-		},
-	},
+	{ lane = "GearShelf", header = "GEAR", accent = BoxLook.Categories.Gear, subs = {} },
+	{ lane = "PlanIslandW", header = "BUILD PLANS", accent = BoxLook.Categories.Blueprint, subs = {} },
+	{ lane = "PlanIslandE", header = "HOME PLANS", accent = BoxLook.Categories.Blueprint, subs = {} },
+	{ lane = "LampShelf", header = "LAMPS", accent = BoxLook.Categories.Cosmetic, subs = {} },
 } :: { ShopKit.Section }
 
 -- A crate or barrel in the stock corner: the real mesh with a part-built
@@ -123,7 +80,7 @@ function Hearth.Build(model: Model, frame: Frame)
 			local lo, hi = ext.lo, ext.hi
 			-- Tall back shelving on the wall behind the unit: an upright
 			-- panel and two boards, looks only.
-			local wallX = if lane.x0 < 0 then -frame.halfW + 0.3 else frame.halfW - 0.3
+			local wallX = if lane.x0 < 0 then -frame.halfW + 0.15 else frame.halfW - 0.15 -- (the panel stands against the wall, behind the unit: not in it)
 			local cz = (lo + hi) / 2
 			dBox(model, "ShelfBack", V3(0.3, 9.5, hi - lo), CF(wallX, fy + 4.75 + 0.3, cz), TABLE)
 			for _, y in ipairs({ 6.6, 9.6 }) do
@@ -170,7 +127,7 @@ function Hearth.Build(model: Model, frame: Frame)
 	ShopKit.WarmLamp(model, -4.2, ceil - 3.4, 3, lampTop) -- (4.2 out: from the door these stay clear of the name board over the counter)
 	ShopKit.WarmLamp(model, 4.2, ceil - 3.4, 3, lampTop)
 	-- Over the counter end and the back corners, so no corner is dark.
-	for _, x in ipairs({ -15.6, -7, 7, 15.6 }) do
+	for _, x in ipairs({ -15.6, -9, 9, 15.6 }) do
 		ShopKit.WarmLamp(model, x, ceil - 3.4, 14.5, lampTop)
 	end
 

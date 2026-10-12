@@ -76,45 +76,33 @@ return function(t)
 		-- the whole shop and its boxes are inside the store budget (StoreStock.spec checks that too)
 	end)
 
-	t.test("every slot is under one sub-sign and every lane has a header", function()
-		local seen = {}
+	t.test("every slot is under one header (one per unit) and the signs are few and readable", function()
 		local lanes = {}
 		for _, section in ipairs(Builder.Sections) do
+			t.eq(lanes[section.lane], nil, section.lane .. " has two headers")
 			lanes[section.lane] = true
 			t.ok(#section.header <= 18, section.header .. " is short enough to stay on one line")
-			for _, sub in ipairs(section.subs) do
-				t.ok(#sub.text <= 16, sub.text .. " is short enough")
-				for _, id in ipairs(sub.ids) do
-					t.eq(seen[id], nil, id .. " is under two signs")
-					seen[id] = sub.text
-				end
-			end
+			t.eq(#section.subs, 0, "no small category signs: the headers, T-badges and name tags are enough")
 		end
 		for _, lane in ipairs(StoreStock.Lanes(KIND)) do
 			t.ok(lanes[lane.name], lane.name .. " has a header")
 		end
+		-- every slot stands in a lane that has a header
+		local laneOf = {}
+		for _, place in ipairs(StoreStock.Placements(KIND)) do
+			laneOf[place.slotId] = place.lane
+		end
 		for _, slot in ipairs(StoreStock.ForShop(KIND)) do
-			t.ok(seen[slot.itemId], slot.slotId .. " is under a sub-sign")
+			t.ok(lanes[laneOf[slot.slotId]], slot.slotId .. " is under a header")
 		end
-		-- the signs themselves
 		local model = interior()
-		local headers, subs = named(model, "HeaderSign"), named(model, "SubSign")
-		t.eq(#headers, #Builder.Sections, "a header per section") -- (per store: +1 when the store also hangs the CHECKOUT board)
-		local n = 0
-		for _, s in ipairs(Builder.Sections) do
-			n += #s.subs
-		end
-		t.eq(#subs, n)
+		local headers = named(model, "HeaderSign")
+		t.eq(#headers, #Builder.Sections, "a header per section")
+		t.eq(#named(model, "SubSign"), 0, "no sub-signs")
 		for _, h in ipairs(headers) do
 			t.ok(
 				ShopKit.TextPx(h.Size.Y, ShopKit.HeaderViewDist) >= ShopKit.MinTextPx,
 				h.Name .. " is readable on a phone"
-			)
-		end
-		for _, s in ipairs(subs) do
-			t.ok(
-				ShopKit.TextPx(s.Size.Y, ShopKit.SubViewDist) >= ShopKit.MinTextPx,
-				"a sub-sign is readable on a phone"
 			)
 		end
 	end)
