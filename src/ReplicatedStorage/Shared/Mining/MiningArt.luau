@@ -10,6 +10,7 @@
 local Kit = require(script.Parent.Parent.Art.Kit)
 local MachineMeshes = require(script.Parent.Parent.Art.MachineMeshes)
 local MachineSkin = require(script.Parent.Parent.Art.MachineSkin)
+local MeshKit = require(script.Parent.Parent.Art.MeshKit)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local LuxEffect = require(script.Parent.Parent.LuxEffect)
 local OreData = require(script.Parent.OreData)
@@ -444,14 +445,56 @@ end
 -- with one PointLight); the mesh has an open recess around it. With the
 -- Blender body (MachineMeshes "SmeltingFurnace") the posts, beams, plinth,
 -- firebox and chimney stay as see-through colliders and the roof, shingles
--- and lanterns are not built.
+-- and lanterns are removed (dressFurnace). It is built part-first and the
+-- mesh is swapped in when it has loaded, so a mesh that is slow or fails
+-- leaves a working, lit part-built furnace.
 local FURNACE_HIDE = { StoneBase = true, Beam = true, Firebox = true, Chimney = true, StubDeck = true }
+
+-- Parts only the part build has (the mesh carries the roof, shingles and
+-- lanterns). Dressing removes them.
+local FURNACE_PART_ONLY = { Roof = true, Shingle = true, Lantern = true, LanternGlow = true }
+
+-- Puts the furnace's mesh on a part-built furnace built at the origin. false
+-- (and nothing changed) when any piece is missing or still loading.
+local function dressFurnace(model: Model): boolean
+	if MachineSkin.Wears(model) then
+		return true
+	end
+	local skin = MachineSkin.Prepare("SmeltingFurnace", false)
+	if skin == nil then
+		return false
+	end
+	for _, child in ipairs(model:GetChildren()) do
+		if FURNACE_PART_ONLY[child.Name] then
+			child:Destroy()
+		end
+	end
+	local mouth = model:FindFirstChild("FireMouth")
+	if mouth and mouth:IsA("BasePart") then
+		-- One PointLight, Shadows off, on the only glow.
+		local light = Instance.new("PointLight")
+		light.Name = "FurnaceLight"
+		light.Color = LavaGlow
+		light.Range = 14
+		light.Brightness = 0.8
+		light.Shadows = false
+		light.Parent = mouth
+	end
+	local intake = model:FindFirstChild("SmeltIntake")
+	if intake and intake:IsA("BasePart") then
+		intake.Transparency = 1
+	end
+	local tray = model:FindFirstChild("OutputTray")
+	if tray and tray:IsA("BasePart") then
+		tray.Transparency = 1
+	end
+	MachineSkin.Commit(model, skin, CFrame.identity, FURNACE_HIDE)
+	return true
+end
 
 function MiningArt.SmeltingFurnace(): Model
 	local model = Instance.new("Model")
 	model.Name = "SmeltingFurnace"
-	local skin = MachineSkin.Prepare("SmeltingFurnace", false)
-	local meshed = skin ~= nil
 	local base =
 		Kit.part(model, "StoneBase", Vector3.new(8, 1.2, 6), CFrame.new(0, 0.6, 0), StoneBase, Enum.Material.Slate)
 	model.PrimaryPart = base
@@ -469,36 +512,28 @@ function MiningArt.SmeltingFurnace(): Model
 	end
 	Kit.part(model, "Beam", Vector3.new(7.6, 0.4, 0.4), CFrame.new(0, 6.1, -2.4), TimberBrown, Enum.Material.Wood)
 	Kit.part(model, "Beam", Vector3.new(7.6, 0.4, 0.4), CFrame.new(0, 6.1, 2.4), TimberBrown, Enum.Material.Wood)
-	if not meshed then
-		local roofL = Kit.wedge(
+	local roofL = Kit.wedge(
+		model,
+		"Roof",
+		Vector3.new(8.4, 1.6, 3.4),
+		CFrame.new(0, 6.6, -1.5) * CFrame.Angles(0, math.pi, 0),
+		RoofSlate,
+		Enum.Material.Slate
+	)
+	Kit.decor(roofL, false)
+	local roofR =
+		Kit.wedge(model, "Roof", Vector3.new(8.4, 1.6, 3.4), CFrame.new(0, 6.6, 1.5), RoofSlate, Enum.Material.Slate)
+	Kit.decor(roofR, false)
+	for i = -3, 3 do
+		local shingle = Kit.part(
 			model,
-			"Roof",
-			Vector3.new(8.4, 1.6, 3.4),
-			CFrame.new(0, 6.6, -1.5) * CFrame.Angles(0, math.pi, 0),
-			RoofSlate,
+			"Shingle",
+			Vector3.new(1.05, 0.12, 3.2),
+			CFrame.new(i * 1.1, 7.15, 0),
+			Color3.fromRGB(58, 62, 70),
 			Enum.Material.Slate
 		)
-		Kit.decor(roofL, false)
-		local roofR = Kit.wedge(
-			model,
-			"Roof",
-			Vector3.new(8.4, 1.6, 3.4),
-			CFrame.new(0, 6.6, 1.5),
-			RoofSlate,
-			Enum.Material.Slate
-		)
-		Kit.decor(roofR, false)
-		for i = -3, 3 do
-			local shingle = Kit.part(
-				model,
-				"Shingle",
-				Vector3.new(1.05, 0.12, 3.2),
-				CFrame.new(i * 1.1, 7.15, 0),
-				Color3.fromRGB(58, 62, 70),
-				Enum.Material.Slate
-			)
-			Kit.decor(shingle, false)
-		end
+		Kit.decor(shingle, false)
 	end
 	Kit.part(model, "Firebox", Vector3.new(3.2, 2.2, 2.4), CFrame.new(0, 2.2, -0.4), StoneBase, Enum.Material.Slate)
 	local mouth = Kit.part(
@@ -521,7 +556,7 @@ function MiningArt.SmeltingFurnace(): Model
 		IronBlack,
 		Enum.Material.DiamondPlate
 	)
-	intake.Transparency = if meshed then 1 else 0.6
+	intake.Transparency = 0.6
 	intake.CanCollide = false
 	intake.CanQuery = false
 	intake.CanTouch = false
@@ -551,23 +586,14 @@ function MiningArt.SmeltingFurnace(): Model
 		Enum.Material.Wood
 	)
 	Kit.decor(tray, false)
-	if meshed then
-		-- One PointLight, Shadows off, on the only glow.
-		local light = Instance.new("PointLight")
-		light.Name = "FurnaceLight"
-		light.Color = LavaGlow
-		light.Range = 14
-		light.Brightness = 0.8
-		light.Shadows = false
-		light.Parent = mouth
-		tray.Transparency = 1
-	else
-		lantern(model, CFrame.new(-3.2, 4.6, -2.2), true)
-		lantern(model, CFrame.new(3.2, 4.6, -2.2), false)
-	end
-	if skin ~= nil then
-		MachineSkin.Commit(model, skin, CFrame.identity, FURNACE_HIDE)
-	end
+	lantern(model, CFrame.new(-3.2, 4.6, -2.2), true)
+	lantern(model, CFrame.new(3.2, 4.6, -2.2), false)
+	-- Never waits for the mesh: the part build above is the machine until the
+	-- body has loaded, then dressFurnace swaps it (MeshKit.Attempt, in the
+	-- frame the model was built in).
+	MeshKit.Attempt(model, function(): boolean
+		return dressFurnace(model)
+	end, true)
 	return model
 end
 
@@ -583,46 +609,78 @@ function MiningArt.SetFurnaceDoor(model: Model, closed: boolean): boolean
 	return MachineSkin.Swing(model, "FurnaceDoor", hinge, "Y", if closed then -MiningArt.FurnaceDoorAjar else 0)
 end
 
-function MiningArt.Prospector(): Model
-	local model = Instance.new("Model")
-	model.Name = "Prospector"
+-- Puts the stall's and the chute's meshes on a part-built Prospector built at
+-- the origin. All or nothing: false (and nothing changed) when either is
+-- missing or still loading, so the stall is never half dressed.
+local function dressProspector(model: Model): boolean
+	if MachineSkin.Wears(model) then
+		return true
+	end
 	local skin = MachineSkin.Prepare("Prospector", false)
 	local chuteSkin = MachineSkin.Prepare("OreChute", false)
-	local meshed = skin ~= nil
-	local counter =
-		Kit.part(model, "Counter", Vector3.new(6, 1.1, 2.2), CFrame.new(0, 1.1, 0), PlankHoney, Enum.Material.Wood)
-	model.PrimaryPart = counter
-	Kit.part(model, "Post", Vector3.new(0.35, 3.2, 0.35), CFrame.new(-2.6, 2.6, -0.8), TimberBrown, Enum.Material.Wood)
-	Kit.part(model, "Post", Vector3.new(0.35, 3.2, 0.35), CFrame.new(2.6, 2.6, -0.8), TimberBrown, Enum.Material.Wood)
-	if not meshed then
-		local roof = Kit.wedge(
-			model,
-			"Awning",
-			Vector3.new(6.4, 0.5, 2.4),
-			CFrame.new(0, 4.3, -0.6),
-			RoofSlate,
-			Enum.Material.Slate
-		)
-		Kit.decor(roof, false)
+	if skin == nil or chuteSkin == nil then
+		if skin ~= nil then
+			for _, piece in ipairs(skin.parts) do
+				piece:Destroy()
+			end
+		end
+		if chuteSkin ~= nil then
+			for _, piece in ipairs(chuteSkin.parts) do
+				piece:Destroy()
+			end
+		end
+		return false
+	end
+	local awning = model:FindFirstChild("Awning")
+	if awning then
+		awning:Destroy()
 	end
 	-- The board's text is a SurfaceGui on the Sign part. Under the mesh the
 	-- part is see-through and stands a hair in front of the mesh's plate.
-	local sign = Kit.part(
-		model,
-		"Sign",
-		Vector3.new(3.2, 0.9, if meshed then 0.04 else 0.2),
-		CFrame.new(0, 3.5, if meshed then -1.72 else -1.5),
-		TimberBrown,
-		Enum.Material.Wood
-	)
-	Kit.signText(sign, "PROSPECTOR", Color3.fromRGB(245, 235, 215), { Enum.NormalId.Front })
-	if meshed then
+	local sign = model:FindFirstChild("Sign")
+	if sign and sign:IsA("BasePart") then
+		sign.Size = Vector3.new(3.2, 0.9, 0.04)
+		sign.CFrame = CFrame.new(0, 3.5, -1.72)
 		sign.Transparency = 1
 		sign.CanCollide = false
 		sign.CanQuery = false
 		sign.CanTouch = false
 		sign.CastShadow = false
 	end
+	local chute = model:FindFirstChild("OreChute")
+	if chute and chute:IsA("BasePart") then
+		chute.Transparency = 1
+	end
+	local stand = model:FindFirstChild("NpcStand")
+	if stand and stand:IsA("BasePart") then
+		stand.Transparency = 1
+	end
+	MachineSkin.Commit(model, skin, CFrame.identity, { Counter = true })
+	-- The hopper and its flap, on the ground under the chute's hit box.
+	for _, piece in ipairs(chuteSkin.parts) do
+		local offset = MachineMeshes.Piece("OreChute", piece.Name)
+		piece.CFrame = CFrame.new(4.2, 0, 0) * CFrame.new(if offset then offset.offset else Vector3.zero)
+		piece.Parent = model
+	end
+	return true
+end
+
+function MiningArt.Prospector(): Model
+	local model = Instance.new("Model")
+	model.Name = "Prospector"
+	local counter =
+		Kit.part(model, "Counter", Vector3.new(6, 1.1, 2.2), CFrame.new(0, 1.1, 0), PlankHoney, Enum.Material.Wood)
+	model.PrimaryPart = counter
+	Kit.part(model, "Post", Vector3.new(0.35, 3.2, 0.35), CFrame.new(-2.6, 2.6, -0.8), TimberBrown, Enum.Material.Wood)
+	Kit.part(model, "Post", Vector3.new(0.35, 3.2, 0.35), CFrame.new(2.6, 2.6, -0.8), TimberBrown, Enum.Material.Wood)
+	local roof =
+		Kit.wedge(model, "Awning", Vector3.new(6.4, 0.5, 2.4), CFrame.new(0, 4.3, -0.6), RoofSlate, Enum.Material.Slate)
+	Kit.decor(roof, false)
+	-- The board's text is a SurfaceGui on the Sign part. Under the mesh the
+	-- part is see-through and stands a hair in front of the mesh's plate.
+	local sign =
+		Kit.part(model, "Sign", Vector3.new(3.2, 0.9, 0.2), CFrame.new(0, 3.5, -1.5), TimberBrown, Enum.Material.Wood)
+	Kit.signText(sign, "PROSPECTOR", Color3.fromRGB(245, 235, 215), { Enum.NormalId.Front })
 	local chute = Kit.part(
 		model,
 		"OreChute",
@@ -631,7 +689,7 @@ function MiningArt.Prospector(): Model
 		IronBlack,
 		Enum.Material.DiamondPlate
 	)
-	chute.Transparency = if chuteSkin ~= nil then 1 else 0.15
+	chute.Transparency = 0.15
 	chute:SetAttribute("OreChute", true)
 	local stand = Kit.part(
 		model,
@@ -642,44 +700,45 @@ function MiningArt.Prospector(): Model
 		Enum.Material.Slate
 	)
 	Kit.decor(stand, false)
-	if skin ~= nil then
-		MachineSkin.Commit(model, skin, CFrame.identity, { Counter = true })
-		stand.Transparency = 1
-	end
-	if chuteSkin ~= nil then
-		-- The hopper and its flap, on the ground under the chute's hit box.
-		for _, piece in ipairs(chuteSkin.parts) do
-			local offset = MachineMeshes.Piece("OreChute", piece.Name)
-			piece.CFrame = CFrame.new(4.2, 0, 0) * CFrame.new(if offset then offset.offset else Vector3.zero)
-			piece.Parent = model
-		end
-	end
+	MeshKit.Attempt(model, function(): boolean
+		return dressProspector(model)
+	end, true)
 	return model
+end
+
+-- Puts the bench's mesh on a part-built CraftBench built at the origin (false
+-- and nothing changed while a piece is missing or loading).
+local function dressBench(model: Model): boolean
+	if MachineSkin.Wears(model) then
+		return true
+	end
+	local skin = MachineSkin.Prepare("CraftBench", false)
+	if skin == nil then
+		return false
+	end
+	local vise = model:FindFirstChild("Vise")
+	if vise then
+		vise:Destroy()
+	end
+	MachineSkin.Commit(model, skin, CFrame.identity, { Top = true })
+	return true
 end
 
 function MiningArt.CraftBench(): Model
 	local model = Instance.new("Model")
 	model.Name = "CraftBench"
-	local skin = MachineSkin.Prepare("CraftBench", false)
 	local top = Kit.part(model, "Top", Vector3.new(4.2, 0.3, 2), CFrame.new(0, 1.7, 0), PlankHoney, Enum.Material.Wood)
 	model.PrimaryPart = top
 	for _, x in ipairs({ -1.8, 1.8 }) do
 		Kit.part(model, "Leg", Vector3.new(0.28, 1.6, 0.28), CFrame.new(x, 0.8, -0.7), TimberBrown, Enum.Material.Wood)
 		Kit.part(model, "Leg", Vector3.new(0.28, 1.6, 0.28), CFrame.new(x, 0.8, 0.7), TimberBrown, Enum.Material.Wood)
 	end
-	if skin == nil then
-		local vise = Kit.part(
-			model,
-			"Vise",
-			Vector3.new(0.4, 0.35, 0.5),
-			CFrame.new(1.5, 2, 0.4),
-			IronBlack,
-			Enum.Material.Metal
-		)
-		Kit.decor(vise, false)
-	else
-		MachineSkin.Commit(model, skin, CFrame.identity, { Top = true })
-	end
+	local vise =
+		Kit.part(model, "Vise", Vector3.new(0.4, 0.35, 0.5), CFrame.new(1.5, 2, 0.4), IronBlack, Enum.Material.Metal)
+	Kit.decor(vise, false)
+	MeshKit.Attempt(model, function(): boolean
+		return dressBench(model)
+	end, true)
 	return model
 end
 

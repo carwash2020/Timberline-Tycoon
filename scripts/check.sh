@@ -60,6 +60,8 @@ if [ "$RUN_LINT" = 1 ]; then
 	echo "== ECONOMY.md is current"
 	lune run tools/economy --check
 	lune run tools/economy1 --check
+	echo "== ASSETS.md is current"
+	lune run tools/assets --check
 fi
 
 echo "All checks passed."

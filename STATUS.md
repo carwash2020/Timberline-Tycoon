@@ -27,9 +27,22 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Asset audit (branch `phase-2/audit-assets`, 12 October 2026)
+
+`ASSETS.md` (generated: `lune run tools/assets`, kept current by `check.sh`) lists every asset id in the source with its use and
+status. **Nothing in it is verified on Roblox or in Studio**: the agent sandbox is blocked from every Roblox host. What is pinned
+by `tests/AssetIds.spec.luau`: id format and length per kind, no URL or zero ids, kinds never mixed (no Model container used as a
+MeshId), unique containers, mesh sharing only Blender-to-Backlog, well-formed MeshTemplates. The four machines that stayed
+part-built in Connor's log (SmeltingFurnace, Prospector, OreChute, CraftBench) had correct ids; they were built at server start
+outside `MeshKit.Attempt`, so a mesh that was not in yet was final. `MiningArt` now swaps the mesh in when it lands, and
+`MachineSkin.Prepare` asks for every piece at once so a five-piece machine is dressed in one round. **Open:** plot machines
+built through `MachineArt` (sawmills, planers, chop saw, belts) have the same gap if built before their meshes are cached
+(needs PlotService to re-dress); the Creator Hub checks for Connor are at the end of `ASSETS.md`.
+
 ## Server boot and runtime audit (branch `phase-2/audit-server-boot`, 12 October 2026)
 
 Read all of ServerScriptService and the server side of Shared for things a real Studio server start would trip on that the mocked specs cannot see. Fixed: the v2 wiring in GameServer ran bare (one throw and "services" never opened, PlayerAdded never connected); MiningBoot built the mine at server start, before MapBuilder's Underground step, so the mine's own rubble could be doubled by an untracked wall (it now waits for the Remotes folder like BaseBoot); a player who left and rejoined the same server did not get their stored shop boxes back (BoxService "restored" flag); MiningBoot, TownBoardBoot and BaseBoot now warn when a module is missing or does not load. Checks in PHASE2_NOTES.md "Server boot and runtime audit". Specs: `ServerBootAudit.spec`, `BoxService.spec`.
+
 ## Client boot audit (branch `phase-2/audit-client-boot`, 12 October 2026)
 
 Connor's log: `ChopSawController Start took 8.03s`, `SawmillController Start took 8.02s`. Seven controllers (ChopSaw, Sawmill,

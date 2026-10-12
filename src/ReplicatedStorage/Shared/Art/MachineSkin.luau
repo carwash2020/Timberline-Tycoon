@@ -27,6 +27,8 @@ local MeshKit = require(script.Parent.MeshKit)
 
 local MachineSkin = {}
 
+export type Piece = MachineMeshes.Piece
+
 export type Skin = {
 	id: string,
 	ghost: boolean,
@@ -79,12 +81,17 @@ local function logMiss(id: string, piece: string, meshId: number)
 	if MeshKit.Override == nil and not hasAssets() then
 		return
 	end
+	-- Not in the cache and not failed: the load is still on its way. A caller
+	-- inside MeshKit.Attempt is swapped later (and never reaches this line);
+	-- one that is not keeps the part build for this model, so say which it is.
+	local state = if MeshKit.IsPending(meshId) then "was still loading (not in yet)" else "did not load"
 	warn(
 		string.format(
-			"[MachineSkin] %s piece %s (mesh %d) did not load; keeping the part-built machine",
+			"[MachineSkin] %s piece %s (mesh %d) %s; keeping the part-built machine",
 			id,
 			piece,
-			meshId
+			meshId,
+			state
 		)
 	)
 end
@@ -97,15 +104,21 @@ function MachineSkin.Prepare(id: string, ghost: boolean?): Skin?
 		return nil
 	end
 	local made: { MeshPart } = {}
+	-- Every piece is asked for even after one misses: each miss queues its load
+	-- (and, inside MeshKit.Attempt, makes the swap wait for ALL of them), so a
+	-- machine of five pieces is dressed after one round of loads, not one piece
+	-- per retry (the swap gives up after three tries).
+	local firstMiss: Piece? = nil
+	local firstMissId = 0
 	for _, piece in ipairs(asset.pieces) do
 		local meshId = MachineMeshes.MeshId(id, piece.name)
 		local part = MeshKit.Create(meshId, piece.name, piece.size)
 		if not part then
-			for _, p in ipairs(made) do
-				p:Destroy()
+			if firstMiss == nil then
+				firstMiss = piece
+				firstMissId = meshId
 			end
-			logMiss(id, piece.name, meshId)
-			return nil
+			continue
 		end
 		MeshKit.Visual(part, meshId)
 		part.Anchored = true
@@ -120,6 +133,13 @@ function MachineSkin.Prepare(id: string, ghost: boolean?): Skin?
 			part.Transparency = 0.45
 		end
 		table.insert(made, part)
+	end
+	if firstMiss ~= nil then
+		for _, p in ipairs(made) do
+			p:Destroy()
+		end
+		logMiss(id, firstMiss.name, firstMissId)
+		return nil
 	end
 	return { id = id, ghost = ghost == true, parts = made }
 end
