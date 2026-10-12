@@ -4010,3 +4010,15 @@ Studio checks:
 After #168 (auto-loads off first): the gaps that were left. GameServer put a character back on its pad if it falls below y = -200 (Shared/VoidRescue, three times per character at most, never a kill), streams the pad's ground before every respawn, and the bare steps between the save and the character are guarded so one error cannot leave a player with no character. Gates, loading card and Studio default spawn were read and are fine (tests/LoadPathAudit.spec).
 
 Studio checks: PC: press Play, no falling or dying while loading; walk into the Deep mine (still no rescue); in Studio run `game.Players.<you>.Character:PivotTo(CFrame.new(0,-300,0))` in the server console and you are put back on the pad with a warn line. Phone and Xbox: join, die once (axe a hazard or reset), respawn on the pad without falling.
+
+## Store polish: Sparkworks (branch `phase-2/store-polish-sparkworks`, 12 October 2026)
+
+What changed is in STATUS.md "Store polish: Sparkworks". Renders: `previews/store-polish/sparkworks-*.png`. Connor's reference screenshots were never received; this follows the written brief. Nothing was run in Studio.
+
+Studio checks:
+1. **PC: from the street.** Walk up the path to the Sparkworks. The front has a teal roof edge and corner posts, two wall lanterns by the door, a lamp post each side of the path, a copper wire with small teal lamps across the front and down both sides, two windows and a window in each side wall, two thin rods with teal balls on the roof. Nothing floats above the grass, the roof sits on the walls with no dark gap, the board reads OPEN ALL DAY. Walk round both sides and the back. At night the windows, lanterns and posts glow warm; nothing is a white blob.
+2. **PC: the doorway and the door.** The door opens and closes as before; the step into the shop has no new bump you catch on (the doorstep is level with the floor). Nothing stands in the doorway.
+3. **PC: inside.** From the door, "BELTS & INPUTS" and "LOGIC & OUTPUTS" read with no chain across a letter. The five small signs hang behind them. "WIRE IT UP" and CHECKOUT both read from the door. Each pedestal holds one item, none touch. The wire spools stand on their pallet. Walk to the counter: Juno is behind it, the brass CHECKOUT plaque is on the counter front.
+4. **Phone (667 x 375, touch):** repeat 3. The big signs read; tap an item: the hover tag and Buy work exactly as before. Walk in and out through the door with the stick.
+5. **Xbox:** repeat 3 with the stick; aim at a pedestal: the selection ring and prompt work as before; B closes the shop panel. Nothing is bound to the right trigger.
+6. **Light:** the shop is warm and readable, not blinding, at day and at night (the lantern lights are 0.9 to 1.4 bright, 22 range at most).

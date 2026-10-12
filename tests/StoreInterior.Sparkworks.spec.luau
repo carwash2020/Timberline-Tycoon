@@ -248,4 +248,137 @@ return function(t)
 		local total = ShopKit.CountParts(model) + boxes + gold * (BoxLogic.ShellPartCap + 3)
 		t.ok(total <= GameConfig.StorePartBudget, string.format("%d parts with boxes", total))
 	end)
+
+	-- The gap between two parts' boxes (0 when they touch or overlap).
+	local function gap(a, b)
+		local ax0, ax1, ay0, ay1, az0, az1 = aabb(a)
+		local bx0, bx1, by0, by1, bz0, bz1 = aabb(b)
+		local dx = math.max(bx0 - ax1, ax0 - bx1, 0)
+		local dy = math.max(by0 - ay1, ay0 - by1, 0)
+		local dz = math.max(bz0 - az1, az0 - bz1, 0)
+		return math.sqrt(dx * dx + dy * dy + dz * dz)
+	end
+
+	t.test("nothing floats: every part is joined, by touching, to the floor, a wall or the roof", function()
+		local model = interior()
+		local all = parts(model)
+		local tol = 0.06
+		-- (a part touching a plane holds itself; the rest are held by touching a held part, so a
+		-- lamp whose chain stops short of the roof, or a board off its wall, is found)
+		local held, queue = {}, {}
+		for _, p in ipairs(all) do
+			local x0, x1, y0, y1, z0, z1 = aabb(p)
+			if
+				p.Name == "Counter"
+				or y0 <= frame.floorTop + tol
+				or y1 >= frame.ceilY - tol
+				or x0 <= -frame.halfW + tol
+				or x1 >= frame.halfW - tol
+				or z0 <= -frame.halfD + tol
+				or z1 >= frame.halfD - tol
+			then
+				held[p] = true
+				table.insert(queue, p)
+			end
+		end
+		local head = 1
+		while head <= #queue do
+			local cur = queue[head]
+			head += 1
+			for _, q in ipairs(all) do
+				if not held[q] and gap(cur, q) <= tol then
+					held[q] = true
+					table.insert(queue, q)
+				end
+			end
+		end
+		for _, p in ipairs(all) do
+			local x0, x1, y0, y1, z0, z1 = aabb(p)
+			t.ok(
+				held[p],
+				string.format("%s floats at %.1f, %.1f, %.1f", p.Name, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
+			)
+		end
+	end)
+
+	t.test("one item per pedestal and no two stands overlap", function()
+		local model = interior()
+		local plinths = named(model, "Plinth")
+		for i = 1, #plinths do
+			local a0, a1, b0, b1, c0, c1 = aabb(plinths[i])
+			for j = i + 1, #plinths do
+				local d0, d1, e0, e1, f0, f1 = aabb(plinths[j])
+				local ox = math.min(a1, d1) - math.max(a0, d0)
+				local oy = math.min(b1, e1) - math.max(b0, e0)
+				local oz = math.min(c1, f1) - math.max(c0, f0)
+				t.ok(
+					not (ox > 0.01 and oy > 0.01 and oz > 0.01),
+					"two stands overlap at " .. plinths[i].Name .. i .. "/" .. j
+				)
+			end
+		end
+	end)
+
+	t.test("signs: headers hang nearest the door and nothing overlaps them or the stands", function()
+		local model = interior()
+		local headers, subs = named(model, "HeaderSign"), named(model, "SubSign")
+		for _, h in ipairs(headers) do
+			t.ok(math.abs(h.CFrame.Position.Z - Builder.HeaderZ) < 1e-3, "headers are at HeaderZ")
+			for _, sub in ipairs(subs) do
+				-- (no sub-sign or chain in front of a header's letters from the doorway)
+				local _, _, _, _, z0 = aabb(sub)
+				t.ok(z0 > h.CFrame.Position.Z + 0.3, sub:GetAttribute("SignText") .. " hangs behind the headers")
+			end
+		end
+		local boards = {}
+		for _, p in ipairs(headers) do
+			table.insert(boards, p)
+		end
+		for _, p in ipairs(subs) do
+			table.insert(boards, p)
+		end
+		for _, p in ipairs(named(model, "CheckoutSign")) do
+			table.insert(boards, p)
+		end
+		local solids = {}
+		for _, n in ipairs({ "Plinth", "TierFlag", "LockChip", "TierBacking", "TierPost" }) do
+			for _, p in ipairs(named(model, n)) do
+				table.insert(solids, p)
+			end
+		end
+		for i, a in ipairs(boards) do
+			for j = i + 1, #boards do
+				t.ok(gap(a, boards[j]) > 0, "two sign boards overlap: " .. tostring(a:GetAttribute("SignText")))
+			end
+			for _, b in ipairs(solids) do
+				t.ok(gap(a, b) > 0.05, tostring(a:GetAttribute("SignText")) .. " clips a " .. b.Name)
+			end
+		end
+	end)
+
+	t.test("sign text fits its board and still reads at 667 x 375", function()
+		local model = interior()
+		-- (the text scales down to the board's width: a capital of the sign font is about 0.55 em
+		-- wide and the text's em is the 0.84 of the board's height TextPx measures)
+		local function effective(board)
+			local text = board:GetAttribute("SignText")
+			local fit = (board.Size.X - 0.4) / (#text * 0.55) / 0.84
+			return math.min(board.Size.Y, fit)
+		end
+		for _, board in ipairs(named(model, "HeaderSign")) do
+			t.ok(
+				ShopKit.TextPx(effective(board), ShopKit.HeaderViewDist) >= ShopKit.MinTextPx,
+				board:GetAttribute("SignText") .. " header text is too small to read on a phone"
+			)
+		end
+		for _, board in ipairs(named(model, "SubSign")) do
+			t.ok(
+				ShopKit.TextPx(effective(board), ShopKit.SubViewDist) >= ShopKit.MinTextPx,
+				board:GetAttribute("SignText") .. " sub-sign text is too small to read on a phone"
+			)
+		end
+		for _, board in ipairs(named(model, "CheckoutSign")) do
+			t.ok(ShopKit.TextPx(effective(board), ShopKit.HeaderViewDist) >= ShopKit.MinTextPx, "CHECKOUT reads")
+		end
+	end)
 end

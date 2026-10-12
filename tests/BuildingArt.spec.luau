@@ -319,6 +319,13 @@ return function(t)
 		end
 	end)
 
+	t.test("the Sparkworks (not in SHOPS: its own interior spec has its footprint) stays at 400 parts", function()
+		-- Store polish: shell, facade, door, interior and lamps, without the boxes (StoreStock counts those).
+		local model = BuildingArt.Shop("Sparkworks", "SPARKWORKS", C3.fromRGB(46, 139, 139))
+		t.ok(#parts(model) <= 400, "Sparkworks parts: " .. #parts(model))
+		t.ok(model:FindFirstChild("Counter"), "Counter")
+	end)
+
 	t.test("an unknown shop kind still builds a store with a Counter", function()
 		local model = BuildingArt.Shop("Bakery", "BAKERY", C3.fromRGB(200, 120, 80))
 		t.ok(model:FindFirstChild("Counter"), "Counter")

@@ -1722,7 +1722,8 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 			TRIM
 		)
 	end
-	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), Palette.RoofSlate, MAT.Slate)
+	-- (the roof's underside is the walls' top, TOP, so it rests on the walls; its top is TOP + 0.65)
+	Kit.part(model, "Roof", V3(2 * HX + 2, 0.65, 2 * HZ + 2), CF(0, TOP + 0.325, 0), Palette.RoofSlate, MAT.Slate)
 
 	-- The name board stands over the roof on two posts, like the General Store's.
 	local signW, signH = 20, 3
@@ -1916,7 +1917,7 @@ function BuildingArt.InteriorFrame(kind: string, s: number): { frame: ShopInteri
 				floorTop = 0.4 * s,
 				halfW = BuildingArt.SparkworksHalfWidth * s - 0.45,
 				halfD = BuildingArt.SparkworksHalfDepth * s - 0.45,
-				ceilY = 10 * s - 0.4,
+				ceilY = 10 * s, -- the roof's underside: the beams and chains reach up to it
 			},
 		}
 	end
@@ -1989,6 +1990,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			wallTop = 10 * s,
 			roofTop = 10.65 * s,
 			groundY = 0.4 * s,
+			yardY = 0, -- the floor is a step up from the ground; the yard's props stand on the ground
 			accent = accent,
 		}
 	end

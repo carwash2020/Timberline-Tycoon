@@ -28,6 +28,7 @@ export type Spec = {
 	roofTop: number, -- the roof's highest point over the front half
 	groundY: number, -- the floor's top
 	accent: Color3,
+	yardY: number?, -- where the yard's props stand (the real ground) when the floor is a step up from it; default groundY
 }
 
 ShopFacade.DoorClear = 0.8
@@ -43,6 +44,9 @@ local IRON = hex("#3B3634")
 local LEAF = hex("#4E7A3E")
 local WOOD = hex("#8C6239")
 local BRICK = hex("#8E4B3A")
+local COPPER = hex("#B87333")
+local STONE = hex("#9C958A")
+local SPARK = hex("#3FC9C0")
 
 local function decor(p: Part): Part
 	Kit.decor(p, if math.max(p.Size.X, p.Size.Y, p.Size.Z) < 3 then false else nil)
@@ -166,6 +170,160 @@ local function awning(parent: Instance, spec: Spec, y: number, reach: number, co
 	end
 end
 
+-- The Sparkworks' street side: it stands on a stone plinth, a doorstep leads to the door,
+-- away from it with a lamp post each side, the front and the side walls carry a copper conduit with spark lamps,
+-- the corners are teal pilasters, the roof edge a teal fascia and the roof two lightning rods. The yard's props
+-- (windows, planters, barrel, crate, board, awning) stand on the real ground (spec.yardY).
+local function sparkworksFront(model: Model, spec: Spec)
+	local fz, hw = spec.frontZ, spec.halfW + 0.45 -- the walls' outside faces
+	local gy = spec.yardY or spec.groundY
+	local floorY = spec.groundY
+	local d = spec.doorHalf
+	local yard = table.clone(spec)
+	yard.groundY = gy
+
+	-- Plinth: the wall's foot sticks out past the floor slab, so a stone strip runs under it
+	-- (front in two pieces round the doorstep, the sides and the back), top level with the floor.
+	-- These and the doorstep are walked on, so they collide.
+	local ring = hw + 0.55
+	local frontLen = ring - d
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(
+			model,
+			"Foundation",
+			V3(frontLen, floorY, 1.0),
+			CF(s * (d + frontLen / 2), floorY / 2, fz - 0.05),
+			STONE,
+			MAT.Cobblestone
+		)
+		Kit.part(
+			model,
+			"Foundation",
+			V3(1.0, floorY, 2 * ring - 1.9),
+			CF(s * (hw + 0.05), floorY / 2, 0),
+			STONE,
+			MAT.Cobblestone
+		)
+	end
+	Kit.part(model, "Foundation", V3(2 * ring, floorY, 1.0), CF(0, floorY / 2, -fz + 0.05), STONE, MAT.Cobblestone)
+	-- The doorstep: level with the floor, under the doormat.
+	Kit.part(model, "Doorstep", V3(2 * d, floorY, 2.9), CF(spec.doorCx, floorY / 2, fz - 1.0), STONE, MAT.Cobblestone)
+
+	-- Yard: two windows, the awning, a planter each side, the board, a barrel and a crate.
+	for _, x in ipairs({ -16, 16 }) do
+		window(model, spec, x, 6.8, 3.6, 4.4, false)
+	end
+	awning(model, yard, 11.9, 4.2, spec.accent, hex("#F2E7CF"))
+	planter(model, -10.3, gy, fz - 1.8)
+	planter(model, 10.3, gy, fz - 1.8)
+	sandwichBoard(model, -15.5, gy, fz - 2.4, "Sparkworks") -- (west, clear of the barrel and crate)
+	barrel(model, spec.halfW - 2.2, gy, fz - 1.6)
+	crate(model, spec.halfW - 4.4, gy, fz - 1.4, 1.7)
+
+	-- A window in each side wall, over the counter's end of the shop (the shelf units' wall
+	-- panels stop short of it).
+	for _, s in ipairs({ -1, 1 }) do
+		local x, cz, cy, w, h = s * (hw + 0.12), 12, 6.8, 3.6, 4.4
+		box(model, "WindowFrame", V3(0.4, 0.4, w + 0.8), CF(x, cy + h / 2 + 0.2, cz), TRIM)
+		for _, e in ipairs({ -1, 1 }) do
+			box(model, "WindowFrame", V3(0.4, h, 0.4), CF(x, cy, cz + e * (w / 2 + 0.2)), TRIM)
+		end
+		box(model, "WindowSill", V3(0.9, 0.35, w + 1.4), CF(x + s * 0.25, cy - h / 2 - 0.2, cz), TRIM)
+		local pane = box(model, "WindowGlass", V3(0.12, h, w), CF(s * hw, cy, cz), hex("#BFD9E6"), MAT.Glass)
+		pane.Transparency = 0.45
+		pane.CastShadow = false
+		box(model, "WindowBar", V3(0.2, h, 0.18), CF(x, cy, cz), TRIM)
+		box(model, "WindowBar", V3(0.2, 0.18, w), CF(x, cy, cz), TRIM)
+	end
+
+	-- Teal pilasters at the front corners and a teal skirting along the walls.
+	local wallH = spec.wallTop - floorY
+	for _, s in ipairs({ -1, 1 }) do
+		box(model, "Pilaster", V3(1.0, wallH, 1.0), CF(s * (hw + 0.05), floorY + wallH / 2, fz - 0.05), spec.accent)
+		box(model, "WallBand", V3(0.3, 1.2, 2 * hw - 1.0), CF(s * (hw + 0.15), floorY + 0.6, 0), spec.accent)
+		local runLen = hw - d - 1.4
+		box(
+			model,
+			"WallBand",
+			V3(runLen, 1.2, 0.3),
+			CF(s * (d + 0.9 + runLen / 2), floorY + 0.6, fz - 0.15),
+			spec.accent
+		)
+	end
+
+	-- Roof edge: a teal fascia on the front and the two sides.
+	local roofH = spec.roofTop - spec.wallTop
+	local roofHalf = hw + 1.05
+	box(model, "Fascia", V3(2 * roofHalf, roofH, 0.3), CF(0, spec.wallTop + roofH / 2, -roofHalf - 0.15), spec.accent)
+	for _, s in ipairs({ -1, 1 }) do
+		box(
+			model,
+			"Fascia",
+			V3(0.3, roofH, 2 * roofHalf),
+			CF(s * (roofHalf + 0.15), spec.wallTop + roofH / 2, 0),
+			spec.accent
+		)
+	end
+
+	-- Wiring: a copper conduit along the front and both sides, spark lamps under it, a drop each side
+	-- of the awning to a wall lantern, and a fuse box on each side wall.
+	local runY = 13.2
+	box(model, "Conduit", V3(2 * hw - 2.0, 0.4, 0.4), CF(0, runY, fz - 0.2), COPPER, MAT.Metal)
+	for _, x in ipairs({ -16, -12.4, 12.4, 16 }) do
+		local bulb = box(model, "SparkBulb", V3(0.9, 0.9, 0.5), CF(x, runY - 0.65, fz - 0.25), SPARK, MAT.Neon)
+		bulb.CastShadow = false
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		local lx = s * (d + 2.7)
+		box(model, "ConduitDrop", V3(0.35, runY - 9.0, 0.35), CF(lx, (runY + 9.0) / 2, fz - 0.2), COPPER, MAT.Metal)
+		box(model, "LanternArm", V3(0.3, 0.25, 1.1), CF(lx, 8.9, fz - 0.55), IRON, MAT.Metal)
+		local glow = Kit.lantern(model, CF(lx, 8.12, fz - 1.0), 0.9)
+		for _, c in ipairs(glow:GetChildren()) do
+			if c:IsA("PointLight") then
+				c.Brightness = 0.9
+				c.Range = 14
+			end
+		end
+		box(model, "Conduit", V3(0.4, 0.4, 2 * hw - 2.0), CF(s * (hw + 0.2), runY, 0), COPPER, MAT.Metal)
+		for _, z in ipairs({ -10, 0, 10 }) do
+			local bulb = box(model, "SparkBulb", V3(0.5, 0.9, 0.9), CF(s * (hw + 0.2), runY - 0.65, z), SPARK, MAT.Neon)
+			bulb.CastShadow = false
+		end
+		box(
+			model,
+			"ConduitDrop",
+			V3(0.35, runY - 8.8, 0.35),
+			CF(s * (hw + 0.175), (runY + 8.8) / 2, -6),
+			COPPER,
+			MAT.Metal
+		)
+		box(model, "FuseBox", V3(0.6, 1.6, 1.2), CF(s * (hw + 0.3), 8.0, -6), hex("#3A332D"), MAT.Metal)
+	end
+
+	-- Roof: a lightning rod each side, a spark ball on top.
+	for _, s in ipairs({ -1, 1 }) do
+		local x = s * (hw - 1.4)
+		box(model, "RodBase", V3(1.6, 0.9, 1.6), CF(x, spec.roofTop + 0.45, -4), STONE, MAT.Slate)
+		box(model, "SparkRod", V3(0.2, 5, 0.2), CF(x, spec.roofTop + 0.9 + 2.5, -4), IRON, MAT.Metal)
+		local ball = Kit.ball(model, "SparkBall", 0.9, CF(x, spec.roofTop + 0.9 + 5 + 0.35, -4), SPARK, MAT.Neon)
+		Kit.decor(ball, false)
+	end
+
+	-- Out front: a lamp post each side of the path (the road paint in WorldLayout, 12 wide, runs to the doorstep).
+	for _, s in ipairs({ -1, 1 }) do
+		local x, pz = s * 9.4, fz - 8
+		box(model, "LampPostBase", V3(1.0, 0.5, 1.0), CF(x, 0.25, pz), STONE, MAT.Cobblestone)
+		box(model, "LampPost", V3(0.35, 5.0, 0.35), CF(x, 3.0, pz), IRON, MAT.Metal)
+		local glow = Kit.lantern(model, CF(x, 5.5 + 0.77, pz), 1.1)
+		for _, c in ipairs(glow:GetChildren()) do
+			if c:IsA("PointLight") then
+				c.Brightness = 0.9
+				c.Range = 16
+			end
+		end
+	end
+end
+
 local function shopSpecific(model: Model, spec: Spec)
 	local gy = spec.groundY
 	local hw = spec.halfW
@@ -184,18 +342,7 @@ local function shopSpecific(model: Model, spec: Spec)
 		crate(model, hw - 4.4, gy, fz - 1.4, 1.7)
 		chimney(model, -16, 8, spec.roofTop - 0.2, 5)
 	elseif spec.kind == "Sparkworks" then
-		-- Two teal-framed windows, a teal and cream awning over the door, a
-		-- planter each side, a barrel and a crate by the east wall and the
-		-- sandwich board ("OPEN ALL DAY": Sparkworks has no hours).
-		for _, x in ipairs({ -16, 16 }) do
-			window(model, spec, x, 6.8, 3.6, 4.4, false)
-		end
-		awning(model, spec, 11.9, 4.2, spec.accent, hex("#F2E7CF"))
-		planter(model, -10.3, gy, fz - 1.8)
-		planter(model, 10.3, gy, fz - 1.8)
-		sandwichBoard(model, 17.5, gy, fz - 2.4, "Sparkworks")
-		barrel(model, hw - 2.2, gy, fz - 1.6)
-		crate(model, hw - 4.4, gy, fz - 1.4, 1.7)
+		sparkworksFront(model, spec)
 	elseif spec.kind == "ToolShed" then
 		-- (The grindstone and the chopping block stand out front, and the door
 		-- header carries the hours board, so the yard has no planters or sandwich
