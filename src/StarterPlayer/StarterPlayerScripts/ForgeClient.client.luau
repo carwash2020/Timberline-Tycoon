@@ -3,7 +3,14 @@
 -- MiningClient, so the end game needs no line in Client's controller list.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ModulesReady = require(ReplicatedStorage.Shared.ModulesReady)
+-- Shared may not have replicated yet: wait for it (bounded) before the first require.
+local SHARED_WAIT = 30
+local SharedFolder = ReplicatedStorage:WaitForChild("Shared", SHARED_WAIT)
+if not SharedFolder then
+	warn("[ForgeClient] ReplicatedStorage.Shared did not arrive in " .. SHARED_WAIT .. " seconds")
+	return
+end
+local ModulesReady = require(SharedFolder:WaitForChild("ModulesReady", SHARED_WAIT))
 
 -- Wait for Client to say every sibling has arrived: ForgeUI requires others
 -- (GamepadNav...) straight away, and one that is missing fails it for good.

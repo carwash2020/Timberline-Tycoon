@@ -16,7 +16,15 @@
 -- requires its siblings directly), MODULE_WAIT seconds for all of them
 -- together. The list is every module in this folder (Client.spec checks
 -- it).
-local ModulesReady = require(game:GetService("ReplicatedStorage").Shared.ModulesReady)
+-- ReplicatedStorage.Shared may not have replicated yet either: wait for the
+-- folder (bounded) before the first require of anything in it.
+local SHARED_WAIT = 30
+local SharedFolder = game:GetService("ReplicatedStorage"):WaitForChild("Shared", SHARED_WAIT)
+if not SharedFolder then
+	warn("[Client] ReplicatedStorage.Shared did not arrive in " .. SHARED_WAIT .. " seconds; the client cannot start")
+	return
+end
+local ModulesReady = require(SharedFolder:WaitForChild("ModulesReady", SHARED_WAIT))
 local MODULES = {
 	"AdminUI",
 	"AmbientLife",
@@ -117,9 +125,8 @@ do
 end
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local JoinFlow = require(ReplicatedStorage.Shared.JoinFlow)
-local Net = require(ReplicatedStorage.Shared.Net)
+local JoinFlow = require(SharedFolder:WaitForChild("JoinFlow", SHARED_WAIT))
+local Net = require(SharedFolder:WaitForChild("Net", SHARED_WAIT))
 
 type Controller = { Start: () -> () }
 

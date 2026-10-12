@@ -1035,8 +1035,8 @@ do
 	deferPlanned(
 		"5. The road signs",
 		2,
-		function(): { { text: string, cframe: CFrame } }
-			local signs: { { text: string, cframe: CFrame } } = {}
+		function(): { { text: string, cframe: CFrame, gateId: string? } }
+			local signs: { { text: string, cframe: CFrame, gateId: string? } } = {}
 			for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
 				table.insert(signs, sign)
 			end
@@ -1051,7 +1051,7 @@ do
 		500,
 		function(cell, slice)
 			for _, sign in ipairs(cell) do
-				place(atomic(BuildingArt.Signpost(sign.text, false, true)), sign.cframe)
+				place(atomic(BuildingArt.Signpost(sign.text, false, true, sign.gateId)), sign.cframe)
 				slice()
 			end
 		end
