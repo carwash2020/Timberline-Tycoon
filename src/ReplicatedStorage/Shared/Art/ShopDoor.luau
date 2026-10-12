@@ -113,30 +113,42 @@ end
 
 local function swingDefs(w: number, h: number, color: Color3, trim: Color3, sign: number): { PartDef }
 	-- `sign` +1: the hinge is on this leaf's -X edge, -1: on its +X edge.
-	return {
+	-- A framed door: the boards of the leaf, a ring of four trim pieces (two stiles, a top and a bottom rail, touching
+	-- edge to edge) and a middle rail, so a leaf stood open reads as a real door, not a flat green slab.
+	local bar = 0.5
+	local defs: { PartDef } = {
 		{ name = "DoorLeaf", size = V3(w, h, 0.4), offset = CF(), color = color, material = MAT.WoodPlanks },
-		{
-			name = "DoorBrace",
-			size = V3(w - 0.5, 0.45, 0.2),
-			offset = CF(0, h * 0.28, -0.3),
-			color = trim,
-			material = MAT.Wood,
-		},
-		{
-			name = "DoorBrace",
-			size = V3(w - 0.5, 0.45, 0.2),
-			offset = CF(0, -h * 0.28, -0.3),
-			color = trim,
-			material = MAT.Wood,
-		},
-		{
-			name = "DoorKnob",
-			size = V3(0.4, 0.4, 0.4),
-			offset = CF(sign * (w / 2 - 0.7), 0, -0.4),
-			color = Color3.fromRGB(201, 162, 74),
-			material = MAT.Metal,
-		},
 	}
+	for _, y in ipairs({ h / 2 - bar / 2, -h / 2 + bar / 2 }) do
+		table.insert(defs, {
+			name = "DoorTrim",
+			size = V3(w - 2 * bar, bar, 0.2),
+			offset = CF(0, y, -0.3),
+			color = trim,
+			material = MAT.Wood,
+		})
+	end
+	for _, x in ipairs({ -w / 2 + bar / 2, w / 2 - bar / 2 }) do
+		table.insert(
+			defs,
+			{ name = "DoorTrim", size = V3(bar, h, 0.2), offset = CF(x, 0, -0.3), color = trim, material = MAT.Wood }
+		)
+	end
+	table.insert(defs, {
+		name = "DoorBrace",
+		size = V3(w - 2 * bar, 0.4, 0.2),
+		offset = CF(0, 0, -0.3),
+		color = trim,
+		material = MAT.Wood,
+	})
+	table.insert(defs, {
+		name = "DoorKnob",
+		size = V3(0.4, 0.4, 0.4),
+		offset = CF(sign * (w / 2 - bar - 0.5), -h * 0.08, -0.45),
+		color = Color3.fromRGB(201, 162, 74),
+		material = MAT.Metal,
+	})
+	return defs
 end
 
 function ShopDoor.BlockSize(spec: Spec): Vector3

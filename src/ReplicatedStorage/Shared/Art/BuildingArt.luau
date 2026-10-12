@@ -33,6 +33,7 @@ local Kit = require(script.Parent.Kit)
 local Palette = require(script.Parent.Palette)
 local SpecBuild = require(script.Parent.SpecBuild)
 local DealershipLot = require(script.Parent.DealershipLot)
+local ModelSlots = require(script.Parent.ModelSlots)
 local ShopFacade = require(script.Parent.ShopFacade)
 local PropArt = require(script.Parent.PropArt)
 local ShopDoor = require(script.Parent.ShopDoor)
@@ -1673,7 +1674,8 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
 	end
-	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
+	-- (beside the east post, not in it: the lantern's cap is 0.34 wide each way, the post 0.225)
+	Kit.lantern(model, CF(6.6, 5.5, -HZ + 0.85), 0.75)
 
 	-- Name boards hang on the back wall, facing the door, each above a sample
 	-- of that item on the ledge. No price is printed: aiming at a board or its
@@ -1709,14 +1711,14 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 		return string.upper(if slot then slot.displayName else itemId)
 	end
 	local offers = {
-		{ x = -11.4, kind = "fence", item = "Blueprint", id = "WoodSign" },
-		{ x = -3.8, kind = "shed", item = "Blueprint", id = "Shed" },
-		{ x = 3.8, kind = "lantern", item = "Gear", id = "Lantern" },
-		{ x = 11.4, kind = "axe", item = "Gear", id = "Flashlight" },
+		{ x = -12.2, kind = "fence", item = "Blueprint", id = "WoodSign" },
+		{ x = -5.0, kind = "shed", item = "Blueprint", id = "Shed" },
+		{ x = 5.0, kind = "lantern", item = "Gear", id = "Lantern" },
+		{ x = 12.2, kind = "axe", item = "Gear", id = "Flashlight" },
 	}
 	for _, offer in ipairs(offers) do
 		local board =
-			Kit.part(model, "PriceTag", V3(5.6, 2.3, 0.16), CF(offer.x, 6.15, HZ - 0.58), hex("#3E2A18"), MAT.Wood)
+			Kit.part(model, "PriceTag", V3(3.8, 1.5, 0.16), CF(offer.x, 5.9, HZ - 0.58), hex("#3E2A18"), MAT.Wood)
 		board.CanCollide = false
 		board.CanQuery = false
 		board.CanTouch = false
@@ -1930,7 +1932,32 @@ local function addHoursBoard(model: Model, shopId: string)
 	if y < clear then
 		y = clear
 	end
-	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, at.Z), SIGN_BOARD, MAT.Wood)
+	-- The General Store's striped awning (ShopFacade) reaches up to 12.7 on the wall over its door:
+	-- the board's bottom edge stays above it, so the two never overlap.
+	if shopId == "HearthAndHome" and y - h / 2 < 12.7 then
+		y = 12.7 + h / 2
+	end
+	-- The board hangs on the wall's outside face, not inside it: if a front wall stands over
+	-- the host at this height, the board's back rests on that wall's front face.
+	local z = at.Z
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") and d.Name == "Wall" then
+			local cf, sz = d.CFrame, d.Size
+			local faceZ = cf.Position.Z - sz.Z / 2
+			if
+				cf.UpVector.Y > 0.99
+				and math.abs(cf.LookVector.Z) > 0.99
+				and math.abs(cf.Position.X - at.X) <= sz.X / 2
+				and y - h / 2 >= cf.Position.Y - sz.Y / 2 - 0.01
+				and y + h / 2 <= cf.Position.Y + sz.Y / 2 + 0.01
+				and faceZ < z + depth / 2
+				and cf.Position.Z + sz.Z / 2 > z - depth / 2
+			then
+				z = faceZ - depth / 2
+			end
+		end
+	end
+	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, z), SIGN_BOARD, MAT.Wood)
 	Kit.decor(board)
 	board:SetAttribute("ShopId", shopId)
 	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
@@ -2134,6 +2161,36 @@ end
 -- its origin, all but the counter: it, its top and what stands on it keep
 -- their size, at the same height over the (raised) floor, so it stays
 -- waist high and the keeper behind it shows.
+-- The four samples on the General Store's back ledge (flashlight, lantern, wood sign, shed) show the
+-- real model of their ModelSlots slot once one is set (meshId 0: the part-built samples stay).
+local function dressLedgeSamples(model: Model)
+	local groups: { [string]: { BasePart } } = {}
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") and d.Name == "Display" then
+			local id = d:GetAttribute("HoverId")
+			if type(id) == "string" then
+				groups[id] = groups[id] or {}
+				table.insert(groups[id], d)
+			end
+		end
+	end
+	for _, slot in ipairs(ModelSlots.Slots) do
+		local list = groups[slot.itemId]
+		if list and ModelSlots.IsSet(slot) then
+			local lo, hi = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+			for _, p in ipairs(list) do
+				local at, half = p.CFrame.Position, p.Size / 2
+				lo = lo:Min(at - half)
+				hi = hi:Max(at + half)
+			end
+			local box = hi - lo
+			local scale = math.max(box.X, box.Y, box.Z) / math.max(slot.size.X, slot.size.Y, slot.size.Z)
+			local centre = CFrame.new((lo.X + hi.X) / 2, lo.Y + slot.size.Y * scale / 2, (lo.Z + hi.Z) / 2)
+			ModelSlots.Dress(model, slot, centre, "display", { scale = scale, remove = list, inBuildFrame = true })
+		end
+	end
+end
+
 function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: number?): Model
 	local model = Kit.model(kind)
 	if kind == "ToolShed" then
@@ -2175,6 +2232,9 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		fitNameSign(sign)
 	end
 	addHoursBoard(model, kind)
+	if kind == "HearthAndHome" then
+		dressLedgeSamples(model)
+	end
 	if kind == "Dealership" then
 		-- The hours board stood 0.25 into the wall above the door: put it against the wall's face.
 		local board = model:FindFirstChild("HoursBoard")

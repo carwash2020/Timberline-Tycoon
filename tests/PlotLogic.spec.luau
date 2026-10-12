@@ -640,7 +640,9 @@ return function(t)
 		-- In stock, or an unlock you bought: place it free.
 		t.eq(PlotLogic.Source(bp("SawmillRickety"), 1, false, true), "place")
 		t.eq(PlotLogic.Source(bp("ChopSaw"), 2, false, true), "place")
-		t.eq(PlotLogic.Source(bp("Shed"), 0, true, true), "place")
+		t.eq(PlotLogic.Source(bp("Mailbox"), 0, true, true), "place")
+		-- The shed is a kit plan (you fill the ghost with planks): bought once, then the kit fee on every place.
+		t.eq(PlotLogic.Source(bp("Shed"), 0, true, true), "fee")
 		-- A sawmill or the chop saw you don't hold is a box at the Tool Shed.
 		t.eq(PlotLogic.Source(bp("SawmillRickety"), 0, false, true), "toolShed")
 		t.eq(PlotLogic.Source(bp("Millmaster200L"), 0, false, true), "toolShed")

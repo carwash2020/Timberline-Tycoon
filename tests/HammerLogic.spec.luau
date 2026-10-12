@@ -76,8 +76,9 @@ return function(t)
 	end)
 
 	t.test("a store unlock sells for nothing back", function()
-		local shed = PlotData.Blueprint("Shed")
-		local actions = Hammer.PieceActions(shed, { uid = "a", blueprintId = "Shed", x = 0, z = 0, rot = 0 })
+		-- (a Mailbox: the Shed is a kit plan now, so it sells for what you paid, like the wall)
+		local shed = PlotData.Blueprint("Mailbox")
+		local actions = Hammer.PieceActions(shed, { uid = "a", blueprintId = "Mailbox", x = 0, z = 0, rot = 0 })
 		t.eq(actions[3].label, "Sell")
 	end)
 
