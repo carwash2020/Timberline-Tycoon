@@ -45,7 +45,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 | mesh | 1053 | 1314 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, RockModels.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau |
 | model | 206 | 206 | BacklogModels.luau, MachineMeshes.luau, TownModels.luau |
 | template | 996 | 996 | src/ReplicatedStorage/MeshTemplates |
-| image | 12 | 12 | StoreData.luau, UIArt.luau, UITheme.luau, WeatherController.luau |
+| image | 18 | 18 | StoreData.luau, UIArt.luau, UITheme.luau, WeatherController.luau |
 | texture | 9 | 9 | TimberGrass.model.json, TimberGround.model.json, TimberLeafy.model.json |
 | sound | 9 | 11 | SoundData.luau |
 | pass | 2 | 2 | StoreData.luau |
@@ -1366,13 +1366,19 @@ has no fallback (listed as `no template` in the mesh table).
 
 Templates matching a mesh id in the code: 996 of 996. Orphans: 0.
 
-## Images (ImageLabel, store cards, particle textures) (12)
+## Images (ImageLabel, store cards, particle textures) (18)
 
 | Id | Used by | Places | Status |
 | --- | --- | ---: | --- |
-| 91282142796474 | store card image, Products | 1 | format ok, not checked yet |
-| 79037897236948 | store card image, Products | 1 | format ok, not checked yet |
-| 71028498113750 | store card image, Products | 1 | format ok, not checked yet |
+| 129566569237407 | store card image, DoubleCash | 1 | image id, not checked on Roblox from the sandbox |
+| 80267879981455 | store card image, LuxAxe | 1 | image id, not checked on Roblox from the sandbox |
+| 91282142796474 | store card image, TowService | 1 | image id, not checked on Roblox from the sandbox |
+| 79037897236948 | store card image, TimberClassic | 1 | image id, not checked on Roblox from the sandbox |
+| 71028498113750 | store card image, PaintShop | 1 | image id, not checked on Roblox from the sandbox |
+| 95950318286949 | store card image, Cash1k | 1 | image id, not checked on Roblox from the sandbox |
+| 102370875631166 | store card image, Cash10k | 1 | image id, not checked on Roblox from the sandbox |
+| 83265240736148 | store card image, DoubleWood | 1 | image id, not checked on Roblox from the sandbox |
+| 96661273504040 | store card image, InstantDelivery | 1 | image id, not checked on Roblox from the sandbox |
 | 139841387610705 | UIArt Plaque | 1 | format ok, not checked yet |
 | 90740664574742 | UIArt Panel | 1 | format ok, not checked yet |
 | 72427678124813 | UIArt Button | 1 | format ok, not checked yet |
@@ -1460,9 +1466,11 @@ reads SurfaceAppearances that exist, and badge ids are 0. Re-check if that chang
    a machine built before its meshes are cached stays part-built until its model is rebuilt (rejoin or
    re-place). MachineSkin now logs `was still loading` instead of `did not load` in that case. A real fix
    needs PlotService to re-dress; not done here (touches plot item registration).
-3. **Store card images** (`StoreData` image ids 91282142796474, 79037897236948, 71028498113750) are
-   possibly Decal ids, which an ImageLabel cannot load by rbxassetid. They now go through `StoreArt`
-   (rbxthumb asset thumbnail), which renders a Decal or an Image id. Rendering unverified (needs Studio).
+3. **Store card images** (nine `StoreData` image ids: the three older ones on Tow Service, Timber
+   Classic and Paint Shop, which may be Decals; six Connor uploaded on 12 October 2026 as IMAGE assets). They
+   go through `StoreArt` (rbxthumb asset thumbnail), which renders any image-like id. Whether each shows the
+   right picture, and that moderation has cleared it, is not checked: the sandbox cannot reach Roblox.
+   `scripts/check-store-icons.ps1` checks the six new ones on Connor's machine.
 4. **Old Roblox sound ids** (`SoundData`: 4110925712, 282906960, 1516791621, 1841461968, 1848183670,
    9116970949, 9117181540, 9118187543, 9120549564) are not owned by the game. Since the 2022 audio
    privacy change a sound only plays if it is public Roblox audio or yours. A failure is silent, never a
@@ -1504,7 +1512,7 @@ Start with these, in this order (they are the ones that did not load):
 Then check one of each kind, because one bad kind fails every id of that kind:
 
 - a **sound**: 4110925712 (Sell and Buy), 1516791621 (Rain), 1841461968 (day music)
-- a **store image**: 91282142796474, 79037897236948, 71028498113750 (shown through the StoreArt thumbnail, so Decal or Image ids both work)
+- a **store image**: 91282142796474, 79037897236948, 71028498113750, and the six new ones (`scripts/check-store-icons.ps1` checks those; shown through the StoreArt thumbnail)
 - a **HUD image**: 76852120099119 (Menu), 129127727779001 (Hammer), 96932580819074 (SellHere)
 - a **UI skin image**: 139841387610705, 90740664574742, 72427678124813, 74100852047057
 - a **particle texture**: 17581858560 (embers), 16830667309 (mist)

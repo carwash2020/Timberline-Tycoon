@@ -1,7 +1,7 @@
 --!nocheck
--- Store card pictures: the three pasted ids may be Decal or Image ids, so
--- every consumer shows them through Roblox's asset thumbnail URL. Nothing
--- here claims the thumbnails render; that needs Studio.
+-- Store card pictures: every consumer shows the Roblox image ids through
+-- the asset thumbnail URL, which renders any image-like asset. Nothing here
+-- claims the thumbnails render; that needs Roblox (scripts/check-store-icons.ps1).
 return function(t)
 	local fs = require("@lune/fs")
 	local StoreArt = t.shared("StoreArt")
@@ -42,7 +42,7 @@ return function(t)
 				end
 			end
 		end
-		t.eq(nonzero, 3, "the three pasted ids")
+		t.eq(nonzero, 9, "all nine rows carry an image id")
 	end)
 
 	t.test("no store image is built as a raw rbxassetid:// URL", function()
