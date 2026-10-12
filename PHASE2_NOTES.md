@@ -3996,3 +3996,9 @@ Studio checks:
 6. **Sparkworks.** Walk in from the door: "LOGIC & OUTPUTS" and "BELTS & INPUTS" read with no chain across a letter (PC and phone). A chain may cross a letter from a different spot; that is only the entrance view.
 7. **Dealership.** Walk down the aisle to the Logging Rig (the last plinth, back row): its crane and stacks are under the ceiling beams. It is about 20% smaller than the real truck (display copy only); buy one and the truck that spawns is full size.
 8. **Join on a slow connection** (Studio: Network Emulation, low bandwidth): the HUD, mining chip and forge window still start; Output may show "ReplicatedStorage.Shared did not arrive" only if it took over 30 seconds.
+
+## Load and spawn path audit (branch `phase-2/load-path-audit`, 12 October 2026)
+
+After #168 (auto-loads off first): the gaps that were left. GameServer put a character back on its pad if it falls below y = -200 (Shared/VoidRescue, three times per character at most, never a kill), streams the pad's ground before every respawn, and the bare steps between the save and the character are guarded so one error cannot leave a player with no character. Gates, loading card and Studio default spawn were read and are fine (tests/LoadPathAudit.spec).
+
+Studio checks: PC: press Play, no falling or dying while loading; walk into the Deep mine (still no rescue); in Studio run `game.Players.<you>.Character:PivotTo(CFrame.new(0,-300,0))` in the server console and you are put back on the pad with a warn line. Phone and Xbox: join, die once (axe a hazard or reset), respawn on the pad without falling.
