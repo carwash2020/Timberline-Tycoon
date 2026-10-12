@@ -131,4 +131,122 @@ return function(t)
 		t.ok(press, "the card still has a Press face")
 		t.eq(press.Selectable, false)
 	end)
+
+	-- Client audit leftover (11 October 2026): Start used to walk every
+	-- descendant of the workspace in one frame, and restyle every instance
+	-- the forest added (an IsA call each). Now the scan is sliced and only
+	-- prompts are touched.
+	local Enum = t.roblox.Enum
+	local function fakeWorld(count, every)
+		local reads = 0
+		local list, prompts = {}, {}
+		for i = 1, count do
+			local inst = { Style = nil }
+			local class = if i % every == 0 then "ProximityPrompt" else "Part"
+			setmetatable(inst, {
+				__index = function(_, key)
+					if key == "ClassName" then
+						reads += 1
+						return class
+					end
+					return nil
+				end,
+			})
+			list[i] = inst
+			if class == "ProximityPrompt" then
+				table.insert(prompts, inst)
+			end
+		end
+		return list, prompts, function()
+			return reads
+		end
+	end
+
+	t.test("the first scan restyles every prompt, and only prompts, a slice at a time", function()
+		local PromptUI = load()
+		local list, prompts, reads = fakeWorld(50000, 97)
+		local waits, mostBetween, last = 0, 0, 0
+		local styled = PromptUI.RestyleAll(list, 4000, function()
+			waits += 1
+			mostBetween = math.max(mostBetween, reads() - last)
+			last = reads()
+		end)
+		t.eq(styled, #prompts)
+		for _, prompt in ipairs(prompts) do
+			t.eq(prompt.Style, Enum.ProximityPromptStyle.Custom)
+		end
+		for i, inst in ipairs(list) do
+			if i % 97 ~= 0 then
+				t.eq(rawget(inst, "Style"), nil, "a non-prompt is left alone")
+			end
+		end
+		t.eq(waits, 12, "50,000 instances in slices of 4,000")
+		t.ok(mostBetween <= 4000, "at most one slice of work between waits: " .. mostBetween)
+		print(string.format("PromptUI scan: 50000 instances, most work in a frame %d (was 50000)", mostBetween))
+	end)
+
+	t.test("Start listens for new instances before it scans, and the scan yields", function()
+		local added = {}
+		local order = {}
+		local list, prompts, reads = fakeWorld(20000, 50)
+		local workspace = {
+			DescendantAdded = {
+				Connect = function(_, fn)
+					table.insert(order, "connect")
+					added.fn = fn
+					return { Disconnect = function() end }
+				end,
+			},
+			GetDescendants = function()
+				table.insert(order, "scan")
+				return list
+			end,
+		}
+		local waits, mostBetween, last = 0, 0, 0
+		local loader = t.loader({
+			services = {
+				GuiService = {
+					IsTenFootInterface = function()
+						return false
+					end,
+				},
+				Players = { LocalPlayer = {} },
+				TextChatService = {},
+				UserInputService = { TouchEnabled = false, KeyboardEnabled = true },
+				ProximityPromptService = { PromptShown = { Connect = function() end } },
+				TweenService = {},
+				CollectionService = {},
+				RunService = { Heartbeat = { Connect = function() end } },
+			},
+			globals = {
+				workspace = workspace,
+				task = {
+					spawn = function(fn)
+						fn()
+					end,
+					wait = function()
+						waits += 1
+						mostBetween = math.max(mostBetween, reads() - last)
+						last = reads()
+					end,
+				},
+			},
+		})
+		local PromptUI = loader:load("StarterPlayer/StarterPlayerScripts/PromptUI")
+		PromptUI.Start()
+		t.eq(order, { "connect", "scan" })
+		t.ok(waits >= 4, "the scan gave frames back: " .. waits)
+		t.ok(mostBetween <= PromptUI.ScanPerFrame)
+		for _, prompt in ipairs(prompts) do
+			t.eq(prompt.Style, Enum.ProximityPromptStyle.Custom)
+		end
+		-- A prompt that shows up later is restyled, a part is not touched.
+		local later = list[50]
+		later.Style = nil
+		added.fn(later)
+		t.eq(later.Style, Enum.ProximityPromptStyle.Custom)
+		local part = list[1]
+		added.fn(part)
+		t.eq(rawget(part, "Style"), nil)
+	end)
 end

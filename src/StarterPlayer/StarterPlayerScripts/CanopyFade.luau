@@ -24,12 +24,15 @@
 --     has left the world is dropped on the next frame, its faded parts put
 --     back to 0 first (in case the same tree comes back). Nothing is
 --     connected per tree, so nothing can leak.
+--   * Which trees are near a line comes from a grid of their home spots
+--     (Shared/TreeIndex), kept up from the folder's children each look.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local CanopyLogic = require(ReplicatedStorage.Shared.CanopyLogic)
+local TreeIndex = require(ReplicatedStorage.Shared.TreeIndex)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local Quality = require(script.Parent.Quality)
 local TreeFX = require(script.Parent.TreeFX)
@@ -73,23 +76,42 @@ local function treeOf(part: Instance, folder: Instance): Model?
 	return if node ~= nil and node:IsA("Model") then node else nil
 end
 
+-- The trees index (Shared/TreeIndex): a grid of the trees' home spots, so a
+-- look visits the cells round the two lines of sight, not the whole forest
+-- (it used to ask every child for its HomePivot ten times a second). New
+-- trees are learned INDEX_BUDGET a look (a few hundred streaming in at once
+-- are spread over a few looks), gone ones forgotten.
+local INDEX_BUDGET = 150
+local index = TreeIndex.new() :: TreeIndex.Index<Model>
+local indexFolder: Instance? = nil
+
+local function homeOf(child: Instance): any -- a Vector3, nil (not yet) or false (not a tree)
+	if not child:IsA("Model") then
+		return false
+	end
+	local home = child:GetAttribute("HomePivot")
+	if typeof(home) ~= "CFrame" then
+		return nil -- not replicated yet: ask again next look
+	end
+	return home.Position
+end
+
 -- The trees near enough to the lines of sight to be in the way.
 local function candidates(folder: Instance, eye: Vector3, targets: { Vector3 }): { Model }
+	if indexFolder ~= folder then
+		index = TreeIndex.new() :: TreeIndex.Index<Model>
+		indexFolder = folder
+	end
+	TreeIndex.Sync(index, folder:GetChildren() :: { any }, homeOf, INDEX_BUDGET)
 	local out: { Model } = {}
-	for _, child in ipairs(folder:GetChildren()) do
-		if not child:IsA("Model") then
-			continue
-		end
-		local home = child:GetAttribute("HomePivot")
-		if typeof(home) ~= "CFrame" then
-			continue
-		end
-		for _, target in ipairs(targets) do
-			if CanopyLogic.NearSightline(home.Position, eye, target) then
+	local seen: { [Model]: boolean } = {}
+	for _, target in ipairs(targets) do
+		for _, child in ipairs((TreeIndex.Near(index, eye, target, CanopyLogic.Reach))) do
+			if not seen[child] then
+				seen[child] = true
 				if not blocked(child) then
 					table.insert(out, child)
 				end
-				break
 			end
 		end
 	end

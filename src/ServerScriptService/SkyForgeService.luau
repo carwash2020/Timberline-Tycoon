@@ -597,9 +597,19 @@ function SkyForgeService.V1Init(ctx: Ctx?)
 					addPrompt(part)
 				end
 			end
-			map.DescendantAdded:Connect(found)
+			-- The map is walked once, for what is in it now. Only the town
+			-- scenes folder (the court's home, MapBuilder step 4) is listened
+			-- to afterwards: listening to the whole map made this a callback
+			-- for every tree the forest planted after it.
 			for _, d in ipairs(map:GetDescendants()) do
 				found(d)
+			end
+			local scenes = map:WaitForChild("TownScenes", 120)
+			if scenes then
+				scenes.DescendantAdded:Connect(found)
+				for _, d in ipairs(scenes:GetDescendants()) do
+					found(d) -- (the court may have landed between the two walks; found() is idempotent)
+				end
 			end
 		end
 	end)

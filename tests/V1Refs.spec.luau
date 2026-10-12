@@ -162,7 +162,7 @@ return function(t)
 		local _, count = string.gsub(boot, "V1Boot%.Start%(", "")
 		t.eq(count, 1, "V1Boot.Start is called once")
 		local startAt = string.find(boot, "V1Boot.Start(", 1, true)
-		local ratesAt = string.find(boot, "remote.ClientReady.OnServerEvent", 1, true)
+		local ratesAt = string.find(boot, "ClientHandshake.Bind(remote.ClientReady", 1, true) -- (was the inline OnServerEvent listener; it moved to ClientHandshake)
 		t.ok(startAt and ratesAt, "both markers exist")
 		for _, name in ipairs({ "MiningBoot", "RegionBoot", "TownBoardBoot" }) do
 			t.ok(fs.isFile("src/ServerScriptService/" .. name .. ".server.luau"), name)

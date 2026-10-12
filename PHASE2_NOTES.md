@@ -3960,6 +3960,17 @@ Studio checks (nothing here has been seen in Studio; the renders are `tools/prev
 
 What changed for other stores: `ShopInterior` now only dispatches to `Shared/Art/ShopInteriors/<Store>.luau`; Hearth & Home, Sparkworks and the Dealership are the old interiors moved unchanged until their agents restyle them. `ShopInterior.SteppedUnit` is now `ShopKit.SteppedUnit` (re-exported), so every store's plinths already become tier stands (colour, flag, lock chip, hover tag); that is the one look change to those three stores before their own pass.
 
+## Robustness and performance pass (branch `phase-2/robustness-pass`, 12 October 2026)
+
+What changed is in STATUS.md "Robustness and performance pass". Nothing here has been seen in Studio. Studio checks (nothing should look different; this is about hitches and join speed):
+1. PC, new server: join. The loading card goes away at the same point as before or sooner; the console shows `client ready handshake from <you>` once, soon after the controllers start (before, up to 3 s after the server was ready to hear it), and `state sent again to the client` after it. The plot offer and the save slots still appear.
+2. PC, walk the Starter Forest, then stand behind a big tree with the camera pulled back: the canopy still fades to see-through and comes back 0.3 s after you move; walk through a dense wood at speed: no pulse every tenth of a second (check the Developer Console, Script Performance, `CanopyFade`).
+3. PC, stand still for a minute far from everything but the town: the micro-profiler shows no 0.75 s spike from `RegionWake` (it used to loop every tree). Walk 700 studs toward Pine Bend and back: far trees are gone from the Explorer while you are away (`ServerStorage.AsleepRegions` holds them) and are back before you arrive; the tutorial oaks never leave.
+4. Server start with the forest planting: in the Explorer the new trees appear under `TimberlineMap.Trees` and the far ones are parked straight away (not left in the workspace for a second).
+5. PC and phone: walk up to Tink, Hazel, Dale and Juno: Talk opens their shop as before (Dale and Juno behind their counters too). Walk to the Sky Forge court: the anvil opens the Sky Forge from within range.
+6. Phone (667 x 375): a prompt (Talk, a box, a sell prompt) shows in the bark card style from the first second after the card fades, including ones far from spawn walked up to later. If one shows the default round Roblox prompt for a moment right after joining, note which and when (the first scan is now spread over a few frames, up to about a second for a very large workspace).
+7. Xbox: nothing about input changed; the prompts still show the pad glyph, B closes panels.
+
 ## First-session polish (branch `phase-2/first-session-polish`, 12 October 2026)
 
 Studio checks (nothing here has been seen in Studio). Do 1 to 6 on a fresh save, on PC, phone (667x375) and Xbox:

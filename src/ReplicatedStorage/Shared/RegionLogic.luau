@@ -657,6 +657,29 @@ end
 -- world. `region` is the tree's Region attribute (a biome id, "wild",
 -- "reach" or "sky"). No people: keep it (an empty server, a test).
 function RegionLogic.KeepTree(region: string?, x: number, z: number, y: number, people: { Person }): boolean
+	return RegionLogic.KeepTreeWith(region, x, z, y, people, nil)
+end
+
+-- Where each person is (RegionLogic.At), once, for a pass over many trees:
+-- KeepTree asks it of every person for every tree otherwise. `false` = nowhere.
+function RegionLogic.Heres(people: { Person }): { Here | boolean }
+	local out: { Here | boolean } = {}
+	for i, person in ipairs(people) do
+		out[i] = RegionLogic.At(person.x, person.z, person.y) or false
+	end
+	return out
+end
+
+-- KeepTree with the people's places already looked up (`heres` from Heres):
+-- the same answer, without a region lookup per tree per person.
+function RegionLogic.KeepTreeWith(
+	region: string?,
+	x: number,
+	z: number,
+	y: number,
+	people: { Person },
+	heres: { Here | boolean }?
+): boolean
 	if #people == 0 then
 		return true
 	end
@@ -671,12 +694,12 @@ function RegionLogic.KeepTree(region: string?, x: number, z: number, y: number, 
 	end
 	local radius = RegionLogic.WakeRadius
 	local margin = RegionLogic.WakeMargin
-	for _, person in ipairs(people) do
+	for i, person in ipairs(people) do
 		local dx, dz = x - person.x, z - person.z
 		if dx * dx + dz * dz <= radius * radius then
 			return true
 		end
-		local here = RegionLogic.At(person.x, person.z, person.y)
+		local here: any = if heres then heres[i] else RegionLogic.At(person.x, person.z, person.y)
 		if here and here.base == base and base ~= "" and base ~= "wild" then
 			return true
 		end

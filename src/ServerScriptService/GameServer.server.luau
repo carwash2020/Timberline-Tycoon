@@ -65,6 +65,7 @@ local NPCService = require(script.Parent.NPCService)
 local NPCTalkService = require(script.Parent.NPCTalkService)
 local PickupGrace = require(script.Parent.PickupGrace)
 local IdleService = require(script.Parent.IdleService)
+local ClientHandshake = require(script.Parent.ClientHandshake)
 local JoinSync = require(script.Parent.JoinSync)
 local LoadState = require(script.Parent.LoadState)
 local PlaceCheck = require(script.Parent.PlaceCheck)
@@ -163,6 +164,28 @@ for _, name in ipairs(Net.RemoteNames) do
 	remote[name] = re
 end
 remotes.Parent = ReplicatedStorage
+
+-- The client's join handshake (JoinSync), heard from the first moment the
+-- remote exists, not after every service's Init: a ClientReady sent early
+-- used to be heard only on the client's next repeat (3 s). The first one
+-- marks the player ready at once; the resend of state waits for
+-- Handshake.SetResend (below, once the services have registered theirs).
+local joinedAt: { [Player]: number } = {}
+local Handshake = ClientHandshake.Bind(remote.ClientReady, {
+	markReady = function(player: any): boolean
+		return JoinSync.MarkReady(player, LoadState.Since())
+	end,
+	onFirst = function(player: any)
+		local since = joinedAt[player]
+		LoadState.Line(
+			string.format(
+				"client ready handshake from %s%s",
+				player.Name,
+				if since then string.format(" (%.1fs after it joined)", os.clock() - since) else ""
+			)
+		)
+	end,
+})
 
 safely("EconomyService.Init", EconomyService.Init, remotes)
 
@@ -1331,7 +1354,9 @@ local function resendState(player: Player)
 	print(string.format("[Load] %s: state sent again to the client (%d resends)", player.Name, good))
 end
 
-local joinedAt: { [Player]: number } = {}
+-- Every ClientReady heard before this point (the listener is up since the
+-- remotes were made) gets its resend now.
+Handshake.SetResend(resendState)
 
 -- The idle kick (IdleService, Shared/IdleLogic): every remote counts as
 -- activity (RateLimiter.OnRequest); the client's IdlePing sends this one
@@ -1339,23 +1364,6 @@ local joinedAt: { [Player]: number } = {}
 IdleService.Init({ notify = notify })
 remote.Activity.OnServerEvent:Connect(function(player: Player)
 	RateLimiter.Allow(player, "Activity") -- counts the activity; the budget only keeps it from being spammed
-end)
-
-remote.ClientReady.OnServerEvent:Connect(function(player: Player)
-	if not RateLimiter.Allow(player, "ClientReady") then
-		return
-	end
-	if JoinSync.MarkReady(player, LoadState.Since()) then
-		local since = joinedAt[player]
-		LoadState.Line(
-			string.format(
-				"client ready handshake from %s%s",
-				player.Name,
-				if since then string.format(" (%.1fs after it joined)", os.clock() - since) else ""
-			)
-		)
-	end
-	resendState(player)
 end)
 
 -- Player lifecycle --------------------------------------------------------
