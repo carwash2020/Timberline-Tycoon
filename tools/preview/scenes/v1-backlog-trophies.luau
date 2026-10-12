@@ -17,6 +17,7 @@ return {
 		local Kit = ctx.art("Kit")
 		local RelicData = ctx.shared("RelicData")
 		local ItemMeshData = ctx.shared("ItemMeshData")
+		local PlotData = ctx.shared("PlotData")
 		local root = roblox.Instance.new("Model")
 		assert(fs.isFile("preview/a2-centres.json"), "run tools/preview/v1_a2_meshes.py (it writes a2-centres.json)")
 		local centres = serde.decode("json", fs.readFile("preview/a2-centres.json"))
@@ -39,14 +40,21 @@ return {
 			sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 			sg.PixelsPerStud = 40
 			sg.Parent = board
-			local l = roblox.Instance.new("TextLabel")
-			l.Size = roblox.UDim2.fromScale(1, 1)
-			l.BackgroundTransparency = 1
-			l.Font = Enum.Font.Fantasy
-			l.TextScaled = true
-			l.TextColor3 = C3.fromRGB(245, 235, 215)
-			l.Text = "PLOT 3\nHOMESTEAD\nConnor"
-			l.Parent = sg
+			-- The same two lines PlotService draws (PlotData.SignText): the
+			-- owner's name leads and the plot line sits under it, both above
+			-- the mesh post's top, so the post never crosses a letter.
+			for _, line in ipairs({ "name", "info" }) do
+				local box = PlotData.SignText[line]
+				local l = roblox.Instance.new("TextLabel")
+				l.Position = roblox.UDim2.fromScale(0.04, box.top)
+				l.Size = roblox.UDim2.fromScale(0.92, box.height)
+				l.BackgroundTransparency = 1
+				l.Font = Enum.Font.Fantasy
+				l.TextScaled = true
+				l.TextColor3 = C3.fromRGB(245, 235, 215)
+				l.Text = if line == "name" then "Connor" else "PLOT 3 · HOMESTEAD"
+				l.Parent = sg
+			end
 		end
 		for _, def in ipairs(ItemMeshData.List("PlotSign")) do
 			local id = string.match(def.meshId, "%d+")

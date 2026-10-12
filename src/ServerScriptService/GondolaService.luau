@@ -362,7 +362,7 @@ end
 GondolaService.GateSignOffset = CFrame.new(-10.5, -0.5, -8.5)
 
 function GondolaService.GateSign(platform: BasePart): Model
-	local sign = BuildingArt.Signpost("SKYROOT GONDOLA\n" .. SkyQuestLogic.GateWords)
+	local sign = BuildingArt.Signpost("SKYROOT GONDOLA\n" .. SkyQuestLogic.GateWords, nil, nil, "sky")
 	sign.Name = "GondolaGateSign"
 	-- Built around the origin with its feet at y = 0, so move that frame (a
 	-- bare PivotTo would put the sign's middle there and sink it).

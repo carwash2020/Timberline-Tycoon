@@ -70,6 +70,28 @@ return function(t)
 		end
 	end)
 
+	t.test(
+		"reduce flashing: old saves get false, junk is off, only true sticks, and migrating twice changes nothing",
+		function()
+			local Schema, data = fresh()
+			t.eq(Schema.Template.settings.reduceFlashing, false)
+			data.settings = { music = false } -- from before the setting
+			Schema.Migrate(data)
+			t.eq(data.settings.reduceFlashing, false)
+			for _, junk in ipairs({ "yes", 1, {}, "true" }) do
+				data.settings = { reduceFlashing = junk }
+				Schema.Migrate(data)
+				t.eq(data.settings.reduceFlashing, false, "junk is off: " .. tostring(junk))
+			end
+			data.settings = { reduceFlashing = true }
+			Schema.Migrate(data)
+			t.eq(data.settings.reduceFlashing, true)
+			local once = data.settings.reduceFlashing
+			Schema.Migrate(data)
+			t.eq(data.settings.reduceFlashing, once, "migrating again changes nothing")
+		end
+	)
+
 	t.test("camera sensitivity: old saves get 1, junk is clamped, and migrating twice changes nothing", function()
 		local Schema, data = fresh()
 		t.eq(Schema.Template.settings.cameraSensitivity, 1)

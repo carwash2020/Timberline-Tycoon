@@ -10,7 +10,7 @@ so each size shows the top of the list, the list scrolled to the new rows, and
 the Codes tab. Liberation Sans stands in for Gotham. Composites of the layout,
 not engine screenshots.
 
-  python3 tools/preview/v1h_settings.py   writes previews/v1-hardening/settings-*.png
+  python3 tools/preview/v1h_settings.py [outdir]   writes settings-*.png (default previews/v1-hardening)
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ sys.path.insert(0, HERE)
 import v1u_round3 as r  # noqa: E402
 
 ROOT = os.path.join(HERE, "..", "..")
-OUT = os.path.join(ROOT, "previews", "v1-hardening")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "previews", "v1-hardening")
 m = r.m
 
 CARD_W, CARD_H = 340, 300
@@ -40,6 +40,7 @@ GAME_ROWS = [
 	"Camera speed  100%  ±",
 	"Graphics: Lower",
 	"CAMERA SHAKE: ON",
+	"REDUCE FLASHING: OFF",
 	"UI scale  NORMAL",
 	"TIPS: ON",
 	"REPLAY TUTORIAL",
@@ -178,6 +179,12 @@ def main():
 				game,
 				scrolled,
 				f"{kind} {tag}: Settings scrolled to Camera speed and Graphics (Lower / Higher), 44 px tall each",
+			),
+			f"settings-flashing-{tag}": scene(
+				phone,
+				game,
+				HEAD + STEP * 7,  # CAMERA SHAKE at the top, REDUCE FLASHING under it
+				f"{kind} {tag}: Settings scrolled to CAMERA SHAKE and the new REDUCE FLASHING row, 44 px tall, same style",
 			),
 			f"settings-bottom-{tag}": scene(
 				phone,

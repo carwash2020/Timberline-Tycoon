@@ -217,6 +217,38 @@ return function(t)
 		end
 	)
 
+	t.test("no display vehicle stands taller than the hall's ceiling beams allow (the Logging Rig's crane)", function()
+		local lot = DealershipLot.Build()
+		local tallest, rig = 0, 0
+		for _, child in ipairs(lot:GetChildren()) do
+			if child:IsA("Model") and child:GetAttribute("ItemId") ~= nil then
+				local top, bottom = -math.huge, math.huge
+				for _, d in ipairs(child:GetDescendants()) do
+					if d:IsA("BasePart") and d.Name ~= "NameSign" then
+						local c = d.CFrame
+						local half = (
+							math.abs(c.RightVector.Y) * d.Size.X
+							+ math.abs(c.UpVector.Y) * d.Size.Y
+							+ math.abs(c.LookVector.Y) * d.Size.Z
+						) / 2
+						top = math.max(top, c.Position.Y + half)
+						bottom = math.min(bottom, c.Position.Y - half)
+					end
+				end
+				-- The plinth top is PlinthHeight; the beams hang to 14.1 over the floor (FloorY).
+				t.ok(
+					top <= 14.1 - DealershipLot.FloorY + 1e-3,
+					child.Name .. " tops out at " .. top .. ", under the ceiling beams"
+				)
+				tallest = math.max(tallest, top)
+				if child.Name == "LoggingRig" then
+					rig = top
+				end
+			end
+		end
+		t.ok(rig > 0 and rig <= tallest, "the Logging Rig was checked")
+	end)
+
 	t.test("bays are ordered by price, left to right, front row then back row, and never overlap", function()
 		local layout = DealershipLot.Layout()
 		local last = -1

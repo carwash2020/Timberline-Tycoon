@@ -23,6 +23,7 @@
 -- bigger) with Kit.scaleModel, which adds no parts. A shop's counter, and
 -- what stands on it, keeps its size: people still lean on it.
 
+local CollectionService = game:GetService("CollectionService")
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local RobuxShelf = require(script.Parent.Parent.RobuxShelf)
 local ShopHoursLogic = require(script.Parent.Parent.ShopHoursLogic)
@@ -2242,7 +2243,7 @@ end
 -- spawn to Murph) and a Logging Rig drives under SELL LOGS HERE's. The
 -- rocks at the posts' feet are looks only (SELL LOGS HERE's stand by the
 -- pad's lane, some road signs' 1.5 studs off the road).
-function BuildingArt.Signpost(text: string, lit: boolean?, solidBoard: boolean?): Model
+function BuildingArt.Signpost(text: string, lit: boolean?, solidBoard: boolean?, gateId: string?): Model
 	local model = Kit.model("Signpost")
 	local rng = Kit.rng(#text * 13 + 5)
 	for _, s in ipairs({ -1, 1 }) do
@@ -2252,6 +2253,17 @@ function BuildingArt.Signpost(text: string, lit: boolean?, solidBoard: boolean?)
 	local board = signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, text, PLANK[2], TIMBER, SIGN_INK, true)
 	if solidBoard then
 		Kit.solid(board)
+	end
+	if gateId then
+		-- A gate sign: WorldUI repaints its "State" label per player
+		-- (GateSignLogic). A small plaque hangs under the board, front only.
+		model:SetAttribute("GateId", gateId)
+		CollectionService:AddTag(model, "GateSign")
+		local plaque = dBox(model, "StatePlaque", V3(7, 0.9, 0.3), CF(0, 4.15, 0), PLANK[2])
+		local labels = Kit.signText(plaque, "Gate", SIGN_INK, { Enum.NormalId.Front })
+		for _, label in ipairs(labels) do
+			label.Name = "State"
+		end
 	end
 	if lit then
 		-- Two goosenecks over the front (-Z) face, under the cap (TWN-07).

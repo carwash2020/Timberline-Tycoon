@@ -157,6 +157,7 @@ function Sparkworks.Build(model: Model, frame: Frame)
 		headerY = Sparkworks.HeaderY,
 		headerZ = -8,
 		tieY = Sparkworks.TieY,
+		subShift = 0.5,
 	})
 	ShopKit.CheckoutSign(model, frame) -- the brass plaque on the counter front and the keeper's mat
 	-- The brass CHECKOUT board over the counter: low enough to sit under the shell's hours board
