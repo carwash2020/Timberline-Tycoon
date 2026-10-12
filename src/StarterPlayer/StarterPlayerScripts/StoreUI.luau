@@ -40,6 +40,7 @@ local HudNav = require(script.Parent.HudNav)
 local MenuPad = require(script.Parent.MenuPad)
 local ShopUI = require(script.Parent.ShopUI)
 local StorePrices = require(script.Parent.StorePrices)
+local UIArt = require(script.Parent.UIArt)
 local UITheme = require(script.Parent.UITheme)
 
 local StoreUI = {}
@@ -265,17 +266,27 @@ local function art(parent: Instance, kind: string, item: StoreData.Pass | StoreD
 	disc.ScaleType = Enum.ScaleType.Fit
 	UITheme.corner(disc, StoreUI.ArtPx // 2)
 	UITheme.stroke(disc, C.AmberEdge, 2)
+	-- The letter or mark is always there; a real image hides it, and an image
+	-- that fails to load (a Decal id instead of an Image id, moderation, no
+	-- network) shows it again, so the disc is never an empty circle.
+	local glyph = if item.key == "DoubleCash" or item.key == "DoubleWood"
+		then "2x"
+		elseif item.key == "Cash1k" or item.key == "Cash10k" then "$"
+		else string.sub(item.name, 1, 1)
+	local mark = UITheme.label(disc, glyph, F.Title, 22, C.Cream)
+	mark.Size = UDim2.fromScale(1, 1)
+	mark.TextXAlignment = Enum.TextXAlignment.Center
 	if item.image > 0 then
-		disc.Image = "rbxassetid://" .. tostring(item.image)
+		local uri = "rbxassetid://" .. tostring(item.image)
+		disc.Image = uri
+		mark.Visible = false
+		UIArt.Listen(uri, function(result: UIArt.LoadStatus)
+			if result == "Failure" then
+				mark.Visible = true
+			end
+		end)
 	else
 		disc.Image = ""
-		local glyph = if item.key == "DoubleCash" or item.key == "DoubleWood"
-			then "2x"
-			elseif item.key == "Cash1k" or item.key == "Cash10k" then "$"
-			else string.sub(item.name, 1, 1)
-		local mark = UITheme.label(disc, glyph, F.Title, 22, C.Cream)
-		mark.Size = UDim2.fromScale(1, 1)
-		mark.TextXAlignment = Enum.TextXAlignment.Center
 	end
 	disc.Parent = parent
 end

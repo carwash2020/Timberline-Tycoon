@@ -45,7 +45,6 @@ local ChopController = {}
 
 -- Seconds to wait for MapBuilder to publish which loop runs. Until then
 -- Active() reads as v1, and arming this chopper would fight CutController.
-local BOOT_WAIT = 120
 
 local player = Players.LocalPlayer
 
@@ -433,11 +432,7 @@ local function track(tag: string)
 	end)
 end
 
-function ChopController.Start()
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < BOOT_WAIT do
-		waited += task.wait(0.25)
-	end
+local function startLoop()
 	if CoreLoop.V2() then
 		return -- CutController swings in the v2 loop
 	end
@@ -488,6 +483,11 @@ function ChopController.Start()
 	if player.Character then
 		watchCharacter(player.Character)
 	end
+end
+
+-- Returns at once: the loop is read when the server publishes it (CoreLoop.WhenKnown).
+function ChopController.Start()
+	CoreLoop.WhenKnown(startLoop)
 end
 
 return ChopController

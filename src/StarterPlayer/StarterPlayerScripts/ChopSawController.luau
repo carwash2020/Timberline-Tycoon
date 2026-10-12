@@ -30,7 +30,6 @@ local UITheme = require(script.Parent.UITheme)
 
 local ChopSawController = {}
 
-local BOOT_WAIT = 8
 local hooked: { [Instance]: boolean } = {}
 local openSaw: Model? = nil
 local panelGui: ScreenGui? = nil
@@ -336,11 +335,7 @@ local function hook(inst: Instance)
 	end)
 end
 
-function ChopSawController.Start()
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < BOOT_WAIT do
-		waited += task.wait(0.25)
-	end
+local function startLoop()
 	if not CoreLoop.V2() then
 		return
 	end
@@ -395,6 +390,11 @@ function ChopSawController.Start()
 		hook(inst)
 	end
 	CollectionService:GetInstanceAddedSignal("ChopSaw"):Connect(hook)
+end
+
+-- Returns at once: the loop is read when the server publishes it (CoreLoop.WhenKnown).
+function ChopSawController.Start()
+	CoreLoop.WhenKnown(startLoop)
 end
 
 function ChopSawController._close()

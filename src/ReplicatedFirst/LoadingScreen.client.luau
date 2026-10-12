@@ -25,7 +25,30 @@
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
-local LoadingTips = require(script.Parent.LoadingTips)
+-- LoadingTips is a sibling that may not have replicated yet, and a failed
+-- require here would end this script before the card is up. Wait for it a
+-- few seconds, and if it is not there (or errors) show a plain line instead.
+local function loadTips(): any
+	local ok, module = pcall(function(): any
+		if script.Parent:FindFirstChild("LoadingTips") == nil then
+			script.Parent:WaitForChild("LoadingTips", 5)
+		end
+		return require(script.Parent.LoadingTips)
+	end)
+	if ok then
+		return module
+	end
+	warn("[LoadingScreen] LoadingTips did not load; showing one line: " .. tostring(module))
+	return {
+		Begin = function()
+			return {}
+		end,
+		LineAt = function()
+			return "Loading your sawmill..."
+		end,
+	}
+end
+local LoadingTips = loadTips()
 
 local MAX_SECONDS = 30 -- the card never stays up longer than this
 local FADE_SECONDS = 0.6

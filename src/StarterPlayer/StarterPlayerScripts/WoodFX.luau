@@ -69,7 +69,6 @@ WoodFX.RingHold = 2.5 -- seconds the ring stays after the last swing
 WoodFX.SpringFrom = 0.72 -- a tree that grew springs up from this much of its size
 WoodFX.SpringTime = 0.9
 WoodFX.SpringWindow = 1.5 -- seconds after GrewAt a tree still springs (it may stream in late)
-WoodFX.BootWait = 120
 -- A Lanternwood tree's night light. Open to tuning.
 WoodFX.GlowRange = 14 -- open to tuning
 WoodFX.GlowBrightness = 0.8 -- open to tuning
@@ -1065,12 +1064,8 @@ local function watchPiece(inst: Instance)
 	end)
 end
 
-function WoodFX.Start()
+local function startLoop()
 	-- MapBuilder says which loop runs before it builds anything.
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < WoodFX.BootWait do
-		waited += task.wait(0.25)
-	end
 	if not CoreLoop.V2() then
 		return -- the v1 loop: TreeFX draws the trees
 	end
@@ -1117,6 +1112,11 @@ function WoodFX.Start()
 		end
 		refreshLanterns()
 	end)
+end
+
+-- Returns at once: the loop is read when the server publishes it (CoreLoop.WhenKnown).
+function WoodFX.Start()
+	CoreLoop.WhenKnown(startLoop)
 end
 
 return WoodFX
