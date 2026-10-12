@@ -93,7 +93,7 @@ return function(t)
 		NewsSeen = row("session", GS, GS, "NewsSeen"),
 		SaveSetting = row("session", GS, GS, "SaveSetting"),
 		SetQuality = row("session", GS, "QualityService", "SetQuality"),
-		ClientReady = row("session", GS, GS, "ClientReady"),
+		ClientReady = row("session", GS, "ClientHandshake", "ClientReady"), -- bound in GameServer, limited in ClientHandshake
 		Sprint = row("session", GS, GS, "Sprint"),
 		SlotAction = row("session", "SaveSlotService", "SaveSlotService", "SlotAction"),
 		SaveNow = row("session", "SaveSlotService", "SaveSlotService", "SaveNow"),
