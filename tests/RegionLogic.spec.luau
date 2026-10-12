@@ -27,7 +27,7 @@ return function(t)
 
 	t.test("the Bayou and Red Mesa are named regions with first-visit toasts", function()
 		for _, c in ipairs({
-			{ disc = "bayou", id = "bayou", name = "The Bayou", biome = "bayou" },
+			{ disc = "bayou", id = "bayou", name = "Bayou", biome = "bayou" },
 			{ disc = "mesa", id = "redmesa", name = "Red Mesa", biome = "mesa" },
 		}) do
 			local d = BiomeData.RegionDiscs[c.disc]

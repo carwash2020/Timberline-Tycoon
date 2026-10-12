@@ -216,7 +216,7 @@ local function buildRegions(): { RegionDef }
 		},
 		{
 			id = "bayou",
-			displayName = "The Bayou",
+			displayName = "Bayou",
 			blurb = "a sunken swamp · bogcypress, mud slows you without Wader Boots",
 			shape = "swamp",
 			palette = "murk and moss",
