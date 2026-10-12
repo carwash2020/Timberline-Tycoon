@@ -166,6 +166,111 @@ local function awning(parent: Instance, spec: Spec, y: number, reach: number, co
 	end
 end
 
+-- A warm wall lantern on a short iron arm, at the shop's front wall (x, y are
+-- its middle). Modest light: never a white-out (ShopKit's caps: 1 / 22).
+local function wallLamp(parent: Instance, spec: Spec, x: number, y: number)
+	box(parent, "LampArm", V3(0.2, 0.2, 0.9), CF(x, y + 0.8, spec.frontZ - 0.45), IRON, MAT.Metal)
+	local glow = Kit.lantern(parent, CF(x, y, spec.frontZ - 0.95), 0.9)
+	for _, d in ipairs(glow:GetChildren()) do
+		if d:IsA("PointLight") then
+			d.Brightness = 0.9
+			d.Range = 14
+			d.Color = Color3.fromRGB(255, 206, 150)
+		end
+	end
+end
+
+-- The General Store's dressing beyond the shared kit: a stone plinth and timber
+-- corner posts so the walls stand on something, a cornice under the roof, shutters
+-- and flower boxes on the windows, lanterns either side of the door, shingle
+-- strips on the roof, and a flagstone path from the street to the door with a
+-- lamp post each side. All looks only; the doorway (x within doorHalf, below the
+-- lintel) stays empty.
+local function hearthDressing(model: Model, spec: Spec)
+	local gy, hw, fz, d = spec.groundY, spec.halfW, spec.frontZ, spec.doorHalf
+	local stone = hex("#8C867C")
+	local green = hex("#3E6A3A")
+	-- plinth in two pieces, leaving the doorway open
+	local sideW = hw - d - 0.4
+	for _, s in ipairs({ -1, 1 }) do
+		box(
+			model,
+			"FoundationStone",
+			V3(sideW, 1.0, 0.5),
+			CF(s * (d + 0.4 + sideW / 2), gy + 0.5, fz - 0.2),
+			stone,
+			MAT.Slate
+		)
+		box(
+			model,
+			"CornerPost",
+			V3(0.9, spec.wallTop - gy, 0.7),
+			CF(s * (hw - 0.45), (spec.wallTop + gy) / 2, fz - 0.1),
+			TIMBER
+		)
+	end
+	box(model, "Cornice", V3(2 * hw, 0.7, 0.7), CF(0, spec.wallTop - 0.35, fz - 0.15), TIMBER)
+	-- shutters beside each window
+	for _, x in ipairs({ -16, 16 }) do
+		for _, s in ipairs({ -1, 1 }) do
+			box(model, "Shutter", V3(1.3, 4.4, 0.2), CF(x + s * 3.0, 7.3, fz - 0.15), green)
+		end
+	end
+	-- two windows in each side wall, so the sides are not blank
+	for _, s in ipairs({ -1, 1 }) do
+		for _, zc in ipairs({ -8, 9 }) do
+			local x = s * (hw + 0.4)
+			box(model, "WindowFrame", V3(0.2, 5.4, 5.0), CF(x, 7.8, zc), TRIM)
+			local pane =
+				box(model, "WindowGlass", V3(0.2, 4.4, 3.6), CF(x + s * 0.2, 7.8, zc), hex("#BFD9E6"), MAT.Glass)
+			pane.Transparency = 0.45
+			pane.CastShadow = false
+			box(model, "WindowSill", V3(0.9, 0.35, 5.6), CF(x + s * 0.2, 4.95, zc), TRIM)
+		end
+	end
+	-- lanterns either side of the door, clear of the leaves
+	for _, s in ipairs({ -1, 1 }) do
+		wallLamp(model, spec, s * (d + 3.6), 8.2)
+	end
+	-- shingle strips along the roof (alternating tones)
+	local roofW = 2 * hw - 1
+	local n = 8
+	for i = 1, n do
+		box(
+			model,
+			"RoofShingle",
+			V3(roofW / n - 0.1, 0.1, 40),
+			CF(-roofW / 2 + roofW / n * (i - 0.5), spec.roofTop + 0.03, 0),
+			if i % 2 == 0 then hex("#3A5E34") else hex("#2F4D2B"),
+			MAT.WoodPlanks
+		)
+	end
+	-- flagstone path from the street to the door, with a lamp post each side
+	for i = 1, 3 do
+		local off = if i % 2 == 0 then 0.5 else -0.5
+		box(
+			model,
+			"PathStone",
+			V3(4.6, 0.1, 1.8),
+			CF(spec.doorCx + off, gy + 0.05, fz - 3.0 - (i - 1) * 2.2),
+			if i % 2 == 0 then hex("#A29A8C") else hex("#938B7E"),
+			MAT.Slate
+		)
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		local x, z = spec.doorCx + s * (d + 2.2), fz - 7
+		Kit.decor(Kit.post(model, "PathLampPost", V3(x, gy, z), 5.2, 0.35, IRON, MAT.Metal), false)
+		local glow = Kit.lantern(model, CF(x, gy + 5.8, z), 0.9)
+		for _, l in ipairs(glow:GetChildren()) do
+			if l:IsA("PointLight") then
+				l.Brightness = 0.9
+				l.Range = 14
+				l.Color = Color3.fromRGB(255, 206, 150)
+			end
+		end
+	end
+end
+
 local function shopSpecific(model: Model, spec: Spec)
 	local gy = spec.groundY
 	local hw = spec.halfW
@@ -173,12 +278,13 @@ local function shopSpecific(model: Model, spec: Spec)
 	local d = spec.doorHalf
 	if spec.kind == "HearthAndHome" then
 		for _, x in ipairs({ -16, 16 }) do
-			window(model, spec, x, 6.8, 3.6, 4.4, false)
+			window(model, spec, x, 7.3, 3.6, 4.4, true)
 		end
+		hearthDressing(model, spec)
 		awning(model, spec, 11.9, 4.2, hex("#3E6A3A"), hex("#F2E7CF"))
 		planter(model, -10.3, gy, fz - 1.8)
 		planter(model, 10.3, gy, fz - 1.8)
-		bench(model, -16.5, gy, fz - 1.4)
+		bench(model, -20.5, gy, fz - 1.4)
 		sandwichBoard(model, 17.5, gy, fz - 2.4, "HearthAndHome")
 		barrel(model, hw - 2.2, gy, fz - 1.6)
 		crate(model, hw - 4.4, gy, fz - 1.4, 1.7)

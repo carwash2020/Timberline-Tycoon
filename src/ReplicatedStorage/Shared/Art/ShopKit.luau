@@ -600,7 +600,8 @@ function ShopKit.TierStand(parent: Instance, s: StandSpec): Part
 	hover.anchor = false
 	HoverTag.Mark(post, hover)
 	if lock then
-		local chipAt = CF(px, s.flagY + ShopKit.FlagSize.Y / 2 + 0.5, pz) * yaw
+		-- (the chip stands on the flag's backing: 0.6 over the flag's middle, plus half the chip)
+		local chipAt = CF(px, s.flagY + ShopKit.FlagSize.Y / 2 + 0.4, pz) * yaw
 		local chip = dBox(parent, "LockChip", ShopKit.ChipSize, chipAt, StoreTier.LockedColor, MAT.SmoothPlastic)
 		Kit.signText(chip, lock.text, StoreTier.LockedInk, nil, Enum.Font.FredokaOne, 0.2)
 		chip:SetAttribute("LockText", lock.text)
@@ -637,7 +638,7 @@ function ShopKit.SectionSigns(
 	parent: Instance,
 	shop: string,
 	sections: { Section },
-	cfg: { headerY: number, headerZ: number, tieY: number, subShift: number? }
+	cfg: { headerY: number, headerZ: number, tieY: number, subShift: number?, tieTop: number? }
 )
 	local placements = StoreStock.Placements(shop)
 	local lanes: { [string]: ShelfLayout.Lane? } = {}
@@ -655,7 +656,10 @@ function ShopKit.SectionSigns(
 			return
 		end
 		tied[key] = true
-		dBox(parent, "SignTie", V3(w + 1.4, 0.5, 0.5), CF(cx, cfg.tieY, z), TIMBER)
+		-- (with cfg.tieTop the tie is a deep beam that reaches up to the roof's underside)
+		local bottom = cfg.tieY - 0.25
+		local height = if cfg.tieTop then cfg.tieTop - bottom else 0.5
+		dBox(parent, "SignTie", V3(w + 1.4, height, 0.5), CF(cx, bottom + height / 2, z), TIMBER)
 	end
 	for _, section in ipairs(sections) do
 		local lane = lanes[section.lane]

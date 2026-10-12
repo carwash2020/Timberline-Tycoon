@@ -33,7 +33,12 @@ local Hearth = {}
 -- collar ties sit just under the beams.
 Hearth.TieY = 14.1
 Hearth.HeaderY = 12.3
-Hearth.TopY = 14.6 -- the highest part the interior adds (the beams reach the ceiling line)
+Hearth.StoreSignY = 12.2 -- the middle of the shop's name board on the back wall
+-- The roof's underside, from BuildingArt's General Store (the roof slab is 0.5 thick, its middle
+-- at (10 + 0.4) x scale): the beams and ties reach up to it so nothing of the ceiling hangs loose.
+Hearth.RoofUnder = (10 + 0.4 - 0.25) * 1.5
+Hearth.BeamY = Hearth.RoofUnder - 0.45 -- the beams' middle (they are 0.9 deep)
+Hearth.TopY = Hearth.RoofUnder -- the highest part the interior adds
 
 -- What the signs say, from the shop's real stock (ids are ItemCatalog ids; a
 -- spec checks every slot of the shop is under exactly one sign).
@@ -110,6 +115,7 @@ function Hearth.Build(model: Model, frame: Frame)
 	local rng = Kit.rng(2605)
 	local ceil = frame.ceilY
 	local fy = frame.floorTop
+	local lampTop = Hearth.BeamY - 0.45 -- chains end on the beams' underside
 	local extents = ShopKit.SteppedUnit(model, "HearthAndHome", frame, "Shelf", TABLE, TABLE_TOP)
 	for _, lane in ipairs(StoreStock.Lanes("HearthAndHome")) do
 		local ext = extents[lane.name]
@@ -140,27 +146,45 @@ function Hearth.Build(model: Model, frame: Frame)
 	runner(model, frame, 3.6, -frame.halfD + 1.6, 12)
 
 	-- Warm timber beams (none at a sign's z), the lanterns hung from them.
-	ShopKit.Beams(model, frame, { -19, -14.5, -2.2, 3, 8.5 })
-	ShopKit.Rafter(model, frame, 0)
+	-- (a beam at every z a lamp or the back-wall sign hangs from, so no chain ends in the air)
+	ShopKit.Beams(model, frame, { -19, -14.5, -9, -2.2, 3, 8.5, 14.5, 20.2 }, Hearth.BeamY)
+	ShopKit.Rafter(model, frame, 0, Hearth.BeamY - 0.1)
 	-- Over the central aisle and over the two side aisles; none in the first 9
 	-- studs (the entrance stays open) and none at a sign's end.
 	for _, z in ipairs({ -2.2, 3 }) do
-		ShopKit.WarmLamp(model, -15.6, ceil - 3.4, z, ceil - 0.9)
-		ShopKit.WarmLamp(model, 15.6, ceil - 3.4, z, ceil - 0.9)
+		ShopKit.WarmLamp(model, -15.6, ceil - 3.4, z, lampTop)
+		ShopKit.WarmLamp(model, 15.6, ceil - 3.4, z, lampTop)
 	end
-	ShopKit.WarmLamp(model, -2.6, ceil - 3.4, -9, ceil - 0.9)
-	ShopKit.WarmLamp(model, 2.6, ceil - 3.4, -9, ceil - 0.9)
-	ShopKit.WarmLamp(model, -2.6, ceil - 3.4, 3, ceil - 0.9)
-	ShopKit.WarmLamp(model, 2.6, ceil - 3.4, 3, ceil - 0.9)
+	ShopKit.WarmLamp(model, -2.6, ceil - 3.4, -9, lampTop)
+	ShopKit.WarmLamp(model, 2.6, ceil - 3.4, -9, lampTop)
+	ShopKit.WarmLamp(model, -2.6, ceil - 3.4, 3, lampTop)
+	ShopKit.WarmLamp(model, 2.6, ceil - 3.4, 3, lampTop)
+	-- Over the counter end and the back corners, so no corner is dark.
+	for _, x in ipairs({ -15.6, -7, 7, 15.6 }) do
+		ShopKit.WarmLamp(model, x, ceil - 3.4, 14.5, lampTop)
+	end
 
 	-- Signs: a header over each unit, a sub-sign over each category, CHECKOUT.
 	ShopKit.SectionSigns(model, "HearthAndHome", Hearth.Sections, {
 		headerY = Hearth.HeaderY,
 		headerZ = -12.5,
 		tieY = Hearth.TieY,
+		tieTop = Hearth.RoofUnder,
 		subShift = 0, -- the side units are 6.8 wide against a wall: centred, a sub-sign stays in the room
 	})
 	ShopKit.CheckoutSign(model, frame)
+	-- The shop's own name over the counter, readable from the door.
+	ShopKit.HeaderSign(model, {
+		cx = 0,
+		cy = Hearth.StoreSignY,
+		z = 20.2,
+		w = 13,
+		h = 2.6,
+		text = "HEARTH & HOME",
+		accent = ShopKit.Colors.Brass,
+		ceilY = lampTop,
+		name = "StoreSign",
+	})
 
 	-- Plants at the front corners of the shelving, and a stock corner by the
 	-- east back wall (clear of the back-room door in the west wall).
