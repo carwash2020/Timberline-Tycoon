@@ -53,7 +53,41 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 Not asset ids, so not listed: `rbxasset://` built-ins (engine particle textures, `FellSound`, most of
 `SoundData`), empty sound slots (`id = ""`, silent), badge ids (all 0 by decision), and the owner user id.
-`meshId = 0` slots (no upload yet, part build kept by design): 151. They are not listed.
+`meshId = 0` slots (no upload yet, part build kept by design): 157. They are not listed.
+
+## Store item models (one slot per item: `Shared/StoreModelSlots.luau`)
+
+One model per item serves the shop box (and the carried box), the placed item and its ghost. A slot
+with no mesh id keeps the part-built look and nothing errors. To switch a model on, upload its GLB
+(steps in STATUS.md, "Store item models") and paste the id into that slot's `meshId` in
+`StoreModelSlots.luau`; nothing else changes. `tests/StoreModelSlots.spec.luau` checks every row here
+against its GLB. Previews draw these GLBs even with no id (`tools/preview/export.luau`).
+
+MODEL_SLOTS, the numbers each slot is placed by (studs; the model stands on y = 0, centred on
+its footprint, turned `yaw` degrees about Y, scaled uniformly by `scale` so it fits `fit`, the
+item's own part-built size; a box shows it at the same fit, inside the box's own size):
+
+| Slot | Item | GLB (repo) | GLB size | fit | yaw | scale | Roblox mesh id | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Barrel | Barrel | `assets/glb/store-items/Barrel.glb` | 2.19 x 3.26 x 2.19 | 1.75 x 2.20 x 1.75 | 0 | 0.675 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
+| Crate | Crate | `assets/glb/store-items/Crate.glb` | 2.60 x 2.50 x 2.60 | 2.00 x 2.00 x 2.00 | 0 | 0.769 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
+| GlowWire | GlowWire | `assets/glb/store-items/GlowWire.glb` | 1.02 x 1.30 x 2.16 | 4.00 x 1.30 x 2.00 | 90 | 1.000 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
+| SkyBin | SkyBin | `assets/glb/store-items/SkyBin.glb` | 3.82 x 3.36 x 3.82 | 4.00 x 4.00 x 4.00 | 0 | 1.047 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
+| RobuxCoins | the Robux box | `assets/glb/store-items/RobuxCoins.glb` | 2.71 x 0.78 x 2.51 | 2.30 x 0.80 x 2.30 | 0 | 0.849 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
+| Parcel | any item with no model (fallback) | `assets/glb/store-items/Parcel.glb` | 1.44 x 1.57 x 1.45 | 1.40 x 1.60 x 1.40 | 0 | 0.966 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
+| InsulatedCoat | InsulatedCoat | `assets/glb/backlog/gear/InsulatedCoat/InsulatedCoat.glb` | 2.95 x 3.35 x 1.23 | 2.50 x 1.90 x 1.00 | 0 | 0.567 | Body 99030148403072 | hooked: uploaded backlog model (id read from BacklogModels) |
+| HeatBoots | HeatBoots | `assets/glb/backlog/gear/HeatBoots/HeatBoots.glb` | 2.35 x 1.83 x 1.55 | 2.05 x 1.40 x 1.50 | 0 | 0.765 | Body 139085752917781, Glow 107828580898545 | hooked: uploaded backlog model (id read from BacklogModels) |
+| FeatherfallCloak | FeatherfallCloak | `assets/glb/backlog/gear/FeatherfallCloak/FeatherfallCloak.glb` | 2.96 x 3.30 x 1.28 | 2.00 x 2.25 x 0.70 | 0 | 0.547 | Body 94301951001026, Glow 72963108243627 | hooked: uploaded backlog model (id read from BacklogModels) |
+| LampPost | LampPost | `assets/meshes/items/LampPost/LampPost.glb` | 1.25 x 8.43 x 1.25 | 1.25 x 8.43 x 1.25 | 0 | 1.000 | Body 122727224889509, Glow 72172329191191 | hooked: uploaded items model (id read from ItemMeshData) |
+
+Not wired by these slots (another lane wires them; no slot here):
+
+| GLB (repo) | Roblox mesh id | Status |
+| --- | --- | --- |
+| `assets/glb/store-items/Flashlight.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
+| `assets/glb/store-items/Lantern.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
+| `assets/glb/store-items/ShedBlueprint.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
+| `assets/glb/store-items/WoodSign.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 
 ## Meshes (MeshId, loaded by MeshKit) (1053)
 

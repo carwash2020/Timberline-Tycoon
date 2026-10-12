@@ -435,6 +435,7 @@ local SLOTS = { "Body", "Indicator", "Moving", "LabelFace" }
 local MeshKit = require(script.Parent.Art.MeshKit)
 local MachineMeshes = require(script.Parent.Art.MachineMeshes)
 local MachineSkin = require(script.Parent.Art.MachineSkin)
+local StoreModelSlots = require(script.Parent.StoreModelSlots)
 
 local known: { [string]: boolean } = {}
 for _, item in ipairs(items) do
@@ -444,8 +445,9 @@ end
 local installed: { [string]: Model } = {}
 local logged: { [string]: boolean } = {}
 
--- A piece nobody ever made a mesh for (Glow Wire, 12 October 2026: no GLB, no
--- MachineMeshes row, no MeshTemplates model) is part-built BY DESIGN. Its
+-- A piece nobody ever uploaded a mesh for (Glow Wire: its GLB is in the repo, in
+-- StoreModelSlots, with no Roblox mesh id yet; no MachineMeshes row, no
+-- MeshTemplates model) is part-built BY DESIGN. Its
 -- fallback is not a warning: it is said once, at debug level (LogicItems.Debug
 -- or LogicItems.DebugSink), and the item keeps its part build. Pieces that do
 -- have mesh art and lose it still warn.
@@ -458,6 +460,14 @@ local function logMiss(id: string)
 	logged[id] = true
 	if MachineMeshes.Get(id) == nil then
 		local line = string.format("%s%s has no mesh art; it is part-built by design", DEBUG_PREFIX, id)
+		local slot = StoreModelSlots.ForItem(id, nil)
+		if slot ~= nil and not StoreModelSlots.IsUploaded(slot) then
+			line = string.format(
+				"%s%s has a model slot (StoreModelSlots) with no Roblox mesh id yet; it stays part-built until the id is set",
+				DEBUG_PREFIX,
+				id
+			)
+		end
 		local sink = (items :: any).DebugSink
 		if sink then
 			sink(line)

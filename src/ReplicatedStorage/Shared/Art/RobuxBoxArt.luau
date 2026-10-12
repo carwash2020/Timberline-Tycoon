@@ -13,6 +13,8 @@
 local BacklogModels = require(script.Parent.BacklogModels)
 local Kit = require(script.Parent.Kit)
 local MeshKit = require(script.Parent.MeshKit)
+local StoreModelArt = require(script.Parent.StoreModelArt)
+local StoreModelSlots = require(script.Parent.Parent.StoreModelSlots)
 
 local RobuxBoxArt = {}
 
@@ -105,9 +107,34 @@ local function dressMesh(parent: Instance, body: BasePart, spec: Spec): { BasePa
 	if #made == 0 then
 		return nil
 	end
+	local root = body.CFrame * CFrame.new(0, -body.Size.Y / 2, 0)
+	-- The Robux box's coins (StoreModelSlots "RobuxCoins", the same model the part-built
+	-- crate shows): a pile on the crate's lid. No mesh id for it yet means no pile; a coin
+	-- mesh that is still loading holds the whole step back, so crate and coins arrive together.
+	local piles: { MeshPart }? = nil
+	local coinSlot = StoreModelSlots.ForItem(nil, "Robux")
+	if coinSlot ~= nil and StoreModelSlots.HasMesh(coinSlot) then
+		local top = 0
+		for _, piece in ipairs(asset.pieces) do
+			if piece.name == "Body" then
+				top = piece.size.Y * k.Y
+			end
+		end
+		piles = StoreModelArt.Build(coinSlot, root * CFrame.new(0, top, 0), {
+			parent = parent,
+			limit = Vector3.new(2.1, 1, 2.1),
+			anchored = body.Anchored,
+			weldTo = body,
+		})
+		if piles == nil then
+			for _, old in ipairs(made) do
+				old:Destroy()
+			end
+			return nil
+		end
+	end
 	body.Transparency = 1
 	body.CastShadow = false
-	local root = body.CFrame * CFrame.new(0, -body.Size.Y / 2, 0)
 	local added: { BasePart } = {}
 	for _, part in ipairs(made) do
 		if part:GetAttribute("MeshPivot") == "authored" then
@@ -151,6 +178,11 @@ local function dressMesh(parent: Instance, body: BasePart, spec: Spec): { BasePa
 		end
 		table.insert(added, part)
 	end
+	if piles ~= nil then
+		for _, pile in ipairs(piles) do
+			table.insert(added, pile)
+		end
+	end
 	return added
 end
 
@@ -170,6 +202,10 @@ function RobuxBoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { Base
 				end
 			end
 			partBuilt = nil
+			local oldContents = parent:FindFirstChild("Contents")
+			if oldContents then
+				oldContents:Destroy()
+			end
 		end
 		return made
 	end)
@@ -322,6 +358,41 @@ function RobuxBoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { Base
 	end
 	contents.Parent = parent
 	partBuilt = added
+	-- The same coin model as the lid pile above, standing on the heap (the bed of coins that
+	-- fills the crate), replacing the two loose coins once its mesh is there. No id yet: the
+	-- loose coins stay.
+	local coinSlot = StoreModelSlots.ForItem(nil, "Robux")
+	if coinSlot ~= nil and StoreModelSlots.HasMesh(coinSlot) then
+		local loose: { Instance } = {}
+		for _, child in ipairs(contents:GetChildren()) do
+			if child.Name == "Coin" then
+				table.insert(loose, child)
+			end
+		end
+		local frame = body.CFrame * CFrame.new(0, floorTop + pile, 0)
+		local piles = StoreModelArt.Dress(contents, function()
+			local made = StoreModelArt.Build(coinSlot, frame, {
+				parent = contents,
+				limit = Vector3.new(W - 2 * t - 0.1, 0.8, D - 2 * t - 0.1),
+				anchored = body.Anchored,
+				weldTo = body,
+			})
+			if made ~= nil then
+				for _, mesh in ipairs(made) do
+					table.insert(added, mesh)
+				end
+			end
+			return made
+		end, loose)
+		if piles ~= nil then
+			for _, gone in ipairs(loose) do
+				local at = table.find(added, gone :: any)
+				if at then
+					table.remove(added, at)
+				end
+			end
+		end
+	end
 	return added
 end
 
