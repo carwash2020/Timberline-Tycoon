@@ -12,7 +12,11 @@
 --   ShopKit.SectionSigns               the signs of a store's own sections
 --   ShopKit.TierStand                  a slot's stand: plinth in the tier colour,
 --                                      a tier flag (T1..T9), a lock chip, hover tag
---   ShopKit.SteppedUnit                the display unit, a stand per placement
+--   ShopKit.SteppedUnit                the display unit, a stand per placement (or, with
+--                                      style "table", a DisplayTable per row and a SpotTag per item)
+--   ShopKit.DisplayTable               a wood-top table with a trim edge, sized for 2 or 3 display spots
+--   ShopKit.SpotTag                    a small price card on a table (and a lock card for a gated item)
+--   ShopKit.SpotLamp                   a small warm spot hung over a table
 --   ShopKit.HoverAnchor                an aim target that carries a hover tag
 --   ShopKit.CheckoutSign               the counter's sign and the keeper's mat
 --   ShopKit.WarmLamp / Light           a hanging lantern with a modest warm light
@@ -27,6 +31,7 @@ local CollectionService = game:GetService("CollectionService")
 
 local Kit = require(script.Parent.Kit)
 local BoxLook = require(script.Parent.Parent.BoxLook)
+local GameConfig = require(script.Parent.Parent.GameConfig)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local MeshKit = require(script.Parent.MeshKit)
 local ShelfLayout = require(script.Parent.Parent.ShelfLayout)
@@ -34,6 +39,7 @@ local StoreStock = require(script.Parent.Parent.StoreStock)
 local StoreTier = require(script.Parent.Parent.StoreTier)
 local TownMeshes = require(script.Parent.TownMeshes)
 local TownModels = require(script.Parent.TownModels)
+local Util = require(script.Parent.Parent.Util)
 
 local ShopKit = {}
 
@@ -92,8 +98,10 @@ function ShopKit.SteppedUnit(
 	frame: Frame,
 	name: string,
 	body: Color3,
-	top: Color3
+	top: Color3,
+	style: string? -- "stand" (default: a coloured plinth and tier flag per box) or "table" (a DisplayTable per row, a SpotTag per box)
 ): { [string]: { lo: number, hi: number } }
+	local asTable = style == "table"
 	local out: { [string]: { lo: number, hi: number } } = {}
 	local placements = StoreStock.Placements(shop)
 	for _, lane in ipairs(StoreStock.Lanes(shop)) do
@@ -121,7 +129,7 @@ function ShopKit.SteppedUnit(
 				last = math.max(last, place.row)
 				-- The stand: the plinth in the tier colour, with its tier flag and lock chip.
 				local slot = StoreStock.Get(place.slotId)
-				if slot then
+				if slot and not asTable then -- (a table's tags are built with the row, below)
 					local accent = BoxLook.Accent(slot.itemKind, slot.itemId)
 					local m = StoreStock.PlinthMargin
 					ShopKit.TierStand(parent, {
@@ -161,6 +169,33 @@ function ShopKit.SteppedUnit(
 			local z1 = if r == last then hi else row.hi + STEP_GAP
 			local base = lane.y - STEP_SLAB
 			local thick = row.surface - base
+			if asTable then
+				-- A DisplayTable: its top is where the boxes' feet are (surface + PlinthHeight), the band under it
+				-- reaches down to the unit's body. One SpotTag per box, on the table's front edge.
+				local tableSpec: TableSpec = {
+					cx = cx,
+					cz = (z0 + z1) / 2,
+					width = w,
+					depth = z1 - z0,
+					topY = row.surface + StoreStock.PlinthHeight,
+					topThick = thick + StoreStock.PlinthHeight, -- one thick plank top from the unit's body to where the boxes stand
+					apronH = 0,
+				}
+				ShopKit.DisplayTable(parent, tableSpec)
+				for _, place in ipairs(placements) do
+					local slot = StoreStock.Get(place.slotId)
+					if slot and place.lane == lane.name and place.row == r then
+						ShopKit.SpotTag(parent, {
+							slot = slot,
+							x = place.x,
+							z = z0 + 0.25,
+							topY = tableSpec.topY,
+							locked = StoreTier.LockOf(slot.itemKind, slot.itemId) ~= nil,
+						})
+					end
+				end
+				continue
+			end
 			local step = Kit.part(
 				parent,
 				name .. "Step",
@@ -172,7 +207,9 @@ function ShopKit.SteppedUnit(
 			step.CanQuery = false
 		end
 		-- The front edge of the first step: a trim board, as the tables had.
-		dBox(parent, name .. "Trim", V3(w + 0.1, 0.5, 0.18), CF(cx, lane.y - 0.5, lo - 0.04), TIMBER)
+		if not asTable then
+			dBox(parent, name .. "Trim", V3(w + 0.1, 0.5, 0.18), CF(cx, lane.y - 0.5, lo - 0.04), TIMBER)
+		end
 	end
 	return out
 end
@@ -611,6 +648,201 @@ function ShopKit.TierStand(parent: Instance, s: StandSpec): Part
 end
 
 ---------------------------------------------------------------------------
+-- Display tables, price tags and spot lamps
+---------------------------------------------------------------------------
+
+-- The wood a display table is made of: a light plank top, a dark apron, a cream trim.
+ShopKit.TableWood = {
+	top = hex("#D6AD78"),
+	apron = TIMBER,
+	trim = hex("#EBDDBB"),
+} :: { [string]: Color3 }
+
+ShopKit.TableOverhang = 0.12 -- the top reaches this far past the apron on every side
+ShopKit.SpotWidth = 3.4 -- the width one display spot is given (a box is at most about 3.1 wide)
+
+export type TableSpec = {
+	cx: number, -- the middle of the top, x
+	cz: number, -- and z
+	width: number?, -- along x; default spots * SpotWidth + 0.8
+	depth: number, -- along z
+	topY: number, -- the top surface: where the items stand
+	spots: number?, -- how many items it carries (2 or 3 is the design; 1 for an odd row)
+	topThick: number?, -- default 0.3
+	apronH: number?, -- the dark band under the top (default 0.5; 0 for none, when the top is thick enough to stand on the unit below)
+	legs: number?, -- with `floorY`, this many stud-wide legs from the floor to the apron (4 for a free-standing table)
+	floorY: number?,
+	solid: boolean?, -- the top collides (default true); the apron, trim and legs never do
+	name: string?,
+}
+
+export type TableParts = { top: Part, apron: Part?, trim: Part, legs: { Part } }
+
+-- A display table: a PLANK TOP (WoodPlanks, in the light wood, a little wider than what is under it), an APRON band
+-- under it in dark timber, a TRIM board along the front edge in cream, and optionally four LEGS to the floor.
+-- It is only the table: items and tags are placed by the caller (ShopKit.SpotTag). Three parts without legs
+-- (two when apronH = 0).
+-- Reusable: ShopKit.DisplayTable(parent, { cx, cz, depth, topY, spots = 3 }).
+function ShopKit.DisplayTable(parent: Instance, s: TableSpec): TableParts
+	local name = s.name or "Table"
+	local thick = s.topThick or 0.3
+	local apronH = s.apronH or 0.5
+	local width = s.width or ((s.spots or 2) * ShopKit.SpotWidth + 0.8)
+	local o = ShopKit.TableOverhang
+	local topMid = s.topY - thick / 2
+	local top = Kit.part(
+		parent,
+		name .. "Top",
+		V3(width, thick, s.depth),
+		CF(s.cx, topMid, s.cz),
+		ShopKit.TableWood.top,
+		MAT.WoodPlanks
+	)
+	top.CanQuery = false
+	if s.solid == false then
+		decor(top)
+	end
+	local apron: Part? = nil
+	if apronH > 0.01 then
+		apron = dBox(
+			parent,
+			name .. "Apron",
+			V3(width - 2 * o, apronH, s.depth - 2 * o),
+			CF(s.cx, s.topY - thick - apronH / 2, s.cz),
+			ShopKit.TableWood.apron
+		)
+	end
+	local trim = dBox(
+		parent,
+		name .. "Trim",
+		V3(width, thick, 0.1),
+		CF(s.cx, topMid, s.cz - s.depth / 2 - 0.05),
+		ShopKit.TableWood.trim
+	)
+	local legs: { Part } = {}
+	if s.legs and s.floorY then
+		local bottom = s.topY - thick - apronH
+		local h = bottom - s.floorY
+		for _, sx in ipairs({ -1, 1 }) do
+			for _, sz in ipairs({ -1, 1 }) do
+				table.insert(
+					legs,
+					dBox(
+						parent,
+						name .. "Leg",
+						V3(0.5, h, 0.5),
+						CF(s.cx + sx * (width / 2 - 0.45), s.floorY + h / 2, s.cz + sz * (s.depth / 2 - 0.45)),
+						ShopKit.TableWood.apron
+					)
+				)
+			end
+		end
+	end
+	return { top = top, apron = apron, trim = trim, legs = legs }
+end
+
+ShopKit.TagSize = Vector3.new(1.45, 0.42, 0.06) -- a price card: width, slope length, thickness
+ShopKit.TagTilt = math.rad(60) -- it leans back this far from standing, so it reads from the aisle and from above
+
+export type TagSpec = {
+	slot: StoreStock.Slot,
+	x: number, -- the middle of the item's spot
+	z: number, -- the middle of the card's footprint (on the table's front margin)
+	topY: number, -- the table top
+	locked: boolean?, -- the item can be locked: a lock card sits beside the price card
+}
+
+-- The price card of one display spot, and for an item that can be locked (StoreTier.LockOf: "S5 SMITH", "NEEDS
+-- STEEL") a LOCK CARD beside it that the client shows only while the item is locked for you (StoreStandState).
+-- Both lean on the table's front margin, inside the table, never taller than a few tenths of a stud. The price is
+-- StoreStock.UnitPrice (the one price the server charges), read here, never typed. The card carries the item's hover
+-- tag, so aiming at it (or tapping it on a phone) names the item and shows the price too. Returns the price card.
+function ShopKit.SpotTag(parent: Instance, s: TagSpec): Part
+	local slot = s.slot
+	local tier = StoreTier.Of(slot.itemKind, slot.itemId)
+	local color = if tier then StoreTier.Color(tier) else WALNUT
+	local ink = if tier then StoreTier.InkOn(color) else CREAM
+	local lock = StoreTier.LockOf(slot.itemKind, slot.itemId)
+	local price = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, GameConfig.CoreLoop)
+	local text = if price then Util.formatCash(price) else slot.displayName
+	local size = ShopKit.TagSize
+	-- (the card's lowest edge rests on the table top: half its slope's height plus half its thickness' share)
+	local lift = size.Y / 2 * math.cos(ShopKit.TagTilt) + size.Z / 2 * math.sin(ShopKit.TagTilt)
+	local tilt = CFrame.Angles(ShopKit.TagTilt, 0, 0)
+	local function standPart(p: Part, role: string, open: Color3)
+		p:SetAttribute("StandRole", role)
+		p:SetAttribute("StandKind", slot.itemKind)
+		p:SetAttribute("StandItem", slot.itemId)
+		p:SetAttribute("StandOpen", open)
+		pcall(function()
+			CollectionService:AddTag(p, "StoreStand")
+		end)
+	end
+	local shift = if s.locked and lock then -0.78 else 0
+	local card = dBox(parent, "SpotTag", size, CF(s.x + shift, s.topY + lift, s.z) * tilt, color, MAT.SmoothPlastic)
+	Kit.signText(card, text, ink, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	card:SetAttribute("SignText", text)
+	if tier then
+		card:SetAttribute("StandTier", tier)
+	end
+	local hover: HoverTag.Spec = {
+		key = "Stand:" .. slot.slotId,
+		name = slot.displayName,
+		kind = slot.itemKind,
+		itemId = slot.itemId,
+		shop = slot.shop,
+		limited = if slot.limited then true else nil,
+		anchor = true,
+	}
+	HoverTag.Mark(card, hover)
+	if lock then
+		standPart(card, "base", color)
+		local chip = dBox(
+			parent,
+			"LockChip",
+			size,
+			CF(s.x + 0.78, s.topY + lift, s.z) * tilt,
+			StoreTier.LockedColor,
+			MAT.SmoothPlastic
+		)
+		Kit.signText(chip, lock.text, StoreTier.LockedInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+		chip:SetAttribute("LockText", lock.text)
+		hover.anchor = false
+		HoverTag.Mark(chip, hover)
+		standPart(chip, "chip", StoreTier.LockedColor)
+	end
+	return card
+end
+
+-- A small warm spot over a table: a brass shade, on a chain (or, with the shade at the ceiling, flush like a can light), with the family's modest light (at most
+-- MaxLightBrightness and MaxLightRange, warm, no shadows). `y` is the middle of the shade, `ceilY` where the
+-- chain ends (a beam, a tie or the ceiling boards).
+function ShopKit.SpotLamp(parent: Instance, x: number, y: number, z: number, ceilY: number): Part
+	local len = ceilY - y - 0.25
+	if len > 0.4 then
+		dBox(parent, "SpotChain", V3(0.08, len, 0.08), CF(x, ceilY - len / 2, z), IRON, MAT.Metal)
+	end
+	local shade = Kit.cylinder(
+		parent,
+		"SpotShade",
+		0.4,
+		0.75,
+		CF(x, y, z) * CFrame.Angles(0, 0, math.pi / 2),
+		hex("#7A5A2A"),
+		MAT.Metal
+	)
+	decor(shade)
+	local light = Instance.new("PointLight")
+	light.Name = "SpotLight"
+	light.Brightness = 0.7
+	light.Range = 15
+	light.Color = ShopKit.Light.Color
+	light.Shadows = false
+	light.Parent = shade
+	return shade
+end
+
+---------------------------------------------------------------------------
 -- Section signs from a store's own sections
 ---------------------------------------------------------------------------
 
@@ -622,6 +854,8 @@ export type Section = {
 	subs: { Sub },
 	subW: number?, -- sub-sign width (default 5.4)
 	subStagger: number?, -- when set, sub-signs alternate this far left and right of the lane's middle, so two signs in one lane do not hide each other from the door
+	headerW: number?, -- the header's width (default: the lane's width less 0.6)
+	headerCx: number?, -- and its middle x (default: the lane's middle): a header can stand nearer the aisle so it is not cut off at the door
 	subAbove: number?, -- studs from a box top to the middle of this section's sub-signs (default SUB_ABOVE; lower for a unit with no tier flags)
 }
 
@@ -666,8 +900,8 @@ function ShopKit.SectionSigns(
 		if lane == nil then
 			continue
 		end
-		local cx = (lane.x0 + lane.x1) / 2
-		local w = lane.x1 - lane.x0 - 0.6
+		local cx = section.headerCx or (lane.x0 + lane.x1) / 2
+		local w = section.headerW or (lane.x1 - lane.x0 - 0.6)
 		tie(cx, w, cfg.headerZ)
 		ShopKit.HeaderSign(parent, {
 			cx = cx,
@@ -740,7 +974,17 @@ end
 -- `hang` a bigger brass board also hangs over the aisle in front of it (for a
 -- store whose back wall is clear). The mat is where NPCData.BehindCounter
 -- stands the keeper.
-function ShopKit.CheckoutSign(model: Model, frame: Frame, hang: boolean?)
+export type CheckoutOpts = {
+	plaque: boolean?, -- the brass plaque on the counter's front face (default true)
+	cy: number?, -- the hung board's middle y (default 10.4 or just under the ceiling)
+	z: number?, -- and its z (default 3.4 in front of the counter)
+	w: number?, -- and its width
+	h: number?, -- and its height
+	ceilY: number?, -- where its chains end (default under the ceiling beams)
+	onCounter: boolean?, -- instead of hanging: a board on two posts standing on the counter's top at its front edge, `cy` over the floor
+}
+
+function ShopKit.CheckoutSign(model: Model, frame: Frame, hang: (boolean | CheckoutOpts)?)
 	local counter = model:FindFirstChild("Counter")
 	if not (counter and counter:IsA("BasePart")) then
 		return
@@ -748,33 +992,62 @@ function ShopKit.CheckoutSign(model: Model, frame: Frame, hang: boolean?)
 	local cf, size = counter.CFrame, counter.Size
 	local front = cf.Position.Z - size.Z / 2
 	local width = math.min(size.X - 1.2, 6.4)
-	local plaque = dBox(
-		model,
-		"CheckoutPlaque",
-		V3(width, 1.5, 0.14),
-		CF(cf.Position.X, cf.Position.Y - 0.1, front - 0.08),
-		BRASS,
-		MAT.Metal
-	)
-	Kit.signText(plaque, "CHECKOUT", INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	dBox(
-		model,
-		"CheckoutPlaqueAccent",
-		V3(width + 0.3, 0.22, 0.2),
-		CF(cf.Position.X, cf.Position.Y - 0.95, front - 0.1),
-		hex("#4CC36A"),
-		MAT.SmoothPlastic
-	)
-	if hang == true then
+	local opts: CheckoutOpts = if type(hang) == "table" then hang else {}
+	local wantHung = hang == true or type(hang) == "table"
+	local showPlaque = if type(hang) == "table" then opts.plaque ~= false else true
+	if showPlaque then
+		local plaque = dBox(
+			model,
+			"CheckoutPlaque",
+			V3(width, 1.5, 0.14),
+			CF(cf.Position.X, cf.Position.Y - 0.1, front - 0.08),
+			BRASS,
+			MAT.Metal
+		)
+		Kit.signText(plaque, "CHECKOUT", INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+		dBox(
+			model,
+			"CheckoutPlaqueAccent",
+			V3(width + 0.3, 0.22, 0.2),
+			CF(cf.Position.X, cf.Position.Y - 0.95, front - 0.1),
+			hex("#4CC36A"),
+			MAT.SmoothPlastic
+		)
+	end
+	if type(hang) == "table" and opts.onCounter == true then
+		-- A board on two posts standing on the counter's front edge: always over the counter, nothing in front of it
+		-- (no chains to cross another sign on screen), clear of the register, till and bell at the counter's middle.
+		local w = opts.w or 7
+		local h = opts.h or 1.5
+		local cy = opts.cy or (cf.Position.Y + size.Y / 2 + 3.4)
+		local z = cf.Position.Z - size.Z / 2 + 0.2
+		local topY = cf.Position.Y + size.Y / 2
+		local board = dBox(model, "CheckoutSign", V3(w, h, 0.3), CF(cf.Position.X, cy, z), BRASS, MAT.Metal)
+		Kit.signText(board, "CHECKOUT", INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+		board:SetAttribute("SignText", "CHECKOUT")
+		dBox(
+			model,
+			"CheckoutSignAccent",
+			V3(w + 0.3, 0.26, 0.4),
+			CF(cf.Position.X, cy - h / 2 - 0.1, z),
+			hex("#4CC36A"),
+			MAT.SmoothPlastic
+		)
+		for _, s in ipairs({ -1, 1 }) do
+			local px = cf.Position.X + s * (w / 2 - 0.4)
+			local top = cy - h / 2 - 0.2
+			dBox(model, "CheckoutPost", V3(0.3, top - topY, 0.3), CF(px, (top + topY) / 2, z), TIMBER)
+		end
+	elseif wantHung then
 		ShopKit.HeaderSign(model, {
 			cx = cf.Position.X,
-			cy = math.min(frame.ceilY - 3.2, 10.4),
-			z = front - 3.4,
-			w = math.min(size.X - 1, 8.4),
-			h = 1.8,
+			cy = opts.cy or math.min(frame.ceilY - 3.2, 10.4),
+			z = opts.z or (front - 3.4),
+			w = opts.w or math.min(size.X - 1, 8.4),
+			h = opts.h or 1.8,
 			text = "CHECKOUT",
 			accent = hex("#4CC36A"),
-			ceilY = frame.ceilY - 0.9,
+			ceilY = opts.ceilY or (frame.ceilY - 0.9),
 			board = BRASS,
 			ink = INK,
 			name = "CheckoutSign",

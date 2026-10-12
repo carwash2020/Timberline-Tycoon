@@ -55,6 +55,15 @@ function Store.scene(opts)
 			-- shell is part-built here too; with opts.townMeshes = true the barn GLB loads, which
 			-- brings its own baked white lamp blocks (not part of the interiors).
 			ctx.art("TownMeshes").Enabled = opts.townMeshes == true
+			-- opts.slotModels: give the four ModelSlots (Flashlight, Lantern, Wood Sign, Shed Blueprint) the preview
+			-- mesh ids of tools/preview/store-items-meshes.json (Connor's GLBs under assets/glb/store-items; the game
+			-- has no Roblox ids for them yet, so in the game the slots stay 0). Run with
+			--   PREVIEW_MESHES=tools/preview/store-items-meshes.json bash tools/preview/shoot.sh store-hearth
+			if opts.slotModels then
+				for i, slot in ipairs(ctx.art("ModelSlots").Slots) do
+					slot.meshId = 91000000 + i
+				end
+			end
 			local shop = BuildingArt.Shop(opts.kind, opts.title, C3.fromRGB(table.unpack(opts.accent)))
 			-- The roof is taken off: the preview has no ambient sky light under a roof, so a
 			-- roofed interior renders black. (The game's Lighting lifts it; judge the interior

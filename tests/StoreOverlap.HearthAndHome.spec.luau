@@ -34,7 +34,37 @@ return function(t)
 		SubSignChain = "subsign",
 		CheckoutPlaque = "checkout",
 		CheckoutPlaqueAccent = "checkout",
+		CheckoutSign = "checkout",
+		CheckoutSignAccent = "checkout",
+		CheckoutPost = "counter",
 		PriceTag = "pricetag",
+		-- the display tables (a wood top with its trim, one unit with the shelf body), the small price and lock cards
+		-- on them, the spots over them
+		TableTop = "unit",
+		TableTrim = "unit",
+		TableApron = "unit",
+		SpotTag = "spottag",
+		SpotChain = "lamp",
+		SpotShade = "lamp",
+		-- the room's furnishings: wall shelves with jars, books and baskets, framed pictures, the rug
+		NookPanel = "wallshelf",
+		NookBoard = "wallshelf",
+		NookJar = "decor",
+		NookBook = "decor",
+		NookBasket = "decor",
+		PictureFrame = "picture",
+		PictureArt = "picture",
+		NookRug = "rug",
+		NookRugEdge = "rug",
+		-- the door frame and the striped awning
+		DoorPost = "doorframe",
+		DoorPostBase = "doorframe",
+		DoorThreshold = "doorframe",
+		AwningStripe = "awning",
+		AwningValance = "awning",
+		AwningRail = "awning",
+		AwningPost = "awning",
+		AwningBracket = "awning",
 		Sign = "namesign",
 		SignFrame = "namesign",
 		SignPost = "namesign",
@@ -105,6 +135,7 @@ return function(t)
 		hours = true,
 		sandwich = true,
 		stand = true,
+		spottag = true,
 		lamp = true,
 	}
 	local PROP = {
@@ -125,6 +156,11 @@ return function(t)
 		ledge = true,
 		counter = true,
 		porchpost = true,
+		decor = true,
+		picture = true,
+		rug = true,
+		doorframe = true,
+		awning = true,
 	}
 	-- Where a sign-like thing is meant to touch the building: [sign part name] = { structure names }.
 	local WELDS = {
@@ -134,7 +170,8 @@ return function(t)
 		SignPost = { Roof = true, RoofShingle = true },
 		LampArm = { Wall = true, CornerPost = true },
 		LampBulb = {},
-		TierPost = { Plinth = true },
+		SpotChain = { CeilingBoards = true, CeilingBeam = true, CeilingRafter = true, SignTie = true },
+		SpotShade = { CeilingBoards = true, CeilingBeam = true, CeilingRafter = true, SignTie = true },
 		PathLampPost = {},
 		-- (the exterior name board's goosenecks stand on its frame)
 	}
@@ -265,6 +302,55 @@ return function(t)
 		return string.format("%s(%.1f,%.1f,%.1f)", a.name, p.X, p.Y, p.Z)
 	end
 
+	-- The restyle's parts (tables, price cards, spots, shelving and decoration, door frame, awning, CHECKOUT) are all in a
+	-- family above, so every test below covers them: nothing new can slip past by having a name the lists do not know.
+	t.test(
+		"every table, price card, spot, shelf, picture, rug, door frame and awning part is covered by the lists",
+		function()
+			local PREFIXES =
+				{ "Table", "Spot", "Nook", "Picture", "DoorPost", "DoorThreshold", "Awning", "Checkout", "LockChip" }
+			local seen = {}
+			local missing = {}
+			for _, a in ipairs(list) do
+				for _, prefix in ipairs(PREFIXES) do
+					if string.sub(a.name, 1, #prefix) == prefix then
+						seen[a.name] = (seen[a.name] or 0) + 1
+						if not a.family then
+							missing[a.name] = true
+						end
+					end
+				end
+			end
+			t.eq(next(missing), nil, "names with no family: " .. table.concat(
+				(function()
+					local out = {}
+					for k in pairs(missing) do
+						table.insert(out, k)
+					end
+					return out
+				end)(),
+				", "
+			))
+			for _, name in ipairs({
+				"TableTop",
+				"TableTrim",
+				"SpotTag",
+				"SpotShade",
+				"NookBoard",
+				"NookJar",
+				"PictureFrame",
+				"NookRug",
+				"DoorPost",
+				"DoorThreshold",
+				"AwningStripe",
+				"AwningValance",
+				"CheckoutSign",
+			}) do
+				t.ok(seen[name], name .. " is in the shop and checked")
+			end
+		end
+	)
+
 	t.test("no two signs, flags, plaques or lamps intersect", function()
 		local bad = {}
 		local pairs_ = 0
@@ -383,7 +469,8 @@ return function(t)
 		local rects = {}
 		for _, a in ipairs(list) do
 			local fam = a.family
-			local isSign = fam and SIGNLIKE[fam] and fam ~= "lamp" and fam ~= "sandwich"
+			-- (the small price cards lean on the tables and stand behind the boxes in front from the door: not screen signs)
+			local isSign = fam and SIGNLIKE[fam] and fam ~= "lamp" and fam ~= "sandwich" and fam ~= "spottag"
 			local isHead = HEAD[a.name]
 			local isOutside = a.c.Z < -22.3
 			if

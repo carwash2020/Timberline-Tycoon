@@ -2147,11 +2147,12 @@ What changed:
       open the Land panel
 
 ### Studio checks: blueprints as items
-- [ ] Buy a Small Shed blueprint at the General Store (box to the counter):
-      the price is what it was, and a rolled plan (cream roll, blue wax seal)
-      appears in your hotbar named "Small Shed Blueprint"
+- [ ] Buy the Shed Blueprint at the General Store (box to the counter):
+      the price is what it was ($600), and a rolled plan (cream roll, blue wax seal)
+      appears in your hotbar named "Shed Blueprint"
 - [ ] Hold it and click (RT, tap): it vanishes, a toast says you learned it,
-      and the Small Shed is now in the hammer list and places free
+      and the Shed is now in the hammer list; placing it costs the kit fee ($240)
+      and puts down a ghost you fill with 60 plank units of your own planks
 - [ ] Buying it again before you use it, or after: refused, nothing charged
 - [ ] Hold a plan and press Drop (Q, Backspace, B on a pad, or a long
       press on the hotbar on a phone; two presses): it lies on the ground with a Pick up prompt; only
@@ -3116,7 +3117,7 @@ Connor sent two Lumber Tycoon 2 pictures: "Look at the Boxes in this image, I wa
 **Studio checks (Connor):**
 - [ ] Tool Shed from the door: dark boxes with a glass window on the front, the top and the aisle side, each showing the real item (axes lying whole, miniature sawmills, planers, belts, chop saw and Sky Bin), an accent band with the name, an accent plinth under each, rows stepping up toward the counter. The aisle is clear and the counter is at the back. The keeper still serves; the doors and hours behave as before.
 - [ ] The axe rack at the back: seven or eight axes standing whole on their steps, each in front of a block in its tier colour with its name; aiming at an axe, its block or its plate shows the hover tag with the price.
-- [ ] General Store (gear, plans, the lamp): every box shows its item (a lantern, a coat, a table, a barrel, the Small Shed in miniature); all boxes reachable; the lamp shelf shows three boxes in a row.
+- [ ] General Store (gear, plans, the lamp): every box shows its item (a lantern, a coat, a table, a barrel, the Shed Blueprint in miniature); all boxes reachable; the lamp shelf shows three boxes in a row.
 - [ ] Dealership: each vehicle on its plinth with its sign, its box on a coloured block at the aisle edge with the little vehicle visible through the window and the strip naming it; you can see the strip from the walkway; the vehicle beside it is unchanged.
 - [ ] Hover: aim at a box through its window (mouse, Xbox screen-centre aim, phone tap): the name and price tag appears, and shows Closed / Out of stock / You already own this as before. No price is printed on any box.
 - [ ] Grab with one press (mouse click, Xbox, phone tap) on the glass and on the strip: the box lifts at once, carried in the hand it moves as one piece, the item in it moves with it; carry three unpaid boxes (the fourth is refused as before); drop one on the floor and put one back on its shelf spot; walk it down the aisle and through the door.

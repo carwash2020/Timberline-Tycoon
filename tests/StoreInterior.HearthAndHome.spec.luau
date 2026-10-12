@@ -107,35 +107,131 @@ return function(t)
 		end
 	end)
 
-	t.test("one tier stand per placement: tier colour, badge, hover tag", function()
+	t.test("a wood-top display table per row, a small price card per box, a lock card for a gated item", function()
 		local model = interior()
-		local plinths = named(model, "Plinth")
-		t.eq(#plinths, #StoreStock.Placements(KIND), "a plinth per placement")
-		local flags = 0
+		local Util = t.shared("Util")
+		local tops = named(model, "TableTop")
+		local rows = {}
+		for _, place in ipairs(StoreStock.Placements(KIND)) do
+			rows[place.lane .. place.row] = true
+		end
+		local rowCount = 0
+		for _ in pairs(rows) do
+			rowCount += 1
+		end
+		t.eq(#tops, rowCount, "a table per row of boxes")
+		t.eq(#named(model, "Plinth"), 0, "no coloured plinths")
+		t.eq(#named(model, "TierFlag"), 0, "no tier flags on posts")
+		t.eq(#named(model, "TierPost"), 0)
+		local cards = named(model, "SpotTag")
+		t.eq(#cards, #StoreStock.Placements(KIND), "a price card per box")
+		local locks = 0
 		for _, place in ipairs(StoreStock.Placements(KIND)) do
 			local slot = StoreStock.Get(place.slotId)
-			local plinth
-			for _, p in ipairs(plinths) do
-				local spec = HoverTag.SpecOf(p)
-				if spec and spec.key == "Stand:" .. slot.slotId then
-					plinth = p
+			-- the table under the box: its top is where the box's feet are, and it carries the whole box
+			local table_
+			for _, top in ipairs(tops) do
+				local x0, x1, _, y1, z0, z1 = aabb(top)
+				local depth = place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
+				if
+					math.abs(y1 - (place.y - place.size.Y / 2)) < 1e-3
+					and place.x - place.size.X / 2 >= x0 - 0.01
+					and place.x + place.size.X / 2 <= x1 + 0.01
+					and place.z - depth / 2 >= z0 - 0.01
+					and place.z + depth / 2 <= z1 + 0.01
+				then
+					table_ = top
 				end
 			end
-			t.ok(plinth, slot.slotId .. " has its stand")
-			local tier = StoreTier.Of(slot.itemKind, slot.itemId)
-			if tier then
-				flags += 1
-				t.eq(plinth.Color, StoreTier.Color(tier), slot.slotId .. " stand colour")
+			t.ok(table_, slot.slotId .. " stands wholly on a table top")
+			-- its price card: the catalog's price, in text, the item's hover tag on it, inside its table
+			local card
+			for _, c in ipairs(cards) do
+				local spec = HoverTag.SpecOf(c)
+				if spec and spec.key == "Stand:" .. slot.slotId then
+					card = c
+				end
 			end
-			-- the stand's top is where the box's feet are (StoreStock), whatever its colour
-			local _, _, _, y1 = aabb(plinth)
+			t.ok(card, slot.slotId .. " has a price card")
+			local price = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, 2)
+			t.eq(card:GetAttribute("SignText"), Util.formatCash(price), slot.slotId .. " card price is the catalog's")
+			t.ok(card.Size.X <= 1.6 and card.Size.Y <= 0.5, slot.slotId .. " card is small")
+			local tx0, tx1, _, _, tz0, tz1 = aabb(table_)
+			local cx0, cx1, cy0, _, cz0, cz1 = aabb(card)
 			t.ok(
-				math.abs(y1 - (place.y - place.size.Y / 2)) < 1e-3,
-				slot.slotId .. " stand top " .. y1 .. " vs " .. (place.y - place.size.Y / 2)
+				cx0 >= tx0 and cx1 <= tx1 and cz0 >= tz0 and cz1 <= tz1,
+				slot.slotId .. " card stands inside its table, not outside the display"
 			)
+			t.ok(math.abs(cy0 - (place.y - place.size.Y / 2)) < 0.03, slot.slotId .. " card rests on the table top")
+			t.ok(cz1 <= place.z - place.size.Z / 2 + 0.01, slot.slotId .. " card is in front of the box, not behind it")
+			-- the lock card of a gated item (never a flag on a post: it stands on the table too)
+			local lock = StoreTier.LockOf(slot.itemKind, slot.itemId)
+			if lock then
+				locks += 1
+				local chip
+				for _, c in ipairs(named(model, "LockChip")) do
+					local spec = HoverTag.SpecOf(c)
+					if spec and spec.key == "Stand:" .. slot.slotId then
+						chip = c
+					end
+				end
+				t.ok(chip, slot.slotId .. " has a lock card")
+				t.eq(chip:GetAttribute("LockText"), lock.text)
+				t.eq(chip:GetAttribute("StandRole"), "chip", "the client shows it only while the item is locked")
+				local lx0, lx1, _, _, lz0, lz1 = aabb(chip)
+				t.ok(
+					lx0 >= tx0 and lx1 <= tx1 and lz0 >= tz0 and lz1 <= tz1,
+					slot.slotId .. " lock card inside its table"
+				)
+			end
 		end
-		t.eq(#named(model, "TierFlag"), flags, "a tier flag for each tiered item")
+		t.eq(#named(model, "LockChip"), locks, "a lock card only for an item that can be locked")
+		t.ok(locks >= 1, "some Hearth & Home items are gated: " .. locks)
 	end)
+
+	t.test("a warm spot hangs over every table or pair of tables, within the light caps", function()
+		local model = interior()
+		local shades = named(model, "SpotShade")
+		t.ok(#shades >= 10, "spots: " .. #shades)
+		for _, shade in ipairs(shades) do
+			local light = shade:FindFirstChildOfClass("PointLight")
+			t.ok(light, "a light in each spot")
+			t.ok(light.Brightness <= ShopKit.MaxLightBrightness and light.Range <= ShopKit.MaxLightRange)
+			t.eq(light.Shadows, false)
+		end
+		-- every table has a spot within 5 studs over it
+		for _, top in ipairs(named(model, "TableTop")) do
+			local at = top.CFrame.Position
+			local near = false
+			for _, shade in ipairs(shades) do
+				local p = shade.CFrame.Position
+				if math.abs(p.X - at.X) <= 5 and math.abs(p.Z - at.Z) <= 5 and p.Y > at.Y then
+					near = true
+				end
+			end
+			t.ok(near, string.format("a spot over the table at (%.1f, %.1f)", at.X, at.Z))
+		end
+	end)
+
+	t.test(
+		"DisplayTable is reusable: a plank top and a trim edge, sized for 2 or 3 display spots, optional legs",
+		function()
+			local parent = Instance.new("Model")
+			local two = ShopKit.DisplayTable(parent, { cx = 0, cz = 0, depth = 3, topY = 4, spots = 2 })
+			t.ok(math.abs(two.top.Size.X - (2 * ShopKit.SpotWidth + 0.8)) < 1e-3)
+			local three = ShopKit.DisplayTable(parent, { cx = 10, cz = 0, depth = 3, topY = 4, spots = 3 })
+			t.ok(math.abs(three.top.Size.X - (3 * ShopKit.SpotWidth + 0.8)) < 1e-3)
+			t.eq(two.top.Material.Name, "WoodPlanks", "a plank top")
+			t.ok(two.apron ~= nil and three.trim ~= nil, "an apron and a trim edge")
+			t.eq(#two.legs, 0)
+			local legged = ShopKit.DisplayTable(
+				parent,
+				{ cx = 20, cz = 0, depth = 3, topY = 4, spots = 2, legs = 4, floorY = 0, solid = false }
+			)
+			t.eq(#legged.legs, 4)
+			t.eq(legged.top.CanCollide, false)
+		end
+	)
 
 	t.test("lights are warm and modest; no big Neon; nothing the kit adds collides", function()
 		local model = interior()
@@ -170,11 +266,23 @@ return function(t)
 			StoreSign = true,
 			KeeperMat = true,
 			KeeperMatEdge = true,
-			TierPost = true,
-			TierBacking = true,
-			TierFlag = true,
+			TableTrim = true,
+			SpotTag = true,
+			SpotShade = true,
+			SpotChain = true,
 			LockChip = true,
-			Plinth = true,
+			CheckoutSign = true,
+			CheckoutSignAccent = true,
+			CheckoutPost = true,
+			NookPanel = true,
+			NookBoard = true,
+			NookJar = true,
+			NookBook = true,
+			NookBasket = true,
+			NookRug = true,
+			NookRugEdge = true,
+			PictureFrame = true,
+			PictureArt = true,
 			SignTie = true,
 			CeilingBeam = true,
 			CeilingRafter = true,
@@ -231,6 +339,10 @@ return function(t)
 			if p.Name ~= "Counter" then
 				local x0, x1, y0, y1, z0, z1 = aabb(p)
 				table.insert(all, { p = p, x0 = x0, x1 = x1, y0 = y0, y1 = y1, z0 = z0, z1 = z1, held = false })
+			else
+				-- (the stand-in for the shell's counter, which stands on the floor: the CHECKOUT board's posts stand on it)
+				local x0, x1, y0, y1, z0, z1 = aabb(p)
+				table.insert(all, { p = p, x0 = x0, x1 = x1, y0 = y0, y1 = y1, z0 = z0, z1 = z1, held = true })
 			end
 		end
 		local function touches(a, b)

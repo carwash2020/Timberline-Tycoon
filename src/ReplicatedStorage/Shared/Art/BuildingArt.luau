@@ -1711,14 +1711,14 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 		return string.upper(if slot then slot.displayName else itemId)
 	end
 	local offers = {
-		{ x = -11.4, kind = "fence", item = "Blueprint", id = "WoodSign" },
-		{ x = -3.8, kind = "shed", item = "Blueprint", id = "Shed" },
-		{ x = 3.8, kind = "lantern", item = "Gear", id = "Lantern" },
-		{ x = 11.4, kind = "axe", item = "Gear", id = "Flashlight" },
+		{ x = -12.2, kind = "fence", item = "Blueprint", id = "WoodSign" },
+		{ x = -5.0, kind = "shed", item = "Blueprint", id = "Shed" },
+		{ x = 5.0, kind = "lantern", item = "Gear", id = "Lantern" },
+		{ x = 12.2, kind = "axe", item = "Gear", id = "Flashlight" },
 	}
 	for _, offer in ipairs(offers) do
 		local board =
-			Kit.part(model, "PriceTag", V3(5.6, 2.3, 0.16), CF(offer.x, 6.15, HZ - 0.58), hex("#3E2A18"), MAT.Wood)
+			Kit.part(model, "PriceTag", V3(3.8, 1.5, 0.16), CF(offer.x, 5.9, HZ - 0.58), hex("#3E2A18"), MAT.Wood)
 		board.CanCollide = false
 		board.CanQuery = false
 		board.CanTouch = false

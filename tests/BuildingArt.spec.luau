@@ -288,7 +288,10 @@ return function(t)
 			-- floor take the whole hall from 215 to 347 parts; its interior has the 400-part budget in
 			-- StoreInterior.Dealership.spec, so the shop's cap moves 250 to 400 (the vehicles are the lot's).
 			-- General Store: the same kit (tier stands, signs, ties, lamps, stock corner) takes its whole shop from 250 to 302 parts (interior 189, its own 400 budget in StoreInterior.HearthAndHome.spec); cap 250 to 350.
-			local budget = ({ ToolShed = 400, HearthAndHome = 350, Dealership = 400 })[shop.kind]
+			-- General Store restyle (display tables with price cards and spots, door frame, striped awning, wall shelves with
+			-- jars, books and baskets, pictures, a rug, plants) plus the event expansion room (zone and banner, about 34 parts,
+			-- ShopEventKit): the whole shop is about 440 parts; cap 350 to 450.
+			local budget = ({ ToolShed = 400, HearthAndHome = 450, Dealership = 400 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
@@ -1097,7 +1100,7 @@ return function(t)
 			end
 			t.ok(ok, label .. " rests wholly on a table or shelf top")
 		end
-		-- A shelf box stands on a PLINTH (a block in its accent colour) which stands
+		-- A Tool Shed box stands on a PLINTH (a block in its accent colour) which stands
 		-- on its row's STEP of the stepped display unit.
 		local function standsOnPlinth(model, steps, place, size, label)
 			sits(model, { Plinth = true }, place, size, label .. " (box on plinth)")
@@ -1116,7 +1119,14 @@ return function(t)
 		local hearth = BuildingArt.Shop("HearthAndHome", "STORE", C3.fromRGB(122, 90, 60))
 		for _, place in ipairs(StoreStock.Placements("HearthAndHome")) do
 			local depth = place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
-			standsOnPlinth(hearth, { ShelfStep = true }, place, V3.new(place.size.X, place.size.Y, depth), place.slotId)
+			-- (Hearth & Home's boxes stand straight on their row's wood-top display table: no plinth.)
+			sits(
+				hearth,
+				{ TableTop = true },
+				place,
+				V3.new(place.size.X, place.size.Y, depth),
+				place.slotId .. " (box on table)"
+			)
 		end
 	end)
 

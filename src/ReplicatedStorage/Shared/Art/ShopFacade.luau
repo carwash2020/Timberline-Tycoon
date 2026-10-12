@@ -178,6 +178,128 @@ local function awning(
 	end
 end
 
+export type FrameOpts = {
+	postW: number?, -- the posts' width (default 0.9)
+	proud: number?, -- how far the posts stand out from the wall (default 0.55)
+	postTop: number?, -- the posts' top (default just under the awning)
+	trim: Color3?, -- the posts' colour (default the cream trim)
+	base: Color3?, -- the footing blocks' colour (default the stone grey)
+}
+
+ShopFacade.FrameGap = 0.75 -- the frame's posts start this far outside the opening, past the door leaves' swing (a leaf is 0.4 thick on the opening's edge)
+
+-- A real DOOR FRAME round the opening, in final studs: two cream posts (pilasters) standing proud of the wall just
+-- outside the opening, each on a stone footing block, and a flush stone THRESHOLD across the doorway (a looks-only
+-- slab 0.08 thick, so there is no step to trip on: nothing collides). The wall's own jambs and header (the leaf the
+-- shop hours recolour) are the inner frame; these are its outer trim. Nothing stands in the opening or in the
+-- 2-stud walk to it. Reusable by any store: ShopFacade.DoorFrame(model, spec) with the same Spec as Add.
+-- Parts: DoorPost x2, DoorPostBase x2, DoorThreshold.
+function ShopFacade.DoorFrame(parent: Instance, spec: Spec, opts: FrameOpts?)
+	local o: FrameOpts = opts or {}
+	local postW = o.postW or 0.9
+	local proud = o.proud or 0.55
+	local gy = spec.groundY
+	local top = o.postTop or (spec.doorTop + 0.65)
+	local inner = spec.doorHalf + ShopFacade.FrameGap
+	local trim = o.trim or TRIM
+	local stone = o.base or hex("#8C867C")
+	for _, s in ipairs({ -1, 1 }) do
+		local x = spec.doorCx + s * (inner + postW / 2)
+		box(parent, "DoorPost", V3(postW, top - gy, proud), CF(x, (top + gy) / 2, spec.frontZ - proud / 2), trim)
+		box(
+			parent,
+			"DoorPostBase",
+			V3(postW + 0.3, 0.7, proud + 0.2),
+			CF(x, gy + 0.35, spec.frontZ - (proud + 0.2) / 2),
+			stone,
+			MAT.Slate
+		)
+	end
+	-- the threshold: a flush stone slab across the doorway, beside the doormat (which starts 0.5 outside it)
+	box(
+		parent,
+		"DoorThreshold",
+		V3(2 * spec.doorHalf, 0.08, 0.9),
+		CF(spec.doorCx, gy + 0.04, spec.frontZ + 0.05),
+		stone,
+		MAT.Slate
+	)
+end
+
+export type AwningOpts = {
+	backY: number, -- the canopy's top at the wall
+	reach: number, -- how far it reaches out from the wall
+	colorA: Color3,
+	colorB: Color3,
+	stripes: number?, -- stripes across (default 6)
+	width: number?, -- default the door + 4
+	tilt: number?, -- radians the front drops below the back (default 0.13)
+	valance: number?, -- the front valance's height (default 0.7; every other piece is a third shorter: a stepped edge)
+}
+
+-- A STRIPED AWNING over the door, built of parts (no uploaded texture): `stripes` fabric slabs 0.18 thick in two
+-- colours side by side, sloping out and down from the wall; a front VALANCE of the same stripes hanging from the front
+-- edge, every other piece a third shorter so the edge steps like a scallop; a timber rail along the front; two posts
+-- to the ground and two brackets back to the wall. Everything stays clear of the door leaves when they swing out
+-- (their tops are lower than the valance's bottom) and of the opening. Looks only. Reusable by any store.
+-- Parts: AwningStripe x n, AwningValance x n, AwningRail, AwningPost x2, AwningBracket x2.
+function ShopFacade.StripedAwning(parent: Instance, spec: Spec, o: AwningOpts)
+	local n = o.stripes or 6
+	local w = o.width or (spec.doorHalf * 2 + 4)
+	local c = spec.doorCx
+	local stripe = w / n
+	local tilt = o.tilt or 0.13
+	local thick = 0.18
+	local reach = o.reach
+	local z0 = spec.frontZ -- the wall's outside face
+	local val = o.valance or 0.7
+	-- the slab's middle: its back edge top is at backY on the wall, the front end drops by reach * sin(tilt)
+	local midY = o.backY - (reach / 2) * math.sin(tilt) - (thick / 2) * math.cos(tilt)
+	local midZ = z0 - (reach / 2) * math.cos(tilt)
+	local frontTop = o.backY - reach * math.sin(tilt)
+	local frontZ = z0 - reach * math.cos(tilt)
+	for i = 1, n do
+		local x = c - w / 2 + stripe * (i - 0.5)
+		local color = if i % 2 == 0 then o.colorA else o.colorB
+		box(
+			parent,
+			"AwningStripe",
+			V3(stripe, thick, reach),
+			CF(x, midY, midZ) * CFrame.Angles(-tilt, 0, 0),
+			color,
+			MAT.Fabric
+		)
+		-- the valance piece under the front edge (stepped: odd pieces hang shorter)
+		local h = if i % 2 == 0 then val else val * 0.62
+		box(
+			parent,
+			"AwningValance",
+			V3(stripe, h, 0.12),
+			CF(x, frontTop - thick - h / 2 + 0.02, frontZ + 0.04),
+			color,
+			MAT.Fabric
+		)
+	end
+	local railY = frontTop - thick - 0.12
+	box(parent, "AwningRail", V3(w + 0.3, 0.2, 0.22), CF(c, railY - 0.05, frontZ + 0.3), TIMBER)
+	for _, s in ipairs({ -1, 1 }) do
+		local x = c + s * (w / 2 - 0.2)
+		local postTop = railY - 0.15
+		box(
+			parent,
+			"AwningPost",
+			V3(0.3, postTop - spec.groundY, 0.3),
+			CF(x, spec.groundY + (postTop - spec.groundY) / 2, frontZ + 0.3),
+			TIMBER
+		)
+		-- a bracket from the post's head back to the wall under the slab
+		local from = Vector3.new(x, railY - 0.15, frontZ + 0.3)
+		local to = Vector3.new(x, railY - 0.15 - (reach - 0.3) * 0.18, z0 - 0.1)
+		local len = (to - from).Magnitude
+		box(parent, "AwningBracket", V3(0.2, 0.2, len), CFrame.lookAt((from + to) / 2, to), TIMBER)
+	end
+end
+
 -- A warm wall lantern on a short iron arm, at the shop's front wall (x, y are
 -- its middle). Modest light: never a white-out (ShopKit's caps: 1 / 22).
 local function wallLamp(parent: Instance, spec: Spec, x: number, y: number)
@@ -303,7 +425,18 @@ local function shopSpecific(model: Model, spec: Spec)
 			window(model, spec, x, 7.3, 3.6, 4.4, true)
 		end
 		hearthDressing(model, spec)
-		awning(model, spec, 11.9, 4.2, hex("#3E6A3A"), hex("#F2E7CF"))
+		ShopFacade.DoorFrame(model, spec)
+		-- (the canopy is high and shallow so the door leaves swing out under its valance, and its top stays under
+		-- the hours board over the door)
+		ShopFacade.StripedAwning(model, spec, {
+			backY = 12.6,
+			reach = 4.4,
+			colorA = hex("#3E6A3A"),
+			colorB = hex("#F2E7CF"),
+			stripes = 6,
+			tilt = 0.12,
+			valance = 0.7,
+		})
 		planter(model, -10.3, gy, fz - 1.8)
 		planter(model, 10.3, gy, fz - 1.8)
 		bench(model, -20.5, gy, fz - 1.4)
