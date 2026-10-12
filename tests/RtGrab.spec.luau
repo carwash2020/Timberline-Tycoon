@@ -13,50 +13,58 @@ return function(t)
 		roblox.Instance, roblox.Enum, roblox.Vector3, roblox.Vector2, roblox.CFrame
 	local Color3 = roblox.Color3
 
+	-- Nothing here registers a roblox.implementMethod / implementProperty: each
+	-- (class, member) can be registered once per test process and other specs
+	-- own Raycast and GetAttributeChangedSignal. The workspace, camera, wood
+	-- and its balls are stand-in tables instead, with the rest forwarded to
+	-- real instances.
 	local world
-	roblox.implementMethod("Workspace", "GetAttributeChangedSignal", function()
-		return {
-			Connect = function()
-				return { Disconnect = function() end }
+
+	-- A table that answers like `real`, with `own` overriding; functions are
+	-- called on the real instance.
+	local function standIn(real, own)
+		return setmetatable({}, {
+			__index = function(_, key)
+				if own[key] ~= nil then
+					return own[key]
+				end
+				local value = real[key]
+				if type(value) == "function" then
+					return function(_, ...)
+						return value(real, ...)
+					end
+				end
+				return value
 			end,
-		}
-	end)
-	roblox.implementMethod("Model", "GetAttributeChangedSignal", function()
-		return {
-			Connect = function()
-				return { Disconnect = function() end }
+			__newindex = function(_, key, value)
+				real[key] = value
 			end,
-		}
-	end)
-	roblox.implementMethod("Workspace", "Raycast", function()
-		return world.hit
-	end)
-	roblox.implementMethod("Camera", "ViewportPointToRay", function()
-		return { Origin = Vector3.new(0, 5, 0), Direction = Vector3.new(0, 0, -1) }
-	end)
-	roblox.implementMethod("Camera", "ScreenPointToRay", function()
-		return { Origin = Vector3.new(0, 5, 0), Direction = Vector3.new(0, 0, -1) }
-	end)
-	roblox.implementMethod("BasePart", "GetMass", function()
-		return 10
-	end)
-	roblox.implementProperty("Humanoid", "Health", function()
-		return 100
-	end, function() end)
-	roblox.implementProperty("Humanoid", "SeatPart", function()
-		return nil
-	end, function() end)
+		})
+	end
 
 	local function noop() end
 
 	local function build(opts)
 		opts = opts or {}
 		local game = Instance.new("DataModel")
-		local workspace = game:GetService("Workspace")
-		workspace:SetAttribute("CoreLoopActive", 2)
-		local camera = Instance.new("Camera")
-		camera.ViewportSize = Vector2.new(1000, 600)
-		workspace.CurrentCamera = camera
+		local realWorkspace = game:GetService("Workspace")
+		realWorkspace:SetAttribute("CoreLoopActive", 2)
+		local ray = { Origin = Vector3.new(0, 5, 0), Direction = Vector3.new(0, 0, -1) }
+		local camera = {
+			ViewportSize = Vector2.new(1000, 600),
+			ViewportPointToRay = function()
+				return ray
+			end,
+			ScreenPointToRay = function()
+				return ray
+			end,
+		}
+		local workspace = standIn(realWorkspace, {
+			CurrentCamera = camera,
+			Raycast = function()
+				return world.hit
+			end,
+		})
 
 		local char = Instance.new("Model")
 		local hrp = Instance.new("Part")
@@ -75,27 +83,33 @@ return function(t)
 			tool.Parent = char
 		end
 
-		local wood = Instance.new("Model")
+		-- AssemblyMass has no default off-engine: the piece the ray finds is a
+		-- stand-in that reads 10; the wood model around it is one too.
+		local realWood = Instance.new("Model")
 		local log = Instance.new("Part")
 		log.Position = Vector3.new(0, 4, -4)
-		log.Parent = wood
-
-		-- AssemblyMass has no default off-engine: the piece the ray finds is a
-		-- stand-in that reads 10 and passes everything else to the real part.
-		local piece = setmetatable({}, {
-			__index = function(_, key)
-				if key == "AssemblyMass" then
-					return 10
-				end
-				local value = log[key]
-				if type(value) == "function" then
-					return function(_, ...)
-						return value(log, ...)
-					end
-				end
-				return value
+		log.Parent = realWood
+		local wood
+		local piece = standIn(log, {
+			AssemblyMass = 10,
+			Parent = nil,
+			GetMass = function()
+				return 10
 			end,
 		})
+		wood = standIn(realWood, {
+			GetAttributeChangedSignal = function()
+				return {
+					Connect = function()
+						return { Disconnect = noop }
+					end,
+				}
+			end,
+			GetDescendants = function()
+				return { piece }
+			end,
+		})
+		rawset(piece, "Parent", wood)
 		world = {
 			hit = { Instance = piece, Position = Vector3.new(0, 4, -4) },
 			grabs = 0,
@@ -261,7 +275,14 @@ return function(t)
 				-- the hold's constraints are plain stand-ins (a stand-in part cannot parent real ones)
 				Instance = setmetatable({
 					new = function(class)
-						if class == "Attachment" or class == "AlignPosition" or class == "AlignOrientation" then
+						-- the grab balls (Part) and their folder, the hold's constraints
+						if
+							class == "Attachment"
+							or class == "AlignPosition"
+							or class == "AlignOrientation"
+							or class == "Folder"
+							or class == "Part"
+						then
 							return { Destroy = noop, Disconnect = noop }
 						end
 						return Instance.new(class)
