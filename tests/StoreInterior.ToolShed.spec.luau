@@ -94,7 +94,10 @@ return function(t)
 			t.ok(lanes[lane.name], lane.name .. " has a header")
 		end
 		for _, slot in ipairs(StoreStock.ForShop(KIND)) do
-			t.ok(seen[slot.itemId], slot.slotId .. " is under a sub-sign")
+			t.ok(
+				seen[slot.itemId] or table.find(Builder.HeaderOnly, slot.itemId),
+				slot.slotId .. " is under a sub-sign or its header"
+			)
 		end
 		-- the signs themselves
 		local model = interior()
@@ -227,6 +230,59 @@ return function(t)
 				t.ok(y0 >= frame.floorTop - 0.2, label .. " above the floor")
 				-- (the axe rack on the back wall reaches 13.1; the signs hang from ties up to Builder.TopY)
 				t.ok(y1 <= (Builder.TopY or frame.ceilY) + 0.25, label .. " under the top: " .. y1)
+			end
+		end
+	end)
+
+	t.test("the signs are few and clear of each other (Connor: too close together, too many)", function()
+		local model = interior()
+		local SIGNS = {
+			TierFlag = true,
+			LockChip = true,
+			HeaderSign = true,
+			SubSign = true,
+			CheckoutPlaque = true,
+			AxePlate = true,
+		}
+		local list = {}
+		for _, p in ipairs(parts(model)) do
+			if SIGNS[p.Name] then
+				table.insert(list, { part = p, box = { aabb(p) } })
+			end
+		end
+		-- 2 headers, 3 sub-signs, a flag per tiered item (16), a chip per lockable item (7), 8 rack plates, CHECKOUT
+		t.ok(#list <= 37, "sign count " .. #list .. " (it was 39)")
+		t.eq(#named(model, "SubSign"), 3, "the AXES sub-sign under the AXES & BELTS header is gone")
+		t.eq(#named(model, "HeaderSign"), 2)
+		local function gap(a, b)
+			local d2 = 0
+			for i = 1, 5, 2 do
+				local g = math.max(a[i] - b[i + 1], b[i] - a[i + 1], 0)
+				d2 += g * g
+			end
+			return math.sqrt(d2)
+		end
+		local MIN_GAP = 1.5 -- studs between any two signs' edges (a chip rests on its own flag: that pair is the one exception)
+		for i = 1, #list do
+			for j = i + 1, #list do
+				local a, b = list[i].part, list[j].part
+				local pair = (a.Name == "LockChip" and b.Name == "TierFlag")
+					or (a.Name == "TierFlag" and b.Name == "LockChip")
+				if not (pair and gap(list[i].box, list[j].box) < 0.2) then
+					local g = gap(list[i].box, list[j].box)
+					t.ok(
+						g >= MIN_GAP,
+						string.format(
+							"%s and %s are %.2f studs apart at %.1f, %.1f, %.1f",
+							a.Name,
+							b.Name,
+							g,
+							a.CFrame.Position.X,
+							a.CFrame.Position.Y,
+							a.CFrame.Position.Z
+						)
+					)
+				end
 			end
 		end
 	end)

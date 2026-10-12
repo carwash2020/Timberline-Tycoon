@@ -92,7 +92,8 @@ function ShopKit.SteppedUnit(
 	frame: Frame,
 	name: string,
 	body: Color3,
-	top: Color3
+	top: Color3,
+	opts: { chipYaw: number?, chipW: number? }?
 ): { [string]: { lo: number, hi: number } }
 	local out: { [string]: { lo: number, hi: number } } = {}
 	local placements = StoreStock.Placements(shop)
@@ -131,6 +132,8 @@ function ShopKit.SteppedUnit(
 						aisle = if (lane.x0 + lane.x1) / 2 < 0 then 1 else -1,
 						flagY = (rowTops[lane.name .. place.row] or place.y) + 1.0,
 						accent = accent,
+						chipYaw = if opts then opts.chipYaw else nil,
+						chipW = if opts then opts.chipW else nil,
 					})
 				end
 			end
@@ -532,6 +535,8 @@ export type StandSpec = {
 	aisle: number, -- +1 when the aisle is on the +X side, -1 on the -X side
 	flagY: number, -- the flag board's middle (uniform along a row)
 	accent: Color3, -- the stand's colour when the item has no tier
+	chipW: number?, -- the lock chip's width (default ShopKit.ChipSize.X)
+	chipYaw: number?, -- turn the lock chip this far to the aisle (default: the flag's); near 90 degrees it is edge-on from the door, so a row of chips does not stack along the sightline
 }
 
 ShopKit.FlagSize = Vector3.new(1.7, 1.0, 0.16)
@@ -601,8 +606,10 @@ function ShopKit.TierStand(parent: Instance, s: StandSpec): Part
 	HoverTag.Mark(post, hover)
 	if lock then
 		-- (it rests on the brass backing's top edge, 0.6 over the flag's middle: it floated 0.2 above it)
-		local chipAt = CF(px, s.flagY + 0.6 + ShopKit.ChipSize.Y / 2, pz) * yaw
-		local chip = dBox(parent, "LockChip", ShopKit.ChipSize, chipAt, StoreTier.LockedColor, MAT.SmoothPlastic)
+		local chipAt = CF(px, s.flagY + 0.6 + ShopKit.ChipSize.Y / 2, pz)
+			* (if s.chipYaw then CFrame.Angles(0, -s.aisle * s.chipYaw, 0) else yaw)
+		local chipSize = if s.chipW then V3(s.chipW, ShopKit.ChipSize.Y, ShopKit.ChipSize.Z) else ShopKit.ChipSize
+		local chip = dBox(parent, "LockChip", chipSize, chipAt, StoreTier.LockedColor, MAT.SmoothPlastic)
 		Kit.signText(chip, lock.text, StoreTier.LockedInk, nil, Enum.Font.FredokaOne, 0.2)
 		chip:SetAttribute("LockText", lock.text)
 		standPart(chip, "chip", StoreTier.LockedColor)

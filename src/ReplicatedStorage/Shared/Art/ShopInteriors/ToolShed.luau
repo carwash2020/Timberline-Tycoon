@@ -51,9 +51,9 @@ ToolShed.TopY = 14.9 -- the highest part the interior adds (the ties' tops)
 -- tag (Shared/HoverTag).
 local RACK_STEP = 0.22 -- each axe's step is this much higher than the last
 local RACK_BLOCK = 2.4 -- the tier-colour block behind each axe (and its step) is this wide (an axe's head and handle show up to 2.4 wide)
-ToolShed.RackGap = 1.5 -- clear studs between one axe's block and the next (it was 0.3)
+ToolShed.RackGap = 1.8 -- clear studs between one axe's block and the next (it was 0.3, then 1.5)
 local RACK_AXE_SHIFT = 0.4 -- the axes' heads stick out to -x, so the pivot stands this far toward +x to centre one on its block
-local RACK_PLATE = 3.0 -- the name plate: wider than the block, still 0.9 clear of the next
+local RACK_PLATE = 2.4 -- the name plate: as wide as the block, so 1.8 clear of the next
 local RACK_BASE = 7.5 -- the first step's top
 local RACK_PANEL_Y = 9.7
 local RACK_PANEL_H = 6.8
@@ -176,6 +176,18 @@ local function axeRack(model: Model, frame: Frame)
 	end
 end
 
+-- The axes need no sub-sign of their own: the header says "AXES & BELTS", and a second
+-- "AXES" board a few studs behind it only crowded the aisle. They are covered by the header.
+ToolShed.HeaderOnly = {
+	"SteelAxe",
+	"HardenedAxe",
+	"SilverAxe",
+	"CobaltAxe",
+	"GoldAxe",
+	"ObsidianAxe",
+	"InfernoAxe",
+}
+
 -- What the signs say, from the shop's real stock (ids are ItemCatalog ids; a
 -- spec checks every slot of the shop is under exactly one sign).
 ToolShed.Sections = {
@@ -184,18 +196,6 @@ ToolShed.Sections = {
 		header = "AXES & BELTS",
 		accent = BoxLook.Categories.Axe,
 		subs = {
-			{
-				text = "AXES",
-				ids = {
-					"SteelAxe",
-					"HardenedAxe",
-					"SilverAxe",
-					"CobaltAxe",
-					"GoldAxe",
-					"ObsidianAxe",
-					"InfernoAxe",
-				},
-			},
 			{ text = "BELT KIT", ids = { "ConveyorFunnel", "ConveyorStraight", "ConveyorTurn", "SkyBin" } },
 		},
 	},
@@ -238,7 +238,17 @@ function ToolShed.Build(model: Model, frame: Frame)
 	local rng = Kit.rng(2604)
 	local ceil = frame.ceilY
 	-- The display tables: a tier stand per slot (plinth, tier flag, lock chip).
-	ShopKit.SteppedUnit(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
+	-- (the unlock chips turn square to the aisle and are 2.4 wide: nearly edge-on from the door, so seven NEEDS
+	-- plaques do not stack along the sightline; they read as you walk past)
+	ShopKit.SteppedUnit(
+		model,
+		"ToolShed",
+		frame,
+		"DisplayTable",
+		TABLE,
+		TABLE_TOP,
+		{ chipYaw = math.rad(90), chipW = 2.4 }
+	)
 	RobuxTableArt.Build(model, frame.floorTop) -- Lane P (unchanged)
 	axeRack(model, frame)
 	counterDetail(model, frame)
