@@ -43,6 +43,8 @@ door-end board, tier T-flags, plinth name signs, hours and closed signs. Specs: 
 front of another from the door, a ceiling on hung boards (6) and on every sign on the building (12). No price, vehicle, tier or
 buying change. Renders `previews/store-polish/dealership-v2-*.png`.
 
+**No-overlap spec (`tests/DealershipOverlap.spec.luau`).** In 3D, on the building (inside and out), the lot and the vehicles: 1225 sign-group pairs, about 105,000 sign-part against structure/prop/vehicle pairs, about 83,000 prop/display/structure pairs, all with 0.05 tolerance. It found and fixed: the hours board stood 0.25 into the wall above the door and the canopy's near end pierced it (canopy now stands 0.7 off the wall, far end unchanged, `ShopFacade.AwningGap`), the lobby trash can overlapped a barrel (moved), and each plinth's aisle stripe ran under the box's accent block (stripe is now 0.3 wide at the very edge, `DealershipLot.StripeWidth`).
+
 ## Store polish: the Dealership (branch `phase-2/store-polish-dealership`, 12 October 2026)
 
 Connor's item 5. The Dealership stays its own building; nothing about buying, prices, stock, hidden Coming-soon items, StoreUI or

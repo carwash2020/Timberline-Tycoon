@@ -73,6 +73,7 @@ DealershipLot.ChipSize = Vector3.new(5.0, 1.0, 0.16)
 DealershipLot.FlagYaw = math.rad(12) -- the flag is turned this far, so it never stands edge-on to the aisle
 DealershipLot.FlagHeight = 5.0 -- the flag's middle, above the plinth's top
 DealershipLot.BandHeight = 0.55
+DealershipLot.StripeWidth = 0.3 -- the aisle-edge stripe: at the very edge, clear of the box's block
 local BRASS = Color3.fromRGB(201, 162, 74)
 -- A display vehicle's Neon lenses are never near-white (ShopKit.NearWhite, luma 0.86): the live
 -- trucks' pale headlamp lens (#FFE9B0) blows out in a lit hall, so the display copy wears warm amber.
@@ -451,8 +452,8 @@ function DealershipLot.Build(): Model
 		local stripe = Kit.part(
 			lot,
 			"PlinthStripe",
-			Vector3.new(bay.width - 0.6, 0.12, 0.6),
-			CFrame.new(cx, top + 0.06, cz + aisleSide * (bay.depth / 2 - 0.5)),
+			Vector3.new(bay.width - 0.6, 0.12, DealershipLot.StripeWidth),
+			CFrame.new(cx, top + 0.06, cz + aisleSide * (bay.depth / 2 - DealershipLot.StripeWidth / 2 - 0.02)),
 			color,
 			Enum.Material.SmoothPlastic
 		)

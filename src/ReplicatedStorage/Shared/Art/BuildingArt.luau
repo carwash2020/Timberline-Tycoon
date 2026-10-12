@@ -2175,6 +2175,15 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		fitNameSign(sign)
 	end
 	addHoursBoard(model, kind)
+	if kind == "Dealership" then
+		-- The hours board stood 0.25 into the wall above the door: put it against the wall's face.
+		local board = model:FindFirstChild("HoursBoard")
+		if board and board:IsA("BasePart") then
+			local face = -DealershipLot.Hall().innerD / 2 - 0.8
+			local at = board.CFrame.Position
+			board.CFrame = CFrame.new(at.X, at.Y, face - board.Size.Z / 2)
+		end
+	end
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
 	if kind ~= "Dealership" and kind ~= "Sparkworks" then -- the hall has no uploaded mesh; its mesh is the old 20 x 16 demo building
 		TownMeshes.Dress(model, TownModels.ShopAsset(kind), { scale = BuildingArt.MeshStretch(kind) })

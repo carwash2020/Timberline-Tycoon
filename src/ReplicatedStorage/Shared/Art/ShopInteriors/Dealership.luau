@@ -349,7 +349,7 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 	plant(model, west + 1.8, fy, zf + 3, 1.4)
 	plant(model, west + lobbyW - 2, fy, zf + 3, 1.4)
 	plant(model, west + lobbyW - 2, fy, zb - 12, 1.4)
-	trashCan(model, west + lobbyW - 2, fy, zb - 1.5)
+	trashCan(model, west + lobbyW - 2, fy, zb - 5.5)
 	stockProp(model, "Crate", west + 1.8, fy, zb - 15, 0.1)
 	stockProp(model, "Crate", west + 1.8, fy, zb - 12.6, -0.15)
 	stockProp(model, "Barrel", west + 4.6, fy, zb - 13, 0)
