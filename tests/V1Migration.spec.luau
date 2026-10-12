@@ -107,6 +107,12 @@ return function(t)
 			contains(after.ground, before.ground, "ground sections")
 			local once = Util.deepCopy(data)
 			Schema.Migrate(data)
+			-- Migrate stamps the active slot's lastPlayed with the clock, so a second that ticks
+			-- between the two runs would differ there (CI flake, 12 October 2026): carry the
+			-- stamp across and compare everything else.
+			for key, slot in pairs(data.slots) do
+				once.slots[key].lastPlayed = slot.lastPlayed
+			end
 			t.eq(data, once, "a second migrate changes nothing")
 			local bytes = #serde.encode("json", data)
 			t.ok(bytes <= MB, string.format("%s is %d bytes", name, bytes))

@@ -27,10 +27,13 @@ export type Spec = {
 	wallTop: number, -- the front wall's top edge
 	roofTop: number, -- the roof's highest point over the front half
 	groundY: number, -- the floor's top
+	matY: number?, -- where the doormat lies, when that is not the floor's top (the Dealership's walk is at street level)
 	accent: Color3,
 }
 
 ShopFacade.DoorClear = 0.8
+ShopFacade.AwningGap = 0.7 -- the Dealership canopy's near end stands this far off the wall, clear of the hours board on it
+ShopFacade.AwningReach = 5 -- how far the Dealership's canopy reaches out from the front wall
 
 local V3, CF = Vector3.new, CFrame.new
 local MAT = Enum.Material
@@ -126,7 +129,7 @@ local function doormat(parent: Instance, spec: Spec)
 		parent,
 		"Doormat",
 		V3(spec.doorHalf * 1.4, 0.06, 2.2),
-		CF(spec.doorCx, spec.groundY + 0.04, spec.frontZ - 1.6),
+		CF(spec.doorCx, (spec.matY or spec.groundY) + 0.04, spec.frontZ - 1.6),
 		hex("#6B5436"),
 		MAT.Fabric
 	)
@@ -138,7 +141,16 @@ local function chimney(parent: Instance, x: number, z: number, baseY: number, h:
 end
 
 -- A striped awning on two posts over the door: `reach` studs out.
-local function awning(parent: Instance, spec: Spec, y: number, reach: number, colorA: Color3, colorB: Color3)
+local function awning(
+	parent: Instance,
+	spec: Spec,
+	y: number,
+	reach: number,
+	colorA: Color3,
+	colorB: Color3,
+	gap: number?
+)
+	local off = gap or 0 -- how far the canopy's near end stands off the wall
 	local w = spec.doorHalf * 2 + 4
 	local c = spec.doorCx
 	local n = 8
@@ -150,7 +162,7 @@ local function awning(parent: Instance, spec: Spec, y: number, reach: number, co
 			parent,
 			"AwningStripe",
 			V3(stripe, 0.25, reach),
-			CF(x, y, spec.frontZ - reach / 2 + 0.2) * CFrame.Angles(-tilt, 0, 0),
+			CF(x, y, spec.frontZ - off - reach / 2 + 0.2) * CFrame.Angles(-tilt, 0, 0),
 			if i % 2 == 0 then colorA else colorB,
 			MAT.Fabric
 		)
@@ -160,7 +172,7 @@ local function awning(parent: Instance, spec: Spec, y: number, reach: number, co
 			parent,
 			"AwningPost",
 			V3(0.3, y - spec.groundY - 0.4, 0.3),
-			CF(c + s * (w / 2 - 0.2), spec.groundY + (y - spec.groundY - 0.4) / 2, spec.frontZ - reach + 0.4),
+			CF(c + s * (w / 2 - 0.2), spec.groundY + (y - spec.groundY - 0.4) / 2, spec.frontZ - off - reach + 0.4),
 			TIMBER
 		)
 	end
@@ -323,11 +335,18 @@ local function shopSpecific(model: Model, spec: Spec)
 		-- The showroom: a canopy over the lobby door, planters, a bench and a
 		-- sandwich board, a flag pole and roof units (its windows are the glass band).
 		local c = spec.doorCx
-		awning(model, spec, spec.doorTop + 0.7, 5, hex("#2F6DB5"), hex("#F2E7CF"))
+		awning(
+			model,
+			spec,
+			spec.doorTop + 0.7,
+			ShopFacade.AwningReach - ShopFacade.AwningGap,
+			hex("#2F6DB5"),
+			hex("#F2E7CF"),
+			ShopFacade.AwningGap
+		)
 		planter(model, c + d + 2.6, gy, fz - 1.8)
 		planter(model, c - d - 2.6, gy, fz - 1.8)
 		bench(model, c + d + 9, gy, fz - 1.4)
-		sandwichBoard(model, c + d + 15, gy, fz - 2.4, "Dealership")
 		box(model, "FlagPole", V3(0.25, 11, 0.25), CF(c + d + 21, gy + 5.5, fz - 1.4), IRON, MAT.Metal)
 		box(model, "FlagCloth", V3(3.2, 2, 0.1), CF(c + d + 22.7, gy + 9.8, fz - 1.4), spec.accent, MAT.Fabric)
 		box(model, "FlagLine", V3(6, 0.08, 0.08), CF(c + d + 24, gy + 10.6, fz - 1.4), IRON, MAT.Metal)

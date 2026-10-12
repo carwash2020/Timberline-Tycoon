@@ -29,6 +29,7 @@ local BuildingArt = require(script.Parent.BuildingArt)
 local Kit = require(script.Parent.Kit)
 local MachineMeshes = require(script.Parent.MachineMeshes)
 local MachineSkin = require(script.Parent.MachineSkin)
+local MeshKit = require(script.Parent.MeshKit)
 local Palette = require(script.Parent.Palette)
 local SawmillLogic = require(script.Parent.Parent.SawmillLogic)
 local SkyBinLogic = require(script.Parent.Parent.SkyBinLogic)
@@ -431,6 +432,108 @@ function MachineArt.AimBelt(model: Model, speed: number?)
 	end
 end
 
+-- The swap ------------------------------------------------------------------
+-- A machine built before its meshes are cached is part-built and usable at
+-- once (no yield: MeshKit.Create never waits). When the meshes land,
+-- MeshKit.Attempt runs the dress step again IN PLACE: the part-only decor is
+-- removed, the few parts that stand differently under a mesh are moved, and
+-- MachineSkin.Commit adds the mesh pieces. Every gameplay part (Root, the
+-- conveyor band, guards, intake, panel, prompts, attributes, attachments)
+-- is the same instance before and after. The step runs with the model put
+-- back where it was built (inBuildFrame) and moved on again, so a machine
+-- already placed or moved keeps its pivot. A machine destroyed first is
+-- dropped by the queue; a failed load keeps the part-built machine.
+local function dropPartOnly(model: Model, names: { [string]: boolean })
+	for _, child in ipairs(model:GetChildren()) do
+		if names[child.Name] and child:IsA("BasePart") and child:GetAttribute("VisualMesh") ~= true then
+			child:Destroy()
+		end
+	end
+end
+
+local function wearWhenLoaded(
+	model: Model,
+	id: string,
+	ghost: boolean,
+	partOnly: { [string]: boolean },
+	before: (() -> ())?,
+	after: (() -> ())?
+)
+	MeshKit.Attempt(model, function(): boolean
+		if MachineSkin.Wears(model) then
+			return true
+		end
+		local skin = MachineSkin.Prepare(id, ghost)
+		if skin == nil then
+			return false
+		end
+		dropPartOnly(model, partOnly)
+		if before then
+			before()
+		end
+		MachineSkin.Commit(model, skin, CFrame.identity)
+		if after then
+			after()
+		end
+		return true
+	end, true)
+end
+
+-- Part-built decor that exists only when the machine has no mesh (the
+-- `meshed` / `skin == nil` branches of each builder below).
+local TIER_DECOR: { [string]: boolean } = {
+	Deck = true,
+	SawBlade = true,
+	Post = true,
+	Stack = true,
+	StackCap = true,
+	MakerPlate = true,
+	Boiler = true,
+	BoilerDome = true,
+	Gauge = true,
+	Gantry = true,
+	GantryLeg = true,
+	Lamp = true,
+	CutterHead = true,
+	Roller = true,
+	SteamPipe = true,
+}
+local CHOP_SAW_DECOR: { [string]: boolean } = { Leg = true, Stripe = true, SawBlade = true }
+local BELT_DECOR: { [string]: boolean } = {
+	Plate = true,
+	Pan = true,
+	Roller = true,
+	RailCap = true,
+	PortCollar = true,
+	Gate = true,
+	RailClamp = true,
+	Leg = true,
+	Saddle = true,
+	Brace = true,
+	ArchRim = true,
+	Face = true,
+	FilterPip = true,
+	Lamp = true,
+}
+
+-- A part of this name is kept when it is under the shape's mesh (Post under a
+-- Belt Support is the real post, not decor).
+local function beltDecor(shape: string): { [string]: boolean }
+	if shape == "support" then
+		local names = table.clone(BELT_DECOR)
+		names.Post = false
+		return names
+	end
+	return BELT_DECOR
+end
+
+local function moveSign(model: Model, name: string, cf: CFrame)
+	local sign = model:FindFirstChild(name)
+	if sign and sign:IsA("BasePart") then
+		sign.CFrame = cf
+	end
+end
+
 -- The gameplay parts of a TLD-1 sawmill or planer, row by row from
 -- MachineMeshes.Layout (the shipped stats.json gameplay_parts): the deck
 -- band that carries wood, the walls and roof a player is stopped by, the
@@ -551,7 +654,7 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	end
 	local preview = ghost == true
 	local model = Kit.model(mill.id)
-	local skin = MachineSkin.Prepare(mill.id, preview)
+	local skin = MachineSkin.Prepare(mill.id, preview, true)
 	local tier = math.clamp(mill.tier, 1, 5)
 	local frame = buildFrame(model, layout, preview, {
 		wall = Kit.hex(mill.color),
@@ -639,6 +742,11 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	model:SetAttribute("MillId", mill.id)
 	model:SetAttribute("Tier", mill.tier)
 	model:SetAttribute("TierName", mill.tierName)
+	if skin == nil then
+		wearWhenLoaded(model, mill.id, preview, TIER_DECOR, function()
+			moveSign(model, "TierSign", ridgeSign(mill.id))
+		end, nil)
+	end
 	return model
 end
 
@@ -697,7 +805,7 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 	end
 	local preview = ghost == true
 	local model = Kit.model(machine.id)
-	local skin = MachineSkin.Prepare(machine.id, preview)
+	local skin = MachineSkin.Prepare(machine.id, preview, true)
 	local meshed = skin ~= nil
 	local layout = MachineMeshes.Layout(machine.id)
 	local fp = ChopSawLogic.Footprint()
@@ -877,6 +985,8 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 	runFlag.Value = true
 	runFlag.Parent = model
 
+	-- Where the PriceSign stands under the mesh (set below, used by the swap).
+	local meshedSignCf: CFrame? = nil
 	if not preview then
 		local panelCf = CFrame.new(baseAt.X + ChopSawLogic.BaseX / 2 + ChopSawLogic.PanelBoardX / 2, baseAt.Y, baseAt.Z)
 		if layout then
@@ -951,15 +1061,16 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 
 		local signX = baseAt.X + ChopSawLogic.BaseX / 2 + ChopSawLogic.PanelBoardX / 2
 		local signCf = CFrame.new(signX, baseAt.Y + ChopSawLogic.SignLift, baseAt.Z) * CFrame.Angles(0, -math.pi / 2, 0)
-		if meshed then
-			-- Just outside the cabin's widest side, over the board.
-			local body = MachineMeshes.Piece(machine.id, "Body")
-			local side = if body then body.size.X / 2 else 3.343
-			signCf = CFrame.new(
-				side + ChopSawLogic.RootY / 2,
-				panelCf.Y + ChopSawLogic.PanelBoardY / 2 + 0.7,
-				panelCf.Z
-			) * CFrame.Angles(0, -math.pi / 2, 0)
+		-- Just outside the cabin's widest side, over the board.
+		local body = MachineMeshes.Piece(machine.id, "Body")
+		local side = if body then body.size.X / 2 else 3.343
+		meshedSignCf = CFrame.new(
+			side + ChopSawLogic.RootY / 2,
+			panelCf.Y + ChopSawLogic.PanelBoardY / 2 + 0.7,
+			panelCf.Z
+		) * CFrame.Angles(0, -math.pi / 2, 0)
+		if meshed and meshedSignCf then
+			signCf = meshedSignCf
 		end
 		local sign = Kit.part(
 			model,
@@ -983,6 +1094,16 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 	model:SetAttribute("Price", machine.priceCash)
 	model:SetAttribute("CutU", ChopSawLogic.DefaultCut)
 	model:SetAttribute("Run", true)
+	if not meshed then
+		wearWhenLoaded(model, machine.id, preview, CHOP_SAW_DECOR, function()
+			-- The mesh's own cabin is the look; the guard box stays as the damage zone.
+			guard.Transparency = 1
+			guard.CastShadow = false
+			if meshedSignCf then
+				moveSign(model, "PriceSign", meshedSignCf)
+			end
+		end, nil)
+	end
 	return model
 end
 
@@ -1057,7 +1178,7 @@ function MachineArt.BuildPlaner(planerId: string, ghost: boolean?): Model?
 	local tier = math.clamp(def.tier, 1, 4)
 	local d = layout.footprint.Y
 	local model = Kit.model(machine.id)
-	local skin = MachineSkin.Prepare(machine.id, preview)
+	local skin = MachineSkin.Prepare(machine.id, preview, true)
 	local frame = buildFrame(model, layout, preview, {
 		wall = PLANER_BODY[tier],
 		wallMaterial = PLANER_MATERIAL[tier],
@@ -1198,6 +1319,11 @@ function MachineArt.BuildPlaner(planerId: string, ghost: boolean?): Model?
 	model:SetAttribute("Price", machine.priceCash)
 	model:SetAttribute("Tier", def.tier)
 	model:SetAttribute("TierName", machine.tierName)
+	if skin == nil then
+		wearWhenLoaded(model, machine.id, preview, TIER_DECOR, function()
+			moveSign(model, "TierSign", ridgeSign(machine.id))
+		end, nil)
+	end
 	return model
 end
 
@@ -1682,7 +1808,7 @@ function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
 	local preview = ghost == true
 	local w, d = def.width, def.depth
 	local model = Kit.model(machine.id)
-	local skin = MachineSkin.Prepare(machine.id, preview)
+	local skin = MachineSkin.Prepare(machine.id, preview, true)
 	local meshed = skin ~= nil
 	local beltTop = DECK_TOP
 	local beltH = 0.32
@@ -1784,6 +1910,15 @@ function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
 	model:SetAttribute("MachineId", machine.id)
 	model:SetAttribute("Shop", machine.shop)
 	model:SetAttribute("Price", machine.priceCash)
+	if not meshed then
+		wearWhenLoaded(model, machine.id, preview, beltDecor(def.shape), nil, function()
+			if def.shape == "switch" then
+				-- The mesh paddle takes the side the part-built gate was set to.
+				local side = model:GetAttribute("GateSide")
+				MachineArt.SetSwitchSide(model, if side == -1 then -1 else 1)
+			end
+		end)
+	end
 	return model
 end
 

@@ -47,6 +47,7 @@ local SLOW_SPECS: { [string]: number } = {
 	["ForestServiceV2.spec.luau"] = 3,
 	["LandscapeStyle.spec.luau"] = 17,
 	["LogicService.spec.luau"] = 3,
+	["MachineSwap.spec.luau"] = 25,
 	["MapBuilder.spec.luau"] = 66,
 	["MonetizationService.spec.luau"] = 6,
 	["NPCService.spec.luau"] = 3,
