@@ -36,7 +36,6 @@ local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local JoinPickLogic = require(ReplicatedStorage.Shared.JoinPickLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
-local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local HudLayout = require(script.Parent.HudLayout)
 local HudNav = require(script.Parent.HudNav)
@@ -595,6 +594,7 @@ local function refresh()
 				QuestUI.JoyBeat()
 			end
 		end
+		local SoundData = require(ReplicatedStorage.Shared.SoundData) -- on use, as UITheme does
 		local tick = SoundData.StepTick(lastStep, index)
 		if tick and not skipped then
 			SoundData.Play(tick)

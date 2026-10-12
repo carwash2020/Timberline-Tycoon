@@ -29,7 +29,6 @@ local UserInputService = game:GetService("UserInputService")
 local DropControls = require(ReplicatedStorage.Shared.DropControls)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
-local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local DialogueUI = require(script.Parent.DialogueUI)
 local DragController = require(script.Parent.DragController)
@@ -229,6 +228,7 @@ local function watchContainer(container: Instance)
 	if container:IsA("Model") then
 		spawnedAt = os.clock()
 		container.ChildAdded:Connect(function(child: Instance)
+			local SoundData = require(ReplicatedStorage.Shared.SoundData) -- on use, as UITheme does
 			if SoundData.EquipPlays(child:IsA("Tool"), os.clock() - spawnedAt) then
 				SoundData.Play("Equip")
 			end

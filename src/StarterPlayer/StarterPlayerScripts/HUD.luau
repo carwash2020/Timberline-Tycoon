@@ -87,7 +87,6 @@ local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
 local PhoneHud = require(ReplicatedStorage.Shared.PhoneHud)
 local QuickMenuLogic = require(ReplicatedStorage.Shared.QuickMenuLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
-local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local GamepadNav = require(script.Parent.GamepadNav)
@@ -924,12 +923,15 @@ syncHint = refreshModal
 
 -- The setting can arrive after the HUD starts (the save loads), and the
 -- bar must come back when a tutorial step starts (SettingsLogic.TipsShown).
-player:GetAttributeChangedSignal("SettingShowTips"):Connect(function()
+local function watchTips()
+	player:GetAttributeChangedSignal("SettingShowTips"):Connect(function()
+		tipsOn = player:GetAttribute("SettingShowTips") ~= false
+		refreshModal()
+	end)
+	player:GetAttributeChangedSignal("TutorialStep"):Connect(refreshModal)
 	tipsOn = player:GetAttribute("SettingShowTips") ~= false
 	refreshModal()
-end)
-player:GetAttributeChangedSignal("TutorialStep"):Connect(refreshModal)
-tipsOn = player:GetAttribute("SettingShowTips") ~= false
+end
 
 -- A piece was picked up (DragController). After a couple, the "how to drag"
 -- hints stop showing.
@@ -2293,6 +2295,7 @@ function HUD.Start()
 
 	buildCash(playerGui)
 	buildBottomRow(gui)
+	watchTips()
 
 	-- The toasts' lane: top centre (the spec's y 44, under the top bar)
 	-- until placeToasts moves it clear of the corner and the left column.
@@ -2365,6 +2368,8 @@ function HUD.Start()
 		Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown, seconds: unknown)
 			if type(message) == "string" then
 				-- A completed purchase also chimes (never a refusal).
+				-- (SoundData is required on use: specs load the HUD without SoundService.)
+				local SoundData = require(ReplicatedStorage.Shared.SoundData)
 				local sound = SoundData.ForNotice(message)
 				if sound then
 					SoundData.Play(sound)
