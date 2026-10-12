@@ -1,7 +1,7 @@
 # V1 Studio checklist, open decisions and cross-lane findings
 
 Refreshed 12 October 2026 for main at `4ecfa51` (#159). Main now has #135 machine meshes, #136 backlog meshes, #138 NPCs,
-tutorial and goals, the Sparkworks shop in town (#144), the ButtonR2 removal (#143), grab on RT (#151) and the load, freeze and
+tutorial and goals, the Sparkworks shop in town (#144), the ButtonR2 removal (#143), grab on RT (#151), the four store interiors (#159 to #162) and the load, freeze and
 first-look fixes (#150 to #158). Nobody can run Studio from a session, so this is what Connor checks by hand. Each lane's
 own, longer checklist is in PHASE2_NOTES.md (the section name is in brackets).
 
@@ -36,17 +36,16 @@ Nothing below has been seen in Studio. Each line says what good looks like.
 9. **Mesh swap-in.** Good: the world appears first in plain parts, then shops, NPCs, trees and the machines pop to their real
    meshes over a few seconds with no hitch. `[MeshKit]` lines list a miss once per asset; the Glow Wire stays a plain bar
    (no GLB yet, silent by design). `[MapBuilder] meshes after the build:` ends with most meshes loaded.
-10. **Store interiors.** Only the Tool Shed is restyled on main; the other three are in open PRs, so check each one when it
-    lands. Good for all: warm beams and lanterns (never white), a sign over each table and a small sign over each group
+10. **Store interiors.** All four are on main (#159 with #160 to #162). Good for all: warm beams and lanterns (never white), a sign over each table and a small sign over each group
     readable from the door, every box on a coloured stand, aisle wide enough to carry a box, frame rate fine on Lower.
-    - **Tool Shed (on main):** "AXES & BELTS" and "MACHINES" headers, sub-signs AXES, BELT KIT, SAWMILLS, PLANERS & SAW;
+    - **Tool Shed:** "AXES & BELTS" and "MACHINES" headers, sub-signs AXES, BELT KIT, SAWMILLS, PLANERS & SAW;
       tier flags T2 to T8 on axes; on a new save the axes above the next one show a dark "NEEDS <axe>" chip and a grey stand;
       a CHECKOUT plaque on the counter; crates and barrels in the west back corner (parts first, then the real meshes).
-    - **Hearth & Home (open PR):** headers GEAR, BUILD PLANS, HOME PLANS, LAMPS; gear stands T3 to T5 with lock chips by
+    - **Hearth & Home:** headers GEAR, BUILD PLANS, HOME PLANS, LAMPS; gear stands T3 to T5 with lock chips by
       stage; side aisles still 3.2 studs.
-    - **Sparkworks (open PR):** "BELTS & INPUTS" and "LOGIC & OUTPUTS", five sub-signs over all 21 boxes, belts yellow and
+    - **Sparkworks:** "BELTS & INPUTS" and "LOGIC & OUTPUTS", five sub-signs over all 21 boxes, belts yellow and
       logic teal stands (no tier flags); Juno behind the counter; copper conduit on the walls.
-    - **Dealership (open PR):** a SHOWROOM board, a header per run of one kind (TRUCKS, TRAILERS), a sub-sign over each bay
+    - **Dealership:** a SHOWROOM board, a header per run of one kind (TRUCKS, TRAILERS), a sub-sign over each bay
       ("BED: 12 LOGS"), tier stripes on the aisle; the Logging Rig's crane pokes above the 15 stud ceiling (known).
 11. **Reduce flashing (this branch).** Settings, GAME tab: a REDUCE FLASHING row (44 px, ring on Xbox, B closes). Turn
     CAMERA SHAKE off: the row reads "ON (SHAKE OFF)". Force a storm in the Starter Forest: in the server command bar `workspace:SetAttribute("WeatherOverride", "Storm")`.

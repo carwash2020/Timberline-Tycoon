@@ -1,10 +1,10 @@
 # STATUS: read this first in a new session
 
 Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `4ecfa51` (#159).**
-Everything below marked as a branch is merged unless it says "draft PR" or "open". #135 (machine meshes), #136 (backlog
+Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
-(#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the Tool Shed store interior
-(#159). **What Connor checks in Studio right now, and every open decision with its default, are in
+(#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
+(#159, with #160 to #162). **What Connor checks in Studio right now, and every open decision with its default, are in
 `V1_STUDIO_CHECKLIST.md`** (top section and section D). Each lane's own longer checklist is in PHASE2_NOTES.md.
 
 **Merged to main (V1):** #118 A1 economy, saves and caps; #119 nature; #120 buildings, shops and props; #121 world; #122 axes,
@@ -15,10 +15,9 @@ tutorial, goals, HUD remake (Foreman Rook, the `Stage:S1` to `S8` events); #139 
 integration pass; #142 lightning finds open ground; #143 no ButtonR2; #144 Sparkworks shop; #145 moderation and policy; #146
 GrabService spec fix; #147 launch settings; #148 and #149 hardening; #150 client module load race; #151 grab on RT; #152
 first screen fix; #153 startup errors; #154 server audit (staged terrain, save prefetch); #155 client freeze; #156 meshes never
-block the build; #157 client audit; #158 world first look; #159 store interiors kit and the Tool Shed.
+block the build; #157 client audit; #158 world first look; #159 store interiors: the kit, Tool Shed, Hearth & Home, Sparkworks and Dealership (#160 to #162 squashed in).
 
-**Still open (draft PRs):** the other three store interiors (Hearth & Home, Sparkworks, Dealership, branches into the kit
-branch) and this branch (docs, CI pin, Reduce flashing).
+**Still open:** only this branch (docs, CI pin, Reduce flashing). All four store interiors (Tool Shed, Hearth & Home, Sparkworks, Dealership; #159 squashed #160 to #162 in) are on main, with `previews/store-interiors/`.
 
 **Stages:** with #138 on main the `Stage:S1` to `S8` keys are written (`MilestoneService.CheckStages`); the stage (`StageOf`)
 still also comes from the best axe and gear. S8 (Master Timber) is set only by its key: deriving it from a full plot is awaiting
