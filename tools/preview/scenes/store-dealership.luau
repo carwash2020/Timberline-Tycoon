@@ -66,6 +66,7 @@ return Store.scene({
 			phone = { pos = { -69, 9, -28.6 }, target = { -40, 8, 3 }, fov = 62 },
 			night = { pos = { -69, 9, -28.6 }, target = { -40, 8, 3 }, fov = 62 },
 			extra = {
+				{ pos = { -25, 4.5, 2 }, target = { -30, 1.6, -6.8 }, fov = 58, label = "a plinth's name sign" },
 				{ pos = { 0, 150, -20 }, target = { 0, 0, 0 }, fov = 62, label = "the hall from above" },
 				{ pos = { -58, 8, 6 }, target = { 30, 6, 0 }, fov = 70, label = "down the aisle" },
 				{ pos = { -62, 9, 4 }, target = { -64, 5, 25 }, fov = 72, label = "counter and keeper" },

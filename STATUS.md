@@ -27,6 +27,24 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Dealership sign spacing (branch `phase-2/dealership-sign-spacing`, follow-up to #180)
+
+Connor approved the #180 renders with "signs may be a little too close together and a little too much in abundance".
+Counted before: 16 hung boards inside (SHOWROOM, 5 TRUCKS/TRAILERS headers, 8 bed sub-signs, CHECKOUT board and a CHECKOUT
+plaque on the counter), 4 flags along the front wall, a swatch board, 17 hung lanterns; outside, 6 text signs (DEALERSHIP, a
+second TRUCKS & TRAILERS board over the windows, the door-end board, hours board, closed sign, a sandwich board). After: 6 hung
+boards inside (SHOWROOM, 4 headers, CHECKOUT), no interior flags, no swatch board, 9 hung lanterns; 4 text signs outside. What went:
+the 8 hung sub-signs (each plinth's own name sign, now bigger, carries the name and a second line with what it hauls, from
+`DealershipLot.BedText`), the repeated header for a kind that comes back later in a row (the plinths' name signs tell it),
+the counter plaque (CHECKOUT hangs lower now, under the SHOWROOM board's line of sight from the door, where it was cropped), the
+per-bay hung lanterns (each plinth has its own lamp post), the OfficeSign over the windows, the sandwich board (the hours board
+says it), the swatch board and the front-wall flags. Kept: SHOWROOM, TRUCKS and TRAILERS, CHECKOUT, the DEALERSHIP roof sign, the
+door-end board, tier T-flags, plinth name signs, hours and closed signs. Specs: 3 studs minimum between hung boards, no board in
+front of another from the door, a ceiling on hung boards (6) and on every sign on the building (12). No price, vehicle, tier or
+buying change. Renders `previews/store-polish/dealership-v2-*.png`.
+
+**No-overlap spec (`tests/DealershipOverlap.spec.luau`).** In 3D, on the building (inside and out), the lot and the vehicles: 1225 sign-group pairs, about 105,000 sign-part against structure/prop/vehicle pairs, about 83,000 prop/display/structure pairs, all with 0.05 tolerance. It found and fixed: the hours board stood 0.25 into the wall above the door and the canopy's near end pierced it (canopy now stands 0.7 off the wall, far end unchanged, `ShopFacade.AwningGap`), the lobby trash can overlapped a barrel (moved), and each plinth's aisle stripe ran under the box's accent block (stripe is now 0.3 wide at the very edge, `DealershipLot.StripeWidth`).
+
 ## Store polish: the Dealership (branch `phase-2/store-polish-dealership`, 12 October 2026)
 
 Connor's item 5. The Dealership stays its own building; nothing about buying, prices, stock, hidden Coming-soon items, StoreUI or

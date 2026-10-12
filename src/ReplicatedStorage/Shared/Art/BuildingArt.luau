@@ -24,7 +24,6 @@
 -- what stands on it, keeps its size: people still lean on it.
 
 local CollectionService = game:GetService("CollectionService")
-local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local RobuxShelf = require(script.Parent.Parent.RobuxShelf)
 local ShopHoursLogic = require(script.Parent.Parent.ShopHoursLogic)
 local StoreStock = require(script.Parent.Parent.StoreStock)
@@ -1487,21 +1486,11 @@ local function dealership(model: Model, title: string, accent: Color3)
 			MAT.Metal
 		)
 	end
-	signBoard(
-		model,
-		"OfficeSign",
-		CF(doorCx + 36, 12.2, -hz - T - 0.55),
-		24,
-		1.6,
-		"TRUCKS & TRAILERS",
-		TRIM,
-		dark,
-		dark,
-		false
-	)
+	-- (The second board over the windows, TRUCKS & TRAILERS, is gone: the door-end board
+	-- says it, and the signs seen through the glass were crowding it.)
 
 	-- The lobby (the west column): the counter against the back wall, facing
-	-- the door, the keeper behind it, the paint swatches on the wall above.
+	-- the door, the keeper behind it (the wall above is bare: the CHECKOUT board hangs in front).
 	local counterX, counterZ = -hx + BuildingArt.DealerLobbyCounterX, hz - BuildingArt.DealerCounterBack
 	placeCounter(model, counterX, counterZ)
 	-- The porch lantern hangs on the awning's east post (ShopFacade's awning: posts
@@ -1513,12 +1502,6 @@ local function dealership(model: Model, title: string, accent: Color3)
 		porchLight.Brightness = 1
 		porchLight.Range = 12
 		porchLight.Shadows = false
-	end
-	dBox(model, "SwatchBoard", V3(11, 3.2, 0.2), CF(counterX, 7.6, hz - 0.1), SIGN_BOARD)
-	local trucks = ItemCatalog.TruckList()
-	for i, truck in ipairs(trucks) do
-		local sx = counterX + (i - (#trucks + 1) / 2) * 1.8
-		dBox(model, "PaintSwatch", V3(1.4, 1.8, 0.14), CF(sx, 7.6, hz - 0.28), hex(truck.look.color), MAT.SmoothPlastic)
 	end
 	Kit.part(model, "ToolChest", V3(2.4, 2.6, 1.3), CF(-hx + 2.4, FLOOR + 1.3, hz - 2), hex("#C8402F"), MAT.Metal)
 	for i = 1, 3 do
@@ -2192,6 +2175,15 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		fitNameSign(sign)
 	end
 	addHoursBoard(model, kind)
+	if kind == "Dealership" then
+		-- The hours board stood 0.25 into the wall above the door: put it against the wall's face.
+		local board = model:FindFirstChild("HoursBoard")
+		if board and board:IsA("BasePart") then
+			local face = -DealershipLot.Hall().innerD / 2 - 0.8
+			local at = board.CFrame.Position
+			board.CFrame = CFrame.new(at.X, at.Y, face - board.Size.Z / 2)
+		end
+	end
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
 	if kind ~= "Dealership" and kind ~= "Sparkworks" then -- the hall has no uploaded mesh; its mesh is the old 20 x 16 demo building
 		TownMeshes.Dress(model, TownModels.ShopAsset(kind), { scale = BuildingArt.MeshStretch(kind) })

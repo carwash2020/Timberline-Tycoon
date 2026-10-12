@@ -107,9 +107,16 @@ return function(t)
 		end
 		-- the signs themselves
 		local model = interior()
-		local headers, subs = named(model, "HeaderSign"), named(model, "SubSign")
-		t.eq(#headers, #runs + 1, "a header per run, and SHOWROOM")
-		t.eq(#subs, #ItemBox.Showroom, "a sub-sign per vehicle")
+		local headers = named(model, "HeaderSign")
+		local labelled = 0
+		for _, run in ipairs(runs) do
+			if run.labelled then
+				labelled += 1
+			end
+		end
+		t.eq(#headers, labelled + 1, "a header per labelled run (the first of its kind in a row), and SHOWROOM")
+		t.ok(labelled < #runs, "a kind that comes back later in its row does not get a second header")
+		t.eq(#named(model, "SubSign"), 0, "no hung sub-signs: the plinth's name sign says what it hauls")
 		local sawTrucks, sawTrailers = false, false
 		for _, h in ipairs(headers) do
 			local text = textOf(h)
@@ -124,19 +131,144 @@ return function(t)
 			t.ok(h.Size.Y >= ShopKit.HeaderMinHeight, text .. " header is tall enough")
 		end
 		t.ok(sawTrucks and sawTrailers, "TRUCKS and TRAILERS are both there")
-		for _, s in ipairs(subs) do
-			local text = textOf(s)
-			t.ok(#text <= 16, text .. " fits one line")
-			local textH = math.min(0.84 * s.Size.Y, 0.88 * s.Size.X / (#text * 0.6))
-			t.ok(
-				ShopKit.TextPx(textH / 0.84, ShopKit.SubViewDist) >= ShopKit.MinTextPx,
-				text .. " is readable on a phone"
-			)
+		-- each plinth's own name sign carries the name and what it hauls, two short lines
+		local lot = DealershipLot.Build()
+		local signs = named(lot, "NameSign")
+		t.eq(#signs, #ItemBox.Showroom, "a name sign per vehicle")
+		for _, bay in ipairs(DealershipLot.Layout().bays) do
+			local found = false
+			for _, sign in ipairs(signs) do
+				local text = textOf(sign)
+				if text and string.find(text, "\n" .. Builder.SubText(bay.kind, bay.id), 1, true) then
+					found = found
+						or string.find(
+								text,
+								ItemCatalog.GetTruck(bay.id) and ItemCatalog.GetTruck(bay.id).displayName
+									or ItemCatalog.GetTrailer(bay.id).displayName,
+								1,
+								true
+							)
+							~= nil
+				end
+			end
+			t.ok(found, bay.id .. " has its name and bed text on one sign")
 		end
-		-- the checkout sign over the counter, and the plaque on its face
+		for _, sign in ipairs(signs) do
+			for line in string.gmatch(textOf(sign), "[^\n]+") do
+				t.ok(#line <= 16, line .. " fits one line")
+			end
+			t.ok(sign.Size.X >= 5, "the name sign is wide enough for two lines")
+		end
+		-- the checkout sign over the counter
 		t.eq(#named(model, "CheckoutSign"), 1, "the CHECKOUT board")
-		t.eq(#named(model, "CheckoutPlaque"), 1, "the CHECKOUT plaque")
+		t.eq(#named(model, "CheckoutPlaque"), 0, "one CHECKOUT sign, not a board and a plaque")
 		t.eq(#named(model, "KeeperMat"), 1, "the keeper's mat")
+	end)
+
+	-- Sign clutter (Connor: a little too close together and too many). Every hung board keeps
+	-- a clear gap from every other, none stands behind another from the door, and there are few.
+	local function boardsOf(model)
+		local out = {}
+		for _, p in ipairs(parts(model)) do
+			if p.Name == "HeaderSign" or p.Name == "CheckoutSign" or p.Name == "SubSign" then
+				table.insert(out, p)
+			end
+		end
+		return out
+	end
+
+	t.test("hung signs keep at least 3 studs between their edges", function()
+		local boards = boardsOf(interior())
+		t.ok(#boards >= 2)
+		local function gap(a, b)
+			local ax0, ax1, ay0, ay1, az0, az1 = aabb(a)
+			local bx0, bx1, by0, by1, bz0, bz1 = aabb(b)
+			local dx = math.max(bx0 - ax1, ax0 - bx1, 0)
+			local dy = math.max(by0 - ay1, ay0 - by1, 0)
+			local dz = math.max(bz0 - az1, az0 - bz1, 0)
+			return math.sqrt(dx * dx + dy * dy + dz * dz)
+		end
+		for i, a in ipairs(boards) do
+			for j = i + 1, #boards do
+				local g = gap(a, boards[j])
+				t.ok(
+					g >= 3,
+					string.format(
+						"%s %s and %s %s are %.1f apart",
+						a.Name,
+						textOf(a),
+						boards[j].Name,
+						textOf(boards[j]),
+						g
+					)
+				)
+			end
+		end
+	end)
+
+	t.test("from the door no hung sign stands in front of another (the door and phone views)", function()
+		local boards = boardsOf(interior())
+		-- the eye: the middle of the door, 9 studs up (the preview's door and phone view)
+		local doorCx = -frame.halfW - 0.4 + 0.75 + 7.5
+		local eye = { x = doorCx, y = 9, z = -frame.halfD - 0.4 }
+		local function rect(b)
+			local x0, x1, y0, y1, z0, z1 = aabb(b)
+			local lo = { yaw = math.huge, pitch = math.huge }
+			local hi = { yaw = -math.huge, pitch = -math.huge }
+			for _, x in ipairs({ x0, x1 }) do
+				for _, y in ipairs({ y0, y1 }) do
+					for _, z in ipairs({ z0, z1 }) do
+						local dx, dy, dz = x - eye.x, y - eye.y, z - eye.z
+						local yaw = math.atan2(dx, dz)
+						local pitch = math.atan2(dy, math.sqrt(dx * dx + dz * dz))
+						lo.yaw, hi.yaw = math.min(lo.yaw, yaw), math.max(hi.yaw, yaw)
+						lo.pitch, hi.pitch = math.min(lo.pitch, pitch), math.max(hi.pitch, pitch)
+					end
+				end
+			end
+			return lo, hi
+		end
+		for i, a in ipairs(boards) do
+			local alo, ahi = rect(a)
+			for j = i + 1, #boards do
+				local blo, bhi = rect(boards[j])
+				local overlap = alo.yaw < bhi.yaw
+					and blo.yaw < ahi.yaw
+					and alo.pitch < bhi.pitch
+					and blo.pitch < ahi.pitch
+				t.eq(overlap, false, textOf(a) .. " and " .. textOf(boards[j]) .. " overlap in the view from the door")
+			end
+		end
+	end)
+
+	t.test("few signs: a ceiling on the hung boards, and on every sign on the building", function()
+		local model = BuildingArt.Shop(KIND, KIND, Color3.fromRGB(47, 109, 181))
+		-- hung inside: SHOWROOM, TRUCKS and TRAILERS over each run, CHECKOUT
+		local hung = #boardsOf(model)
+		t.ok(hung <= 6, "hung boards: " .. hung)
+
+		-- every text sign in the shop (hung boards, the roof name sign, the door-end board,
+		-- the hours board and the closed sign): none beyond these
+		local allowed = {
+			HeaderSign = true,
+			CheckoutSign = true,
+			Sign = true,
+			EndSign = true,
+			HoursBoard = true,
+			DoorClosedSign = true,
+		}
+		local total = 0
+		for _, p in ipairs(parts(model)) do
+			if p:FindFirstChildOfClass("SurfaceGui") then
+				t.ok(allowed[p.Name] == true, "an unexpected sign: " .. p.Name)
+				total += 1
+			end
+		end
+		t.ok(total <= 12, "signs on the whole building: " .. total)
+		t.eq(#named(model, "OfficeSign"), 0, "no second TRUCKS & TRAILERS board over the windows")
+		t.eq(#named(model, "SandwichBoard"), 0, "no sandwich board: the hours board says it")
+		t.eq(#named(model, "SwatchBoard"), 0, "no swatch board behind the counter")
+		t.eq(#named(model, "FlagCloth"), 1, "one flag, by the door")
 	end)
 
 	t.test("the sub-signs say what each vehicle hauls, from the catalog", function()
@@ -583,7 +715,7 @@ return function(t)
 			end
 			return false
 		end
-		for _, name in ipairs({ "Planter", "AwningPost", "BenchLeg", "SandwichBoard", "ForecourtLampPost" }) do
+		for _, name in ipairs({ "Planter", "AwningPost", "BenchLeg", "ForecourtLampPost" }) do
 			t.ok(#named(model, name) > 0, name .. " is there")
 			for _, p in ipairs(named(model, name)) do
 				local x0, x1, y0, _, z0 = aabb(p)

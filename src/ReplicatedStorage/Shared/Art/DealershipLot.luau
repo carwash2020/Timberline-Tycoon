@@ -67,11 +67,13 @@ DealershipLot.BlockMargin = 0.25 -- the block is this much bigger than the box a
 -- post stands beside the box (the same parts as ShopKit.TierStand makes for a
 -- shelf: TierPost, TierBacking, TierFlag, and a LockChip when StoreTier.LockOf
 -- names a lock, none for a vehicle today).
+DealershipLot.NameSignSize = Vector3.new(6.0, 2.6, 0.3) -- the plinth's name sign: the name, and under it what it hauls
 DealershipLot.FlagSize = Vector3.new(3.4, 2.0, 0.2)
 DealershipLot.ChipSize = Vector3.new(5.0, 1.0, 0.16)
 DealershipLot.FlagYaw = math.rad(12) -- the flag is turned this far, so it never stands edge-on to the aisle
 DealershipLot.FlagHeight = 5.0 -- the flag's middle, above the plinth's top
 DealershipLot.BandHeight = 0.55
+DealershipLot.StripeWidth = 0.3 -- the aisle-edge stripe: at the very edge, clear of the box's block
 local BRASS = Color3.fromRGB(201, 162, 74)
 -- A display vehicle's Neon lenses are never near-white (ShopKit.NearWhite, luma 0.86): the live
 -- trucks' pale headlamp lens (#FFE9B0) blows out in a lit hall, so the display copy wears warm amber.
@@ -292,6 +294,21 @@ end
 -- The vehicle's name, which the sign beside it shows. Its price is not
 -- printed: aiming at the vehicle, its plinth or its box shows the price in a
 -- tag (Shared/HoverTag).
+-- What the vehicle hauls, the second line of its name sign (ShopLogic's own words for the
+-- shop card: "Bed: 12 logs", "No bed", "+12 bed space"). The hung sub-signs that used to say
+-- this over each bay are gone: one sign per plinth now carries the name and the bed.
+function DealershipLot.BedText(kind: string, id: string): string
+	if kind == "Truck" then
+		local truck = ItemCatalog.GetTruck(id)
+		if truck and truck.bedCapacity > 0 then
+			return string.format("BED: %d LOGS", truck.bedCapacity)
+		end
+		return "NO BED"
+	end
+	local trailer = ItemCatalog.GetTrailer(id)
+	return if trailer then string.format("+%d BED SPACE", trailer.extraCapacity) else "TRAILER"
+end
+
 local function nameOf(kind: string, id: string): string
 	local item = itemOf(kind, id)
 	return if item then item.displayName else id
@@ -435,8 +452,8 @@ function DealershipLot.Build(): Model
 		local stripe = Kit.part(
 			lot,
 			"PlinthStripe",
-			Vector3.new(bay.width - 0.6, 0.12, 0.6),
-			CFrame.new(cx, top + 0.06, cz + aisleSide * (bay.depth / 2 - 0.5)),
+			Vector3.new(bay.width - 0.6, 0.12, DealershipLot.StripeWidth),
+			CFrame.new(cx, top + 0.06, cz + aisleSide * (bay.depth / 2 - DealershipLot.StripeWidth / 2 - 0.02)),
 			color,
 			Enum.Material.SmoothPlastic
 		)
@@ -504,15 +521,19 @@ function DealershipLot.Build(): Model
 			local sign = Kit.part(
 				model,
 				"NameSign",
-				Vector3.new(4.2, 2.2, 0.3),
-				CFrame.new(cx + bay.width / 2 - 2.6, 1.1, cz + aisleSide * (bay.depth / 2 + 0.15)), -- on the floor, against the plinth's band
+				DealershipLot.NameSignSize,
+				CFrame.new(
+					cx + bay.width / 2 - DealershipLot.NameSignSize.X / 2,
+					DealershipLot.NameSignSize.Y / 2,
+					cz + aisleSide * (bay.depth / 2 + 0.15)
+				), -- on the floor, against the plinth's band
 				Color3.fromRGB(62, 42, 24),
 				Enum.Material.Wood
 			)
 			Kit.decor(sign, false)
 			Kit.signText(
 				sign,
-				nameOf(bay.kind, bay.id),
+				nameOf(bay.kind, bay.id) .. "\n" .. DealershipLot.BedText(bay.kind, bay.id),
 				Color3.fromRGB(245, 235, 215),
 				{ Enum.NormalId.Front, Enum.NormalId.Back }
 			)

@@ -4036,3 +4036,10 @@ Nothing here was seen in Studio. Check on PC, phone and Xbox (the swap is server
    panel buttons are still tappable (they are the same parts).
 6. Placement ghost: right after joining the ghost turns into the mesh at 0.45 see-through.
 
+
+## Dealership sign spacing (Studio checks)
+
+1. PC, phone, Xbox: from the door, TRUCKS and TRAILERS headers, SHOWROOM and CHECKOUT never overlap or crop each other; there are fewer hung boards, none within about 3 studs of another.
+2. All: each plinth's name sign shows the name and, under it, BED: n LOGS, NO BED or +n BED SPACE.
+3. All: no TRUCKS & TRAILERS board over the windows, no sandwich board, no flags along the inside front wall; the door-end board and the roof DEALERSHIP sign remain.
+4. Phone/Xbox: hover tags, the buy prompt and vehicle spawn work as before.
