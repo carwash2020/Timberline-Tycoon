@@ -1368,6 +1368,9 @@ end
 -- MapBuilder stands them in the hall). Nothing is parked outside. The
 -- lobby door is 14 wide and 11.5 tall. Its extents come from
 -- DealershipLot.Hall so the hall is always as big as the bays need.
+BuildingArt.EndSignWidth = 36 -- the board across the door end's wall (TRUCKS & TRAILERS: its words fit at full height)
+BuildingArt.ForecourtDepth = 5 -- the Dealership's paved apron, from the front wall out (the footprint spec allows 6)
+
 local function dealership(model: Model, title: string, accent: Color3)
 	local hall = DealershipLot.Hall()
 	local hx, hz = hall.innerW / 2, hall.innerD / 2
@@ -1501,10 +1504,10 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- the door, the keeper behind it, the paint swatches on the wall above.
 	local counterX, counterZ = -hx + BuildingArt.DealerLobbyCounterX, hz - BuildingArt.DealerCounterBack
 	placeCounter(model, counterX, counterZ)
-	for _, s in ipairs({ -1, 1 }) do
-		Kit.part(model, "PorchPost", V3(0.5, 8, 0.5), CF(doorCx + s * (7.5 + 1.4), 4, -hz - T - 2.2), TIMBER, MAT.Wood)
-	end
-	local porchGlow = Kit.lantern(model, CF(doorCx + 7.5 + 1.4, 7.2, -hz - T - 2.2), 0.8)
+	-- The porch lantern hangs on the awning's east post (ShopFacade's awning: posts
+	-- 9.3 either side of the door's middle, at the canopy's front edge), where a second
+	-- pair of porch posts used to stand beside them.
+	local porchGlow = Kit.lantern(model, CF(doorCx + 8.8, 7.2, -hz - T - ShopFacade.AwningReach + 0.4), 0.8)
 	local porchLight = porchGlow:FindFirstChildOfClass("PointLight")
 	if porchLight then
 		porchLight.Brightness = 1
@@ -1521,6 +1524,83 @@ local function dealership(model: Model, title: string, accent: Color3)
 	for i = 1, 3 do
 		dBox(model, "Drawer", V3(2.2, 0.12, 0.1), CF(-hx + 2.4, FLOOR + 0.6 * i, hz - 2.7), IRON, MAT.Metal)
 	end
+
+	-- The forecourt (store polish): a paved apron the length of the front, level with the
+	-- hall's floor, so the planters, bench, sandwich board, awning posts and doormat stand on
+	-- something (they were standing 0.4 over the lawn), with a blue kerb along its edge, a
+	-- pier of cream trim between the windows, a cornice under the roof's lip and a lamp post
+	-- every 24 studs (0.9 bright, 14 range: under ShopKit's caps).
+	local frontZ = -hz - T - 0.1
+	-- In two pieces with the door's walk left open between them (DealershipPath ends at the
+	-- door: nothing that collides may lie on it, and the walk stays level with the street).
+	local aprons = { { -hx - T - 3.5, doorX0 }, { doorX1, hx + T } }
+	for _, piece in ipairs(aprons) do
+		local x0, x1 = piece[1], piece[2]
+		-- (Looks only: it does not collide, so it never stands on a road or on grass the world
+		-- spec checks; the walk is level with the street and the paving is paint on top of it.)
+		dBox(
+			model,
+			"Forecourt",
+			V3(x1 - x0, FLOOR, BuildingArt.ForecourtDepth),
+			CF((x0 + x1) / 2, FLOOR / 2, frontZ - BuildingArt.ForecourtDepth / 2 + 0.1),
+			Kit.shade(CONCRETE, 0.12),
+			MAT.Concrete
+		)
+		dBox(
+			model,
+			"ForecourtKerb",
+			V3(x1 - x0, 0.14, 0.5),
+			CF((x0 + x1) / 2, FLOOR + 0.07, frontZ - BuildingArt.ForecourtDepth + 0.35),
+			accent,
+			MAT.SmoothPlastic
+		)
+	end
+	local pierH = H - 0.6 - FLOOR
+	for _, x in ipairs({ doorCx + 20, doorCx + 52, doorCx + 73, doorCx + 94, doorCx + 115, hx + T - 0.7 }) do
+		dBox(model, "Pier", V3(1.4, pierH, 0.5), CF(x, FLOOR + pierH / 2, -hz - T - 0.25), TRIM, MAT.WoodPlanks)
+	end
+	-- The ends: the door end faces the approach road from the spawn, so it reads from far
+	-- off: the accent stripe round the corner, and a board across the wall.
+	for _, e in ipairs({ -1, 1 }) do
+		dBox(
+			model,
+			"Stripe",
+			V3(0.3, 0.7, 2 * hz + 2 * T + 0.4),
+			CF(e * (hx + T + 0.1), H - 1.6, 0),
+			accent,
+			MAT.SmoothPlastic
+		)
+	end
+	signBoard(
+		model,
+		"EndSign",
+		CF(-hx - T - 0.25, 10.2, 0) * CFrame.Angles(0, math.pi / 2, 0), -- against the wall, facing the approach
+		BuildingArt.EndSignWidth,
+		3.6,
+		"TRUCKS & TRAILERS",
+		accent,
+		TRIM,
+		TRIM,
+		false
+	)
+	local roofLip = 2 * hx + 2 * T + 0.6
+	dBox(model, "Cornice", V3(roofLip, 0.6, 0.6), CF(0, H - 0.3, -hz - T - 0.3), TRIM, MAT.WoodPlanks)
+	dBox(model, "Cornice", V3(roofLip, 0.6, 0.6), CF(0, H - 0.3, hz + T + 0.3), TRIM, MAT.WoodPlanks)
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "Cornice", V3(0.6, 0.6, 2 * hz + 2 * T), CF(s * (hx + T + 0.3), H - 0.3, 0), TRIM, MAT.WoodPlanks)
+	end
+	for _, x in ipairs({ doorCx + 36, doorCx + 60, doorCx + 84, doorCx + 108, doorCx + 132 }) do
+		local lz = frontZ - BuildingArt.ForecourtDepth + 1.2
+		dBox(model, "ForecourtLampPost", V3(0.35, 6.2, 0.35), CF(x, FLOOR + 3.1, lz), dark, MAT.Metal)
+		local glow = Kit.lantern(model, CFrame.new(x, FLOOR + 6.9, lz), 1)
+		local lamp = glow:FindFirstChildOfClass("PointLight")
+		if lamp then
+			lamp.Brightness = 0.9
+			lamp.Range = 14
+			lamp.Shadows = false
+		end
+	end
+
 	local rng = Kit.rng(512)
 	-- A tyre stack (every tyre solid), by the toolchest.
 	for i = 1, 4 do
@@ -1976,6 +2056,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			wallTop = 15,
 			roofTop = 15.8,
 			groundY = 0.4,
+			matY = 0, -- the door's walk is left open in the forecourt: the mat lies on the street
 			accent = accent,
 		}
 	elseif kind == "Sparkworks" then

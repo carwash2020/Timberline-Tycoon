@@ -27,6 +27,31 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Store polish: the Dealership (branch `phase-2/store-polish-dealership`, 12 October 2026)
+
+Connor's item 5. The Dealership stays its own building; nothing about buying, prices, stock, hidden Coming-soon items, StoreUI or
+the purchase flow changed. **Connor's reference screenshots never arrived, so this was designed to the written brief** (and
+renders are the thing to approve). Audited the #162 build with `tools/preview` and a new geometry spec, then fixed what was real:
+
+- **Floating parts (found by the new spec).** The ceiling beams and rafters stopped 0.7 short of the walls; every hung sign, chain
+  and lantern ended 0.9 under the roof (in the air); the reception chair's backrest sat 0.2 off its seat; each vehicle's name sign
+  hovered 0.2 over the floor and 0.35 off its plinth. Beams and rafters now run into the walls (`Dealership.WallTuck`), every
+  chain runs to the roof's underside, the backrest touches the seat, the name sign stands on the floor against the plinth band.
+- **Clearance.** The Logging Rig's display copy topped out 0.1 under the beams (`MaxVehicleHeight` 12.4); now 12.0 (0.5 of air).
+  Display copy only; the gameplay truck, its stats and every price are untouched.
+- **Exterior** (`BuildingArt.dealership`): a paved forecourt (`Forecourt`, `ForecourtKerb`, 5 deep, two pieces with the door's walk left open and looks only (it does not collide), because `DealershipLot.spec` and `WorldPlan.spec` keep colliding parts off `DealershipPath`, roads and grass; the doormat lies on the street) level with the hall floor, so the
+  planters, bench, sandwich board, awning posts and doormat stand on something (they stood 0.4 over the lawn); six cream piers
+  between the windows, a cornice under the roof's lip, five forecourt lamp posts (0.9 / 14, under ShopKit's caps), the accent stripe
+  round all four sides, and a `TRUCKS & TRAILERS` board across the door end's wall (the end the approach road meets). The second pair
+  of porch posts is gone: the porch lantern hangs on the awning post.
+- **Specs** (`StoreInterior.Dealership.spec`): no floating parts for the interior, the whole hall and the lot's stands; every display
+  rests on its own plinth, one per vehicle; nothing hung touches a display vehicle; every display under the beams with 0.4 spare;
+  forecourt, end board (text fits, faces west, against the wall) and stripes. Moved: `MaxVehicleHeight` 12.4 to 12.0 (design
+  moved). Whole hall 384 parts (cap 400, interior 218 of its own 400, lot 528).
+- **Renders** in `previews/store-polish/dealership-*.png` (exterior front, 3/4, night, the door end, interior from the door, the
+  tier stand, the counter, phone size). The keeper's body does not draw in the preview (only his name tag), for every store.
+- **Awaiting Connor:** the reference screenshots (send them if the brief missed something); whether the lot lamps should be dimmer
+  or fewer.
 ## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
 
 The three pasted store image ids (91282142796474 Tow Service, 79037897236948 Timber Classic, 71028498113750 Paint Shop) may be Decal ids, which an ImageLabel cannot load by `rbxassetid://`. `Shared/StoreArt.ImageFor(id, size)` now returns `rbxthumb://type=Asset&id=<id>&w=<n>&h=<n>` (150 on the panel card, 420 on the world board) for a nonzero id and `""` for 0; `StoreUI` and `StoreBoard` use it, and the letter or mark fallback (failed load, id 0) is unchanged. No prices, sale flags or ids changed. Unverified: that the thumbnails render (needs Studio). `AssetIds.spec` allows the one rbxthumb literal in `StoreArt.luau` and still fails any other.

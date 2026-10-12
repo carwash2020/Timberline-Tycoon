@@ -58,6 +58,7 @@ Dealership.HeaderWidth = 9.2
 Dealership.SubWidth = 8.4
 Dealership.HeaderYaw = math.rad(90) -- a header faces the door end (west), so it reads from the lobby and down the aisle
 Dealership.SubYaw = math.rad(14) -- a sub-sign is turned a little to the aisle
+Dealership.WallTuck = 0.5 -- a beam or rafter runs this far past the interior frame, into the wall (the wall's face is 0.4 out)
 Dealership.TopY = 15.1 -- the highest part the interior adds (the beams' tops)
 
 ---------------------------------------------------------------------------
@@ -217,15 +218,22 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 
 	-- Warm timber beams across the hall and rafters along it. None over the
 	-- logging rig's crane (it stands tall at the back row, x 11 to 29).
-	ShopKit.Beams(model, frame, { zf + 6, zf + 17, midZ - 3.3, midZ + 6, zb - 1.5 })
+	-- The beams and rafters run into the walls (the kit's stop 0.7 short of them,
+	-- which leaves a timber hanging in the air in a hall this wide).
+	local into = Dealership.WallTuck
+	for _, z in ipairs({ zf + 6, zf + 17, midZ - 3.3, midZ + 6, zb - 1.5 }) do
+		dBox(model, "CeilingBeam", V3(2 * (frame.halfW + into), 0.9, 0.9), CF(0, ceil - 0.45, z), TIMBER)
+	end
 	for _, x in ipairs({ west + 19, cx - 6, east - 36, east - 8 }) do
-		ShopKit.Rafter(model, frame, x)
+		dBox(model, "CeilingRafter", V3(0.7, 0.7, 2 * (frame.halfD + into)), CF(x, ceil - 0.35, 0), TIMBER)
 	end
 
 	-- Signs: SHOWROOM over the lobby, a header over each run, a sub-sign over
 	-- each bay. `keepOut` lists what a lantern must stay clear of.
 	local keepOut: { { x0: number, x1: number, z0: number, z1: number } } = {}
-	local chainTop = ceil - 0.9
+	-- Every chain runs up to the roof's underside (the ceiling line), so a sign or a
+	-- lantern is welded to the roof and never hangs from nothing under it.
+	local chainTop = ceil
 	ShopKit.HeaderSign(model, {
 		cx = lobbyCx,
 		cy = Dealership.HeaderY,
@@ -286,7 +294,10 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 			end
 		end
 	end
-	ShopKit.CheckoutSign(model, frame, true)
+	-- (The kit hangs the board 0.9 under the frame's ceiling; this one runs its chains to the roof.)
+	local lower = table.clone(frame)
+	lower.ceilY = ceil + 0.9
+	ShopKit.CheckoutSign(model, lower, true)
 
 	-- Lanterns: six down the aisle, one over each bay at its aisle edge, three in
 	-- the lobby; every one is the family's warm capped lamp, and none hangs where a
@@ -328,7 +339,7 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 	dBox(model, "ReceptionTable", V3(3.6, 1.2, 2), CF(west + 4, fy + 0.6, zb - 24), TABLE_TOP, MAT.Wood)
 	for _, z in ipairs({ zb - 28, zb - 20 }) do
 		dBox(model, "ReceptionChair", V3(2, 1.2, 2), CF(west + 4, fy + 0.6, z), BLUE, MAT.Fabric)
-		dBox(model, "ReceptionChairBack", V3(0.4, 1.8, 2), CF(west + 2.6, fy + 1.5, z), BLUE, MAT.Fabric)
+		dBox(model, "ReceptionChairBack", V3(0.4, 1.8, 2), CF(west + 2.8, fy + 1.5, z), BLUE, MAT.Fabric)
 	end
 	plant(model, west + 1.8, fy, zf + 3, 1.4)
 	plant(model, west + lobbyW - 2, fy, zf + 3, 1.4)
