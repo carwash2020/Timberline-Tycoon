@@ -501,4 +501,38 @@ return function(t)
 			t.ok(py1 <= y0 + 1e-3, row[3] .. " plate is below the band")
 		end
 	end)
+
+	t.test(
+		"the General Store's wood look: a wood base and a slim walnut name card, the same box and the same name",
+		function()
+			local plain, plainBody = dressed("Blueprint", "WoodSign")
+			local wood, woodBody = dressed("Blueprint", "WoodSign", { wood = true })
+			t.eq(woodBody.Size, plainBody.Size, "the box is the same size")
+			local function find(model, name)
+				for _, p in ipairs(parts(model)) do
+					if p.Name == name then
+						return p
+					end
+				end
+				return nil
+			end
+			local plainBase, woodBase = find(plain, "Base"), find(wood, "Base")
+			t.eq(plainBase.Color, BoxLook.Accent("Blueprint", "WoodSign"), "other stores keep the accent floor")
+			t.eq(woodBase.Color, BoxArt.Wood.base, "wood: no coloured slab")
+			t.eq(woodBase.Size, plainBase.Size, "the base is the same size (nothing moves)")
+			local plainStrip, woodStrip = find(plain, "Strip"), find(wood, "Strip")
+			t.ok(
+				woodStrip.Size.X < plainStrip.Size.X and woodStrip.Size.Y < plainStrip.Size.Y,
+				"a slimmer, narrower card"
+			)
+			t.eq(woodStrip.Color, BoxArt.Wood.card)
+			local label
+			for _, d in ipairs(woodStrip:GetDescendants()) do
+				if d:IsA("TextLabel") then
+					label = d
+				end
+			end
+			t.eq(label.Text, "Item", "the name is still on it")
+		end
+	)
 end

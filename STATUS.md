@@ -130,11 +130,18 @@ Connor's fixes after the #183 renders. No price, on/off-sale or buy-flow change 
 - **Room fill:** two wall shelf units (jars, books, baskets), four framed pictures, a rug in the east nook, two more plants.
 - **Event room** (#185 `ShopEventKit`): the roped zone (16 x 9, back west corner, back against the wall) and the banner (front west
   corner, off the doorway aisle).
-- **Parts:** the whole shop is 444 (cap 350 to 450: the event room is 34 of it). Interior budget unchanged (400).
+- **Parts:** the whole shop is 451 (cap 350 to 460: the event room is 34 of it). Interior budget unchanged (400).
 - **Specs:** `StoreOverlap.HearthAndHome` (families for every new part, plus a guard that no new name is unchecked),
   `StoreInterior.HearthAndHome` (tables, cards, lock cards, spots, `DisplayTable`), `BuildingArt` (box on its table, cap 450).
 - **Renders:** `previews/store-polish/hearth-v3-*.png` (exterior front, three-quarter, night, door close-up, interior from the door,
   table close-up, counter and CHECKOUT, phone 667x375). Not seen in Studio.
+- **v4 (Connor's review of the v3 renders):** the coloured slab under each box was BoxArt's accent floor; scoped to Hearth & Home only
+  with `BoxArt` `spec.wood` (BoxService and the preview pass it for the General Store's boxes): a wood base board of the same size and a
+  slim walnut name card (0.36 tall, 74% of the box width) instead of the accent floor and band; box size, hover tag, prompts and focus
+  are identical, and no other store's boxes change. The display tables are oak (colours that show in the preview), a thick top with a
+  cream trim along its front edge, two legs to the floor under each table's front corners, tables stepping up and meeting; the unit's
+  solid core stays as an invisible collider. `store-hearth-event` scene shows the event zone and banner active; the banner now faces
+  into the room (it faced the wall). Parts 451 (cap 460). Renders: `previews/store-polish/hearth-v4-*.png`.
 - **Awaiting Connor:** (1) placing the Shed costs the $240 kit fee on top of the $600 plan (default: the kit rule); (2) the Lantern and
   Flashlight have no held model in the game, so their held slot path waits for a held-gear feature; (3) the blue under each box is
   the box's own accent floor (BoxArt, shared by every store), not a plinth; (4) parts 444 against the old 350 cap.

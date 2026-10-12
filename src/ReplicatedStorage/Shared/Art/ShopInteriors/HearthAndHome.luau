@@ -138,7 +138,6 @@ end
 
 local JAR = { hex("#7FB7A4"), hex("#D9A441"), hex("#B5594A"), hex("#9DB87A") }
 local BASKET = hex("#B88A4E")
-local BOOKS = { hex("#8E3426"), hex("#2F5D3A"), hex("#3A5E8C"), hex("#C9A24A") }
 
 -- A wall shelf unit on a side wall (x is the wall's inner face, `side` -1 west / +1 east): a back panel, two boards
 -- and what stands on them (jars, books, baskets). Looks only; z0..z1 is its length along the wall.
@@ -171,36 +170,15 @@ local function wallShelves(
 	put("NookJar", V3(0.7, 1.1, 0.7), top1, -0.9 * u, JAR[1 + seed % 4], MAT.Glass)
 	put("NookJar", V3(0.7, 0.8, 0.7), top1, 0.9 * u, JAR[1 + (seed + 1) % 4], MAT.Glass)
 	put("NookBasket", V3(0.95, 0.95, 1.5), top1, 3 * u, BASKET, MAT.Wood)
-	-- upper board: two books lying, a jar, a jar
-	put("NookBook", V3(0.8, 0.28, 1.3), top2, -3 * u, BOOKS[1 + seed % 4], MAT.Wood)
-	put("NookBook", V3(0.7, 0.26, 1.1), top2 + 0.28, -3 * u, BOOKS[1 + (seed + 2) % 4], MAT.Wood)
-	put("NookJar", V3(0.65, 1.0, 0.65), top2, -0.3 * u, JAR[1 + (seed + 2) % 4], MAT.Glass)
-	put("NookJar", V3(0.65, 0.7, 0.65), top2, 2.2 * u, JAR[1 + (seed + 3) % 4], MAT.Glass)
+	-- upper board: two jars
+	put("NookJar", V3(0.65, 1.0, 0.65), top2, -1.5 * u, JAR[1 + (seed + 2) % 4], MAT.Glass)
+	put("NookJar", V3(0.65, 0.7, 0.65), top2, 1.5 * u, JAR[1 + (seed + 3) % 4], MAT.Glass)
 end
 
 -- A framed picture flat on a wall facing -Z (the back wall): a wood frame and a canvas just proud of it.
-local function picture(
-	model: Model,
-	x: number,
-	y: number,
-	wallZ: number,
-	w: number,
-	h: number,
-	canvas: Color3,
-	kind: number
-)
+local function picture(model: Model, x: number, y: number, wallZ: number, w: number, h: number, canvas: Color3)
 	dBox(model, "PictureFrame", V3(w, h, 0.2), CF(x, y, wallZ - 0.1), TABLE)
 	dBox(model, "PictureArt", V3(w - 0.5, h - 0.5, 0.1), CF(x, y, wallZ - 0.22), canvas, MAT.SmoothPlastic)
-	if kind == 1 then
-		-- a hill under a sky: one more block on the canvas
-		dBox(
-			model,
-			"PictureArt",
-			V3(w - 0.5, (h - 0.5) * 0.4, 0.08),
-			CF(x, y - (h - 0.5) * 0.3, wallZ - 0.27),
-			hex("#5E8A4E")
-		)
-	end
 end
 
 -- The room's furnishings beyond the stock: wall shelves with jars, books and baskets, framed pictures on the back
@@ -211,10 +189,10 @@ function Hearth.Dressing(model: Model, frame: Frame)
 	wallShelves(model, -frame.halfW, -1, 6.4, 14.8, 5.2, 0)
 	wallShelves(model, frame.halfW, 1, -3.4, 12.4, 5.2, 1)
 	local backZ = frame.halfD
-	picture(model, -13.2, 12.0, backZ, 3.4, 2.4, hex("#9CC3D8"), 1)
-	picture(model, 13.2, 12.0, backZ, 3.4, 2.4, hex("#E0B77A"), 1)
-	picture(model, -19.6, 12.0, backZ, 2.6, 2.6, hex("#C98B7B"), 0)
-	picture(model, 19.6, 12.0, backZ, 2.6, 2.6, hex("#8DB08A"), 0)
+	picture(model, -13.2, 12.0, backZ, 3.4, 2.4, hex("#9CC3D8"))
+	picture(model, 13.2, 12.0, backZ, 3.4, 2.4, hex("#E0B77A"))
+	picture(model, -19.6, 12.0, backZ, 2.6, 2.6, hex("#C98B7B"))
+	picture(model, 19.6, 12.0, backZ, 2.6, 2.6, hex("#8DB08A"))
 	-- a rug in the east nook, by the crates
 	dBox(model, "NookRug", V3(7.4, 0.06, 4.4), CF(19.0, fy + ShopKit.Layer[2], 11.6), hex("#3E5F7A"), MAT.Fabric)
 	dBox(model, "NookRugEdge", V3(6.4, 0.07, 3.4), CF(19.0, fy + ShopKit.Layer[3], 11.6), hex("#D9C28A"), MAT.Fabric)
@@ -276,8 +254,6 @@ function Hearth.Build(model: Model, frame: Frame)
 	-- (the side aisles: one lamp each side at z -2.2; the spots over the tables light the rest, and the part budget is tight)
 	ShopKit.WarmLamp(model, -15.6, ceil - 3.4, -2.2, lampTop)
 	ShopKit.WarmLamp(model, 15.6, ceil - 3.4, -2.2, lampTop)
-	ShopKit.WarmLamp(model, -2.6, ceil - 3.4, -9, lampTop)
-	ShopKit.WarmLamp(model, 2.6, ceil - 3.4, -9, lampTop)
 	ShopKit.WarmLamp(model, -4.2, ceil - 3.4, 3, lampTop) -- (4.2 out: from the door these stay clear of the name board over the counter)
 	ShopKit.WarmLamp(model, 4.2, ceil - 3.4, 3, lampTop)
 	-- Over the counter end and the back corners, so no corner is dark.
@@ -323,7 +299,7 @@ function Hearth.Build(model: Model, frame: Frame)
 	-- the island, the back-room door and the counter); and the event banner in the front west corner, off the doorway
 	-- aisle, facing the door.
 	ShopEventKit.BuildZone(model, "HearthAndHome", CF(-14.6, fy, 15.8), V3(16, 0, 9))
-	ShopEventKit.BuildBanner(model, "HearthAndHome", CF(-15.6, fy, -19.6), 4.4)
+	ShopEventKit.BuildBanner(model, "HearthAndHome", CF(-15.6, fy, -19.6) * CFrame.Angles(0, math.pi, 0), 4.4)
 end
 
 return Hearth

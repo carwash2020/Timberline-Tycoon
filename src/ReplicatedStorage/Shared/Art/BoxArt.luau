@@ -48,6 +48,16 @@ export type Spec = {
 	gold: boolean?, -- a Robux box: RobuxBoxArt's open crate of coins (Lane P)
 	robuxKey: string?, -- the Robux item's key (its coin pile)
 	side: string?, -- "Left" | "Right": the side facing the aisle gets a window too
+	wood: boolean?, -- the General Store's look (Hearth & Home only): a wood base board flush under the box and a slim walnut name card, instead of the accent floor and band. Same box size, hover tag and focus.
+}
+
+-- The wood look: the base board and the name card (see Spec.wood).
+BoxArt.Wood = {
+	base = Color3.fromRGB(122, 84, 50),
+	card = Color3.fromRGB(58, 38, 24),
+	ink = Color3.fromRGB(243, 231, 201),
+	stripH = 0.36,
+	cardShare = 0.74, -- the card is this share of the box's width
 }
 
 BoxArt.Charcoal = BoxLook.Charcoal
@@ -155,7 +165,8 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	local wallColor = if gold then BoxLook.CharcoalGold else BoxLook.Charcoal
 	local ink = BoxLook.InkOn(accent)
 	local t, floor = L.wall, BoxSize.Floor
-	local stripH = L.stripH
+	local wood = spec.wood == true
+	local stripH = if wood then BoxArt.Wood.stripH else L.stripH
 	body.Transparency = 1
 	body.CastShadow = false
 	local added: { BasePart } = {}
@@ -172,12 +183,12 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 			"Base",
 			Vector3.new(W + 2 * L.edge, floor, D + 2 * L.edge),
 			Vector3.new(0, -H / 2 + floor / 2, 0),
-			accent,
-			Enum.Material.SmoothPlastic
+			if wood then BoxArt.Wood.base else accent,
+			if wood then Enum.Material.Wood else Enum.Material.SmoothPlastic
 		)
 	)
 	if spec.tier and spec.tier ~= "" then
-		write(base, Enum.NormalId.Front, spec.tier, ink, Enum.Font.GothamBold)
+		write(base, Enum.NormalId.Front, spec.tier, if wood then BoxArt.Wood.ink else ink, Enum.Font.GothamBold)
 	end
 
 	-- The walls: dark, from the floor to the top, flush with the box. The
@@ -276,13 +287,13 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 			parent,
 			body,
 			"Strip",
-			Vector3.new(W, stripH, L.stripProud),
+			Vector3.new(if wood then W * BoxArt.Wood.cardShare else W, stripH, L.stripProud),
 			Vector3.new(0, H / 2 - stripH / 2, -(D / 2 + L.stripProud / 2)),
-			accent,
-			Enum.Material.SmoothPlastic
+			if wood then BoxArt.Wood.card else accent,
+			if wood then Enum.Material.Wood else Enum.Material.SmoothPlastic
 		)
 	)
-	write(strip, Enum.NormalId.Front, spec.name, ink, Enum.Font.FredokaOne)
+	write(strip, Enum.NormalId.Front, spec.name, if wood then BoxArt.Wood.ink else ink, Enum.Font.FredokaOne)
 
 	-- A brass plate under the name band, on the left. It used to sit on
 	-- the band and covered the name. This is the one spare shell part
@@ -293,7 +304,7 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	local logoH = 0.3
 	local gap = 0.06
 	local stripFront = -(D / 2 + L.stripProud)
-	local stripBottom = H / 2 - L.stripH
+	local stripBottom = H / 2 - stripH
 	add(plate(
 		parent,
 		body,

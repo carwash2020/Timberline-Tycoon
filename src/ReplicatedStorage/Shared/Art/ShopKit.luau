@@ -152,7 +152,7 @@ function ShopKit.SteppedUnit(
 		local w = lane.x1 - lane.x0
 		local cx = (lane.x0 + lane.x1) / 2
 		local bodyH = lane.y - STEP_SLAB - frame.floorTop
-		Kit.part(
+		local core = Kit.part(
 			parent,
 			name,
 			V3(w - 0.4, bodyH, hi - lo - 0.4),
@@ -160,6 +160,11 @@ function ShopKit.SteppedUnit(
 			body,
 			MAT.WoodPlanks
 		)
+		if asTable then
+			-- (the solid core stays as the collider so nobody walks through the unit, but you see the tables on their legs)
+			core.Transparency = 1
+			core.CastShadow = false
+		end
 		for r = 1, last do
 			local row = rows[r]
 			if row == nil then
@@ -167,6 +172,16 @@ function ShopKit.SteppedUnit(
 			end
 			local z0 = if r == 1 then lo else row.lo - STEP_GAP
 			local z1 = if r == last then hi else row.hi + STEP_GAP
+			if asTable and r < last then
+				-- (the tables meet: each one's back rests against the front of the next, a step higher)
+				for n = r + 1, last do
+					local nextRow = rows[n]
+					if nextRow then
+						z1 = nextRow.lo - STEP_GAP
+						break
+					end
+				end
+			end
 			local base = lane.y - STEP_SLAB
 			local thick = row.surface - base
 			if asTable then
@@ -178,8 +193,10 @@ function ShopKit.SteppedUnit(
 					width = w,
 					depth = z1 - z0,
 					topY = row.surface + StoreStock.PlinthHeight,
-					topThick = thick + StoreStock.PlinthHeight, -- one thick plank top from the unit's body to where the boxes stand
+					topThick = thick + StoreStock.PlinthHeight, -- one thick oak top from the unit's body line to where the boxes stand
 					apronH = 0,
+					legs = 2, -- a leg under each front corner; each table's back rests on the next one (the last one on the unit's hidden core)
+					floorY = frame.floorTop,
 				}
 				ShopKit.DisplayTable(parent, tableSpec)
 				for _, place in ipairs(placements) do
@@ -653,9 +670,9 @@ end
 
 -- The wood a display table is made of: a light plank top, a dark apron, a cream trim.
 ShopKit.TableWood = {
-	top = hex("#D6AD78"),
-	apron = TIMBER,
-	trim = hex("#EBDDBB"),
+	top = hex("#B7813F"), -- oak: reads as wood in the preview too (WoodPlanks shows only in Studio)
+	apron = hex("#6A4526"),
+	trim = hex("#F2E5C3"),
 } :: { [string]: Color3 }
 
 ShopKit.TableOverhang = 0.12 -- the top reaches this far past the apron on every side
@@ -670,7 +687,7 @@ export type TableSpec = {
 	spots: number?, -- how many items it carries (2 or 3 is the design; 1 for an odd row)
 	topThick: number?, -- default 0.3
 	apronH: number?, -- the dark band under the top (default 0.5; 0 for none, when the top is thick enough to stand on the unit below)
-	legs: number?, -- with `floorY`, this many stud-wide legs from the floor to the apron (4 for a free-standing table)
+	legs: number?, -- with `floorY`: 2 = a leg under each front corner (a table whose back rests on the next one), 4 = all four corners
 	floorY: number?,
 	solid: boolean?, -- the top collides (default true); the apron, trim and legs never do
 	name: string?,
@@ -712,11 +729,13 @@ function ShopKit.DisplayTable(parent: Instance, s: TableSpec): TableParts
 			ShopKit.TableWood.apron
 		)
 	end
+	-- (the cream trim runs along the top of the front edge; a thick top shows its oak below it, like an apron)
+	local trimH = math.min(thick, 0.28)
 	local trim = dBox(
 		parent,
 		name .. "Trim",
-		V3(width, thick, 0.1),
-		CF(s.cx, topMid, s.cz - s.depth / 2 - 0.05),
+		V3(width, trimH, 0.1),
+		CF(s.cx, s.topY - trimH / 2, s.cz - s.depth / 2 - 0.05),
 		ShopKit.TableWood.trim
 	)
 	local legs: { Part } = {}
@@ -725,16 +744,18 @@ function ShopKit.DisplayTable(parent: Instance, s: TableSpec): TableParts
 		local h = bottom - s.floorY
 		for _, sx in ipairs({ -1, 1 }) do
 			for _, sz in ipairs({ -1, 1 }) do
-				table.insert(
-					legs,
-					dBox(
-						parent,
-						name .. "Leg",
-						V3(0.5, h, 0.5),
-						CF(s.cx + sx * (width / 2 - 0.45), s.floorY + h / 2, s.cz + sz * (s.depth / 2 - 0.45)),
-						ShopKit.TableWood.apron
+				if sz == -1 or s.legs >= 4 then
+					table.insert(
+						legs,
+						dBox(
+							parent,
+							name .. "Leg",
+							V3(0.6, h, 0.6),
+							CF(s.cx + sx * (width / 2 - 0.5), s.floorY + h / 2, s.cz + sz * (s.depth / 2 - 0.5)),
+							ShopKit.TableWood.apron
+						)
 					)
-				)
+				end
 			end
 		end
 	end

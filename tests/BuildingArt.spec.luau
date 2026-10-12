@@ -290,8 +290,8 @@ return function(t)
 			-- General Store: the same kit (tier stands, signs, ties, lamps, stock corner) takes its whole shop from 250 to 302 parts (interior 189, its own 400 budget in StoreInterior.HearthAndHome.spec); cap 250 to 350.
 			-- General Store restyle (display tables with price cards and spots, door frame, striped awning, wall shelves with
 			-- jars, books and baskets, pictures, a rug, plants) plus the event expansion room (zone and banner, about 34 parts,
-			-- ShopEventKit): the whole shop is about 440 parts; cap 350 to 450.
-			local budget = ({ ToolShed = 400, HearthAndHome = 450, Dealership = 400 })[shop.kind]
+			-- ShopEventKit): the whole shop is about 450 parts; cap 350 to 460 (tables on legs, oak tops).
+			local budget = ({ ToolShed = 400, HearthAndHome = 460, Dealership = 400 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do

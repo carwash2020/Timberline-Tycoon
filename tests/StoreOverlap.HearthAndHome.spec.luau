@@ -43,6 +43,7 @@ return function(t)
 		TableTop = "unit",
 		TableTrim = "unit",
 		TableApron = "unit",
+		TableLeg = "unit",
 		SpotTag = "spottag",
 		SpotChain = "lamp",
 		SpotShade = "lamp",
