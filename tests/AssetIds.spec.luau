@@ -58,7 +58,16 @@ return function(t)
 						and not string.find(text, "assetdelivery", 1, true),
 					where_ .. " uses an asset-delivery URL: " .. text
 				)
-			elseif string.sub(text, 1, 7) == "rbxthumb" then
+			elseif
+				string.sub(text, 1, 8) == "rbxthumb"
+				and lit.path == "src/ReplicatedStorage/Shared/StoreArt.luau"
+				and string.find(text, "type=Asset&id=", 1, true)
+			then
+				-- The one sanctioned use: StoreArt shows a store card's picture through the
+				-- asset thumbnail, which renders a Decal id or an Image id alike (the pasted
+				-- store ids are not known to be Image ids). Everywhere else still fails.
+				continue
+			elseif string.sub(text, 1, 8) == "rbxthumb" then
 				t.ok(false, where_ .. " uses rbxthumb, which loads a thumbnail, not the asset: " .. text)
 			elseif text == "rbxassetid://" then
 				-- A prefix that is joined to an id ("rbxassetid://" .. tostring(id)); fine.

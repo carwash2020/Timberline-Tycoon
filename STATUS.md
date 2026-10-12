@@ -34,6 +34,10 @@ Connor's reference screenshots for this item were never received; this is built 
 - Added to the street side (`ShopFacade`, `BuildingArt.toolShed`): two lit windows with shutters in each long wall, a lantern on the west porch post, a two-stone flagstone path from the doormat. About 25 parts: the whole shop is 383, cap 400.
 - `StoreInterior.ToolShed.spec` gained: nothing the interior adds pokes through the roof, no floating parts in the whole shop (0.05 tolerance), and the street-side dressing. Renders: `previews/store-polish/toolshed-*.png`; scenes `store-toolshed` (interior) and the new `store-toolshed-exterior`.
 
+## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
+
+The three pasted store image ids (91282142796474 Tow Service, 79037897236948 Timber Classic, 71028498113750 Paint Shop) may be Decal ids, which an ImageLabel cannot load by `rbxassetid://`. `Shared/StoreArt.ImageFor(id, size)` now returns `rbxthumb://type=Asset&id=<id>&w=<n>&h=<n>` (150 on the panel card, 420 on the world board) for a nonzero id and `""` for 0; `StoreUI` and `StoreBoard` use it, and the letter or mark fallback (failed load, id 0) is unchanged. No prices, sale flags or ids changed. Unverified: that the thumbnails render (needs Studio). `AssetIds.spec` allows the one rbxthumb literal in `StoreArt.luau` and still fails any other.
+
 ## Asset audit (branch `phase-2/audit-assets`, 12 October 2026)
 
 `ASSETS.md` (generated: `lune run tools/assets`, kept current by `check.sh`) lists every asset id in the source with its use and
@@ -42,9 +46,17 @@ by `tests/AssetIds.spec.luau`: id format and length per kind, no URL or zero ids
 MeshId), unique containers, mesh sharing only Blender-to-Backlog, well-formed MeshTemplates. The four machines that stayed
 part-built in Connor's log (SmeltingFurnace, Prospector, OreChute, CraftBench) had correct ids; they were built at server start
 outside `MeshKit.Attempt`, so a mesh that was not in yet was final. `MiningArt` now swaps the mesh in when it lands, and
-`MachineSkin.Prepare` asks for every piece at once so a five-piece machine is dressed in one round. **Open:** plot machines
-built through `MachineArt` (sawmills, planers, chop saw, belts) have the same gap if built before their meshes are cached
-(needs PlotService to re-dress); the Creator Hub checks for Connor are at the end of `ASSETS.md`.
+`MachineSkin.Prepare` asks for every piece at once so a five-piece machine is dressed in one round. **Plot machines (13 October 2026,
+branch `phase-2/plot-machines-swap-meshes`):** the same gap on `MachineArt` (sawmills, planers, chop saw, belts) is closed: a
+machine built before its meshes are cached is part-built and usable at once, then `MeshKit.Attempt` swaps the mesh in place
+(`MachineArt.wearWhenLoaded`; same gameplay part instances, pivot kept after a move, a failed load keeps the part build with one
+log line, a destroyed machine is dropped). `tests/MachineSwap.spec` pins it for every kind. The Sky Bin has no mesh entry in
+`MachineMeshes`, so there is nothing to swap. Nothing seen in Studio. The Creator Hub checks for Connor are at the end of `ASSETS.md`.
+
+**Asset check tool (branch `phase-2/asset-check-tool`).** No id has been checked on Roblox (sandbox blocked). Connor runs
+`scripts\check-assets.ps1` on Windows (steps in `ASSETS.md`): it reads `tools/asset-ids.json` (written by `tools/assets`), asks
+`economy.roblox.com/v2/assets/<id>/details` for each id, and writes `ASSETS-CHECK.md` / `.csv` (type, owner, will it load, must-fix
+list, the four machine meshes first). Read-only. Pinned by `tests/AssetCheckTool.spec.luau`. **Open:** run it and bring back the table.
 
 ## Server boot and runtime audit (branch `phase-2/audit-server-boot`, 12 October 2026)
 
