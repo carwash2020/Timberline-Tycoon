@@ -81,7 +81,7 @@ DealershipLot.MaxNeonLuma = 0.86
 -- FloorY and the plinth PlinthHeight, less a little air. The Logging Rig's
 -- crane and stacks stand 15.8 tall, so its display copy (never the gameplay
 -- truck) is scaled down to fit; every other vehicle is already under this.
-DealershipLot.MaxVehicleHeight = 12.4
+DealershipLot.MaxVehicleHeight = 12.0
 DealershipLot.DisplayLens = Color3.fromRGB(255, 205, 125)
 
 -- The vehicles on show: ItemBox.Showroom, the one list.
@@ -505,7 +505,7 @@ function DealershipLot.Build(): Model
 				model,
 				"NameSign",
 				Vector3.new(4.2, 2.2, 0.3),
-				CFrame.new(cx + bay.width / 2 - 2.6, 1.3, cz + aisleSide * (bay.depth / 2 + 0.5)),
+				CFrame.new(cx + bay.width / 2 - 2.6, 1.1, cz + aisleSide * (bay.depth / 2 + 0.15)), -- on the floor, against the plinth's band
 				Color3.fromRGB(62, 42, 24),
 				Enum.Material.Wood
 			)

@@ -4010,3 +4010,14 @@ Studio checks:
 After #168 (auto-loads off first): the gaps that were left. GameServer put a character back on its pad if it falls below y = -200 (Shared/VoidRescue, three times per character at most, never a kill), streams the pad's ground before every respawn, and the bare steps between the save and the character are guarded so one error cannot leave a player with no character. Gates, loading card and Studio default spawn were read and are fine (tests/LoadPathAudit.spec).
 
 Studio checks: PC: press Play, no falling or dying while loading; walk into the Deep mine (still no rescue); in Studio run `game.Players.<you>.Character:PivotTo(CFrame.new(0,-300,0))` in the server console and you are put back on the pad with a warn line. Phone and Xbox: join, die once (axe a hazard or reset), respawn on the pad without falling.
+
+## Store polish: Dealership (Studio checks)
+
+Design to the written brief (Connor's reference screenshots were never received). Renders: `previews/store-polish/dealership-*.png`.
+
+1. PC: walk up the approach road to the Dealership. Good: a blue TRUCKS & TRAILERS board across the door-end wall, a paved forecourt with lamp posts and cream piers along the glass, planters and bench on paving, the porch lantern on the awning post.
+2. PC: walk through the door (the doormat and walk stay level with the street). Good: no step trouble, the door still opens and shuts on the keeper's hours.
+3. PC, phone, Xbox: from the door look down the aisle. Good: TRUCKS and TRAILERS headers and the bed sub-signs read, nothing hangs from nothing, no vehicle touches a beam or a sign, the Logging Rig clears the beams.
+4. Phone (667x375) and Xbox: walk to a bay, the T-flag and box hover tags still appear, the buy prompt works as before, a bought vehicle spawns as before.
+5. Night: forecourt lamps and showroom lanterns glow warm, none blinding.
+6. PC: walk onto the forecourt paving by the planters. The paving does not collide (street level), so your feet sit a little low in it; tell Connor if that looks wrong (the fix is paint on the terrain in WorldLayout).

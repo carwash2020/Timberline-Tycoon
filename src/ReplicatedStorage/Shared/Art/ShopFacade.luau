@@ -27,10 +27,12 @@ export type Spec = {
 	wallTop: number, -- the front wall's top edge
 	roofTop: number, -- the roof's highest point over the front half
 	groundY: number, -- the floor's top
+	matY: number?, -- where the doormat lies, when that is not the floor's top (the Dealership's walk is at street level)
 	accent: Color3,
 }
 
 ShopFacade.DoorClear = 0.8
+ShopFacade.AwningReach = 5 -- how far the Dealership's canopy reaches out from the front wall
 
 local V3, CF = Vector3.new, CFrame.new
 local MAT = Enum.Material
@@ -126,7 +128,7 @@ local function doormat(parent: Instance, spec: Spec)
 		parent,
 		"Doormat",
 		V3(spec.doorHalf * 1.4, 0.06, 2.2),
-		CF(spec.doorCx, spec.groundY + 0.04, spec.frontZ - 1.6),
+		CF(spec.doorCx, (spec.matY or spec.groundY) + 0.04, spec.frontZ - 1.6),
 		hex("#6B5436"),
 		MAT.Fabric
 	)
@@ -207,7 +209,7 @@ local function shopSpecific(model: Model, spec: Spec)
 		-- The showroom: a canopy over the lobby door, planters, a bench and a
 		-- sandwich board, a flag pole and roof units (its windows are the glass band).
 		local c = spec.doorCx
-		awning(model, spec, spec.doorTop + 0.7, 5, hex("#2F6DB5"), hex("#F2E7CF"))
+		awning(model, spec, spec.doorTop + 0.7, ShopFacade.AwningReach, hex("#2F6DB5"), hex("#F2E7CF"))
 		planter(model, c + d + 2.6, gy, fz - 1.8)
 		planter(model, c - d - 2.6, gy, fz - 1.8)
 		bench(model, c + d + 9, gy, fz - 1.4)
