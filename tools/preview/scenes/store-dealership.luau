@@ -13,7 +13,7 @@ return Store.scene({
 	accent = { 47, 109, 181 },
 	keeper = "Dale",
 	walker = { -56, -1 },
-	populate = function(ctx, root, _shop)
+	populate = function(ctx, root, shop)
 		local roblox = ctx.roblox
 		local V3, CF, C3 = roblox.Vector3, roblox.CFrame, roblox.Color3
 		local Kit = ctx.art("Kit")
@@ -21,6 +21,12 @@ return Store.scene({
 		local DealershipLot = ctx.art("DealershipLot")
 		local StoreStock = ctx.shared("StoreStock")
 		local hall = DealershipLot.Hall()
+		-- The roof is off in these views, so the roof units would hang in the air: drop them too.
+		for _, d in ipairs(shop:GetDescendants()) do
+			if d.Name == "RoofUnit" then
+				d:Destroy()
+			end
+		end
 		-- The lot sits where MapBuilder puts it, relative to the hall.
 		local width, depth = DealershipLot.Size()
 		local lot = DealershipLot.Build()
@@ -60,6 +66,7 @@ return Store.scene({
 			phone = { pos = { -69, 9, -28.6 }, target = { -40, 8, 3 }, fov = 62 },
 			night = { pos = { -69, 9, -28.6 }, target = { -40, 8, 3 }, fov = 62 },
 			extra = {
+				{ pos = { -25, 4.5, 2 }, target = { -30, 1.6, -6.8 }, fov = 58, label = "a plinth's name sign" },
 				{ pos = { 0, 150, -20 }, target = { 0, 0, 0 }, fov = 62, label = "the hall from above" },
 				{ pos = { -58, 8, 6 }, target = { 30, 6, 0 }, fov = 70, label = "down the aisle" },
 				{ pos = { -62, 9, 4 }, target = { -64, 5, 25 }, fov = 72, label = "counter and keeper" },

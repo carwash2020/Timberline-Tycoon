@@ -36,6 +36,50 @@ Connor's reference screenshots for this item were never received; this is built 
 - Round 3 (Connor: signs too close and too many): sign count 39 to 37 (the "AXES" sub-sign under "AXES & BELTS" is gone; the axes sit under the header), the seven NEEDS chips are 2.4 wide and turn square to the aisle so they no longer stack along the sightline from the door (`ShopKit.SteppedUnit` / `TierStand` got optional `chipYaw` and `chipW`, other stores unchanged), the rack name plates are 2.4 wide with 1.8 clear. `StoreInterior.ToolShed.spec` bounds the count and checks at least 1.5 studs between any two signs. Renders `previews/store-polish/toolshed-v2-*.png`.
 - Round 4 (Connor: "ensure no overlap"): new `tests/StoreOverlap.ToolShed.spec.luau` (the template for every store). Oriented-box (separating axis) tests with a 0.05 stud tolerance over the whole shop: 9,316 sign/flag/plaque/lamp pairs, 17,536 sign-vs-structure pairs (wall, window, beam, shelf, pedestal, counter, roof), 2,850 prop/furniture pairs, and 132,526 stocked-box pairs (real BoxArt box and case vs pedestals, flags, posts and each other). Found and fixed: sign posts and goosenecks sunk into the roof sign's frame, flag posts into their brass backing, lantern chains into their caps and the tie beam, lantern caps floating off their glass (`Kit.lantern`), porch lanterns sunk into their posts, the grindstone leg in the porch post, the facade barrel and crate in the grindstone and chopping block, the rack plates on the rack rail, the header frames in the roof slope (header 10.2 wide, `maxW`), the hours board buried inside the front wall (it was invisible; now front-flush on the door track), the side-window parts embedded 0.05 in the wall. Intended welds kept (named in the spec): the roof sign's posts sunk up to 1.0 into the roof deck, the grindstone wheel in its trough, round logs in a pile. The BoxArt cases intersect nothing; no change to box or item art.
 
+
+## Dealership sign spacing (branch `phase-2/dealership-sign-spacing`, follow-up to #180)
+
+Connor approved the #180 renders with "signs may be a little too close together and a little too much in abundance".
+Counted before: 16 hung boards inside (SHOWROOM, 5 TRUCKS/TRAILERS headers, 8 bed sub-signs, CHECKOUT board and a CHECKOUT
+plaque on the counter), 4 flags along the front wall, a swatch board, 17 hung lanterns; outside, 6 text signs (DEALERSHIP, a
+second TRUCKS & TRAILERS board over the windows, the door-end board, hours board, closed sign, a sandwich board). After: 6 hung
+boards inside (SHOWROOM, 4 headers, CHECKOUT), no interior flags, no swatch board, 9 hung lanterns; 4 text signs outside. What went:
+the 8 hung sub-signs (each plinth's own name sign, now bigger, carries the name and a second line with what it hauls, from
+`DealershipLot.BedText`), the repeated header for a kind that comes back later in a row (the plinths' name signs tell it),
+the counter plaque (CHECKOUT hangs lower now, under the SHOWROOM board's line of sight from the door, where it was cropped), the
+per-bay hung lanterns (each plinth has its own lamp post), the OfficeSign over the windows, the sandwich board (the hours board
+says it), the swatch board and the front-wall flags. Kept: SHOWROOM, TRUCKS and TRAILERS, CHECKOUT, the DEALERSHIP roof sign, the
+door-end board, tier T-flags, plinth name signs, hours and closed signs. Specs: 3 studs minimum between hung boards, no board in
+front of another from the door, a ceiling on hung boards (6) and on every sign on the building (12). No price, vehicle, tier or
+buying change. Renders `previews/store-polish/dealership-v2-*.png`.
+
+**No-overlap spec (`tests/DealershipOverlap.spec.luau`).** In 3D, on the building (inside and out), the lot and the vehicles: 1225 sign-group pairs, about 105,000 sign-part against structure/prop/vehicle pairs, about 83,000 prop/display/structure pairs, all with 0.05 tolerance. It found and fixed: the hours board stood 0.25 into the wall above the door and the canopy's near end pierced it (canopy now stands 0.7 off the wall, far end unchanged, `ShopFacade.AwningGap`), the lobby trash can overlapped a barrel (moved), and each plinth's aisle stripe ran under the box's accent block (stripe is now 0.3 wide at the very edge, `DealershipLot.StripeWidth`).
+
+## Store polish: the Dealership (branch `phase-2/store-polish-dealership`, 12 October 2026)
+
+Connor's item 5. The Dealership stays its own building; nothing about buying, prices, stock, hidden Coming-soon items, StoreUI or
+the purchase flow changed. **Connor's reference screenshots never arrived, so this was designed to the written brief** (and
+renders are the thing to approve). Audited the #162 build with `tools/preview` and a new geometry spec, then fixed what was real:
+
+- **Floating parts (found by the new spec).** The ceiling beams and rafters stopped 0.7 short of the walls; every hung sign, chain
+  and lantern ended 0.9 under the roof (in the air); the reception chair's backrest sat 0.2 off its seat; each vehicle's name sign
+  hovered 0.2 over the floor and 0.35 off its plinth. Beams and rafters now run into the walls (`Dealership.WallTuck`), every
+  chain runs to the roof's underside, the backrest touches the seat, the name sign stands on the floor against the plinth band.
+- **Clearance.** The Logging Rig's display copy topped out 0.1 under the beams (`MaxVehicleHeight` 12.4); now 12.0 (0.5 of air).
+  Display copy only; the gameplay truck, its stats and every price are untouched.
+- **Exterior** (`BuildingArt.dealership`): a paved forecourt (`Forecourt`, `ForecourtKerb`, 5 deep, two pieces with the door's walk left open and looks only (it does not collide), because `DealershipLot.spec` and `WorldPlan.spec` keep colliding parts off `DealershipPath`, roads and grass; the doormat lies on the street) level with the hall floor, so the
+  planters, bench, sandwich board, awning posts and doormat stand on something (they stood 0.4 over the lawn); six cream piers
+  between the windows, a cornice under the roof's lip, five forecourt lamp posts (0.9 / 14, under ShopKit's caps), the accent stripe
+  round all four sides, and a `TRUCKS & TRAILERS` board across the door end's wall (the end the approach road meets). The second pair
+  of porch posts is gone: the porch lantern hangs on the awning post.
+- **Specs** (`StoreInterior.Dealership.spec`): no floating parts for the interior, the whole hall and the lot's stands; every display
+  rests on its own plinth, one per vehicle; nothing hung touches a display vehicle; every display under the beams with 0.4 spare;
+  forecourt, end board (text fits, faces west, against the wall) and stripes. Moved: `MaxVehicleHeight` 12.4 to 12.0 (design
+  moved). Whole hall 384 parts (cap 400, interior 218 of its own 400, lot 528).
+- **Renders** in `previews/store-polish/dealership-*.png` (exterior front, 3/4, night, the door end, interior from the door, the
+  tier stand, the counter, phone size). The keeper's body does not draw in the preview (only his name tag), for every store.
+- **Awaiting Connor:** the reference screenshots (send them if the brief missed something); whether the lot lamps should be dimmer
+  or fewer.
 ## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
 
 The three pasted store image ids (91282142796474 Tow Service, 79037897236948 Timber Classic, 71028498113750 Paint Shop) may be Decal ids, which an ImageLabel cannot load by `rbxassetid://`. `Shared/StoreArt.ImageFor(id, size)` now returns `rbxthumb://type=Asset&id=<id>&w=<n>&h=<n>` (150 on the panel card, 420 on the world board) for a nonzero id and `""` for 0; `StoreUI` and `StoreBoard` use it, and the letter or mark fallback (failed load, id 0) is unchanged. No prices, sale flags or ids changed. Unverified: that the thumbnails render (needs Studio). `AssetIds.spec` allows the one rbxthumb literal in `StoreArt.luau` and still fails any other.
