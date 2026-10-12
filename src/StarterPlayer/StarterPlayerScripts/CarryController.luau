@@ -31,7 +31,6 @@ local CarryController = {}
 
 -- Seconds to wait for MapBuilder to publish which loop runs. Until then
 -- Active() reads as v1, and the old Sell prompt would fight the v2 pad.
-local BOOT_WAIT = 120
 
 local player = Players.LocalPlayer
 
@@ -210,11 +209,7 @@ local function setupSellPrompt()
 	end)
 end
 
-function CarryController.Start()
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < BOOT_WAIT do
-		waited += task.wait(0.25)
-	end
+local function startLoop()
 	if CoreLoop.V2() then
 		return
 	end
@@ -231,6 +226,11 @@ function CarryController.Start()
 		end
 	end)
 	task.spawn(setupSellPrompt)
+end
+
+-- Returns at once: the loop is read when the server publishes it (CoreLoop.WhenKnown).
+function CarryController.Start()
+	CoreLoop.WhenKnown(startLoop)
 end
 
 return CarryController

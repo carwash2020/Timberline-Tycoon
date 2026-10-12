@@ -40,6 +40,35 @@ function CoreLoop.Active(): number
 	return if valid(n) then n :: number else 1
 end
 
+-- Runs `callback` once the server has published the loop (MapBuilder sets
+-- CoreLoopActive before it builds, but after its requires, so a client can
+-- get here first; if the server's world code fails to load it is never set).
+-- Never yields: a controller's Start used to poll for this with task.wait for
+-- up to 8 to 120 s (Connor's Studio log: "ChopSawController Start took
+-- 8.03s"), held the client's ready handshake, and then, once the wait ran
+-- out, decided for the v1 loop for good. Now Start returns at once and the
+-- callback runs when the attribute lands, however late; if it is already
+-- there, the callback runs right now. `root` is for specs (default workspace).
+function CoreLoop.WhenKnown(callback: () -> (), root: Instance?)
+	local source: Instance = root or workspace
+	if source:GetAttribute(CoreLoop.ActiveAttribute) ~= nil then
+		callback()
+		return
+	end
+	local connection: RBXScriptConnection? = nil
+	local done = false
+	connection = source:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(function()
+		if done or source:GetAttribute(CoreLoop.ActiveAttribute) == nil then
+			return
+		end
+		done = true
+		if connection then
+			connection:Disconnect()
+		end
+		callback()
+	end)
+end
+
 -- True when the v2 loop is running.
 function CoreLoop.V2(): boolean
 	return CoreLoop.Active() == 2
