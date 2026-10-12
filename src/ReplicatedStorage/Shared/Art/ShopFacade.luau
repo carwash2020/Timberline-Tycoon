@@ -191,13 +191,13 @@ local function hearthDressing(model: Model, spec: Spec)
 	local stone = hex("#8C867C")
 	local green = hex("#3E6A3A")
 	-- plinth in two pieces, leaving the doorway open
-	local sideW = hw - d - 0.4
+	local sideW = hw - d - 0.8
 	for _, s in ipairs({ -1, 1 }) do
 		box(
 			model,
 			"FoundationStone",
 			V3(sideW, 1.0, 0.5),
-			CF(s * (d + 0.4 + sideW / 2), gy + 0.5, fz - 0.2),
+			CF(s * (d + 0.8 + sideW / 2), gy + 0.5, fz - 0.2),
 			stone,
 			MAT.Slate
 		)

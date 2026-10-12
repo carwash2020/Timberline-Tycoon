@@ -25,7 +25,15 @@ return {
 		local root = roblox.Instance.new("Model")
 		Common.ground(ctx, root, 400, C3.fromRGB(116, 164, 84), V3.new(60, -0.5, 20))
 
-		local ROOF = { Roof = true, Shingle = true, RidgeCap = true, Gable = true, Rafter = true, TieBeam = true }
+		local ROOF = {
+			Roof = true,
+			Shingle = true,
+			RidgeCap = true,
+			Gable = true,
+			Rafter = true,
+			TieBeam = true,
+			CeilingBoards = true,
+		}
 		local function strip(model)
 			for _, d in ipairs(model:GetDescendants()) do
 				if d:IsA("BasePart") and ROOF[d.Name] then

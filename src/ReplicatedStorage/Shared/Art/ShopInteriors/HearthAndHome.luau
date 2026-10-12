@@ -33,11 +33,11 @@ local Hearth = {}
 -- collar ties sit just under the beams.
 Hearth.TieY = 14.1
 Hearth.HeaderY = 12.3
-Hearth.StoreSignY = 12.2 -- the middle of the shop's name board on the back wall
+Hearth.StoreSignY = 12.5 -- the middle of the shop's name board on the back wall
 -- The roof's underside, from BuildingArt's General Store (the roof slab is 0.5 thick, its middle
--- at (10 + 0.4) x scale): the beams and ties reach up to it so nothing of the ceiling hangs loose.
+-- at (10 + 0.4) x scale). A plank ceiling fills the 0.6 between the frame's ceiling line and it, so the
+-- beams, ties and every chain hang from something solid and no sky shows through.
 Hearth.RoofUnder = (10 + 0.4 - 0.25) * 1.5
-Hearth.BeamY = Hearth.RoofUnder - 0.45 -- the beams' middle (they are 0.9 deep)
 Hearth.TopY = Hearth.RoofUnder -- the highest part the interior adds
 
 -- What the signs say, from the shop's real stock (ids are ItemCatalog ids; a
@@ -115,7 +115,7 @@ function Hearth.Build(model: Model, frame: Frame)
 	local rng = Kit.rng(2605)
 	local ceil = frame.ceilY
 	local fy = frame.floorTop
-	local lampTop = Hearth.BeamY - 0.45 -- chains end on the beams' underside
+	local lampTop = ceil - 0.9 -- chains end on the beams' underside
 	local extents = ShopKit.SteppedUnit(model, "HearthAndHome", frame, "Shelf", TABLE, TABLE_TOP)
 	for _, lane in ipairs(StoreStock.Lanes("HearthAndHome")) do
 		local ext = extents[lane.name]
@@ -140,6 +140,16 @@ function Hearth.Build(model: Model, frame: Frame)
 	counterDetail(model, frame)
 	backDoor(model, frame, -frame.halfW + 0.3, 18.5, false, -1)
 
+	-- The plank ceiling (looks only), from the beams' top to the roof's underside.
+	dBox(
+		model,
+		"CeilingBoards",
+		V3(2 * frame.halfW - 0.2, Hearth.RoofUnder - ceil, 2 * frame.halfD - 0.2),
+		CF(0, (ceil + Hearth.RoofUnder) / 2, 0),
+		hex("#6B4A2E"),
+		MAT.WoodPlanks
+	)
+
 	-- Floor: warm boards, a green border, the long runner down the middle.
 	plankFloor(model, frame, hex("#C8995F"), { hex("#B3874F"), hex("#D8AB72"), hex("#A57A47") }, 2.8, rng)
 	floorBorder(model, frame, 0.8, hex("#4E7A3E"), MAT.Wood)
@@ -147,8 +157,8 @@ function Hearth.Build(model: Model, frame: Frame)
 
 	-- Warm timber beams (none at a sign's z), the lanterns hung from them.
 	-- (a beam at every z a lamp or the back-wall sign hangs from, so no chain ends in the air)
-	ShopKit.Beams(model, frame, { -19, -14.5, -9, -2.2, 3, 8.5, 14.5, 20.2 }, Hearth.BeamY)
-	ShopKit.Rafter(model, frame, 0, Hearth.BeamY - 0.1)
+	ShopKit.Beams(model, frame, { -19, -14.5, -9, -2.2, 3, 8.5, 14.5, 20.2 })
+	ShopKit.Rafter(model, frame, 0)
 	-- Over the central aisle and over the two side aisles; none in the first 9
 	-- studs (the entrance stays open) and none at a sign's end.
 	for _, z in ipairs({ -2.2, 3 }) do
@@ -157,8 +167,8 @@ function Hearth.Build(model: Model, frame: Frame)
 	end
 	ShopKit.WarmLamp(model, -2.6, ceil - 3.4, -9, lampTop)
 	ShopKit.WarmLamp(model, 2.6, ceil - 3.4, -9, lampTop)
-	ShopKit.WarmLamp(model, -2.6, ceil - 3.4, 3, lampTop)
-	ShopKit.WarmLamp(model, 2.6, ceil - 3.4, 3, lampTop)
+	ShopKit.WarmLamp(model, -4.2, ceil - 3.4, 3, lampTop) -- (4.2 out: from the door these stay clear of the name board over the counter)
+	ShopKit.WarmLamp(model, 4.2, ceil - 3.4, 3, lampTop)
 	-- Over the counter end and the back corners, so no corner is dark.
 	for _, x in ipairs({ -15.6, -7, 7, 15.6 }) do
 		ShopKit.WarmLamp(model, x, ceil - 3.4, 14.5, lampTop)
@@ -169,7 +179,7 @@ function Hearth.Build(model: Model, frame: Frame)
 		headerY = Hearth.HeaderY,
 		headerZ = -12.5,
 		tieY = Hearth.TieY,
-		tieTop = Hearth.RoofUnder,
+		tieTop = ceil,
 		subShift = 0, -- the side units are 6.8 wide against a wall: centred, a sub-sign stays in the room
 	})
 	ShopKit.CheckoutSign(model, frame)
@@ -178,8 +188,8 @@ function Hearth.Build(model: Model, frame: Frame)
 		cx = 0,
 		cy = Hearth.StoreSignY,
 		z = 20.2,
-		w = 13,
-		h = 2.6,
+		w = 11,
+		h = 2.0, -- the price boards on the back wall top out at 10.95: this hangs clear of them
 		text = "HEARTH & HOME",
 		accent = ShopKit.Colors.Brass,
 		ceilY = lampTop,

@@ -260,8 +260,7 @@ return function(t)
 				or a.x1 >= frame.halfW - TOL
 				or a.z0 <= -frame.halfD + TOL
 				or a.z1 >= frame.halfD - TOL
-			local onCeiling = (a.p.Name == "CeilingBeam" or a.p.Name == "CeilingRafter" or a.p.Name == "SignTie")
-				and a.y1 >= roofUnder - TOL
+			local onCeiling = a.p.Name == "CeilingBoards" and a.y1 >= roofUnder - TOL
 			if onFloor or onWall or onCeiling then
 				a.held = true
 				table.insert(queue, a)
@@ -300,7 +299,18 @@ return function(t)
 		t.ok(board.Size.X >= 10, "wide enough for its text")
 		-- over the counter, clear of the price boards below and of the ceiling above
 		local _, _, y0, y1 = aabb(board)
-		t.ok(y0 >= 9.6, "clear of the price boards: " .. y0)
+		-- the shell's price boards (BuildingArt) must stay under the board's accent bar (0.42 under it)
+		local shop = BuildingArt.Shop(KIND, KIND, Color3.fromRGB(47, 93, 58))
+		local tagTop = -math.huge
+		for _, p in ipairs(named(shop, "PriceTag")) do
+			local _, _, _, ty1 = aabb(p)
+			tagTop = math.max(tagTop, ty1)
+		end
+		t.ok(tagTop > 0, "found the price boards")
+		t.ok(
+			y0 - 0.45 >= tagTop,
+			string.format("clear of the price boards: bar %.2f vs tag top %.2f", y0 - 0.45, tagTop)
+		)
 		t.ok(y1 <= Builder.TopY, "under the top: " .. y1)
 	end)
 

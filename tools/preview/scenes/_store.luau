@@ -59,7 +59,15 @@ function Store.scene(opts)
 			-- The roof is taken off: the preview has no ambient sky light under a roof, so a
 			-- roofed interior renders black. (The game's Lighting lifts it; judge the interior
 			-- lights by the brightness caps in ShopKit.Light, not by how dark the roof is.)
-			local ROOF = { Roof = true, Shingle = true, RidgeCap = true, Gable = true, Rafter = true, TieBeam = true }
+			local ROOF = {
+				Roof = true,
+				Shingle = true,
+				RidgeCap = true,
+				Gable = true,
+				Rafter = true,
+				TieBeam = true,
+				CeilingBoards = true,
+			}
 			for _, d in ipairs(shop:GetDescendants()) do
 				if d:IsA("BasePart") and ROOF[d.Name] then
 					d:Destroy()

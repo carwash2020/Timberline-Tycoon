@@ -290,7 +290,7 @@ return function(t)
 			-- General Store: the same kit (tier stands, signs, ties, lamps, stock corner) takes its whole shop from 250 to 302 parts (interior 189, its own 400 budget in StoreInterior.HearthAndHome.spec); cap 250 to 350.
 			-- Store polish (General Store): the street-side dressing (plinth, corner posts, cornice, shutters,
 			-- flower boxes, door lanterns, roof shingles, flagstone path and lamp posts) and the interior's
-			-- name board, back lamps and beams take the whole shop from 302 to 379 parts; cap 350 to 400.
+			-- name board, back lamps and beams take the whole shop from 302 to 380 parts; cap 350 to 400.
 			local budget = ({ ToolShed = 400, HearthAndHome = 400, Dealership = 400 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
