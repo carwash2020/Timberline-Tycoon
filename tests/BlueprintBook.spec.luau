@@ -193,8 +193,8 @@ return function(t)
 
 	t.test("the refusal texts keep the old palette's words", function()
 		local shed = PlotData.Blueprint("Shed")
-		t.eq(Book.Message("store", shed), "Buy the Small Shed at the General Store first.")
-		t.eq(Book.Message("toolShed", shed), "Buy the Small Shed at the Tool Shed first.")
+		t.eq(Book.Message("store", shed), "Buy the Shed Blueprint at the General Store first.")
+		t.eq(Book.Message("toolShed", shed), "Buy the Shed at the Tool Shed first.")
 		t.ok(string.find(Book.Message("notOwned", shed), "hammer", 1, true))
 	end)
 
@@ -302,8 +302,8 @@ return function(t)
 	end)
 
 	t.test("an unlock you learned places free; a box in stock places free and shows its count", function()
-		local shed = PlotData.Blueprint("Shed")
-		local entry = { id = "Shed", bp = shed, group = "Buildings", stock = 0 }
+		local mailbox = PlotData.Blueprint("Mailbox")
+		local entry = { id = "Mailbox", bp = mailbox, group = "Decor", stock = 0 }
 		local row = Book.Row(entry, { tier = 1, cash = 0, boxed = true })
 		t.eq(row.ready, true)
 		t.eq(row.button, "Place")
@@ -316,7 +316,7 @@ return function(t)
 	end)
 
 	t.test("the redeem texts say what happened", function()
-		t.ok(string.find(Book.RedeemText("ok", "Shed"), "learned the Small Shed", 1, true))
+		t.ok(string.find(Book.RedeemText("ok", "Shed"), "learned the Shed.", 1, true))
 		t.ok(string.find(Book.RedeemText("known", "Shed"), "already know", 1, true))
 		t.ok(string.find(Book.RedeemText("missing", nil), "isn't in your pack", 1, true))
 	end)

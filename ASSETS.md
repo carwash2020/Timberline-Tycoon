@@ -53,7 +53,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 Not asset ids, so not listed: `rbxasset://` built-ins (engine particle textures, `FellSound`, most of
 `SoundData`), empty sound slots (`id = ""`, silent), badge ids (all 0 by decision), and the owner user id.
-`meshId = 0` slots (no upload yet, part build kept by design): 151. They are not listed.
+`meshId = 0` slots (no upload yet, part build kept by design): 155. They are not listed.
 
 ## Meshes (MeshId, loaded by MeshKit) (1053)
 

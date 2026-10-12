@@ -45,9 +45,14 @@ return function(t)
 			elseif piece.kit then
 				seen += 1
 				-- Only the glass plan is sold (ModernKit): it still pays the kit fee.
-				t.eq(piece.unlock, if piece.family then true else nil, piece.id .. " store unlock")
+				-- (The Shed Blueprint is sold too: the shed became a kit piece you fill with planks.)
+				t.eq(
+					piece.unlock,
+					if piece.family or piece.id == "Shed" then true else nil,
+					piece.id .. " store unlock"
+				)
 				t.eq(PlotData.Price(piece), piece.woodUnits * 4, piece.id)
-				if not ModernKit.ById[piece.id] then
+				if not ModernKit.ById[piece.id] and piece.id ~= "Shed" then -- (the shed is part-built; its model slot is ItemModelSlots)
 					t.ok(KitMeshData.Get(piece.id) ~= nil, piece.id .. " has a mesh entry")
 				end
 				local ok = if piece.fits
@@ -64,7 +69,7 @@ return function(t)
 				t.eq(ok, true, piece.id .. " places")
 			end
 		end
-		t.eq(seen, 24 + #ModernKit.Pieces)
+		t.eq(seen, 24 + #ModernKit.Pieces + 1, "the kit, the glass plan's family and the Shed")
 		t.eq(PlotData.Price(bp("Wall")), 32)
 		t.eq(bp("Wall").priceCash, 80, "the old wall price stays for saves with no paid")
 		t.eq(PlotData.LegacyPrice(bp("Wall")), 80)
@@ -227,14 +232,14 @@ return function(t)
 				paid = 999,
 				wood = "oak",
 			},
-			{ uid = "shed", blueprintId = "Shed", x = 8, z = 0, rot = 0, fill = { units = 2 }, paid = 50 },
+			{ uid = "shed", blueprintId = "Mailbox", x = 8, z = 0, rot = 0, fill = { units = 2 }, paid = 50 },
 		}
 		Schema.Migrate(data)
 		t.eq(data.plot.placed[1].fill, nil, "units already cover the wall")
 		t.eq(data.plot.placed[1].wood, "birch")
 		t.eq(data.plot.placed[2].fill.units, 3)
 		t.eq(data.plot.placed[2].paid, PlotData.Price(bp("Wall")), "paid clamps to the fee")
-		t.eq(data.plot.placed[3].fill, nil, "a shed is not a kit piece")
+		t.eq(data.plot.placed[3].fill, nil, "a mailbox is not a kit piece")
 		t.eq(data.plot.placed[3].paid, nil)
 	end)
 

@@ -749,7 +749,7 @@ return function(t)
 		poor.buy("Blueprint", "Shed")
 		t.eq(poor.plans, {})
 		t.eq(poor.profile.cash, 500)
-		t.eq(poor.toasts, { "You need $100 more for the Small Shed." })
+		t.eq(poor.toasts, { "You need $100 more for the Shed Blueprint." })
 		-- Only the store unlocks are sold; a starter plan is not.
 		local starter = setup({ cash = 1000, claimed = true })
 		starter.buy("Blueprint", "Wall")

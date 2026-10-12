@@ -151,7 +151,7 @@ local function blueprintSlots(): { Slot }
 				shop = "HearthAndHome",
 				itemKind = "Blueprint",
 				itemId = bp.id,
-				displayName = bp.displayName,
+				displayName = bp.storeName or bp.displayName,
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = "#8C6A45",

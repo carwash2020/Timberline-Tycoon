@@ -33,6 +33,7 @@ local BoxLook = require(script.Parent.Parent.BoxLook)
 local BoxSize = require(script.Parent.Parent.BoxSize)
 local ItemBox = require(script.Parent.Parent.ItemBox)
 local ItemModel = require(script.Parent.ItemModel)
+local ModelSlots = require(script.Parent.ModelSlots)
 local Kit = require(script.Parent.Kit)
 local RobuxBoxArt = require(script.Parent.RobuxBoxArt)
 
@@ -328,6 +329,12 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 		table.insert(added, p)
 	end
 	contents.Parent = parent
+	-- An item with a model slot (Flashlight, Lantern, Wood Sign, Shed Blueprint) shows its real model
+	-- here once one is set; until then (meshId 0) the part-built copy stays.
+	local slot = ModelSlots.For(kind, itemId)
+	if slot then
+		ModelSlots.Dress(contents, slot, at, "display", { scale = scale, weldTo = body, remove = parts })
+	end
 	return added
 end
 

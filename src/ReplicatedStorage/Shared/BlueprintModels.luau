@@ -14,6 +14,7 @@ local ItemMeshes = require(script.Parent.ItemMeshes)
 local KitPaint = require(script.Parent.KitPaint)
 local KitMeshes = require(script.Parent.KitMeshes)
 local LogicItems = require(script.Parent.LogicItems)
+local ModelSlots = require(script.Parent.Art.ModelSlots)
 local PlotData = require(script.Parent.PlotData)
 local TreeArt = require(script.Parent.Art.TreeArt)
 local WoodData = require(script.Parent.WoodData)
@@ -139,6 +140,28 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 		KitMeshes.Dress(model, bp.id, ghost)
 	else
 		ItemMeshes.Attach(model, root, bp.id, ghost)
+	end
+	-- The Wood Sign has a model slot (Art/ModelSlots): with a real model set it stands here, the boxes
+	-- stay as the (invisible) collider; meshId 0 keeps the part-built look. (The Shed's model is the
+	-- plan you carry, not the shed you build: its ghost stays part-built.)
+	local slot = ModelSlots.For("Blueprint", bp.id)
+	if slot and slot.placedAs == "plot" then
+		local options: ModelSlots.DressOptions = {
+			weldTo = root :: BasePart,
+			onDressed = function(mesh: MeshPart)
+				mesh:SetAttribute("ItemVisual", true)
+				mesh:SetAttribute("Role", "Prop")
+				mesh.Transparency = if ghost then 0.45 else 0
+				for _, child in ipairs(model:GetChildren()) do
+					if child:IsA("BasePart") and string.sub(child.Name, 1, 4) == "Part" then
+						child:SetAttribute("Role", nil)
+						child:SetAttribute("Collider", true)
+						child.Transparency = 1
+					end
+				end
+			end,
+		}
+		ModelSlots.Dress(model, slot, CFrame.new(0, slot.size.Y / 2, 0), "placed", options)
 	end
 	local applyMeshes = (LogicItems :: any).ApplyMeshes
 	if type(applyMeshes) == "function" then

@@ -33,6 +33,7 @@ local Kit = require(script.Parent.Kit)
 local Palette = require(script.Parent.Palette)
 local SpecBuild = require(script.Parent.SpecBuild)
 local DealershipLot = require(script.Parent.DealershipLot)
+local ModelSlots = require(script.Parent.ModelSlots)
 local ShopFacade = require(script.Parent.ShopFacade)
 local PropArt = require(script.Parent.PropArt)
 local ShopDoor = require(script.Parent.ShopDoor)
@@ -2160,6 +2161,36 @@ end
 -- its origin, all but the counter: it, its top and what stands on it keep
 -- their size, at the same height over the (raised) floor, so it stays
 -- waist high and the keeper behind it shows.
+-- The four samples on the General Store's back ledge (flashlight, lantern, wood sign, shed) show the
+-- real model of their ModelSlots slot once one is set (meshId 0: the part-built samples stay).
+local function dressLedgeSamples(model: Model)
+	local groups: { [string]: { BasePart } } = {}
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") and d.Name == "Display" then
+			local id = d:GetAttribute("HoverId")
+			if type(id) == "string" then
+				groups[id] = groups[id] or {}
+				table.insert(groups[id], d)
+			end
+		end
+	end
+	for _, slot in ipairs(ModelSlots.Slots) do
+		local list = groups[slot.itemId]
+		if list and ModelSlots.IsSet(slot) then
+			local lo, hi = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+			for _, p in ipairs(list) do
+				local at, half = p.CFrame.Position, p.Size / 2
+				lo = lo:Min(at - half)
+				hi = hi:Max(at + half)
+			end
+			local box = hi - lo
+			local scale = math.max(box.X, box.Y, box.Z) / math.max(slot.size.X, slot.size.Y, slot.size.Z)
+			local centre = CFrame.new((lo.X + hi.X) / 2, lo.Y + slot.size.Y * scale / 2, (lo.Z + hi.Z) / 2)
+			ModelSlots.Dress(model, slot, centre, "display", { scale = scale, remove = list, inBuildFrame = true })
+		end
+	end
+end
+
 function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: number?): Model
 	local model = Kit.model(kind)
 	if kind == "ToolShed" then
@@ -2201,6 +2232,9 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		fitNameSign(sign)
 	end
 	addHoursBoard(model, kind)
+	if kind == "HearthAndHome" then
+		dressLedgeSamples(model)
+	end
 	if kind == "Dealership" then
 		-- The hours board stood 0.25 into the wall above the door: put it against the wall's face.
 		local board = model:FindFirstChild("HoursBoard")

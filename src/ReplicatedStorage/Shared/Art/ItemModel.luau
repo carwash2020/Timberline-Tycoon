@@ -23,11 +23,13 @@
 -- clones a few parts instead of building a truck again. Pure art code.
 
 local AxeArt = require(script.Parent.AxeArt)
+local BlueprintArt = require(script.Parent.BlueprintArt)
 local BlueprintModels = require(script.Parent.Parent.BlueprintModels)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Kit)
 local MachineArt = require(script.Parent.MachineArt)
 local MachineSkin = require(script.Parent.MachineSkin)
+local ModelSlots = require(script.Parent.ModelSlots)
 local PlotData = require(script.Parent.Parent.PlotData)
 local TruckArt = require(script.Parent.TruckArt)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
@@ -432,6 +434,102 @@ function ItemModel.Place(display: Display, parent: Instance, at: CFrame, scale: 
 		table.insert(out, copy)
 	end
 	return out
+end
+
+-- A piece of gear built at real size from its icon, with the middle of its box.
+local function gearModel(itemId: string): (Model?, CFrame)
+	local icon = ICONS[itemId]
+	if not icon then
+		return nil, CFrame.identity
+	end
+	local model = Instance.new("Model")
+	model.Name = itemId
+	icon(model)
+	local lo: Vector3? = nil
+	local hi: Vector3? = nil
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			lo, hi = corners(d.CFrame, d.Size, lo, hi)
+		end
+	end
+	local centre = if lo and hi then (lo + hi) / 2 else Vector3.zero
+	return model, CF(centre)
+end
+
+-- The item in a hand: a plan is BlueprintArt.Held (its model slot swaps the
+-- roll for the real model); a piece of gear is its icon at real size, parts
+-- welded to the first one, nothing colliding. Its model slot (ModelSlots) swaps
+-- the icon for the real model the same way. Gear is worn today, so no game path
+-- equips this yet: it is here so the slot's held path exists and is tested.
+function ItemModel.Held(kind: string, itemId: string): Model?
+	if kind == "Blueprint" then
+		return BlueprintArt.Held(itemId)
+	end
+	local model, centre = gearModel(itemId)
+	if not model or kind ~= "Gear" then
+		return nil
+	end
+	local list: { BasePart } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			table.insert(list, d)
+		end
+	end
+	if #list == 0 then
+		return nil
+	end
+	local first = list[1]
+	model.PrimaryPart = first
+	for _, p in ipairs(list) do
+		p.Anchored = false
+		p.Massless = true
+		p.CanCollide = false
+		p.CanTouch = false
+		if p ~= first then
+			local weld = Instance.new("WeldConstraint")
+			weld.Name = "Weld"
+			weld.Part0 = first
+			weld.Part1 = p
+			weld.Parent = p
+		end
+	end
+	local slot = ModelSlots.For(kind, itemId)
+	if slot then
+		ModelSlots.Dress(model, slot, centre, "held", { weldTo = first, remove = list })
+	end
+	return model
+end
+
+-- The item in the world: a plan's piece is BlueprintModels.Build (the Wood Sign
+-- takes its model slot there), the Shed Blueprint is the plan lying on the
+-- ground (BlueprintArt.Dropped); a piece of gear is its
+-- icon at real size, anchored, swapped for its model slot's mesh when set.
+function ItemModel.Placed(kind: string, itemId: string): Model?
+	if kind == "Blueprint" then
+		local slot = ModelSlots.For(kind, itemId)
+		if slot and slot.placedAs == "dropped" then
+			return BlueprintArt.Dropped(itemId)
+		end
+		local bp = PlotData.Blueprint(itemId)
+		return if bp then BlueprintModels.Build(bp, false) else nil
+	end
+	local model, centre = gearModel(itemId)
+	if not model or kind ~= "Gear" then
+		return nil
+	end
+	local list: { BasePart } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			table.insert(list, d)
+		end
+	end
+	local slot = ModelSlots.For(kind, itemId)
+	if slot then
+		ModelSlots.Dress(model, slot, centre, "placed", { remove = list })
+	end
+	return model
 end
 
 return ItemModel

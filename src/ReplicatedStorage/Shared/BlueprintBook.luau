@@ -370,7 +370,10 @@ function BlueprintBook.Message(reason: string?, bp: PlotData.Blueprint?): string
 		if key then
 			return string.format("Buy the %s plan at the General Store first.", key.displayName)
 		end
-		return string.format("Buy the %s at the General Store first.", name)
+		return string.format(
+			"Buy the %s at the General Store first.",
+			if bp and bp.storeName then bp.storeName else name
+		)
 	elseif reason == "toolShed" then
 		return string.format("Buy the %s at the Tool Shed first.", name)
 	end
