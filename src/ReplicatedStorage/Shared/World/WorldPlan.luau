@@ -428,15 +428,11 @@ local STAND_LOW = 70 -- lowland only
 local STAND_SET_BACK = 20 -- studs every stand tree keeps off a road's edge
 local STAND_ROADSIDE = 80 -- a roadside stand's trees stand at most this far off its road's edge
 local STAND_SPACING = 12 -- studs between two trees
-local STAND_APART = 100 -- studs between two stands' middles
-local STAND_CLEAR = 20 -- studs between a stand's edge and the trees already there
 local STAND_GONDOLA = 30 -- studs off the gondola's routes (seen from above)
 local STAND_ROCK = 6 -- studs off a boulder's side
 local STAND_SIGN = 12 -- studs off a road sign
-local STAND_SCENERY = 8 -- studs off a scenery piece's footprint (the scenery's own gap to a tree)
 local STAND_FAR = 400 -- pine and maple stand at least this far from the sawmill
 local STAND_MAX = 178 -- cap. Shelves and the lighthouse vista take some, so the live count is under this.
-local STAND_OPEN_MOST = 6 -- trees in an open-country stand (4 to this; roadside ones 4-9)
 
 -- A country stand: `trees` round `center` (all within `radius`); `road`
 -- names the haul road it lines (nil out in the open country).
@@ -544,7 +540,7 @@ function WorldPlan.CountryStands(): { Stand }
 		end
 		for _, spot in ipairs(scenery) do
 			local dx, dz = x - spot.center.X, z - spot.center.Z
-			if dx * dx + dz * dz < (spot.radius + STAND_SCENERY) ^ 2 then
+			if dx * dx + dz * dz < (spot.radius + 8) ^ 2 then -- STAND_SCENERY = 8: studs off a scenery piece's footprint (the scenery's own gap to a tree)
 				return false
 			end
 		end
@@ -566,11 +562,11 @@ function WorldPlan.CountryStands(): { Stand }
 		end
 		local radius = math.sqrt(400 * want / math.pi) -- the Starter Forest's one tree per 400 sq studs
 		local c = at(radius)
-		if not ground(c.X, c.Y) or crowded(c.X, c.Y, radius + STAND_CLEAR) then
+		if not ground(c.X, c.Y) or crowded(c.X, c.Y, radius + 20) then -- STAND_CLEAR = 20: studs between a stand's edge and the trees already there
 			return nil
 		end
 		for _, s in ipairs(stands) do
-			if (s.center - c).Magnitude < STAND_APART then
+			if (s.center - c).Magnitude < 100 then -- STAND_APART = 100: studs between two stands' middles
 				return nil
 			end
 		end
@@ -694,7 +690,7 @@ function WorldPlan.CountryStands(): { Stand }
 				local x, z = rng:range(cx + 30, cx + STAND_CELL - 30), rng:range(cz + 30, cz + STAND_CELL - 30)
 				if plant(function(): Vector2
 					return Vector2.new(x, z)
-				end, nil, STAND_OPEN_MOST) then
+				end, nil, 6) then -- STAND_OPEN_MOST = 6: trees in an open-country stand (4 to this; roadside ones 4-9)
 					break
 				end
 			end
@@ -1348,7 +1344,6 @@ local SCENERY_CELL = 200 -- one group of pieces per cell of open country
 local SCENERY_ROAD_STEP = 150 -- and one every this far along the haul roads
 local SCENERY_ROADS = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
 local SCENERY_EDGE = 1150 -- clear of the mountains at the world's edge
-local SCENERY_LOW = 75 -- lowland only
 -- Along a road, in turn (a random start per road), and what stands with each.
 local SCENERY_CYCLE =
 	{ "Outcrop", "FenceLine", "RuinedCabin", "LogPile", "Windmill", "Outcrop", "HayLine", "LookoutTower" }
@@ -1562,7 +1557,7 @@ function WorldPlan.Scenery(): { ScenerySpot }
 			local h = TerrainGen.HeightAt(sx, sz)
 			lo, hi = math.min(lo, h), math.max(hi, h)
 		end
-		if hi > SCENERY_LOW or hi - lo > math.min(WorldPlan.SceneryGrade * 2 * r, WorldPlan.ScenerySink) then
+		if hi > 75 or hi - lo > math.min(WorldPlan.SceneryGrade * 2 * r, WorldPlan.ScenerySink) then -- SCENERY_LOW = 75: lowland only
 			return nil
 		end
 		-- The spawn's view of the lighthouse lamp. A piece within its
@@ -2539,14 +2534,12 @@ end
 -- a station's roof or the isle. (The cabin is 5.4 across; a station's roof,
 -- its barge boards, reaches 5.2 behind its middle; the isle's grassy rim
 -- 1.1 past its radius, and its rim stones' corners about 3.4 past it.)
-local GONDOLA_OUT = 9
-local GONDOLA_RIM = 7
 
 function WorldPlan.GondolaPath(sky: Sky, from: Vector3, back: Vector3, to: Vector3): { Vector3 }
 	local c = sky.main.center
 	local out = Vector3.new(to.X - c.X, 0, to.Z - c.Z).Unit
-	local rim = Vector3.new(c.X, to.Y, c.Z) + out * (sky.main.radius + GONDOLA_RIM)
-	return { from, from + Vector3.new(back.X, 0, back.Z).Unit * GONDOLA_OUT, rim, to }
+	local rim = Vector3.new(c.X, to.Y, c.Z) + out * (sky.main.radius + 7) -- GONDOLA_RIM = 7
+	return { from, from + Vector3.new(back.X, 0, back.Z).Unit * 9, rim, to } -- GONDOLA_OUT = 9
 end
 
 -- The point `alpha` (0 to 1) of the way along `path`, by length (so a
@@ -2692,10 +2685,8 @@ WorldPlan.BackdropEye = Vector3.new(0, 6, 90)
 WorldPlan.BackdropSeeds = { north = 101, west = 201, south = 302 }
 
 local SKIRT_STEP = 4 -- studs between the terrain samples along a wall
-local SKIRT_IN = 2 -- the samples sit this far inside the wall
 local SKIRT_BELOW = 4 -- a skirt block's top sits this far under the lowest of them
 local SKIRT_LONG = 500 -- the longest skirt block along a wall
-local SKIRT_CLIFF = 40 -- a jump this big between samples splits the skirt (cliffs, river banks)
 local SKIRT_BOTTOM = SEA_LEVEL - 15 -- every skirt block reaches down to here
 local BANK = 400 -- a skirt block's bank rises from SKIRT_BOTTOM at the wall to its top this far out
 local FOOT_BELOW = 25 -- mountain feet sink this far under the skirt
@@ -2774,9 +2765,9 @@ local function wallRuns(side: Side): { { Sample } }
 	local current: { Sample } = {}
 	local last: Sample? = nil
 	for u = -HALF, HALF, SKIRT_STEP do
-		local p = sidePoint(side, u, -SKIRT_IN)
+		local p = sidePoint(side, u, -2) -- SKIRT_IN = 2: the samples sit this far inside the wall
 		local s: Sample = { u = u, h = TerrainGen.HeightAt(p.X, p.Z), water = TerrainGen.WaterLevelAt(p.X, p.Z) }
-		if last and math.abs(s.h - last.h) > SKIRT_CLIFF then
+		if last and math.abs(s.h - last.h) > 40 then -- SKIRT_CLIFF = 40: a jump this big between samples splits the skirt (cliffs, river banks)
 			table.insert(runs, current)
 			current = {}
 		end
@@ -3099,7 +3090,6 @@ local FAR_ROW: Row = {
 	colors = BACKDROP_COLORS.rock,
 	snow = { 380, 520 },
 }
-local PEAK_MAX = 1000 -- however far off
 
 -- A row along `wall`: from u0 to u1 (or out both ways from `anchor`), or,
 -- given `fill`, one mountain on the eye's line through each of its points
@@ -3194,7 +3184,7 @@ local function placeRow(
 			return {
 				foot = Vector3.new(spot.X, footY, spot.Z),
 				dir = dir,
-				peak = math.min(PEAK_MAX, (EYE.Y + away * rise - footY * back * rise) / (1 - back * rise)),
+				peak = math.min(1000, (EYE.Y + away * rise - footY * back * rise) / (1 - back * rise)), -- PEAK_MAX = 1000: however far off
 				left = left,
 				right = right,
 				pitch = pitch,
@@ -3764,7 +3754,6 @@ WorldPlan.ClusterBig = { 6, 9.5 } -- the size (studs across) of each cluster's b
 WorldPlan.ClusterSmall = { 2.4, 5.6 } -- and of the ones leaning on it
 local CLUSTER_CELL = 200
 local CLUSTER_NEAR = 700 -- squares this near the sawmill get theirs first
-local CLUSTER_APART = 120 -- studs between two clusters' middles
 local CLUSTER_GRASS = { Grass = true, LeafyGrass = true }
 
 -- How deep a rock `size` studs across sits in the ground.
@@ -3933,7 +3922,7 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 			local z = rng:range(cell.Y + 20, cell.Y + CLUSTER_CELL - 20)
 			local apart = true
 			for _, o in ipairs(out) do
-				if Vector2.new(o.center.X - x, o.center.Z - z).Magnitude < CLUSTER_APART then
+				if Vector2.new(o.center.X - x, o.center.Z - z).Magnitude < 120 then -- CLUSTER_APART = 120: studs between two clusters' middles
 					apart = false
 					break
 				end
@@ -4197,7 +4186,6 @@ export type Dock = {
 }
 
 local cachedDocks: { Dock }? = nil
-local DOCK_ON_BANK = 3 -- a dock's first studs rest on its bank (its land end is 2.5 past the water's edge)
 
 -- A dock from `land` out along `out` over water whose surface is at
 -- `level`, `length` long, if it fits there.
@@ -4219,7 +4207,7 @@ local function dockAt(kind: string, land: Vector2, out: Vector2, length: number,
 		for _, off in ipairs({ -width / 2, 0, width / 2 }) do
 			local q = land + out * k + side * off
 			local ground = TerrainGen.HeightAt(q.X, q.Y)
-			if ground > top - (if k <= DOCK_ON_BANK then 0.05 else 0.9) then
+			if ground > top - (if k <= 3 then 0.05 else 0.9) then -- DOCK_ON_BANK = 3: a dock's first studs rest on its bank (its land end is 2.5 past the water's edge)
 				return nil
 			end
 			if TerrainGen.WaterLevelAt(q.X, q.Y) == nil and grassUnder(q.X, q.Y) then
@@ -4888,7 +4876,6 @@ WorldPlan.FillerHysteresis = 48 -- studs a loaded cell keeps its look past its r
 WorldPlan.FillerDensity = { core = 0.4, edge = 0.6, copse = 0.28, ornament = 0.03 }
 local FILLER_CELL = WorldPlan.FillerCellSize
 local FILLER_GRID = 3
-local FILLER_JITTER = 3.6
 local FILLER_LOW = 70 -- lowland only (the mountains rise above it)
 
 -- What grows round each place: kind = share, and how far from the place's
@@ -4942,7 +4929,6 @@ local FILLER_MIX: { { biome: string?, reach: number, mix: Mix } } = {
 }
 local ORNAMENT_MIX: Mix =
 	{ { kind = "conifer", share = 0.5 }, { kind = "birch", share = 0.3 }, { kind = "maple", share = 0.2 } }
-local VOLCANO_SPARSE = 0.5 -- density there
 
 -- The mix at (x, z): the first place whose reach (dithered a little, so
 -- the change isn't a hard line) covers it.
@@ -5106,7 +5092,7 @@ local function fillerDensity(x: number, z: number, roadClearance: number): (numb
 		end
 		local mix, id = mixAt(x, z)
 		if id == "volcano" then
-			p *= VOLCANO_SPARSE
+			p *= 0.5 -- VOLCANO_SPARSE = 0.5: density there
 		end
 		return p, mix, true
 	end
@@ -5127,7 +5113,6 @@ end
 -- (1..PropArt's FillerVariants), its trunk's foot at (x, y, z) on the
 -- ground, turned `yaw`, at `scale`.
 export type FillerTree = { kind: string, variant: number, x: number, y: number, z: number, yaw: number, scale: number }
-local FILLER_VARIANTS = 6 -- PropArt.FillerVariants (Shared code can't require Art's builders here)
 
 local function cellSeed(cx: number, cz: number): number
 	return (cx + 1000) * 7919 + (cz + 1000) * 104729 + 17
@@ -5148,9 +5133,9 @@ function WorldPlan.FillerCellTrees(cx: number, cz: number): { FillerTree }
 	for i = 0, FILLER_GRID - 1 do
 		for k = 0, FILLER_GRID - 1 do
 			-- The same seven draws for every candidate, grown or not.
-			local jx, jz = rng:range(-FILLER_JITTER, FILLER_JITTER), rng:range(-FILLER_JITTER, FILLER_JITTER)
+			local jx, jz = rng:range(-3.6, 3.6), rng:range(-3.6, 3.6) -- FILLER_JITTER = 3.6
 			local roll, kindRoll = rng:next(), rng:next()
-			local variant = rng:int(1, FILLER_VARIANTS)
+			local variant = rng:int(1, 6) -- FILLER_VARIANTS = 6: PropArt.FillerVariants (Shared code can't require Art's builders here)
 			local yaw, scaleRoll = rng:range(0, math.pi * 2), rng:next()
 			local x = cx * FILLER_CELL + (i + 0.5) * step + jx
 			local z = cz * FILLER_CELL + (k + 0.5) * step + jz
@@ -5271,7 +5256,6 @@ end
 export type Tuft = { x: number, y: number, z: number, yaw: number, seed: number, biome: string }
 local TUFT_EDGE = { 0.28, 0.62 }
 local TUFT_VERGE = { 0.6, 3.5 }
-local TUFT_TRIES = 16 -- candidates per cell for the fringe and the verges
 local TUFT_NO: { [string]: boolean } = { snow = true, volcano = true }
 
 -- What tufts gather round, binned by FILLER_CELL squares: rocks (a disc to
@@ -5354,7 +5338,7 @@ function WorldPlan.TuftCell(cx: number, cz: number): { Tuft }
 		end
 	end
 	-- The forest's fringe and the road verges.
-	for _ = 1, TUFT_TRIES do
+	for _ = 1, 16 do -- TUFT_TRIES = 16: candidates per cell for the fringe and the verges
 		local x = cx * FILLER_CELL + rng:next() * FILLER_CELL
 		local z = cz * FILLER_CELL + rng:next() * FILLER_CELL
 		local roll, yaw, seed = rng:next(), rng:range(0, math.pi * 2), rng:int(1, 99999)
