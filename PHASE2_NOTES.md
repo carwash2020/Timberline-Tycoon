@@ -4010,3 +4010,19 @@ Studio checks:
 After #168 (auto-loads off first): the gaps that were left. GameServer put a character back on its pad if it falls below y = -200 (Shared/VoidRescue, three times per character at most, never a kill), streams the pad's ground before every respawn, and the bare steps between the save and the character are guarded so one error cannot leave a player with no character. Gates, loading card and Studio default spawn were read and are fine (tests/LoadPathAudit.spec).
 
 Studio checks: PC: press Play, no falling or dying while loading; walk into the Deep mine (still no rescue); in Studio run `game.Players.<you>.Character:PivotTo(CFrame.new(0,-300,0))` in the server console and you are put back on the pad with a warn line. Phone and Xbox: join, die once (axe a hazard or reset), respawn on the pad without falling.
+
+## Plot machines swap their meshes in (branch `phase-2/plot-machines-swap-meshes`, 13 October 2026)
+
+Nothing here was seen in Studio. Check on PC, phone and Xbox (the swap is server side, so what the client shows is the same):
+
+1. Join a server fresh (cold mesh cache) with a saved plot that has a sawmill, a planer, the chop saw and belts. They appear at once
+   as plain boxy machines, you can feed wood and set the cut, and within a few seconds each turns into its Blender model with no
+   flicker of the panel, prompts or signs. Output shows at most one `[MachineSkin] ... did not load` line per machine that truly fails.
+2. Place a sawmill from the shop right after joining (before meshes load) and walk away from it: it swaps without moving or
+   turning. Turn it with the move tool before it swaps: it keeps its place and facing, mesh included.
+3. A 5-piece machine (a Wood Detector, a Tilted Belt) is dressed whole: never a body without its belt or rollers.
+4. Switch Belt: flip its side after it swaps; the paddle swings. Chop saw: the price sign stands over the board on the mesh.
+5. Xbox: the Set the cut / Set the length prompts still show the selection ring and respond to A on the swapped machine; phone: the
+   panel buttons are still tappable (they are the same parts).
+6. Placement ghost: right after joining the ghost turns into the mesh at 0.45 see-through.
+

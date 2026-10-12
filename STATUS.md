@@ -35,9 +35,12 @@ by `tests/AssetIds.spec.luau`: id format and length per kind, no URL or zero ids
 MeshId), unique containers, mesh sharing only Blender-to-Backlog, well-formed MeshTemplates. The four machines that stayed
 part-built in Connor's log (SmeltingFurnace, Prospector, OreChute, CraftBench) had correct ids; they were built at server start
 outside `MeshKit.Attempt`, so a mesh that was not in yet was final. `MiningArt` now swaps the mesh in when it lands, and
-`MachineSkin.Prepare` asks for every piece at once so a five-piece machine is dressed in one round. **Open:** plot machines
-built through `MachineArt` (sawmills, planers, chop saw, belts) have the same gap if built before their meshes are cached
-(needs PlotService to re-dress); the Creator Hub checks for Connor are at the end of `ASSETS.md`.
+`MachineSkin.Prepare` asks for every piece at once so a five-piece machine is dressed in one round. **Plot machines (13 October 2026,
+branch `phase-2/plot-machines-swap-meshes`):** the same gap on `MachineArt` (sawmills, planers, chop saw, belts) is closed: a
+machine built before its meshes are cached is part-built and usable at once, then `MeshKit.Attempt` swaps the mesh in place
+(`MachineArt.wearWhenLoaded`; same gameplay part instances, pivot kept after a move, a failed load keeps the part build with one
+log line, a destroyed machine is dropped). `tests/MachineSwap.spec` pins it for every kind. The Sky Bin has no mesh entry in
+`MachineMeshes`, so there is nothing to swap. Nothing seen in Studio. The Creator Hub checks for Connor are at the end of `ASSETS.md`.
 
 ## Server boot and runtime audit (branch `phase-2/audit-server-boot`, 12 October 2026)
 
