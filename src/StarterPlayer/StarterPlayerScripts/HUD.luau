@@ -86,6 +86,8 @@ local GamepadNavLogic = require(ReplicatedStorage.Shared.GamepadNavLogic)
 local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
 local PhoneHud = require(ReplicatedStorage.Shared.PhoneHud)
 local QuickMenuLogic = require(ReplicatedStorage.Shared.QuickMenuLogic)
+local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
+local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local GamepadNav = require(script.Parent.GamepadNav)
@@ -643,6 +645,7 @@ end
 -- a cooldown, no repeats, a short queue). During the first-sale flow only
 -- errors show: Murph's card and the arrow are the one objective.
 local policy = NoticePolicy.New()
+local tipsOn = true -- the TIPS setting (HUD.SetTips, the SettingShowTips attribute)
 local pumping = false
 
 local function flowQuiet(): boolean
@@ -698,6 +701,10 @@ function HUD.Toast(
 	options: { priority: NoticePolicy.Priority?, key: string?, once: boolean? }?
 )
 	if not toastStack then
+		return
+	end
+	-- TIPS off: a once-a-session tip stays away (not during a tutorial step).
+	if NoticePolicy.IsTip(options) and not SettingsLogic.TipsShown(tipsOn, player:GetAttribute("TutorialStep")) then
 		return
 	end
 	local shown = HudRules.ToastSeconds(message, seconds)
@@ -888,7 +895,6 @@ local function refreshChip()
 	chipText = text
 end
 
-local tipsOn = true
 local buildOpen = false
 local hintHolds: { [string]: boolean } = {} -- panels that keep the bottom row away (HUD.HoldHint)
 
@@ -908,11 +914,22 @@ local function refreshModal()
 	syncRowVisible()
 	local hint = hintLabel
 	if hint then
-		hint.Visible = modalRect == nil and tipsOn and not hintQuiet
+		hint.Visible = modalRect == nil
+			and SettingsLogic.TipsShown(tipsOn, player:GetAttribute("TutorialStep"))
+			and not hintQuiet
 	end
 	refreshChip()
 end
 syncHint = refreshModal
+
+-- The setting can arrive after the HUD starts (the save loads), and the
+-- bar must come back when a tutorial step starts (SettingsLogic.TipsShown).
+player:GetAttributeChangedSignal("SettingShowTips"):Connect(function()
+	tipsOn = player:GetAttribute("SettingShowTips") ~= false
+	refreshModal()
+end)
+player:GetAttributeChangedSignal("TutorialStep"):Connect(refreshModal)
+tipsOn = player:GetAttribute("SettingShowTips") ~= false
 
 -- A piece was picked up (DragController). After a couple, the "how to drag"
 -- hints stop showing.
@@ -2347,6 +2364,11 @@ function HUD.Start()
 		Net.Remote("CashChanged").OnClientEvent:Connect(setCash)
 		Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown, seconds: unknown)
 			if type(message) == "string" then
+				-- A completed purchase also chimes (never a refusal).
+				local sound = SoundData.ForNotice(message)
+				if sound then
+					SoundData.Play(sound)
+				end
 				HUD.Toast(message, if type(seconds) == "number" then seconds else nil)
 			end
 		end)

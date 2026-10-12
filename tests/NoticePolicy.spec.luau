@@ -258,4 +258,12 @@ return function(t)
 		t.eq(NoticePolicy.Tick(state, 1 + NoticePolicy.MaxWait + 1, false, false), nil)
 		t.eq(NoticePolicy.Pending(state), false)
 	end)
+
+	t.test("a tip is a once-keyed notice; refusals and results are not", function()
+		t.eq(NoticePolicy.IsTip({ key = "axeHint", once = true }), true)
+		t.eq(NoticePolicy.IsTip({ key = "axeHint" }), false, "a key alone repeats")
+		t.eq(NoticePolicy.IsTip({ once = true }), false, "no key")
+		t.eq(NoticePolicy.IsTip({ key = "", once = true }), false)
+		t.eq(NoticePolicy.IsTip(nil), false)
+	end)
 end

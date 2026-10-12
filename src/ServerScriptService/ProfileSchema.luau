@@ -94,6 +94,9 @@ export type DailyState = {
 	-- read as 0): the calendar day 1..7 last paid, and the UTC day it paid.
 	loginDay: number?,
 	lastLoginDay: number?,
+	-- The daily-return toast held back while the tutorial runs (the cash is
+	-- already paid). Shown once when it ends, then cleared. Absent = none.
+	loginToast: string?,
 }
 
 -- One log riding in your truck bed (saved, so a disconnect never loses a
@@ -840,6 +843,10 @@ local function applyDaily(record: any)
 		return
 	end
 	daily.areasToday = booleanMap(daily.areasToday)
+	-- A held login toast stays only if it is real text of a sane length.
+	if type(daily.loginToast) ~= "string" or daily.loginToast == "" or #daily.loginToast > 120 then
+		daily.loginToast = nil
+	end
 	local owed = finiteNumber(daily.bonusOwed, 0)
 	daily.bonusOwed = if owed < 0 then 0 else owed
 	if type(daily.goals) ~= "table" then

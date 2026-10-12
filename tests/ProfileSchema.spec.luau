@@ -52,6 +52,24 @@ return function(t)
 		end
 	)
 
+	t.test("a held login toast survives Migrate when it is real text; junk is dropped; idempotent", function()
+		local Schema, data = fresh()
+		t.eq(data.daily.loginToast, nil, "a fresh save holds none")
+		data.daily.loginToast = "Daily return, day 1 of 7: +$15"
+		Schema.Migrate(data)
+		t.eq(data.daily.loginToast, "Daily return, day 1 of 7: +$15")
+		local before = t.loader():shared("Util").deepCopy(data)
+		Schema.Migrate(data)
+		sameClock(before, data)
+		t.eq(data, before)
+		for _, junk in ipairs({ 5, true, "", string.rep("x", 500) }) do
+			local _, bad = fresh()
+			bad.daily.loginToast = junk
+			Schema.Migrate(bad)
+			t.eq(bad.daily.loginToast, nil)
+		end
+	end)
+
 	t.test("camera sensitivity: old saves get 1, junk is clamped, and migrating twice changes nothing", function()
 		local Schema, data = fresh()
 		t.eq(Schema.Template.settings.cameraSensitivity, 1)

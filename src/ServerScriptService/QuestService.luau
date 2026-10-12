@@ -47,6 +47,7 @@ local DayCounterLogic = require(ReplicatedStorage.Shared.DayCounterLogic)
 local NextGoal = require(ReplicatedStorage.Shared.NextGoal)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local RelicData = require(ReplicatedStorage.Shared.RelicData)
+local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -169,6 +170,14 @@ function QuestService.RefreshNextGoal(player: Player)
 	end
 end
 
+-- Listeners told when a player's tutorial ends (DailyService shows the login
+-- toast it held back). QuestService cannot require them: they require it.
+local finishedListeners: { (Player) -> () } = {}
+
+function QuestService.OnFinished(listener: (Player) -> ())
+	table.insert(finishedListeners, listener)
+end
+
 local function finish(player: Player, profile: Profile, how: "completed" | "skipped" | "bypassed")
 	profile.tutorialDone = true
 	profile.tutorialProgress = 0
@@ -185,6 +194,12 @@ local function finish(player: Player, profile: Profile, how: "completed" | "skip
 	end)
 	-- After "Finished the tutorial", so the funnel numbers stay in order.
 	refreshNext(player, profile)
+	for _, listener in ipairs(finishedListeners) do
+		local ok = pcall(listener, player)
+		if not ok then
+			warn("[QuestService] a finish listener failed")
+		end
+	end
 end
 
 local function claimedPlot(profile: Profile): boolean
@@ -278,6 +293,13 @@ function QuestService.Start(player: Player, profile: Profile)
 	pcall(function()
 		player:GetAttributeChangedSignal("ClimateKind"):Connect(function()
 			if type(profile.tipsSeen) ~= "table" then
+				return
+			end
+			-- TIPS off: no tip now, and it stays unseen so turning tips on
+			-- brings it back the next time it applies.
+			if
+				not SettingsLogic.TipsShown(player:GetAttribute("SettingShowTips"), player:GetAttribute("TutorialStep"))
+			then
 				return
 			end
 			local tip = ClimateHudLogic.Tip(player:GetAttribute("ClimateKind"), profile.tipsSeen)

@@ -183,6 +183,13 @@ function NoticePolicy.Classify(text: string): Priority
 	return "normal"
 end
 
+-- A tip: a notice with a key that shows once per session ("put your axe
+-- away"). The TIPS setting hides these (SettingsLogic.TipsShown); refusals
+-- and results never carry a once-key, so they are never hidden by it.
+function NoticePolicy.IsTip(notice: { key: string?, once: boolean? }?): boolean
+	return notice ~= nil and notice.once == true and type(notice.key) == "string" and notice.key ~= ""
+end
+
 function NoticePolicy.New(): State
 	return {
 		visible = {},

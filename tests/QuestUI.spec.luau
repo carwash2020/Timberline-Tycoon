@@ -13,6 +13,8 @@ return function(t)
 			TextChatService = {},
 			TweenService = {},
 			UserInputService = {},
+			SoundService = {}, -- QuestUI plays the step tick through SoundData
+			Debris = { AddItem = function() end },
 		},
 	})
 	local QuestUI = loader:load("StarterPlayer/StarterPlayerScripts/QuestUI")

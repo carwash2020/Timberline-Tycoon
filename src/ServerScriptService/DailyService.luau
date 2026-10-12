@@ -77,6 +77,8 @@ local COUNTED_BY: { [DailyEvent]: DailyData.GoalKind } = {
 	figuredSold = "sellFigured",
 }
 
+local FlushDelay = 4 -- seconds after the tutorial ends before the held login toast shows
+
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local clock: () -> number = os.time -- tests replace this
 local loop = 1 -- the core loop that runs (Init)
@@ -124,7 +126,14 @@ local function claimLogin(player: Player, profile: Profile): boolean
 	local message = if day == DailyData.LoginDays
 		then string.format("Day %d of your daily return: the weekly milestone! +%s", day, Util.formatCash(reward))
 		else string.format("Daily return, day %d of %d: +%s", day, DailyData.LoginDays, Util.formatCash(reward))
-	toast(player, profile, message)
+	if profile.tutorialDone then
+		notify(player, message)
+	else
+		-- The cash is already in the wallet; the toast that explains it waits
+		-- for the tutorial to end (DailyService.FlushLoginToast), and is saved
+		-- so a rejoin mid-tutorial does not lose it (claimLogin pays once a day).
+		daily.loginToast = message
+	end
 	analytics(player, "DailyReturn", day)
 	return true
 end
@@ -398,8 +407,23 @@ function DailyService.Start(player: Player, profile: Profile)
 	end
 	rollIfNewDay(player, profile)
 	claimLogin(player, profile)
+	DailyService.FlushLoginToast(player, profile) -- a held toast from a finished tutorial
 	publish(player, profile)
 	QuestService.RefreshNextGoal(player)
+end
+
+-- Shows the login toast that was held back during the tutorial, once. A
+-- no-op until the tutorial is done and when none is waiting. Cleared
+-- before it is sent, so it can never show twice.
+function DailyService.FlushLoginToast(player: Player, profile: Profile): boolean
+	local daily = profile.daily
+	local message = daily.loginToast
+	if not profile.tutorialDone or type(message) ~= "string" or message == "" then
+		return false
+	end
+	daily.loginToast = nil
+	notify(player, message)
+	return true
 end
 
 -- New goals at midnight for everyone online.
@@ -429,6 +453,16 @@ function DailyService.Init(
 	turnInRemote: RemoteEvent?
 )
 	notify = notifyFn
+	-- The day-1 login toast waits for the tutorial's end; a few seconds
+	-- later, so it does not land on the farewell and the joy beat.
+	QuestService.OnFinished(function(player: Player)
+		task.delay(FlushDelay, function()
+			local profile = ProfileService.GetProfile(player)
+			if profile then
+				DailyService.FlushLoginToast(player, profile)
+			end
+		end)
+	end)
 	if turnInRemote then
 		turnInRemote.OnServerEvent:Connect(onTurnIn)
 	end

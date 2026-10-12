@@ -13,6 +13,9 @@ local NewsService = {}
 local ATTRIBUTE = "NewsV1Seen"
 
 type Save = {
+	tutorialDone: boolean?,
+	tutorialRefresher: boolean?,
+	tutorialReplay: boolean?,
 	onboarding: { [string]: boolean }?,
 }
 
@@ -24,7 +27,12 @@ local function book(profile: Save): { [string]: boolean }
 end
 
 function NewsService.Start(player: Player, profile: Save)
-	local seen = book(profile)[NewsLogic.Key] == true
+	local pages = book(profile)
+	-- A brand-new player has nothing new to catch up on: mark it seen.
+	if NewsLogic.IsBrandNew(profile.tutorialDone, profile.tutorialRefresher, profile.tutorialReplay) then
+		NewsLogic.Mark(pages)
+	end
+	local seen = pages[NewsLogic.Key] == true
 	player:SetAttribute(ATTRIBUTE, seen)
 end
 
