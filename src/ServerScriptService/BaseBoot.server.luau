@@ -38,11 +38,12 @@ end
 local function service(name: string): any
 	local mod = ServerScriptService:FindFirstChild(name)
 	if mod == nil or not mod:IsA("ModuleScript") then
+		warn("[BaseBoot] " .. name .. " is not in ServerScriptService; what depends on it was not started")
 		return nil
 	end
 	local ok, result = pcall(require, mod)
 	if not ok then
-		warn("[BaseBoot] " .. name .. " " .. tostring(result))
+		warn("[BaseBoot] " .. name .. " did not load: " .. tostring(result))
 		return nil
 	end
 	return result

@@ -27,6 +27,9 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Server boot and runtime audit (branch `phase-2/audit-server-boot`, 12 October 2026)
+
+Read all of ServerScriptService and the server side of Shared for things a real Studio server start would trip on that the mocked specs cannot see. Fixed: the v2 wiring in GameServer ran bare (one throw and "services" never opened, PlayerAdded never connected); MiningBoot built the mine at server start, before MapBuilder's Underground step, so the mine's own rubble could be doubled by an untracked wall (it now waits for the Remotes folder like BaseBoot); a player who left and rejoined the same server did not get their stored shop boxes back (BoxService "restored" flag); MiningBoot, TownBoardBoot and BaseBoot now warn when a module is missing or does not load. Checks in PHASE2_NOTES.md "Server boot and runtime audit". Specs: `ServerBootAudit.spec`, `BoxService.spec`.
 ## Client boot audit (branch `phase-2/audit-client-boot`, 12 October 2026)
 
 Connor's log: `ChopSawController Start took 8.03s`, `SawmillController Start took 8.02s`. Seven controllers (ChopSaw, Sawmill,

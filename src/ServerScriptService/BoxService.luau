@@ -129,7 +129,11 @@ local entered: { [string]: { string } } = {}
 local respawnAt: { [string]: number } = {}
 local homes: { [string]: Home } = {}
 local skips: { [number]: { [string]: boolean } } = {}
-local restored: { [number]: boolean } = {}
+-- [userId] -> the profile whose stored boxes were put back. The profile, not a
+-- flag: a player who leaves and rejoins the same server gets a new profile
+-- table (Commit took their boxes off the counter on the way out), so their
+-- stored boxes must come back; weak so a released profile is not kept alive.
+local restored: { [number]: any } = setmetatable({}, { __mode = "v" }) :: any
 local stocked: { [Instance]: boolean } = {}
 local rememberedShops: { [string]: ShopAnchor } = {}
 local signStock: TextLabel? = nil
@@ -1385,10 +1389,10 @@ function BoxService.Commit(player: Player)
 end
 
 function BoxService.Restore(player: Player, profile: any)
-	if restored[player.UserId] then
+	if restored[player.UserId] == profile then
 		return
 	end
-	restored[player.UserId] = true
+	restored[player.UserId] = profile
 	local storage = profile.storage
 	if type(storage) ~= "table" then
 		return
