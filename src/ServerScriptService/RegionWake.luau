@@ -48,6 +48,35 @@ local function people(): { RegionLogic.Person }
 	return out
 end
 
+RegionWake.Batch = 150 -- trees a frame a sweep looks at (about 1,400 in the forest)
+
+local lastList: { RegionLogic.Person }? = nil -- the people the last sweep started with
+local lastHeres: { RegionLogic.Here | boolean }? = nil
+local doneSignature: string? = nil -- the people a finished sweep saw: the same again, nothing to redo
+local dirty = true -- a tree arrived before any sweep: sweep
+local queue: { Model } = {}
+local cursor = 1 -- the next tree of `queue` a sweep looks at; past its end: no sweep running
+local sweepSignature = ""
+
+-- Whether `model` should be in the world or parked for these people, and put
+-- it there. A tutorial oak always stays.
+local function settle(model: Model, home: Folder, list: { RegionLogic.Person }, heres: { RegionLogic.Here | boolean })
+	if model:GetAttribute("TutorialGrove") == true then
+		if model.Parent ~= home then
+			model.Parent = home
+		end
+		return
+	end
+	local region = model:GetAttribute("Region")
+	local regionId = if type(region) == "string" then region else "wild"
+	local pivot = model:GetPivot().Position
+	local keep = RegionLogic.KeepTreeWith(regionId, pivot.X, pivot.Z, pivot.Y, list, heres)
+	local want = if keep then home else asleepFolder()
+	if model.Parent ~= want then
+		model.Parent = want
+	end
+end
+
 local function watch(model: Instance)
 	if not model:IsA("Model") then
 		return
@@ -59,39 +88,101 @@ local function watch(model: Instance)
 	model.Destroying:Connect(function()
 		known[model] = nil
 	end)
-end
-
-local function pass()
-	local home = treesFolder
-	if not home then
+	-- A tree just planted is put where the last sweep's people want it in the
+	-- same frame, before it replicates, not parked a sweep later (a client in
+	-- a far corner was sent the whole forest and told to drop it again). The
+	-- placer sets its attributes right after parenting, so look a beat later.
+	local list, heres = lastList, lastHeres
+	if not list or not heres then
+		dirty = true
 		return
 	end
+	task.defer(function()
+		local home = treesFolder
+		if home and model.Parent == home and lastList == list then
+			settle(model, home, list, heres)
+		end
+	end)
+end
+
+local function signatureOf(list: { RegionLogic.Person }): string
+	local parts: { string } = {}
+	for _, p in ipairs(list) do
+		table.insert(parts, string.format("%.9g,%.9g,%.9g", p.x, p.y, p.z))
+	end
+	return table.concat(parts, ";")
+end
+
+-- A slice of the sweep: Batch trees, then give the frame back.
+local function work(list: { RegionLogic.Person }, heres: { RegionLogic.Here | boolean })
+	local home = treesFolder
+	if not home then
+		cursor = #queue + 1
+		return
+	end
+	local last = math.min(cursor + RegionWake.Batch - 1, #queue)
+	for i = cursor, last do
+		local model = queue[i]
+		if model.Parent == nil then
+			known[model] = nil
+		else
+			settle(model, home, list, heres)
+		end
+	end
+	cursor = last + 1
+	if cursor > #queue then
+		doneSignature = sweepSignature
+		queue = {}
+	end
+end
+
+-- One heartbeat. Every Tick seconds a sweep over the trees starts if the
+-- people are not where the last finished sweep saw them (standing still
+-- changes no answer: nothing to do); a sweep runs RegionWake.Batch trees a
+-- frame. Exposed for the specs.
+local elapsed = RegionWake.Tick
+function RegionWake.Step(dt: number)
+	if cursor <= #queue and lastList and lastHeres then
+		work(lastList, lastHeres)
+		return
+	end
+	elapsed += dt
+	if elapsed < RegionWake.Tick then
+		return
+	end
+	elapsed = 0
 	local list = people()
 	-- Nobody here: leave every tree where MapBuilder put it.
 	if #list == 0 then
 		return
 	end
-	local away = asleepFolder()
-	for model in pairs(known) do
-		if model.Parent == nil then
-			known[model] = nil
-			continue
-		end
-		if model:GetAttribute("TutorialGrove") == true then
-			if model.Parent ~= home then
-				model.Parent = home
-			end
-			continue
-		end
-		local region = model:GetAttribute("Region")
-		local regionId = if type(region) == "string" then region else "wild"
-		local pivot = model:GetPivot().Position
-		local keep = RegionLogic.KeepTree(regionId, pivot.X, pivot.Z, pivot.Y, list)
-		local want = if keep then home else away
-		if model.Parent ~= want then
-			model.Parent = want
-		end
+	local signature = signatureOf(list)
+	if signature == doneSignature and not dirty then
+		return
 	end
+	dirty = false
+	sweepSignature = signature
+	local heres = RegionLogic.Heres(list)
+	lastList, lastHeres = list, heres
+	queue = {}
+	for model in pairs(known) do
+		table.insert(queue, model)
+	end
+	cursor = 1
+	if #queue == 0 then
+		doneSignature = signature
+		return
+	end
+	work(list, heres)
+end
+
+-- Starts watching `trees` (Init does, once the map is in). Exposed for the specs.
+function RegionWake.Attach(trees: Folder)
+	treesFolder = trees
+	for _, child in ipairs(trees:GetChildren()) do
+		watch(child)
+	end
+	trees.ChildAdded:Connect(watch)
 end
 
 function RegionWake.Init()
@@ -106,20 +197,10 @@ function RegionWake.Init()
 			warn("[RegionWake] no Trees folder")
 			return
 		end
-		treesFolder = trees
-		for _, child in ipairs(trees:GetChildren()) do
-			watch(child)
-		end
-		trees.ChildAdded:Connect(watch)
-		local elapsed = RegionWake.Tick
+		RegionWake.Attach(trees)
 		RunService.Heartbeat:Connect(function(dt: number)
-			elapsed += dt
-			if elapsed < RegionWake.Tick then
-				return
-			end
-			elapsed = 0
 			local ok, err = pcall(function(): any
-				pass()
+				RegionWake.Step(dt)
 				return true
 			end)
 			if not ok then

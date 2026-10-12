@@ -247,21 +247,20 @@ local function hook(model: Model)
 	end)
 end
 
+-- The keepers are NPCService's models, and NPCService tags every one "NPC"
+-- (the only place a Talk prompt is made). Hooking those (the ones there now,
+-- then each one the tag reaches) replaces walking every descendant of the
+-- workspace once and being called for every instance the forest adds.
 local function watchKeepers()
-	local Workspace = game:GetService("Workspace")
+	local CollectionService = game:GetService("CollectionService")
 	local function consider(inst: Instance)
 		if inst:IsA("Model") then
 			hook(inst)
 		end
 	end
-	if type((Workspace :: any).GetDescendants) == "function" then
-		for _, child in ipairs(Workspace:GetDescendants()) do
-			consider(child)
-		end
-	end
-	local added = (Workspace :: any).DescendantAdded
-	if type(added) == "table" and type(added.Connect) == "function" then
-		added:Connect(consider)
+	CollectionService:GetInstanceAddedSignal("NPC"):Connect(consider)
+	for _, inst in ipairs(CollectionService:GetTagged("NPC")) do
+		consider(inst)
 	end
 end
 

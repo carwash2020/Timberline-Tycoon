@@ -100,8 +100,8 @@ return function(t)
 			},
 			-- The map watchers wait for the world: not run here.
 			globals = {
-				task = { spawn = function() end },
-				workspace = {
+				task = { spawn = opts.spawn or function() end },
+				workspace = opts.workspace or {
 					FindFirstChild = opts.findFirstChild or function()
 						return nil -- no plots here: the trophy step is skipped
 					end,
@@ -187,6 +187,113 @@ return function(t)
 		})
 		w.S.BuildTrophies(w.player)
 		t.ok(table.find(asked, "SignPost") ~= nil, "the trophy step reached the plot (it looked for the sign post)")
+	end)
+
+	-- Server audit leftover (11 October 2026): V1Init listened to every
+	-- instance added anywhere under TimberlineMap (the forest plants ~1,400
+	-- trees there) to catch the court's TemperSpot. Now it walks the map once
+	-- and listens only to TownScenes, where MapBuilder puts the court.
+	t.test("the map is walked once and only the town scenes are listened to, and the court's anvil is found", function()
+		local function inst(class, name, parent)
+			local i = { ClassName = class, Name = name, Parent = parent, kids = {} }
+			function i:IsA(c)
+				return c == class or (c == "BasePart" and class == "Part")
+			end
+			function i:FindFirstChild(n)
+				return if n == "SkyForgePoint" then self.point else nil
+			end
+			function i:GetDescendants()
+				return self.kids
+			end
+			return i
+		end
+		local listens = {}
+		local function listener(name)
+			return {
+				Connect = function(_, fn)
+					table.insert(listens, { on = name, fn = fn })
+				end,
+			}
+		end
+		local map = inst("Folder", "TimberlineMap")
+		local oak = inst("Model", "Tree")
+		local scenes = inst("Folder", "TownScenes", map)
+		map.kids = { oak, scenes }
+		map.DescendantAdded = listener("map")
+		scenes.DescendantAdded = listener("scenes")
+		map.WaitForChild = function(_, name)
+			return if name == "TownScenes" then scenes else nil
+		end
+		local walks = { map = 0, scenes = 0 }
+		local mapKids, sceneKids = map.GetDescendants, scenes.GetDescendants
+		map.GetDescendants = function(self)
+			walks.map += 1
+			return mapKids(self)
+		end
+		scenes.GetDescendants = function(self)
+			walks.scenes += 1
+			return sceneKids(self)
+		end
+		local w
+		w = setup({
+			spawn = function(fn)
+				fn()
+			end,
+			workspace = {
+				FindFirstChild = function()
+					return nil
+				end,
+				WaitForChild = function(_, name)
+					return if name == "TimberlineMap" then map else nil
+				end,
+			},
+		})
+		t.eq(walks.map, 1, "the map is walked once")
+		t.eq(#listens, 1)
+		t.eq(listens[1].on, "scenes", "and only the town scenes are listened to")
+		-- The court lands later: its anvil's TemperSpot is found.
+		local anvil = t.roblox.Instance.new("Part")
+		anvil.Name = "Anvil"
+		anvil.Position = Vector3.new(500, 3, 0) -- far from the tagged anvil the setup stands at
+		anvil.Parent = t.roblox.Instance.new("Folder")
+		local spot = t.roblox.Instance.new("Attachment")
+		spot.Name = "TemperSpot"
+		spot.Parent = anvil
+		local point = t.roblox.Instance.new("Attachment")
+		point.Name = "SkyForgePoint" -- its prompt is already there (Lune has no ProximityPrompt events)
+		point.Parent = anvil
+		listens[1].fn(spot)
+		w.player.Character.FindFirstChild = function(_, name)
+			return if name == "HumanoidRootPart"
+				then {
+					Position = Vector3.new(502, 3, 0),
+					IsA = function()
+						return true
+					end,
+				}
+				else nil
+		end
+		t.ok(w.S.AnvilNear(w.player) ~= nil)
+	end)
+
+	t.test("TemperSpot is made only by the court, which is placed in TownScenes", function()
+		local fs = require("@lune/fs")
+		local hits = 0
+		for _, path in ipairs({
+			"src/ReplicatedStorage/Shared/Art/BuildingArt.luau",
+			"src/ReplicatedStorage/Shared/Art/PropArt.luau",
+			"src/ServerScriptService/PlotService.luau",
+			"src/ServerScriptService/MapBuilder.server.luau",
+		}) do
+			local source = fs.readFile(path)
+			for _ in string.gmatch(source, "TemperSpot") do
+				hits += 1
+			end
+		end
+		t.eq(hits, 1, "one TemperSpot in the builders: the court's anvil")
+		local map = fs.readFile("src/ServerScriptService/MapBuilder.server.luau")
+		t.ok(string.find(map, 'folder.Name = "TownScenes"', 1, true), "the court's home folder")
+		t.ok(string.find(map, "BuildingArt.SkyForgeCourt()", 1, true))
 	end)
 
 	t.test("tempering charges the exact cost and stamps the grade; nothing else moves", function()

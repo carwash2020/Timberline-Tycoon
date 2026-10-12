@@ -29,7 +29,19 @@ return function(t)
 		}
 	end
 
+	-- A clock that moves 4 ms every time it is read, so the slices (12 ms, 30 ms)
+	-- end after a fixed number of blocks whatever the machine's speed. (With the
+	-- real os.clock a fast CI runner finished 100 flat chunks inside the slices
+	-- and 'yields as it goes' failed once on #159.)
+	local STEP = 0.004
 	local function loadBuilder(terrain, yields)
+		local now = 0
+		local fakeOs = setmetatable({
+			clock = function()
+				now += STEP
+				return now
+			end,
+		}, { __index = os })
 		local ws = { Terrain = terrain }
 		function ws.SetAttribute() end
 		function ws.Raycast()
@@ -56,6 +68,7 @@ return function(t)
 					end,
 				},
 				workspace = ws,
+				os = fakeOs,
 				task = {
 					wait = function()
 						yields.n += 1

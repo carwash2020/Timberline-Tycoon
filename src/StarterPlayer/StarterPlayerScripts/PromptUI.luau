@@ -311,20 +311,46 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	table.insert(conns, prompt.Destroying:Once(cleanup))
 end
 
+-- Only prompts are touched. (ClassName is a property read; IsA is a call per
+-- instance, and the forest adds tens of thousands of parts after Start.)
 local function restyle(inst: Instance)
-	if inst:IsA("ProximityPrompt") then
-		inst.Style = Enum.ProximityPromptStyle.Custom
+	if inst.ClassName == "ProximityPrompt" then
+		(inst :: ProximityPrompt).Style = Enum.ProximityPromptStyle.Custom
 	end
+end
+
+-- How many instances the first scan looks at before it gives the frame back
+-- (client audit leftover: it walked every descendant of the workspace in one go).
+PromptUI.ScanPerFrame = 4000
+
+-- Restyles the prompts in `list`, PromptUI.ScanPerFrame instances at a time,
+-- calling `wait` between the slices. Returns how many it restyled.
+function PromptUI.RestyleAll(list: { Instance }, perStep: number, wait: () -> ()): number
+	local styled, looked = 0, 0
+	for _, inst in ipairs(list) do
+		if inst.ClassName == "ProximityPrompt" then
+			(inst :: ProximityPrompt).Style = Enum.ProximityPromptStyle.Custom
+			styled += 1
+		end
+		looked += 1
+		if looked >= perStep then
+			looked = 0
+			wait()
+		end
+	end
+	return styled
 end
 
 function PromptUI.Start()
 	if not GameConfig.CustomPrompts then
 		return
 	end
-	for _, inst in ipairs(workspace:GetDescendants()) do
-		restyle(inst)
-	end
+	-- Connected first: a prompt that appears while the scan is still running is
+	-- caught here, one the scan already passed is not missed.
 	workspace.DescendantAdded:Connect(restyle)
+	task.spawn(function()
+		PromptUI.RestyleAll(workspace:GetDescendants(), PromptUI.ScanPerFrame, task.wait)
+	end)
 	RunService.Heartbeat:Connect(function(dt: number)
 		if next(watched) == nil then
 			return
