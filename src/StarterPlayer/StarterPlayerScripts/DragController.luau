@@ -79,7 +79,6 @@ local TOUCH_PRIORITY = Enum.ContextActionPriority.Low.Value -- under the touch t
 local HINT_EVERY = 6 -- seconds between "put your axe away" hints
 local POLL = 0.2 -- seconds between the reticle's checks
 local HEAL_AFTER = 1 -- a piece the server still says we hold, after we let go: tell it again
-local BOOT_WAIT = 120 -- seconds to wait for the server to say which loop runs
 local BUTTON_SIZE = Vector2.new(60, UITheme.Size.Tap)
 
 type Device = "mouse" | "touch" | "pad"
@@ -995,12 +994,8 @@ end
 -- Start
 ---------------------------------------------------------------------------
 
-function DragController.Start()
+local function startLoop()
 	-- MapBuilder says which loop runs before it builds anything.
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < BOOT_WAIT do
-		waited += task.wait(0.25)
-	end
 	if not CoreLoop.V2() then
 		return -- the v1 loop: nothing here runs
 	end
@@ -1080,6 +1075,11 @@ function DragController.Start()
 			refreshReticle()
 		end
 	end)
+end
+
+-- Returns at once: the loop is read when the server publishes it (CoreLoop.WhenKnown).
+function DragController.Start()
+	CoreLoop.WhenKnown(startLoop)
 end
 
 return DragController

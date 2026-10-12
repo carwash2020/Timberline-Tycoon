@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GamepadNav = require(script.Parent.GamepadNav)
 local HUD = require(script.Parent.HUD)
 local UITheme = require(script.Parent.UITheme)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 local ForgeUI = {}
@@ -629,7 +630,9 @@ end
 function ForgeUI.Start()
 	local player = Players.LocalPlayer :: Player
 	task.spawn(function()
-		local folder = ReplicatedStorage:WaitForChild("Remotes", 60)
+		-- As long as the server may take to build the world (a 300 s build in
+		-- Studio, 12 October 2026): at 60 s the Forge never opened this session.
+		local folder = ReplicatedStorage:WaitForChild("Remotes", Net.RemotesWaitSeconds)
 		local remote = folder and folder:WaitForChild("ForgeOpen", 60)
 		if remote and remote:IsA("RemoteEvent") then
 			remote.OnClientEvent:Connect(function(view: unknown)

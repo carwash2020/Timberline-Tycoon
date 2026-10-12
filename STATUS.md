@@ -27,6 +27,16 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Client boot audit (branch `phase-2/audit-client-boot`, 12 October 2026)
+
+Connor's log: `ChopSawController Start took 8.03s`, `SawmillController Start took 8.02s`. Seven controllers (ChopSaw, Sawmill,
+Carry, Chop, Cut, Drag, WoodFX) polled for `CoreLoopActive` with `task.wait` inside Start (8 to 120 s), held the client ready
+handshake, and after the wait decided for the v1 loop for good. `CoreLoop.WhenKnown` now runs their setup when the server
+publishes the loop, however late, and Start returns at once. Also: ForgeUI waited 60 s for the Remotes folder (a build takes
+300 s, so the Forge never opened) and QuestUI 30 s for Murph's portrait; both wait past the build now. The store's art discs show
+their letter when an image fails to load. The loading card no longer needs a bare `require` of LoadingTips. Spec:
+`tests/CoreLoopWhenKnown.spec.luau`. Studio checks are in the PR body.
+
 ## Load and spawn path audit (branch `phase-2/load-path-audit`, 12 October 2026)
 
 Void rescue for characters (Shared/VoidRescue, y -200, 3 per character), spawn-area streaming before every respawn, guarded join steps. Details in PHASE2_NOTES.md. Needs a Studio look (checks listed there).

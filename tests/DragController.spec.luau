@@ -8,11 +8,33 @@ return function(t)
 	local roblox = t.roblox
 	local Instance, Enum, Color3 = roblox.Instance, roblox.Enum, roblox.Color3
 
+	local current
+	roblox.implementMethod("Workspace", "GetAttributeChangedSignal", function(_, name)
+		return {
+			Connect = function(_, fn)
+				t.eq(name, "CoreLoopActive")
+				table.insert(current.pending, fn)
+				return { Disconnect = function() end }
+			end,
+		}
+	end)
+
 	local function setup(loop)
 		local game = Instance.new("DataModel")
 		local workspace = game:GetService("Workspace")
 		workspace:SetAttribute("CoreLoopActive", loop)
 		local rec = { binds = {}, connections = 0, made = {}, renderSteps = {}, waited = 0 }
+		-- The loop not published yet: the spec publishes it later through
+		-- the changed signal (@lune/roblox lacks it; see implementMethod below).
+		local pending = {}
+		rec.pending = pending
+		current = rec
+		function rec.publish(value)
+			workspace:SetAttribute("CoreLoopActive", value)
+			for _, fn in ipairs(pending) do
+				fn()
+			end
+		end
 		local function sig()
 			return {
 				Connect = function()
@@ -150,12 +172,20 @@ return function(t)
 		t.eq(rec.waited, 0, "and it didn't wait: the loop was known")
 	end)
 
-	t.test("no word from the server about the loop: it waits a while, then stays off", function()
-		local rec = setup(nil)
-		t.ok(rec.waited >= 60, "waited " .. rec.waited)
-		t.eq(rec.binds, {})
-		t.eq(rec.connections, 0)
-	end)
+	t.test(
+		"no word from the server about the loop: Start returns at once, builds nothing, starts when it comes",
+		function()
+			local rec = setup(nil)
+			t.eq(rec.waited, 0, "Start did not yield (it used to wait up to 120 s)")
+			t.eq(rec.binds, {})
+			t.eq(rec.connections, 0)
+			rec.publish(1)
+			t.eq(rec.binds, {}, "the v1 loop: still nothing")
+			local late = setup(nil)
+			late.publish(2)
+			t.eq(#late.binds, 1, "v2 arriving late still starts it (it used to stay off for good)")
+		end
+	)
 
 	t.test("under v2: touches through a low-priority action, the hold's keys only while holding", function()
 		local rec = setup(2)

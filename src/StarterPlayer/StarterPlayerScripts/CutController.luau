@@ -73,7 +73,6 @@ CutController.RayLength = 250
 CutController.WoodGroup = "Wood" -- nearest-section search; the pointer ray does not use it
 CutController.NearSlack = 1.5 -- studs past the axe's reach the nearest-section search looks
 CutController.HardToastEvery = 3
-CutController.BootWait = 120 -- seconds to wait for the server to say which loop runs
 
 local READY_COLOR = Color3.fromRGB(255, 244, 214)
 local HARD_COLOR = Color3.fromRGB(255, 170, 70)
@@ -788,12 +787,8 @@ local function watchCharacter(char: Model)
 	end)
 end
 
-function CutController.Start()
+local function startLoop()
 	-- MapBuilder says which loop runs before it builds anything.
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < CutController.BootWait do
-		waited += task.wait(0.25)
-	end
 	if not CoreLoop.V2() then
 		return -- the v1 loop: ChopController swings
 	end
@@ -866,6 +861,11 @@ function CutController.Start()
 	if player.Character then
 		watchCharacter(player.Character)
 	end
+end
+
+-- Returns at once: the loop is read when the server publishes it (CoreLoop.WhenKnown).
+function CutController.Start()
+	CoreLoop.WhenKnown(startLoop)
 end
 
 return CutController
