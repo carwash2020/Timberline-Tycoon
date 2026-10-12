@@ -1329,17 +1329,19 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	nameSign(model, CF(0, signY, signZ), signW, signH, title, accent, TRIM, TRIM, false, 0.7)
 	for _, s in ipairs({ -1, 1 }) do
 		local roofY = RY - (RY - KY) * 4.6 / KX -- the upper roof, 4.6 out from the ridge
-		local h = signY - signH / 2 - roofY + 0.5
+		local h = signY - signH / 2 - NAME_FRAME - roofY + 0.5 -- up to the frame's underside, not into it
 		dBox(model, "SignPost", V3(0.5, h, 0.5), CF(s * 4.6, roofY - 0.5 + h / 2, signZ + 0.5), TIMBER)
-		gooseneck(model, CF(s * 5.2, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
+		-- (the arm starts on the frame's top face, not inside it)
+		gooseneck(model, CF(s * 5.2, signY + (signH + NAME_FRAME) / 2 + 0.42, signZ - 0.2))
 	end
 	-- Porch: two posts flanking the opening, a lantern on each.
 	-- Clear of the grindstone (x ±7.6) and of the door-width scan at the wall.
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(model, "PorchPost", V3(0.45, 6.4, 0.45), CF(s * 6.2, 3.2, -HZ - 1.15), TIMBER, MAT.Wood)
 	end
-	Kit.lantern(model, CF(6.2, 5.8, -HZ - 1.15), 0.75)
-	Kit.lantern(model, CF(-6.2, 5.8, -HZ - 1.15), 0.75) -- the west post lights the grindstone side at night
+	-- (each lantern stands on its post's top, 6.4 high, not sunk into it)
+	Kit.lantern(model, CF(6.2, 6.93, -HZ - 1.15), 0.75)
+	Kit.lantern(model, CF(-6.2, 6.93, -HZ - 1.15), 0.75) -- the west post lights the grindstone side at night
 	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
 	-- The counter stands at the back (final studs: BuildingArt.ToolShedCounterZ).
 	local CZ = BuildingArt.ToolShedCounterZ / BuildingArt.Scale.ToolShed
@@ -1352,7 +1354,7 @@ local function toolShed(model: Model, title: string, accent: Color3)
 
 	-- Out front: the grindstone and the chopping block; firewood stacked by
 	-- the west wall (all of it solid; it was the east wall until the shed grew wider).
-	grindstone(model, CF(-7.6, 0, -HZ - 2.2))
+	grindstone(model, CF(-8.4, 0, -HZ - 2.2)) -- (was -7.6: its leg cut into the porch post)
 	choppingBlock(model, CF(7.6, 0, -HZ - 2.2), rng)
 	for row = 0, 1 do
 		for i = 0, 1 - row do
@@ -1868,7 +1870,14 @@ local function addHoursBoard(model: Model, shopId: string)
 	if y < clear then
 		y = clear
 	end
-	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, at.Z), SIGN_BOARD, MAT.Wood)
+	-- (a door track in the way: stand on its top instead)
+	local track = model:FindFirstChild("DoorTrack")
+	if track and track:IsA("BasePart") then
+		y = math.max(y, track.CFrame.Position.Y + track.Size.Y / 2 + h / 2)
+	end
+	-- Front-flush with the header it stands on, so it never cuts into the wall behind it.
+	local boardZ = at.Z - host.Size.Z / 2 + depth / 2
+	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, boardZ), SIGN_BOARD, MAT.Wood)
 	Kit.decor(board)
 	board:SetAttribute("ShopId", shopId)
 	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do

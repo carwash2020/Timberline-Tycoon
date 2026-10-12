@@ -78,13 +78,13 @@ end
 -- touches the wall or the one before it.
 local function sideWindow(parent: Instance, side: number, x: number, z: number, cy: number, w: number, h: number)
 	local color = Kit.shade(hex("#963E2C"), -0.1)
-	box(parent, "SideWindowFrame", V3(0.3, h + 0.8, w + 0.8), CF(x + side * 0.1, cy, z), TRIM)
-	local pane = box(parent, "WindowGlass", V3(0.12, h, w), CF(x + side * 0.31, cy, z), hex("#BFD9E6"), MAT.Glass)
+	box(parent, "SideWindowFrame", V3(0.3, h + 0.8, w + 0.8), CF(x + side * 0.15, cy, z), TRIM)
+	local pane = box(parent, "WindowGlass", V3(0.12, h, w), CF(x + side * 0.36, cy, z), hex("#BFD9E6"), MAT.Glass)
 	pane.Transparency = 0.45
 	pane.CastShadow = false
-	box(parent, "SideWindowSill", V3(0.6, 0.3, w + 1.4), CF(x + side * 0.25, cy - h / 2 - 0.55, z), TRIM)
+	box(parent, "SideWindowSill", V3(0.6, 0.3, w + 1.4), CF(x + side * 0.3, cy - h / 2 - 0.55, z), TRIM)
 	for _, s in ipairs({ -1, 1 }) do
-		box(parent, "SideShutter", V3(0.25, h + 0.8, 0.9), CF(x + side * 0.075, cy, z + s * (w / 2 + 0.85)), color)
+		box(parent, "SideShutter", V3(0.25, h + 0.8, 0.9), CF(x + side * 0.125, cy, z + s * (w / 2 + 0.85)), color)
 	end
 end
 
@@ -216,8 +216,8 @@ local function shopSpecific(model: Model, spec: Spec)
 		-- (The grindstone and the chopping block stand out front, and the door
 		-- header carries the hours board, so the yard has no planters or sandwich
 		-- board; the barrel and the crate stand by the west wall.)
-		barrel(model, -hw + 4.2, gy, fz - 2.4)
-		crate(model, hw - 4.2, gy, fz - 2.6, 1.7)
+		barrel(model, -hw + 0.9, gy, fz - 2.4)
+		crate(model, hw - 3.2, gy, fz - 2.6, 1.7)
 		chimney(model, -6, 6, spec.roofTop - 2.4, 5)
 		-- Two windows in each long wall (the long sides were bare boards), lit at
 		-- night like every window, and a flagstone path from the doormat out to the lane.

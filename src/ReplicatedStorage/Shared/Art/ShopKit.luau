@@ -584,10 +584,10 @@ function ShopKit.TierStand(parent: Instance, s: StandSpec): Part
 	HoverTag.Mark(plinth, hover)
 	plinth:SetAttribute("StandTier", tier)
 	-- The flag: a post at the aisle-side front corner, standing in the plinth's margin.
-	local px = s.at.X + s.aisle * (s.size.X / 2 - 0.12)
+	local px = s.at.X + s.aisle * (s.size.X / 2 - 0.08) -- (flush with the plinth's edge: the case's base overhung it)
 	local pz = s.at.Z - s.size.Z / 2 + 0.12
 	local base = s.at.Y + s.size.Y / 2
-	local postTop = s.flagY - ShopKit.FlagSize.Y / 2
+	local postTop = s.flagY - ShopKit.FlagSize.Y / 2 - 0.1 -- up to the brass backing's underside, not into it
 	local post =
 		dBox(parent, "TierPost", V3(0.16, postTop - base, 0.16), CF(px, (base + postTop) / 2, pz), BRASS, MAT.Metal)
 	local yaw = CFrame.Angles(0, -s.aisle * ShopKit.FlagYaw, 0)
@@ -645,7 +645,14 @@ function ShopKit.SectionSigns(
 	parent: Instance,
 	shop: string,
 	sections: { Section },
-	cfg: { headerY: number, headerZ: number, tieY: number, subShift: number?, tieMaxX: number? }
+	cfg: {
+		headerY: number,
+		headerZ: number,
+		tieY: number,
+		subShift: number?,
+		tieMaxX: number?,
+		maxW: number?,
+	}
 )
 	local placements = StoreStock.Placements(shop)
 	local lanes: { [string]: ShelfLayout.Lane? } = {}
@@ -676,7 +683,7 @@ function ShopKit.SectionSigns(
 			continue
 		end
 		local cx = (lane.x0 + lane.x1) / 2
-		local w = lane.x1 - lane.x0 - 0.6
+		local w = math.min(lane.x1 - lane.x0 - 0.6, cfg.maxW or math.huge) -- (maxW: a header narrower than its lane clears a sloping roof)
 		tie(cx, w, cfg.headerZ)
 		ShopKit.HeaderSign(parent, {
 			cx = cx,
@@ -814,7 +821,7 @@ end
 
 -- A lantern on a chain with the family's modest warm light.
 function ShopKit.WarmLamp(parent: Instance, x: number, y: number, z: number, ceilY: number): Part
-	local len = ceilY - y - 0.6
+	local len = ceilY - y - 0.83 -- the chain ends on the lantern cap's top (0.75 x 1.1 over its middle)
 	dBox(parent, "LampChain", V3(0.1, len, 0.1), CF(x, ceilY - len / 2, z), IRON, MAT.Metal)
 	local glow = Kit.lantern(parent, CF(x, y, z), 1.1)
 	for _, d in ipairs(glow:GetChildren()) do

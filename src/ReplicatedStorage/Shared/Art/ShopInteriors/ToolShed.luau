@@ -74,7 +74,7 @@ local function axeRack(model: Model, frame: Frame)
 	local wallZ = frame.halfD
 	dBox(model, "Pegboard", V3(width, RACK_PANEL_H, 0.3), CF(0, RACK_PANEL_Y, wallZ - 0.2), TABLE)
 	for _, y in ipairs({ RACK_PANEL_Y - RACK_PANEL_H / 2, RACK_PANEL_Y + RACK_PANEL_H / 2 }) do
-		dBox(model, "AxeRackRail", V3(width + 0.3, 0.35, 0.5), CF(0, y, wallZ - 0.4), TIMBER)
+		dBox(model, "AxeRackRail", V3(width + 0.3, 0.35, 0.3), CF(0, y, wallZ - 0.3), TIMBER) -- (0.3 deep: the name plates stand clear of it)
 	end
 	for i, axe in ipairs(axes) do
 		local x = (i - (#axes + 1) / 2) * pitch
@@ -265,8 +265,10 @@ function ToolShed.Build(model: Model, frame: Frame)
 	-- Over the aisle, at the beams, none in the first 9 studs (the entrance stays open) and
 	-- none beside a header's end.
 	for _, z in ipairs({ -3, 5 }) do
-		ShopKit.WarmLamp(model, -2.6, ceil - 3.4, z, ceil - 0.9)
-		ShopKit.WarmLamp(model, 2.6, ceil - 3.4, z, ceil - 0.9)
+		-- (the chains at z 5 hang from the shell's tie beam, whose underside is 12.3)
+		local top = if z == 5 then math.min(12.3, ceil - 0.9) else ceil - 0.9
+		ShopKit.WarmLamp(model, -2.6, ceil - 3.4, z, top)
+		ShopKit.WarmLamp(model, 2.6, ceil - 3.4, z, top)
 	end
 	ShopKit.WarmLamp(model, 0, ceil - 3.4, -10, ceil - 0.9)
 	ShopKit.WarmLamp(model, 0, ceil - 3.4, 12, ceil - 0.9)
@@ -277,6 +279,7 @@ function ToolShed.Build(model: Model, frame: Frame)
 		headerZ = -8,
 		tieY = ToolShed.TieY,
 		tieMaxX = ToolShed.TieMaxX,
+		maxW = 10.2,
 	})
 	ShopKit.CheckoutSign(model, frame)
 

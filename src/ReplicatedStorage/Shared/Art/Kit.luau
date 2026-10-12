@@ -629,7 +629,7 @@ function Kit.lantern(parent: Instance, cf: CFrame, scale: number?): Part
 			parent,
 			"LanternCap",
 			Vector3.new(0.9, 0.25, 0.9) * s,
-			cf * CFrame.new(0, 0.7 * s, 0),
+			cf * CFrame.new(0, 0.625 * s, 0), -- (its underside rests on the glass top, 0.5 s)
 			iron,
 			Enum.Material.Metal
 		),
