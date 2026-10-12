@@ -1733,8 +1733,17 @@ function TruckArt.Rig(model: Model)
 				axle.Name = "Axle"
 				axle.Part0 = hung
 				axle.Part1 = d
-				axle.C0 = hung.CFrame:ToObjectSpace(d.CFrame)
-				axle.C1 = CFrame.identity
+				if d:GetAttribute("Mirror") == true then
+					-- A mesh wheel turned half way round about Y (VehicleMeshes.swapWheel): the
+					-- joint sits on the unturned frame and C1 carries the turn, so Transform
+					-- (spin about X, steer about Y) acts the same as on the other side.
+					local half = CFrame.Angles(0, math.pi, 0)
+					axle.C0 = hung.CFrame:ToObjectSpace(d.CFrame * half)
+					axle.C1 = half
+				else
+					axle.C0 = hung.CFrame:ToObjectSpace(d.CFrame)
+					axle.C1 = CFrame.identity
+				end
 				axle.MaxVelocity = 0 -- only Transform turns it
 				axle.Parent = d
 			else

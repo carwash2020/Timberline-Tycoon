@@ -4043,3 +4043,12 @@ Nothing here was seen in Studio. Check on PC, phone and Xbox (the swap is server
 2. All: each plinth's name sign shows the name and, under it, BED: n LOGS, NO BED or +n BED SPACE.
 3. All: no TRUCKS & TRAILERS board over the windows, no sandwich board, no flags along the inside front wall; the door-end board and the roof DEALERSHIP sign remain.
 4. Phone/Xbox: hover tags, the buy prompt and vehicle spawn work as before.
+
+## Robux store icons and the Pickup's wheels (Studio checks)
+
+1. PC, phone, Xbox: open the Robux store (STORE button). Passes tab: 2x Cash shows coins with 2x, Lux Axe a gold axe. Products tab: Small and Large Cash Pack show coin stacks; 2x Wood (a log pile) and Instant Delivery (a parcel with a lightning bolt) are "Coming soon" cards with no price and no Buy button. Tow Service, Timber Classic and Paint Shop show their older pictures. If a disc shows a letter or "2x" mark instead of a picture, that image is not loading (run `scripts/check-store-icons.ps1`, see below).
+2. All: the bulletin board in town shows the same pictures on 2x Cash, Lux Axe and Small Cash Pack (page 1) and Large Cash Pack (page 2); the "Coming soon" strip lists the rest.
+3. Windows PowerShell, from the repo folder: `powershell -ExecutionPolicy Bypass -File .\scripts\check-store-icons.ps1`. Every one of the six should say Completed; open each image URL to see it. Pending: wait and re-run. Blocked or InReview: moderation. If two pictures are swapped, tell Claude which pair.
+4. Pickup: buy or spawn a Pickup. Look at it from the LEFT (driver's) side and the right: both sides show a pale rim with a blue hub and bolts on all four wheels (before, the left side showed flat black tyres). Drive: all four wheels spin the same direction as the truck moves, and the front pair steers. Nothing else about driving, the hitch, the bed or the hitbox changes.
+5. Dealership: the Pickup on its plinth shows the same four wheels, standing on the plinth (none floating or sunk).
+6. Look at the other trucks: they are unchanged (their left wheels still show the flat side; see Awaiting Connor in the PR).

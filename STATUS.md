@@ -27,6 +27,29 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Robux store icons and the Pickup's wheels (branch `phase-2/robux-icons-pickup-wheels`, 12 October 2026)
+
+- **Six store icons set** (`StoreData` `image`, Connor's IMAGE uploads, user 5682024709): 2x Cash 129566569237407, Lux Axe
+  80267879981455, Small Cash Pack ($1,000 product 3716312861) 95950318286949, Large Cash Pack ($10,000 product 3716312899)
+  102370875631166, 2x Wood (product 3717310556) 83265240736148, Instant Delivery (product 3717310577) 96661273504040. They show
+  through `StoreArt.ImageFor` as before. The three older ids (91282142796474, 79037897236948, 71028498113750) were on Tow
+  Service, Timber Classic and Paint Shop, none of the six, so they stay. The $1,000 / $10,000 game passes are untouched. No
+  price, id, sale flag or badge changed: 2x Wood and Instant Delivery keep product id 0, so they stay "Coming soon" cards (they
+  were never hidden: `offSale = "soon"`) and nothing can buy them. **Not verified**: the sandbox cannot reach Roblox, so nobody
+  has seen that each id shows the right picture or has cleared moderation. `scripts/check-store-icons.ps1` (Windows PowerShell
+  5.1, read-only) asks Roblox's thumbnail service on Connor's machine and writes `STORE-ICONS-CHECK.md`. `tests/StoreIcons.spec`
+  pins the ids, no duplicates, well-formed ids, hidden rows stay unbuyable and the script lists all six. `ASSETS.md` lists each
+  new id as "image id, not checked on Roblox from the sandbox" (`tools/assetscan` now names the row).
+- **Pickup wheels.** `Pickup.glb` (like every truck GLB) holds ONE unplaced Wheel piece at its origin, not four placed wheels;
+  the game stands four copies at the truck's wheel positions (`VehicleMeshes` swaps each part-built wheel for the mesh), so the
+  Pickup, in game and in the dealership copy, has always had four mesh wheels (centres x +-4.7125, y 1.7545, z -9.685 and
+  7.085, radius 1.7545, width 1.373; the Body mesh's arches are centred at z -9.75 and 7.0, flare top 3.97 over the tyre top
+  3.509). What looked wheel-less: the wheel mesh shows its rim and hub on its +X face only and every wheel was placed the same
+  way, so the Pickup's whole left (-X) side showed flat black tyre backs. The Pickup's left wheels are now turned half way
+  round about Y (`VehicleModels` `mirrorLeft`, `VehicleMeshes.swapWheel`); `TruckArt.Rig` keeps the Axle joint on the unturned
+  frame (turn in C1), so spin and steering are unchanged. Look only: no physics, hitbox, price or stat. Other trucks show the
+  same flat left side and are **not** changed (Awaiting Connor). `tests/PickupWheels.spec` pins all of it, and that no other
+  truck changed. Renders: `previews/pickup-wheels/`; UI and board: `previews/robux-icons/` (placeholder art, real art needs Roblox).
 ## Store event expansion room (branch `phase-2/store-event-expansion`, system only, nothing on sale)
 
 Every store can grow for an event without a rebuild. This PR is the system; each store's builder places the geometry.

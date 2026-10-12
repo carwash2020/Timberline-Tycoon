@@ -6,7 +6,10 @@
 
 local VehicleModels = {}
 
-export type Piece = { meshId: number, size: Vector3 }
+-- mirrorLeft (a Wheel only): the mesh has its rim face on +X only, so a wheel on the truck's -X side is
+-- turned half way round (about Y) to show its rim outward too. Look only: the axle, spin and steering
+-- are unchanged (TruckArt.Rig). Set on the Pickup only.
+export type Piece = { meshId: number, size: Vector3, mirrorLeft: boolean? }
 
 local trucks: { [string]: { [string]: Piece } } = {
 	Rustbucket = {
@@ -22,7 +25,7 @@ local trucks: { [string]: { [string]: Piece } } = {
 		Glass = { meshId = 76718452145232, size = Vector3.new(10.098, 3.391, 3.395) },
 		Lights = { meshId = 100056308278514, size = Vector3.new(8.54, 2.95, 25.03) },
 		Bed = { meshId = 137659811327372, size = Vector3.new(8.72, 3.87, 15.685) },
-		Wheel = { meshId = 124886704209701, size = Vector3.new(1.373, 3.509, 3.509) },
+		Wheel = { meshId = 124886704209701, size = Vector3.new(1.373, 3.509, 3.509), mirrorLeft = true },
 		Hitch = { meshId = 121507994255438, size = Vector3.new(0.7, 1.06, 1.68) },
 	},
 	ScoutATV = {
