@@ -27,6 +27,53 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Dealership sign spacing (branch `phase-2/dealership-sign-spacing`, follow-up to #180)
+
+Connor approved the #180 renders with "signs may be a little too close together and a little too much in abundance".
+Counted before: 16 hung boards inside (SHOWROOM, 5 TRUCKS/TRAILERS headers, 8 bed sub-signs, CHECKOUT board and a CHECKOUT
+plaque on the counter), 4 flags along the front wall, a swatch board, 17 hung lanterns; outside, 6 text signs (DEALERSHIP, a
+second TRUCKS & TRAILERS board over the windows, the door-end board, hours board, closed sign, a sandwich board). After: 6 hung
+boards inside (SHOWROOM, 4 headers, CHECKOUT), no interior flags, no swatch board, 9 hung lanterns; 4 text signs outside. What went:
+the 8 hung sub-signs (each plinth's own name sign, now bigger, carries the name and a second line with what it hauls, from
+`DealershipLot.BedText`), the repeated header for a kind that comes back later in a row (the plinths' name signs tell it),
+the counter plaque (CHECKOUT hangs lower now, under the SHOWROOM board's line of sight from the door, where it was cropped), the
+per-bay hung lanterns (each plinth has its own lamp post), the OfficeSign over the windows, the sandwich board (the hours board
+says it), the swatch board and the front-wall flags. Kept: SHOWROOM, TRUCKS and TRAILERS, CHECKOUT, the DEALERSHIP roof sign, the
+door-end board, tier T-flags, plinth name signs, hours and closed signs. Specs: 3 studs minimum between hung boards, no board in
+front of another from the door, a ceiling on hung boards (6) and on every sign on the building (12). No price, vehicle, tier or
+buying change. Renders `previews/store-polish/dealership-v2-*.png`.
+
+**No-overlap spec (`tests/DealershipOverlap.spec.luau`).** In 3D, on the building (inside and out), the lot and the vehicles: 1225 sign-group pairs, about 105,000 sign-part against structure/prop/vehicle pairs, about 83,000 prop/display/structure pairs, all with 0.05 tolerance. It found and fixed: the hours board stood 0.25 into the wall above the door and the canopy's near end pierced it (canopy now stands 0.7 off the wall, far end unchanged, `ShopFacade.AwningGap`), the lobby trash can overlapped a barrel (moved), and each plinth's aisle stripe ran under the box's accent block (stripe is now 0.3 wide at the very edge, `DealershipLot.StripeWidth`).
+
+## Store polish: the Dealership (branch `phase-2/store-polish-dealership`, 12 October 2026)
+
+Connor's item 5. The Dealership stays its own building; nothing about buying, prices, stock, hidden Coming-soon items, StoreUI or
+the purchase flow changed. **Connor's reference screenshots never arrived, so this was designed to the written brief** (and
+renders are the thing to approve). Audited the #162 build with `tools/preview` and a new geometry spec, then fixed what was real:
+
+- **Floating parts (found by the new spec).** The ceiling beams and rafters stopped 0.7 short of the walls; every hung sign, chain
+  and lantern ended 0.9 under the roof (in the air); the reception chair's backrest sat 0.2 off its seat; each vehicle's name sign
+  hovered 0.2 over the floor and 0.35 off its plinth. Beams and rafters now run into the walls (`Dealership.WallTuck`), every
+  chain runs to the roof's underside, the backrest touches the seat, the name sign stands on the floor against the plinth band.
+- **Clearance.** The Logging Rig's display copy topped out 0.1 under the beams (`MaxVehicleHeight` 12.4); now 12.0 (0.5 of air).
+  Display copy only; the gameplay truck, its stats and every price are untouched.
+- **Exterior** (`BuildingArt.dealership`): a paved forecourt (`Forecourt`, `ForecourtKerb`, 5 deep, two pieces with the door's walk left open and looks only (it does not collide), because `DealershipLot.spec` and `WorldPlan.spec` keep colliding parts off `DealershipPath`, roads and grass; the doormat lies on the street) level with the hall floor, so the
+  planters, bench, sandwich board, awning posts and doormat stand on something (they stood 0.4 over the lawn); six cream piers
+  between the windows, a cornice under the roof's lip, five forecourt lamp posts (0.9 / 14, under ShopKit's caps), the accent stripe
+  round all four sides, and a `TRUCKS & TRAILERS` board across the door end's wall (the end the approach road meets). The second pair
+  of porch posts is gone: the porch lantern hangs on the awning post.
+- **Specs** (`StoreInterior.Dealership.spec`): no floating parts for the interior, the whole hall and the lot's stands; every display
+  rests on its own plinth, one per vehicle; nothing hung touches a display vehicle; every display under the beams with 0.4 spare;
+  forecourt, end board (text fits, faces west, against the wall) and stripes. Moved: `MaxVehicleHeight` 12.4 to 12.0 (design
+  moved). Whole hall 384 parts (cap 400, interior 218 of its own 400, lot 528).
+- **Renders** in `previews/store-polish/dealership-*.png` (exterior front, 3/4, night, the door end, interior from the door, the
+  tier stand, the counter, phone size). The keeper's body does not draw in the preview (only his name tag), for every store.
+- **Awaiting Connor:** the reference screenshots (send them if the brief missed something); whether the lot lamps should be dimmer
+  or fewer.
+## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
+
+The three pasted store image ids (91282142796474 Tow Service, 79037897236948 Timber Classic, 71028498113750 Paint Shop) may be Decal ids, which an ImageLabel cannot load by `rbxassetid://`. `Shared/StoreArt.ImageFor(id, size)` now returns `rbxthumb://type=Asset&id=<id>&w=<n>&h=<n>` (150 on the panel card, 420 on the world board) for a nonzero id and `""` for 0; `StoreUI` and `StoreBoard` use it, and the letter or mark fallback (failed load, id 0) is unchanged. No prices, sale flags or ids changed. Unverified: that the thumbnails render (needs Studio). `AssetIds.spec` allows the one rbxthumb literal in `StoreArt.luau` and still fails any other.
+
 ## Asset audit (branch `phase-2/audit-assets`, 12 October 2026)
 
 `ASSETS.md` (generated: `lune run tools/assets`, kept current by `check.sh`) lists every asset id in the source with its use and
@@ -35,9 +82,17 @@ by `tests/AssetIds.spec.luau`: id format and length per kind, no URL or zero ids
 MeshId), unique containers, mesh sharing only Blender-to-Backlog, well-formed MeshTemplates. The four machines that stayed
 part-built in Connor's log (SmeltingFurnace, Prospector, OreChute, CraftBench) had correct ids; they were built at server start
 outside `MeshKit.Attempt`, so a mesh that was not in yet was final. `MiningArt` now swaps the mesh in when it lands, and
-`MachineSkin.Prepare` asks for every piece at once so a five-piece machine is dressed in one round. **Open:** plot machines
-built through `MachineArt` (sawmills, planers, chop saw, belts) have the same gap if built before their meshes are cached
-(needs PlotService to re-dress); the Creator Hub checks for Connor are at the end of `ASSETS.md`.
+`MachineSkin.Prepare` asks for every piece at once so a five-piece machine is dressed in one round. **Plot machines (13 October 2026,
+branch `phase-2/plot-machines-swap-meshes`):** the same gap on `MachineArt` (sawmills, planers, chop saw, belts) is closed: a
+machine built before its meshes are cached is part-built and usable at once, then `MeshKit.Attempt` swaps the mesh in place
+(`MachineArt.wearWhenLoaded`; same gameplay part instances, pivot kept after a move, a failed load keeps the part build with one
+log line, a destroyed machine is dropped). `tests/MachineSwap.spec` pins it for every kind. The Sky Bin has no mesh entry in
+`MachineMeshes`, so there is nothing to swap. Nothing seen in Studio. The Creator Hub checks for Connor are at the end of `ASSETS.md`.
+
+**Asset check tool (branch `phase-2/asset-check-tool`).** No id has been checked on Roblox (sandbox blocked). Connor runs
+`scripts\check-assets.ps1` on Windows (steps in `ASSETS.md`): it reads `tools/asset-ids.json` (written by `tools/assets`), asks
+`economy.roblox.com/v2/assets/<id>/details` for each id, and writes `ASSETS-CHECK.md` / `.csv` (type, owner, will it load, must-fix
+list, the four machine meshes first). Read-only. Pinned by `tests/AssetCheckTool.spec.luau`. **Open:** run it and bring back the table.
 
 ## Server boot and runtime audit (branch `phase-2/audit-server-boot`, 12 October 2026)
 

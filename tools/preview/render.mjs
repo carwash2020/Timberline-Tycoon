@@ -32,7 +32,7 @@ if (threeDir) {
     route.fulfill({ status: 200, contentType: "application/javascript", body: fs.readFileSync(file) });
   });
 }
-await page.goto("file://" + path.resolve(htmlPath), { timeout: 180000 }); // (a busy machine loads a big scene slowly)
+await page.goto("file://" + path.resolve(htmlPath), { timeout: 180000 }); // a big scene on a busy machine loads slowly
 await page.waitForFunction(() => window.__ready === true, null, { timeout: 120000 });
 const count = await page.evaluate(() => window.viewCount);
 const base = htmlPath.replace(/\.html$/, "");

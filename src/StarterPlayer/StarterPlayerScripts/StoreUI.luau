@@ -31,6 +31,7 @@ local PolicyLogic = require(ReplicatedStorage.Shared.PolicyLogic)
 local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local StoreBoard = require(ReplicatedStorage.Shared.StoreBoard)
 local StoreCopy = require(ReplicatedStorage.Shared.Store.StoreCopy)
+local StoreArt = require(ReplicatedStorage.Shared.StoreArt)
 local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local StoreSale = require(ReplicatedStorage.Shared.Store.StoreSale)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -267,7 +268,7 @@ local function art(parent: Instance, kind: string, item: StoreData.Pass | StoreD
 	UITheme.corner(disc, StoreUI.ArtPx // 2)
 	UITheme.stroke(disc, C.AmberEdge, 2)
 	-- The letter or mark is always there; a real image hides it, and an image
-	-- that fails to load (a Decal id instead of an Image id, moderation, no
+	-- that fails to load (a thumbnail that is not ready, moderation, no
 	-- network) shows it again, so the disc is never an empty circle.
 	local glyph = if item.key == "DoubleCash" or item.key == "DoubleWood"
 		then "2x"
@@ -276,8 +277,8 @@ local function art(parent: Instance, kind: string, item: StoreData.Pass | StoreD
 	local mark = UITheme.label(disc, glyph, F.Title, 22, C.Cream)
 	mark.Size = UDim2.fromScale(1, 1)
 	mark.TextXAlignment = Enum.TextXAlignment.Center
-	if item.image > 0 then
-		local uri = "rbxassetid://" .. tostring(item.image)
+	local uri = StoreArt.ImageFor(item.image, StoreArt.Small)
+	if uri ~= "" then
 		disc.Image = uri
 		mark.Visible = false
 		UIArt.Listen(uri, function(result: UIArt.LoadStatus)

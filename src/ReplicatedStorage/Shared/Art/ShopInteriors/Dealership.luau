@@ -17,7 +17,6 @@
 local ShopKit = require(script.Parent.Parent.ShopKit)
 local Kit = require(script.Parent.Parent.Kit)
 local DealershipLot = require(script.Parent.Parent.DealershipLot)
-local ItemCatalog = require(script.Parent.Parent.Parent.ItemCatalog)
 
 type Frame = ShopKit.Frame
 local V3, CF = Vector3.new, CFrame.new
@@ -53,11 +52,10 @@ export type Bay = { x: number, z: number, row: number, aisleZ: number }
 -- The signs hang this far under the ceiling line (frame.ceilY - 0.9 is the
 -- underside of the beams).
 Dealership.HeaderY = 11.3 -- a header's middle
-Dealership.SubY = 8.6 -- a sub-sign's middle (over the tallest box, 7.3)
-Dealership.HeaderWidth = 9.2
-Dealership.SubWidth = 8.4
+Dealership.CheckoutY = 7.6 -- the CHECKOUT board's middle: under the SHOWROOM board's line of sight from the door
+Dealership.HeaderWidth = 10.4
 Dealership.HeaderYaw = math.rad(90) -- a header faces the door end (west), so it reads from the lobby and down the aisle
-Dealership.SubYaw = math.rad(14) -- a sub-sign is turned a little to the aisle
+Dealership.WallTuck = 0.5 -- a beam or rafter runs this far past the interior frame, into the wall (the wall's face is 0.4 out)
 Dealership.TopY = 15.1 -- the highest part the interior adds (the beams' tops)
 
 ---------------------------------------------------------------------------
@@ -72,6 +70,7 @@ export type Run = {
 	ids: { string }, -- the vehicles under it, in bay order
 	first: number, -- index of the first bay in the layout
 	last: number,
+	labelled: boolean, -- gets a hung header: the first run of its kind in its row (a kind that comes back later in the row is told by the plinths' own name signs)
 }
 
 -- A run is neighbouring bays of one row that sell one kind of vehicle. The bays
@@ -91,7 +90,15 @@ function Dealership.Runs(): { Run }
 				ids = { bay.id },
 				first = i,
 				last = i,
+				labelled = true,
 			})
+		end
+	end
+	for i, run in ipairs(runs) do
+		for j = 1, i - 1 do
+			if runs[j].row == run.row and runs[j].kind == run.kind then
+				run.labelled = false
+			end
 		end
 	end
 	return runs
@@ -100,15 +107,7 @@ end
 -- The sub-sign over a bay: what the vehicle hauls (ShopLogic's own words for
 -- the shop card: "Bed: 12 logs", "No bed", "+12 bed space").
 function Dealership.SubText(kind: string, id: string): string
-	if kind == "Truck" then
-		local truck = ItemCatalog.GetTruck(id)
-		if truck and truck.bedCapacity > 0 then
-			return string.format("BED: %d LOGS", truck.bedCapacity)
-		end
-		return "NO BED"
-	end
-	local trailer = ItemCatalog.GetTrailer(id)
-	return if trailer then string.format("+%d BED SPACE", trailer.extraCapacity) else "TRAILER"
+	return DealershipLot.BedText(kind, id)
 end
 
 ---------------------------------------------------------------------------
@@ -217,15 +216,22 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 
 	-- Warm timber beams across the hall and rafters along it. None over the
 	-- logging rig's crane (it stands tall at the back row, x 11 to 29).
-	ShopKit.Beams(model, frame, { zf + 6, zf + 17, midZ - 3.3, midZ + 6, zb - 1.5 })
+	-- The beams and rafters run into the walls (the kit's stop 0.7 short of them,
+	-- which leaves a timber hanging in the air in a hall this wide).
+	local into = Dealership.WallTuck
+	for _, z in ipairs({ zf + 6, zf + 17, midZ - 3.3, midZ + 6, zb - 1.5 }) do
+		dBox(model, "CeilingBeam", V3(2 * (frame.halfW + into), 0.9, 0.9), CF(0, ceil - 0.45, z), TIMBER)
+	end
 	for _, x in ipairs({ west + 19, cx - 6, east - 36, east - 8 }) do
-		ShopKit.Rafter(model, frame, x)
+		dBox(model, "CeilingRafter", V3(0.7, 0.7, 2 * (frame.halfD + into)), CF(x, ceil - 0.35, 0), TIMBER)
 	end
 
 	-- Signs: SHOWROOM over the lobby, a header over each run, a sub-sign over
 	-- each bay. `keepOut` lists what a lantern must stay clear of.
 	local keepOut: { { x0: number, x1: number, z0: number, z1: number } } = {}
-	local chainTop = ceil - 0.9
+	-- Every chain runs up to the roof's underside (the ceiling line), so a sign or a
+	-- lantern is welded to the roof and never hangs from nothing under it.
+	local chainTop = ceil
 	ShopKit.HeaderSign(model, {
 		cx = lobbyCx,
 		cy = Dealership.HeaderY,
@@ -244,12 +250,15 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 			plinthW[i] = lot.width
 		end
 		for _, run in ipairs(Dealership.Runs()) do
+			if not run.labelled then
+				continue
+			end
 			local first = bays[run.first]
 			-- The row's aisle edge: the header stands over the plinth's aisle end, so
 			-- the front row's headers are in z -13 to -4 and the back row's 4 to 13.
 			local s = if run.row == 1 then 1 else -1 -- toward the aisle
 			local hz = first.aisleZ - s * 1.5
-			local hx = first.x - plinthW[run.first] / 2 + (if run.row == 1 then 0.9 else -3.6)
+			local hx = first.x - plinthW[run.first] / 2 + (if run.row == 1 then 0.9 else -6.6)
 			yawed(model, hx, hz, Dealership.HeaderYaw, function(tmp)
 				ShopKit.HeaderSign(tmp, {
 					cx = 0,
@@ -268,28 +277,38 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 				z0 = hz - Dealership.HeaderWidth / 2 - 1,
 				z1 = hz + Dealership.HeaderWidth / 2 + 1,
 			})
-			for i = run.first, run.last do
-				local bay = bays[i]
-				local lotBay = layout[i]
-				yawed(model, bay.x, bay.aisleZ - s * 0.8, -s * Dealership.SubYaw, function(tmp)
-					ShopKit.SubSign(tmp, {
-						cx = 0,
-						cy = Dealership.SubY,
-						z = 0,
-						w = Dealership.SubWidth,
-						h = ShopKit.SubMinHeight + 0.2,
-						text = Dealership.SubText(lotBay.kind, lotBay.id),
-						accent = BLUE,
-						ceilY = chainTop,
-					})
-				end)
-			end
 		end
 	end
-	ShopKit.CheckoutSign(model, frame, true)
+	-- The CHECKOUT board hangs low over the counter, under the SHOWROOM board's line of sight
+	-- from the door (a board hung high behind SHOWROOM was cropped by it). The kit's counter
+	-- plaque is dropped: it said the same thing a hand below the board. The kit still lays
+	-- the keeper's mat.
+	local lower = table.clone(frame)
+	lower.ceilY = ceil + 0.9
+	ShopKit.CheckoutSign(model, lower, false)
+	for _, part in ipairs(model:GetChildren()) do
+		if part.Name == "CheckoutPlaque" or part.Name == "CheckoutPlaqueAccent" then
+			part:Destroy()
+		end
+	end
+	local counter = model:FindFirstChild("Counter")
+	if counter and counter:IsA("BasePart") then
+		ShopKit.HeaderSign(model, {
+			cx = counter.CFrame.Position.X,
+			cy = Dealership.CheckoutY,
+			z = counter.CFrame.Position.Z - counter.Size.Z / 2 - 3.4,
+			w = 8.4,
+			h = 1.8,
+			text = "CHECKOUT",
+			accent = hex("#4CC36A"),
+			ceilY = chainTop,
+			board = ShopKit.Colors.Brass,
+			ink = ShopKit.Colors.Ink,
+			name = "CheckoutSign",
+		})
+	end
 
-	-- Lanterns: six down the aisle, one over each bay at its aisle edge, three in
-	-- the lobby; every one is the family's warm capped lamp, and none hangs where a
+	-- Lanterns: six down the aisle and three in the lobby (each plinth has its own lamp post); every one is the family's warm capped lamp, and none hangs where a
 	-- header is.
 	local function lamp(x: number, z: number)
 		for _, k in ipairs(keepOut) do
@@ -302,9 +321,6 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 	local aisleZ = if aisleLo < aisleHi then (aisleLo + aisleHi) / 2 else midZ
 	for i = 0, 5 do
 		lamp(ax0 + 10 + i * 20, aisleZ)
-	end
-	for _, bay in ipairs(bays) do
-		lamp(bay.x, bay.aisleZ + (if bay.row == 1 then -3.2 else 3.2))
 	end
 	for _, z in ipairs({ zf + 10, midZ + 2, zb - 16 }) do
 		lamp(lobbyCx, z)
@@ -328,26 +344,15 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 	dBox(model, "ReceptionTable", V3(3.6, 1.2, 2), CF(west + 4, fy + 0.6, zb - 24), TABLE_TOP, MAT.Wood)
 	for _, z in ipairs({ zb - 28, zb - 20 }) do
 		dBox(model, "ReceptionChair", V3(2, 1.2, 2), CF(west + 4, fy + 0.6, z), BLUE, MAT.Fabric)
-		dBox(model, "ReceptionChairBack", V3(0.4, 1.8, 2), CF(west + 2.6, fy + 1.5, z), BLUE, MAT.Fabric)
+		dBox(model, "ReceptionChairBack", V3(0.4, 1.8, 2), CF(west + 2.8, fy + 1.5, z), BLUE, MAT.Fabric)
 	end
 	plant(model, west + 1.8, fy, zf + 3, 1.4)
 	plant(model, west + lobbyW - 2, fy, zf + 3, 1.4)
 	plant(model, west + lobbyW - 2, fy, zb - 12, 1.4)
-	trashCan(model, west + lobbyW - 2, fy, zb - 1.5)
+	trashCan(model, west + lobbyW - 2, fy, zb - 5.5)
 	stockProp(model, "Crate", west + 1.8, fy, zb - 15, 0.1)
 	stockProp(model, "Crate", west + 1.8, fy, zb - 12.6, -0.15)
 	stockProp(model, "Barrel", west + 4.6, fy, zb - 13, 0)
-	for i, x in ipairs({ west + 36, west + 66, west + 96, west + 126 }) do
-		dBox(model, "FlagPole", V3(0.2, 5, 0.2), CF(x, fy + 2.5, zf + 0.6), IRON, MAT.Metal)
-		dBox(
-			model,
-			"FlagCloth",
-			V3(2.4, 1.5, 0.1),
-			CF(x + 1.3, fy + 4.2, zf + 0.6),
-			if i % 2 == 0 then BLUE else hex("#C8402F"),
-			MAT.Fabric
-		)
-	end
 	counterDetail(model, frame)
 	backDoor(model, frame, west + 5.7, zb, true, 0)
 end

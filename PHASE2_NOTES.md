@@ -4022,3 +4022,36 @@ Studio checks:
 4. **Phone (667 x 375, touch):** repeat 3. The big signs read; tap an item: the hover tag and Buy work exactly as before. Walk in and out through the door with the stick.
 5. **Xbox:** repeat 3 with the stick; aim at a pedestal: the selection ring and prompt work as before; B closes the shop panel. Nothing is bound to the right trigger.
 6. **Light:** the shop is warm and readable, not blinding, at day and at night (the lantern lights are 0.9 to 1.4 bright, 22 range at most).
+
+## Store polish: Dealership (Studio checks)
+
+Design to the written brief (Connor's reference screenshots were never received). Renders: `previews/store-polish/dealership-*.png`.
+
+1. PC: walk up the approach road to the Dealership. Good: a blue TRUCKS & TRAILERS board across the door-end wall, a paved forecourt with lamp posts and cream piers along the glass, planters and bench on paving, the porch lantern on the awning post.
+2. PC: walk through the door (the doormat and walk stay level with the street). Good: no step trouble, the door still opens and shuts on the keeper's hours.
+3. PC, phone, Xbox: from the door look down the aisle. Good: TRUCKS and TRAILERS headers and the bed sub-signs read, nothing hangs from nothing, no vehicle touches a beam or a sign, the Logging Rig clears the beams.
+4. Phone (667x375) and Xbox: walk to a bay, the T-flag and box hover tags still appear, the buy prompt works as before, a bought vehicle spawns as before.
+5. Night: forecourt lamps and showroom lanterns glow warm, none blinding.
+6. PC: walk onto the forecourt paving by the planters. The paving does not collide (street level), so your feet sit a little low in it; tell Connor if that looks wrong (the fix is paint on the terrain in WorldLayout).
+## Plot machines swap their meshes in (branch `phase-2/plot-machines-swap-meshes`, 13 October 2026)
+
+Nothing here was seen in Studio. Check on PC, phone and Xbox (the swap is server side, so what the client shows is the same):
+
+1. Join a server fresh (cold mesh cache) with a saved plot that has a sawmill, a planer, the chop saw and belts. They appear at once
+   as plain boxy machines, you can feed wood and set the cut, and within a few seconds each turns into its Blender model with no
+   flicker of the panel, prompts or signs. Output shows at most one `[MachineSkin] ... did not load` line per machine that truly fails.
+2. Place a sawmill from the shop right after joining (before meshes load) and walk away from it: it swaps without moving or
+   turning. Turn it with the move tool before it swaps: it keeps its place and facing, mesh included.
+3. A 5-piece machine (a Wood Detector, a Tilted Belt) is dressed whole: never a body without its belt or rollers.
+4. Switch Belt: flip its side after it swaps; the paddle swings. Chop saw: the price sign stands over the board on the mesh.
+5. Xbox: the Set the cut / Set the length prompts still show the selection ring and respond to A on the swapped machine; phone: the
+   panel buttons are still tappable (they are the same parts).
+6. Placement ghost: right after joining the ghost turns into the mesh at 0.45 see-through.
+
+
+## Dealership sign spacing (Studio checks)
+
+1. PC, phone, Xbox: from the door, TRUCKS and TRAILERS headers, SHOWROOM and CHECKOUT never overlap or crop each other; there are fewer hung boards, none within about 3 studs of another.
+2. All: each plinth's name sign shows the name and, under it, BED: n LOGS, NO BED or +n BED SPACE.
+3. All: no TRUCKS & TRAILERS board over the windows, no sandwich board, no flags along the inside front wall; the door-end board and the roof DEALERSHIP sign remain.
+4. Phone/Xbox: hover tags, the buy prompt and vehicle spawn work as before.

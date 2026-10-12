@@ -6,6 +6,9 @@
 -- Run from the repo root:   lune run tools/assets
 -- Check it is current:      lune run tools/assets --check
 --
+-- It also writes tools/asset-ids.json, the id list scripts/check-assets.ps1
+-- reads (so the PowerShell script never parses markdown).
+--
 -- STATUS here is what the repo can prove. Nothing in this file has been
 -- checked against Roblox (the Claude sandbox cannot reach any Roblox
 -- endpoint) and nothing has been seen in Studio. "format ok" means the id is
@@ -15,6 +18,7 @@
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
+local serde = require("@lune/serde")
 
 assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tools/assets")
 
@@ -104,8 +108,32 @@ emit(
 emit("| Anything in Roblox Studio | **NOT VERIFIED.** Nothing here was seen in Studio |")
 emit("")
 emit("Status words in the tables: `format ok` = well-formed number of the right length for its")
-emit("kind; `template` = a `MeshTemplates/<id>.model.json` fallback exists; `unverified` = not")
-emit("checked on Roblox (every row, until Connor runs the Creator Hub steps at the end).")
+emit("kind; `template` = a `MeshTemplates/<id>.model.json` fallback exists; `not checked yet` = not")
+emit("checked on Roblox (every row, until Connor runs the check below).")
+emit("")
+emit("## Run the check (Windows, one run, about 10 minutes)")
+emit("")
+emit("`scripts/check-assets.ps1` asks Roblox's public endpoint")
+emit("`https://economy.roblox.com/v2/assets/<id>/details` about every id in `tools/asset-ids.json`")
+emit("(the list this file is generated from). It is read-only: it changes no source file and uploads")
+emit("nothing. It writes `ASSETS-CHECK.md` and `ASSETS-CHECK.csv` next to the repo with, for each id, whether")
+emit("it loads, the asset type, who owns it (you = Roblox user 5682024709, a group, or someone else, with the")
+emit("creator id and name), and a short **must fix** list at the top (failing and foreign-owned first, the four")
+emit("machine meshes before everything else).")
+emit("")
+emit("Open PowerShell in the repo folder (File Explorer, open the Timberline-Tycoon folder, click the address")
+emit("bar, type `powershell`, press Enter), then run these one at a time:")
+emit("")
+emit("```powershell")
+emit("Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass")
+emit(".\\scripts\\check-assets.ps1")
+emit("```")
+emit("")
+emit(
+	"Try only the four machine meshes first (a few seconds): `.\\scripts\\check-assets.ps1 -Only 124635139968707,76460785351208,91355579985009,87960541936824`"
+)
+emit("")
+emit("Until you run it every status below is `not checked yet`; nothing here has been checked against Roblox.")
 emit("")
 
 emit("## Summary")
@@ -220,7 +248,7 @@ for _, kind in ipairs(KIND_ORDER) do
 		if #files > 1 then
 			usedBy ..= " (also " .. table.concat(files, ", ") .. ")"
 		end
-		local status = "format ok, unverified"
+		local status = "format ok, not checked yet"
 		if kind == "mesh" then
 			status = templateText(row.digits) .. ", " .. status
 			if string.find(first.use, "Collision", 1, true) then
@@ -281,7 +309,8 @@ emit("   a machine built before its meshes are cached stays part-built until its
 emit("   re-place). MachineSkin now logs `was still loading` instead of `did not load` in that case. A real fix")
 emit("   needs PlotService to re-dress; not done here (touches plot item registration).")
 emit("3. **Store card images** (`StoreData` image ids 91282142796474, 79037897236948, 71028498113750) are")
-emit("   commented `decal id`. An ImageLabel needs an **Image** id; a Decal id shows nothing. Unverified.")
+emit("   possibly Decal ids, which an ImageLabel cannot load by rbxassetid. They now go through `StoreArt`")
+emit("   (rbxthumb asset thumbnail), which renders a Decal or an Image id. Rendering unverified (needs Studio).")
 emit("4. **Old Roblox sound ids** (`SoundData`: 4110925712, 282906960, 1516791621, 1841461968, 1848183670,")
 emit("   9116970949, 9117181540, 9118187543, 9120549564) are not owned by the game. Since the 2022 audio")
 emit("   privacy change a sound only plays if it is public Roblox audio or yours. A failure is silent, never a")
@@ -292,10 +321,14 @@ emit("6. **19 mesh ids are written twice on purpose** (`BlenderAssets` mirrors `
 emit("   shares an id between modules; no model container id is used as a MeshId.")
 emit("")
 
-emit("## Creator Hub checks for Connor (Mac, no coding)")
+emit("## Creator Hub checks (fallback if the script cannot run; Mac or Windows, no coding)")
 emit("")
-emit("Do these once, signed in as the account that uploaded the assets (Elucidhealer618), because a mesh")
-emit("owned by another account will not load in the game.")
+emit("Use these only if `scripts/check-assets.ps1` cannot run (it is faster and checks every id). Do them")
+emit("once, signed in as the account that uploaded the assets (Elucidhealer618, user 5682024709), because a")
+emit("mesh owned by another account will not load in the game. A quick manual check of one id: open")
+emit("`https://economy.roblox.com/v2/assets/<id>/details` in a browser; `Creator.Id` must be 5682024709 and")
+emit("`AssetTypeId` must be 4 for a mesh, 1 for an image, 3 for audio (a 404 means it does not exist or is")
+emit("private).")
 emit("")
 emit("1. Open https://create.roblox.com in Safari or Chrome and sign in.")
 emit("2. Click **Creations** (left side), then **Development Items**, then **Meshes**. Do the same for")
@@ -320,7 +353,9 @@ emit("")
 emit("Then check one of each kind, because one bad kind fails every id of that kind:")
 emit("")
 emit("- a **sound**: 4110925712 (Sell and Buy), 1516791621 (Rain), 1841461968 (day music)")
-emit("- a **store image**: 91282142796474, 79037897236948, 71028498113750 (must be Image ids, not Decal ids)")
+emit(
+	"- a **store image**: 91282142796474, 79037897236948, 71028498113750 (shown through the StoreArt thumbnail, so Decal or Image ids both work)"
+)
 emit("- a **HUD image**: 76852120099119 (Menu), 129127727779001 (Hammer), 96932580819074 (SellHere)")
 emit("- a **UI skin image**: 139841387610705, 90740664574742, 72427678124813, 74100852047057")
 emit("- a **particle texture**: 17581858560 (embers), 16830667309 (mist)")
@@ -329,14 +364,59 @@ emit("")
 
 local text = table.concat(out, "\n") .. "\n"
 
+-- tools/asset-ids.json: what scripts/check-assets.ps1 reads. Templates, passes and
+-- products are not downloadable assets, so they are left out. Priority 1 = the
+-- four machine meshes that did not load in Studio.
+local PRIORITY = {
+	["124635139968707"] = true,
+	["76460785351208"] = true,
+	["91355579985009"] = true,
+	["87960541936824"] = true,
+}
+local EXPECT = {
+	mesh = { 4 },
+	model = { 10 },
+	image = { 1 },
+	texture = { 1 },
+	sound = { 3 },
+}
+local entries: { any } = {}
+for _, kind in ipairs(KIND_ORDER) do
+	local expect = EXPECT[kind]
+	if not expect then
+		continue
+	end
+	for _, key in ipairs(order) do
+		local group = groups[key]
+		if group.kind ~= kind then
+			continue
+		end
+		local first = group.uses[1]
+		local usedBy = string.gsub(first.use, "|", "/")
+		usedBy = string.gsub(usedBy, "%s+", " ")
+		table.insert(entries, {
+			id = group.digits,
+			kind = kind,
+			expectTypeId = expect[1],
+			usedBy = usedBy,
+			places = #group.uses,
+			priority = if PRIORITY[group.digits] then 1 else 2,
+			collision = kind == "mesh" and string.find(first.use, "Collision", 1, true) ~= nil,
+		})
+	end
+end
+local idsText = serde.encode("json", { ownerUserId = 5682024709, assets = entries }, true) .. "\n"
+
 if process.args[1] == "--check" then
 	local existing = if fs.isFile("ASSETS.md") then fs.readFile("ASSETS.md") else ""
-	if existing ~= text then
-		print("ASSETS.md is out of date: run `lune run tools/assets` and commit it.")
+	local existingIds = if fs.isFile("tools/asset-ids.json") then fs.readFile("tools/asset-ids.json") else ""
+	if existing ~= text or existingIds ~= idsText then
+		print("ASSETS.md or tools/asset-ids.json is out of date: run `lune run tools/assets` and commit both.")
 		process.exit(1)
 	end
 	print("ASSETS.md is current.")
 else
 	fs.writeFile("ASSETS.md", text)
+	fs.writeFile("tools/asset-ids.json", idsText)
 	print(string.format("wrote ASSETS.md (%d groups from %d places)", #order, #records))
 end
