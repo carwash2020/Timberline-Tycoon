@@ -207,7 +207,9 @@ local function sparkworksFront(model: Model, spec: Spec)
 	end
 	Kit.part(model, "Foundation", V3(2 * ring, floorY, 1.0), CF(0, floorY / 2, -fz + 0.05), STONE, MAT.Cobblestone)
 	-- The doorstep: level with the floor, under the doormat.
-	Kit.part(model, "Doorstep", V3(2 * d, floorY, 2.9), CF(spec.doorCx, floorY / 2, fz - 1.0), STONE, MAT.Cobblestone)
+	Kit.part(model, "Doorstep", V3(2 * d, floorY, 1.9), CF(spec.doorCx, floorY / 2, fz - 0.5), STONE, MAT.Cobblestone)
+	-- (the doormat, 1.5 deep, lies on it: the generic one is 2.2 deep and would hang over the step)
+	box(model, "Doormat", V3(d * 1.4, 0.06, 1.5), CF(spec.doorCx, floorY + 0.04, fz - 0.5), hex("#6B5436"), MAT.Fabric)
 
 	-- Yard: two windows, the awning, a planter each side, the board, a barrel and a crate.
 	for _, x in ipairs({ -16, 16 }) do
@@ -374,7 +376,9 @@ local function shopSpecific(model: Model, spec: Spec)
 			box(model, "RoofUnitFan", V3(2.2, 0.2, 2.2), CF(x, spec.roofTop + 2.3, spec.frontZ + 10), IRON, MAT.Metal)
 		end
 	end
-	doormat(model, spec)
+	if spec.kind ~= "Sparkworks" then
+		doormat(model, spec)
+	end
 end
 
 -- Adds the facade to the shop's model. See Spec.
