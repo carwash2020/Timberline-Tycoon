@@ -31,7 +31,7 @@ return {
 					label = "4 night three-quarter",
 					night = true,
 				},
-				{ pos = { 0, 6, -34 }, target = { 0, 6.5, -22 }, fov = 62, label = "5 door and awning" },
+				{ pos = { -13, 6.5, -40 }, target = { 0, 7.5, -24 }, fov = 46, label = "5 door and awning" },
 				{ pos = { 40, 28, 55 }, target = { 0, 6, 0 }, fov = 55, label = "6 from behind" },
 				{ pos = { 0, 8, -62 }, target = { 0, 9, -14 }, fov = 62, label = "7 phone front" },
 			},

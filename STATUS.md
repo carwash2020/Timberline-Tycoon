@@ -95,6 +95,50 @@ renders are the thing to approve). Audited the #162 build with `tools/preview` a
   tier stand, the counter, phone size). The keeper's body does not draw in the preview (only his name tag), for every store.
 - **Awaiting Connor:** the reference screenshots (send them if the brief missed something); whether the lot lamps should be dimmer
   or fewer.
+## Hearth & Home restyle, Shed Blueprint and model slots (branch `phase-2/store-polish-hearth`, PR #183, 12 October 2026)
+
+Connor's fixes after the #183 renders. No price, on/off-sale or buy-flow change (the five formerly off-sale products stay id 0).
+
+- **Shed Blueprint.** The General Store's Small Shed is now the **Shed Blueprint**, $600 as before. Buying hands over the plan (the
+  hammer's plan item, unchanged); placing it costs the kit fee (60 units x $4 = $240) and puts down a **ghost you fill with 60 plank
+  units**, like the wall (`PlotData` Shed: `kit = true`, `storePrice = 600`, `storeName = "Shed Blueprint"`, `displayName = "Shed"`).
+  The save id stays `Shed`, so no migration is needed: a save that owned the plan, carried it or had a shed standing loads unchanged
+  (a placed shed with no `fill` stays a finished shed). Spec: `tests/ShedBlueprint.spec.luau`. Moved pins (design moved): the
+  `Shed` rows in `BuildingKit`, `ModernKit`, `PlotLogic`, `BlueprintBook`, `PlotService`, `ShopService`, `BlueprintService` specs.
+- **MODEL_SLOTS.** Four items get one model slot each, in `Shared/Art/ModelSlots.luau`: `Flashlight`, `Lantern`, `WoodSign`,
+  `ShedBlueprint` (Connor's GLBs, `assets/glb/store-items/<Name>.glb`). Put the Roblox MeshPart id in the slot's `meshId` (it is 0
+  now, so every path keeps its part-built look) and the model swaps in, through `MeshKit.Attempt`, never blocking, on: the shop
+  box's window copy and the sample on the General Store's back ledge (display: `BoxArt.Dress`, `BuildingArt`), the item in the hand
+  (held: `BlueprintArt.Held` for a plan, `ItemModel.Held` for gear) and the item in the world (placed: `BlueprintModels.Build` for the
+  Wood Sign on a plot, `BlueprintArt.Dropped` for the plan on the ground, `ItemModel.Placed` for gear). What the model must be:
+  its `size` is the GLB's own proportions times `fit` (Flashlight 2.30 x 0.58 x 0.58 lying along X, Lantern 0.61 x 1.55 x 0.61,
+  Wood Sign 2.29 x 3.90 x 0.41, Shed Blueprint 2.10 x 4.57 x 2.71), pivot at the middle of the bounding box, +Y up, front toward -Z.
+  Gear is worn today, so nothing in the game equips `ItemModel.Held`/`Placed` for the Lantern and Flashlight yet; the slot paths
+  exist and are tested. The Shed's model is the plan, so on a plot the Shed ghost stays the part-built shed. The preview loads the
+  GLBs through `tools/preview/store-items-meshes.json` (`PREVIEW_MESHES=tools/preview/store-items-meshes.json`). Spec:
+  `tests/ModelSlots.spec.luau` (also reads each GLB's bounding box).
+- **Display tables** (`ShopKit.DisplayTable`, `SpotTag`, `SpotLamp`; `SteppedUnit(..., "table")`): a wood-top plank table per row of
+  boxes (trim edge), a small price card per box read from `StoreStock.UnitPrice` (carries the hover tag), a lock card ("S5 SMITH")
+  beside the price card for a gated item (shown only while locked, as the old chip), and a warm spot over each table. The tier
+  flags on posts are gone (the stray purple "T5 / S5 SMI..." flag was one standing against the wall); nothing stands outside its table.
+- **Signs.** HOME PLANS and BUILD PLANS are 7.2 wide and nearer the aisle (whole word on screen from the door and on a phone); the
+  four back-wall item boards are 5.7 x 2.25 (were 8.4 x 3.45) and read SHED BLUEPRINT; CHECKOUT stands on two posts on the counter
+  front over the register (no plaque, no chains across other signs).
+- **Door frame and awning** (`ShopFacade.DoorFrame`, `ShopFacade.StripedAwning`): cream posts on stone footings, a flush stone
+  threshold (looks only: no step), and a striped canopy of 0.18 thick fabric slabs with a stepped valance, rail, posts and brackets.
+  The swing leaves are framed doors now (ring of trim, middle rail).
+- **Room fill:** two wall shelf units (jars, books, baskets), four framed pictures, a rug in the east nook, two more plants.
+- **Event room** (#185 `ShopEventKit`): the roped zone (16 x 9, back west corner, back against the wall) and the banner (front west
+  corner, off the doorway aisle).
+- **Parts:** the whole shop is 444 (cap 350 to 450: the event room is 34 of it). Interior budget unchanged (400).
+- **Specs:** `StoreOverlap.HearthAndHome` (families for every new part, plus a guard that no new name is unchecked),
+  `StoreInterior.HearthAndHome` (tables, cards, lock cards, spots, `DisplayTable`), `BuildingArt` (box on its table, cap 450).
+- **Renders:** `previews/store-polish/hearth-v3-*.png` (exterior front, three-quarter, night, door close-up, interior from the door,
+  table close-up, counter and CHECKOUT, phone 667x375). Not seen in Studio.
+- **Awaiting Connor:** (1) placing the Shed costs the $240 kit fee on top of the $600 plan (default: the kit rule); (2) the Lantern and
+  Flashlight have no held model in the game, so their held slot path waits for a held-gear feature; (3) the blue under each box is
+  the box's own accent floor (BoxArt, shared by every store), not a plinth; (4) parts 444 against the old 350 cap.
+
 ## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
 
 The three pasted store image ids (91282142796474 Tow Service, 79037897236948 Timber Classic, 71028498113750 Paint Shop) may be Decal ids, which an ImageLabel cannot load by `rbxassetid://`. `Shared/StoreArt.ImageFor(id, size)` now returns `rbxthumb://type=Asset&id=<id>&w=<n>&h=<n>` (150 on the panel card, 420 on the world board) for a nonzero id and `""` for 0; `StoreUI` and `StoreBoard` use it, and the letter or mark fallback (failed load, id 0) is unchanged. No prices, sale flags or ids changed. Unverified: that the thumbnails render (needs Studio). `AssetIds.spec` allows the one rbxthumb literal in `StoreArt.luau` and still fails any other.

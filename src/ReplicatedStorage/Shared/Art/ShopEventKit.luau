@@ -235,7 +235,9 @@ function ShopEventKit.BuildZone(parent: Instance, kind: string, anchor: CFrame, 
 		attach.Parent = marker
 	end
 
-	CollectionService:AddTag(model, ShopEventKit.ZoneTag)
+	pcall(function()
+		CollectionService:AddTag(model, ShopEventKit.ZoneTag)
+	end)
 	ShopEventKit.SetZoneActive(model, false)
 	return model
 end
@@ -298,7 +300,9 @@ function ShopEventKit.BuildBanner(parent: Instance, kind: string, anchor: CFrame
 	board:SetAttribute("Store", kind)
 	board:SetAttribute("Active", false)
 	board:SetAttribute("Text", "")
-	CollectionService:AddTag(board, ShopEventKit.BannerTag)
+	pcall(function()
+		CollectionService:AddTag(board, ShopEventKit.BannerTag)
+	end)
 	ShopEventKit.SetBannerActive(board, false, nil)
 	return model
 end

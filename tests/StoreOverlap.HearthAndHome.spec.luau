@@ -62,7 +62,6 @@ return function(t)
 		DoorThreshold = "doorframe",
 		AwningStripe = "awning",
 		AwningValance = "awning",
-		AwningRail = "awning",
 		AwningPost = "awning",
 		AwningBracket = "awning",
 		Sign = "namesign",
@@ -157,6 +156,7 @@ return function(t)
 		counter = true,
 		porchpost = true,
 		decor = true,
+		event = true,
 		picture = true,
 		rug = true,
 		doorframe = true,
@@ -268,7 +268,8 @@ return function(t)
 			parent[i] = i
 		end
 		for i, a in ipairs(list) do
-			a.family = FAMILY[a.name]
+			-- (the event room's zone and banner, ShopEventKit: every Event* part is one family of props)
+			a.family = FAMILY[a.name] or (if string.sub(a.name, 1, 5) == "Event" then "event" else nil)
 			a.id = i
 		end
 		for i = 1, #list do
@@ -307,8 +308,18 @@ return function(t)
 	t.test(
 		"every table, price card, spot, shelf, picture, rug, door frame and awning part is covered by the lists",
 		function()
-			local PREFIXES =
-				{ "Table", "Spot", "Nook", "Picture", "DoorPost", "DoorThreshold", "Awning", "Checkout", "LockChip" }
+			local PREFIXES = {
+				"Table",
+				"Spot",
+				"Nook",
+				"Picture",
+				"DoorPost",
+				"DoorThreshold",
+				"Awning",
+				"Checkout",
+				"LockChip",
+				"Event",
+			}
 			local seen = {}
 			local missing = {}
 			for _, a in ipairs(list) do

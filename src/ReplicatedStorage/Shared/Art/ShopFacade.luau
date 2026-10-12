@@ -190,7 +190,7 @@ ShopFacade.FrameGap = 0.75 -- the frame's posts start this far outside the openi
 
 -- A real DOOR FRAME round the opening, in final studs: two cream posts (pilasters) standing proud of the wall just
 -- outside the opening, each on a stone footing block, and a flush stone THRESHOLD across the doorway (a looks-only
--- slab 0.08 thick, so there is no step to trip on: nothing collides). The wall's own jambs and header (the leaf the
+-- slab 0.12 thick, so there is no step to trip on: nothing collides). The wall's own jambs and header (the leaf the
 -- shop hours recolour) are the inner frame; these are its outer trim. Nothing stands in the opening or in the
 -- 2-stud walk to it. Reusable by any store: ShopFacade.DoorFrame(model, spec) with the same Spec as Add.
 -- Parts: DoorPost x2, DoorPostBase x2, DoorThreshold.
@@ -205,12 +205,19 @@ function ShopFacade.DoorFrame(parent: Instance, spec: Spec, opts: FrameOpts?)
 	local stone = o.base or hex("#8C867C")
 	for _, s in ipairs({ -1, 1 }) do
 		local x = spec.doorCx + s * (inner + postW / 2)
-		box(parent, "DoorPost", V3(postW, top - gy, proud), CF(x, (top + gy) / 2, spec.frontZ - proud / 2), trim)
+		-- (the post starts inside its footing and the footing sinks 0.05 into the wall: no two faces share a plane)
+		box(
+			parent,
+			"DoorPost",
+			V3(postW, top - gy - 0.35, proud),
+			CF(x, (top + gy + 0.35) / 2, spec.frontZ - proud / 2 - 0.03),
+			trim
+		)
 		box(
 			parent,
 			"DoorPostBase",
-			V3(postW + 0.3, 0.7, proud + 0.2),
-			CF(x, gy + 0.35, spec.frontZ - (proud + 0.2) / 2),
+			V3(postW + 0.3, 0.6, proud + 0.3),
+			CF(x, gy + 0.32, spec.frontZ - (proud + 0.3) / 2),
 			stone,
 			MAT.Slate
 		)
@@ -219,8 +226,8 @@ function ShopFacade.DoorFrame(parent: Instance, spec: Spec, opts: FrameOpts?)
 	box(
 		parent,
 		"DoorThreshold",
-		V3(2 * spec.doorHalf, 0.08, 0.9),
-		CF(spec.doorCx, gy + 0.04, spec.frontZ + 0.05),
+		V3(2 * spec.doorHalf, 0.12, 0.4),
+		CF(spec.doorCx, gy + 0.06, spec.frontZ + 0.7),
 		stone,
 		MAT.Slate
 	)
@@ -239,10 +246,10 @@ export type AwningOpts = {
 
 -- A STRIPED AWNING over the door, built of parts (no uploaded texture): `stripes` fabric slabs 0.18 thick in two
 -- colours side by side, sloping out and down from the wall; a front VALANCE of the same stripes hanging from the front
--- edge, every other piece a third shorter so the edge steps like a scallop; a timber rail along the front; two posts
+-- edge, every other piece a third shorter so the edge steps like a scallop; two posts
 -- to the ground and two brackets back to the wall. Everything stays clear of the door leaves when they swing out
 -- (their tops are lower than the valance's bottom) and of the opening. Looks only. Reusable by any store.
--- Parts: AwningStripe x n, AwningValance x n, AwningRail, AwningPost x2, AwningBracket x2.
+-- Parts: AwningStripe x n, AwningValance x n, AwningPost x2, AwningBracket x2.
 function ShopFacade.StripedAwning(parent: Instance, spec: Spec, o: AwningOpts)
 	local n = o.stripes or 6
 	local w = o.width or (spec.doorHalf * 2 + 4)
@@ -281,19 +288,18 @@ function ShopFacade.StripedAwning(parent: Instance, spec: Spec, o: AwningOpts)
 		)
 	end
 	local railY = frontTop - thick - 0.12
-	box(parent, "AwningRail", V3(w + 0.3, 0.2, 0.22), CF(c, railY - 0.05, frontZ + 0.3), TIMBER)
 	for _, s in ipairs({ -1, 1 }) do
 		local x = c + s * (w / 2 - 0.2)
-		local postTop = railY - 0.15
+		local postTop = railY + 0.05
 		box(
 			parent,
 			"AwningPost",
 			V3(0.3, postTop - spec.groundY, 0.3),
-			CF(x, spec.groundY + (postTop - spec.groundY) / 2, frontZ + 0.3),
+			CF(x, spec.groundY + (postTop - spec.groundY) / 2, frontZ + 0.2),
 			TIMBER
 		)
 		-- a bracket from the post's head back to the wall under the slab
-		local from = Vector3.new(x, railY - 0.15, frontZ + 0.3)
+		local from = Vector3.new(x, railY - 0.15, frontZ + 0.2)
 		local to = Vector3.new(x, railY - 0.15 - (reach - 0.3) * 0.18, z0 - 0.1)
 		local len = (to - from).Magnitude
 		box(parent, "AwningBracket", V3(0.2, 0.2, len), CFrame.lookAt((from + to) / 2, to), TIMBER)
@@ -430,7 +436,7 @@ local function shopSpecific(model: Model, spec: Spec)
 		-- the hours board over the door)
 		ShopFacade.StripedAwning(model, spec, {
 			backY = 12.6,
-			reach = 4.4,
+			reach = 4.0,
 			colorA = hex("#3E6A3A"),
 			colorB = hex("#F2E7CF"),
 			stripes = 6,

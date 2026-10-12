@@ -13,6 +13,7 @@ local ShopKit = require(script.Parent.Parent.ShopKit)
 local Kit = require(script.Parent.Parent.Kit)
 local BoxLook = require(script.Parent.Parent.Parent.BoxLook)
 local StoreStock = require(script.Parent.Parent.Parent.StoreStock)
+local ShopEventKit = require(script.Parent.Parent.ShopEventKit)
 
 type Frame = ShopKit.Frame
 local V3, CF = Vector3.new, CFrame.new
@@ -272,10 +273,9 @@ function Hearth.Build(model: Model, frame: Frame)
 	ShopKit.Rafter(model, frame, 0)
 	-- Over the central aisle and over the two side aisles; none in the first 9
 	-- studs (the entrance stays open) and none at a sign's end.
-	for _, z in ipairs({ -2.2, 3 }) do
-		ShopKit.WarmLamp(model, -15.6, ceil - 3.4, z, lampTop)
-		ShopKit.WarmLamp(model, 15.6, ceil - 3.4, z, lampTop)
-	end
+	-- (the side aisles: one lamp each side at z -2.2; the spots over the tables light the rest, and the part budget is tight)
+	ShopKit.WarmLamp(model, -15.6, ceil - 3.4, -2.2, lampTop)
+	ShopKit.WarmLamp(model, 15.6, ceil - 3.4, -2.2, lampTop)
 	ShopKit.WarmLamp(model, -2.6, ceil - 3.4, -9, lampTop)
 	ShopKit.WarmLamp(model, 2.6, ceil - 3.4, -9, lampTop)
 	ShopKit.WarmLamp(model, -4.2, ceil - 3.4, 3, lampTop) -- (4.2 out: from the door these stay clear of the name board over the counter)
@@ -317,6 +317,13 @@ function Hearth.Build(model: Model, frame: Frame)
 	stockProp(model, "Crate", 21.2, fy, 18.6, 0.1)
 	stockProp(model, "Crate", 21.2, fy, 16.4, -0.15)
 	stockProp(model, "Barrel", 18.2, fy, 19.6, 0)
+
+	-- The event expansion room (EVENTS.md, ShopEventKit): a roped-off 16 x 9 area in the back west corner, its open front
+	-- toward the door and its back against the back wall, between the counter and the west wall (clear of the gear shelf,
+	-- the island, the back-room door and the counter); and the event banner in the front west corner, off the doorway
+	-- aisle, facing the door.
+	ShopEventKit.BuildZone(model, "HearthAndHome", CF(-14.6, fy, 15.8), V3(16, 0, 9))
+	ShopEventKit.BuildBanner(model, "HearthAndHome", CF(-15.6, fy, -19.6), 4.4)
 end
 
 return Hearth
