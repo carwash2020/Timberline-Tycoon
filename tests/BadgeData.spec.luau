@@ -187,4 +187,32 @@ return function(t)
 		end
 		t.ok(rank, "Badges is a tile in the quick menu's order")
 	end)
+
+	t.test("new badges are the ones a sync adds, and the toast says earned, never a Roblox award", function()
+		local before = { FirstSale = true }
+		t.eq(#BadgeData.NewlyEarned(before, before), 0, "no change, no toast")
+		t.eq(BadgeData.ToastText({}), nil)
+		local one = BadgeData.NewlyEarned(before, { FirstSale = true, FirstTruck = true })
+		t.eq(one[1], "FirstTruck")
+		t.eq(#one, 1)
+		t.eq(BadgeData.ToastText(one), "Badge earned: First Truck")
+		t.eq(#BadgeData.NewlyEarned(nil, { FirstSale = true }), 1, "from nothing")
+		t.eq(#BadgeData.NewlyEarned({ FirstSale = true }, {}), 0, "losing one is not an earn")
+		t.eq(#BadgeData.NewlyEarned({}, { Bogus = true }), 0, "unknown keys are ignored")
+		local many = BadgeData.NewlyEarned({}, { FirstSale = true, FirstTruck = true, FirstPlank = true })
+		t.eq(BadgeData.ToastText(many), "Badges earned: First Sale and 2 more")
+		for _, def in ipairs(BadgeData.All()) do
+			local text = BadgeData.ToastText({ def.key })
+			t.ok(text ~= nil and #text <= 40, def.key)
+			t.eq(string.find(string.lower(text), "roblox", 1, true), nil)
+		end
+	end)
+
+	t.test("BadgeUI toasts through HUD.Toast on a later sync, not the first", function()
+		local fs = require("@lune/fs")
+		local ui = fs.readFile("src/StarterPlayer/StarterPlayerScripts/BadgeUI.luau")
+		t.ok(string.find(ui, "BadgeData.ToastText(BadgeData.NewlyEarned(", 1, true), "uses the rule")
+		t.ok(string.find(ui, "if primed and payload ~= latest", 1, true), "the join sync stays silent")
+		t.ok(string.find(ui, "HUD.Toast(text", 1, true), "through the toast policy")
+	end)
 end

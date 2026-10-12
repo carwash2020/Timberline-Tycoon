@@ -231,6 +231,21 @@ function SettingsLogic.Set(settings: Settings, key: string, value: unknown): boo
 	return false
 end
 
+-- The TIPS setting: whether tips (the bottom hint bar, once-a-session tip
+-- toasts, the first-cold/heat tip) show. `setting` is the SettingShowTips
+-- attribute or the saved value as read: only a real `false` turns tips off
+-- (nil, a missing key or odd data keeps the default, on). `step` is the
+-- TutorialStep attribute as read: while a tutorial step runs (a number
+-- above 0) tips stay on whatever the setting says, because the hint bar and
+-- the "put your axe away" toast carry lessons the step needs. Murph's own
+-- card never depends on this (QuestUI does not read the setting).
+function SettingsLogic.TipsShown(setting: unknown, step: unknown): boolean
+	if setting ~= false then
+		return true
+	end
+	return type(step) == "number" and step == step and step >= 1
+end
+
 -- Reduce flashing. In force when the player turned it on, or while camera
 -- shake is off (the same "calm the screen" choice: shake only switches off
 -- when the attribute is exactly false, as in SettingsUI). Takes the two

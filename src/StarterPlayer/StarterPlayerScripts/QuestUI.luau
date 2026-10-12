@@ -594,6 +594,11 @@ local function refresh()
 				QuestUI.JoyBeat()
 			end
 		end
+		local SoundData = require(ReplicatedStorage.Shared.SoundData) -- on use, as UITheme does
+		local tick = SoundData.StepTick(lastStep, index)
+		if tick and not skipped then
+			SoundData.Play(tick)
+		end
 		lastStep = index
 	end
 	updateBeacon()

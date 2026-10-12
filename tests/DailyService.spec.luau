@@ -603,4 +603,51 @@ return function(t)
 		s.Daily.Start(s.player, s.profile)
 		t.eq(s.profile.daily.loginDay, 1, "a missed day restarts the calendar")
 	end)
+
+	-- The day-1 login cash is paid at join, during the tutorial. Its toast is
+	-- held (and saved) and shown once when the tutorial ends.
+	local function freshDaily()
+		return { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0, loginDay = 0, lastLoginDay = 0 }
+	end
+
+	t.test("the day-1 login toast is held during the tutorial, then shown once when it ends", function()
+		local s = setup({ tutorialDone = false, daily = freshDaily() })
+		t.eq(#s.toasts, 0, "silent during the tutorial")
+		t.eq(s.profile.daily.loginToast, "Daily return, day 1 of 7: +$15", "held and saved, the same words and amount")
+		t.eq(s.Daily.FlushLoginToast(s.player, s.profile), false, "still in the tutorial: nothing yet")
+		s.profile.tutorialDone = true -- QuestService finishes it
+		t.eq(s.Daily.FlushLoginToast(s.player, s.profile), true)
+		t.eq(s.toasts, { "Daily return, day 1 of 7: +$15" })
+		t.eq(s.profile.daily.loginToast, nil, "cleared once shown")
+		t.eq(s.Daily.FlushLoginToast(s.player, s.profile), false, "never twice")
+		t.eq(#s.toasts, 1)
+	end)
+
+	t.test("a rejoin mid-tutorial does not lose the held toast (the day pays only once)", function()
+		-- The saved state after joining mid-tutorial: today's return paid, toast held.
+		local held = freshDaily()
+		held.loginDay = 1
+		held.lastLoginDay = math.floor((20000 * 86400 + 3600) / 86400)
+		held.loginToast = "Daily return, day 1 of 7: +$15"
+		local s = setup({ tutorialDone = false, daily = held })
+		t.eq(#s.toasts, 0, "rejoined mid-tutorial: still quiet")
+		t.eq(s.profile.daily.loginToast, "Daily return, day 1 of 7: +$15", "still held")
+		s.profile.tutorialDone = true
+		s.Daily.Start(s.player, s.profile) -- joins again after the tutorial
+		t.eq(s.toasts, { "Daily return, day 1 of 7: +$15" }, "shown once on the next join")
+		t.eq(s.profile.daily.loginToast, nil)
+	end)
+
+	t.test("a player past the tutorial gets the login toast at once, none held", function()
+		local s = setup({ daily = freshDaily() })
+		t.eq(s.toasts, { "Daily return, day 1 of 7: +$15" })
+		t.eq(s.profile.daily.loginToast, nil)
+	end)
+
+	t.test("the tutorial's end tells DailyService (the hook is registered)", function()
+		local fs = require("@lune/fs")
+		local daily = fs.readFile("src/ServerScriptService/DailyService.luau")
+		t.ok(string.find(daily, "QuestService.OnFinished(", 1, true))
+		t.ok(string.find(daily, "FlushLoginToast(player, profile)", 1, true))
+	end)
 end

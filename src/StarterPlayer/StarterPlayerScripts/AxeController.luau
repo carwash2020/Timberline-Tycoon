@@ -220,7 +220,20 @@ local function refresh()
 	end
 end
 
+-- The Equip sound: a tool lands in the character's hands (after the first
+-- moments of a spawn, SoundData.EquipPlays).
+local spawnedAt = os.clock()
+
 local function watchContainer(container: Instance)
+	if container:IsA("Model") then
+		spawnedAt = os.clock()
+		container.ChildAdded:Connect(function(child: Instance)
+			local SoundData = require(ReplicatedStorage.Shared.SoundData) -- on use, as UITheme does
+			if SoundData.EquipPlays(child:IsA("Tool"), os.clock() - spawnedAt) then
+				SoundData.Play("Equip")
+			end
+		end)
+	end
 	container.ChildAdded:Connect(refresh)
 	container.ChildRemoved:Connect(refresh)
 	refresh()

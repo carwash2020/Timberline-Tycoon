@@ -138,8 +138,24 @@ function BadgeUI.Start()
 
 	-- The server writes the Badges attribute and fires BadgeSync. This
 	-- client only reads them; it never writes the attribute back.
+	-- The first sync after joining is what the save already had: no toast.
+	-- After that, each new badge gets one in-game toast ("Badge earned: ...")
+	-- through HUD.Toast, so NoticePolicy's limits apply (one non-critical at
+	-- a time, queued behind a stage or other toast, dropped in the first-sale
+	-- flow). The panel always has it. Says nothing about Roblox's own badge.
+	local primed = false
 	local function show(payload: unknown)
-		if type(payload) ~= "string" or payload == latest then
+		if type(payload) ~= "string" then
+			return
+		end
+		if primed and payload ~= latest then
+			local text = BadgeData.ToastText(BadgeData.NewlyEarned(BadgeData.Decode(latest), BadgeData.Decode(payload)))
+			if text then
+				HUD.Toast(text, nil, { priority = "normal" })
+			end
+		end
+		primed = true
+		if payload == latest then
 			return
 		end
 		latest = payload

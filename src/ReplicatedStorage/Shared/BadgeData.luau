@@ -488,6 +488,37 @@ function BadgeData.Rows(awarded: { [string]: boolean }?): { Row }
 	return rows
 end
 
+-- The badges in `now` that `before` did not have, in list order. The
+-- client toasts these when a sync arrives after the first one.
+function BadgeData.NewlyEarned(before: { [string]: boolean }?, now: { [string]: boolean }?): { string }
+	local had = if type(before) == "table" then before else {}
+	local have = if type(now) == "table" then now else {}
+	local keys: { string } = {}
+	for _, def in ipairs(ALL) do
+		if have[def.key] == true and had[def.key] ~= true then
+			table.insert(keys, def.key)
+		end
+	end
+	return keys
+end
+
+-- The in-game toast for new badges, or nil for none. It says "earned" and
+-- never claims a Roblox badge was awarded (the Creator Hub ids may be 0).
+-- Several at once fold into one toast so a catch-up does not flood.
+function BadgeData.ToastText(keys: { string }): string?
+	if #keys == 0 then
+		return nil
+	end
+	local first = BY_KEY[keys[1]]
+	if first == nil then
+		return nil
+	end
+	if #keys == 1 then
+		return "Badge earned: " .. first.name
+	end
+	return string.format("Badges earned: %s and %d more", first.name, #keys - 1)
+end
+
 function BadgeData.Count(awarded: { [string]: boolean }?): (number, number)
 	local n = 0
 	local rows = BadgeData.Rows(awarded)

@@ -243,6 +243,33 @@ function SoundData.PlayFell(stage: "start" | "land", position: Vector3, mass: nu
 	end
 end
 
+-- Which feedback sound a server notice earns, if any. A completed purchase
+-- is the server's "Bought the X!" line (ShopService); every refusal ("You
+-- need $40 more...", "can't afford") is worded differently, so a refused
+-- buy never plays it.
+function SoundData.ForNotice(text: unknown): string?
+	if type(text) == "string" and string.sub(text, 1, #"Bought the ") == "Bought the " then
+		return "Buy"
+	end
+	return nil
+end
+
+-- A tool the character picks up in hand makes the Equip sound, but not the
+-- one a respawn puts there (the first moments after the character loads).
+SoundData.EquipSettleSeconds = 1.5
+function SoundData.EquipPlays(isTool: boolean, secondsSinceSpawn: number): boolean
+	return isTool and secondsSinceSpawn >= SoundData.EquipSettleSeconds
+end
+
+-- A soft tick when Murph's tutorial moves ON to a new step: not at join
+-- (no earlier step), not when it ends (the joy beat has its own chime).
+function SoundData.StepTick(previous: number, step: number): string?
+	if previous >= 1 and step > previous then
+		return "UIClick"
+	end
+	return nil
+end
+
 -- Plays a one-shot sound in the player's ears (UI, rewards).
 function SoundData.Play(name: string)
 	if not SoundData.SfxEnabled then
