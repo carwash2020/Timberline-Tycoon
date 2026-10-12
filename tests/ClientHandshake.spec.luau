@@ -3,8 +3,6 @@
 -- handshake sent early is heard at once (it used to wait for the client's
 -- next repeat, 3 s later), and the resend it owes waits for the services.
 return function(t)
-	local ClientHandshake = t.load("ServerScriptService/ClientHandshake")
-
 	local function rig(allowed)
 		local w = { first = {}, ready = {}, resent = {}, handler = nil }
 		local event = {
@@ -15,10 +13,17 @@ return function(t)
 				end,
 			},
 		}
+		local ClientHandshake = t.loader({
+			mocks = {
+				RateLimiter = {
+					Allow = function(_, key)
+						assert(key == "ClientReady")
+						return allowed ~= false
+					end,
+				},
+			},
+		}):server("ClientHandshake")
 		w.handshake = ClientHandshake.Bind(event, {
-			allow = function()
-				return allowed ~= false
-			end,
 			markReady = function(player)
 				if w.ready[player] then
 					return false

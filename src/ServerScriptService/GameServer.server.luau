@@ -172,9 +172,6 @@ remotes.Parent = ReplicatedStorage
 -- Handshake.SetResend (below, once the services have registered theirs).
 local joinedAt: { [Player]: number } = {}
 local Handshake = ClientHandshake.Bind(remote.ClientReady, {
-	allow = function(player: any): boolean
-		return RateLimiter.Allow(player, "ClientReady")
-	end,
 	markReady = function(player: any): boolean
 		return JoinSync.MarkReady(player, LoadState.Since())
 	end,

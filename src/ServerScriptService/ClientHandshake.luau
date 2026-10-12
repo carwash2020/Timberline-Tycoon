@@ -10,10 +10,11 @@
 -- GameServer says it can (SetResend), for every player who already asked.
 -- No Roblox API in here: the specs drive it with fakes.
 
+local RateLimiter = require(script.Parent.RateLimiter)
+
 local ClientHandshake = {}
 
 export type Deps = {
-	allow: (player: any) -> boolean, -- the rate limit
 	markReady: (player: any) -> boolean, -- true the first time a player says it
 	onFirst: (player: any) -> (), -- the log line for that first time
 }
@@ -27,7 +28,7 @@ function ClientHandshake.Bind(event: any, deps: Deps): Handshake
 	local resend: ((player: any) -> ())? = nil
 	local pending: { [any]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 	event.OnServerEvent:Connect(function(player: any)
-		if not deps.allow(player) then
+		if not RateLimiter.Allow(player, "ClientReady") then
 			return
 		end
 		if deps.markReady(player) then

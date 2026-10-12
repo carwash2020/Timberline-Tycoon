@@ -113,7 +113,7 @@ return function(t)
 		local limits = fs.readFile("src/ServerScriptService/RateLimiter.luau")
 		t.ok(string.find(limits, "ClientReady = ", 1, true), "a budget")
 		local game = fs.readFile("src/ServerScriptService/GameServer.server.luau")
-		t.ok(string.find(game, "remote.ClientReady.OnServerEvent", 1, true))
+		t.ok(string.find(game, "ClientHandshake.Bind(remote.ClientReady", 1, true)) -- (the listener is ClientHandshake, bound early)
 		for _, name in ipairs({ "cash", "plotOffer", "saveSlots" }) do
 			t.ok(string.find(game, 'JoinSync.Register("' .. name .. '"', 1, true), name .. " is resent")
 		end
