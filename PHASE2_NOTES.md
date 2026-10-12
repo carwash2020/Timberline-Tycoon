@@ -4021,3 +4021,18 @@ Design to the written brief (Connor's reference screenshots were never received)
 4. Phone (667x375) and Xbox: walk to a bay, the T-flag and box hover tags still appear, the buy prompt works as before, a bought vehicle spawns as before.
 5. Night: forecourt lamps and showroom lanterns glow warm, none blinding.
 6. PC: walk onto the forecourt paving by the planters. The paving does not collide (street level), so your feet sit a little low in it; tell Connor if that looks wrong (the fix is paint on the terrain in WorldLayout).
+## Plot machines swap their meshes in (branch `phase-2/plot-machines-swap-meshes`, 13 October 2026)
+
+Nothing here was seen in Studio. Check on PC, phone and Xbox (the swap is server side, so what the client shows is the same):
+
+1. Join a server fresh (cold mesh cache) with a saved plot that has a sawmill, a planer, the chop saw and belts. They appear at once
+   as plain boxy machines, you can feed wood and set the cut, and within a few seconds each turns into its Blender model with no
+   flicker of the panel, prompts or signs. Output shows at most one `[MachineSkin] ... did not load` line per machine that truly fails.
+2. Place a sawmill from the shop right after joining (before meshes load) and walk away from it: it swaps without moving or
+   turning. Turn it with the move tool before it swaps: it keeps its place and facing, mesh included.
+3. A 5-piece machine (a Wood Detector, a Tilted Belt) is dressed whole: never a body without its belt or rollers.
+4. Switch Belt: flip its side after it swaps; the paddle swings. Chop saw: the price sign stands over the board on the mesh.
+5. Xbox: the Set the cut / Set the length prompts still show the selection ring and respond to A on the swapped machine; phone: the
+   panel buttons are still tappable (they are the same parts).
+6. Placement ghost: right after joining the ghost turns into the mesh at 0.45 see-through.
+

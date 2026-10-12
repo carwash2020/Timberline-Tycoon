@@ -22,6 +22,7 @@
 
 local InputKit = require(script.Parent.InputKit)
 local Kit = require(script.Parent.Art.Kit)
+local StoreArt = require(script.Parent.StoreArt)
 local StoreCopy = require(script.Parent.Store.StoreCopy)
 local StoreData = require(script.Parent.StoreData)
 local StoreSale = require(script.Parent.Store.StoreSale)
@@ -242,8 +243,9 @@ local function poster(parent: Instance, entry: StoreData.Entry, order: number, c
 	disc.BorderSizePixel = 0
 	disc.ScaleType = Enum.ScaleType.Fit
 	corner(disc, StoreBoard.ArtPx // 2)
-	if item.image > 0 then
-		disc.Image = "rbxassetid://" .. tostring(item.image)
+	local uri = StoreArt.ImageFor(item.image, StoreArt.Large)
+	if uri ~= "" then
+		disc.Image = uri
 	else
 		disc.Image = ""
 		local glyph = text(

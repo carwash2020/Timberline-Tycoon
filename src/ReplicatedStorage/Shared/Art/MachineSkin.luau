@@ -97,8 +97,10 @@ local function logMiss(id: string, piece: string, meshId: number)
 end
 
 -- Loads every piece of `id`. nil when the machine has no entry or any piece
--- is missing (nothing is left behind). Never throws.
-function MachineSkin.Prepare(id: string, ghost: boolean?): Skin?
+-- is missing (nothing is left behind). Never throws. `quiet` skips the
+-- "keeping the part-built machine" line: a builder that probes first and then
+-- dresses inside MeshKit.Attempt (MachineArt) lets the dress step say it once.
+function MachineSkin.Prepare(id: string, ghost: boolean?, quiet: boolean?): Skin?
 	local asset = MachineMeshes.Get(id)
 	if not asset or MachineSkin.Disabled then
 		return nil
@@ -138,7 +140,9 @@ function MachineSkin.Prepare(id: string, ghost: boolean?): Skin?
 		for _, p in ipairs(made) do
 			p:Destroy()
 		end
-		logMiss(id, firstMiss.name, firstMissId)
+		if quiet ~= true then
+			logMiss(id, firstMiss.name, firstMissId)
+		end
 		return nil
 	end
 	return { id = id, ghost = ghost == true, parts = made }
