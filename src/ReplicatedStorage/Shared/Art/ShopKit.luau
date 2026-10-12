@@ -600,7 +600,8 @@ function ShopKit.TierStand(parent: Instance, s: StandSpec): Part
 	hover.anchor = false
 	HoverTag.Mark(post, hover)
 	if lock then
-		local chipAt = CF(px, s.flagY + ShopKit.FlagSize.Y / 2 + 0.5, pz) * yaw
+		-- (it rests on the brass backing's top edge, 0.6 over the flag's middle: it floated 0.2 above it)
+		local chipAt = CF(px, s.flagY + 0.6 + ShopKit.ChipSize.Y / 2, pz) * yaw
 		local chip = dBox(parent, "LockChip", ShopKit.ChipSize, chipAt, StoreTier.LockedColor, MAT.SmoothPlastic)
 		Kit.signText(chip, lock.text, StoreTier.LockedInk, nil, Enum.Font.FredokaOne, 0.2)
 		chip:SetAttribute("LockText", lock.text)
@@ -637,7 +638,7 @@ function ShopKit.SectionSigns(
 	parent: Instance,
 	shop: string,
 	sections: { Section },
-	cfg: { headerY: number, headerZ: number, tieY: number, subShift: number? }
+	cfg: { headerY: number, headerZ: number, tieY: number, subShift: number?, tieMaxX: number? }
 )
 	local placements = StoreStock.Placements(shop)
 	local lanes: { [string]: ShelfLayout.Lane? } = {}
@@ -655,7 +656,12 @@ function ShopKit.SectionSigns(
 			return
 		end
 		tied[key] = true
-		dBox(parent, "SignTie", V3(w + 1.4, 0.5, 0.5), CF(cx, cfg.tieY, z), TIMBER)
+		-- A store with a sloping roof (the Tool Shed's gambrel) gives tieMaxX: the tie stops there, under the shingles.
+		local x0, x1 = cx - (w + 1.4) / 2, cx + (w + 1.4) / 2
+		if cfg.tieMaxX then
+			x0, x1 = math.max(x0, -cfg.tieMaxX), math.min(x1, cfg.tieMaxX)
+		end
+		dBox(parent, "SignTie", V3(x1 - x0, 0.5, 0.5), CF((x0 + x1) / 2, cfg.tieY, z), TIMBER)
 	end
 	for _, section in ipairs(sections) do
 		local lane = lanes[section.lane]

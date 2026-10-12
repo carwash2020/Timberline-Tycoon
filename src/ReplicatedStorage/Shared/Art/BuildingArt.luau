@@ -1333,12 +1333,13 @@ local function toolShed(model: Model, title: string, accent: Color3)
 		dBox(model, "SignPost", V3(0.5, h, 0.5), CF(s * 4.6, roofY - 0.5 + h / 2, signZ + 0.5), TIMBER)
 		gooseneck(model, CF(s * 5.2, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 	end
-	-- Porch: two posts flanking the opening, one lantern on the east post.
+	-- Porch: two posts flanking the opening, a lantern on each.
 	-- Clear of the grindstone (x ±7.6) and of the door-width scan at the wall.
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(model, "PorchPost", V3(0.45, 6.4, 0.45), CF(s * 6.2, 3.2, -HZ - 1.15), TIMBER, MAT.Wood)
 	end
 	Kit.lantern(model, CF(6.2, 5.8, -HZ - 1.15), 0.75)
+	Kit.lantern(model, CF(-6.2, 5.8, -HZ - 1.15), 0.75) -- the west post lights the grindstone side at night
 	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
 	-- The counter stands at the back (final studs: BuildingArt.ToolShedCounterZ).
 	local CZ = BuildingArt.ToolShedCounterZ / BuildingArt.Scale.ToolShed

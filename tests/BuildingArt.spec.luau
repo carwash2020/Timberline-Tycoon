@@ -282,7 +282,7 @@ return function(t)
 			-- price tags, hanging goods, the cash desk's furnishings, and the Tool
 			-- Shed's rack of eight real axe models (about 20 parts each).
 			-- Store interiors kit: the Tool Shed's tier stands (flag, post, backing, chip), signs, ties,
-			-- lamps and stock corner take its whole shop from 245 to 366 parts; its interior has its own
+			-- lamps and stock corner take its whole shop from 245 to 366 parts (383 with the side windows, path and second porch lantern); its interior has its own
 			-- 400-part budget (StoreInterior.ToolShed.spec), so the shop's cap moves to 400.
 			-- The Dealership's showroom polish (the same kit): the hall's signs, lanterns, beams and
 			-- floor take the whole hall from 215 to 347 parts; its interior has the 400-part budget in

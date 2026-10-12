@@ -72,6 +72,22 @@ local function window(parent: Instance, spec: Spec, cx: number, cy: number, w: n
 	end
 end
 
+-- A window in a side wall (`side` -1 west, +1 east): a cream frame board on the
+-- wall's outside face (`x` is that face), the glass in front of it, a sill under it
+-- and a shutter each side. Facing along X; `z` and `cy` are its middle. Every part
+-- touches the wall or the one before it.
+local function sideWindow(parent: Instance, side: number, x: number, z: number, cy: number, w: number, h: number)
+	local color = Kit.shade(hex("#963E2C"), -0.1)
+	box(parent, "SideWindowFrame", V3(0.3, h + 0.8, w + 0.8), CF(x + side * 0.1, cy, z), TRIM)
+	local pane = box(parent, "WindowGlass", V3(0.12, h, w), CF(x + side * 0.31, cy, z), hex("#BFD9E6"), MAT.Glass)
+	pane.Transparency = 0.45
+	pane.CastShadow = false
+	box(parent, "SideWindowSill", V3(0.6, 0.3, w + 1.4), CF(x + side * 0.25, cy - h / 2 - 0.55, z), TRIM)
+	for _, s in ipairs({ -1, 1 }) do
+		box(parent, "SideShutter", V3(0.25, h + 0.8, 0.9), CF(x + side * 0.075, cy, z + s * (w / 2 + 0.85)), color)
+	end
+end
+
 local function planter(parent: Instance, x: number, y: number, z: number)
 	box(parent, "Planter", V3(2.2, 1.6, 2.2), CF(x, y + 0.8, z), WOOD)
 	box(parent, "PlanterBand", V3(2.3, 0.25, 2.3), CF(x, y + 1.3, z), TIMBER)
@@ -203,6 +219,24 @@ local function shopSpecific(model: Model, spec: Spec)
 		barrel(model, -hw + 4.2, gy, fz - 2.4)
 		crate(model, hw - 4.2, gy, fz - 2.6, 1.7)
 		chimney(model, -6, 6, spec.roofTop - 2.4, 5)
+		-- Two windows in each long wall (the long sides were bare boards), lit at
+		-- night like every window, and a flagstone path from the doormat out to the lane.
+		for _, side in ipairs({ -1, 1 }) do
+			for _, z in ipairs({ -9, 9 }) do
+				sideWindow(model, side, side * (hw + 0.45), z, 7.6, 3.6, 3.6)
+			end
+		end
+		local matEnd = fz - 2.65
+		for i, depth in ipairs({ 2.0, 2.0 }) do
+			box(
+				model,
+				"PathStone",
+				V3(if i == 1 then 6 else 5.2, 0.15, depth),
+				CF(spec.doorCx, 0.075, matEnd - depth * (i - 0.5)),
+				if i == 1 then hex("#A39A86") else hex("#948B78"),
+				MAT.Slate
+			)
+		end
 	else
 		-- The showroom: a canopy over the lobby door, planters, a bench and a
 		-- sandwich board, a flag pole and roof units (its windows are the glass band).

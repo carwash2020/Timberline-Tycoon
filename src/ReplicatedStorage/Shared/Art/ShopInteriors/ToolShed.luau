@@ -33,10 +33,13 @@ local ToolShed = {}
 
 -- The signs hang from collar ties up in the barn (the roof is a gambrel: at the
 -- lane the underside is about 19 high, so a tie at 15.2 is under it). Everything
--- else the interior adds stays under frame.ceilY.
-ToolShed.TieY = 15.2
+-- else the interior adds stays under frame.ceilY. The ties used to sit at 15.2 and
+-- 17.55 long, so their ends stuck through the lower roof slope (the notches on
+-- the shingles); at 14.6 and stopping at TieMaxX they stay under it.
+ToolShed.TieY = 14.6
+ToolShed.TieMaxX = 16.6
 ToolShed.HeaderY = 12.6
-ToolShed.TopY = 15.7 -- the highest part the interior adds (the ties' tops)
+ToolShed.TopY = 14.9 -- the highest part the interior adds (the ties' tops)
 
 -- The axe rack on the back wall, as Lumber Tycoon 2 shows its axes: every axe
 -- the shop sells (ItemCatalog's ladder, in order), each its real AxeArt model
@@ -263,6 +266,7 @@ function ToolShed.Build(model: Model, frame: Frame)
 		headerY = ToolShed.HeaderY,
 		headerZ = -8,
 		tieY = ToolShed.TieY,
+		tieMaxX = ToolShed.TieMaxX,
 	})
 	ShopKit.CheckoutSign(model, frame)
 

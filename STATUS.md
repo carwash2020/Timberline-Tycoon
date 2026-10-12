@@ -27,6 +27,13 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Tool Shed polish round 2 (branch `phase-2/store-polish-toolshed`, look only, ready PR, not merged until Connor OKs the renders)
+
+Connor's reference screenshots for this item were never received; this is built to the written brief. No price, item, stock, StoreUI or purchase-flow change; the hidden "Coming soon" items are untouched. Studio has seen none of it.
+- Audit found: (1) the lock chips floated 0.2 studs over their tier flags (`ShopKit.TierStand`, every store: now resting on the flag's brass backing); (2) the sign ties ended 17.55 out at y 15.2 and stuck through the lower roof slope as dark notches on the shingles (Tool Shed ties now at 14.6 and stop at 16.6, `ShopKit.SectionSigns` got an optional `tieMaxX`); (3) the long walls were bare boards, one porch lantern and no ground path.
+- Added to the street side (`ShopFacade`, `BuildingArt.toolShed`): two lit windows with shutters in each long wall, a lantern on the west porch post, a two-stone flagstone path from the doormat. About 25 parts: the whole shop is 383, cap 400.
+- `StoreInterior.ToolShed.spec` gained: nothing the interior adds pokes through the roof, no floating parts in the whole shop (0.05 tolerance), and the street-side dressing. Renders: `previews/store-polish/toolshed-*.png`; scenes `store-toolshed` (interior) and the new `store-toolshed-exterior`.
+
 ## Asset audit (branch `phase-2/audit-assets`, 12 October 2026)
 
 `ASSETS.md` (generated: `lune run tools/assets`, kept current by `check.sh`) lists every asset id in the source with its use and

@@ -231,6 +231,95 @@ return function(t)
 		end
 	end)
 
+	-- The gambrel's top surface at |x| (final studs): the eave, the knee, the ridge.
+	local function roofTop(x)
+		local HX = BuildingArt.ToolShedHalfWidth
+		local ex, ey = (HX + 0.3) * scale, 9 * scale
+		local kx, ky = (HX - 4.1) * scale, 13 * scale
+		local rx, ry = 0, 14.8 * scale
+		x = math.abs(x)
+		if x >= ex then
+			return ey
+		elseif x >= kx then
+			return ky + (ey - ky) * (x - kx) / (ex - kx)
+		end
+		return ry + (ky - ry) * x / kx
+	end
+
+	t.test(
+		"nothing the interior adds pokes up through the roof (the tie ends did, as notches in the shingles)",
+		function()
+			local model = interior()
+			for _, p in ipairs(parts(model)) do
+				if p.Name ~= "Counter" then
+					local x0, x1, _, y1 = aabb(p)
+					local worst = math.max(math.abs(x0), math.abs(x1))
+					t.ok(
+						y1 <= roofTop(worst) - 0.15,
+						string.format("%s top %.2f is over the roof %.2f at x %.1f", p.Name, y1, roofTop(worst), worst)
+					)
+				end
+			end
+		end
+	)
+
+	t.test(
+		"no floating parts: everything in the shop rests on a part, the floor or the ground (0.05 tolerance)",
+		function()
+			local model = BuildingArt.Shop(KIND, KIND, Color3.fromRGB(150, 62, 44))
+			local all = parts(model)
+			local boxes = {}
+			for i, p in ipairs(all) do
+				boxes[i] = { aabb(p) }
+			end
+			-- (the closed-door sign hangs over the opening by design; it is only built while shut)
+			for i, p in ipairs(all) do
+				local a = boxes[i]
+				if a[3] > 0.05 and p.Name ~= "DoorClosedSign" then
+					local touching = false
+					for j, b in ipairs(boxes) do
+						if
+							i ~= j
+							and a[1] <= b[2] + 0.05
+							and b[1] <= a[2] + 0.05
+							and a[3] <= b[4] + 0.05
+							and b[3] <= a[4] + 0.05
+							and a[5] <= b[6] + 0.05
+							and b[5] <= a[6] + 0.05
+						then
+							touching = true
+							break
+						end
+					end
+					t.ok(touching, string.format("%s floats at %.1f, %.1f, %.1f", p.Name, a[1], a[3], a[5]))
+				end
+			end
+		end
+	)
+
+	t.test(
+		"the street side: four side windows (glass lit at night), a path, both porch lanterns; the facade stays looks only",
+		function()
+			local model = BuildingArt.Shop(KIND, KIND, Color3.fromRGB(150, 62, 44))
+			local side, stones, lanterns = 0, 0, 0
+			for _, p in ipairs(parts(model)) do
+				if p.Name == "WindowGlass" and math.abs(p.CFrame.Position.X) > 10 then
+					side += 1
+					t.eq(p.CanCollide, false)
+				elseif p.Name == "PathStone" then
+					stones += 1
+					t.eq(p.CanCollide, false)
+					t.ok(p.CFrame.Position.Y < 0.2, "a path stone lies on the ground")
+				elseif p.Name == "LanternGlow" and p.CFrame.Position.Z < -frame.halfD - 0.5 then
+					lanterns += 1
+				end
+			end
+			t.eq(side, 4, "two windows in each long wall")
+			t.eq(stones, 2, "a flagstone path")
+			t.eq(lanterns, 2, "a lantern on each porch post")
+		end
+	)
+
 	t.test("the whole shop with its boxes is still inside the store budget", function()
 		local GameConfig = t.shared("GameConfig")
 		local model = BuildingArt.Shop(KIND, KIND, Color3.fromRGB(150, 62, 44))
