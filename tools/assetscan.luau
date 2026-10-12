@@ -118,6 +118,7 @@ function Scan.Scan(): { Record }
 		else
 			local currentKey = ""
 			local section = ""
+			local storeRow: string? = nil
 			for n, raw in ipairs(string.split(fs.readFile(path), "\n")) do
 				local line = stripComment(raw)
 				local assetKey = string.match(line, '^%s*id = "([%w_]+)"') or string.match(line, "^\t(%w+) = {%s*$")
@@ -134,9 +135,13 @@ function Scan.Scan(): { Record }
 					if digits and key ~= "image" then
 						add(out, digits, section, path, n, "CreatorIds." .. key)
 					end
+					local rowKey = string.match(line, '^%s*key = "(%w+)",')
+					if rowKey then
+						storeRow = rowKey
+					end
 					local imageDigits = string.match(line, "^%s*image = (%d+),")
 					if imageDigits and imageDigits ~= "0" then
-						add(out, imageDigits, "image", path, n, "store card image, " .. currentKey)
+						add(out, imageDigits, "image", path, n, "store card image, " .. (storeRow or currentKey))
 					end
 				elseif file == "UITheme.luau" then
 					local key, digits = string.match(line, "^%s*(%w+) = (%d%d%d%d%d%d+),")
