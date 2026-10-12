@@ -27,6 +27,10 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Load and spawn path audit (branch `phase-2/load-path-audit`, 12 October 2026)
+
+Void rescue for characters (Shared/VoidRescue, y -200, 3 per character), spawn-area streaming before every respawn, guarded join steps. Details in PHASE2_NOTES.md. Needs a Studio look (checks listed there).
+
 ## Docs, CI and accessibility (branch `phase-2/docs-ci-accessibility`, 12 October 2026, draft PR)
 
 - **CI type definitions are pinned and cached.** `scripts/check.sh` used to download luau-lsp's `globalTypes.d.luau` from the

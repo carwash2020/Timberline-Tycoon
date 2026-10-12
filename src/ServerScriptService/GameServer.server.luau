@@ -89,6 +89,7 @@ local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
+local VoidRescue = require(ReplicatedStorage.Shared.VoidRescue)
 local JoinFlow = require(ReplicatedStorage.Shared.JoinFlow)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
@@ -1404,11 +1405,73 @@ local function loadCharacter(player: Player): boolean
 	return ok
 end
 
+-- The pad this player spawns on: their plot's (RespawnLocation) while it
+-- stands, else the town's.
+local function spawnPad(player: Player): BasePart?
+	local mine = player.RespawnLocation
+	if mine and mine.Parent ~= nil and mine:IsDescendantOf(workspace) then
+		return mine
+	end
+	local town = mapFolder:FindFirstChild("SpawnLocation")
+	if town and town:IsA("BasePart") then
+		return town
+	end
+	return nil
+end
+
+-- Has the client stream the ground round the pad in before a character is
+-- loaded onto it (StreamingEnabled: a character put where nothing has
+-- streamed yet falls). Bounded (JoinFlow.StreamSeconds) and never throws.
+local function streamAroundSpawn(player: Player)
+	local pad = spawnPad(player)
+	local spawnPos = if pad then pad.Position + Vector3.new(0, JoinFlow.StreamLift, 0) else Vector3.new(0, 10, 0)
+	local ask = (player :: any).RequestStreamAroundAsync
+	if type(ask) == "function" then
+		local ok, err = pcall(function()
+			ask(player, spawnPos, JoinFlow.StreamSeconds)
+		end)
+		if not ok then
+			warn(string.format("[GameServer] %s: streaming the spawn area failed: %s", player.Name, tostring(err)))
+		end
+	end
+end
+
+-- A character that has fallen out of the world is put back on its pad, not
+-- left to die at the engine's destroy height and respawn into the same hole
+-- (Shared/VoidRescue: a few times at most, so it cannot loop).
+local function watchForVoid(player: Player, character: Model, humanoid: Humanoid)
+	local tracker = VoidRescue.new()
+	while player.Parent == Players and player.Character == character and humanoid.Health > 0 do
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") and tracker.Check(root.Position.Y, os.clock()) then
+			local pad = spawnPad(player)
+			warn(
+				string.format(
+					"[GameServer] %s fell out of the world (y %.0f): put back on the spawn pad (%d of %d)",
+					player.Name,
+					root.Position.Y,
+					tracker.Count(),
+					VoidRescue.MaxRescues
+				)
+			)
+			if pad then
+				streamAroundSpawn(player)
+				if player.Character == character and humanoid.Health > 0 then
+					character:PivotTo(pad.CFrame + Vector3.new(0, pad.Size.Y / 2 + VoidRescue.PadLift, 0))
+					root.AssemblyLinearVelocity = Vector3.zero
+				end
+			end
+		end
+		task.wait(VoidRescue.CheckSeconds)
+	end
+end
+
 local function onCharacterAdded(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not humanoid or not humanoid:IsA("Humanoid") then
 		return
 	end
+	task.spawn(watchForVoid, player, character, humanoid)
 	humanoid.Died:Connect(function()
 		dropCarriedLogs(player)
 		-- MapBuilder turned CharacterAutoLoads off (nobody spawns before the
@@ -1416,7 +1479,10 @@ local function onCharacterAdded(player: Player, character: Model)
 		-- respawning too.
 		task.delay(JoinFlow.RespawnDelay(Players.RespawnTime), function()
 			if player.Parent == Players and player.Character == character then
-				loadCharacter(player)
+				streamAroundSpawn(player) -- the ground under the pad first, so the new character does not fall
+				if player.Parent == Players and player.Character == character then
+					loadCharacter(player)
+				end
 			end
 		end)
 	end)
@@ -1492,19 +1558,7 @@ local function enterWorld(player: Player, joinLap: (string) -> ())
 	end
 
 	-- Stream the spawn area in before the character exists.
-	local spawnPart = mapFolder:FindFirstChild("SpawnLocation")
-	local spawnPos = if spawnPart and spawnPart:IsA("BasePart")
-		then spawnPart.Position + Vector3.new(0, JoinFlow.StreamLift, 0)
-		else Vector3.new(0, 10, 0)
-	local ask = (player :: any).RequestStreamAroundAsync
-	if type(ask) == "function" then
-		local ok, err = pcall(function()
-			ask(player, spawnPos, JoinFlow.StreamSeconds)
-		end)
-		if not ok then
-			warn(string.format("[GameServer] %s: streaming the spawn area failed: %s", player.Name, tostring(err)))
-		end
-	end
+	streamAroundSpawn(player)
 	joinLap("spawn area streamed")
 	if player.Parent ~= Players then
 		return
@@ -1586,9 +1640,14 @@ local function onPlayerAdded(player: Player)
 		return -- "left": they're already gone
 	end
 
-	local truckId = ownedEquipped(profile)
-	player:SetAttribute("OwnsTruck", truckId ~= "")
-	player:SetAttribute("EquippedTruck", truckId)
+	-- Everything from here to enterWorld is guarded (safely): an error in one
+	-- of these must not end onPlayerAdded, or the player would never get a
+	-- character and would sit on the loading card for good.
+	safely("equipped truck", function()
+		local truckId = ownedEquipped(profile)
+		player:SetAttribute("OwnsTruck", truckId ~= "")
+		player:SetAttribute("EquippedTruck", truckId)
+	end)
 
 	-- The v2 loop: v1 logs still on hand are bought back (and a first join
 	-- topped up to StartingCash) into v2Credit, before the truck spawns or
@@ -1612,14 +1671,16 @@ local function onPlayerAdded(player: Player)
 	end
 
 	player:SetAttribute("Cash", profile.cash)
-	profile.settings = SettingsLogic.Sanitize(profile.settings)
-	for key, attr in pairs(SettingsLogic.Attributes) do
-		player:SetAttribute(attr, (profile.settings :: any)[key])
-	end
-	if profile.pendingCash > 0 then
-		player:SetAttribute("PendingCash", profile.pendingCash)
-		EconomyService.PayPending(player)
-	end
+	safely("settings and pending cash", function()
+		profile.settings = SettingsLogic.Sanitize(profile.settings)
+		for key, attr in pairs(SettingsLogic.Attributes) do
+			player:SetAttribute(attr, (profile.settings :: any)[key])
+		end
+		if profile.pendingCash > 0 then
+			player:SetAttribute("PendingCash", profile.pendingCash)
+			EconomyService.PayPending(player)
+		end
+	end)
 	-- What MigrateV2 left owed, through the wallet (overflow banked).
 	if CoreLoop.V2() and profile.v2Credit > 0 then
 		safely("pay v2Credit", function()
