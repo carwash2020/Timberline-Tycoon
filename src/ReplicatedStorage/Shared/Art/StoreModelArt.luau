@@ -15,11 +15,11 @@ local StoreModelSlots = require(script.Parent.Parent.StoreModelSlots)
 local StoreModelArt = {}
 
 export type BuildOpts = {
-	parent: Instance?,
+	parent: any?, -- an Instance (any: a table field's type is invariant, callers pass a Model)
 	limit: Vector3?, -- an extra box the model must fit (the display's part-built extent)
 	scale: number?, -- multiplies the fitted size (the display's box scale)
 	anchored: boolean?,
-	weldTo: BasePart?, -- welds every piece to this part
+	weldTo: any?, -- a BasePart: welds every piece to this part
 	attribute: string?, -- set true on every piece (BlueprintModels marks its visuals)
 }
 
@@ -91,7 +91,7 @@ end
 -- When it makes parts, `replaced` (the part-built look) is destroyed. Returns
 -- the parts, or nil (the part-built look stays). `alive` is what the swap
 -- belongs to: when it is gone the swap is dropped.
-function StoreModelArt.Dress(alive: Instance, build: () -> { MeshPart }?, replaced: { Instance }?): { MeshPart }?
+function StoreModelArt.Dress(alive: Instance, build: () -> { MeshPart }?, replaced: { any }?): { MeshPart }?
 	return MeshKit.Attempt(alive, function(): { MeshPart }?
 		local made = build()
 		if made ~= nil and replaced ~= nil then
