@@ -716,8 +716,10 @@ local function portrait(parent: Instance): ViewportFrame
 	view.Parent = parent
 	task.spawn(function()
 		-- Bounded: a missing map must not leave this thread waiting forever.
-		local map = workspace:WaitForChild("TimberlineMap", 30)
-		local murph = if map then map:WaitForChild("Murph", 30) else nil
+		-- Murph arrives after the world build (NPCService), which took 300 s in
+		-- Studio on 12 October 2026: 30 s left the card without his face.
+		local map = workspace:WaitForChild("TimberlineMap", QuestUI.PortraitWait)
+		local murph = if map then map:WaitForChild("Murph", QuestUI.PortraitWait) else nil
 		local head = if murph then murph:WaitForChild("Head", 15) else nil
 		if not head or not head:IsA("BasePart") or not murph then
 			return
@@ -989,7 +991,8 @@ end
 -- up a moment before its children, so the prompt is waited for (WaitForChild,
 -- bounded by QuestUI.TalkWait) and, if it never comes, the player is told in
 -- Murph's card where to go instead of nothing happening. No second prompt.
-QuestUI.TalkWait = 15 -- seconds to wait for Murph's Talk prompt
+QuestUI.TalkWait = 15 -- seconds to wait for Murph's Talk prompt (once his model is there)
+QuestUI.PortraitWait = 600 -- seconds to wait for the map, and then Murph, before the portrait gives up
 QuestUI.TalkFallback =
 	"I'm at my camp by the fire. Follow the amber arrow, then press the Talk button when you're close."
 local murphHooked = false

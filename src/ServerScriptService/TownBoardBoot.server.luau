@@ -1,6 +1,8 @@
 --!strict
 -- TownBoardBoot: starts the town leaderboard board without editing
--- GameServer or V1Boot. A missing module is skipped.
+-- GameServer or V1Boot. A module that is missing or fails is skipped, with a
+-- warning (the board is the one thing a silent skip would never be noticed
+-- for: nothing else in the game points at it).
 
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -12,5 +14,9 @@ if mod ~= nil and mod:IsA("ModuleScript") then
 		if not ran then
 			warn("[TownBoardBoot] TownBoardService " .. tostring(err))
 		end
+	else
+		warn("[TownBoardBoot] TownBoardService did not load: " .. tostring(result))
 	end
+else
+	warn("[TownBoardBoot] TownBoardService is not in ServerScriptService; the town board was not started")
 end

@@ -26,7 +26,6 @@ local UITheme = require(script.Parent.UITheme)
 
 local SawmillController = {}
 
-local BOOT_WAIT = 8 -- seconds to hear which loop runs (MapBuilder publishes it)
 local hooked: { [Instance]: boolean } = {}
 local openMill: Model? = nil
 local panelGui: ScreenGui? = nil
@@ -458,11 +457,7 @@ local function hook(inst: Instance)
 	end)
 end
 
-function SawmillController.Start()
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < BOOT_WAIT do
-		waited += task.wait(0.25)
-	end
+local function startLoop()
 	if not CoreLoop.V2() then
 		return
 	end
@@ -510,6 +505,11 @@ function SawmillController.Start()
 		end
 		CollectionService:GetInstanceAddedSignal(tag):Connect(hook)
 	end
+end
+
+-- Returns at once: the loop is read when the server publishes it (CoreLoop.WhenKnown).
+function SawmillController.Start()
+	CoreLoop.WhenKnown(startLoop)
 end
 
 -- Specs and a re-open after close. Not used by Start's callers.

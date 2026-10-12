@@ -329,6 +329,34 @@ return function(t)
 		t.eq(#charges, 0)
 	end)
 
+	t.test("leaving and rejoining the same server brings the stored box back (new profile, same user)", function()
+		local _, Box, _, profile = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local uid = rec.uid
+		rec.paid = true
+		rec.buyerId = 7
+		rec.onShelf = false
+		local player = person(Vector3.new(0, 4.5, 0))
+		Box.RememberShop("ToolShed", { counter = counter, zoneCf = CFrame.new(), zoneSize = Vector3.new(18, 1, 14) })
+		-- The first join: BoxService's tick restored (nothing stored yet) and marked this user done.
+		Box.Restore(player, profile)
+		Box.Commit(player) -- the leave: the box goes into the save and off the counter
+		t.eq(Box.Get(uid), nil)
+		-- The same user joins this server again: a new profile table with the saved box in it.
+		local rejoined = { cash = 1000, storage = table.clone(profile.storage), axes = {}, materials = {} }
+		Box.Restore(player, rejoined)
+		t.ok(Box.Get(uid) ~= nil, "the stored box is back on the counter after a rejoin")
+		Box.Restore(player, rejoined)
+		local shown = 0
+		for _, item in ipairs(Box.Each()) do
+			if item.paid and item.buyerId == 7 then
+				shown += 1
+			end
+		end
+		t.eq(shown, 1, "and a second look at the same profile does not duplicate it")
+	end)
+
 	t.test("a bought slot refills on its timer, and picking one up does not start it", function()
 		local _, Box = boot()
 		local counter = counterPart()
