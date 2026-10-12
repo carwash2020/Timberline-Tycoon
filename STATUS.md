@@ -27,6 +27,18 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Asset audit (branch `phase-2/audit-assets`, 12 October 2026)
+
+`ASSETS.md` (generated: `lune run tools/assets`, kept current by `check.sh`) lists every asset id in the source with its use and
+status. **Nothing in it is verified on Roblox or in Studio**: the agent sandbox is blocked from every Roblox host. What is pinned
+by `tests/AssetIds.spec.luau`: id format and length per kind, no URL or zero ids, kinds never mixed (no Model container used as a
+MeshId), unique containers, mesh sharing only Blender-to-Backlog, well-formed MeshTemplates. The four machines that stayed
+part-built in Connor's log (SmeltingFurnace, Prospector, OreChute, CraftBench) had correct ids; they were built at server start
+outside `MeshKit.Attempt`, so a mesh that was not in yet was final. `MiningArt` now swaps the mesh in when it lands, and
+`MachineSkin.Prepare` asks for every piece at once so a five-piece machine is dressed in one round. **Open:** plot machines
+built through `MachineArt` (sawmills, planers, chop saw, belts) have the same gap if built before their meshes are cached
+(needs PlotService to re-dress); the Creator Hub checks for Connor are at the end of `ASSETS.md`.
+
 ## Load and spawn path audit (branch `phase-2/load-path-audit`, 12 October 2026)
 
 Void rescue for characters (Shared/VoidRescue, y -200, 3 per character), spawn-area streaming before every respawn, guarded join steps. Details in PHASE2_NOTES.md. Needs a Studio look (checks listed there).
