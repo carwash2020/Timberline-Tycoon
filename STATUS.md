@@ -42,6 +42,11 @@ machine built before its meshes are cached is part-built and usable at once, the
 log line, a destroyed machine is dropped). `tests/MachineSwap.spec` pins it for every kind. The Sky Bin has no mesh entry in
 `MachineMeshes`, so there is nothing to swap. Nothing seen in Studio. The Creator Hub checks for Connor are at the end of `ASSETS.md`.
 
+**Asset check tool (branch `phase-2/asset-check-tool`).** No id has been checked on Roblox (sandbox blocked). Connor runs
+`scripts\check-assets.ps1` on Windows (steps in `ASSETS.md`): it reads `tools/asset-ids.json` (written by `tools/assets`), asks
+`economy.roblox.com/v2/assets/<id>/details` for each id, and writes `ASSETS-CHECK.md` / `.csv` (type, owner, will it load, must-fix
+list, the four machine meshes first). Read-only. Pinned by `tests/AssetCheckTool.spec.luau`. **Open:** run it and bring back the table.
+
 ## Server boot and runtime audit (branch `phase-2/audit-server-boot`, 12 October 2026)
 
 Read all of ServerScriptService and the server side of Shared for things a real Studio server start would trip on that the mocked specs cannot see. Fixed: the v2 wiring in GameServer ran bare (one throw and "services" never opened, PlayerAdded never connected); MiningBoot built the mine at server start, before MapBuilder's Underground step, so the mine's own rubble could be doubled by an untracked wall (it now waits for the Remotes folder like BaseBoot); a player who left and rejoined the same server did not get their stored shop boxes back (BoxService "restored" flag); MiningBoot, TownBoardBoot and BaseBoot now warn when a module is missing or does not load. Checks in PHASE2_NOTES.md "Server boot and runtime audit". Specs: `ServerBootAudit.spec`, `BoxService.spec`.
