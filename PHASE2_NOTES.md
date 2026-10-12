@@ -1,5 +1,13 @@
 # Phase 2+ build notes
 
+## Server boot and runtime audit (12 October 2026, branch `phase-2/audit-server-boot`)
+
+Studio checks (none of this has been seen in Studio):
+1. Start the server (Play, or Start with 1 player). Output should show, in order, `[MapBuilder] ... done` lines, `[GameServer] ...`, then `[Load] GameServer init done` and `[GameServer] <you> can play`. There must be no `[GameServer] core loop v2 wiring failed` line; if there is, its traceback names the call.
+2. Mine: with the world up, walk to the mine mouth. Each rubble wall should be one wall (not two overlapping), have a "Crawl out" prompt, and clear when blasted. `[MiningBoot]` should print nothing.
+3. Stop, then Play again with a second client (Start with 2 players), buy a shop box without opening it, leave with player 2 and rejoin from the same server: the box is back on the counter.
+4. Output has no `[BaseBoot] ... is not in ServerScriptService`, `[MiningBoot]` or `[TownBoardBoot]` line.
+
 ## Server audit: game-breaking and long-loading bugs (11 October 2026, branch `phase-2/fix-server-audit`)
 
 Method: read GameServer's init order and a new player's first 60 seconds (PlayerAdded, save, gates, stream, character,

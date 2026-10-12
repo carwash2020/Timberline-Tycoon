@@ -27,6 +27,10 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Server boot and runtime audit (branch `phase-2/audit-server-boot`, 12 October 2026)
+
+Read all of ServerScriptService and the server side of Shared for things a real Studio server start would trip on that the mocked specs cannot see. Fixed: the v2 wiring in GameServer ran bare (one throw and "services" never opened, PlayerAdded never connected); MiningBoot built the mine at server start, before MapBuilder's Underground step, so the mine's own rubble could be doubled by an untracked wall (it now waits for the Remotes folder like BaseBoot); a player who left and rejoined the same server did not get their stored shop boxes back (BoxService "restored" flag); MiningBoot, TownBoardBoot and BaseBoot now warn when a module is missing or does not load. Checks in PHASE2_NOTES.md "Server boot and runtime audit". Specs: `ServerBootAudit.spec`, `BoxService.spec`.
+
 ## Load and spawn path audit (branch `phase-2/load-path-audit`, 12 October 2026)
 
 Void rescue for characters (Shared/VoidRescue, y -200, 3 per character), spawn-area streaming before every respawn, guarded join steps. Details in PHASE2_NOTES.md. Needs a Studio look (checks listed there).
