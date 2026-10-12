@@ -74,6 +74,15 @@ DealershipLot.FlagYaw = math.rad(12) -- the flag is turned this far, so it never
 DealershipLot.FlagHeight = 5.0 -- the flag's middle, above the plinth's top
 DealershipLot.BandHeight = 0.55
 DealershipLot.StripeWidth = 0.3 -- the aisle-edge stripe: at the very edge, clear of the box's block
+-- The tier stripe and band are paint, not slabs: thin skins (decal-style parts, never
+-- collide, never cast a shadow) the full width of their plinth, edge to edge, so the
+-- stripe's ends sit exactly on the plinth's corners and the band's top edge exactly on
+-- the plinth's top edge. The stripe lies ON the top (its underside the slab's top, 0.05
+-- of paint above it) along the aisle edge; the band is the aisle face's own outer skin
+-- (the slab is one thickness shallower than the bay, the band fills the rest: its outer
+-- face is the bay's edge, its top face continues the slab's top, the stripe's edge
+-- meets it). Nothing is coplanar with another face and nothing leaves the bay.
+DealershipLot.PaintThickness = 0.05
 local BRASS = Color3.fromRGB(201, 162, 74)
 -- A display vehicle's Neon lenses are never near-white (ShopKit.NearWhite, luma 0.86): the live
 -- trucks' pale headlamp lens (#FFE9B0) blows out in a lit hall, so the display copy wears warm amber.
@@ -439,32 +448,36 @@ function DealershipLot.Build(): Model
 
 		-- The plinth: a slab you can walk up onto, a stripe of the stand's tier colour
 		-- along its front edge, a lamp post at the back corner.
+		-- The slab stops one paint thickness short of the aisle edge; the band's skin fills
+		-- that last bit (its outer face is the bay's edge), so no face is coplanar with
+		-- another and nothing sticks out past the bay.
+		local aisleSide = if bay.row == 1 then 1 else -1 -- +Z or -Z: toward the central aisle
+		local skin = DealershipLot.PaintThickness
 		local slab = Kit.part(
 			lot,
 			"Plinth",
-			Vector3.new(bay.width, top, bay.depth),
-			CFrame.new(cx, top / 2, cz),
+			Vector3.new(bay.width, top, bay.depth - skin),
+			CFrame.new(cx, top / 2, cz - aisleSide * skin / 2),
 			Color3.fromRGB(150, 146, 138),
 			Enum.Material.Concrete
 		)
 		slab:SetAttribute("ItemId", bay.id)
-		local aisleSide = if bay.row == 1 then 1 else -1 -- +Z or -Z: toward the central aisle
 		local stripe = Kit.part(
 			lot,
 			"PlinthStripe",
-			Vector3.new(bay.width - 0.6, 0.12, DealershipLot.StripeWidth),
-			CFrame.new(cx, top + 0.06, cz + aisleSide * (bay.depth / 2 - DealershipLot.StripeWidth / 2 - 0.02)),
+			Vector3.new(bay.width, skin, DealershipLot.StripeWidth),
+			CFrame.new(cx, top + skin / 2, cz + aisleSide * (bay.depth / 2 - skin - DealershipLot.StripeWidth / 2)),
 			color,
 			Enum.Material.SmoothPlastic
 		)
 		Kit.decor(stripe, false)
-		-- The tier band on the plinth's aisle face (a hair proud of it, never past the
-		-- aisle line the spec pins), so the stand's colour reads from across the hall.
+		-- The tier band on the plinth's aisle face, from the top edge down, so the stand's
+		-- colour reads from across the hall.
 		local band = Kit.part(
 			lot,
 			"PlinthBand",
-			Vector3.new(bay.width - 0.6, DealershipLot.BandHeight, 0.14),
-			CFrame.new(cx, top - DealershipLot.BandHeight / 2 - 0.15, cz + aisleSide * (bay.depth / 2 - 0.062)),
+			Vector3.new(bay.width, DealershipLot.BandHeight, skin),
+			CFrame.new(cx, top - DealershipLot.BandHeight / 2, cz + aisleSide * (bay.depth / 2 - skin / 2)),
 			color,
 			Enum.Material.SmoothPlastic
 		)

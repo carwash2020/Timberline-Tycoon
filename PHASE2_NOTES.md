@@ -4037,6 +4037,13 @@ Nothing here was seen in Studio. Check on PC, phone and Xbox (the swap is server
 6. Placement ghost: right after joining the ghost turns into the mesh at 0.45 see-through.
 
 
+## Dealership lot tier strips (Studio checks)
+
+1. PC, phone, Xbox: walk the showroom lot's two rows of plinths. Good: each plinth has one tier-colour line along its aisle edge (flat on the top, corner to corner) and a thin colour band down the aisle face; the colour matches that plinth's T-flag.
+2. Crouch or look from the aisle at low angles at a plinth corner and at the gap between two plinths. Good: nothing sticks out past the slab, nothing floats, no flicker or shimmer on the stripe or band edges (z-fighting), no gap at the corner.
+3. Walk along the aisle edge and onto a plinth. Good: you do not catch on the stripe (it does not collide); the name signs still stand against the band.
+4. Hover tags, buying and vehicle spawn work as before.
+
 ## Dealership sign spacing (Studio checks)
 
 1. PC, phone, Xbox: from the door, TRUCKS and TRAILERS headers, SHOWROOM and CHECKOUT never overlap or crop each other; there are fewer hung boards, none within about 3 studs of another.

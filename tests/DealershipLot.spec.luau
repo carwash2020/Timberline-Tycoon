@@ -142,8 +142,10 @@ return function(t)
 			-- The clear central walkway: from the front row's aisle edge to the back row's.
 			local aisleLo, aisleHi = -math.huge, math.huge
 			for _, bay in ipairs(layout.bays) do
-				local p = plinths[bay.id]
-				local _, _, _, _, pz0, pz1 = aabb(p)
+				-- The bay's own edges (the slab stops a paint thickness short of its aisle edge,
+				-- where the tier band fills the last bit).
+				local pz0 = -layout.depth / 2 + bay.z - bay.depth / 2
+				local pz1 = -layout.depth / 2 + bay.z + bay.depth / 2
 				if bay.row == 1 then
 					aisleLo = math.max(aisleLo, pz1)
 				else

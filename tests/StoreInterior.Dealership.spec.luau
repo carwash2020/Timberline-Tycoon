@@ -334,7 +334,13 @@ return function(t)
 					continue
 				end
 				local x0, x1, _, _, z0, z1 = aabb(d)
-				if d.Name == "PlinthStripe" and x0 >= px0 and x1 <= px1 and z0 >= pz0 and z1 <= pz1 then
+				if
+					d.Name == "PlinthStripe"
+					and x0 >= px0 - 1e-3
+					and x1 <= px1 + 1e-3
+					and z0 >= pz0 - 1e-3
+					and z1 <= pz1 + 1e-3
+				then
 					stripe = d
 				elseif d.Name == "PlinthBand" and x0 >= px0 - 0.01 and x1 <= px1 + 0.01 then
 					local _, _, _, _, bz0, bz1 = aabb(d)

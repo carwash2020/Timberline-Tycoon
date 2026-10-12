@@ -27,6 +27,10 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Dealership lot tier strips are paint (branch `phase-2/lot-tier-strips`)
+
+The coloured strips on the dealership's 8 plinths (the tier colour that matches each T1 to T5 / T1 to T3 flag) looked like loose slabs: the top stripe was a 0.12-thick bar inset from the corners and the aisle band a bar floating on the face with gaps. In `Art/DealershipLot` both are now 0.05-thick skins (`PaintThickness`): the `PlinthStripe` lies flush on the plinth's top along the aisle edge, full width corner to corner; the `PlinthBand` is the aisle face's own outer skin, top edge on the plinth's top edge, outer face the bay's edge (the slab is 0.05 shallower there, so no face is coplanar and nothing leaves the bay). CanCollide, CanTouch, CanQuery and CastShadow are all false; colours, prices, tiers and lot layout are unchanged. New spec `DealershipLotStrips.spec` checks every plinth (8): flush within 0.1 (actually 0.001), thin, inside the bay footprint, corner to corner, no collide or shadow, one tier colour for stripe, band and flag. Two existing specs were adjusted for the design move, not weakened: `DealershipLot.spec` measures the aisle from the bay edges (the slab now stops 0.05 short, the band fills it) and `StoreInterior.Dealership.spec` finds the stripe with a 1e-3 tolerance. Scene `lot-strips` (new); renders in `previews/lot-strips/before-*.png` and `after-*.png` (8 views: lot from above, both rows low along the aisle, corners, seam, edge). The grass-green/blue pads the boxes stand on (`BoxBlock`, accent colour) are the vehicle box pedestals, not tier strips, and are untouched. Not seen in Studio.
+
 ## Store event expansion room (branch `phase-2/store-event-expansion`, system only, nothing on sale)
 
 Every store can grow for an event without a rebuild. This PR is the system; each store's builder places the geometry.
