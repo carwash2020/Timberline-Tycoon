@@ -75,6 +75,30 @@ shelves changed while the ids are unset: every item keeps its part-built look an
   Explorer, in Properties copy the number inside `MeshId` (`rbxassetid://123` gives 123; NOT the model's id from Creator Hub); open
   `src/ReplicatedStorage/Shared/StoreModelSlots.luau`, find the row with that `id`, and replace the `0` in `meshId = 0` with the number.
   Nothing else changes. The ids are checked by `lune run tools/assets` (ASSETS.md) the same as every other mesh.
+## Store event expansion room (branch `phase-2/store-event-expansion`, system only, nothing on sale)
+
+Every store can grow for an event without a rebuild. This PR is the system; each store's builder places the geometry.
+Plain version, with the how-to in `EVENTS.md`:
+
+- **Nothing is on sale and nothing is visible by default.** The schedule (`Shared/StoreEventData.Events`) is empty, the 12 event
+  slots (`StoreData.EventSlots`, 3 per store) are unapproved with no price, and with the default empty schedule every store,
+  row, price and visibility is identical to before (`StoreEventService.spec` pins it). `tools/economy` and `ECONOMY.md` did not change.
+- **An event slot can be bought only when ALL of these hold:** an enabled event for that store is running now, the event lists the slot,
+  Connor has set `approved = true` with an `itemKind`, `itemId` and an explicit `price` on the row. An unset price keeps it refused.
+  The server check is in `ShopService.ChargeAndGrant`; the slot id is never an ordinary shop item.
+- **Switching an event on or off needs no code change:** edit one table (`StoreEventData`) with a start date, an end date and
+  `enabled`, or in Studio paste JSON into the Workspace attribute `StoreEventConfig` (Studio only, nothing published).
+  `StoreEventService` re-checks every minute from the config and `os.time()`; a restart, a clock change or a toggle off mid-event just
+  recomputes. Items vanish from sale when an event ends or is turned off; items already bought stay owned.
+- **New modules:** `Shared/StoreEvents` (pure rules, dates, sanitising, 60-day cap), `Shared/StoreEventData` (the schedule),
+  `Shared/Art/ShopEventKit` (the roped-off zone and the event banner builder, about 26 and 8 parts), `StoreEventService` (server).
+  Small hooks: `StoreData.EventSlots`, `ShopService.SetLiveEventSlots` and the event-slot gate, `BoxService` passes `eventSlot`.
+- **Still to do (other lanes):** each store's builder calls `ShopEventKit.BuildZone` and `BuildBanner` (API at the top of the module);
+  Hearth & Home, Tool Shed and Sparkworks restyles are in other PRs.
+- **Awaiting Connor:** approve the event items and their prices when an event is planned; the banner wording per event; whether
+  an owner chat command to start an event is wanted (not built: `AdminService` has no event pattern to follow).
+- **Not verified:** the zone and banner have not been seen in Studio or rendered with real meshes (they are plain parts); the
+  Studio attribute path is tested with a fake clock and mocks only.
 
 ## Dealership sign spacing (branch `phase-2/dealership-sign-spacing`, follow-up to #180)
 
