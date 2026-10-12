@@ -31,6 +31,8 @@ local MachineArt = require(script.Parent.MachineArt)
 local MachineSkin = require(script.Parent.MachineSkin)
 local ModelSlots = require(script.Parent.ModelSlots)
 local PlotData = require(script.Parent.Parent.PlotData)
+local StoreModelArt = require(script.Parent.StoreModelArt)
+local StoreModelSlots = require(script.Parent.Parent.StoreModelSlots)
 local TruckArt = require(script.Parent.TruckArt)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
 
@@ -66,6 +68,8 @@ export type Display = {
 	shown: Vector3, -- the bounding box of the parts that are kept (never bigger than extent)
 	total: number, -- visible parts of the built model, before the budget
 	generic: boolean, -- no model of its own: a generic icon stands in
+	slot: StoreModelSlots.Slot?, -- the item's model slot (StoreModelSlots), or the Parcel's when it has no model
+	fallback: boolean, -- `slot` is the Parcel: the item has no slot of its own
 }
 
 local V3, CF = Vector3.new, CFrame.new
@@ -335,7 +339,11 @@ end
 local function make(kind: string, itemId: string): Display
 	-- A builder that errors (a mesh that will not load, an art module that
 	-- changed) must never take the shop with it: the box shows a parcel instead.
+	-- Suspended: a placed model built only to be measured and copied must not start
+	-- a mesh swap of its own (BoxArt swaps the box's contents, see StoreModelArt).
+	StoreModelArt.Suspended = true
 	local ok, model, turn, generic = pcall(buildRaw, kind, itemId)
+	StoreModelArt.Suspended = false
 	if not ok then
 		warn(string.format("[ItemModel] %s %s did not build: %s", kind, itemId, tostring(model)))
 		local parcelModel = Instance.new("Model")
@@ -380,14 +388,32 @@ local function make(kind: string, itemId: string): Display
 	if model then
 		model:Destroy()
 	end
+	-- One model slot per item; an item with no model of its own (the generic
+	-- parcel stands in) gets the Parcel's slot.
+	local slot = StoreModelSlots.ForItem(itemId, kind)
+	local fallback = false
+	if slot == nil and generic then
+		slot = StoreModelSlots.Resolve(itemId, kind)
+		fallback = true
+	end
+	-- A slot with a mesh id (not "loaded": the id is static, so the shelf layout is too)
+	-- sizes the box for the model, not for the part build: the Glow Wire's spool is
+	-- taller and deeper than its 0.3 stud bar, and the bar is wider than the spool.
+	-- (BoxArt keeps the part build inside the box until the mesh lands.)
+	local extent = high - low
+	if slot ~= nil and StoreModelSlots.HasMesh(slot) then
+		extent = StoreModelSlots.Layout(slot).size
+	end
 	return {
 		kind = kind,
 		itemId = itemId,
 		parts = parts,
-		extent = high - low,
+		extent = extent,
 		shown = shown,
 		total = total,
 		generic = generic,
+		slot = slot,
+		fallback = fallback,
 	}
 end
 

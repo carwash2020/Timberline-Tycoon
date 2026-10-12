@@ -483,6 +483,23 @@ function tintMaterials(root, hex) {
     o.material = Array.isArray(o.material) ? own : own[0];
   });
 }
+// Opt-in (manifest "soft": true): the store item GLBs carry PBR metal (steel hoops, gold
+// coins) and the viewer has no environment map, so full metal renders near black. A Roblox
+// MeshPart has no PBR metal either, so cap it and let the base colour show.
+function softenMetal(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const own = mats.map((m) => {
+      if (!m || !(m.metalness > 0.25)) return m;
+      const c = m.clone();
+      c.metalness = 0.25;
+      c.roughness = Math.max(c.roughness, 0.45);
+      return c;
+    });
+    o.material = Array.isArray(o.material) ? own : own[0];
+  });
+}
 async function addMeshes() {
   const pending = new Map();
   for (const p of scene.meshes) {
@@ -503,6 +520,7 @@ async function addMeshes() {
         const node = nodeNamed(gltf, info.node);
         if (node) placedNode = fittedNode(node, Math.max(p[1], 0.01), Math.max(p[2], 0.01), Math.max(p[3], 0.01));
         if (placedNode && info.tint) tintMaterials(placedNode, p[16]);
+        if (placedNode && info.soft) softenMetal(placedNode);
         // Opt-in (manifest "turn", degrees about the mesh's own vertical): the
         // game's FBX import turns the NPC meshes a half turn from this GLB, and
         // NPCMeshes adds the matching TownModels.NpcMeshYaw, so a preview that

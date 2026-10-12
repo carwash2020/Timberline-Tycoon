@@ -184,6 +184,112 @@ emit(
 )
 emit("")
 
+-- The store item model slots (Shared/StoreModelSlots): one slot per store item, each
+-- over a GLB in the repo. A slot whose Roblox mesh id is not set yet is listed here
+-- (it is not an id, so the scan above does not see it) until Connor uploads it.
+do
+	local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
+	local Slots = Loader.new():shared("StoreModelSlots")
+	emit("## Store item models (one slot per item: `Shared/StoreModelSlots.luau`)")
+	emit("")
+	emit("One model per item serves the shop box (and the carried box), the placed item and its ghost. A slot")
+	emit("with no mesh id keeps the part-built look and nothing errors. To switch a model on, upload its GLB")
+	emit('(steps in STATUS.md, "Store item models") and paste the id into that slot\'s `meshId` in')
+	emit("`StoreModelSlots.luau`; nothing else changes. `tests/StoreModelSlots.spec.luau` checks every row here")
+	emit("against its GLB. Previews draw these GLBs even with no id (`tools/preview/export.luau`).")
+	emit("")
+	emit("MODEL_SLOTS, the numbers each slot is placed by (studs; the model stands on y = 0, centred on")
+	emit("its footprint, turned `yaw` degrees about Y, scaled uniformly by `scale` so it fits `fit`, the")
+	emit("item's own part-built size; a box shows it at the same fit, inside the box's own size):")
+	emit("")
+	emit("| Slot | Item | GLB (repo) | GLB size | fit | yaw | scale | Roblox mesh id | Status |")
+	emit("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+	for _, slot in ipairs(Slots.All) do
+		local ids: { string } = {}
+		local unset = false
+		for _, piece in ipairs(slot.pieces) do
+			if piece.meshId == 0 then
+				unset = true
+			else
+				table.insert(ids, piece.name .. " " .. tostring(piece.meshId))
+			end
+		end
+		local items = if #slot.items > 0
+			then table.concat(slot.items, ", ")
+			else (if slot.fallback then "any item with no model (fallback)" else "the Robux box")
+		local status = if unset
+			then "GLB in repo, not uploaded: no Roblox mesh id yet"
+			else "hooked: uploaded " .. slot.source .. " model (id read from " .. (if slot.source == "backlog"
+				then "BacklogModels"
+				else "ItemMeshData") .. ")"
+		local layout = Slots.Layout(slot)
+		local lo, hi = nil, nil
+		for _, piece in ipairs(slot.pieces) do
+			local a, b = piece.centre - piece.size / 2, piece.centre + piece.size / 2
+			lo = if lo then lo:Min(a) else a
+			hi = if hi then hi:Max(b) else b
+		end
+		local native = hi - lo
+		local function dims(v: any): string
+			return string.format("%.2f x %.2f x %.2f", v.X, v.Y, v.Z)
+		end
+		emit(
+			line(
+				"| ",
+				slot.id,
+				" | ",
+				items,
+				" | `",
+				slot.glb,
+				"` | ",
+				dims(native),
+				" | ",
+				dims(slot.fit),
+				" | ",
+				tostring(slot.yaw),
+				" | ",
+				string.format("%.3f", layout.scale),
+				" | ",
+				if #ids > 0 then table.concat(ids, ", ") else "unset",
+				" | ",
+				status,
+				" |"
+			)
+		)
+	end
+	-- A GLB in the folder that has no slot here belongs to another lane (Hearth and Home wires
+	-- Flashlight, Lantern, WoodSign and ShedBlueprint): listed so no GLB in the repo is unlisted.
+	local have: { [string]: boolean } = {}
+	for _, slot in ipairs(Slots.All) do
+		have[slot.id] = true
+	end
+	local others: { string } = {}
+	for _, file in ipairs(fs.readDir("assets/glb/store-items")) do
+		local name = string.match(file, "^(.+)%.glb$")
+		if name and not have[name] then
+			table.insert(others, name)
+		end
+	end
+	table.sort(others)
+	if #others > 0 then
+		emit("")
+		emit("Not wired by these slots (another lane wires them; no slot here):")
+		emit("")
+		emit("| GLB (repo) | Roblox mesh id | Status |")
+		emit("| --- | --- | --- |")
+		for _, name in ipairs(others) do
+			emit(
+				line(
+					"| `assets/glb/store-items/",
+					name,
+					".glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |"
+				)
+			)
+		end
+	end
+	emit("")
+end
+
 local function templateText(digits: string): string
 	if templateIds[digits] then
 		return "template"
@@ -249,6 +355,9 @@ for _, kind in ipairs(KIND_ORDER) do
 			usedBy ..= " (also " .. table.concat(files, ", ") .. ")"
 		end
 		local status = "format ok, not checked yet"
+		if kind == "image" and string.sub(first.use, 1, 16) == "store card image" then
+			status = "image id, not checked on Roblox from the sandbox"
+		end
 		if kind == "mesh" then
 			status = templateText(row.digits) .. ", " .. status
 			if string.find(first.use, "Collision", 1, true) then
@@ -308,9 +417,11 @@ emit("2. **Same gap remains for plot machines** (sawmills, planers, chop saw, be
 emit("   a machine built before its meshes are cached stays part-built until its model is rebuilt (rejoin or")
 emit("   re-place). MachineSkin now logs `was still loading` instead of `did not load` in that case. A real fix")
 emit("   needs PlotService to re-dress; not done here (touches plot item registration).")
-emit("3. **Store card images** (`StoreData` image ids 91282142796474, 79037897236948, 71028498113750) are")
-emit("   possibly Decal ids, which an ImageLabel cannot load by rbxassetid. They now go through `StoreArt`")
-emit("   (rbxthumb asset thumbnail), which renders a Decal or an Image id. Rendering unverified (needs Studio).")
+emit("3. **Store card images** (nine `StoreData` image ids: the three older ones on Tow Service, Timber")
+emit("   Classic and Paint Shop, which may be Decals; six Connor uploaded on 12 October 2026 as IMAGE assets). They")
+emit("   go through `StoreArt` (rbxthumb asset thumbnail), which renders any image-like id. Whether each shows the")
+emit("   right picture, and that moderation has cleared it, is not checked: the sandbox cannot reach Roblox.")
+emit("   `scripts/check-store-icons.ps1` checks the six new ones on Connor's machine.")
 emit("4. **Old Roblox sound ids** (`SoundData`: 4110925712, 282906960, 1516791621, 1841461968, 1848183670,")
 emit("   9116970949, 9117181540, 9118187543, 9120549564) are not owned by the game. Since the 2022 audio")
 emit("   privacy change a sound only plays if it is public Roblox audio or yours. A failure is silent, never a")
@@ -354,7 +465,7 @@ emit("Then check one of each kind, because one bad kind fails every id of that k
 emit("")
 emit("- a **sound**: 4110925712 (Sell and Buy), 1516791621 (Rain), 1841461968 (day music)")
 emit(
-	"- a **store image**: 91282142796474, 79037897236948, 71028498113750 (shown through the StoreArt thumbnail, so Decal or Image ids both work)"
+	"- a **store image**: 91282142796474, 79037897236948, 71028498113750, and the six new ones (`scripts/check-store-icons.ps1` checks those; shown through the StoreArt thumbnail)"
 )
 emit("- a **HUD image**: 76852120099119 (Menu), 129127727779001 (Hammer), 96932580819074 (SellHere)")
 emit("- a **UI skin image**: 139841387610705, 90740664574742, 72427678124813, 74100852047057")

@@ -36,6 +36,8 @@ local ItemModel = require(script.Parent.ItemModel)
 local ModelSlots = require(script.Parent.ModelSlots)
 local Kit = require(script.Parent.Kit)
 local RobuxBoxArt = require(script.Parent.RobuxBoxArt)
+local StoreModelArt = require(script.Parent.StoreModelArt)
+local StoreModelSlots = require(script.Parent.Parent.StoreModelSlots)
 
 local BoxArt = {}
 
@@ -329,7 +331,18 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	end
 	local inner = ext * scale
 	local at = body.CFrame * CFrame.new(BoxSize.ItemOffset(size, inner))
-	local parts = ItemModel.Place(display, contents, at, scale)
+	-- With a model slot that has a mesh the box is sized for the MODEL (ItemModel), and the
+	-- part-built copy, which stands only until the mesh lands, is fitted inside it and set on
+	-- the floor on its own.
+	local slot = display.slot
+	local meshed = slot ~= nil and StoreModelSlots.HasMesh(slot)
+	local partScale, partAt = scale, at
+	if meshed and display.shown.X > 0 and display.shown.Y > 0 and display.shown.Z > 0 then
+		local shown = display.shown
+		partScale = math.min(scale, inner.X / shown.X, inner.Y / shown.Y, inner.Z / shown.Z)
+		partAt = at * CFrame.new(0, (shown.Y * partScale - inner.Y) / 2, 0)
+	end
+	local parts = ItemModel.Place(display, contents, partAt, partScale)
 	for _, p in ipairs(parts) do
 		p.Massless = true
 		local weld = Instance.new("WeldConstraint")
@@ -342,9 +355,35 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	contents.Parent = parent
 	-- An item with a model slot (Flashlight, Lantern, Wood Sign, Shed Blueprint) shows its real model
 	-- here once one is set; until then (meshId 0) the part-built copy stays.
-	local slot = ModelSlots.For(kind, itemId)
-	if slot then
-		ModelSlots.Dress(contents, slot, at, "display", { scale = scale, weldTo = body, remove = parts })
+	local hearthSlot = ModelSlots.For(kind, itemId)
+	if hearthSlot then
+		ModelSlots.Dress(contents, hearthSlot, at, "display", { scale = scale, weldTo = body, remove = parts })
+	end
+	-- The item's own model, when its slot has a mesh (StoreModelSlots): the part-built
+	-- copy above stands until the mesh is there, then it is swapped for the mesh
+	-- (never waits, never errors; an unset or failed id leaves the copy).
+	if meshed and slot ~= nil then
+		local frame = at * CFrame.new(0, -inner.Y / 2, 0)
+		local made = StoreModelArt.Dress(contents, function()
+			return StoreModelArt.Build(slot, frame, {
+				parent = contents,
+				limit = ext,
+				scale = scale,
+				anchored = body.Anchored,
+				weldTo = body,
+			})
+		end, parts)
+		if made ~= nil then
+			for _, old in ipairs(parts) do
+				local at_ = table.find(added, old)
+				if at_ then
+					table.remove(added, at_)
+				end
+			end
+			for _, mesh in ipairs(made) do
+				table.insert(added, mesh)
+			end
+		end
 	end
 	return added
 end
