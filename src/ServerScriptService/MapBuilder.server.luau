@@ -50,6 +50,14 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+-- First, before the ~35 requires below (they take seconds): Studio's player
+-- joins as soon as the server starts, and with auto-loads still on a
+-- character spawns into the empty world, falls through where the ground will
+-- be, dies and respawns over and over until this line runs (12 October 2026:
+-- "while the game is loading you just fall under the map and die over and
+-- over"). The project file also sets it (default.project.json, Players).
+Players.CharacterAutoLoads = false
+
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -148,7 +156,8 @@ map.Parent = workspace
 
 -- 2. Nobody spawns until GameServer's join flow says so (the world, the save and
 -- the streamed spawn area are all ready). The flow also respawns the dead.
-Players.CharacterAutoLoads = false
+-- (CharacterAutoLoads is switched off at the very top of this script, before
+-- the requires.)
 
 -- 3. Terrain.
 local terrainSeconds = 0

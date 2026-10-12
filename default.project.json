@@ -23,7 +23,8 @@
     "Players": {
       "$className": "Players",
       "$properties": {
-        "MaxPlayers": 12
+        "MaxPlayers": 12,
+        "CharacterAutoLoads": false
       }
     },
     "Workspace": {
