@@ -525,7 +525,8 @@ local function onLightning(payload: { [string]: any })
 	if distance < 2600 then
 		drawBolt(position)
 	end
-	-- The whole sky flashes: hard near, softer far.
+	-- The whole sky flashes: hard near, softer far. (LightingController.Flash
+	-- softens or drops these with Reduce flashing on.)
 	local strength = 2 * math.clamp(1 - (distance - 300) / 1700, 0.25, 1)
 	LightingController.Flash(strength, 0.08)
 	LightingController.Flash(strength * 0.6, 0.06, 0.14)

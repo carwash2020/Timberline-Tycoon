@@ -1,26 +1,55 @@
 # STATUS: read this first in a new session
 
-Last updated 11 October 2026 (the V1 integration pass, branch `phase-2/v1-z-integration`). **Main is at `2bf981d` (#139).**
-Everything below marked as a branch is merged unless this header says otherwise. The consolidated V1 Studio checklist
-(PC, phone, Xbox) and every open decision with its default are in `V1_STUDIO_CHECKLIST.md`.
+Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `4ecfa51` (#159).**
+Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
+meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
+(#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
+(#159, with #160 to #162). **What Connor checks in Studio right now, and every open decision with its default, are in
+`V1_STUDIO_CHECKLIST.md`** (top section and section D). Each lane's own longer checklist is in PHASE2_NOTES.md.
+
+**Merged to main (V1):** #118 A1 economy, saves and caps; #119 nature; #120 buildings, shops and props; #121 world; #122 axes,
+boxes, shelves, hover tags; #123 Sparkworks logic; #124 UI redesign; #125 mining and crafting; #126 real-mesh previews; #127
+faster CI; #128 UI round 3; #129 automation; #130 Blender asset pipeline; #131 building and blueprints; #132 end game; #133
+purchases; #134 end game follow-ups; #135 machine meshes; #136 backlog meshes; #137 badges and the town board; #138 NPCs,
+tutorial, goals, HUD remake (Foreman Rook, the `Stage:S1` to `S8` events); #139 Bayou and Red Mesa; #140 owner UserId; #141
+integration pass; #142 lightning finds open ground; #143 no ButtonR2; #144 Sparkworks shop; #145 moderation and policy; #146
+GrabService spec fix; #147 launch settings; #148 and #149 hardening; #150 client module load race; #151 grab on RT; #152
+first screen fix; #153 startup errors; #154 server audit (staged terrain, save prefetch); #155 client freeze; #156 meshes never
+block the build; #157 client audit; #158 world first look; #159 store interiors: the kit, Tool Shed, Hearth & Home, Sparkworks and Dealership (#160 to #162 squashed in).
+
+**Still open:** only this branch (docs, CI pin, Reduce flashing). All four store interiors (Tool Shed, Hearth & Home, Sparkworks, Dealership; #159 squashed #160 to #162 in) are on main, with `previews/store-interiors/`.
+
+**Stages:** with #138 on main the `Stage:S1` to `S8` keys are written (`MilestoneService.CheckStages`); the stage (`StageOf`)
+still also comes from the best axe and gear. S8 (Master Timber) is set only by its key: deriving it from a full plot is awaiting
+Connor (it would raise cash packs about 25%).
+
+**Rules that did not change:** the five formerly off-sale products keep id 0 (Coming soon), badge ids stay 0 until Connor
+pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
+never bound; `NoButtonR2.spec`), no Robux price in code.
+
+## Docs, CI and accessibility (branch `phase-2/docs-ci-accessibility`, 12 October 2026, draft PR)
+
+- **CI type definitions are pinned and cached.** `scripts/check.sh` used to download luau-lsp's `globalTypes.d.luau` from the
+  upstream `main` branch on every run. It now reads the pin in `scripts/globalTypes.pin` (a luau-lsp tag, kept equal to the
+  luau-lsp version in `rokit.toml`), downloads that tag once to `globalTypes.d.luau` (gitignored, with a `.pin` stamp so a changed
+  pin refreshes it), and reuses it. `.github/workflows/checks.yml` caches both files with `actions/cache` keyed on the pin
+  (the `lint` job only; job names `lint`, `tests (1/4..4/4)`, `checks` and the sharding are unchanged). To move the pin, change
+  `scripts/globalTypes.pin` together with `rokit.toml`.
+- **Reduce flashing** (Settings, GAME tab, saved per player as `settings.reduceFlashing`, default off). The only full-screen
+  flash in the game is the lightning one (`WeatherController.onLightning` calls `LightingController.Flash` twice, a pulse of
+  `ExposureCompensation`); the audit found no other (the cash chip's green tint is a small chip, the plot claim fade is a slow
+  black fade, confetti is not a flash). With it on, `LightingController.Flash` (the one place every flash goes through) drops
+  the second flash and plays the first at a quarter of the strength for 0.35 s (`SettingsLogic.SoftenFlash`). It is also in force
+  while Camera shake is off (`SettingsLogic.ReduceFlashing`; the row then reads "REDUCE FLASHING: ON (SHAKE OFF)"), because
+  shake already means "calm the screen". The bolt, the thunder and the warning ring are unchanged. Old saves load with it off
+  (`SettingsLogic.Sanitize` inside `ProfileSchema.Migrate`, idempotent). Previews (layout composites, not engine shots):
+  `previews/docs-ci-accessibility/settings-*.png`.
+
+
+## Earlier V1 notes (kept)
 
 - **Client freeze and the late forest** (branch `phase-2/fix-client-freeze`, 11 October 2026, draft PR): Studio showed `TreeFill:380: Script timeout` every 10 s, `WeatherController Start took 11.28s`, and 3 trees at spawn then 1,217 about 10 s later. Causes: `WorldPlan.Trees` (about 10 s of work in Lune) was started again by every client script that asked for it while ForestFiller's paused build was still running (a paused build caches nothing until it ends), and the first ask came through `NatureData.FromWorldPlan` (cave points of interest are placed against every tree) from `WeatherController.Start`'s aurora and from `AmbientLife.zones` (each a full unpaused build); several planners had no pause at all (Scenery 2.2 s, BoulderClusters 3 s, ForestTrees, the Boulders, which were also never cached: 0.6 s each, MeadowBoulders 0.7 s each, many times). Fixes: `TreeFill.takenNear` is a hash grid (same answers as the scan, `TreeFill.TakenNearScan` is the reference); `WorldPlan.WithPause` plus `breathe()` in every planner's hot loop (bound to the calling thread, results unchanged); `WorldPlan.Trees`, `FirstTrees` and the heavy planners run one at a time (a second caller waits for the first's result); `WorldPlan.TreesReady`; `NatureData.FromWorldPlan` is worked out once per plan and leaves the caves out until the trees are ready (callers: `WeatherController`, `AmbientLife`; cells loaded before the caves joined are re-scattered); `WeatherController.Start` spawns the aurora off its path; Boulders and MeadowBoulders cached. The server (`MapBuilder` "5. The trees") plants `WorldPlan.FirstTrees` first (meadow and wild groves, under a second), then each batch the planner hands over (`WorldPlan.Trees(pause, emit)`: the town's trees first, they stand round the spawn; `TreeFill.Extra` plans them first, and keeps the list order, so every tree is where it was: pinned checksum in `tests/ClientFreeze.spec`), nearest the spawn first inside each batch, instead of planning all 1,041 before planting any (one global sawmill-first sort). No tree count, wood or price changed, so ECONOMY.md and ECONOMY_V1.md did not move. The one design change: the old "nearest the sawmill first, globally" spec became "the first batch, then the town's trees, each nearest the spawn first" (MapBuilder.spec). Still needs Studio: no frame over 100 ms in the profiler on PC, phone and Xbox, and the tree timeline (PHASE2_NOTES.md "Client freeze and the late forest").
 - **V1 backlog meshes** (branch `phase-2/v1-backlog-meshes`, 10 October 2026, off main `ec9d2cb`; draft PR): `Art/BacklogModels` holds the 109 uploaded backlog assets (shops, gear, landmarks, furniture, plants, cave props, critters, polish, the two environment remakes, townsfolk) with every piece's real MeshPart id, and `TownModels.Get` falls through to it (not for townsfolk, which stay with the NPC lane). All 372 ids have `MeshTemplates` files. Wired now: OddsAndEnds, Sparkworks, LandOffice, GateKiosk (glow keeps the gate colour), ArrivalArch (`TownMeshes.Dress`) and the Robux crate (`RobuxBoxArt`, the open crate of parts stays as the fallback). A missing mesh keeps the part build, sets `MeshFallback` on the model and logs once per asset. Trees: `TreeModels` rows for Lanternwood (live), Bog Cypress and Ironwood (waiting for job 11) plus the `Knees` branch in `TreeMeshes`. Not wired, waiting on a design call or a builder: the Robux table (mesh is a one-row 2.5 high table, the shelf has two rows on a riser at 3.9), Sky Forge Court, the other boards and scenes, gear, landmarks, plants, cave props, critters, polish, the two environment remakes (`SawdustPileV2`, `PathRoundV2`). Source GLBs for the backlog are in `assets/glb/backlog` (from `phase-2/v1-glb-sources`, npcs excluded). Previews with the real meshes: `previews/v1-backlog/` (34 shots: five shops, the Robux crate, Lanternwood, five angles each; made by `python3 tools/preview/backlog_manifest.py` then `PREVIEW_MESHES=preview/backlog-meshes.json bash tools/preview/shoot.sh v1-backlog`) and `previews/v1-a2/relic-trophies.png` re-shot (`v1-backlog-trophies`). Studio checklist: PHASE2_NOTES.md "V1 backlog meshes".
-Last updated 8 October 2026 (V1 map remake, branch `phase-2/v1-b-world`). The layout plan is `MAP_V1.md`. The labelled picture is `previews/v1-b/00-overview.png`.
-**Merged to main (V1):** #118 A1 economy, saves and caps; #119 nature; #120 buildings, shops and props; #121 world
-(ring map, mine mouth, plot value, roads, mountains, water, lighting); #122 axes, boxes, shelves and hover tags; #123
-Sparkworks logic; #124 UI redesign; #125 mining and crafting; #126 preview renderer draws the real meshes; #127 faster CI;
-#128 UI round 3; #129 automation; #130 Blender asset pipeline; #131 building and blueprints; #132 end game (gondola, Sky Forge,
-tempering, relics); #133 purchases redesign; #134 end game follow-ups; #137 badges and the town board; #139 Bayou and Red Mesa.
-
-**Still open and NOT on main:** #135 machine meshes (`phase-2/v1-k-wirein`), #136 backlog meshes
-(`phase-2/v1-backlog-meshes`), #138 NPCs, tutorial and goals (`phase-2/v1-e-npcs-ui`). Until #138 lands nothing writes the
-`Stage:S1` to `Stage:S8` keys: the stage (`StageOf`) comes from the best axe, and the gear; S8 (Master Timber) is set only by the
-key (deriving it from a full plot is awaiting Connor, it would raise cash packs about 25%). Lane E's keeper lines, region banner and the Foreman goals are in #138.
-
-**Rules that did not change:** the five formerly off-sale products keep id 0 (Coming soon), badge ids stay 0 until Connor
-pastes them, no trading or gifting, no ButtonR2 binding in new code (a separate branch, `phase-2/v1-no-buttonr2`, removes
-the old ones), no Robux price in code.
 
 ## Store interiors: shared kit and the Tool Shed pilot (branch `phase-2/store-interiors-polish`, draft PR, look-and-layout only)
 
