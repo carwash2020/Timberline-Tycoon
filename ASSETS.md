@@ -1405,7 +1405,8 @@ reads SurfaceAppearances that exist, and badge ids are 0. Re-check if that chang
    re-place). MachineSkin now logs `was still loading` instead of `did not load` in that case. A real fix
    needs PlotService to re-dress; not done here (touches plot item registration).
 3. **Store card images** (`StoreData` image ids 91282142796474, 79037897236948, 71028498113750) are
-   commented `decal id`. An ImageLabel needs an **Image** id; a Decal id shows nothing. Unverified.
+   possibly Decal ids, which an ImageLabel cannot load by rbxassetid. They now go through `StoreArt`
+   (rbxthumb asset thumbnail), which renders a Decal or an Image id. Rendering unverified (needs Studio).
 4. **Old Roblox sound ids** (`SoundData`: 4110925712, 282906960, 1516791621, 1841461968, 1848183670,
    9116970949, 9117181540, 9118187543, 9120549564) are not owned by the game. Since the 2022 audio
    privacy change a sound only plays if it is public Roblox audio or yours. A failure is silent, never a
@@ -1443,7 +1444,7 @@ Start with these, in this order (they are the ones that did not load):
 Then check one of each kind, because one bad kind fails every id of that kind:
 
 - a **sound**: 4110925712 (Sell and Buy), 1516791621 (Rain), 1841461968 (day music)
-- a **store image**: 91282142796474, 79037897236948, 71028498113750 (must be Image ids, not Decal ids)
+- a **store image**: 91282142796474, 79037897236948, 71028498113750 (shown through the StoreArt thumbnail, so Decal or Image ids both work)
 - a **HUD image**: 76852120099119 (Menu), 129127727779001 (Hammer), 96932580819074 (SellHere)
 - a **UI skin image**: 139841387610705, 90740664574742, 72427678124813, 74100852047057
 - a **particle texture**: 17581858560 (embers), 16830667309 (mist)

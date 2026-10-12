@@ -44,7 +44,7 @@ StoreData.CreatorIds = {
 export type Pass = {
 	key: PassKey,
 	id: number, -- game pass id from Creator Hub (0 until pasted)
-	image: number, -- PASTE a decal asset id; 0 = styled placeholder
+	image: number, -- PASTE a Decal or Image asset id (StoreArt renders either); 0 = styled placeholder
 	name: string,
 	description: string, -- word for word what Creator Hub says
 	order: number, -- card order in the store, on the board and on the shelf
@@ -65,7 +65,7 @@ export type Pass = {
 export type Product = {
 	key: ProductKey,
 	id: number, -- developer product id from Creator Hub (0 until pasted)
-	image: number, -- PASTE a decal asset id; 0 = styled placeholder
+	image: number, -- PASTE a Decal or Image asset id (StoreArt renders either); 0 = styled placeholder
 	name: string,
 	description: string, -- word for word what Creator Hub says (static, no live amount)
 	order: number,
