@@ -1748,7 +1748,6 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
 	end
-	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
 
 	-- The back wall behind the keeper: a row of spark lamps, each over its
 	-- switch, and a copper run joining them. Looks only.
@@ -1761,9 +1760,6 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 		dBox(model, "WallSwitch", V3(0.5, 0.8, 0.2), CF(x, 5.9, backZ - 0.1), Palette.IronBlack, MAT.Metal)
 	end
 	dBox(model, "CopperRun", V3(14.4, 0.2, 0.2), CF(0, 6.65, backZ - 0.08), Palette.Brass, MAT.Metal)
-	local board = Kit.part(model, "BackSign", V3(9, 1.6, 0.2), CF(0, 9, backZ - 0.2), Palette.SignInk, MAT.Wood)
-	Kit.signText(board, "WIRE IT UP", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	Kit.decor(board, false)
 end
 
 -- Shelf slots are attachments on the counter (they are not parts, so the

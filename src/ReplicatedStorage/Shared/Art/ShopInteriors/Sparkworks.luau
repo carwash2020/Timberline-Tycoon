@@ -50,24 +50,13 @@ Sparkworks.Sections = {
 		lane = "FittingShelf",
 		header = "BELTS & INPUTS",
 		accent = TEAL,
-		subs = {
-			{ text = "BELTS", ids = { "BeltSupport", "SwitchBelt", "TiltedBelt" } },
-			{ text = "INPUTS", ids = { "WoodDetector", "Button", "Lever", "PressurePlate", "SparkSwitch" } },
-		},
+		subs = {}, -- (header only: the header says it and each box carries its own name tag)
 	},
 	{
 		lane = "LogicShelf",
 		header = "LOGIC & OUTPUTS",
 		accent = COPPER,
-		subW = 7.2, -- GATES & TIMERS needs the width to stay readable on a phone
-		subs = {
-			{
-				text = "GATES & TIMERS",
-				ids = { "GateAnd", "GateOr", "GateXor", "GateNot", "Delay", "Sustain", "Clock" },
-			},
-			{ text = "OUTPUTS", ids = { "SparkLamp", "GlowWire", "Hatch", "WoodSweeper" } },
-			{ text = "LASERS", ids = { "LaserEmitter", "LaserReceiver" } },
-		},
+		subs = {}, -- (header only: the box name tags carry the rest)
 	},
 } :: { ShopKit.Section }
 
@@ -77,17 +66,18 @@ local function wallWork(model: Model, frame: Frame, west: boolean, lo: number, h
 	local wallX = if west then -frame.halfW + 0.3 else frame.halfW - 0.3 -- the panel's middle, 0.3 off the wall
 	local into = if west then 1 else -1
 	local cz = (lo + hi) / 2
-	-- (the panel is 0.6 thick, flush with the wall: its far face is the wall's face)
-	dBox(model, "WallPanel", V3(0.6, 9.4, hi - lo), CF(wallX, frame.floorTop + 4.7 + 0.3, cz), TABLE)
-	for _, y in ipairs({ 5.2, 10.4 }) do
+	-- (the panel is 0.25 thick, flush with the wall: its far face is the wall's face, and its front face
+	-- is clear of the pedestals, which stand 0.05 off it)
+	dBox(model, "WallPanel", V3(0.25, 9.4, hi - lo), CF(wallX - into * 0.175, frame.floorTop + 4.7 + 0.3, cz), TABLE)
+	for _, y in ipairs({ 5.2, 9.9 }) do
 		dBox(model, "PanelRail", V3(0.5, 0.35, hi - lo + 0.3), CF(wallX + into * 0.1, y, cz), TIMBER)
 	end
 	-- the conduit run and two drops, each with a fuse box
-	dBox(model, "Conduit", V3(0.4, 0.4, hi - lo - 0.6), CF(wallX + into * 0.35, 9.4, cz), COPPER, MAT.Metal)
+	dBox(model, "Conduit", V3(0.4, 0.4, hi - lo - 0.6), CF(wallX + into * 0.15, 9.4, cz), COPPER, MAT.Metal)
 	for _, z in ipairs({ lo + 3, hi - 3 }) do
-		dBox(model, "ConduitDrop", V3(0.4, 3.4, 0.4), CF(wallX + into * 0.35, 7.5, z), COPPER, MAT.Metal)
-		dBox(model, "FuseBox", V3(0.5, 1.5, 1.2), CF(wallX + into * 0.45, 5.8, z), FUSE, MAT.Metal)
-		dBox(model, "FuseLight", V3(0.2, 0.3, 0.3), CF(wallX + into * 0.78, 6.2, z), TEAL, MAT.SmoothPlastic)
+		dBox(model, "ConduitDrop", V3(0.4, 3.4, 0.4), CF(wallX + into * 0.15, 7.5, z), COPPER, MAT.Metal)
+		dBox(model, "FuseBox", V3(0.5, 1.5, 1.2), CF(wallX + into * 0.2, 5.8, z), FUSE, MAT.Metal)
+		dBox(model, "FuseLight", V3(0.2, 0.3, 0.3), CF(wallX + into * 0.55, 6.2, z), TEAL, MAT.SmoothPlastic)
 	end
 end
 
@@ -155,7 +145,7 @@ function Sparkworks.Build(model: Model, frame: Frame)
 	end
 	dBox(model, "CeilingRafter", V3(0.7, 0.7, 2 * frame.halfD), CF(0, ceil - 0.35, 0), TIMBER)
 	-- (out over the shelf units' front edges, not on the aisle's middle: a lamp there stands
-	-- between the door and the WIRE IT UP board on the back wall)
+	-- between the door and the checkout board and the keeper)
 	for _, z in ipairs({ -5, 1 }) do
 		ShopKit.WarmLamp(model, -5.6, ceil - 3.4, z, ceil)
 		ShopKit.WarmLamp(model, 5.6, ceil - 3.4, z, ceil)
@@ -172,7 +162,13 @@ function Sparkworks.Build(model: Model, frame: Frame)
 		tieY = Sparkworks.TieY,
 		subShift = 0.5,
 	})
-	ShopKit.CheckoutSign(model, frame) -- the brass plaque on the counter front and the keeper's mat
+	ShopKit.CheckoutSign(model, frame) -- the keeper's mat (and a plaque, dropped below: the hanging board is the one checkout sign)
+	for _, name in ipairs({ "CheckoutPlaque", "CheckoutPlaqueAccent" }) do
+		local extra = model:FindFirstChild(name)
+		if extra then
+			extra:Destroy()
+		end
+	end
 	-- The brass CHECKOUT board over the counter: low enough to sit under the shell's hours board
 	-- and high enough to clear Juno behind the counter (the kit's own hanging board is higher and
 	-- covers that sign).

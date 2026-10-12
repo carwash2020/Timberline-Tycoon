@@ -93,8 +93,20 @@ return function(t)
 		for _, lane in ipairs(StoreStock.Lanes(KIND)) do
 			t.ok(lanes[lane.name], lane.name .. " has a header")
 		end
+		-- (a lane whose section has no sub-signs is covered by its header alone)
+		local headerOnly = {}
+		for _, section in ipairs(Builder.Sections) do
+			headerOnly[section.lane] = #section.subs == 0
+		end
+		local laneOf = {}
+		for _, place in ipairs(StoreStock.Placements(KIND)) do
+			laneOf[place.slotId] = place.lane
+		end
 		for _, slot in ipairs(StoreStock.ForShop(KIND)) do
-			t.ok(seen[slot.itemId], slot.slotId .. " is under a sub-sign")
+			t.ok(
+				seen[slot.itemId] or headerOnly[laneOf[slot.slotId]],
+				slot.slotId .. " is under a sub-sign or a header-only lane"
+			)
 		end
 		-- the signs themselves
 		local model = interior()
