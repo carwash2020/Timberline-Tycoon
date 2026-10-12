@@ -184,6 +184,112 @@ emit(
 )
 emit("")
 
+-- The store item model slots (Shared/StoreModelSlots): one slot per store item, each
+-- over a GLB in the repo. A slot whose Roblox mesh id is not set yet is listed here
+-- (it is not an id, so the scan above does not see it) until Connor uploads it.
+do
+	local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
+	local Slots = Loader.new():shared("StoreModelSlots")
+	emit("## Store item models (one slot per item: `Shared/StoreModelSlots.luau`)")
+	emit("")
+	emit("One model per item serves the shop box (and the carried box), the placed item and its ghost. A slot")
+	emit("with no mesh id keeps the part-built look and nothing errors. To switch a model on, upload its GLB")
+	emit('(steps in STATUS.md, "Store item models") and paste the id into that slot\'s `meshId` in')
+	emit("`StoreModelSlots.luau`; nothing else changes. `tests/StoreModelSlots.spec.luau` checks every row here")
+	emit("against its GLB. Previews draw these GLBs even with no id (`tools/preview/export.luau`).")
+	emit("")
+	emit("MODEL_SLOTS, the numbers each slot is placed by (studs; the model stands on y = 0, centred on")
+	emit("its footprint, turned `yaw` degrees about Y, scaled uniformly by `scale` so it fits `fit`, the")
+	emit("item's own part-built size; a box shows it at the same fit, inside the box's own size):")
+	emit("")
+	emit("| Slot | Item | GLB (repo) | GLB size | fit | yaw | scale | Roblox mesh id | Status |")
+	emit("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+	for _, slot in ipairs(Slots.All) do
+		local ids: { string } = {}
+		local unset = false
+		for _, piece in ipairs(slot.pieces) do
+			if piece.meshId == 0 then
+				unset = true
+			else
+				table.insert(ids, piece.name .. " " .. tostring(piece.meshId))
+			end
+		end
+		local items = if #slot.items > 0
+			then table.concat(slot.items, ", ")
+			else (if slot.fallback then "any item with no model (fallback)" else "the Robux box")
+		local status = if unset
+			then "GLB in repo, not uploaded: no Roblox mesh id yet"
+			else "hooked: uploaded " .. slot.source .. " model (id read from " .. (if slot.source == "backlog"
+				then "BacklogModels"
+				else "ItemMeshData") .. ")"
+		local layout = Slots.Layout(slot)
+		local lo, hi = nil, nil
+		for _, piece in ipairs(slot.pieces) do
+			local a, b = piece.centre - piece.size / 2, piece.centre + piece.size / 2
+			lo = if lo then lo:Min(a) else a
+			hi = if hi then hi:Max(b) else b
+		end
+		local native = hi - lo
+		local function dims(v: any): string
+			return string.format("%.2f x %.2f x %.2f", v.X, v.Y, v.Z)
+		end
+		emit(
+			line(
+				"| ",
+				slot.id,
+				" | ",
+				items,
+				" | `",
+				slot.glb,
+				"` | ",
+				dims(native),
+				" | ",
+				dims(slot.fit),
+				" | ",
+				tostring(slot.yaw),
+				" | ",
+				string.format("%.3f", layout.scale),
+				" | ",
+				if #ids > 0 then table.concat(ids, ", ") else "unset",
+				" | ",
+				status,
+				" |"
+			)
+		)
+	end
+	-- A GLB in the folder that has no slot here belongs to another lane (Hearth and Home wires
+	-- Flashlight, Lantern, WoodSign and ShedBlueprint): listed so no GLB in the repo is unlisted.
+	local have: { [string]: boolean } = {}
+	for _, slot in ipairs(Slots.All) do
+		have[slot.id] = true
+	end
+	local others: { string } = {}
+	for _, file in ipairs(fs.readDir("assets/glb/store-items")) do
+		local name = string.match(file, "^(.+)%.glb$")
+		if name and not have[name] then
+			table.insert(others, name)
+		end
+	end
+	table.sort(others)
+	if #others > 0 then
+		emit("")
+		emit("Not wired by these slots (another lane wires them; no slot here):")
+		emit("")
+		emit("| GLB (repo) | Roblox mesh id | Status |")
+		emit("| --- | --- | --- |")
+		for _, name in ipairs(others) do
+			emit(
+				line(
+					"| `assets/glb/store-items/",
+					name,
+					".glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |"
+				)
+			)
+		end
+	end
+	emit("")
+end
+
 local function templateText(digits: string): string
 	if templateIds[digits] then
 		return "template"

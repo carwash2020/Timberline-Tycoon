@@ -523,8 +523,11 @@ return function(t)
 		t.ok(string.find(build, "buildTimings.OverBudget()", 1, true), "an over-budget build is warned")
 	end)
 
-	t.test("the manifest is the 685 meshes of the 12 October log (town meshes off)", function()
+	t.test("the manifest is the 685 meshes of the 12 October log plus the store gear (town meshes off)", function()
 		local MeshManifest = t.shared("Art/MeshManifest")
-		t.eq(#MeshManifest.Flat(false), 685, "685 ids start loading in the background; none is awaited")
+		-- 685 + 5: the store item model slots (StoreModelSlots, group "store") preload the gear's
+		-- ids (InsulatedCoat 1, HeatBoots 2, FeatherfallCloak 2); the lamp post's two are already
+		-- in the "items" group, and the slots with no Roblox id yet add none.
+		t.eq(#MeshManifest.Flat(false), 690, "690 ids start loading in the background; none is awaited")
 	end)
 end

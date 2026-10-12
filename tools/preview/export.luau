@@ -153,7 +153,50 @@ end
 -- keeps its part-built stand-in. Reporting every manifest id as available
 -- makes that stand-in get deleted, which is what the game does once the mesh
 -- loads. An id that is not in the manifest still fails, and the parts stay.
+-- The store item models (Shared/StoreModelSlots): every slot's GLB is in the repo
+-- but most have no Roblox mesh id yet (Connor uploads them later), so a piece
+-- with no id is given a made-up one here, registered against its GLB, and the
+-- slot's PreviewIds say so: the art then draws the real model and the render
+-- shows what the game will once the id is pasted in. A piece that already has
+-- an id (the gear, the lamp post) is registered under it when the manifest
+-- does not know it. PREVIEW_STORE_GLBS=0 turns this off (the part-built look).
+local function registerStoreSlots(loader)
+	if process.env.PREVIEW_STORE_GLBS == "0" then
+		return
+	end
+	local Slots = loader:load("ReplicatedStorage/Shared/StoreModelSlots")
+	local preview = {}
+	local n = 0
+	for si, slot in ipairs(Slots.All) do
+		if not fs.isFile(slot.glb) then
+			print("  warning: store model " .. slot.id .. " has no GLB at " .. slot.glb)
+			continue
+		end
+		for pi, piece in ipairs(slot.pieces) do
+			local id = piece.meshId
+			if id == 0 then
+				id = 9000000000000 + si * 10 + pi
+				preview[slot.id .. "/" .. piece.name] = id
+			end
+			if manifest[tostring(id)] == nil then
+				manifest[tostring(id)] = {
+					file = "@" .. slot.glb,
+					node = piece.name,
+					initialSize = { piece.size.X, piece.size.Y, piece.size.Z },
+					soft = true, -- metal capped in the viewer (viewer.html softenMetal)
+				}
+				n += 1
+			end
+		end
+	end
+	Slots.PreviewIds = preview
+	if n > 0 then
+		print(string.format("  store item models: %d GLB pieces registered for the preview", n))
+	end
+end
+
 local function installMeshOverride(loader)
+	registerStoreSlots(loader)
 	local MeshKit = loader:load("ReplicatedStorage/Shared/Art/MeshKit")
 	MeshKit.Reset()
 	MeshKit.Override = function(meshId, name, size)
@@ -367,6 +410,7 @@ local function export(name: string, def)
 						node = info.node,
 						initialSize = info.initialSize,
 						tint = info.tint,
+						soft = info.soft,
 						turn = info.turn,
 					}
 					blobFor(info.file)

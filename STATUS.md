@@ -27,6 +27,54 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Store item models (branch `phase-2/store-item-models`, 12 October 2026)
+
+Connor's item 2: the ten store GLBs (`assets/glb/store-items/`, from `phase-2/v1-store-items`) are in the repo and wired, one model
+slot per item, with **no Roblox mesh id yet** (he uploads them later). Nothing about prices, what is on sale, buying or the
+shelves changed while the ids are unset: every item keeps its part-built look and nothing errors.
+
+- **One slot per item (`Shared/StoreModelSlots`, pure data).** The same slot draws the item in the shop box (and so the carried
+  box), on the plot and as the placement ghost. Mine: Barrel, Crate, Glow Wire, Sky Bin (new GLBs), RobuxCoins (the Robux box),
+  Parcel (the fallback), and the already-uploaded InsulatedCoat, HeatBoots, FeatherfallCloak (`BacklogModels` ids) and the lamp
+  post (`ItemMeshData` ids). **Flashlight, Lantern, WoodSign and ShedBlueprint are the Hearth & Home lane's (#183): no slot here**
+  (their GLBs are in the folder and listed in ASSETS.md as "wired by the Hearth and Home lane"; they can add rows to the same module).
+- **Fallback rule, in one place.** `StoreModelSlots.Resolve(itemId, kind)` = the item's slot, else the Parcel (and says which).
+  `ItemModel` uses it for an item with no model of its own (today none of the shop items is one; a made-up gear id shows it). The
+  last step is the part-built look: a slot with no id, a mesh that is still loading and a mesh that failed all keep it.
+- **Engine side (`Art/StoreModelArt`).** `Build` makes the slot's MeshParts (`MeshKit.Create`, which never yields) standing on a
+  frame; `Dress` runs it inside `MeshKit.Attempt`, so a mesh that lands later swaps in and an unset or failed one changes nothing.
+  Wired: `BoxArt` (box contents), `BlueprintModels.Build` (placed Barrel, Crate, Glow Wire and their ghosts), `MachineArt.BuildSkyBin`
+  (the bin; the flume, cloud and the labelled collider stay), `RobuxBoxArt` (a coin pile on the mesh crate's lid, or on the floor of
+  the part-built open crate). `LogicItems`' silent Glow Wire fallback now says "has a model slot with no Roblox mesh id yet".
+- **Sizes.** The model is scaled uniformly to its slot's `fit`, the item's part-built size (Barrel 1.75 x 2.2, Crate 2, Glow Wire
+  4 x 2 footprint, Sky Bin 4, parcel 1.4). With an id set the BOX is sized for the model (`ItemModel` extent), so the Glow Wire's
+  spool is not shrunk to the 0.3 stud bar's box; with no id the boxes are exactly what they were. The numbers (GLB size, fit, yaw,
+  scale) are the MODEL_SLOTS table in `ASSETS.md`, generated from the data and checked against each GLB by the spec.
+- **Scenery unchanged.** The town's Crate and Barrel props (`BuildingArt` PROPS, `TownMeshes`, the shops' stock corners) stay
+  part-built / on their old uploaded meshes: the new store models are the shop and plot items, not the scenery.
+- **Lamp post.** The store's lamp is `assets/meshes/items/LampPost` (1.25 x 8.4, the plot item ItemMeshData already places),
+  not `environment/LampPost` (the 10.6 stud street lamp with its arm, town scenery). Only the box display is new for it.
+- **Gear is box-only.** Nothing in the game wears or holds the coat, boots or cloak (they are owned flags), so "held/worn" does not
+  apply; the carried box is the held path. Preloaded (`MeshManifest` group "store": 5 ids; `BuildBudget` pin 685 to 690).
+- **Previews.** `tools/preview/export.luau` registers every slot's GLB (a made-up id for an unset piece, `Slots.PreviewIds`), so
+  renders show the real models; `PREVIEW_STORE_GLBS=0` shows the part-built look. Scenes `store-item-models`,
+  `store-item-models-placed`, `store-models-raw`. Renders (37 PNGs, `previews/store-item-models/`): `contact-sheet.png`,
+  `table-1920x1080.png`, `phone-glowwire-667x375.png`, `<item>-display.png` and `-display-3q.png` for barrel, crate, glowwire, skybin,
+  insulatedcoat, heatboots, featherfallcloak, lamppost, `parcel-fallback`, `robux-box` (mesh crate, coins on the lid) and
+  `robux-box-partbuilt` (open crate, coins on the heap), `<item>-placed.png` and `-placed-3q.png` (part build, model, ghost) for
+  barrel, crate, glowwire, skybin, `placed-all.png`, and the shop entrances `toolshed-`, `sparkworks-`, `hearth-entrance.png`.
+  Made with `python3 tools/preview/backlog_manifest.py` then `PREVIEW_MESHES=preview/backlog-meshes.json bash tools/preview/shoot.sh
+  store-item-models` (and `-placed`). In Lune the Robux crate's Glow and Badge pieces are put at their GLB places by the scene (Studio
+  keeps them by the mesh pivot).
+- **What only Studio can tell** (nothing here was seen in Studio): that an uploaded GLB loads and faces the way the previews show
+  (the GLBs' front is -Z; a half turn is `yaw` in the slot row); that the textured GLBs (Barrel, Crate, Glow Wire have a wood
+  texture) keep their wood through a plain mesh id (see Awaiting Connor); the Sky Bin's "SKY BIN" and log-count labels over the
+  mesh bin; the Glow Wire's on/off look (its mesh glows always; the lamp's light still switches).
+- **How Connor switches a model on** (Windows, one item at a time; the PR body has the same steps): in Studio open the place, View
+  > Asset Manager > Bulk Import, pick the item's GLB (`assets/glb/store-items/<Name>.glb`), Import; click the new MeshPart in the
+  Explorer, in Properties copy the number inside `MeshId` (`rbxassetid://123` gives 123; NOT the model's id from Creator Hub); open
+  `src/ReplicatedStorage/Shared/StoreModelSlots.luau`, find the row with that `id`, and replace the `0` in `meshId = 0` with the number.
+  Nothing else changes. The ids are checked by `lune run tools/assets` (ASSETS.md) the same as every other mesh.
 ## Dealership lot tier strips are paint (branch `phase-2/lot-tier-strips`)
 
 The coloured strips on the dealership's 8 plinths (the tier colour that matches each T1 to T5 / T1 to T3 flag) looked like loose slabs: the top stripe was a 0.12-thick bar inset from the corners and the aisle band a bar floating on the face with gaps. In `Art/DealershipLot` both are now 0.05-thick skins (`PaintThickness`): the `PlinthStripe` lies flush on the plinth's top along the aisle edge, full width corner to corner; the `PlinthBand` is the aisle face's own outer skin, top edge on the plinth's top edge, outer face the bay's edge (the slab is 0.05 shallower there, so no face is coplanar and nothing leaves the bay). CanCollide, CanTouch, CanQuery and CastShadow are all false; colours, prices, tiers and lot layout are unchanged. New spec `DealershipLotStrips.spec` checks every plinth (8): flush within 0.1 (actually 0.001), thin, inside the bay footprint, corner to corner, no collide or shadow, one tier colour for stripe, band and flag. Two existing specs were adjusted for the design move, not weakened: `DealershipLot.spec` measures the aisle from the bay edges (the slab now stops 0.05 short, the band fills it) and `StoreInterior.Dealership.spec` finds the stripe with a 1e-3 tolerance. Scene `lot-strips` (new); renders in `previews/lot-strips/before-*.png` and `after-*.png` (8 views: lot from above, both rows low along the aisle, corners, seam, edge). The grass-green/blue pads the boxes stand on (`BoxBlock`, accent colour) are the vehicle box pedestals, not tier strips, and are untouched. Not seen in Studio.

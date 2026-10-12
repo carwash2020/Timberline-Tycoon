@@ -15,6 +15,7 @@ local KitPaint = require(script.Parent.KitPaint)
 local KitMeshes = require(script.Parent.KitMeshes)
 local LogicItems = require(script.Parent.LogicItems)
 local PlotData = require(script.Parent.PlotData)
+local StoreModelArt = require(script.Parent.Art.StoreModelArt)
 local TreeArt = require(script.Parent.Art.TreeArt)
 local WoodData = require(script.Parent.WoodData)
 
@@ -139,6 +140,11 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 		KitMeshes.Dress(model, bp.id, ghost)
 	else
 		ItemMeshes.Attach(model, root, bp.id, ghost)
+	end
+	-- The item's one model slot (StoreModelSlots): the same model the shop box shows.
+	-- No mesh id yet, or a mesh still loading, keeps the boxes above as the look.
+	if not bp.kit then
+		StoreModelArt.DressPlaced(model, root, bp.id, ghost)
 	end
 	local applyMeshes = (LogicItems :: any).ApplyMeshes
 	if type(applyMeshes) == "function" then

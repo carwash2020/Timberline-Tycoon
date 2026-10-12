@@ -33,6 +33,7 @@ local MeshKit = require(script.Parent.MeshKit)
 local Palette = require(script.Parent.Palette)
 local SawmillLogic = require(script.Parent.Parent.SawmillLogic)
 local SkyBinLogic = require(script.Parent.Parent.SkyBinLogic)
+local StoreModelArt = require(script.Parent.StoreModelArt)
 local Util = require(script.Parent.Parent.Util)
 
 local MachineArt = {}
@@ -1146,6 +1147,19 @@ function MachineArt.BuildSkyBin(ghost: boolean?): Model?
 	model:SetAttribute("MachineId", machine.id)
 	model:SetAttribute("Shop", machine.shop)
 	model:SetAttribute("Price", machine.priceCash)
+	-- The Sky Bin's one model slot (StoreModelSlots): the bin's mesh replaces the part-built
+	-- bin, its strap, rim and base; the flume and cloud stay, and so does the "SkyBin" part
+	-- (the collider that carries the labels). No mesh id yet keeps the part build.
+	local hide: { BasePart } = {}
+	for _, d in ipairs(model:GetChildren()) do
+		if
+			d:IsA("BasePart")
+			and (d.Name == "SkyBin" or d.Name == "BinBase" or d.Name == "BinStrap" or d.Name == "BinRim")
+		then
+			table.insert(hide, d)
+		end
+	end
+	StoreModelArt.DressPlaced(model, root, SkyBinLogic.Id, preview, hide)
 	return model
 end
 
