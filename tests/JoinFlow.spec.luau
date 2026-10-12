@@ -123,6 +123,15 @@ return function(t)
 		t.ok(string.find(map, "CharacterAutoLoads = false", 1, true), "off before the ground")
 		t.ok(string.find(map, "CharacterAutoLoads = true", 1, true) == nil, "MapBuilder never turns it back on")
 		t.ok(string.find(map, "LoadCharacter", 1, true) == nil, "and loads nobody")
+		-- Studio, 12 October: the player joined while MapBuilder was still requiring modules,
+		-- fell through the empty world and died on a loop. Off before the first require, and in the project file.
+		local off = string.find(map, "Players.CharacterAutoLoads = false", 1, true)
+		local firstRequire = string.find(map, "require(", 1, true)
+		t.ok(off and firstRequire and off < firstRequire, "off before the first require, not after the slow ones")
+		t.ok(
+			string.find(fs.readFile("default.project.json"), '"CharacterAutoLoads": false', 1, true),
+			"the project file turns auto-loads off too"
+		)
 		local game = fs.readFile("src/ServerScriptService/GameServer.server.luau")
 		local enter = string.find(game, "pcall(enterWorld", 1, true)
 		local loaded = string.find(game, 'player:SetAttribute("ProfileLoaded", true)', 1, true)
