@@ -612,4 +612,17 @@ return function(t)
 		t.eq(later.Steps[later.profile.tutorialStep].id, "truck", "already past the new plot step")
 		t.eq(later.profile.plot.claimed, true)
 	end)
+
+	t.test("finishing the tutorial tells the listeners, once (DailyService's held login toast)", function()
+		local s = setup()
+		local told = {}
+		s.Quest.OnFinished(function(player)
+			table.insert(told, player)
+		end)
+		s.Quest.Start(s.player, s.profile)
+		s.skip()
+		t.eq(s.profile.tutorialDone, true)
+		t.eq(#told, 1)
+		t.eq(told[1], s.player)
+	end)
 end

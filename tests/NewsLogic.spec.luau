@@ -44,4 +44,12 @@ return function(t)
 		News.Mark(book)
 		t.eq(book["News:V1"], true, "closing twice still stores the one key")
 	end)
+
+	t.test("brand-new means still in the first tutorial, not a refresher or a replay", function()
+		t.eq(News.IsBrandNew(false, false, false), true)
+		t.eq(News.IsBrandNew(nil, nil, nil), true, "a fresh template")
+		t.eq(News.IsBrandNew(true, false, false), false, "finished: returning")
+		t.eq(News.IsBrandNew(false, true, false), false, "refresher: returning")
+		t.eq(News.IsBrandNew(false, false, true), false, "replay: returning")
+	end)
 end
