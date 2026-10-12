@@ -3970,3 +3970,17 @@ What changed is in STATUS.md "Robustness and performance pass". Nothing here has
 5. PC and phone: walk up to Tink, Hazel, Dale and Juno: Talk opens their shop as before (Dale and Juno behind their counters too). Walk to the Sky Forge court: the anvil opens the Sky Forge from within range.
 6. Phone (667 x 375): a prompt (Talk, a box, a sell prompt) shows in the bark card style from the first second after the card fades, including ones far from spawn walked up to later. If one shows the default round Roblox prompt for a moment right after joining, note which and when (the first scan is now spread over a few frames, up to about a second for a very large workspace).
 7. Xbox: nothing about input changed; the prompts still show the pad glyph, B closes panels.
+
+## V1.1 polish leftovers (branch `phase-2/polish-v11-leftovers`, 12 October 2026)
+
+What changed is in STATUS.md "V1.1 polish leftovers". Renders: `previews/polish-v11/` (`plot-sign-trophies.png`, `sparkworks-entrance.png`, `dealership-entrance.png`, `dealership-rig-before.png`, `dealership-rig-after.png`). Nothing here has been seen in Studio.
+
+Studio checks:
+1. **PC: gate signs.** Walk to the sign at the Snow road, the Volcano road, the Gloam Hollow trail and the gondola station. Each has a small plaque under the board. Without the gear it reads the requirement in red ("Cold hurts here. Coat protects.", "Heat hurts here. Boots protect.", "Dark and deep. Bring a Lantern.", "Obsidian Axe + Gondola Pass from Gus"). Buy the Coat (or Boots, Lantern, the pass): within a second the plaque turns green and reads "Protected". A second player without the gear still sees red.
+2. **Phone (667x375):** the plaque is readable from where the road meets the sign, and the board text above it is not covered.
+3. **Xbox:** same as PC; nothing is bound to a button.
+4. **Region banner.** Drive into the Bayou and into Red Mesa: a toast names "Bayou" / "Red Mesa" with its line, once. Leave and come back in the same session: no repeat. Mud and stage gates behave as before.
+5. **Plot sign.** Stand in front of a claimed plot's sign: the name and "PLOT n · TIER" sit above the post, nothing crosses a letter (also from the side and from 20 studs).
+6. **Sparkworks.** Walk in from the door: "LOGIC & OUTPUTS" and "BELTS & INPUTS" read with no chain across a letter (PC and phone). A chain may cross a letter from a different spot; that is only the entrance view.
+7. **Dealership.** Walk down the aisle to the Logging Rig (the last plinth, back row): its crane and stacks are under the ceiling beams. It is about 20% smaller than the real truck (display copy only); buy one and the truck that spawns is full size.
+8. **Join on a slow connection** (Studio: Network Emulation, low bandwidth): the HUD, mining chip and forge window still start; Output may show "ReplicatedStorage.Shared did not arrive" only if it took over 30 seconds.

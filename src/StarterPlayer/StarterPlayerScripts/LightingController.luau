@@ -41,6 +41,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
+local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
 local RainFog = require(ReplicatedStorage.Shared.RainFog)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
@@ -153,8 +154,21 @@ type FlashEntry = { from: number, to: number, amount: number }
 local flashes: { FlashEntry } = {}
 
 -- Brightens the whole scene by `amount` (ExposureCompensation) for
--- `duration` seconds, starting after `delay` (default now).
+-- `duration` seconds, starting after `delay` (default now). With "Reduce
+-- flashing" on (or camera shake off) it is softened or dropped
+-- (SettingsLogic.SoftenFlash); every screen flash goes through here.
 function LightingController.Flash(amount: number, duration: number, delay: number?)
+	local player = Players.LocalPlayer
+	local reduce = player ~= nil
+		and SettingsLogic.ReduceFlashing(
+			player:GetAttribute(SettingsLogic.ReduceFlashingAttribute),
+			player:GetAttribute("SettingCameraShake")
+		)
+	local soft = SettingsLogic.SoftenFlash(reduce, amount, duration, delay)
+	if soft == nil then
+		return
+	end
+	amount, duration = soft.amount, soft.duration
 	local start = os.clock() + (delay or 0)
 	table.insert(flashes, { from = start, to = start + duration, amount = amount })
 end

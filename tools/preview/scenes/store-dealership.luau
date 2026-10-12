@@ -66,6 +66,7 @@ return Store.scene({
 				{ pos = { 20, 9, 0 }, target = { 20, 6, 18 }, fov = 70, label = "back row from the aisle" },
 				{ pos = { -50, 9, 3 }, target = { -40, 9, 9 }, fov = 64, label = "a header close up" },
 				{ pos = { 4, 8, -2 }, target = { 20, 4, -12 }, fov = 62, label = "front row stands" },
+				{ pos = { 14, 11, -4 }, target = { 40, 9, 20 }, fov = 58, label = "logging rig under the beams" },
 			},
 		}
 	end,

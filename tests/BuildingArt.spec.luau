@@ -354,6 +354,14 @@ return function(t)
 		end
 		t.eq(#bulbs(BuildingArt.Signpost("SELL LOGS HERE", true)), 2, "a lit signpost has two lamps")
 		t.eq(#bulbs(BuildingArt.Signpost("TO THE WOODS")), 0, "a plain signpost has none")
+		do
+			local gate = BuildingArt.Signpost("SNOWFIELDS", false, true, "snow")
+			t.eq(gate:GetAttribute("GateId"), "snow", "a gate sign carries its gate id")
+			t.ok(gate:HasTag("GateSign"), "a gate sign is tagged")
+			local label = gate:FindFirstChild("State", true)
+			t.ok(label ~= nil and label:IsA("TextLabel"), "a gate sign has a State label")
+			t.eq(BuildingArt.Signpost("TO THE WOODS"):FindFirstChild("State", true), nil, "a plain signpost has none")
+		end
 		-- The bulbs only glow at night: LightingController switches parts by
 		-- name, so the name must be one of its GLOW_NAMES.
 		local fs = require("@lune/fs")

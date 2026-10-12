@@ -168,6 +168,11 @@ return function(t)
 		t.ok(string.find(blob, "SNOWFIELDS", 1, true), "a snow gate")
 		t.ok(string.find(blob, "VOLCANO", 1, true), "a volcano gate")
 		t.ok(string.find(blob, "GLOAM", 1, true), "a hollow gate")
+		local ids = {}
+		for _, sign in ipairs(gates) do
+			ids[sign.gateId or "?"] = true
+		end
+		t.ok(ids.snow and ids.volcano and ids.grove, "each carries its gate id")
 		t.eq(#WorldPlan.RoadSigns(function()
 			return ""
 		end), 6)
