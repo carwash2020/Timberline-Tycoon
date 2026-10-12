@@ -1,14 +1,15 @@
 --!strict
 -- The picture URL for a store card's art disc.
 --
--- StoreData keeps one number per card (`image`), pasted from the Creator
--- Dashboard, and it may be a Decal id or an Image id. An ImageLabel only
--- loads an Image id through rbxassetid://; a Decal id there shows nothing.
--- Roblox's asset thumbnail URL renders the picture for either, so every
--- consumer (the store panel and the in-world board) goes through here and
--- nothing builds an rbxassetid:// for a store image.
+-- StoreData keeps one number per card (`image`): a Roblox IMAGE asset id that
+-- Connor uploaded. An ImageLabel loads an Image id through rbxassetid://, but
+-- Roblox's asset thumbnail URL renders any image-like asset id (an Image or a
+-- Decal), so every consumer (the store panel and the in-world board) goes
+-- through here and nothing builds an rbxassetid:// for a store image.
 --
--- Unverified without Studio: that each of the three ids renders.
+-- Unverified without Roblox: that each of the nine ids renders the right
+-- picture (the sandbox cannot reach Roblox). scripts/check-store-icons.ps1
+-- checks the six newest on Connor's machine.
 
 local StoreArt = {}
 

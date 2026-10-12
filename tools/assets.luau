@@ -249,6 +249,9 @@ for _, kind in ipairs(KIND_ORDER) do
 			usedBy ..= " (also " .. table.concat(files, ", ") .. ")"
 		end
 		local status = "format ok, not checked yet"
+		if kind == "image" and string.sub(first.use, 1, 16) == "store card image" then
+			status = "image id, not checked on Roblox from the sandbox"
+		end
 		if kind == "mesh" then
 			status = templateText(row.digits) .. ", " .. status
 			if string.find(first.use, "Collision", 1, true) then
@@ -308,9 +311,11 @@ emit("2. **Same gap remains for plot machines** (sawmills, planers, chop saw, be
 emit("   a machine built before its meshes are cached stays part-built until its model is rebuilt (rejoin or")
 emit("   re-place). MachineSkin now logs `was still loading` instead of `did not load` in that case. A real fix")
 emit("   needs PlotService to re-dress; not done here (touches plot item registration).")
-emit("3. **Store card images** (`StoreData` image ids 91282142796474, 79037897236948, 71028498113750) are")
-emit("   possibly Decal ids, which an ImageLabel cannot load by rbxassetid. They now go through `StoreArt`")
-emit("   (rbxthumb asset thumbnail), which renders a Decal or an Image id. Rendering unverified (needs Studio).")
+emit("3. **Store card images** (nine `StoreData` image ids: the three older ones on Tow Service, Timber")
+emit("   Classic and Paint Shop, which may be Decals; six Connor uploaded on 12 October 2026 as IMAGE assets). They")
+emit("   go through `StoreArt` (rbxthumb asset thumbnail), which renders any image-like id. Whether each shows the")
+emit("   right picture, and that moderation has cleared it, is not checked: the sandbox cannot reach Roblox.")
+emit("   `scripts/check-store-icons.ps1` checks the six new ones on Connor's machine.")
 emit("4. **Old Roblox sound ids** (`SoundData`: 4110925712, 282906960, 1516791621, 1841461968, 1848183670,")
 emit("   9116970949, 9117181540, 9118187543, 9120549564) are not owned by the game. Since the 2022 audio")
 emit("   privacy change a sound only plays if it is public Roblox audio or yours. A failure is silent, never a")
@@ -354,7 +359,7 @@ emit("Then check one of each kind, because one bad kind fails every id of that k
 emit("")
 emit("- a **sound**: 4110925712 (Sell and Buy), 1516791621 (Rain), 1841461968 (day music)")
 emit(
-	"- a **store image**: 91282142796474, 79037897236948, 71028498113750 (shown through the StoreArt thumbnail, so Decal or Image ids both work)"
+	"- a **store image**: 91282142796474, 79037897236948, 71028498113750, and the six new ones (`scripts/check-store-icons.ps1` checks those; shown through the StoreArt thumbnail)"
 )
 emit("- a **HUD image**: 76852120099119 (Menu), 129127727779001 (Hammer), 96932580819074 (SellHere)")
 emit("- a **UI skin image**: 139841387610705, 90740664574742, 72427678124813, 74100852047057")

@@ -300,7 +300,7 @@ local function fidelity(part: MeshPart, role: string)
 	end
 end
 
-type Made = { part: MeshPart, role: string, trailer: boolean, wheel: BasePart? }
+type Made = { part: MeshPart, role: string, trailer: boolean, wheel: BasePart?, mirror: boolean }
 
 local function destroyMade(made: { Made })
 	for _, item in ipairs(made) do
@@ -332,12 +332,28 @@ local function addRole(
 	if role ~= "Wheel" then
 		MeshKit.Visual(part, piece.meshId)
 	end
-	table.insert(made, { part = part, role = role, trailer = trailer, wheel = wheel })
+	-- A wheel on the truck's -X side shows its back (the mesh's rim face is on +X): turn it
+	-- about Y so the rim faces out. Judged in the chassis frame, so it holds wherever the
+	-- model stands.
+	local mirror = false
+	if role == "Wheel" and piece.mirrorLeft == true and wheel ~= nil then
+		local owner = wheel:FindFirstAncestorWhichIsA("Model")
+		local chassis = if owner then owner:FindFirstChild("Chassis", true) else nil
+		if chassis and chassis:IsA("BasePart") then
+			mirror = chassis.CFrame:PointToObjectSpace(wheel.CFrame.Position).X < 0
+		end
+	end
+	table.insert(made, { part = part, role = role, trailer = trailer, wheel = wheel, mirror = mirror })
 	return true
 end
 
-local function swapWheel(mesh: MeshPart, wheel: BasePart)
-	mesh.CFrame = wheel.CFrame
+local function swapWheel(mesh: MeshPart, wheel: BasePart, mirror: boolean)
+	mesh.CFrame = if mirror then wheel.CFrame * CFrame.Angles(0, math.pi, 0) else wheel.CFrame
+	if mirror then
+		-- TruckArt.Rig reads this: the axle is kept on the unturned wheel and the half turn
+		-- goes in the joint's C1, so spin and steering run the same way on both sides.
+		mesh:SetAttribute("Mirror", true)
+	end
 	mesh.Color = wheel.Color
 	mesh.Material = wheel.Material
 	mesh.Anchored = wheel.Anchored
@@ -428,7 +444,7 @@ local function applyNow(model: Model, truckId: string, trailerId: string?): bool
 	for _, item in ipairs(made) do
 		local part = item.part
 		if item.role == "Wheel" and item.wheel and item.wheel.Parent then
-			swapWheel(part, item.wheel)
+			swapWheel(part, item.wheel, item.mirror)
 		else
 			local root = if item.trailer then trailerAt else origin
 			placePiece(part, item.role, part.Size, item.trailer, hull, root)

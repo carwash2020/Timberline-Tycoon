@@ -44,7 +44,7 @@ StoreData.CreatorIds = {
 export type Pass = {
 	key: PassKey,
 	id: number, -- game pass id from Creator Hub (0 until pasted)
-	image: number, -- PASTE a Decal or Image asset id (StoreArt renders either); 0 = styled placeholder
+	image: number, -- Roblox image asset id (StoreArt shows it through the asset thumbnail); 0 = styled placeholder
 	name: string,
 	description: string, -- word for word what Creator Hub says
 	order: number, -- card order in the store, on the board and on the shelf
@@ -65,7 +65,7 @@ export type Pass = {
 export type Product = {
 	key: ProductKey,
 	id: number, -- developer product id from Creator Hub (0 until pasted)
-	image: number, -- PASTE a Decal or Image asset id (StoreArt renders either); 0 = styled placeholder
+	image: number, -- Roblox image asset id (StoreArt shows it through the asset thumbnail); 0 = styled placeholder
 	name: string,
 	description: string, -- word for word what Creator Hub says (static, no live amount)
 	order: number,
@@ -85,7 +85,7 @@ StoreData.Passes = {
 	{
 		key = "DoubleCash",
 		id = StoreData.CreatorIds.Passes.DoubleCash,
-		image = 0, -- PASTE decal id
+		image = 129566569237407, -- image id, not checked on Roblox from the sandbox
 		name = "2x Cash",
 		description = "Wood you sell pays double. It doesn't change your axes, trucks, or how fast you chop, and everything in the game can still be earned without it.",
 		order = 1,
@@ -94,7 +94,7 @@ StoreData.Passes = {
 	{
 		key = "LuxAxe",
 		id = StoreData.CreatorIds.Passes.LuxAxe,
-		image = 0, -- PASTE decal id
+		image = 80267879981455, -- image id, not checked on Roblox from the sandbox
 		name = "Lux Axe",
 		description = "A black axe with a gold head, a diamond edge, and a sparkle. It sits between the Inferno Axe and the Starfall Axe, and the Starfall Axe can still be bought with cash. Wood you cut with it sells for 10% more. It's yours to keep and can't be sold. It can't be tempered.",
 		order = 2,
@@ -137,7 +137,7 @@ StoreData.Products = {
 	{
 		key = "Cash1k",
 		id = StoreData.CreatorIds.Products.Cash1k,
-		image = 0, -- PASTE decal id
+		image = 95950318286949, -- image id, not checked on Roblox from the sandbox
 		name = "Small Cash Pack",
 		description = "Adds 15 minutes of wood income at your current stage.",
 		order = 6,
@@ -148,7 +148,7 @@ StoreData.Products = {
 	{
 		key = "Cash10k",
 		id = StoreData.CreatorIds.Products.Cash10k,
-		image = 0, -- PASTE decal id
+		image = 102370875631166, -- image id, not checked on Roblox from the sandbox
 		name = "Large Cash Pack",
 		description = "Adds 2 hours of wood income at your current stage.",
 		order = 7,
@@ -159,7 +159,7 @@ StoreData.Products = {
 	{
 		key = "DoubleWood",
 		id = StoreData.CreatorIds.Products.DoubleWood,
-		image = 0, -- PASTE decal id
+		image = 83265240736148, -- image id, not checked on Roblox from the sandbox
 		name = "2x Wood (48 hours)",
 		description = "For 48 hours, wood from every tree you fell sells for double. Buying it again adds 48 more hours.",
 		order = 8,
@@ -169,7 +169,7 @@ StoreData.Products = {
 	{
 		key = "InstantDelivery",
 		id = StoreData.CreatorIds.Products.InstantDelivery,
-		image = 0, -- PASTE decal id
+		image = 96661273504040, -- image id, not checked on Roblox from the sandbox
 		name = "Instant Delivery",
 		description = "Sell your truckload from anywhere, once.",
 		order = 9,
