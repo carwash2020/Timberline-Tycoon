@@ -36,6 +36,8 @@ local SparkworksStock = require(ReplicatedStorage.Shared.SparkworksStock)
 local StockIds = require(ReplicatedStorage.Shared.StockIds)
 local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
+local StoreData = require(ReplicatedStorage.Shared.StoreData)
+local StoreEvents = require(ReplicatedStorage.Shared.StoreEvents)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
 local AxeService = require(script.Parent.AxeService)
@@ -685,7 +687,28 @@ export type BoxGrant = {
 	shop: string?,
 	free: boolean?, -- AdminService only: the owner's gift, no price and no shop hours
 	deferGrant: boolean?, -- charge now, hand over the item when the box is opened (GrantItem)
+	eventSlot: string?, -- a StoreData.EventSlots id: set by BoxService from its own record, never by a client
 }
+
+-- The event slots that may sell right now: { [slotId] = slot }. Empty unless
+-- StoreEventService has an active, scheduled event that lists the slot and
+-- the slot is approved with an item and an explicit price. Nothing else
+-- ever fills it, so with no scheduled event no event slot can be bought.
+local liveEventSlots: { [string]: StoreData.EventSlot } = {}
+
+function ShopService.SetLiveEventSlots(slots: { [string]: StoreData.EventSlot })
+	local copy: { [string]: StoreData.EventSlot } = {}
+	for id, slot in pairs(slots) do
+		if StoreEvents.SlotSellable(slot) then
+			copy[id] = slot
+		end
+	end
+	liveEventSlots = copy
+end
+
+function ShopService.LiveEventSlots(): { [string]: StoreData.EventSlot }
+	return liveEventSlots
+end
 
 local settled: { [string]: string } = {}
 
@@ -878,12 +901,23 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 	if (box.kind == "Truck" or box.kind == "Trailer") and (type(shopId) ~= "string" or shopId == "") then
 		shopId = "Dealership"
 	end
+	-- An event slot sells only while it is live (see liveEventSlots), for the item
+	-- and the price on its row. An event slot id offered as an ordinary item is refused.
+	local eventPrice: number? = nil
+	if box.eventSlot ~= nil or StoreEvents.IsSlotId(box.itemId) then
+		local live = if type(box.eventSlot) == "string" then liveEventSlots[box.eventSlot] else nil
+		if live == nil or box.itemId ~= live.itemId or box.kind ~= live.itemKind or box.free == true then
+			return fail("locked")
+		end
+		eventPrice = live.price
+		shopId = live.store
+	end
 	local free = box.free == true
 	if not free and type(shopId) == "string" and not ShopHoursLogic.IsOpen(shopId, ShopService.Hour()) then
 		return fail("sleepy")
 	end
 	local limited = not free and (box.limited == true or (box.kind == "Cosmetic" and box.itemId == "LampPost"))
-	local price = StoreStock.UnitPrice(box.kind, box.itemId, limited, loop)
+	local price = if eventPrice ~= nil then eventPrice else StoreStock.UnitPrice(box.kind, box.itemId, limited, loop)
 	if free then
 		price = 0
 	end
