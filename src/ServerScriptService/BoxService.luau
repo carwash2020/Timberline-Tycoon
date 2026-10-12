@@ -24,6 +24,7 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local RobuxShelf = require(ReplicatedStorage.Shared.RobuxShelf)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
+local StoreEvents = require(ReplicatedStorage.Shared.StoreEvents)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
 local LeaveCommit = require(script.Parent.LeaveCommit)
@@ -40,6 +41,7 @@ type BoxGrant = {
 	shop: string?,
 	free: boolean?,
 	deferGrant: boolean?,
+	eventSlot: string?,
 }
 
 BoxService.Group = "Boxes"
@@ -956,6 +958,7 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 		limited = rec.limited,
 		shop = rec.shop,
 		deferGrant = true, -- the buyer is handed the box; the item comes out when it is opened
+		eventSlot = if StoreEvents.IsSlotId(rec.slotId) then rec.slotId else nil, -- an event slot sells only while live (ShopService)
 	})
 	if ok then
 		rec.pendingGrant = BoxUnpack.Mode(rec.itemKind, rec.itemId) ~= "vehicle"

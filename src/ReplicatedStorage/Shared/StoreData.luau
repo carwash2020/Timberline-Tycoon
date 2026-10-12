@@ -177,6 +177,97 @@ StoreData.Products = {
 	},
 } :: { Product }
 
+-- EVENT SLOTS: open shelf slots reserved for store events (the "event
+-- expansion room"; EVENTS.md). They are NOT on sale and not in any list:
+--   * no store screen, board, shelf, hover tag, price list or the economy
+--     model reads them (StoreStock, StoreBoard, StoreUI and tools/economy
+--     never look at this table);
+--   * a slot sells only while ALL of these hold (StoreEvents.SlotSellable
+--     and the server's purchase check in ShopService.ChargeAndGrant):
+--       1. a scheduled event for its store is running (StoreEventData or the
+--          Studio attribute), and that event lists the slot id;
+--       2. the slot is approved = true with an itemKind and itemId the shop
+--          already knows how to hand over;
+--       3. the slot has an explicit price (whole dollars, more than 0).
+--   An unset price (nil) keeps it refused. Nothing here sets a price.
+-- To fill one later, Connor edits the one row: approved, itemKind, itemId,
+-- price. Never change an existing item's id or price from here.
+export type EventSlot = {
+	id: string, -- the slot id; an event config lists these in `items`
+	store: string, -- ToolShed | HearthAndHome | Sparkworks | Dealership
+	index: number, -- 1 to 3: which of the store's three event tables
+	eventSlot: boolean, -- always true: marks this as an event slot, not stock
+	visible: boolean, -- false: never drawn on a shelf or board while the event is off
+	approved: boolean, -- Connor has approved the item in this slot (default false)
+	itemKind: string?, -- "Cosmetic", "Gear" and so on; nil until approved
+	itemId: string?, -- the item's id in its catalog; nil until approved
+	price: number?, -- in-game cash price; nil = unset = refused
+}
+
+StoreData.EventSlots = {
+	ToolShed = {
+		{ id = "event-toolshed-1", store = "ToolShed", index = 1, eventSlot = true, visible = false, approved = false },
+		{ id = "event-toolshed-2", store = "ToolShed", index = 2, eventSlot = true, visible = false, approved = false },
+		{ id = "event-toolshed-3", store = "ToolShed", index = 3, eventSlot = true, visible = false, approved = false },
+	},
+	HearthAndHome = {
+		{
+			id = "event-hearth-1",
+			store = "HearthAndHome",
+			index = 1,
+			eventSlot = true,
+			visible = false,
+			approved = false,
+		},
+		{
+			id = "event-hearth-2",
+			store = "HearthAndHome",
+			index = 2,
+			eventSlot = true,
+			visible = false,
+			approved = false,
+		},
+		{
+			id = "event-hearth-3",
+			store = "HearthAndHome",
+			index = 3,
+			eventSlot = true,
+			visible = false,
+			approved = false,
+		},
+	},
+	Sparkworks = {
+		{ id = "event-spark-1", store = "Sparkworks", index = 1, eventSlot = true, visible = false, approved = false },
+		{ id = "event-spark-2", store = "Sparkworks", index = 2, eventSlot = true, visible = false, approved = false },
+		{ id = "event-spark-3", store = "Sparkworks", index = 3, eventSlot = true, visible = false, approved = false },
+	},
+	Dealership = {
+		{ id = "event-dealer-1", store = "Dealership", index = 1, eventSlot = true, visible = false, approved = false },
+		{ id = "event-dealer-2", store = "Dealership", index = 2, eventSlot = true, visible = false, approved = false },
+		{ id = "event-dealer-3", store = "Dealership", index = 3, eventSlot = true, visible = false, approved = false },
+	},
+} :: { [string]: { EventSlot } }
+
+-- Every event slot, store by store.
+function StoreData.EventSlotList(): { EventSlot }
+	local out: { EventSlot } = {}
+	for _, store in ipairs({ "ToolShed", "HearthAndHome", "Sparkworks", "Dealership" }) do
+		for _, slot in ipairs(StoreData.EventSlots[store] or {}) do
+			table.insert(out, slot)
+		end
+	end
+	return out
+end
+
+function StoreData.EventSlot(id: string): EventSlot?
+	for _, slot in ipairs(StoreData.EventSlotList()) do
+		if slot.id == id then
+			return slot
+		end
+	end
+	return nil
+end
+
 -- Passes and products whose Creator Hub id is pasted (id > 0).
 function StoreData.ListedPasses(): { Pass }
 	local out: { Pass } = {}

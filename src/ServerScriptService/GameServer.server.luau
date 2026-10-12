@@ -78,6 +78,7 @@ local RateLimiter = require(script.Parent.RateLimiter)
 local SprintLogic = require(ReplicatedStorage.Shared.SprintLogic)
 local RegionWake = require(script.Parent.RegionWake)
 local ShopService = require(script.Parent.ShopService)
+local StoreEventService = require(script.Parent.StoreEventService)
 local TreeService = require(script.Parent.TreeService)
 local TruckLoad = require(script.Parent.TruckLoad)
 local BuildMaterials = require(script.Parent.BuildMaterials)
@@ -693,6 +694,7 @@ safely("BlueprintService.Init", BlueprintService.Init, notify, {
 	DropBlueprint = remote.DropBlueprint,
 })
 safely("ShopService.Init", ShopService.Init, mapFolder, remote.BuyItem, remote.EquipItem, notify, activeLoop)
+safely("StoreEventService.Init", StoreEventService.Init) -- store events: empty schedule by default, so nothing changes
 -- The tutorial's pad steps: the pad went down, the truck rolled out.
 VehicleService.Hooks.padEvent = function(player: Player, event: string)
 	if event == "padPlaced" then
