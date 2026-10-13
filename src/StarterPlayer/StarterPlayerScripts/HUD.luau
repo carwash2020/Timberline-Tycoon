@@ -217,6 +217,7 @@ type PadBinding = {
 local padBindings: { PadBinding } = {} -- the D-pad's shortcuts (HUD.PadShortcut)
 local padBound = false -- whether they're bound right now (not while a menu has the selection)
 
+local LOADING_FAILSAFE = 4 -- seconds after ProfileLoaded for the one-time loading-card check
 local loadingCard: Frame? = nil
 local loadingLabel: TextLabel? = nil
 local loadingFill: Frame? = nil -- the loading card's bar (Shared/LoadStages)
@@ -2268,6 +2269,25 @@ local function buildLoading(gui: ScreenGui)
 	card.outer.Parent = gui
 	loadingCard, loadingLabel = card.outer, label
 	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(refreshLoading)
+	-- The one-time failsafe: a few seconds after the save is in, a loading
+	-- card still showing is a veil over the game. Hide it and say so.
+	local checked = false
+	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(function()
+		if checked or player:GetAttribute("ProfileLoaded") ~= true then
+			return
+		end
+		checked = true
+		task.delay(LOADING_FAILSAFE, function()
+			if card.outer.Visible then
+				warn(
+					"[HUD] failsafe: the loading card "
+						.. card.outer:GetFullName()
+						.. " was still up after the save loaded; hidden"
+				)
+				card.outer.Visible = false
+			end
+		end)
+	end)
 	workspace:GetAttributeChangedSignal("LoadStage"):Connect(refreshLoading)
 	refreshLoading()
 end

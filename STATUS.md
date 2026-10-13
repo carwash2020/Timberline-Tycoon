@@ -27,6 +27,19 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Grey box after the join (branch `phase-2/grey-box-after-load`, 13 October 2026)
+
+Connor on Xbox: once the game loaded, a grey veil lay over the screen.
+Cause found in `NewsUI`: its full-screen dim (`Scrim`, PanelAlt at 45%) was
+built visible inside an always-enabled ScreenGui (DisplayOrder 16, over the
+HUD), with only the card hidden. It now starts hidden and shows and hides
+with the card. Also: a one-time failsafe 4 s after the hand-over in
+`LoadingScreen` (destroys a leftover card, warns naming it) and in the HUD's
+own loading card; `UITheme.HiddenSelection` on the Badges list (a
+panel-sized selection group); the plot-claim fade survives a failing hide.
+`tests/GreyBox.spec` builds the overlays and fails on any visible, big,
+translucent object. Needs Connor on Xbox: see the PR's checks.
+
 ## Store item models (branch `phase-2/store-item-models`, 12 October 2026)
 
 Connor's item 2: the ten store GLBs (`assets/glb/store-items/`, from `phase-2/v1-store-items`) are in the repo and wired, one model
