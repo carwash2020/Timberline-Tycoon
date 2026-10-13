@@ -50,7 +50,8 @@ export type Spec = {
 	gold: boolean?, -- a Robux box: RobuxBoxArt's open crate of coins (Lane P)
 	robuxKey: string?, -- the Robux item's key (its coin pile)
 	side: string?, -- "Left" | "Right": the side facing the aisle gets a window too
-	wood: boolean?, -- the General Store's look (Hearth & Home only): a wood base board flush under the box and a slim walnut name card, instead of the accent floor and band. Same box size, hover tag and focus.
+	cardColor: Color3?, -- with `wood`: the name card's colour instead of the walnut (the Sparkworks' dark teal)
+	wood: boolean?, -- the General Store's look (Hearth & Home, and the Sparkworks with a teal card): a wood base board flush under the box and a slim walnut name card, instead of the accent floor and band. Same box size, hover tag and focus.
 }
 
 -- The wood look: the base board and the name card (see Spec.wood).
@@ -61,6 +62,7 @@ BoxArt.Wood = {
 	stripH = 0.36,
 	cardShare = 0.74, -- the card is this share of the box's width
 }
+BoxArt.WoodTealCard = Color3.fromRGB(26, 74, 74) -- the Sparkworks' name card: the same wood base, a dark teal card
 
 BoxArt.Charcoal = BoxLook.Charcoal
 BoxArt.Categories = BoxLook.Categories
@@ -291,7 +293,7 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 			"Strip",
 			Vector3.new(if wood then W * BoxArt.Wood.cardShare else W, stripH, L.stripProud),
 			Vector3.new(0, H / 2 - stripH / 2, -(D / 2 + L.stripProud / 2)),
-			if wood then BoxArt.Wood.card else accent,
+			if wood then (spec.cardColor or BoxArt.Wood.card) else accent,
 			if wood then Enum.Material.Wood else Enum.Material.SmoothPlastic
 		)
 	)

@@ -294,7 +294,9 @@ return function(t)
 			-- Tool Shed restyle (the same kit as Hearth & Home: wooden display tables on legs with price cards and spots, door frame,
 			-- striped awning, wall shelves, pictures, pegboards, rug, plants, the event room, lit side windows, a path): the whole
 			-- shop is about 450 parts (the tier stands' flags, posts and chips are gone, the porch posts too); cap 400 to 460.
-			local budget = ({ ToolShed = 460, HearthAndHome = 460, Dealership = 400 })[shop.kind]
+			-- Dealership restyle (wooden tables, wall shelving, pictures, rugs, door frame, striped awning, the event room and its
+			-- banner, 55 parts with its tables): the whole hall is 408 parts; cap 400 to 420.
+			local budget = ({ ToolShed = 460, HearthAndHome = 460, Dealership = 420 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
@@ -323,6 +325,16 @@ return function(t)
 				)
 			end
 		end
+	end)
+
+	t.test("the Sparkworks (not in SHOPS: its own specs have its footprint) stays at 440 parts", function()
+		-- Store polish took the shop, facade, door, interior and lamps (without the boxes, which StoreStock counts) to
+		-- 400. The restyle (display tables on legs with price cards and spots, the door frame and striped awning, wall
+		-- shelves with coils, cells and jars, pictures, a rug, plants, the spools) plus the event room and the event
+		-- banner (about 36 parts, ShopEventKit) makes the whole shop about 420 parts; cap 400 to 440.
+		local model = BuildingArt.Shop("Sparkworks", "SPARKWORKS", C3.fromRGB(46, 139, 139))
+		t.ok(#parts(model) <= 440, "Sparkworks parts: " .. #parts(model))
+		t.ok(model:FindFirstChild("Counter"), "Counter")
 	end)
 
 	t.test("an unknown shop kind still builds a store with a Counter", function()

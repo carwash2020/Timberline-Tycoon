@@ -257,6 +257,62 @@ The Hearth & Home restyle (#183, #185) applied to the Tool Shed. Each store stay
 - **Awaiting Connor:** (1) event room is 11.9 x 8.6 (not 16 x 9) and the banner stands at the aisle's west edge, because the tables leave
   no other floor; (2) the barn door's open leaves slide 2.1 further out than before; (3) the CHECKOUT board hides the middle two rack
   name plates from some angles (it stands on the counter in front of the rack).
+## Dealership restyle in the Hearth & Home look (branch `phase-2/store-restyle-dealership`, 12 October 2026)
+
+The Hearth & Home cleanup (#183, with the event kit #185) applied to the showroom hall. Looks and layout only: no price, economy, stock,
+sale or buy-flow change; the lot, plinths, vehicles, boxes, bays and the sign-spacing and lot-strip work are kept.
+
+- **Door frame and awning** (`ShopFacade.DoorFrame` now takes an optional `gap`; `ShopFacade.StripedAwning`; the Dealership branch of
+  `ShopFacade.Add`): cream posts on stone footings, the dark header and jambs, a flush stone threshold; the flat blue/cream canopy is
+  now an 8-stripe fabric awning with a stepped valance, posts and brackets (`ShopFacade.DealerAwning`: back 12.15, reach 4.6). The
+  hours board over the door is raised clear of the canopy's back (`BuildingArt.Shop`), the front footing starts past the right post,
+  the planters stand 0.5 further out, the porch lantern follows the new awning post.
+- **Plinths and boxes** (`DealershipLot`): the big accent pad under each box was a 0.3 slab; it is now a 0.1 inlay inside a 0.05 wood
+  border (`BoxMatFrame`), both flush on the plinth's top, the border's edge meeting the tier stripe's inner edge. Vehicles' boxes wear
+  the wood base and slim name card the General Store's do (`BoxService`: `wood` for the Dealership too). Name signs 5.0 x 1.9 x 0.16
+  (were 6.0 x 2.6 x 0.3), tier flags 2.8 x 1.6 on a post 4.6 up (were 3.4 x 2.0 at 5.0); each flag, band and stripe keeps its plinth's tier colour.
+- **CHECKOUT** stands on two posts on the counter (`ShopKit.CheckoutSign` `onCounter`), no plaque, no chains.
+- **Room fill** (`ShopInteriors/Dealership`): wooden tables from the kit (`ShopKit.DisplayTable`: reception and finance, legs on the
+  rug), two rugs, wall shelving with binders and model trucks (west and back walls), five framed pictures, plants, the brochure racks
+  moved to the front wall. Everything is clear of the runner, the doorway aisle and every vehicle.
+- **Event room** (`ShopEventKit`): the roped zone (16 x 9, turned so its back is on the west wall and its open front faces the runner)
+  with its three tables on the pads (the Hearth's wood, looks only), and the blank banner in the front corner by the entrance,
+  facing the doorway aisle; hidden/closed by default, nothing on sale. Scene `store-dealership-event` shows it active.
+- **Parts:** whole hall 408 (was 285), cap 400 to 420 (`BuildingArt.spec`, `StoreInterior.Dealership.spec`); interior still under 400.
+- **Specs:** new `StoreRestyle.Dealership` (door frame, awning, tables, furnishings, box mats, slim signs and flag colours, CHECKOUT, event
+  zone and banner placement, hidden by default, nothing on sale, caps); `DealershipOverlap` has every new part name in a class, a
+  guard that no part name goes unchecked (the floor skins and door mechanics are named as looks-only) and an event-room test.
+  Pinned numbers that moved because the design moved: the hall's part cap 400 to 420 (two specs); wall furniture may meet the wall's
+  face (0.41 instead of 0.31 in the inside-the-hall check, for `BrochureRack`, `NookPanel`, `PictureFrame` only).
+- **Renders (`tools/preview`, scenes `store-dealership`, `store-dealership-exterior` (new view 9), `store-dealership-event`):**
+  `previews/store-polish/dealership-v4-*.png`: exterior-front, exterior-three-quarter, exterior-night, door-closeup, awning-closeup,
+  door-phone-667x375, interior-door, interior-night, interior-phone-667x375, plinth-closeup, name-sign, lot-row, table-closeup,
+  counter-checkout, lobby-west-wall, front-wall, event-zone, event-zone-from-door, event-banner. The Dealership vehicles are part-built
+  (no meshes), so these are the real parts. Not seen in Studio.
+## Sparkworks restyle (branch `phase-2/store-restyle-sparkworks`, 13 October 2026)
+
+The Hearth & Home look (#183) applied to the Sparkworks in its teal and copper. Look only: no price, stock, on-sale or buy-flow change.
+
+- **Tables and boxes:** `SteppedUnit(..., "table")`: a wood-top table on legs per row (9), a small price card per box (no tiers or gated
+  items here, so no flags and no lock cards), a spot over each table. `BoxArt` `spec.wood` now also reaches the Sparkworks boxes
+  (`BoxService`, one condition); a new optional `spec.cardColor` gives them a dark teal name card (`BoxArt.WoodTealCard`) on the same
+  wood base. Other stores unchanged.
+- **Street side:** `ShopFacade` `sparkworksFront` (from #184: plinth, doorstep, pilasters, fascia, copper conduit with spark lamps, rods,
+  lamp posts) plus `DoorFrame` and a teal and cream `StripedAwning`; the hours board sits over the awning. Room is 15 high (roof rests on
+  the walls), no porch posts or WIRE IT UP board.
+- **Inside:** two headers 10 wide (BELTS & INPUTS, LOGIC & OUTPUTS) fully inside the walls, CHECKOUT on the counter, a SPARKWORKS name
+  board over it (no sub-signs), wall shelves, six framed pictures, rug, plants, spools on a pallet, stock corner, conduit and fuse boxes.
+- **Event room:** `ShopEventKit` zone 12 x 10 in the back west corner against the west wall (turned so its open front faces the aisle),
+  hidden by default; banner by the counter's east end facing the door, off the aisle, hidden and blank. The room is only 35 wide and
+  the lanes fill both side walls to z 4.7 and 8.3, so the corner is 12 wide: `ShopEventKit.MinSize` 14 x 8 to 12 x 8 (its three table
+  spots come out about 2.3 wide there). The front corners are lane fronts, so the banner is not by the door (Awaiting Connor).
+- **Parts:** whole shop 419 (cap 400 to 440, `BuildingArt.spec`); interior within the 400 budget. 
+- **Specs:** `StoreOverlap.Sparkworks` (3D SAT, families for every part, unchecked-name guard, screen views), `StoreInterior.Sparkworks`
+  (tables, cards, spots, headers, floating, event zone and banner placement), `StoreExterior.Sparkworks` (cap, floating, door frame and
+  awning), `BoxArt`, `BoxService`, `ShopEventKit`. Pinned numbers moved (design moved): sign-pair counts 5000 to 4000 and 10 to 6 signs.
+- **Renders:** `previews/store-polish/sparkworks-v4-*.png` (scenes `store-sparkworks`, `-exterior`, `-event`). Not seen in Studio.
+- **Awaiting Connor:** (1) banner placement by the counter, not the door (no free floor by the door); (2) event tables 2.3 wide here;
+  (3) #184 is superseded by this branch (same room height, no sub-signs, exterior front).
 
 ## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
 

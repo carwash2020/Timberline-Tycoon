@@ -1447,11 +1447,13 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- A stone footing round the foot of every wall, and the accent stripe.
 	local foot = Kit.shade(CONCRETE, -0.2)
 	dBox(model, "Footing", V3(2 * hx + 2 * T + 0.6, 1.4, 0.5), CF(0, FLOOR + 0.7, hz + T + 0.15), foot, MAT.Slate)
+	-- (the front footing starts past the door frame's right post and its stone base, which stand beside the opening)
+	local footX0, footX1 = doorX1 + 1.9, hx + 0.7
 	dBox(
 		model,
 		"Footing",
-		V3(hx - doorX1 + T + 0.6, 1.4, 0.5),
-		CF((doorX1 + hx) / 2, FLOOR + 0.7, -hz - T - 0.15),
+		V3(footX1 - footX0, 1.4, 0.5),
+		CF((footX0 + footX1) / 2, FLOOR + 0.7, -hz - T - 0.15),
 		foot,
 		MAT.Slate
 	)
@@ -1493,7 +1495,8 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- The porch lantern hangs on the awning's east post (ShopFacade's awning: posts
 	-- 9.3 either side of the door's middle, at the canopy's front edge), where a second
 	-- pair of porch posts used to stand beside them.
-	local porchGlow = Kit.lantern(model, CF(doorCx + 8.8, 7.2, -hz - T - ShopFacade.AwningReach + 0.4), 0.8)
+	local awn = ShopFacade.DealerAwning
+	local porchGlow = Kit.lantern(model, CF(doorCx + 8.8, 7.2, -hz - T - awn.reach * math.cos(awn.tilt) + 0.2), 0.8)
 	local porchLight = porchGlow:FindFirstChildOfClass("PointLight")
 	if porchLight then
 		porchLight.Brightness = 1
@@ -1783,7 +1786,8 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 			TRIM
 		)
 	end
-	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), Palette.RoofSlate, MAT.Slate)
+	-- (the roof's underside is the walls' top, TOP, so it rests on the walls; its top is TOP + 0.65)
+	Kit.part(model, "Roof", V3(2 * HX + 2, 0.65, 2 * HZ + 2), CF(0, TOP + 0.325, 0), Palette.RoofSlate, MAT.Slate)
 
 	-- The name board stands over the roof on two posts, like the General Store's.
 	local signW, signH = 20, 3
@@ -1804,11 +1808,8 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 
 	-- The counter stands at the back (customer side faces -Z), the keeper
 	-- behind it; the shelf units stop short of it.
+	-- (no porch posts inside the door: the display tables start there, and the door has its frame outside)
 	placeCounter(model, 0, BuildingArt.SparkworksCounterZ / BuildingArt.Scale.Sparkworks)
-	for _, s in ipairs({ -1, 1 }) do
-		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
-	end
-	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
 
 	-- The back wall behind the keeper: a row of spark lamps, each over its
 	-- switch, and a copper run joining them. Looks only.
@@ -1821,9 +1822,6 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 		dBox(model, "WallSwitch", V3(0.5, 0.8, 0.2), CF(x, 5.9, backZ - 0.1), Palette.IronBlack, MAT.Metal)
 	end
 	dBox(model, "CopperRun", V3(14.4, 0.2, 0.2), CF(0, 6.65, backZ - 0.08), Palette.Brass, MAT.Metal)
-	local board = Kit.part(model, "BackSign", V3(9, 1.6, 0.2), CF(0, 9, backZ - 0.2), Palette.SignInk, MAT.Wood)
-	Kit.signText(board, "WIRE IT UP", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	Kit.decor(board, false)
 end
 
 -- Shelf slots are attachments on the counter (they are not parts, so the
@@ -1930,7 +1928,7 @@ local function addHoursBoard(model: Model, shopId: string)
 	end
 	-- The General Store's striped awning (ShopFacade) reaches up to 12.7 on the wall over its door:
 	-- the board's bottom edge stays above it, so the two never overlap.
-	if shopId == "HearthAndHome" and y - h / 2 < 12.7 then
+	if (shopId == "HearthAndHome" or shopId == "Sparkworks") and y - h / 2 < 12.7 then
 		y = 12.7 + h / 2
 	end
 	-- The Tool Shed's barn-door track runs across the front at 11.85 and its striped awning (ShopFacade) reaches up to
@@ -2012,7 +2010,7 @@ function BuildingArt.InteriorFrame(kind: string, s: number): { frame: ShopInteri
 				floorTop = 0.4 * s,
 				halfW = BuildingArt.SparkworksHalfWidth * s - 0.45,
 				halfD = BuildingArt.SparkworksHalfDepth * s - 0.45,
-				ceilY = 10 * s - 0.4,
+				ceilY = 10 * s, -- the roof's underside (it rests on the walls): the beams and chains reach up to it
 			},
 		}
 	end
@@ -2087,6 +2085,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			wallTop = 10 * s,
 			roofTop = 10.65 * s,
 			groundY = 0.4 * s,
+			yardY = 0, -- the floor is a step up from the ground; the yard's props stand on the ground
 			accent = accent,
 		}
 	end
@@ -2250,7 +2249,9 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		if board and board:IsA("BasePart") then
 			local face = -DealershipLot.Hall().innerD / 2 - 0.8
 			local at = board.CFrame.Position
-			board.CFrame = CFrame.new(at.X, at.Y, face - board.Size.Z / 2)
+			-- (and clear over the striped canopy's back, which stands over the door header: ShopFacade.DealerAwning)
+			local y = math.max(at.Y, ShopFacade.DealerAwning.backY + 0.15 + board.Size.Y / 2)
+			board.CFrame = CFrame.new(at.X, y, face - board.Size.Z / 2)
 		end
 	end
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.

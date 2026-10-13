@@ -615,6 +615,43 @@ return function(t)
 		t.eq(rec.paid, false)
 	end)
 
+	t.test("a Hearth & Home, Sparkworks or Tool Shed box stands on wood (the Sparkworks card is dark teal)", function()
+		local BoxArt = t.load("ReplicatedStorage/Shared/Art/BoxArt")
+		local function baseAndCard(shop, kind, id, name)
+			local _, Box = boot(nil, 12)
+			local rec = Box.Make({
+				uid = "wood-" .. shop,
+				shop = shop,
+				itemKind = kind,
+				itemId = id,
+				displayName = name,
+				price = 100,
+				cf = CFrame.new(0, 4.5, 0),
+				counter = counterPart(),
+				zoneCf = CFrame.new(),
+				zoneSize = Vector3.new(18, 1, 14),
+				onShelf = true,
+			})
+			local base, card
+			for _, d in ipairs(rec.part.Parent:GetDescendants()) do
+				if d:IsA("BasePart") and d.Name == "Base" then
+					base = d
+				elseif d:IsA("BasePart") and d.Name == "Strip" then
+					card = d
+				end
+			end
+			return base, card
+		end
+		local hb, hc = baseAndCard("HearthAndHome", "Gear", "InsulatedCoat", "Insulated Coat")
+		t.eq(hb.Color, BoxArt.Wood.base, "Hearth & Home: a wood base")
+		t.eq(hc.Color, BoxArt.Wood.card, "and the walnut card")
+		local sb, sc = baseAndCard("Sparkworks", "Logic", "GateAnd", "AND Gate")
+		t.eq(sb.Color, BoxArt.Wood.base, "Sparkworks: the same wood base")
+		t.eq(sc.Color, BoxArt.WoodTealCard, "and its dark teal card")
+		local tb = baseAndCard("ToolShed", "Gear", "SteelAxe", "Steel Axe")
+		t.eq(tb.Color, BoxArt.Wood.base, "the Tool Shed: the same wood base (its restyle, like the others)")
+	end)
+
 	t.test("a closed keeper offers no buy card and says when the shop opens", function()
 		local loader = boot(nil, 22)
 		local sent = {}
@@ -659,7 +696,7 @@ return function(t)
 	end
 
 	t.test(
-		"the Tool Shed's shelf boxes get the wood look (a wood base), like Hearth & Home's; no other box does",
+		"the Tool Shed's shelf boxes get the wood look (a wood base), like Hearth & Home's and the Sparkworks'; the gold Robux boxes do not",
 		function()
 			local _, Box = boot()
 			local counter = counterPart()
@@ -691,9 +728,10 @@ return function(t)
 				BoxArt.Wood.base,
 				"Hearth: wood"
 			)
-			t.ok(
-				baseOf(make("w-3", "Sparkworks", "Machine", "ChopSaw", "Chop Saw")).Color ~= BoxArt.Wood.base,
-				"Sparkworks: plain"
+			t.eq(
+				baseOf(make("w-3", "Sparkworks", "Machine", "ChopSaw", "Chop Saw")).Color,
+				BoxArt.Wood.base,
+				"Sparkworks: wood (restyled in the same kit)"
 			)
 			t.ok(
 				baseOf(robuxBox(Box, counter, Vector3.new(0, 4.5, 0))).Color ~= BoxArt.Wood.base,
