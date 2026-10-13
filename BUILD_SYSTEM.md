@@ -40,7 +40,7 @@ So nothing a player had unlocked or paid for is lost, and running it twice chang
 
 ## Where blueprints come from
 
-- **Stores.** The General Store's boxes with `unlock = true` (Shed, Wood Sign, Paint Can, Mailbox, the furniture). Paying at the counter now grants a physical blueprint instead of flipping a flag. The price is the old one.
+- **Stores.** The General Store's boxes with `unlock = true` (Shed Blueprint, Wood Sign, Paint Can, Mailbox, the furniture). Paying at the counter now grants a physical blueprint instead of flipping a flag. The price is the old one. The Shed (id `Shed`, sold as "Shed Blueprint", `PlotData.storeName`) is a kit plan like the glass wall: placing it costs the kit fee (60 units x $4) and puts down a ghost you fill with planks; a shed placed before that change has no `fill` and stays a finished shed.
 - **Owner.** `/gift <player> Blueprint <id>` gives the item (any blueprint id, not only store ones). Owner-only as before.
 - **Found / dropped.** `BlueprintService.Drop` and the pick-up prompt exist now (drop with Q, Backspace or B, like an axe), and `BlueprintService.Spawn(position, id)` puts one in the world for later content. No world spawns are placed yet (open question).
 

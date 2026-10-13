@@ -18,6 +18,7 @@
 
 local PlotData = require(script.Parent.Parent.PlotData)
 local Kit = require(script.Parent.Kit)
+local ModelSlots = require(script.Parent.ModelSlots)
 
 local BlueprintArt = {}
 
@@ -117,6 +118,20 @@ function BlueprintArt.Held(id: string): Model
 			d.CanTouch = false
 		end
 	end
+	-- A plan with a model slot (the Wood Sign, the Shed Blueprint) shows that model in the hand once one
+	-- is set, scaled down to roll size; meshId 0 keeps the rolled plan.
+	local slot = ModelSlots.For("Blueprint", id)
+	local handle = model.PrimaryPart
+	if slot and handle then
+		local hide = {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				table.insert(hide, d)
+			end
+		end
+		local biggest = math.max(slot.size.X, slot.size.Y, slot.size.Z)
+		ModelSlots.Dress(model, slot, handle.CFrame, "held", { scale = LEN / biggest, weldTo = handle, hide = hide })
+	end
 	return model
 end
 
@@ -132,6 +147,25 @@ function BlueprintArt.Dropped(id: string): Model
 			d.Anchored = true
 			d.CanCollide = false
 		end
+	end
+	-- The Shed Blueprint's model slot (Art/ModelSlots): its model, standing, is the plan lying in the
+	-- world once one is set; meshId 0 keeps the roll.
+	local slot = ModelSlots.For("Blueprint", id)
+	if slot and slot.placedAs == "dropped" then
+		local hide = {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				table.insert(hide, d)
+			end
+		end
+		local scale = LEN * 1.5 / math.max(slot.size.X, slot.size.Y, slot.size.Z)
+		ModelSlots.Dress(
+			model,
+			slot,
+			CFrame.new(0, slot.size.Y * scale / 2, 0),
+			"placed",
+			{ scale = scale, hide = hide }
+		)
 	end
 	return model
 end

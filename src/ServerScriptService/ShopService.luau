@@ -575,7 +575,11 @@ local function buyBlueprint(player: Player, blueprintId: string)
 	if profile.cash < price then
 		notify(
 			player,
-			string.format("You need %s more for the %s.", Util.formatCash(price - profile.cash), bp.displayName)
+			string.format(
+				"You need %s more for the %s.",
+				Util.formatCash(price - profile.cash),
+				bp.storeName or bp.displayName
+			)
 		)
 		return
 	end

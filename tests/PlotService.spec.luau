@@ -865,19 +865,41 @@ return function(t)
 		local ann, profile = s.newPlayer(1, "Ann")
 		s.claim(ann, 1)
 		ann.standOn(1)
-		s.P.Place(ann, "Shed", 0, 0, 0)
-		t.eq(s.lastToast(), "Buy the Small Shed at the General Store first.")
+		s.P.Place(ann, "Mailbox", 0, 0, 0)
+		t.eq(s.lastToast(), "Buy the Mailbox at the General Store first.")
 		t.eq(#profile.plot.placed, 0)
 		t.eq(profile.cash, 1000)
 		-- Using the physical blueprint adds it to the book (BlueprintService).
-		table.insert(profile.blueprintBook, "Shed")
-		s.P.Place(ann, "Shed", 0, 0, 0)
+		table.insert(profile.blueprintBook, "Mailbox")
+		s.P.Place(ann, "Mailbox", 0, 0, 0)
 		t.eq(#profile.plot.placed, 1)
 		t.eq(profile.cash, 1000, "an unlock you own places free, as before")
 		-- And every copy after that is free too.
-		s.P.Place(ann, "Shed", 0, 20, 0)
+		s.P.Place(ann, "Mailbox", 0, 20, 0)
 		t.eq(#profile.plot.placed, 2)
 	end)
+
+	t.test(
+		"the Shed Blueprint: refused until learned, then a ghost you fill with planks, paying the kit fee",
+		function()
+			local s = setup({ cash = 1000 })
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			ann.standOn(1)
+			s.P.Place(ann, "Shed", 0, 0, 0)
+			t.eq(s.lastToast(), "Buy the Shed Blueprint at the General Store first.")
+			t.eq(#profile.plot.placed, 0)
+			table.insert(profile.blueprintBook, "Shed")
+			s.P.Place(ann, "Shed", 0, 0, 0)
+			t.eq(#profile.plot.placed, 1)
+			local item = profile.plot.placed[1]
+			-- (Designed move: the shed used to be a built piece that placed free. It is a kit piece now,
+			-- 60 plank units at the kit fee, like the wall.)
+			t.eq(profile.cash, 1000 - 60 * 4, "the kit fee, on top of the plan's $600 shelf price")
+			t.eq(item.paid, 240)
+			t.eq(item.fill, { units = 0 }, "an empty ghost until planks are dropped in")
+		end
+	)
 
 	t.test("hammer build: a plan that is not in your book is refused, with the reason, and costs nothing", function()
 		local s = setup({ cash = 1000 })
@@ -904,6 +926,7 @@ return function(t)
 		profile.furnitureBlueprints = { Shed = true }
 		s.P.Place(ann, "Shed", 0, 0, 0)
 		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.plot.placed[1].fill, { units = 0 }, "the old save's shed plan places as the new ghost")
 	end)
 
 	t.test("hammer build: a kit piece still charges its fee and starts as an empty ghost", function()

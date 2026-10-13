@@ -501,4 +501,65 @@ return function(t)
 			t.ok(py1 <= y0 + 1e-3, row[3] .. " plate is below the band")
 		end
 	end)
+
+	t.test(
+		"the General Store's wood look: a wood base and a slim walnut name card, the same box and the same name",
+		function()
+			local plain, plainBody = dressed("Blueprint", "WoodSign")
+			local wood, woodBody = dressed("Blueprint", "WoodSign", { wood = true })
+			t.eq(woodBody.Size, plainBody.Size, "the box is the same size")
+			local function find(model, name)
+				for _, p in ipairs(parts(model)) do
+					if p.Name == name then
+						return p
+					end
+				end
+				return nil
+			end
+			local plainBase, woodBase = find(plain, "Base"), find(wood, "Base")
+			t.eq(plainBase.Color, BoxLook.Accent("Blueprint", "WoodSign"), "other stores keep the accent floor")
+			t.eq(woodBase.Color, BoxArt.Wood.base, "wood: no coloured slab")
+			t.eq(woodBase.Size, plainBase.Size, "the base is the same size (nothing moves)")
+			local plainStrip, woodStrip = find(plain, "Strip"), find(wood, "Strip")
+			t.ok(
+				woodStrip.Size.X < plainStrip.Size.X and woodStrip.Size.Y < plainStrip.Size.Y,
+				"a slimmer, narrower card"
+			)
+			t.eq(woodStrip.Color, BoxArt.Wood.card)
+			local label
+			for _, d in ipairs(woodStrip:GetDescendants()) do
+				if d:IsA("TextLabel") then
+					label = d
+				end
+			end
+			t.eq(label.Text, "Item", "the name is still on it")
+		end
+	)
+
+	t.test("the wood look takes an optional card colour (the Sparkworks' dark teal); the base stays wood", function()
+		local model = dressed("Logic", "GateAnd", { wood = true, cardColor = BoxArt.WoodTealCard })
+		local base, strip
+		for _, p in ipairs(parts(model)) do
+			if p.Name == "Base" then
+				base = p
+			elseif p.Name == "Strip" then
+				strip = p
+			end
+		end
+		t.eq(base.Color, BoxArt.Wood.base)
+		t.eq(strip.Color, BoxArt.WoodTealCard)
+		-- without the option the card is the walnut, and without `wood` the colour is ignored
+		local walnut = dressed("Logic", "GateAnd", { wood = true })
+		local plain = dressed("Logic", "GateAnd", { cardColor = BoxArt.WoodTealCard })
+		for _, p in ipairs(parts(walnut)) do
+			if p.Name == "Strip" then
+				t.eq(p.Color, BoxArt.Wood.card)
+			end
+		end
+		for _, p in ipairs(parts(plain)) do
+			if p.Name == "Base" then
+				t.ok(p.Color ~= BoxArt.Wood.base, "no wood without `wood`")
+			end
+		end
+	end)
 end

@@ -182,6 +182,7 @@ export type Blueprint = {
 	slot: { size: Vector3, offset: Vector3 }?, -- the opening a Door or Window must sit inside
 	overhang: number?, -- roof: how far it sticks out past the footprint (visual; overlap ignores it). Default RoofOverhang
 	storePrice: number?, -- a store plan's shelf price when it is not the placing fee (a kit piece's fee is small)
+	storeName: string?, -- what the General Store calls the plan when it is not the building's name ("Shed Blueprint")
 	gated: boolean?, -- not a starter plan: learned from another plan's `family` (BlueprintBook)
 	family: { string }?, -- a store plan that teaches all of these at once, itself included
 	slabUnits: number?, -- Lane F: sandstone slabs to fill (BuildCost)
@@ -328,11 +329,14 @@ PlotData.Blueprints = {
 	},
 	{
 		id = "Shed",
-		displayName = "Small Shed",
+		displayName = "Shed",
+		storeName = "Shed Blueprint", -- what the General Store, its signs and the hover tag call the plan
 		category = "Buildings",
 		priceCash = 600,
 		woodUnits = 60,
+		kit = true, -- you build your own: place the ghost, then fill it with planks (60 units, the kit fee on place)
 		unlock = true,
+		storePrice = 600, -- the shelf price is the old $600; the kit fee is on top of it, as for the glass plan
 		tier = 1,
 		footprint = Vector2.new(10, 8),
 		boxes = {
@@ -357,7 +361,7 @@ PlotData.Blueprints = {
 			{ size = Vector3.new(0.4, 5, 8), offset = Vector3.new(4.8, 2.7, 0), color = WOOD, material = "WoodPlanks" },
 			{ size = Vector3.new(10, 0.4, 8), offset = Vector3.new(0, 5.2, 0), color = "#6B4423", material = "Wood" },
 		},
-		note = "A starter shed",
+		note = "Your own shed: place the plan, then fill it with planks",
 	},
 	{
 		id = "WoodSign",

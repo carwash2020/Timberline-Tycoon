@@ -434,4 +434,17 @@ return function(t)
 		end, "footprint")
 		t.eq(#model:GetChildren(), 0)
 	end)
+
+	t.test(
+		"the least footprint is 12 x 8 (the Sparkworks' back corner): it builds, a narrower one is refused",
+		function()
+			local model = Instance.new("Model")
+			t.eq(ShopEventKit.MinSize, Vector3.new(12, 0, 8))
+			local zone = ShopEventKit.BuildZone(model, "Sparkworks", CFrame.new(0, 0, 0), ShopEventKit.MinSize)
+			t.eq(#ShopEventKit.TableMarkers(zone), 3, "its three table spots")
+			t.fails(function()
+				ShopEventKit.BuildZone(model, "Sparkworks", CFrame.new(0, 0, 0), Vector3.new(11.9, 0, 8))
+			end, "footprint")
+		end
+	)
 end

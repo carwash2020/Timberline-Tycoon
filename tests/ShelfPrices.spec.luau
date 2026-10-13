@@ -155,7 +155,13 @@ return function(t)
 		for _, shop in ipairs(shops) do
 			local model = BuildingArt.Shop(shop.kind, shop.title, shop.accent)
 			for _, label in ipairs(labelsOf(model)) do
-				t.ok(not printsPrice(label.Text), shop.kind .. " prints a price: " .. label.Text)
+				-- (Connor, 12 October: Hearth & Home's display tables carry a small price card per box, read from the
+				-- catalog; StoreInterior.HearthAndHome.spec pins that the number is the catalog's price. The Tool
+				-- Shed's restyle gives its tables the same card; StoreInterior.ToolShed.spec pins it. Nothing else
+				-- in either shop may print a price: not the rack's plates, the name cards or the headers.)
+				local card = label.Parent and label.Parent.Parent
+				local onTag = card ~= nil and card.Name == "SpotTag"
+				t.ok(onTag or not printsPrice(label.Text), shop.kind .. " prints a price: " .. label.Text)
 			end
 		end
 	end)

@@ -288,7 +288,15 @@ return function(t)
 			-- floor take the whole hall from 215 to 347 parts; its interior has the 400-part budget in
 			-- StoreInterior.Dealership.spec, so the shop's cap moves 250 to 400 (the vehicles are the lot's).
 			-- General Store: the same kit (tier stands, signs, ties, lamps, stock corner) takes its whole shop from 250 to 302 parts (interior 189, its own 400 budget in StoreInterior.HearthAndHome.spec); cap 250 to 350.
-			local budget = ({ ToolShed = 400, HearthAndHome = 350, Dealership = 400 })[shop.kind]
+			-- General Store restyle (display tables with price cards and spots, door frame, striped awning, wall shelves with
+			-- jars, books and baskets, pictures, a rug, plants) plus the event expansion room (zone and banner, about 34 parts,
+			-- ShopEventKit): the whole shop is about 450 parts; cap 350 to 460 (tables on legs, oak tops).
+			-- Tool Shed restyle (the same kit as Hearth & Home: wooden display tables on legs with price cards and spots, door frame,
+			-- striped awning, wall shelves, pictures, pegboards, rug, plants, the event room, lit side windows, a path): the whole
+			-- shop is about 450 parts (the tier stands' flags, posts and chips are gone, the porch posts too); cap 400 to 460.
+			-- Dealership restyle (wooden tables, wall shelving, pictures, rugs, door frame, striped awning, the event room and its
+			-- banner, 55 parts with its tables): the whole hall is 408 parts; cap 400 to 420.
+			local budget = ({ ToolShed = 460, HearthAndHome = 460, Dealership = 420 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
@@ -317,6 +325,16 @@ return function(t)
 				)
 			end
 		end
+	end)
+
+	t.test("the Sparkworks (not in SHOPS: its own specs have its footprint) stays at 440 parts", function()
+		-- Store polish took the shop, facade, door, interior and lamps (without the boxes, which StoreStock counts) to
+		-- 400. The restyle (display tables on legs with price cards and spots, the door frame and striped awning, wall
+		-- shelves with coils, cells and jars, pictures, a rug, plants, the spools) plus the event room and the event
+		-- banner (about 36 parts, ShopEventKit) makes the whole shop about 420 parts; cap 400 to 440.
+		local model = BuildingArt.Shop("Sparkworks", "SPARKWORKS", C3.fromRGB(46, 139, 139))
+		t.ok(#parts(model) <= 440, "Sparkworks parts: " .. #parts(model))
+		t.ok(model:FindFirstChild("Counter"), "Counter")
 	end)
 
 	t.test("an unknown shop kind still builds a store with a Counter", function()
@@ -1097,16 +1115,17 @@ return function(t)
 			end
 			t.ok(ok, label .. " rests wholly on a table or shelf top")
 		end
-		-- A shelf box stands on a PLINTH (a block in its accent colour) which stands
-		-- on its row's STEP of the stepped display unit.
-		local function standsOnPlinth(model, steps, place, size, label)
-			sits(model, { Plinth = true }, place, size, label .. " (box on plinth)")
-			local plinthPlace = { x = place.x, z = place.z, y = place.y - StoreStock.PlinthHeight }
-			sits(model, steps, plinthPlace, size, label .. " (plinth on step)")
-		end
+		-- A Tool Shed box stands straight on its row's wood-top display table (Hearth & Home restyle: no plinth).
 		local shed = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
 		for _, place in ipairs(StoreStock.Placements("ToolShed")) do
-			standsOnPlinth(shed, { DisplayTableStep = true }, place, place.size, place.slotId)
+			local depth = place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
+			sits(
+				shed,
+				{ TableTop = true },
+				place,
+				V3.new(place.size.X, place.size.Y, depth),
+				place.slotId .. " (box on table)"
+			)
 		end
 		local robuxSize = loader:shared("BoxSize").Class(RobuxShelf.Class).size
 		for _, place in ipairs(RobuxShelf.Placements()) do
@@ -1116,7 +1135,14 @@ return function(t)
 		local hearth = BuildingArt.Shop("HearthAndHome", "STORE", C3.fromRGB(122, 90, 60))
 		for _, place in ipairs(StoreStock.Placements("HearthAndHome")) do
 			local depth = place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
-			standsOnPlinth(hearth, { ShelfStep = true }, place, V3.new(place.size.X, place.size.Y, depth), place.slotId)
+			-- (Hearth & Home's boxes stand straight on their row's wood-top display table: no plinth.)
+			sits(
+				hearth,
+				{ TableTop = true },
+				place,
+				V3.new(place.size.X, place.size.Y, depth),
+				place.slotId .. " (box on table)"
+			)
 		end
 	end)
 

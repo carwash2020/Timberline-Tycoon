@@ -188,6 +188,150 @@ renders are the thing to approve). Audited the #162 build with `tools/preview` a
   tier stand, the counter, phone size). The keeper's body does not draw in the preview (only his name tag), for every store.
 - **Awaiting Connor:** the reference screenshots (send them if the brief missed something); whether the lot lamps should be dimmer
   or fewer.
+## Hearth & Home restyle, Shed Blueprint and model slots (branch `phase-2/store-polish-hearth`, PR #183, 12 October 2026)
+
+Connor's fixes after the #183 renders. No price, on/off-sale or buy-flow change (the five formerly off-sale products stay id 0).
+
+- **Shed Blueprint.** The General Store's Small Shed is now the **Shed Blueprint**, $600 as before. Buying hands over the plan (the
+  hammer's plan item, unchanged); placing it costs the kit fee (60 units x $4 = $240) and puts down a **ghost you fill with 60 plank
+  units**, like the wall (`PlotData` Shed: `kit = true`, `storePrice = 600`, `storeName = "Shed Blueprint"`, `displayName = "Shed"`).
+  The save id stays `Shed`, so no migration is needed: a save that owned the plan, carried it or had a shed standing loads unchanged
+  (a placed shed with no `fill` stays a finished shed). Spec: `tests/ShedBlueprint.spec.luau`. Moved pins (design moved): the
+  `Shed` rows in `BuildingKit`, `ModernKit`, `PlotLogic`, `BlueprintBook`, `PlotService`, `ShopService`, `BlueprintService` specs.
+- **MODEL_SLOTS.** Four items get one model slot each, in `Shared/Art/ModelSlots.luau`: `Flashlight`, `Lantern`, `WoodSign`,
+  `ShedBlueprint` (Connor's GLBs, `assets/glb/store-items/<Name>.glb`). Put the Roblox MeshPart id in the slot's `meshId` (it is 0
+  now, so every path keeps its part-built look) and the model swaps in, through `MeshKit.Attempt`, never blocking, on: the shop
+  box's window copy and the sample on the General Store's back ledge (display: `BoxArt.Dress`, `BuildingArt`), the item in the hand
+  (held: `BlueprintArt.Held` for a plan, `ItemModel.Held` for gear) and the item in the world (placed: `BlueprintModels.Build` for the
+  Wood Sign on a plot, `BlueprintArt.Dropped` for the plan on the ground, `ItemModel.Placed` for gear). What the model must be:
+  its `size` is the GLB's own proportions times `fit` (Flashlight 2.30 x 0.58 x 0.58 lying along X, Lantern 0.61 x 1.55 x 0.61,
+  Wood Sign 2.29 x 3.90 x 0.41, Shed Blueprint 2.10 x 4.57 x 2.71), pivot at the middle of the bounding box, +Y up, front toward -Z.
+  Gear is worn today, so nothing in the game equips `ItemModel.Held`/`Placed` for the Lantern and Flashlight yet; the slot paths
+  exist and are tested. The Shed's model is the plan, so on a plot the Shed ghost stays the part-built shed. The preview loads the
+  GLBs through `tools/preview/store-items-meshes.json` (`PREVIEW_MESHES=tools/preview/store-items-meshes.json`). Spec:
+  `tests/ModelSlots.spec.luau` (also reads each GLB's bounding box).
+- **Display tables** (`ShopKit.DisplayTable`, `SpotTag`, `SpotLamp`; `SteppedUnit(..., "table")`): a wood-top plank table per row of
+  boxes (trim edge), a small price card per box read from `StoreStock.UnitPrice` (carries the hover tag), a lock card ("S5 SMITH")
+  beside the price card for a gated item (shown only while locked, as the old chip), and a warm spot over each table. The tier
+  flags on posts are gone (the stray purple "T5 / S5 SMI..." flag was one standing against the wall); nothing stands outside its table.
+- **Signs.** HOME PLANS and BUILD PLANS are 7.2 wide and nearer the aisle (whole word on screen from the door and on a phone); the
+  four back-wall item boards are 5.7 x 2.25 (were 8.4 x 3.45) and read SHED BLUEPRINT; CHECKOUT stands on two posts on the counter
+  front over the register (no plaque, no chains across other signs).
+- **Door frame and awning** (`ShopFacade.DoorFrame`, `ShopFacade.StripedAwning`): cream posts on stone footings, a flush stone
+  threshold (looks only: no step), and a striped canopy of 0.18 thick fabric slabs with a stepped valance, rail, posts and brackets.
+  The swing leaves are framed doors now (ring of trim, middle rail).
+- **Room fill:** two wall shelf units (jars, books, baskets), four framed pictures, a rug in the east nook, two more plants.
+- **Event room** (#185 `ShopEventKit`): the roped zone (16 x 9, back west corner, back against the wall) and the banner (front west
+  corner, off the doorway aisle).
+- **Parts:** the whole shop is 451 (cap 350 to 460: the event room is 34 of it). Interior budget unchanged (400).
+- **Specs:** `StoreOverlap.HearthAndHome` (families for every new part, plus a guard that no new name is unchecked),
+  `StoreInterior.HearthAndHome` (tables, cards, lock cards, spots, `DisplayTable`), `BuildingArt` (box on its table, cap 450).
+- **Renders:** `previews/store-polish/hearth-v3-*.png` (exterior front, three-quarter, night, door close-up, interior from the door,
+  table close-up, counter and CHECKOUT, phone 667x375). Not seen in Studio.
+- **v4 (Connor's review of the v3 renders):** the coloured slab under each box was BoxArt's accent floor; scoped to Hearth & Home only
+  with `BoxArt` `spec.wood` (BoxService and the preview pass it for the General Store's boxes): a wood base board of the same size and a
+  slim walnut name card (0.36 tall, 74% of the box width) instead of the accent floor and band; box size, hover tag, prompts and focus
+  are identical, and no other store's boxes change. The display tables are oak (colours that show in the preview), a thick top with a
+  cream trim along its front edge, two legs to the floor under each table's front corners, tables stepping up and meeting; the unit's
+  solid core stays as an invisible collider. `store-hearth-event` scene shows the event zone and banner active; the banner now faces
+  into the room (it faced the wall). Parts 451 (cap 460). Renders: `previews/store-polish/hearth-v4-*.png`.
+- **Awaiting Connor:** (1) placing the Shed costs the $240 kit fee on top of the $600 plan (default: the kit rule); (2) the Lantern and
+  Flashlight have no held model in the game, so their held slot path waits for a held-gear feature; (3) the blue under each box is
+  the box's own accent floor (BoxArt, shared by every store), not a plinth; (4) parts 444 against the old 350 cap.
+
+## Tool Shed restyle (branch `phase-2/store-restyle-toolshed`, look only; no price, item, stock, on-sale or buy-flow change)
+
+The Hearth & Home restyle (#183, #185) applied to the Tool Shed. Each store stays its own building. Not seen in Studio.
+- **Tables:** `ShopKit.SteppedUnit(..., "table")` on both units: a wood-top `DisplayTable` per row of boxes (plank top, cream trim edge,
+  two legs), a small price card per box (`SpotTag`, the price from `StoreStock.UnitPrice`), a lock card for a gated axe, a spot over the
+  middle of each table. The coloured plinths, tier flags on posts and "NEEDS ..." chips on posts are gone. Boxes get the wood base and
+  slim name card (`BoxArt` `spec.wood`): `BoxService` passes it for `ToolShed` too (not for the gold Robux boxes, not for other stores).
+- **Signs:** two headers (AXES & BELTS, MACHINES) 8.6 wide, toward the aisle, hung on short chains from a cross beam (the collar ties
+  stuck through the lower roof slope and floated; they are gone, `ShopKit.SectionSigns` got an optional `noTie`); no sub-signs; rack
+  name plates 2.4 x 1.0 (were 3.0 x 1.3); CHECKOUT on two posts on the counter's front edge (no plaque).
+- **Street side:** `ShopFacade.DoorFrame` (cream posts on stone footings, a lantern each, threshold) and `ShopFacade.StripedAwning`
+  (barn red and cream) over the barn door, which still slides: its open leaves stand 2.1 further out (`ShopDoor.Spec.openShift`, optional)
+  so they clear the posts. The porch posts are gone. From #181: two lit windows in each long wall, a flagstone path, the firewood
+  moved off the wall. The hours board used to sit inside the wall (invisible): it stands on the wall's face above the awning and the
+  door track.
+- **Room fill:** two shelves with tools and cans over the tables each side, four framed pictures, a pegboard of tools each side of the
+  door, a rug and two plants before the counter, a plant by the door; the back-room door moved to the west wall.
+- **Event room:** the roped zone (11.9 x 8.6, `ShopEventKit.BuildZone`) in the back east corner and the blank banner at the aisle's west
+  edge just inside the door, both hidden by default, nothing on sale. **The tables fill both sides, so no 14 x 8 patch of floor is free:**
+  `BuildZone` got an optional `minSize` (the Tool Shed passes 11 x 8; other stores unchanged) and the banner cannot be off the 6-stud
+  middle of the aisle (the aisle is 10 wide; it stands in the west 3.5 of it, clear of the 3-stud walk and of the table).
+- **Parts:** 452 whole shop (cap 400 to 460, `BuildingArt.spec`); interior budget unchanged (400).
+- **Specs:** `StoreOverlap.ToolShed` (new: oriented-box overlap over the whole shop plus a stand-in per box, sign/sign, sign/building,
+  prop/prop, props vs walls and roof, nothing up in the barn through the roof, screen-space from the door, phone, entrance and street,
+  and a guard that every part name is classified), `StoreInterior.ToolShed` (rewritten for tables, headers, CHECKOUT, dressing, event
+  room, nothing floats), `BuildingArt` (box on its table; cap 460), `BoxService` (wood look for the Tool Shed, not for gold boxes).
+- **Out front:** the barn's floor is 0.75 over the lawn (a ramp climbs to the door), and the facade props used to stand at the floor's
+  level, hovering: the door posts, awning posts, barrel, crate and doormat now stand on the lawn (the threshold stays at the floor);
+  the grindstone moved 0.6 west so its leg is clear of the awning post.
+- **Renders:** `previews/store-polish/toolshed-v4-*.png`, 25 of them (exterior front, three-quarter, night, side, phone 667x375, door
+  close-up, awning and hours board, door post and lantern, both yards; interior from the door, phone 667x375, night, table close-up,
+  counter and CHECKOUT, from above, stock corner, machine table, west wall, pegboard; event zone, from above, at night, banner).
+  Scenes `store-toolshed`, `store-toolshed-exterior`, `store-toolshed-event` (the last shows the event room active).
+- **Awaiting Connor:** (1) event room is 11.9 x 8.6 (not 16 x 9) and the banner stands at the aisle's west edge, because the tables leave
+  no other floor; (2) the barn door's open leaves slide 2.1 further out than before; (3) the CHECKOUT board hides the middle two rack
+  name plates from some angles (it stands on the counter in front of the rack).
+## Dealership restyle in the Hearth & Home look (branch `phase-2/store-restyle-dealership`, 12 October 2026)
+
+The Hearth & Home cleanup (#183, with the event kit #185) applied to the showroom hall. Looks and layout only: no price, economy, stock,
+sale or buy-flow change; the lot, plinths, vehicles, boxes, bays and the sign-spacing and lot-strip work are kept.
+
+- **Door frame and awning** (`ShopFacade.DoorFrame` now takes an optional `gap`; `ShopFacade.StripedAwning`; the Dealership branch of
+  `ShopFacade.Add`): cream posts on stone footings, the dark header and jambs, a flush stone threshold; the flat blue/cream canopy is
+  now an 8-stripe fabric awning with a stepped valance, posts and brackets (`ShopFacade.DealerAwning`: back 12.15, reach 4.6). The
+  hours board over the door is raised clear of the canopy's back (`BuildingArt.Shop`), the front footing starts past the right post,
+  the planters stand 0.5 further out, the porch lantern follows the new awning post.
+- **Plinths and boxes** (`DealershipLot`): the big accent pad under each box was a 0.3 slab; it is now a 0.1 inlay inside a 0.05 wood
+  border (`BoxMatFrame`), both flush on the plinth's top, the border's edge meeting the tier stripe's inner edge. Vehicles' boxes wear
+  the wood base and slim name card the General Store's do (`BoxService`: `wood` for the Dealership too). Name signs 5.0 x 1.9 x 0.16
+  (were 6.0 x 2.6 x 0.3), tier flags 2.8 x 1.6 on a post 4.6 up (were 3.4 x 2.0 at 5.0); each flag, band and stripe keeps its plinth's tier colour.
+- **CHECKOUT** stands on two posts on the counter (`ShopKit.CheckoutSign` `onCounter`), no plaque, no chains.
+- **Room fill** (`ShopInteriors/Dealership`): wooden tables from the kit (`ShopKit.DisplayTable`: reception and finance, legs on the
+  rug), two rugs, wall shelving with binders and model trucks (west and back walls), five framed pictures, plants, the brochure racks
+  moved to the front wall. Everything is clear of the runner, the doorway aisle and every vehicle.
+- **Event room** (`ShopEventKit`): the roped zone (16 x 9, turned so its back is on the west wall and its open front faces the runner)
+  with its three tables on the pads (the Hearth's wood, looks only), and the blank banner in the front corner by the entrance,
+  facing the doorway aisle; hidden/closed by default, nothing on sale. Scene `store-dealership-event` shows it active.
+- **Parts:** whole hall 408 (was 285), cap 400 to 420 (`BuildingArt.spec`, `StoreInterior.Dealership.spec`); interior still under 400.
+- **Specs:** new `StoreRestyle.Dealership` (door frame, awning, tables, furnishings, box mats, slim signs and flag colours, CHECKOUT, event
+  zone and banner placement, hidden by default, nothing on sale, caps); `DealershipOverlap` has every new part name in a class, a
+  guard that no part name goes unchecked (the floor skins and door mechanics are named as looks-only) and an event-room test.
+  Pinned numbers that moved because the design moved: the hall's part cap 400 to 420 (two specs); wall furniture may meet the wall's
+  face (0.41 instead of 0.31 in the inside-the-hall check, for `BrochureRack`, `NookPanel`, `PictureFrame` only).
+- **Renders (`tools/preview`, scenes `store-dealership`, `store-dealership-exterior` (new view 9), `store-dealership-event`):**
+  `previews/store-polish/dealership-v4-*.png`: exterior-front, exterior-three-quarter, exterior-night, door-closeup, awning-closeup,
+  door-phone-667x375, interior-door, interior-night, interior-phone-667x375, plinth-closeup, name-sign, lot-row, table-closeup,
+  counter-checkout, lobby-west-wall, front-wall, event-zone, event-zone-from-door, event-banner. The Dealership vehicles are part-built
+  (no meshes), so these are the real parts. Not seen in Studio.
+## Sparkworks restyle (branch `phase-2/store-restyle-sparkworks`, 13 October 2026)
+
+The Hearth & Home look (#183) applied to the Sparkworks in its teal and copper. Look only: no price, stock, on-sale or buy-flow change.
+
+- **Tables and boxes:** `SteppedUnit(..., "table")`: a wood-top table on legs per row (9), a small price card per box (no tiers or gated
+  items here, so no flags and no lock cards), a spot over each table. `BoxArt` `spec.wood` now also reaches the Sparkworks boxes
+  (`BoxService`, one condition); a new optional `spec.cardColor` gives them a dark teal name card (`BoxArt.WoodTealCard`) on the same
+  wood base. Other stores unchanged.
+- **Street side:** `ShopFacade` `sparkworksFront` (from #184: plinth, doorstep, pilasters, fascia, copper conduit with spark lamps, rods,
+  lamp posts) plus `DoorFrame` and a teal and cream `StripedAwning`; the hours board sits over the awning. Room is 15 high (roof rests on
+  the walls), no porch posts or WIRE IT UP board.
+- **Inside:** two headers 10 wide (BELTS & INPUTS, LOGIC & OUTPUTS) fully inside the walls, CHECKOUT on the counter, a SPARKWORKS name
+  board over it (no sub-signs), wall shelves, six framed pictures, rug, plants, spools on a pallet, stock corner, conduit and fuse boxes.
+- **Event room:** `ShopEventKit` zone 12 x 10 in the back west corner against the west wall (turned so its open front faces the aisle),
+  hidden by default; banner by the counter's east end facing the door, off the aisle, hidden and blank. The room is only 35 wide and
+  the lanes fill both side walls to z 4.7 and 8.3, so the corner is 12 wide: `ShopEventKit.MinSize` 14 x 8 to 12 x 8 (its three table
+  spots come out about 2.3 wide there). The front corners are lane fronts, so the banner is not by the door (Awaiting Connor).
+- **Parts:** whole shop 419 (cap 400 to 440, `BuildingArt.spec`); interior within the 400 budget. 
+- **Specs:** `StoreOverlap.Sparkworks` (3D SAT, families for every part, unchecked-name guard, screen views), `StoreInterior.Sparkworks`
+  (tables, cards, spots, headers, floating, event zone and banner placement), `StoreExterior.Sparkworks` (cap, floating, door frame and
+  awning), `BoxArt`, `BoxService`, `ShopEventKit`. Pinned numbers moved (design moved): sign-pair counts 5000 to 4000 and 10 to 6 signs.
+- **Renders:** `previews/store-polish/sparkworks-v4-*.png` (scenes `store-sparkworks`, `-exterior`, `-event`). Not seen in Studio.
+- **Awaiting Connor:** (1) banner placement by the counter, not the door (no free floor by the door); (2) event tables 2.3 wide here;
+  (3) #184 is superseded by this branch (same room height, no sub-signs, exterior front).
+
 ## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
 
 The three pasted store image ids (91282142796474 Tow Service, 79037897236948 Timber Classic, 71028498113750 Paint Shop) may be Decal ids, which an ImageLabel cannot load by `rbxassetid://`. `Shared/StoreArt.ImageFor(id, size)` now returns `rbxthumb://type=Asset&id=<id>&w=<n>&h=<n>` (150 on the panel card, 420 on the world board) for a nonzero id and `""` for 0; `StoreUI` and `StoreBoard` use it, and the letter or mark fallback (failed load, id 0) is unchanged. No prices, sale flags or ids changed. Unverified: that the thumbnails render (needs Studio). `AssetIds.spec` allows the one rbxthumb literal in `StoreArt.luau` and still fails any other.
@@ -295,6 +439,8 @@ A polish pass on every store interior so all stores read as one Timberline famil
 **Awaiting Connor** (defaults used): (1) tier flags are posts with a flag at 40 degrees to the aisle over each box (the plinth is only 0.3 tall, so a badge on it would not read). (2) Vehicles get tiers from their price order within trucks and trailers (the catalog has no vehicle tier). (3) A plan shows a badge only when it needs plot tier 2 or more. (4) Locked means axes in order and gear for a later stage; nothing else is gated in the stores today. (5) Hearth & Home side aisles stay 3.2 studs. (6) The preview takes the roof off (a roofed interior renders black in the preview; the game's Lighting lifts it), so judge the light by the caps (0.9 / 16) and a Studio look.
 
 **General Store / Hearth & Home (branch `phase-2/store-interiors-hearth`, draft PR into the kit branch, look-and-layout only)**: `ShopInteriors/HearthAndHome.luau` in the new look. Headers GEAR, BUILD PLANS, HOME PLANS, LAMPS (over mid-lane at z -12.5, y 12.3, from collar ties under the flat roof); sub-signs WEAR & LIGHT (all five gear), SHED & YARD and INDOORS (west plans), HOME DECOR and FIRE & LAMP (east plans), LAMP POST; every one of the 20 slots is under exactly one. A tier stand per slot (gear T3 to T5 with lock chips; plans and the lamp post have no tier, so a category-colour stand and no flag); 8 warm lanterns on 5 beams and a rafter; a CHECKOUT plaque and keeper mat on the counter; plants at the front corners; a crate and barrel corner (real meshes, parts first); the old wall shelving behind the gear and lamp units kept. Interior parts 189 (budget 400, `StoreInterior.HearthAndHome.spec`); whole shop 302. Lanes, stock, prices, footprints and the 3.2-stud side aisles are untouched: the aisles read open because nothing hangs below y 9 in them and the lanterns are over them at y 11. Backward-compatible additions to `ShopKit.SectionSigns`: `cfg.subShift` (default 1.3, as before) and per-section `subAbove`, `subW`, `subStagger` (all optional, defaults as before), so two sub-signs in one 9-stud island stand side by side instead of hiding each other from the door. Pinned number moved (design moved): `BuildingArt.spec` whole-shop cap for HearthAndHome 250 to 350. Previews (scene `store-hearth`, roof off): `previews/store-interiors/hearth-entrance.png`, `hearth-tier-stand.png`, `hearth-phone.png` (667x375), `hearth-night.png`, and the contact sheet. Not seen in Studio.
+
+**Hearth & Home polish (branch `phase-2/store-polish-hearth`, look only; no price, item, stock or buy-flow change)**: street side (`ShopFacade`): stone plinth, timber corner posts, cornice, green shutters and flower boxes on the windows, two wall lanterns clear of the door leaves, roof shingle strips, two windows in each side wall, a flagstone path to the door with a lamp post each side (all looks only, lights 0.9 / 14, shadowless). Inside: a HEARTH & HOME name board over the counter, four lamps and two beams over the back half (no dark corner), a plank ceiling fills the 0.6 stud between the beams and the roof (the sign ties and the entrance lamps used to hang under the roof with nothing above them) and every lamp chain ends on a beam, and the lock chip stands on its flag's backing (it floated 0.1 above it, in every store). New specs in `StoreInterior.HearthAndHome.spec` (nothing floats, name board, signs do not overlap, back corners lit, street lights under the caps). Signage thinned (Connor: too many signs, too close): the six small category sub-signs are gone (headers, T-badges, unlock labels, item name tags and the checkout stay); interior boards 15 to 10. New `tests/StoreOverlap.HearthAndHome.spec.luau`: oriented-box (SAT) overlap checks over the whole shop plus a stand-in per stocked box (signs vs signs, signs vs building and fittings, props vs props, props vs shell; about 47,000 pairs) and screen-space checks from the door, phone, entrance and street cameras. It found and I fixed: the hours board buried in the wall over the door (now on the wall's face, above the awning), the porch lantern inside its post, the wall-shelf panel inside the shelf units, the path stone on the doormat, and the lock chip floating over its flag; flag chips narrowed 3.0 to 2.6 and back lamps moved so nothing stacks on screen. Part cap: the whole shop is 345 parts, inside the existing 350 (no cap change); the StoreInterior.HearthAndHome spec no longer wants sub-signs (design moved). Connor's reference screenshots never arrived: designed to the written brief. Previews: `previews/store-polish/hearth-*.png` (scene `store-hearth-outside` for the street side; `store-hearth` for the inside, views re-aimed). Not seen in Studio.
 
 ## Robustness and performance pass (branch `phase-2/robustness-pass`, 12 October 2026, draft PR, no visuals, no prices or balance)
 

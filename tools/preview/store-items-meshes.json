@@ -1,0 +1,22 @@
+{
+  "91000001": {
+    "file": "../../assets/glb/store-items/Flashlight.glb",
+    "node": "Flashlight",
+    "initialSize": [0.851, 0.214, 0.214]
+  },
+  "91000002": {
+    "file": "../../assets/glb/store-items/Lantern.glb",
+    "node": "Lantern",
+    "initialSize": [0.509, 1.306, 0.509]
+  },
+  "91000003": {
+    "file": "../../assets/glb/store-items/WoodSign.glb",
+    "node": "WoodSign",
+    "initialSize": [2.2, 3.75, 0.395]
+  },
+  "91000004": {
+    "file": "../../assets/glb/store-items/ShedBlueprint.glb",
+    "node": "ShedBlueprint",
+    "initialSize": [1.4, 3.045, 1.807]
+  }
+}

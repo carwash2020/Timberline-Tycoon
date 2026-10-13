@@ -38,6 +38,7 @@ return function(t)
 		HeaderSignChain = true,
 		SignFrame = true,
 		SignPost = true,
+		CheckoutSignAccent = true, -- (CHECKOUT's accent bar is part of the sign)
 		TierBacking = true,
 		TierPost = true,
 		FlagPole = true,
@@ -75,7 +76,26 @@ return function(t)
 		ForecourtLampPost = "lamp",
 		BoxSpot = "box",
 		BoxBlock = "box",
+		BoxMatFrame = "box", -- (the box's wood border and its accent mat are one piece of paint on the plinth)
 		LampPost = "lamp",
+		-- the restyle: wooden tables (a plank top, apron, trim and legs are one table), wall shelving with binders and
+		-- model trucks, framed pictures, rugs, the door frame, the striped awning
+		ReceptionTop = "table",
+		ReceptionApron = "table",
+		ReceptionTrim = "table",
+		ReceptionLeg = "table",
+		FinanceTop = "table",
+		FinanceApron = "table",
+		FinanceTrim = "table",
+		FinanceLeg = "table",
+		NookPanel = "wallshelf",
+		NookBoard = "wallshelf",
+		NookBinder = "decor",
+		NookModel = "decor",
+		PictureFrame = "picture",
+		PictureArt = "picture",
+		LobbyRug = "rug",
+		LobbyRugEdge = "rug",
 	}
 	local COUNTER = {
 		Counter = true,
@@ -87,6 +107,7 @@ return function(t)
 		RegisterTag = true,
 		LedgerCover = true,
 		LedgerPage = true,
+		CheckoutPost = true, -- (the sign's two posts are planted in the counter's top)
 	}
 	local STRUCT = {
 		Wall = true,
@@ -106,6 +127,11 @@ return function(t)
 		BackRoomDoorFrame = true,
 		AwningPost = true,
 		AwningStripe = true,
+		AwningValance = true,
+		AwningBracket = true,
+		DoorPost = true, -- (the door frame: cream posts on stone footings, a flush threshold; checked on its own below)
+		DoorPostBase = true,
+		DoorThreshold = true,
 		RoofUnit = true,
 		RoofUnitFan = true,
 		ShutterSlat = true,
@@ -264,6 +290,34 @@ return function(t)
 	-- Hung things (a board's chains, a lantern's chain) end at the roof underside: weld, not overlap.
 	local function isWeldTo(item)
 		return item.name == "CeilingBeam" or item.name == "CeilingRafter" or item.name == "Roof"
+	end
+
+	-- Parts that lie flat on the floor or the ground, trim, glass and the like that the checks below do not test against
+	-- anything: each is named here on purpose, so a NEW part name cannot slip in unchecked (see the guard test at the end).
+	local LOOKS_ONLY = {}
+	for _, name in ipairs({
+		-- floor skins: boards, border, the aisle and lobby runners and their edges, the yellow aisle lines, the keeper's mat
+		"FloorBoards",
+		"FloorBorder",
+		"FloorPlank",
+		"AisleRunner",
+		"AisleRunnerEdge",
+		"AisleStripe",
+		"LobbyRunner",
+		"LobbyRunnerEdge",
+		"KeeperMat",
+		"KeeperMatEdge",
+		"Doormat",
+		-- paint and trim on the shell: the accent stripe, the forecourt's kerb, the roof slab
+		"Stripe",
+		"ForecourtKerb",
+		"Roof",
+		-- the doors' own parts (ShopDoor, BackRoomDoor's knob)
+		"DoorBlock",
+		"DoorSensor",
+		"BackRoomKnob",
+	}) do
+		LOOKS_ONLY[name] = true
 	end
 
 	local function report(bad, what)
@@ -444,4 +498,105 @@ return function(t)
 		print(string.format("  props, display items and structure: %d pairs checked", checked))
 		t.ok(checked > 3000, "coverage: " .. checked)
 	end)
+
+	t.test(
+		"no part name goes unchecked: every part of the hall is in a class above or is named as looks-only",
+		function()
+			local unknown = {}
+			local seen = 0
+			for _, it in ipairs(items) do
+				local n = it.name
+				seen += 1
+				local known = SIGN_BOARDS[n] ~= nil
+					or SIGN_FRAMES[n]
+					or LANTERN[n]
+					or PROPS[n]
+					or COUNTER[n]
+					or STRUCT[n]
+					or LOOKS_ONLY[n]
+					or string.sub(n, 1, 5) == "Event" -- (the event room: the test below)
+					or n == "Vehicle"
+				if not known then
+					unknown[n] = true
+				end
+			end
+			local list = {}
+			for n in pairs(unknown) do
+				table.insert(list, n)
+			end
+			table.sort(list)
+			t.eq(#list, 0, "part names no class checks: " .. table.concat(list, ", "))
+			t.ok(seen > 900, "the guard looked at the whole hall and its lot: " .. seen)
+			-- the restyle's own names are each in a class
+			for _, n in ipairs({
+				"DoorPost",
+				"DoorPostBase",
+				"DoorThreshold",
+				"AwningStripe",
+				"AwningValance",
+				"AwningBracket",
+				"AwningPost",
+				"ReceptionTop",
+				"ReceptionApron",
+				"ReceptionTrim",
+				"ReceptionLeg",
+				"FinanceTop",
+				"FinanceApron",
+				"FinanceTrim",
+				"FinanceLeg",
+				"NookPanel",
+				"NookBoard",
+				"NookBinder",
+				"NookModel",
+				"PictureFrame",
+				"PictureArt",
+				"LobbyRug",
+				"LobbyRugEdge",
+				"CheckoutPost",
+				"CheckoutSignAccent",
+				"BoxMatFrame",
+			}) do
+				t.ok(
+					SIGN_FRAMES[n] or PROPS[n] or COUNTER[n] or STRUCT[n],
+					n .. " is in a class the overlap checks test"
+				)
+			end
+		end
+	)
+
+	t.test(
+		"the event room and its banner share space with nothing: not plinths, vehicles, props, beams or walls",
+		function()
+			local event, others = {}, {}
+			for _, it in ipairs(items) do
+				if string.sub(it.name, 1, 5) == "Event" then
+					table.insert(event, it)
+				elseif it.name ~= "Roof" and it.name ~= "Slab" then
+					table.insert(others, it)
+				end
+			end
+			t.ok(#event >= 55, "the zone, its tables and the banner: " .. #event)
+			local bad, checked = {}, 0
+			for _, a in ipairs(event) do
+				for _, b in ipairs(others) do
+					-- (the zone's mat lies on the floor's own skins, and its posts stand on the mat: those are not tested)
+					local skin = b.name:find("Floor")
+						or b.name:find("Runner")
+						or b.name:find("Rug")
+						or b.name:find("Aisle")
+					if not skin then
+						checked += 1
+						if overlaps(a.box, b.box) then
+							table.insert(
+								bad,
+								a.name .. " meets " .. b.name .. string.format(" at %.1f, %.1f", a.box[1], a.box[5])
+							)
+						end
+					end
+				end
+			end
+			report(bad, "the event room meets")
+			t.ok(checked > 10000, "coverage: " .. checked)
+		end
+	)
 end

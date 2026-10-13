@@ -1,5 +1,32 @@
 # Phase 2+ build notes
 
+## Dealership restyle (Studio checks, branch `phase-2/store-restyle-dealership`)
+
+None of this has been seen in Studio. Do each on PC, then phone (667x375), then Xbox where it has a button.
+1. All: stand at the lobby door. Good: cream posts on stone footings either side of the opening, a striped blue and cream fabric awning over it with
+   a stepped edge, the hours board above the awning's back (not through it), a flush threshold you cross without a bump or a step.
+2. All: walk in. Good: the TRUCKS / TRAILERS / SHOWROOM headers read and do not overlap; CHECKOUT stands on the counter's front edge over the register;
+   wooden tables (reception, finance) on rugs, shelves with binders and model trucks, framed pictures on the walls, plants. Nothing blocks the way from the
+   door to the counter or the aisle between the rows.
+3. All: look at a plinth from the aisle. Good: the box sits on a thin coloured mat inside a wood border lying flat on the plinth top (no loose slab, no
+   gap, no flicker); the T-flag colour matches the band and stripe on that plinth; the name sign is a slim board against the plinth.
+4. All: nothing floats (look under the shelves, at the table legs, the awning posts, the banner feet) and nothing sinks into a wall or the floor.
+5. All: the roped-off event room by the west wall (three tables on pads, brass rope up) and nothing in it for sale. With no event running the banner by the entrance
+   is invisible. When `StoreEventService` activates the Dealership: ropes drop, the lamp comes on, the banner shows its text facing the door aisle.
+6. Phone: the headers and CHECKOUT are readable at 667x375 and the taps on boxes and the counter still work. Xbox: the selection ring and A on a box,
+   the counter and the vehicle prompts work as before; B closes panels.
+7. Buying a vehicle (hover tag, price, spawn pad) behaves exactly as before.
+## Sparkworks restyle (13 October 2026, branch `phase-2/store-restyle-sparkworks`)
+
+Studio checks (none of this has been seen in Studio; details in STATUS.md):
+1. PC: walk into the Sparkworks. Wood display tables on legs with small price cards, no coloured slabs or flags, a header over each unit
+   (whole words), CHECKOUT on the counter, SPARKWORKS over it. Boxes have a wood base and a dark teal name card. Walk the aisle: nothing blocks it.
+2. From the street: teal and cream striped awning over a framed door, hours board above it, no floating pieces, lamp posts each side.
+3. Back west corner: a roped mat with three table spots (hidden banner by the counter's east end). Run an event (EVENTS.md) to see the rope drop
+   and the banner appear.
+4. Phone (667x375): headers and CHECKOUT readable, price cards tappable (hover tag), nothing cropped. Xbox: the selection ring lands on the
+   price cards and boxes as in Hearth & Home; B closes the panel.
+
 ## Server boot and runtime audit (12 October 2026, branch `phase-2/audit-server-boot`)
 
 Studio checks (none of this has been seen in Studio):
@@ -2147,11 +2174,12 @@ What changed:
       open the Land panel
 
 ### Studio checks: blueprints as items
-- [ ] Buy a Small Shed blueprint at the General Store (box to the counter):
-      the price is what it was, and a rolled plan (cream roll, blue wax seal)
-      appears in your hotbar named "Small Shed Blueprint"
+- [ ] Buy the Shed Blueprint at the General Store (box to the counter):
+      the price is what it was ($600), and a rolled plan (cream roll, blue wax seal)
+      appears in your hotbar named "Shed Blueprint"
 - [ ] Hold it and click (RT, tap): it vanishes, a toast says you learned it,
-      and the Small Shed is now in the hammer list and places free
+      and the Shed is now in the hammer list; placing it costs the kit fee ($240)
+      and puts down a ghost you fill with 60 plank units of your own planks
 - [ ] Buying it again before you use it, or after: refused, nothing charged
 - [ ] Hold a plan and press Drop (Q, Backspace, B on a pad, or a long
       press on the hotbar on a phone; two presses): it lies on the ground with a Pick up prompt; only
@@ -3116,7 +3144,7 @@ Connor sent two Lumber Tycoon 2 pictures: "Look at the Boxes in this image, I wa
 **Studio checks (Connor):**
 - [ ] Tool Shed from the door: dark boxes with a glass window on the front, the top and the aisle side, each showing the real item (axes lying whole, miniature sawmills, planers, belts, chop saw and Sky Bin), an accent band with the name, an accent plinth under each, rows stepping up toward the counter. The aisle is clear and the counter is at the back. The keeper still serves; the doors and hours behave as before.
 - [ ] The axe rack at the back: seven or eight axes standing whole on their steps, each in front of a block in its tier colour with its name; aiming at an axe, its block or its plate shows the hover tag with the price.
-- [ ] General Store (gear, plans, the lamp): every box shows its item (a lantern, a coat, a table, a barrel, the Small Shed in miniature); all boxes reachable; the lamp shelf shows three boxes in a row.
+- [ ] General Store (gear, plans, the lamp): every box shows its item (a lantern, a coat, a table, a barrel, the Shed Blueprint in miniature); all boxes reachable; the lamp shelf shows three boxes in a row.
 - [ ] Dealership: each vehicle on its plinth with its sign, its box on a coloured block at the aisle edge with the little vehicle visible through the window and the strip naming it; you can see the strip from the walkway; the vehicle beside it is unchanged.
 - [ ] Hover: aim at a box through its window (mouse, Xbox screen-centre aim, phone tap): the name and price tag appears, and shows Closed / Out of stock / You already own this as before. No price is printed on any box.
 - [ ] Grab with one press (mouse click, Xbox, phone tap) on the glass and on the strip: the box lifts at once, carried in the hand it moves as one piece, the item in it moves with it; carry three unpaid boxes (the fourth is refused as before); drop one on the floor and put one back on its shelf spot; walk it down the aisle and through the door.
@@ -4095,3 +4123,12 @@ is unchanged in every file, keep its id). Nothing breaks in the meantime: every 
 4. Before any re-upload: the Timber Classic (part-built): wheels in front of the body, stake bed with posts and a rail, one flat
    mudflap behind the rear wheel, door names readable.
 5. Everything still drives and tows as before; hitbox, speed and bed capacity are unchanged.
+
+## Tool Shed restyle (Studio checks)
+
+1. PC, phone (667 x 375), Xbox: walk in the barn door. Good: two rows of wooden display tables on legs (plank tops, a cream trim edge), each box on a wood base with a slim name card, a small price card on the table's front edge per box (axes that need an earlier axe also show a small "NEEDS ..." card beside it), a warm spot over each table; no coloured slabs under the boxes, no tier flags or purple/blue signs on posts.
+2. All: two big headers (AXES & BELTS, MACHINES) hang low and fully inside the walls on both sides of the aisle, readable from the door and on the phone; no small category boards. CHECKOUT stands on the counter in front of the register. The axe rack's name plates are smaller.
+3. All: the room is dressed: shelves with tools and cans and framed pictures high on both side walls, a pegboard of tools each side of the door, a rug and two plants before the counter, a plant by the door. Nothing floats and nothing is stuck in a wall or the roof; walking the aisle and to the counter is as free as before.
+4. All: from the street the barn has a door frame (cream posts, a lantern on each, a stone threshold) and a striped red and cream awning; the barn-door leaves slide open to the outside of the posts and shut across the doorway; the hours board stands above the awning and shows the hours (it used to be buried in the wall). Two lit windows in each long wall at night; a flagstone path to the door.
+5. All: shop hours still shut the door (the DoorBlock) and the hours board still updates. Buying, the price shown on hover, the Robux table and the keeper are unchanged.
+6. Event room (only visible if an event runs, or in a Studio test that calls ShopEventKit.SetZoneActive / SetBannerActive): the roped mat in the back east corner (ropes up when idle, down when active, lamp on when active) and the banner at the west edge of the aisle by the door (invisible until active, blank). Good: neither blocks the walk to the counter, both stand on the floor, nothing is for sale there.

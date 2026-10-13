@@ -60,7 +60,7 @@ ShopEventKit.ZoneTag = "EventExpansion"
 ShopEventKit.BannerTag = "EventBanner"
 ShopEventKit.Kinds = StoreEvents.Stores -- ToolShed, HearthAndHome, Sparkworks, Dealership
 ShopEventKit.DefaultSize = V3(16, 0, 9) -- the zone's footprint (x, z); y is ignored
-ShopEventKit.MinSize = V3(14, 0, 8)
+ShopEventKit.MinSize = V3(12, 0, 8) -- (the Sparkworks' back corner is 12 wide; its tables come out narrower)
 ShopEventKit.TableCount = 3
 ShopEventKit.PartBudget = 36 -- the most the zone and banner use together
 
@@ -122,14 +122,20 @@ function ShopEventKit.Footprint(size: Vector3?): { minX: number, maxX: number, m
 end
 
 -- Builds the zone (see the header). Returns the model, which is tagged and
--- inactive. Errors for an unknown store or a footprint under MinSize.
-function ShopEventKit.BuildZone(parent: Instance, kind: string, anchor: CFrame, size: Vector3?): Model
+-- inactive. Errors for an unknown store or a footprint under MinSize (or under
+-- `minSize`, an optional lower floor for a store whose room has no clear 14 x 8
+-- patch: the Tool Shed's tables fill its floor).
+function ShopEventKit.BuildZone(
+	parent: Instance,
+	kind: string,
+	anchor: CFrame,
+	size: Vector3?,
+	minSize: Vector3?
+): Model
 	assert(known(kind), "ShopEventKit.BuildZone: unknown store " .. tostring(kind))
 	local s = size or ShopEventKit.DefaultSize
-	assert(
-		s.X >= ShopEventKit.MinSize.X and s.Z >= ShopEventKit.MinSize.Z,
-		"ShopEventKit.BuildZone: footprint is under " .. tostring(ShopEventKit.MinSize)
-	)
+	local least = minSize or ShopEventKit.MinSize
+	assert(s.X >= least.X and s.Z >= least.Z, "ShopEventKit.BuildZone: footprint is under " .. tostring(least))
 	local sx, sz = s.X, s.Z
 	local accent = ACCENT[kind]
 	local model = Kit.model("EventExpansion", parent)
@@ -235,7 +241,9 @@ function ShopEventKit.BuildZone(parent: Instance, kind: string, anchor: CFrame, 
 		attach.Parent = marker
 	end
 
-	CollectionService:AddTag(model, ShopEventKit.ZoneTag)
+	pcall(function()
+		CollectionService:AddTag(model, ShopEventKit.ZoneTag)
+	end)
 	ShopEventKit.SetZoneActive(model, false)
 	return model
 end
@@ -298,7 +306,9 @@ function ShopEventKit.BuildBanner(parent: Instance, kind: string, anchor: CFrame
 	board:SetAttribute("Store", kind)
 	board:SetAttribute("Active", false)
 	board:SetAttribute("Text", "")
-	CollectionService:AddTag(board, ShopEventKit.BannerTag)
+	pcall(function()
+		CollectionService:AddTag(board, ShopEventKit.BannerTag)
+	end)
 	ShopEventKit.SetBannerActive(board, false, nil)
 	return model
 end

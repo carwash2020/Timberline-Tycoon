@@ -293,7 +293,7 @@ return function(t)
 			},
 		})
 		s.Service.GiveLoadout(s.player, s.character)
-		t.eq(names(s.toolsIn(s.backpack)), { "Hammer", "Small Shed Blueprint", "Mailbox Blueprint" })
+		t.eq(names(s.toolsIn(s.backpack)), { "Hammer", "Shed Blueprint", "Mailbox Blueprint" })
 		local plan = s.toolsIn(s.backpack)[2]
 		t.eq(plan:GetAttribute("BlueprintId"), "Shed")
 		t.eq(plan:GetAttribute("BlueprintUid"), "a")
@@ -354,7 +354,7 @@ return function(t)
 		t.eq(s.profile.blueprintItems, {})
 		t.eq(plan.destroyed, true, "the physical item is gone")
 		t.eq(s.attrs.Blueprints, "Shed")
-		t.eq(s.toasts[#s.toasts].text, "You learned the Small Shed. It's in your hammer's list for good.")
+		t.eq(s.toasts[#s.toasts].text, "You learned the Shed. It's in your hammer's list for good.")
 	end)
 
 	t.test("a plan in the Backpack (not in hand) cannot be used", function()

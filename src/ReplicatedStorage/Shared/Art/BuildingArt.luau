@@ -33,6 +33,7 @@ local Kit = require(script.Parent.Kit)
 local Palette = require(script.Parent.Palette)
 local SpecBuild = require(script.Parent.SpecBuild)
 local DealershipLot = require(script.Parent.DealershipLot)
+local ModelSlots = require(script.Parent.ModelSlots)
 local ShopFacade = require(script.Parent.ShopFacade)
 local PropArt = require(script.Parent.PropArt)
 local ShopDoor = require(script.Parent.ShopDoor)
@@ -1332,12 +1333,8 @@ local function toolShed(model: Model, title: string, accent: Color3)
 		dBox(model, "SignPost", V3(0.5, h, 0.5), CF(s * 4.6, roofY - 0.5 + h / 2, signZ + 0.5), TIMBER)
 		gooseneck(model, CF(s * 5.2, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 	end
-	-- Porch: two posts flanking the opening, one lantern on the east post.
-	-- Clear of the grindstone (x ±7.6) and of the door-width scan at the wall.
-	for _, s in ipairs({ -1, 1 }) do
-		Kit.part(model, "PorchPost", V3(0.45, 6.4, 0.45), CF(s * 6.2, 3.2, -HZ - 1.15), TIMBER, MAT.Wood)
-	end
-	Kit.lantern(model, CF(6.2, 5.8, -HZ - 1.15), 0.75)
+	-- (The porch posts and their lantern are gone: the door frame and the striped awning of the Hearth & Home restyle,
+	-- ShopFacade.DoorFrame and StripedAwning, frame the doorway, and the open barn-door leaves slide clear of them.)
 	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
 	-- The counter stands at the back (final studs: BuildingArt.ToolShedCounterZ).
 	local CZ = BuildingArt.ToolShedCounterZ / BuildingArt.Scale.ToolShed
@@ -1350,12 +1347,12 @@ local function toolShed(model: Model, title: string, accent: Color3)
 
 	-- Out front: the grindstone and the chopping block; firewood stacked by
 	-- the west wall (all of it solid; it was the east wall until the shed grew wider).
-	grindstone(model, CF(-7.6, 0, -HZ - 2.2))
+	grindstone(model, CF(-8.2, 0, -HZ - 2.2)) -- (0.6 further west: its leg stood in the awning post)
 	choppingBlock(model, CF(7.6, 0, -HZ - 2.2), rng)
 	for row = 0, 1 do
 		for i = 0, 1 - row do
 			local z = -2 + (i - (1 - row) / 2) * 1.55
-			log(model, CF(-(HX + 1.25), 0.75 + row * 1.32, z), 2, 1.5, rng, 1, true)
+			log(model, CF(-(HX + 1.4), 0.75 + row * 1.32, z), 2, 1.5, rng, 1, true) -- (1.4 out: the log ends clear the wall)
 		end
 	end
 end
@@ -1450,11 +1447,13 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- A stone footing round the foot of every wall, and the accent stripe.
 	local foot = Kit.shade(CONCRETE, -0.2)
 	dBox(model, "Footing", V3(2 * hx + 2 * T + 0.6, 1.4, 0.5), CF(0, FLOOR + 0.7, hz + T + 0.15), foot, MAT.Slate)
+	-- (the front footing starts past the door frame's right post and its stone base, which stand beside the opening)
+	local footX0, footX1 = doorX1 + 1.9, hx + 0.7
 	dBox(
 		model,
 		"Footing",
-		V3(hx - doorX1 + T + 0.6, 1.4, 0.5),
-		CF((doorX1 + hx) / 2, FLOOR + 0.7, -hz - T - 0.15),
+		V3(footX1 - footX0, 1.4, 0.5),
+		CF((footX0 + footX1) / 2, FLOOR + 0.7, -hz - T - 0.15),
 		foot,
 		MAT.Slate
 	)
@@ -1496,7 +1495,8 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- The porch lantern hangs on the awning's east post (ShopFacade's awning: posts
 	-- 9.3 either side of the door's middle, at the canopy's front edge), where a second
 	-- pair of porch posts used to stand beside them.
-	local porchGlow = Kit.lantern(model, CF(doorCx + 8.8, 7.2, -hz - T - ShopFacade.AwningReach + 0.4), 0.8)
+	local awn = ShopFacade.DealerAwning
+	local porchGlow = Kit.lantern(model, CF(doorCx + 8.8, 7.2, -hz - T - awn.reach * math.cos(awn.tilt) + 0.2), 0.8)
 	local porchLight = porchGlow:FindFirstChildOfClass("PointLight")
 	if porchLight then
 		porchLight.Brightness = 1
@@ -1673,7 +1673,8 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
 	end
-	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
+	-- (beside the east post, not in it: the lantern's cap is 0.34 wide each way, the post 0.225)
+	Kit.lantern(model, CF(6.6, 5.5, -HZ + 0.85), 0.75)
 
 	-- Name boards hang on the back wall, facing the door, each above a sample
 	-- of that item on the ledge. No price is printed: aiming at a board or its
@@ -1709,14 +1710,14 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 		return string.upper(if slot then slot.displayName else itemId)
 	end
 	local offers = {
-		{ x = -11.4, kind = "fence", item = "Blueprint", id = "WoodSign" },
-		{ x = -3.8, kind = "shed", item = "Blueprint", id = "Shed" },
-		{ x = 3.8, kind = "lantern", item = "Gear", id = "Lantern" },
-		{ x = 11.4, kind = "axe", item = "Gear", id = "Flashlight" },
+		{ x = -12.2, kind = "fence", item = "Blueprint", id = "WoodSign" },
+		{ x = -5.0, kind = "shed", item = "Blueprint", id = "Shed" },
+		{ x = 5.0, kind = "lantern", item = "Gear", id = "Lantern" },
+		{ x = 12.2, kind = "axe", item = "Gear", id = "Flashlight" },
 	}
 	for _, offer in ipairs(offers) do
 		local board =
-			Kit.part(model, "PriceTag", V3(5.6, 2.3, 0.16), CF(offer.x, 6.15, HZ - 0.58), hex("#3E2A18"), MAT.Wood)
+			Kit.part(model, "PriceTag", V3(3.8, 1.5, 0.16), CF(offer.x, 5.9, HZ - 0.58), hex("#3E2A18"), MAT.Wood)
 		board.CanCollide = false
 		board.CanQuery = false
 		board.CanTouch = false
@@ -1785,7 +1786,8 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 			TRIM
 		)
 	end
-	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), Palette.RoofSlate, MAT.Slate)
+	-- (the roof's underside is the walls' top, TOP, so it rests on the walls; its top is TOP + 0.65)
+	Kit.part(model, "Roof", V3(2 * HX + 2, 0.65, 2 * HZ + 2), CF(0, TOP + 0.325, 0), Palette.RoofSlate, MAT.Slate)
 
 	-- The name board stands over the roof on two posts, like the General Store's.
 	local signW, signH = 20, 3
@@ -1806,11 +1808,8 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 
 	-- The counter stands at the back (customer side faces -Z), the keeper
 	-- behind it; the shelf units stop short of it.
+	-- (no porch posts inside the door: the display tables start there, and the door has its frame outside)
 	placeCounter(model, 0, BuildingArt.SparkworksCounterZ / BuildingArt.Scale.Sparkworks)
-	for _, s in ipairs({ -1, 1 }) do
-		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
-	end
-	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
 
 	-- The back wall behind the keeper: a row of spark lamps, each over its
 	-- switch, and a copper run joining them. Looks only.
@@ -1823,9 +1822,6 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 		dBox(model, "WallSwitch", V3(0.5, 0.8, 0.2), CF(x, 5.9, backZ - 0.1), Palette.IronBlack, MAT.Metal)
 	end
 	dBox(model, "CopperRun", V3(14.4, 0.2, 0.2), CF(0, 6.65, backZ - 0.08), Palette.Brass, MAT.Metal)
-	local board = Kit.part(model, "BackSign", V3(9, 1.6, 0.2), CF(0, 9, backZ - 0.2), Palette.SignInk, MAT.Wood)
-	Kit.signText(board, "WIRE IT UP", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	Kit.decor(board, false)
 end
 
 -- Shelf slots are attachments on the counter (they are not parts, so the
@@ -1930,7 +1926,42 @@ local function addHoursBoard(model: Model, shopId: string)
 	if y < clear then
 		y = clear
 	end
-	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, at.Z), SIGN_BOARD, MAT.Wood)
+	-- The General Store's striped awning (ShopFacade) reaches up to 12.7 on the wall over its door:
+	-- the board's bottom edge stays above it, so the two never overlap.
+	if (shopId == "HearthAndHome" or shopId == "Sparkworks") and y - h / 2 < 12.7 then
+		y = 12.7 + h / 2
+	end
+	-- The Tool Shed's barn-door track runs across the front at 11.85 and its striped awning (ShopFacade) reaches up to
+	-- 12.4 on the wall over the door: the board stands on the wall's face above both (it used to sit inside the wall).
+	local toolShedWallFace: number? = nil
+	if shopId == "ToolShed" then
+		y = math.max(y, 12.45 + h / 2)
+		toolShedWallFace = -(BuildingArt.ToolShedHalfDepth * BuildingArt.Scale.ToolShed + 0.45)
+	end
+	-- The board hangs on the wall's outside face, not inside it: if a front wall stands over
+	-- the host at this height, the board's back rests on that wall's front face.
+	local z = at.Z
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") and d.Name == "Wall" then
+			local cf, sz = d.CFrame, d.Size
+			local faceZ = cf.Position.Z - sz.Z / 2
+			if
+				cf.UpVector.Y > 0.99
+				and math.abs(cf.LookVector.Z) > 0.99
+				and math.abs(cf.Position.X - at.X) <= sz.X / 2
+				and y - h / 2 >= cf.Position.Y - sz.Y / 2 - 0.01
+				and y + h / 2 <= cf.Position.Y + sz.Y / 2 + 0.01
+				and faceZ < z + depth / 2
+				and cf.Position.Z + sz.Z / 2 > z - depth / 2
+			then
+				z = faceZ - depth / 2
+			end
+		end
+	end
+	if toolShedWallFace then
+		z = toolShedWallFace - depth / 2
+	end
+	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, z), SIGN_BOARD, MAT.Wood)
 	Kit.decor(board)
 	board:SetAttribute("ShopId", shopId)
 	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
@@ -1979,7 +2010,7 @@ function BuildingArt.InteriorFrame(kind: string, s: number): { frame: ShopInteri
 				floorTop = 0.4 * s,
 				halfW = BuildingArt.SparkworksHalfWidth * s - 0.45,
 				halfD = BuildingArt.SparkworksHalfDepth * s - 0.45,
-				ceilY = 10 * s - 0.4,
+				ceilY = 10 * s, -- the roof's underside (it rests on the walls): the beams and chains reach up to it
 			},
 		}
 	end
@@ -2024,6 +2055,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			wallTop = 9 * s,
 			roofTop = 14.8 * s + 0.75,
 			groundY = 0.5 * s,
+			matY = 0, -- the lawn: the barn's floor is 0.75 above it (a ramp climbs to the door), so the mat lies on the grass past the ramp
 			accent = accent,
 		}
 	elseif kind == "Dealership" then
@@ -2053,6 +2085,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			wallTop = 10 * s,
 			roofTop = 10.65 * s,
 			groundY = 0.4 * s,
+			yardY = 0, -- the floor is a step up from the ground; the yard's props stand on the ground
 			accent = accent,
 		}
 	end
@@ -2083,6 +2116,8 @@ function BuildingArt.DoorSpec(kind: string, s: number, accent: Color3): ShopDoor
 			z = -(BuildingArt.ToolShedHalfDepth + 0.5) * s,
 			color = Kit.shade(accent, -0.2),
 			trim = TRIM,
+			-- (open, each leaf slides this much further out along the wall so it stands clear of the door frame's posts)
+			openShift = 2.1,
 		}
 	elseif kind == "Dealership" then
 		local hall = DealershipLot.Hall()
@@ -2134,6 +2169,36 @@ end
 -- its origin, all but the counter: it, its top and what stands on it keep
 -- their size, at the same height over the (raised) floor, so it stays
 -- waist high and the keeper behind it shows.
+-- The four samples on the General Store's back ledge (flashlight, lantern, wood sign, shed) show the
+-- real model of their ModelSlots slot once one is set (meshId 0: the part-built samples stay).
+local function dressLedgeSamples(model: Model)
+	local groups: { [string]: { BasePart } } = {}
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") and d.Name == "Display" then
+			local id = d:GetAttribute("HoverId")
+			if type(id) == "string" then
+				groups[id] = groups[id] or {}
+				table.insert(groups[id], d)
+			end
+		end
+	end
+	for _, slot in ipairs(ModelSlots.Slots) do
+		local list = groups[slot.itemId]
+		if list and ModelSlots.IsSet(slot) then
+			local lo, hi = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+			for _, p in ipairs(list) do
+				local at, half = p.CFrame.Position, p.Size / 2
+				lo = lo:Min(at - half)
+				hi = hi:Max(at + half)
+			end
+			local box = hi - lo
+			local scale = math.max(box.X, box.Y, box.Z) / math.max(slot.size.X, slot.size.Y, slot.size.Z)
+			local centre = CFrame.new((lo.X + hi.X) / 2, lo.Y + slot.size.Y * scale / 2, (lo.Z + hi.Z) / 2)
+			ModelSlots.Dress(model, slot, centre, "display", { scale = scale, remove = list, inBuildFrame = true })
+		end
+	end
+end
+
 function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: number?): Model
 	local model = Kit.model(kind)
 	if kind == "ToolShed" then
@@ -2175,13 +2240,18 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		fitNameSign(sign)
 	end
 	addHoursBoard(model, kind)
+	if kind == "HearthAndHome" then
+		dressLedgeSamples(model)
+	end
 	if kind == "Dealership" then
 		-- The hours board stood 0.25 into the wall above the door: put it against the wall's face.
 		local board = model:FindFirstChild("HoursBoard")
 		if board and board:IsA("BasePart") then
 			local face = -DealershipLot.Hall().innerD / 2 - 0.8
 			local at = board.CFrame.Position
-			board.CFrame = CFrame.new(at.X, at.Y, face - board.Size.Z / 2)
+			-- (and clear over the striped canopy's back, which stands over the door header: ShopFacade.DealerAwning)
+			local y = math.max(at.Y, ShopFacade.DealerAwning.backY + 0.15 + board.Size.Y / 2)
+			board.CFrame = CFrame.new(at.X, y, face - board.Size.Z / 2)
 		end
 	end
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
