@@ -228,8 +228,8 @@ return function(t)
 						end
 						return seconds or FRAME
 					end,
-					delay = function(seconds, fn)
-						table.insert(s.delays, { seconds = seconds, fn = fn })
+					delay = function(seconds, fn, ...)
+						table.insert(s.delays, { seconds = seconds, fn = fn, args = table.pack(...) })
 					end,
 				},
 				os = setmetatable({
@@ -510,7 +510,9 @@ return function(t)
 
 	t.test("a backstop takes the card down whatever the script is doing", function()
 		local s = run({ backstopAt = 5 })
-		t.eq(#s.delays, 1)
+		-- The backstop, then the one-time failsafe (grey-box fix) the script
+		-- sets after its own removal.
+		t.eq(#s.delays, 2)
 		local backstop = s.delays[1]
 		t.ok(backstop.seconds > 30 and backstop.seconds <= 40, "a little after the 30 s cap")
 		t.ok(s.backstopFired)
@@ -522,9 +524,27 @@ return function(t)
 
 	t.test("the backstop is harmless once the card has gone", function()
 		local s = run({ character = 1, profile = 1 })
-		t.eq(#s.delays, 1)
+		t.eq(#s.delays, 2, "the backstop and the failsafe")
 		s.delays[1].fn()
 		t.eq(#s.playerGui:GetChildren(), 0)
 		t.eq(#s.warnings, 0)
+	end)
+
+	t.test("a few seconds after the hand-over a failsafe removes a leftover card and names it", function()
+		local s = run({ character = 1, profile = 1 })
+		t.eq(s.card(), nil, "the card is gone after its fade")
+		local sweep = s.delays[#s.delays]
+		t.ok(sweep.seconds > 0 and sweep.seconds <= 10, "one bounded check, not a loop")
+		-- A copy the script lost track of (a re-run, a stale card).
+		local stray = Instance.new("ScreenGui")
+		stray.Name = "LoadingScreen"
+		stray.Parent = s.playerGui
+		local before = #s.warnings
+		sweep.fn(table.unpack(sweep.args, 1, sweep.args.n))
+		t.eq(s.card(), nil, "the leftover is destroyed")
+		t.ok(
+			#s.warnings > before and string.find(s.warnings[#s.warnings], "leftover loading card", 1, true),
+			"it says so"
+		)
 	end)
 end

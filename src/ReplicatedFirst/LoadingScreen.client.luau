@@ -53,6 +53,7 @@ local LoadingTips = loadTips()
 local MAX_SECONDS = 30 -- the card never stays up longer than this
 local FADE_SECONDS = 0.6
 local BACKSTOP_SECONDS = MAX_SECONDS + FADE_SECONDS + 5
+local FAILSAFE_SECONDS = 4 -- after the hand-over, one last look for a card left behind
 local TIP_SECONDS = 5 -- each tip shows this long
 local TIP_FADE = 0.3 -- and fades in and out over this
 local PLAYERGUI_WAIT = 5 -- seconds per WaitForChild try (a timeout, so no infinite-yield warning)
@@ -85,6 +86,19 @@ local function removeCard()
 	gui = nil
 	if g then
 		g:Destroy()
+	end
+end
+
+-- The one-time failsafe, FAILSAFE_SECONDS after the hand-over: any
+-- LoadingScreen still in PlayerGui (a card this script lost track of, or a
+-- second copy from a re-run) is a grey veil over the game, so it is
+-- destroyed and named in a warn. Runs once; never loops.
+local function sweep(playerGui: Instance)
+	for _, child in ipairs(playerGui:GetChildren()) do
+		if child.Name == "LoadingScreen" then
+			warn("[LoadingScreen] failsafe: leftover loading card " .. child:GetFullName() .. " removed")
+			child:Destroy()
+		end
 	end
 end
 
@@ -305,6 +319,7 @@ local function run()
 		task.wait()
 	end
 	removeCard()
+	task.delay(FAILSAFE_SECONDS, sweep, playerGui)
 end
 
 local ok, err = xpcall(function(): any
@@ -314,4 +329,8 @@ end, debug.traceback)
 if not ok then
 	warn("[LoadingScreen] " .. tostring(err))
 	removeCard()
+	local guiRoot = player and player:FindFirstChildOfClass("PlayerGui")
+	if guiRoot then
+		task.delay(FAILSAFE_SECONDS, sweep, guiRoot)
+	end
 end

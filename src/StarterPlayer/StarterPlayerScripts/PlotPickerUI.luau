@@ -676,7 +676,14 @@ local function claimed(name: string)
 	TweenService:Create(black, info, { BackgroundTransparency = 0 }):Play()
 	TweenService:Create(toast, info, { TextTransparency = 0 }):Play()
 	task.delay(half, function()
-		hide()
+		-- A hide that errors must not leave the black card up.
+		local ok, err = pcall(function(): any
+			hide()
+			return nil
+		end)
+		if not ok then
+			warn("[PlotPickerUI] hide failed during the claim fade: " .. tostring(err))
+		end
 		task.wait(0.4) -- long enough to read it
 		local out = TweenInfo.new(half, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		TweenService:Create(black, out, { BackgroundTransparency = 1 }):Play()

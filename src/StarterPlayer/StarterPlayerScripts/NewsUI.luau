@@ -24,6 +24,7 @@ local CLOSE_GAP = 8 -- between the last row and the Close button
 
 local player = Players.LocalPlayer
 local panel: Frame? = nil
+local scrimBack: TextButton? = nil -- the dim behind the card
 local closeFace: GuiButton? = nil
 local closeBound = false
 
@@ -127,6 +128,9 @@ local function dismiss()
 		return
 	end
 	root.Visible = false
+	if scrimBack then
+		scrimBack.Visible = false -- the dim goes with the card, never alone
+	end
 	unbind()
 	MenuPad.Close(root)
 	player:SetAttribute(SEEN_ATTR, true)
@@ -163,6 +167,9 @@ function NewsUI.Open()
 		return
 	end
 	root.Visible = true
+	if scrimBack then
+		scrimBack.Visible = true
+	end
 	bindClose()
 	MenuPad.Open(face, root)
 end
@@ -190,7 +197,11 @@ function NewsUI.Start()
 	scrim.AutoButtonColor = false
 	scrim.Text = ""
 	scrim.Selectable = false
+	-- Hidden until the card opens: a full-screen dim with no card on it is
+	-- the grey veil over the whole game (and it would eat every tap).
+	scrim.Visible = false
 	scrim.Parent = gui
+	scrimBack = scrim
 
 	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, false)
 	card.outer.Name = "WhatsNew"

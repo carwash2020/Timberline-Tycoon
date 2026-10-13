@@ -64,6 +64,7 @@ function BadgeUI.Start()
 	scroll.ScrollingDirection = Enum.ScrollingDirection.Y
 	scroll.Selectable = true
 	scroll.SelectionGroup = true
+	scroll.SelectionImageObject = UITheme.HiddenSelection() -- panel-sized: no box over the whole list
 	scroll.SelectionBehaviorUp = Enum.SelectionBehavior.Stop
 	scroll.SelectionBehaviorDown = Enum.SelectionBehavior.Stop
 	scroll.SelectionBehaviorLeft = Enum.SelectionBehavior.Stop

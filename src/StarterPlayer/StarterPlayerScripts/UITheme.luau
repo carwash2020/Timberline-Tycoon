@@ -1387,6 +1387,18 @@ function selectionRing(): Frame
 	return ring
 end
 
+-- A selection image that draws nothing, for a panel-sized object the gamepad
+-- may land on (a selection group's own frame): the engine's default box over
+-- a whole panel reads as a grey slab. Its children carry the visible ring.
+function UITheme.HiddenSelection(): Frame
+	local empty = Instance.new("Frame")
+	empty.Name = "NoSelection"
+	empty.BackgroundTransparency = 1
+	empty.BorderSizePixel = 0
+	empty.Size = UDim2.fromScale(1, 1)
+	return empty
+end
+
 function UITheme.Start()
 	local playerGui = UITheme.PlayerGui()
 	playerGui.SelectionImageObject = selectionRing()
