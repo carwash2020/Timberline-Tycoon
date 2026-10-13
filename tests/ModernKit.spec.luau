@@ -466,7 +466,11 @@ return function(t)
 		t.eq(PlotLogic.PlacePrice(key, false), nil)
 		t.eq(PlotLogic.PlacePrice(key, true), 20)
 		t.eq(PlotLogic.PlacePrice(bp("Mailbox"), true), 0)
-		t.eq(PlotLogic.PlacePrice(bp("Shed"), true), 240)
+		t.eq(
+			PlotLogic.PlacePrice(bp("Shed"), true),
+			0,
+			"the Shed Blueprint places free (Connor, 13 October 2026: placeFee 0)"
+		)
 		t.eq(PlotLogic.SellPlan(key, { uid = "a", paid = 20 }).cash, 10)
 		local row = BlueprintBook.Row(
 			{ id = "PictureWall8", bp = key, group = "Buildings", stock = 0 },
