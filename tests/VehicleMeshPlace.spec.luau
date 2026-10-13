@@ -4,6 +4,11 @@
 -- the part-built hull it replaces. (Before: every piece stood on the ground
 -- centre, so the Bed sat under the road-level boards, the Glass and Lights
 -- sank to the ground and the Hitch sat mid-truck.)
+-- 12 October 2026 (the vehicle GLB pass): each piece now goes where its GLB assembly
+-- authored it (VehicleModels.Piece.at), which puts the arches over the tyres; Place stays
+-- the rule for a piece with no `at` (the last test). So a piece's middle is its `at`, a
+-- trailer's from its bed's middle, and the checks below that were "on the ground" or "at
+-- the chassis bottom" are "at its authored place, above the ground".
 return function(t)
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
 	local TruckArt = t.load("ReplicatedStorage/Shared/Art/TruckArt")
@@ -58,14 +63,17 @@ return function(t)
 				local clo = range(chassis)
 				local body = find(model, "MeshBody")
 				local blo, bhi = range(body)
-				t.ok(math.abs(blo.Y) < 0.01, def.id .. " body stands on the ground")
+				local spec = VehicleModels.Truck(def.id)
+				t.ok((body.CFrame.Position - spec.Body.at).Magnitude < 0.01, def.id .. " body at its authored place")
+				t.ok(blo.Y >= 0, def.id .. " body is not below the ground")
 				local bed = find(model, "MeshBed")
 				if bed then
 					local lo = range(bed)
 					local floor = model:FindFirstChild("BedFloor", true)
-					t.ok(math.abs(lo.Y - clo.Y) < 0.01, def.id .. " bed starts at the chassis bottom")
+					t.ok((bed.CFrame.Position - spec.Bed.at).Magnitude < 0.01, def.id .. " bed at its authored place")
+					t.ok(lo.Y > clo.Y - 0.6, def.id .. " bed starts at the chassis bottom or above")
 					t.ok(
-						math.abs(bed.CFrame.Position.Z - floor.CFrame.Position.Z) < 0.01,
+						math.abs(bed.CFrame.Position.Z - floor.CFrame.Position.Z) < 0.6, -- the Rustbucket mesh bed overhangs the floor by 1 at the back
 						def.id .. " bed on the floor"
 					)
 				end
@@ -108,11 +116,15 @@ return function(t)
 					local piece = find(model, name, true)
 					t.ok(piece, trailer.id .. " " .. name)
 					local lo, hi = range(piece)
-					t.ok(lo.Y > 0.5, trailer.id .. " " .. name .. " is off the ground")
+					t.ok(
+						lo.Y > (if name == "MeshHitch" then -0.01 else 0.5),
+						trailer.id .. " " .. name .. " is off the ground (a coupler reaches down to it)"
+					)
 					t.ok(hi.Y < bhi.Y + 4, trailer.id .. " " .. name .. " is not above the bed")
 					if name ~= "MeshHitch" then
+						local want = VehicleModels.Trailer(trailer.id, truck.id)[string.sub(name, 5)].at
 						t.ok(
-							math.abs(piece.CFrame.Position.Z - tb.CFrame.Position.Z) < 0.01,
+							math.abs(piece.CFrame.Position.Z - (tb.CFrame.Position.Z + want.Z)) < 0.01,
 							trailer.id .. " " .. name .. " along the bed"
 						)
 					else

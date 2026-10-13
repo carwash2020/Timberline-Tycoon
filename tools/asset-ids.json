@@ -8413,7 +8413,8 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
-      "usedBy": "VehicleModels.luau Rustbucket Body"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau Rustbucket "
     },
     {
       "collision": false,
@@ -8422,7 +8423,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
-      "usedBy": "VehicleModels.luau Rustbucket Glass"
+      "usedBy": "VehicleModels.luau Rustbucket "
     },
     {
       "collision": false,
@@ -8431,7 +8432,8 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
-      "usedBy": "VehicleModels.luau Rustbucket Lights"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau Rustbucket "
     },
     {
       "collision": false,
@@ -8440,6 +8442,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Rustbucket Bed"
     },
     {
@@ -8449,6 +8452,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Rustbucket Wheel"
     },
     {
@@ -8458,6 +8462,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Rustbucket Hitch"
     },
     {
@@ -8467,7 +8472,8 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
-      "usedBy": "VehicleModels.luau Pickup Body"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau Pickup "
     },
     {
       "collision": false,
@@ -8485,6 +8491,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Pickup Lights"
     },
     {
@@ -8494,6 +8501,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Pickup Bed"
     },
     {
@@ -8503,6 +8511,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Pickup Wheel"
     },
     {
@@ -8512,6 +8521,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Pickup Hitch"
     },
     {
@@ -8521,6 +8531,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau ScoutATV Body"
     },
     {
@@ -8539,7 +8550,8 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
-      "usedBy": "VehicleModels.luau ScoutATV Lights"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau ScoutATV "
     },
     {
       "collision": false,
@@ -8548,6 +8560,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau ScoutATV Wheel"
     },
     {
@@ -8557,7 +8570,8 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
-      "usedBy": "VehicleModels.luau Flatbed Body"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau Flatbed "
     },
     {
       "collision": false,
@@ -8575,6 +8589,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Flatbed Lights"
     },
     {
@@ -8584,6 +8599,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Flatbed Bed"
     },
     {
@@ -8593,6 +8609,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Flatbed Wheel"
     },
     {
@@ -8602,6 +8619,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau Flatbed Hitch"
     },
     {
@@ -8611,6 +8629,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau LoggingRig Body"
     },
     {
@@ -8629,6 +8648,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau LoggingRig Lights"
     },
     {
@@ -8638,6 +8658,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau LoggingRig Bed"
     },
     {
@@ -8647,6 +8668,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau LoggingRig Wheel"
     },
     {
@@ -8656,6 +8678,7 @@
       "kind": "mesh",
       "places": 1,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau LoggingRig Hitch"
     },
     {
@@ -8665,7 +8688,8 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
-      "usedBy": "VehicleModels.luau PonyTrailer Body"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau PonyTrailer "
     },
     {
       "collision": false,
@@ -8674,7 +8698,8 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
-      "usedBy": "VehicleModels.luau PonyTrailer Lights"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau PonyTrailer "
     },
     {
       "collision": false,
@@ -8683,6 +8708,7 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau PonyTrailer Bed"
     },
     {
@@ -8692,6 +8718,7 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau PonyTrailer Wheel"
     },
     {
@@ -8701,7 +8728,8 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
-      "usedBy": "VehicleModels.luau PonyTrailer Hitch"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau PonyTrailer "
     },
     {
       "collision": false,
@@ -8710,7 +8738,8 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
-      "usedBy": "VehicleModels.luau RanchTrailer Body"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau RanchTrailer "
     },
     {
       "collision": false,
@@ -8719,7 +8748,8 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
-      "usedBy": "VehicleModels.luau RanchTrailer Lights"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau RanchTrailer "
     },
     {
       "collision": false,
@@ -8728,6 +8758,7 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau RanchTrailer Bed"
     },
     {
@@ -8737,6 +8768,7 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau RanchTrailer Wheel"
     },
     {
@@ -8746,7 +8778,8 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
-      "usedBy": "VehicleModels.luau RanchTrailer Hitch"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau RanchTrailer "
     },
     {
       "collision": false,
@@ -8755,6 +8788,7 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau HeavyHauler Body"
     },
     {
@@ -8764,7 +8798,8 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
-      "usedBy": "VehicleModels.luau HeavyHauler Lights"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau HeavyHauler "
     },
     {
       "collision": false,
@@ -8773,6 +8808,7 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau HeavyHauler Bed"
     },
     {
@@ -8782,6 +8818,7 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
+      "status": "new GLB in repo, needs re-upload",
       "usedBy": "VehicleModels.luau HeavyHauler Wheel"
     },
     {
@@ -8791,7 +8828,8 @@
       "kind": "mesh",
       "places": 5,
       "priority": 2,
-      "usedBy": "VehicleModels.luau HeavyHauler Hitch"
+      "status": "new GLB in repo, needs re-upload",
+      "usedBy": "VehicleModels.luau HeavyHauler "
     },
     {
       "collision": false,

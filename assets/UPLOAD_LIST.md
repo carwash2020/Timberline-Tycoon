@@ -182,14 +182,14 @@ Every other registry row is uploaded and Approved. Status `repo`: the GLB is in
 | `trees/Oak` | repo | TreeModels | 1,644 | 22.105 x 11.992 x 22.93 | Parts |
 | `trees/Palmwood` | repo | TreeModels | 756 | 18.998 x 7.166 x 19.224 | Parts |
 | `trees/Pine` | repo | TreeModels | 960 | 18.492 x 41.005 x 18.492 | Parts |
-| `vehicles/Flatbed` | repo | VehicleModels | 4,142 | 12.14 x 13.537 x 35.205 | Parts |
-| `vehicles/HeavyHauler` | repo | VehicleModels | 2,084 | 12 x 8.579 x 28.643 | Parts |
-| `vehicles/LoggingRig` | repo | VehicleModels | 5,170 | 12.91 x 17.255 x 47.45 | Parts |
-| `vehicles/Pickup` | repo | VehicleModels | 3,326 | 11.11 x 11.6 x 26.86 | Parts |
-| `vehicles/PonyTrailer` | repo | VehicleModels | 1,760 | 9.79 x 6.309 x 15.643 | Parts |
-| `vehicles/RanchTrailer` | repo | VehicleModels | 1,924 | 10.31 x 8.514 x 20.843 | Parts |
-| `vehicles/Rustbucket` | repo | VehicleModels | 4,402 | 10.64 x 11.386 x 23.698 | Parts |
-| `vehicles/ScoutATV` | repo | VehicleModels | 2,428 | 9.4 x 12.283 x 12.891 | Parts |
+| `vehicles/Flatbed` | repo | VehicleModels | 4,882 | 12.18 x 13.543 x 35.205 | Parts |
+| `vehicles/HeavyHauler` | repo | VehicleModels | 3,112 | 12 x 8.585 x 28.643 | Parts |
+| `vehicles/LoggingRig` | repo | VehicleModels | 5,910 | 12.99 x 17.261 x 47.45 | Parts |
+| `vehicles/Pickup` | repo | VehicleModels | 4,446 | 11.11 x 11.605 x 26.86 | Parts |
+| `vehicles/PonyTrailer` | repo | VehicleModels | 2,572 | 9.79 x 6.315 x 15.643 | Parts |
+| `vehicles/RanchTrailer` | repo | VehicleModels | 2,904 | 10.31 x 8.52 x 20.843 | Parts |
+| `vehicles/Rustbucket` | repo | VehicleModels | 5,314 | 10.69 x 11.395 x 23.698 | Parts |
+| `vehicles/ScoutATV` | repo | VehicleModels | 3,256 | 9.4 x 12.29 x 12.891 | Parts |
 
 Kept part-built on purpose (not on this list): shop boxes (the LT2-style dark box with a
 window, BoxArt), every gameplay part (hitboxes, prompts, sell zones, signs with text).

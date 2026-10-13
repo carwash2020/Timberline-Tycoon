@@ -20,6 +20,14 @@
 -- coupler). A piece whose import pivot DID survive (MeshPivot "authored") is
 -- used as it is only when that lands within PivotTolerance of the hull's
 -- place; otherwise the hull's place wins. Never a guess from the ground.
+--
+-- 12 October 2026 (the vehicle GLB pass): every non-wheel piece now carries `at`
+-- (VehicleModels.Piece), its middle in the GLB's own assembly, and goes exactly
+-- there (a trailer's from its bed's middle). The GLBs are authored on the ground
+-- with the wheels at TruckLayout's wheel centres, so the arches meet the tyres.
+-- The hull rule above dropped a Body 0.7 stud below its arches (tyres through the
+-- body, tests/VehicleWheelClearance.spec). Place stays as the rule for a piece with
+-- no `at`.
 
 local MeshKit = require(script.Parent.MeshKit)
 local VehicleModels = require(script.Parent.VehicleModels)
@@ -300,7 +308,14 @@ local function fidelity(part: MeshPart, role: string)
 	end
 end
 
-type Made = { part: MeshPart, role: string, trailer: boolean, wheel: BasePart?, mirror: boolean }
+type Made = {
+	part: MeshPart,
+	role: string,
+	trailer: boolean,
+	wheel: BasePart?,
+	mirror: boolean,
+	at: Vector3?, -- VehicleModels.Piece.at
+}
 
 local function destroyMade(made: { Made })
 	for _, item in ipairs(made) do
@@ -343,7 +358,7 @@ local function addRole(
 			mirror = chassis.CFrame:PointToObjectSpace(wheel.CFrame.Position).X < 0
 		end
 	end
-	table.insert(made, { part = part, role = role, trailer = trailer, wheel = wheel, mirror = mirror })
+	table.insert(made, { part = part, role = role, trailer = trailer, wheel = wheel, mirror = mirror, at = piece.at })
 	return true
 end
 
@@ -447,7 +462,14 @@ local function applyNow(model: Model, truckId: string, trailerId: string?): bool
 			swapWheel(part, item.wheel, item.mirror)
 		else
 			local root = if item.trailer then trailerAt else origin
-			placePiece(part, item.role, part.Size, item.trailer, hull, root)
+			if item.at then
+				-- Where the GLB's assembly puts it (VehicleModels.Piece.at): a trailer's piece is
+				-- measured from its bed's middle.
+				local base = if item.trailer and hull.trailerBed then hull.trailerBed.pos else Vector3.zero
+				part.CFrame = CFrame.new(item.at + Vector3.new(0, 0, base.Z))
+			else
+				placePiece(part, item.role, part.Size, item.trailer, hull, root)
+			end
 			if item.trailer then
 				part:SetAttribute("TrailerBody", true)
 				part:SetAttribute("RigHalf", "trailer")

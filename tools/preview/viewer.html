@@ -594,6 +594,14 @@ function setView(i) {
   camera.fov = v.fov || scene.fov || 55;
   camera.updateProjectionMatrix();
   controls.update();
+  // shadowFollow: the sun's shadow box follows the view's target (a scene of
+  // many specimens far apart, each shot lit and shadowed like the only one).
+  if (scene.shadowFollow) {
+    const at = new THREE.Vector3(...v.target);
+    sun.target.position.copy(at);
+    sun.position.copy(at).addScaledVector(sd, shadowRadius * 2);
+    sun.target.updateMatrixWorld();
+  }
   useLighting(night);
   useLights(night, camera.position);
   const hud = document.getElementById("hud");

@@ -87,6 +87,9 @@ export type BuildExtras = {
 
 local V3 = Vector3.new
 local CF = CFrame.new
+-- A stripe or trim strip stands this far off the paint it lies on: proud, not sunk and not
+-- level (two faces on one plane flicker).
+local STRIPE_PROUD = 0.04
 local hex = Kit.hex
 local M = Enum.Material
 
@@ -262,6 +265,8 @@ type FenderStyle = {
 
 local function fender(parent: Instance, x: number, z0: number, z1: number, s: FenderStyle)
 	local inset = s.r * 0.66
+	-- The cap's underside stays a hair over the tyre top.
+	local top = math.max(s.top, 2 * s.r + 0.06 + s.thick)
 	local za, zb = z0 - inset, z1 + inset
 	local tilt = s.tilt or CFrame.identity
 	if s.simple then
@@ -269,7 +274,7 @@ local function fender(parent: Instance, x: number, z0: number, z1: number, s: Fe
 			parent,
 			"Fender",
 			V3(s.width, s.thick, zb - za),
-			CF(x, s.top - s.thick / 2, (za + zb) / 2) * tilt,
+			CF(x, top - s.thick / 2, (za + zb) / 2) * tilt,
 			s.color,
 			s.material
 		)
@@ -279,16 +284,27 @@ local function fender(parent: Instance, x: number, z0: number, z1: number, s: Fe
 		parent,
 		"Fender",
 		V3(s.width, s.thick, zb - za),
-		CF(x, s.top - s.thick / 2, (za + zb) / 2) * tilt,
+		CF(x, top - s.thick / 2, (za + zb) / 2) * tilt,
 		s.color,
 		s.material
 	)
-	local fh, bh = s.top - s.front[2], s.top - s.back[2]
+	-- A wedge is a solid, so its tall face must stand outside the tyre: the lowest it may
+	-- reach at `dz` from the axle is where the tyre's own top edge is there, plus a gap. A
+	-- shorter wedge keeps the shoulder look without cutting into the rubber.
+	local function lowestAt(low: number, dz: number): number
+		local d = s.r + 0.05
+		if dz >= d then
+			return low
+		end
+		return math.max(low, s.r + math.sqrt(d * d - dz * dz) + 0.02)
+	end
+	local fh = math.max(top - lowestAt(s.front[2], inset), 0.12)
+	local bh = math.max(top - lowestAt(s.back[2], inset), 0.12)
 	decoWedge(
 		parent,
 		"Fender",
 		V3(s.width, fh, s.front[1]),
-		CF(x, s.top - fh / 2, za - s.front[1] / 2) * tilt,
+		CF(x, top - fh / 2, za - s.front[1] / 2) * tilt,
 		s.color,
 		s.material
 	)
@@ -296,7 +312,7 @@ local function fender(parent: Instance, x: number, z0: number, z1: number, s: Fe
 		parent,
 		"Fender",
 		V3(s.width, bh, s.back[1]),
-		CF(x, s.top - bh / 2, zb + s.back[1] / 2) * CFrame.Angles(0, math.pi, 0),
+		CF(x, top - bh / 2, zb + s.back[1] / 2) * CFrame.Angles(0, math.pi, 0),
 		s.color,
 		s.material
 	)
@@ -306,14 +322,20 @@ end
 -- when the style has a hub colour, a round hub cap and one bolt off its
 -- centre as children, so the whole wheel spins as one. The dark bolt on the
 -- pale rim makes the spin readable.
+-- A `dished` wheel (the Pickup and the Timber Classic) is the whole thing:
+-- a cream rim with a lip standing proud, a darker dish sunk inside it, four
+-- lug nuts (the HubBolt and three LugNut) on a ring and a chrome cap in the
+-- middle, each a cylinder through the tyre so both faces look the same.
 local HUB_CAP = 0.42 -- the cap's diameter, times the tyre's radius
 local HUB_BOLT = 0.14 -- the bolt's diameter, times the radius
 local HUB_BOLT_AT = 0.36 -- the bolt's centre out from the axle, times the radius
+local DISH = 0.8 -- the dish's diameter, times the rim's
 type WheelStyle = {
 	rim: Color3,
 	rimMaterial: Enum.Material?,
 	rimScale: number?,
 	hub: Color3?,
+	dished: boolean?,
 	steer: boolean,
 	rear: boolean,
 }
@@ -325,6 +347,27 @@ local function wheel(parent: Instance, center: Vector3, r: number, w: number, s:
 	tyre:SetAttribute("Radius", r)
 	tyre:SetAttribute("Steer", s.steer)
 	tyre:SetAttribute("Rear", s.rear)
+	if s.dished then
+		-- Lip 0.08 proud, dish 0.02 proud (0.06 sunk), cap 0.10, nuts 0.12: no two faces level.
+		local rimDia = r * 2 * (s.rimScale or 0.6)
+		decoCyl(tyre, "Rim", w + 0.16, rimDia, cf, s.rim, s.rimMaterial or M.Metal)
+		decoCyl(tyre, "RimDish", w + 0.04, rimDia * DISH, cf, Kit.shade(s.rim, -0.12), M.Metal)
+		decoCyl(tyre, "Hub", w + 0.2, r * HUB_CAP, cf, s.hub or CHROME_HI, M.Metal)
+		decoCyl(tyre, "HubBolt", w + 0.24, r * HUB_BOLT, cf * CF(0, r * HUB_BOLT_AT, 0), BLACK, M.Metal)
+		for i = 1, 3 do
+			local ang = i * math.pi / 2
+			decoCyl(
+				tyre,
+				"LugNut",
+				w + 0.24,
+				r * HUB_BOLT,
+				cf * CF(0, r * HUB_BOLT_AT * math.cos(ang), r * HUB_BOLT_AT * math.sin(ang)),
+				BLACK,
+				M.Metal
+			)
+		end
+		return tyre
+	end
 	decoCyl(tyre, "Rim", w + 0.06, r * 2 * (s.rimScale or 0.6), cf, s.rim, s.rimMaterial or M.Metal)
 	if s.hub then
 		decoCyl(tyre, "Hub", w + 0.12, r * HUB_CAP, cf, s.hub, M.Metal)
@@ -772,11 +815,14 @@ builders.pickup = function(c: Ctx)
 			m,
 			"Trim",
 			V3(0.07, 0.15, bedEnd - cabZ0),
-			CF(side * (W / 2 + 0.035), belt - 0.3, (cabZ0 + bedEnd) / 2),
+			CF(side * (W / 2 + STRIPE_PROUD - 0.035), belt - 0.3, (cabZ0 + bedEnd) / 2),
 			CHROME_HI,
 			M.Metal
 		)
-		deco(m, "MudFlap", V3(0.7, 0.85, 0.08), CF(side * (W / 2 + 0.15), 1.35, zR + 1.7), BLACK, M.SmoothPlastic)
+		-- The one mudflap of the part-built Pickup (a meshed Pickup drops it: the mesh has its own,
+		-- and this is not in VehicleMeshes.KEEP). Flush: hung straight from the rear fender's tail,
+		-- centred under it, behind the tyre.
+		deco(m, "MudFlap", V3(0.8, 1.1, 0.08), CF(side * (W / 2 + 0.4), 2.27, zR + 1.95), BLACK, M.SmoothPlastic)
 	end
 
 	-- Bed: smooth painted walls with chrome caps; a flared rear fender over
@@ -808,11 +854,39 @@ builders.pickup = function(c: Ctx)
 	end
 	deco(m, "BedFront", V3(W - 2 * wall, lay.wallHeight, 0.3), CF(0, wallY, bedStart + 0.15), paint, M.Metal)
 	hull(m, "Tailgate", V3(W - 2 * wall, lay.wallHeight, 0.3), CF(0, wallY, bedEnd - 0.15), paint, M.Metal)
+	-- The Timber Classic's bed is a farm stake bed: three wooden stake posts a side, standing on
+	-- the deck outside the walls, and a top rail along them. Looks only (the walls are the hull).
+	if c.def.classic == true then
+		local wood = hex("#8A6038")
+		local rng = c.rng
+		local postH = lay.wallHeight + 0.3
+		for _, side in ipairs({ -1, 1 }) do
+			local px = side * (W / 2 + 0.08)
+			for _, z in ipairs({ bedStart + 0.5, lay.bedCenterZ, bedEnd - 0.5 }) do
+				deco(
+					m,
+					"BedPost",
+					V3(0.3, postH, 0.3),
+					CF(px, floorTop - 0.05 + postH / 2, z),
+					Kit.vary(wood, rng, 0.05),
+					M.WoodPlanks
+				)
+			end
+			deco(
+				m,
+				"BedRail",
+				V3(0.3, 0.2, lay.bedLength),
+				CF(px, floorTop + lay.wallHeight + 0.33, lay.bedCenterZ),
+				Kit.vary(wood, rng, 0.05),
+				M.WoodPlanks
+			)
+		end
+	end
 	deco(m, "RearBumper", V3(W + 0.25, 0.55, 0.5), CF(0, 1.95, L / 2 - 0.2), CHROME, M.Metal)
 	exhaust(m, V3(1.7, 1.6, bedEnd - 0.8), V3(1.75, 1.55, L / 2 + 0.3), 0.3, CHROME, M.Metal, 0.3, hex("#8A8580"))
 
-	local front = { rim = cream, rimScale = 0.64, hub = CHROME_HI, steer = true, rear = false }
-	local back = { rim = cream, rimScale = 0.64, steer = false, rear = true }
+	local front = { rim = cream, rimScale = 0.64, hub = CHROME_HI, dished = true, steer = true, rear = false }
+	local back = { rim = cream, rimScale = 0.64, hub = CHROME_HI, dished = true, steer = false, rear = true }
 	wheels(m, lay, front, back)
 	gloss(m, paint, 0.05)
 end
@@ -1065,7 +1139,14 @@ builders.rig = function(c: Ctx)
 	deco(m, "HoodTop", V3(4.5, 0.45, 4.4), CF(0, 4.525, f + 3.9), paint, M.Metal)
 	decoWedge(m, "HoodNose", V3(4.5, 0.45, 1.0), CF(0, 4.525, f + 1.2), paint, M.Metal)
 	for _, side in ipairs({ -1, 1 }) do
-		deco(m, "Pinstripe", V3(0.05, 0.26, 5.3), CF(side * 2.52, 3.75, f + 3.42), hex("#F1E6CC"), M.SmoothPlastic)
+		deco(
+			m,
+			"Pinstripe",
+			V3(0.05, 0.26, 5.3),
+			CF(side * (2.5 + STRIPE_PROUD - 0.025), 3.75, f + 3.42),
+			hex("#F1E6CC"),
+			M.SmoothPlastic
+		)
 	end
 	deco(m, "Grille", V3(3.4, 3.3, 0.32), CF(0, 3.55, f + 0.66), CHROME_HI, M.Metal)
 	deco(m, "GrilleBars", V3(2.9, 2.7, 0.08), CF(0, 3.55, f + 0.48), BLACK, M.Metal)
@@ -1331,7 +1412,7 @@ local function drawTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
 					M.Metal
 				)
 			end
-			deco(model, "Marker", V3(0.1, 0.26, 0.45), CF(side * (W / 2 + 0.02), y, bc), AMBER, M.Neon)
+			deco(model, "Marker", V3(0.1, 0.26, 0.45), CF(side * (W / 2 + 0.02), y, bs + 1.7), AMBER, M.Neon)
 		end
 		hull(model, "TrailerFront", V3(W, wallH, 0.3), CF(0, deckTop + wallH / 2, bs + 0.15), paint, M.Metal)
 	end
@@ -1661,6 +1742,7 @@ local BED = {
 	BedBoard = true,
 	BedWall = true,
 	BedPost = true,
+	BedRail = true,
 	Tailgate = true,
 	BedCap = true,
 	BedFront = true,
