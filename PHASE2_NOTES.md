@@ -1,5 +1,16 @@
 # Phase 2+ build notes
 
+## Sparkworks restyle (13 October 2026, branch `phase-2/store-restyle-sparkworks`)
+
+Studio checks (none of this has been seen in Studio; details in STATUS.md):
+1. PC: walk into the Sparkworks. Wood display tables on legs with small price cards, no coloured slabs or flags, a header over each unit
+   (whole words), CHECKOUT on the counter, SPARKWORKS over it. Boxes have a wood base and a dark teal name card. Walk the aisle: nothing blocks it.
+2. From the street: teal and cream striped awning over a framed door, hours board above it, no floating pieces, lamp posts each side.
+3. Back west corner: a roped mat with three table spots (hidden banner by the counter's east end). Run an event (EVENTS.md) to see the rope drop
+   and the banner appear.
+4. Phone (667x375): headers and CHECKOUT readable, price cards tappable (hover tag), nothing cropped. Xbox: the selection ring lands on the
+   price cards and boxes as in Hearth & Home; B closes the panel.
+
 ## Server boot and runtime audit (12 October 2026, branch `phase-2/audit-server-boot`)
 
 Studio checks (none of this has been seen in Studio):

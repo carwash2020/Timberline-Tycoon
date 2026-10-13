@@ -535,4 +535,31 @@ return function(t)
 			t.eq(label.Text, "Item", "the name is still on it")
 		end
 	)
+
+	t.test("the wood look takes an optional card colour (the Sparkworks' dark teal); the base stays wood", function()
+		local model = dressed("Logic", "GateAnd", { wood = true, cardColor = BoxArt.WoodTealCard })
+		local base, strip
+		for _, p in ipairs(parts(model)) do
+			if p.Name == "Base" then
+				base = p
+			elseif p.Name == "Strip" then
+				strip = p
+			end
+		end
+		t.eq(base.Color, BoxArt.Wood.base)
+		t.eq(strip.Color, BoxArt.WoodTealCard)
+		-- without the option the card is the walnut, and without `wood` the colour is ignored
+		local walnut = dressed("Logic", "GateAnd", { wood = true })
+		local plain = dressed("Logic", "GateAnd", { cardColor = BoxArt.WoodTealCard })
+		for _, p in ipairs(parts(walnut)) do
+			if p.Name == "Strip" then
+				t.eq(p.Color, BoxArt.Wood.card)
+			end
+		end
+		for _, p in ipairs(parts(plain)) do
+			if p.Name == "Base" then
+				t.ok(p.Color ~= BoxArt.Wood.base, "no wood without `wood`")
+			end
+		end
+	end)
 end

@@ -94,7 +94,7 @@ or comma. The Output window shows `[StoreEventService] StoreEventConfig is not v
 
 - `ShopEventKit.BuildZone(parent, kind, anchor, size?)` builds the roped-off area (about 26 parts). `anchor` is the middle of the
   zone's floor footprint on the floor surface; its **-Z side is the open front** (toward the aisle) and +Z is the back (a wall or
-  a shelf run). `size` is the footprint (x wide, z deep); the default is 16 x 9, the least 14 x 8. It makes the tag
+  a shelf run). `size` is the footprint (x wide, z deep); the default is 16 x 9, the least 12 x 8 (the Sparkworks' back corner is 12 wide, so its three table spots come out about 2.3 wide). It makes the tag
   `EventExpansion`, attributes `Store` and `Active = false`, three table spots `EventTable1..3` (invisible parts, each with an
   Attachment `TableAttachment`) and one lamp. Nothing in it collides.
 - `ShopEventKit.BuildBanner(parent, kind, anchor, width?)` builds the banner by the door (about 8 parts). `anchor` is the middle of

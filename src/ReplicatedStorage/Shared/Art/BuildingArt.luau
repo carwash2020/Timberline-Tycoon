@@ -1787,7 +1787,8 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 			TRIM
 		)
 	end
-	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), Palette.RoofSlate, MAT.Slate)
+	-- (the roof's underside is the walls' top, TOP, so it rests on the walls; its top is TOP + 0.65)
+	Kit.part(model, "Roof", V3(2 * HX + 2, 0.65, 2 * HZ + 2), CF(0, TOP + 0.325, 0), Palette.RoofSlate, MAT.Slate)
 
 	-- The name board stands over the roof on two posts, like the General Store's.
 	local signW, signH = 20, 3
@@ -1808,11 +1809,8 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 
 	-- The counter stands at the back (customer side faces -Z), the keeper
 	-- behind it; the shelf units stop short of it.
+	-- (no porch posts inside the door: the display tables start there, and the door has its frame outside)
 	placeCounter(model, 0, BuildingArt.SparkworksCounterZ / BuildingArt.Scale.Sparkworks)
-	for _, s in ipairs({ -1, 1 }) do
-		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
-	end
-	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
 
 	-- The back wall behind the keeper: a row of spark lamps, each over its
 	-- switch, and a copper run joining them. Looks only.
@@ -1825,9 +1823,6 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 		dBox(model, "WallSwitch", V3(0.5, 0.8, 0.2), CF(x, 5.9, backZ - 0.1), Palette.IronBlack, MAT.Metal)
 	end
 	dBox(model, "CopperRun", V3(14.4, 0.2, 0.2), CF(0, 6.65, backZ - 0.08), Palette.Brass, MAT.Metal)
-	local board = Kit.part(model, "BackSign", V3(9, 1.6, 0.2), CF(0, 9, backZ - 0.2), Palette.SignInk, MAT.Wood)
-	Kit.signText(board, "WIRE IT UP", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	Kit.decor(board, false)
 end
 
 -- Shelf slots are attachments on the counter (they are not parts, so the
@@ -1934,7 +1929,7 @@ local function addHoursBoard(model: Model, shopId: string)
 	end
 	-- The General Store's striped awning (ShopFacade) reaches up to 12.7 on the wall over its door:
 	-- the board's bottom edge stays above it, so the two never overlap.
-	if shopId == "HearthAndHome" and y - h / 2 < 12.7 then
+	if (shopId == "HearthAndHome" or shopId == "Sparkworks") and y - h / 2 < 12.7 then
 		y = 12.7 + h / 2
 	end
 	-- The board hangs on the wall's outside face, not inside it: if a front wall stands over
@@ -2006,7 +2001,7 @@ function BuildingArt.InteriorFrame(kind: string, s: number): { frame: ShopInteri
 				floorTop = 0.4 * s,
 				halfW = BuildingArt.SparkworksHalfWidth * s - 0.45,
 				halfD = BuildingArt.SparkworksHalfDepth * s - 0.45,
-				ceilY = 10 * s - 0.4,
+				ceilY = 10 * s, -- the roof's underside (it rests on the walls): the beams and chains reach up to it
 			},
 		}
 	end
@@ -2080,6 +2075,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			wallTop = 10 * s,
 			roofTop = 10.65 * s,
 			groundY = 0.4 * s,
+			yardY = 0, -- the floor is a step up from the ground; the yard's props stand on the ground
 			accent = accent,
 		}
 	end
