@@ -143,44 +143,6 @@ local function chimney(parent: Instance, x: number, z: number, baseY: number, h:
 	box(parent, "ChimneyCap", V3(2.4, 0.3, 2.4), CF(x, baseY + h + 0.15, z), hex("#5C5650"), MAT.Slate)
 end
 
--- A striped awning on two posts over the door: `reach` studs out.
-local function awning(
-	parent: Instance,
-	spec: Spec,
-	y: number,
-	reach: number,
-	colorA: Color3,
-	colorB: Color3,
-	gap: number?
-)
-	local off = gap or 0 -- how far the canopy's near end stands off the wall
-	local w = spec.doorHalf * 2 + 4
-	local c = spec.doorCx
-	local n = 8
-	local stripe = w / n
-	local tilt = 0.32
-	for i = 1, n do
-		local x = c - w / 2 + stripe * (i - 0.5)
-		box(
-			parent,
-			"AwningStripe",
-			V3(stripe, 0.25, reach),
-			CF(x, y, spec.frontZ - off - reach / 2 + 0.2) * CFrame.Angles(-tilt, 0, 0),
-			if i % 2 == 0 then colorA else colorB,
-			MAT.Fabric
-		)
-	end
-	for _, s in ipairs({ -1, 1 }) do
-		box(
-			parent,
-			"AwningPost",
-			V3(0.3, y - spec.groundY - 0.4, 0.3),
-			CF(c + s * (w / 2 - 0.2), spec.groundY + (y - spec.groundY - 0.4) / 2, spec.frontZ - off - reach + 0.4),
-			TIMBER
-		)
-	end
-end
-
 export type FrameOpts = {
 	postW: number?, -- the posts' width (default 0.9)
 	proud: number?, -- how far the posts stand out from the wall (default 0.55)
