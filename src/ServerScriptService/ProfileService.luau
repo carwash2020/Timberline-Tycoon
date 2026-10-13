@@ -77,33 +77,97 @@ function ProfileService.Unsaveable(player: Player): string?
 	return unsaveable[player]
 end
 
--- Starts the player's save session. Yields until the save is loaded:
--- ProfileStore keeps retrying and, if another server still holds the save
--- (the player just hopped servers), asks it to let go and then takes over.
--- Only one copy is ever loaded: a second join gets the save only after the
--- first server's session has ended, and that server then kicks its player.
--- Returns (profile, nil) on success, or (nil, "left" | "failed"). On
--- "failed" nothing was kept: the player is marked unsaveable and no session
--- is left running that could write.
-local function loadNow(player: Player): (Profile?, string?)
+-- Why a load attempt ended without a save (the reason code shown to the
+-- player and printed in the Output):
+--   start     StartSessionAsync raised (a DataStore or ProfileStore error)
+--   lock      no session before the attempt's time budget ran out: the save
+--             stayed held by another session or server, or DataStore calls
+--             kept failing
+--   contended ProfileStore gave up early: another session overrode our
+--             request for the lock
+--   migrate   Reconcile/Migrate raised on the stored save (it was put back
+--             exactly as stored)
+--   error     the load code itself raised
+--   closing   the server is shutting down
+export type FailInfo = { reason: string, detail: string, waited: number, attempts: number }
+
+-- A failed attempt is tried again (nothing was written and no session is
+-- left running, so a second try cannot make anything worse). Total tries per
+-- reason; the waits are between tries.
+ProfileService.LoadAttempts = 3
+ProfileService.MigrateAttempts = 2 -- a Migrate error is deterministic; one more look in case it was not
+ProfileService.RetryBudgetSec = 60 -- time budget of each try after the first
+ProfileService.RetryWaits = { 3, 6 }
+local NOTE_AFTER_SEC = 6 -- a load this slow tells the player what it is waiting for
+
+local function trim(text: string): string
+	return if #text > 200 then string.sub(text, 1, 200) .. "..." else text
+end
+
+-- The loading card's second line (Player attribute "LoadNote"); nil clears it.
+local function setNote(player: Player, text: string?)
+	pcall(function()
+		player:SetAttribute("LoadNote", text)
+	end)
+end
+
+type Opened = { session: any?, pristine: any?, committed: boolean }
+
+-- One try at starting the player's save session. Yields until the save is
+-- loaded: ProfileStore keeps retrying and, if another server still holds the
+-- save (the player just hopped servers), asks it to let go and then takes
+-- over. Only one copy is ever loaded: a second join gets the save only after
+-- the first server's session has ended, and that server then kicks its
+-- player. Returns (profile, nil), or (nil, "left") or (nil, "failed", reason,
+-- detail). On a failure nothing was kept: the player is marked unsaveable
+-- and no session is left running that could write.
+local function loadOnce(player: Player, budget: number, opened: Opened): (Profile?, string?, string?, string?)
 	local startedAt = os.clock()
+	unsaveable[player] = nil
+	local finished = false
+	local function waited(): number
+		return os.clock() - startedAt
+	end
+	-- After a few seconds with no save, say what the wait is.
+	local function tick()
+		if finished or player.Parent ~= Players then
+			return
+		end
+		setNote(
+			player,
+			string.format("Waiting for your save to be released by another session (%d s)...", math.floor(waited()))
+		)
+		task.delay(1, tick)
+	end
+	task.delay(NOTE_AFTER_SEC, tick)
+
 	local started, session = pcall(function(): any
 		return store:StartSessionAsync(KEY_PREFIX .. player.UserId, {
 			Cancel = function()
-				return player.Parent ~= Players or os.clock() - startedAt > ProfileService.LoadBudgetSec
+				return player.Parent ~= Players or os.clock() - startedAt > budget
 			end,
 		})
 	end)
+	finished = true
 	if not started then
-		warn(string.format("[ProfileService] starting %s's save failed: %s", player.Name, tostring(session)))
 		unsaveable[player] = "start"
-		return nil, if player.Parent ~= Players then "left" else "failed"
+		return nil, if player.Parent ~= Players then "left" else "failed", "start", trim(tostring(session))
 	end
 	if session == nil then
-		unsaveable[player] = "load"
-		return nil, if player.Parent ~= Players then "left" else "failed"
+		if player.Parent ~= Players then
+			unsaveable[player] = "load"
+			return nil, "left"
+		end
+		local reason = if ProfileStore.IsClosing then "closing" elseif waited() >= budget then "lock" else "contended"
+		unsaveable[player] = reason
+		local detail = if reason == "lock"
+			then string.format("no session after %.0fs (save held elsewhere, or DataStore calls failing)", waited())
+			elseif reason == "closing" then "server is shutting down"
+			else "ProfileStore returned early (another session overrode the lock request)"
+		return nil, "failed", reason, detail
 	end
 
+	opened.session = session
 	session:AddUserId(player.UserId) -- GDPR: lets Roblox erase this key on request
 	-- Reconcile would copy the template's WorldVersion onto a save that
 	-- never had one, and a later map would then skip the park. Missing
@@ -111,6 +175,7 @@ local function loadNow(player: Player): (Profile?, string?)
 	-- A new profile already has the field, copied from the template, so
 	-- it starts on the current map.
 	local pristine = deepCopy(session.Data)
+	opened.pristine = pristine
 	local prepared, why = pcall(function()
 		local hadWorldVersion = session.Data.worldVersion ~= nil
 		session:Reconcile()
@@ -123,15 +188,16 @@ local function loadNow(player: Player): (Profile?, string?)
 		-- A half-migrated table must not be written back over the real
 		-- save. Put back what the DataStore gave us, end the session
 		-- (which writes exactly that) and refuse to play on it.
-		warn(string.format("[ProfileService] %s's save could not be prepared: %s", player.Name, tostring(why)))
 		unsaveable[player] = "migrate"
 		session.Data = pristine
+		opened.committed = true -- ended here
 		session:EndSession()
-		return nil, if player.Parent ~= Players then "left" else "failed"
+		return nil, if player.Parent ~= Players then "left" else "failed", "migrate", trim(tostring(why))
 	end
 
 	-- The player may have left while we were waiting on the DataStore.
 	if player.Parent ~= Players then
+		opened.committed = true
 		session:EndSession()
 		return nil, "left"
 	end
@@ -153,7 +219,107 @@ local function loadNow(player: Player): (Profile?, string?)
 	-- are in Data before it is written. LeaveCommit runs once per player.
 	LeaveCommit.Bind(session.OnLastSave, player)
 	sessions[player] = session
+	opened.committed = true
 	return session.Data :: Profile, nil
+end
+
+-- The whole load: up to LoadAttempts tries with a short wait between, never
+-- retrying a player who left. Every try prints a first line and a last line
+-- with the time it took, so a failed join can be explained from the Output.
+-- Returns (profile, nil), (nil, "left") or (nil, "failed", FailInfo).
+local function loadWithRetry(player: Player): (Profile?, string?, FailInfo?)
+	local startedAt = os.clock()
+	local attempt = 0
+	local info: FailInfo = { reason = "error", detail = "", waited = 0, attempts = 0 }
+	while true do
+		attempt += 1
+		local budget = if attempt == 1 then ProfileService.LoadBudgetSec else ProfileService.RetryBudgetSec
+		print(
+			string.format(
+				"[ProfileService] %s: load attempt %d/%d starting (budget %ds, %.1fs since the first try)",
+				player.Name,
+				attempt,
+				ProfileService.LoadAttempts,
+				budget,
+				os.clock() - startedAt
+			)
+		)
+		local tryStart = os.clock()
+		local opened: Opened = { session = nil, pristine = nil, committed = false }
+		local ok, profile, err, reason, detail = pcall(loadOnce, player, budget, opened)
+		if not ok then
+			-- The load code itself raised. If it had opened a session, end it
+			-- (with the data as stored) so the next try is not locked out by it.
+			detail, reason, err, profile = trim(tostring(profile)), "error", "failed", nil
+			unsaveable[player] = "error"
+			if opened.session ~= nil and not opened.committed then
+				pcall(function()
+					if opened.pristine ~= nil then
+						opened.session.Data = opened.pristine
+					end
+					opened.session:EndSession()
+				end)
+			end
+			if player.Parent ~= Players then
+				err = "left"
+			end
+		end
+		if profile ~= nil then
+			setNote(player, nil)
+			print(
+				string.format(
+					"[ProfileService] %s: save loaded on attempt %d in %.1fs (%.1fs in all)",
+					player.Name,
+					attempt,
+					os.clock() - tryStart,
+					os.clock() - startedAt
+				)
+			)
+			return profile, nil, nil
+		end
+		if err == "left" then
+			setNote(player, nil)
+			return nil, "left", nil
+		end
+		local why = tostring(reason)
+		info = { reason = why, detail = tostring(detail), waited = os.clock() - startedAt, attempts = attempt }
+		warn(
+			string.format(
+				"[ProfileService] %s: load attempt %d/%d failed after %.1fs: reason=%s (%s)",
+				player.Name,
+				attempt,
+				ProfileService.LoadAttempts,
+				os.clock() - tryStart,
+				why,
+				info.detail
+			)
+		)
+		local limit = if why == "migrate"
+			then math.min(ProfileService.MigrateAttempts, ProfileService.LoadAttempts)
+			else ProfileService.LoadAttempts
+		if attempt >= limit or why == "closing" then
+			break
+		end
+		local pause = ProfileService.RetryWaits[attempt] or ProfileService.RetryWaits[#ProfileService.RetryWaits] or 3
+		setNote(player, string.format("Your save did not open yet. Trying again (%d of %d)...", attempt + 1, limit))
+		task.wait(pause)
+		if player.Parent ~= Players then
+			setNote(player, nil)
+			return nil, "left", nil
+		end
+	end
+	setNote(player, nil)
+	warn(
+		string.format(
+			"[ProfileService] %s: save load FAILED (reason=%s, waited %.0fs over %d tries): %s",
+			player.Name,
+			info.reason,
+			info.waited,
+			info.attempts,
+			info.detail
+		)
+	)
+	return nil, "failed", info
 end
 
 -- Server audit (11 October 2026): GameServer connects PlayerAdded only after
@@ -162,34 +328,36 @@ end
 -- save is still held by another server), only began then. Prefetch starts it
 -- the moment the player arrives; LoadProfile (the join flow) picks up the
 -- result. Nothing else changes: the same load, run earlier.
-type Fetch = { done: boolean, profile: Profile?, err: string? }
+type Fetch = { done: boolean, profile: Profile?, err: string?, info: FailInfo? }
 local fetches: { [Player]: Fetch } = setmetatable({}, { __mode = "k" }) :: any
 
 function ProfileService.Prefetch(player: Player)
 	if fetches[player] ~= nil then
 		return
 	end
-	local fetch: Fetch = { done = false, profile = nil, err = nil }
+	local fetch: Fetch = { done = false, profile = nil, err = nil, info = nil }
 	fetches[player] = fetch
 	task.spawn(function()
-		local ok, profile, err = pcall(loadNow, player)
+		local ok, profile, err, info = pcall(loadWithRetry, player)
 		if ok then
-			fetch.profile, fetch.err = profile :: any, err :: any
+			fetch.profile, fetch.err, fetch.info = profile :: any, err :: any, info :: any
 		else
 			warn(string.format("[ProfileService] loading %s's save failed: %s", player.Name, tostring(profile)))
-			unsaveable[player] = "start"
+			unsaveable[player] = "error"
 			fetch.err = if player.Parent ~= Players then "left" else "failed"
+			fetch.info = { reason = "error", detail = trim(tostring(profile)), waited = 0, attempts = 1 }
 		end
 		fetch.done = true
 	end)
 end
 
 -- Yields until the player's save is loaded (starting the load if Prefetch
--- did not). Returns (profile, nil) or (nil, "left" | "failed"); see loadNow.
-function ProfileService.LoadProfile(player: Player): (Profile?, string?)
+-- did not). Returns (profile, nil), (nil, "left") or (nil, "failed", info);
+-- see loadWithRetry.
+function ProfileService.LoadProfile(player: Player): (Profile?, string?, FailInfo?)
 	local fetch = fetches[player]
 	if fetch == nil then
-		return loadNow(player) -- no prefetch: load here, as it always did
+		return loadWithRetry(player) -- no prefetch: load here, as it always did
 	end
 	while not fetch.done do
 		task.wait()
@@ -197,7 +365,7 @@ function ProfileService.LoadProfile(player: Player): (Profile?, string?)
 	if fetches[player] == fetch then
 		fetches[player] = nil
 	end
-	return fetch.profile, fetch.err
+	return fetch.profile, fetch.err, fetch.info
 end
 
 -- A player who leaves before the join flow has picked their save up (the

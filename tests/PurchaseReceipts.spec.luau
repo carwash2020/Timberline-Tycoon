@@ -118,6 +118,7 @@ return function(t)
 						fn(...)
 					end,
 					wait = function() end,
+					delay = function() end,
 				},
 			},
 		})

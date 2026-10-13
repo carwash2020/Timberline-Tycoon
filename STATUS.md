@@ -27,6 +27,14 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Save load kick, error 267 (branch `phase-2/save-load-kick-fix`, 13 October 2026)
+
+A failed save load no longer kicks at once: ProfileService retries (3 tries, 2 for Migrate errors, only when no session
+was left and nothing written), the loading card says so, and the kick message and server Output carry a reason code
+(`start`, `lock`, `contended`, `migrate`, `error`, `closing`) and the seconds waited. Root cause not yet confirmed: it
+needs Connor's server Output lines `[ProfileService] ... load attempt` / `FAILED (reason=...)`. Details and Studio checks:
+PHASE2_NOTES.md "Save load kick".
+
 ## Store item models (branch `phase-2/store-item-models`, 12 October 2026)
 
 Connor's item 2: the ten store GLBs (`assets/glb/store-items/`, from `phase-2/v1-store-items`) are in the repo and wired, one model
