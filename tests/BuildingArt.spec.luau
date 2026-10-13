@@ -291,7 +291,9 @@ return function(t)
 			-- General Store restyle (display tables with price cards and spots, door frame, striped awning, wall shelves with
 			-- jars, books and baskets, pictures, a rug, plants) plus the event expansion room (zone and banner, about 34 parts,
 			-- ShopEventKit): the whole shop is about 450 parts; cap 350 to 460 (tables on legs, oak tops).
-			local budget = ({ ToolShed = 400, HearthAndHome = 460, Dealership = 400 })[shop.kind]
+			-- Dealership restyle (wooden tables, wall shelving, pictures, rugs, door frame, striped awning, the event room and its
+			-- banner, 55 parts with its tables): the whole hall is 408 parts; cap 400 to 420.
+			local budget = ({ ToolShed = 400, HearthAndHome = 460, Dealership = 420 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do

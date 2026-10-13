@@ -221,6 +221,39 @@ Connor's fixes after the #183 renders. No price, on/off-sale or buy-flow change 
   Flashlight have no held model in the game, so their held slot path waits for a held-gear feature; (3) the blue under each box is
   the box's own accent floor (BoxArt, shared by every store), not a plinth; (4) parts 444 against the old 350 cap.
 
+## Dealership restyle in the Hearth & Home look (branch `phase-2/store-restyle-dealership`, 12 October 2026)
+
+The Hearth & Home cleanup (#183, with the event kit #185) applied to the showroom hall. Looks and layout only: no price, economy, stock,
+sale or buy-flow change; the lot, plinths, vehicles, boxes, bays and the sign-spacing and lot-strip work are kept.
+
+- **Door frame and awning** (`ShopFacade.DoorFrame` now takes an optional `gap`; `ShopFacade.StripedAwning`; the Dealership branch of
+  `ShopFacade.Add`): cream posts on stone footings, the dark header and jambs, a flush stone threshold; the flat blue/cream canopy is
+  now an 8-stripe fabric awning with a stepped valance, posts and brackets (`ShopFacade.DealerAwning`: back 12.15, reach 4.6). The
+  hours board over the door is raised clear of the canopy's back (`BuildingArt.Shop`), the front footing starts past the right post,
+  the planters stand 0.5 further out, the porch lantern follows the new awning post.
+- **Plinths and boxes** (`DealershipLot`): the big accent pad under each box was a 0.3 slab; it is now a 0.1 inlay inside a 0.05 wood
+  border (`BoxMatFrame`), both flush on the plinth's top, the border's edge meeting the tier stripe's inner edge. Vehicles' boxes wear
+  the wood base and slim name card the General Store's do (`BoxService`: `wood` for the Dealership too). Name signs 5.0 x 1.9 x 0.16
+  (were 6.0 x 2.6 x 0.3), tier flags 2.8 x 1.6 on a post 4.6 up (were 3.4 x 2.0 at 5.0); each flag, band and stripe keeps its plinth's tier colour.
+- **CHECKOUT** stands on two posts on the counter (`ShopKit.CheckoutSign` `onCounter`), no plaque, no chains.
+- **Room fill** (`ShopInteriors/Dealership`): wooden tables from the kit (`ShopKit.DisplayTable`: reception and finance, legs on the
+  rug), two rugs, wall shelving with binders and model trucks (west and back walls), five framed pictures, plants, the brochure racks
+  moved to the front wall. Everything is clear of the runner, the doorway aisle and every vehicle.
+- **Event room** (`ShopEventKit`): the roped zone (16 x 9, turned so its back is on the west wall and its open front faces the runner)
+  with its three tables on the pads (the Hearth's wood, looks only), and the blank banner in the front corner by the entrance,
+  facing the doorway aisle; hidden/closed by default, nothing on sale. Scene `store-dealership-event` shows it active.
+- **Parts:** whole hall 408 (was 285), cap 400 to 420 (`BuildingArt.spec`, `StoreInterior.Dealership.spec`); interior still under 400.
+- **Specs:** new `StoreRestyle.Dealership` (door frame, awning, tables, furnishings, box mats, slim signs and flag colours, CHECKOUT, event
+  zone and banner placement, hidden by default, nothing on sale, caps); `DealershipOverlap` has every new part name in a class, a
+  guard that no part name goes unchecked (the floor skins and door mechanics are named as looks-only) and an event-room test.
+  Pinned numbers that moved because the design moved: the hall's part cap 400 to 420 (two specs); wall furniture may meet the wall's
+  face (0.41 instead of 0.31 in the inside-the-hall check, for `BrochureRack`, `NookPanel`, `PictureFrame` only).
+- **Renders (`tools/preview`, scenes `store-dealership`, `store-dealership-exterior` (new view 9), `store-dealership-event`):**
+  `previews/store-polish/dealership-v4-*.png`: exterior-front, exterior-three-quarter, exterior-night, door-closeup, awning-closeup,
+  door-phone-667x375, interior-door, interior-night, interior-phone-667x375, plinth-closeup, name-sign, lot-row, table-closeup,
+  counter-checkout, lobby-west-wall, front-wall, event-zone, event-zone-from-door, event-banner. The Dealership vehicles are part-built
+  (no meshes), so these are the real parts. Not seen in Studio.
+
 ## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
 
 The three pasted store image ids (91282142796474 Tow Service, 79037897236948 Timber Classic, 71028498113750 Paint Shop) may be Decal ids, which an ImageLabel cannot load by `rbxassetid://`. `Shared/StoreArt.ImageFor(id, size)` now returns `rbxthumb://type=Asset&id=<id>&w=<n>&h=<n>` (150 on the panel card, 420 on the world board) for a nonzero id and `""` for 0; `StoreUI` and `StoreBoard` use it, and the letter or mark fallback (failed load, id 0) is unchanged. No prices, sale flags or ids changed. Unverified: that the thumbnails render (needs Studio). `AssetIds.spec` allows the one rbxthumb literal in `StoreArt.luau` and still fails any other.

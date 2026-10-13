@@ -33,7 +33,9 @@ export type Spec = {
 
 ShopFacade.DoorClear = 0.8
 ShopFacade.AwningGap = 0.7 -- the Dealership canopy's near end stands this far off the wall, clear of the hours board on it
-ShopFacade.AwningReach = 5 -- how far the Dealership's canopy reaches out from the front wall
+ShopFacade.AwningReach = 5 -- how far the Dealership's canopy reaches out from the front wall (its porch lantern's old reference)
+-- The Dealership's striped canopy (StripedAwning): its back's top at the wall, the reach out and the tilt.
+ShopFacade.DealerAwning = { backY = 12.15, reach = 4.8, tilt = 0.28 }
 
 local V3, CF = Vector3.new, CFrame.new
 local MAT = Enum.Material
@@ -184,6 +186,7 @@ export type FrameOpts = {
 	postTop: number?, -- the posts' top (default just under the awning)
 	trim: Color3?, -- the posts' colour (default the cream trim)
 	base: Color3?, -- the footing blocks' colour (default the stone grey)
+	gap: number?, -- how far the posts start outside the opening (default FrameGap)
 }
 
 ShopFacade.FrameGap = 0.75 -- the frame's posts start this far outside the opening, past the door leaves' swing (a leaf is 0.4 thick on the opening's edge)
@@ -200,7 +203,7 @@ function ShopFacade.DoorFrame(parent: Instance, spec: Spec, opts: FrameOpts?)
 	local proud = o.proud or 0.55
 	local gy = spec.groundY
 	local top = o.postTop or (spec.doorTop + 0.65)
-	local inner = spec.doorHalf + ShopFacade.FrameGap
+	local inner = spec.doorHalf + (o.gap or ShopFacade.FrameGap)
 	local trim = o.trim or TRIM
 	local stone = o.base or hex("#8C867C")
 	for _, s in ipairs({ -1, 1 }) do
@@ -474,17 +477,24 @@ local function shopSpecific(model: Model, spec: Spec)
 		-- The showroom: a canopy over the lobby door, planters, a bench and a
 		-- sandwich board, a flag pole and roof units (its windows are the glass band).
 		local c = spec.doorCx
-		awning(
-			model,
-			spec,
-			spec.doorTop + 0.7,
-			ShopFacade.AwningReach - ShopFacade.AwningGap,
-			hex("#2F6DB5"),
-			hex("#F2E7CF"),
-			ShopFacade.AwningGap
-		)
-		planter(model, c + d + 2.6, gy, fz - 1.8)
-		planter(model, c - d - 2.6, gy, fz - 1.8)
+		-- (the door frame and the striped awning, as the General Store has them: cream posts on stone footings and a
+		-- flush threshold, and a canopy of fabric stripes with a stepped valance. The hall's roll-up door has no
+		-- leaves to swing, so the canopy is lower and deeper than the General Store's; its back stands over the
+		-- door header (the hours board over the door is raised clear of it in BuildingArt).)
+		ShopFacade.DoorFrame(model, spec, { postW = 0.8, gap = 0.9, postTop = spec.doorTop + 0.05 })
+		local a = ShopFacade.DealerAwning
+		ShopFacade.StripedAwning(model, spec, {
+			backY = a.backY,
+			reach = a.reach,
+			colorA = hex("#2F6DB5"),
+			colorB = hex("#F2E7CF"),
+			stripes = 8,
+			tilt = a.tilt,
+			valance = 0.7,
+		})
+		-- (the planters stand outside the door frame's posts and their footings)
+		planter(model, c + d + 3.1, gy, fz - 1.8)
+		planter(model, c - d - 3.1, gy, fz - 1.8)
 		bench(model, c + d + 9, gy, fz - 1.4)
 		box(model, "FlagPole", V3(0.25, 11, 0.25), CF(c + d + 21, gy + 5.5, fz - 1.4), IRON, MAT.Metal)
 		box(model, "FlagCloth", V3(3.2, 2, 0.1), CF(c + d + 22.7, gy + 9.8, fz - 1.4), spec.accent, MAT.Fabric)

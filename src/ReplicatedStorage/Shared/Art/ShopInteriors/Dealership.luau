@@ -11,12 +11,15 @@
 -- under ShopKit's caps, a big header sign over each run of one kind of vehicle
 -- (TRUCKS, TRAILERS), a small sub-sign over each bay (what the vehicle
 -- hauls), the lobby's SHOWROOM board, the CHECKOUT sign over the counter, and
--- the lobby furnishings. The vehicles' own stock, order, prices and bays are
--- untouched.
+-- the lobby furnishings (store restyle, in the Hearth & Home's look: wooden display
+-- tables, wall shelving with binders and model trucks, framed pictures, rugs, plants), the
+-- event expansion room and its banner (ShopEventKit). The vehicles' own stock, order, prices
+-- and bays are untouched.
 
 local ShopKit = require(script.Parent.Parent.ShopKit)
 local Kit = require(script.Parent.Parent.Kit)
 local DealershipLot = require(script.Parent.Parent.DealershipLot)
+local ShopEventKit = require(script.Parent.Parent.ShopEventKit)
 
 type Frame = ShopKit.Frame
 local V3, CF = Vector3.new, CFrame.new
@@ -52,7 +55,7 @@ export type Bay = { x: number, z: number, row: number, aisleZ: number }
 -- The signs hang this far under the ceiling line (frame.ceilY - 0.9 is the
 -- underside of the beams).
 Dealership.HeaderY = 11.3 -- a header's middle
-Dealership.CheckoutY = 7.6 -- the CHECKOUT board's middle: under the SHOWROOM board's line of sight from the door
+Dealership.CheckoutY = 7.7 -- the CHECKOUT board's middle, on its posts over the counter (the top is 3.85)
 Dealership.HeaderWidth = 10.4
 Dealership.HeaderYaw = math.rad(90) -- a header faces the door end (west), so it reads from the lobby and down the aisle
 Dealership.WallTuck = 0.5 -- a beam or rafter runs this far past the interior frame, into the wall (the wall's face is 0.4 out)
@@ -148,6 +151,109 @@ local function stockProp(model: Model, asset: string, x: number, y: number, z: n
 	end
 	fallback.Parent = model
 	ShopKit.MeshProp(model, asset, at, fallback)
+end
+
+---------------------------------------------------------------------------
+-- The room's furnishings beyond the stock (looks only, all inside the walls)
+---------------------------------------------------------------------------
+
+-- Where a wall's inner face is, past the interior frame (the walls' faces are this far out of it).
+local WALL_OUT = 0.4
+local BINDER = { hex("#2F6DB5"), hex("#C9A24A"), hex("#7FA3C8"), hex("#B5594A") }
+local MODEL_PAINT = { hex("#B5594A"), hex("#2F6DB5"), hex("#C9A24A"), hex("#4E7A3E") }
+
+-- A wall shelf unit: a back panel, two boards and what stands on them (binders and little model trucks). `at` is
+-- the unit's middle on the wall's face at the floor, its +Z pointing into the room and its X along the wall; `len`
+-- is its length along the wall, `lowY` the lower board's height over the floor.
+local function wallShelves(model: Model, at: CFrame, len: number, lowY: number, seed: number)
+	dBox(model, "NookPanel", V3(len, 4.4, 0.2), at * CF(0, lowY + 1.9, 0.1), TABLE)
+	local ys = { lowY, lowY + 2.6 }
+	for _, y in ipairs(ys) do
+		dBox(model, "NookBoard", V3(len, 0.25, 1.2), at * CF(0, y, 0.7), TABLE_TOP)
+	end
+	local function put(name: string, size: Vector3, topY: number, dx: number, color: Color3)
+		return dBox(model, name, size, at * CF(dx, topY + size.Y / 2, 0.7), color, MAT.SmoothPlastic)
+	end
+	local top1, top2 = ys[1] + 0.125, ys[2] + 0.125
+	local u = len / 8
+	-- lower board: three binders, two model trucks, a binder
+	for i, dx in ipairs({ -3 * u, -2.5 * u, -2 * u }) do
+		put("NookBinder", V3(0.4, 1.1 + 0.15 * i, 0.9), top1, dx, BINDER[1 + (seed + i) % 4])
+	end
+	put("NookModel", V3(2.0, 0.5, 0.8), top1, 0.6 * u, MODEL_PAINT[1 + seed % 4])
+	put("NookModel", V3(0.8, 0.5, 0.7), top1, 0.6 * u + 1.1, MODEL_PAINT[1 + (seed + 1) % 4])
+	put("NookBinder", V3(0.4, 1.3, 0.9), top1, 3 * u, BINDER[1 + (seed + 2) % 4])
+	-- upper board: two model trucks
+	put("NookModel", V3(2.4, 0.6, 0.9), top2, -1.8 * u, MODEL_PAINT[1 + (seed + 2) % 4])
+	put("NookModel", V3(2.4, 0.6, 0.9), top2, 1.8 * u, MODEL_PAINT[1 + (seed + 3) % 4])
+end
+
+-- A framed picture flat on a wall: a wood frame and a canvas just proud of it. `at` as for wallShelves, `y` its middle.
+local function picture(model: Model, at: CFrame, y: number, w: number, h: number, canvas: Color3)
+	dBox(model, "PictureFrame", V3(w, h, 0.2), at * CF(0, y, 0.1), TABLE)
+	dBox(model, "PictureArt", V3(w - 0.5, h - 0.5, 0.1), at * CF(0, y, 0.22), canvas, MAT.SmoothPlastic)
+end
+
+-- A rug lying flush on the floor: a body and a lighter edge board, both thin skins on the floor's own layers.
+local function rug(model: Model, fy: number, x: number, z: number, w: number, d: number, body: Color3, edge: Color3)
+	dBox(model, "LobbyRug", V3(w, 0.06, d), CF(x, fy + LAYER2, z), body, MAT.Fabric)
+	dBox(model, "LobbyRugEdge", V3(w - 1.0, 0.07, d - 1.0), CF(x, fy + LAYER3, z), edge, MAT.Fabric)
+end
+
+-- A table in the Hearth & Home's wood (ShopKit.DisplayTable): a plank top, a dark apron, a cream trim and four legs
+-- to `floorY` (the rug's top under it). `topH` is the top's height over that. Parts are named <name>Top, <name>Apron, <name>Trim, <name>Leg.
+local function woodTable(
+	model: Model,
+	name: string,
+	x: number,
+	z: number,
+	floorY: number,
+	w: number,
+	d: number,
+	topH: number
+)
+	return ShopKit.DisplayTable(model, {
+		name = name,
+		cx = x,
+		cz = z,
+		width = w,
+		depth = d,
+		topY = floorY + topH,
+		apronH = 0.4,
+		legs = 4,
+		floorY = floorY,
+	})
+end
+
+-- The event room's three tables, on the zone's pads (ShopEventKit's markers): the Hearth & Home's wood table kit
+-- (a plank top, a dark apron, a cream trim, four legs), built in the zone's own frame and turned with it. Looks only:
+-- the roped-off room has nothing to walk into.
+local function eventTables(model: Model, zone: Model, anchor: CFrame)
+	local tmp = Instance.new("Model")
+	for i, marker in ipairs(ShopEventKit.TableMarkers(zone)) do
+		local at = anchor:PointToObjectSpace(marker.CFrame.Position)
+		ShopKit.DisplayTable(tmp, {
+			name = "EventDisplay" .. i,
+			cx = at.X,
+			cz = at.Z,
+			width = marker.Size.X - 0.2,
+			depth = marker.Size.Z - 0.3,
+			topY = 2.3,
+			apronH = 0.35,
+			legs = 4,
+			floorY = 0.14,
+			solid = false,
+		})
+	end
+	for _, d in ipairs(tmp:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.CFrame = anchor * d.CFrame
+		end
+	end
+	for _, child in ipairs(tmp:GetChildren()) do
+		child.Parent = model
+	end
+	tmp:Destroy()
 end
 
 function Dealership.Build(model: Model, frame: Frame, west: number, east: number, zf: number, zb: number, bays: { Bay })
@@ -279,34 +385,14 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 			})
 		end
 	end
-	-- The CHECKOUT board hangs low over the counter, under the SHOWROOM board's line of sight
-	-- from the door (a board hung high behind SHOWROOM was cropped by it). The kit's counter
-	-- plaque is dropped: it said the same thing a hand below the board. The kit still lays
-	-- the keeper's mat.
-	local lower = table.clone(frame)
-	lower.ceilY = ceil + 0.9
-	ShopKit.CheckoutSign(model, lower, false)
-	for _, part in ipairs(model:GetChildren()) do
-		if part.Name == "CheckoutPlaque" or part.Name == "CheckoutPlaqueAccent" then
-			part:Destroy()
-		end
-	end
-	local counter = model:FindFirstChild("Counter")
-	if counter and counter:IsA("BasePart") then
-		ShopKit.HeaderSign(model, {
-			cx = counter.CFrame.Position.X,
-			cy = Dealership.CheckoutY,
-			z = counter.CFrame.Position.Z - counter.Size.Z / 2 - 3.4,
-			w = 8.4,
-			h = 1.8,
-			text = "CHECKOUT",
-			accent = hex("#4CC36A"),
-			ceilY = chainTop,
-			board = ShopKit.Colors.Brass,
-			ink = ShopKit.Colors.Ink,
-			name = "CheckoutSign",
-		})
-	end
+	-- CHECKOUT stands on two posts on the counter's front edge, over the register and the bell, so it reads
+	-- from the door over the counter and nothing hangs in front of it (no chains across another sign). The
+	-- kit also lays the keeper's mat; no plaque.
+	ShopKit.CheckoutSign(
+		model,
+		frame,
+		{ plaque = false, onCounter = true, cy = Dealership.CheckoutY, w = 5.4, h = 1.5 }
+	)
 
 	-- Lanterns: six down the aisle and three in the lobby (each plinth has its own lamp post); every one is the family's warm capped lamp, and none hangs where a
 	-- header is.
@@ -326,33 +412,73 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 		lamp(lobbyCx, z)
 	end
 
-	-- Lobby: brochure racks and a reception corner with plants, the crate corner
-	-- (real Crate and Barrel meshes, parts first), the flags along the front wall.
-	for i, x in ipairs({ west + 1.5, west + 1.5 }) do
-		dBox(model, "BrochureRack", V3(2.4, 4.2, 0.8), CF(x, fy + 2.1, zf + 22 + (i - 1) * 3.5), TABLE, MAT.Wood)
+	-- Lobby: brochure racks against the front wall, a reception corner (a wooden table, two chairs, a rug), a finance
+	-- table with brochures, wall shelving, framed pictures, plants and the crate corner (real Crate and Barrel meshes,
+	-- parts first). The doorway aisle (the door's walk to the counter, the runner) and every bay stay clear.
+	for i, x in ipairs({ west + 23.4, west + 26.4 }) do
+		dBox(model, "BrochureRack", V3(2.4, 4.2, 0.8), CF(x, fy + 2.1, zf), TABLE, MAT.Wood)
 		for r = 1, 3 do
 			dBox(
 				model,
 				"Brochure",
 				V3(1.9, 0.9, 0.12),
-				CF(x, fy + 0.9 + r * 0.95, zf + 21.55 + (i - 1) * 3.5),
+				CF(x, fy + 0.9 + r * 0.95, zf + 0.46),
 				if (i + r) % 2 == 0 then PAPER else hex("#7FA3C8"),
 				MAT.SmoothPlastic
 			)
 		end
 	end
-	dBox(model, "ReceptionTable", V3(3.6, 1.2, 2), CF(west + 4, fy + 0.6, zb - 24), TABLE_TOP, MAT.Wood)
+	-- (the rug's edge board is its highest skin: what stands on the rug stands on that, so no leg or chair is sunk in it)
+	local onRug = fy + LAYER3 + 0.035
+	local recvZ = zb - 24
+	rug(model, fy, west + 4.6, recvZ, 8.6, 12.0, BLUE_DEEP, RUNNER_EDGE)
+	woodTable(model, "Reception", west + 4, recvZ, onRug, 4.4, 2.4, 2.0)
 	for _, z in ipairs({ zb - 28, zb - 20 }) do
-		dBox(model, "ReceptionChair", V3(2, 1.2, 2), CF(west + 4, fy + 0.6, z), BLUE, MAT.Fabric)
-		dBox(model, "ReceptionChairBack", V3(0.4, 1.8, 2), CF(west + 2.8, fy + 1.5, z), BLUE, MAT.Fabric)
+		dBox(model, "ReceptionChair", V3(2, 1.2, 2), CF(west + 4, onRug + 0.6, z), BLUE, MAT.Fabric)
+		dBox(model, "ReceptionChairBack", V3(0.4, 1.8, 2), CF(west + 2.8, onRug + 1.5, z), BLUE, MAT.Fabric)
 	end
+	-- the finance table, east of the runner, with a rug under it and a few brochures on it
+	local finX, finZ = west + 20.4, zb - 18
+	rug(model, fy, finX, finZ, 8, 6, hex("#3E5F7A"), RUNNER_EDGE)
+	woodTable(model, "Finance", finX, finZ, onRug, 4.4, 2.4, 2.0)
+	for i, dx in ipairs({ -1.2, 0, 1.2 }) do
+		dBox(
+			model,
+			"Brochure",
+			V3(0.9, 0.12, 1.2),
+			CF(finX + dx, onRug + 2.06, finZ),
+			if i % 2 == 0 then PAPER else hex("#7FA3C8"),
+			MAT.SmoothPlastic
+		)
+	end
+	-- wall shelving (west wall over the crate corner, back wall east of the counter) and framed pictures
+	local westWall = CF(-(frame.halfW + WALL_OUT), fy, 0) * CFrame.Angles(0, math.pi / 2, 0)
+	local backWall = CF(0, fy, frame.halfD + WALL_OUT) * CFrame.Angles(0, math.pi, 0)
+	wallShelves(model, westWall * CF(-(zb - 12.2), 0, 0), 9, 5.0, 0)
+	wallShelves(model, backWall * CF(-(west + 29.6), 0, 0), 8, 4.4, 1)
+	for _, z in ipairs({ zf + 8, zb - 38.7, zb - 24 }) do
+		picture(model, westWall * CF(-z, 0, 0), 8.6, 3.4, 2.4, hex("#9CC3D8"))
+	end
+	picture(model, backWall * CF(-(west + 22.6), 0, 0), 9.2, 3.4, 2.4, hex("#E0B77A"))
+	picture(model, backWall * CF(-(west + 29.6), 0, 0), 11.6, 3.4, 2.4, hex("#C98B7B"))
+	picture(model, backWall * CF(-(west + 1.6), 0, 0), 9.2, 2.4, 2.6, hex("#8DB08A"))
 	plant(model, west + 1.8, fy, zf + 3, 1.4)
-	plant(model, west + lobbyW - 2, fy, zf + 3, 1.4)
 	plant(model, west + lobbyW - 2, fy, zb - 12, 1.4)
+	plant(model, west + 16.6, fy, zb - 9.2, 1.2)
 	trashCan(model, west + lobbyW - 2, fy, zb - 5.5)
 	stockProp(model, "Crate", west + 1.8, fy, zb - 15, 0.1)
 	stockProp(model, "Crate", west + 1.8, fy, zb - 12.6, -0.15)
 	stockProp(model, "Barrel", west + 4.6, fy, zb - 13, 0)
+
+	-- The event expansion room (EVENTS.md, ShopEventKit): a roped-off 16 x 9 area against the west wall, turned so its
+	-- open front faces east toward the runner, between the door's end of the lobby and the reception corner (clear of the
+	-- doorway aisle and every bay), with its three tables on the pads; and the event banner in the front corner east of the
+	-- door, just outside the door's width (so the door's sensor, the runner and the walk in stay clear), facing into the
+	-- lobby with the front wall behind it (in the east it stood in front of the first truck from the door).
+	local zoneAnchor = CF(west + 4.6, fy, zf + 21.7) * CFrame.Angles(0, -math.pi / 2, 0)
+	local zone = ShopEventKit.BuildZone(model, "Dealership", zoneAnchor, V3(16, 0, 9))
+	eventTables(model, zone, zoneAnchor)
+	ShopEventKit.BuildBanner(model, "Dealership", CF(west + 18.4, fy, zf + 3) * CFrame.Angles(0, math.pi, 0), 4.4)
 	counterDetail(model, frame)
 	backDoor(model, frame, west + 5.7, zb, true, 0)
 end

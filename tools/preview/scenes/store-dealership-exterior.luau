@@ -2,7 +2,7 @@
 -- The Dealership hall from outside (store polish): the building as MapBuilder stands it,
 -- roof on, the door shut, on a flat lawn. Views: 1 front, 2 three-quarter from the door end,
 -- 3 night, 4 the forecourt and the door close up, 5 the door end's wall, 6 the door from
--- the street (shoot it at 667x375 for the phone size), 7 the forecourt lamps, 8 the east end.
+-- the street (shoot it at 667x375 for the phone size), 7 the forecourt lamps, 8 the east end, 9 the awning and door frame.
 local Common = require("./_common")
 
 return {
@@ -38,6 +38,12 @@ return {
 			{ pos = { doorX, 5, -48 }, target = { doorX, 6, -hz }, label = "6 the door from the street", fov = 62 },
 			{ pos = { 10, 5, -54 }, target = { 28, 5, -34 }, label = "7 forecourt lamps and piers", fov = 70 },
 			{ pos = { 135, 22, 75 }, target = { 20, 6, 0 }, label = "8 east end and back", fov = 62 },
+			{
+				pos = { doorX + 9, 8.5, -47 },
+				target = { doorX, 9.5, -hz },
+				label = "9 the awning and door frame",
+				fov = 62,
+			},
 		}
 		return { root = root, shadowRadius = 260, cameras = cameras }
 	end,
