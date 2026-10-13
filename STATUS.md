@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `4ecfa51` (#159).**
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `4ecfa51` (#159).**
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
 (#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
@@ -235,7 +235,7 @@ Connor's fixes after the #183 renders. No price, on/off-sale or buy-flow change 
   cream trim along its front edge, two legs to the floor under each table's front corners, tables stepping up and meeting; the unit's
   solid core stays as an invisible collider. `store-hearth-event` scene shows the event zone and banner active; the banner now faces
   into the room (it faced the wall). Parts 451 (cap 460). Renders: `previews/store-polish/hearth-v4-*.png`.
-- **Awaiting Connor:** (1) placing the Shed costs the $240 kit fee on top of the $600 plan (default: the kit rule); (2) the Lantern and
+- **Awaiting Connor:** (1) DECIDED by Connor, 13 Oct 2026: placing the Shed Blueprint ghost is free (`placeFee = 0`); the plan is still $600 and the fill is still 60 plank units; an old save's `paid` 240 still sells back at half; (2) the Lantern and
   Flashlight have no held model in the game, so their held slot path waits for a held-gear feature; (3) the blue under each box is
   the box's own accent floor (BoxArt, shared by every store), not a plinth; (4) parts 444 against the old 350 cap.
 

@@ -596,6 +596,9 @@ function BlueprintBook.NeedsText(bp: PlotData.Blueprint, stock: number?): string
 		return string.format("%s · fee %s", BuildCost.Text(BuildCost.Of(bp)), Util.formatCash(PlotData.Price(bp)))
 	end
 	if bp.kit == true and type(bp.woodUnits) == "number" then
+		if PlotData.Price(bp) <= 0 then
+			return string.format("%d u³ of planks, one wood · free to place", bp.woodUnits)
+		end
 		return string.format("%d u³ of planks, one wood · fee %s", bp.woodUnits, Util.formatCash(PlotData.Price(bp)))
 	end
 	local price = PlotData.Price(bp)

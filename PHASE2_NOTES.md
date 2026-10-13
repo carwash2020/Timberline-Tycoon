@@ -2174,12 +2174,15 @@ What changed:
       open the Land panel
 
 ### Studio checks: blueprints as items
+- [ ] Shed Blueprint, free placing (13 Oct 2026): buy the plan for $600 (cash drops by exactly $600); place the ghost: cash does not
+      change and no toast or "need $" message appears (try it with $0 spare cash too); the hover/book row says "free to place", not a fee;
+      fill it with 60 planks; it builds; sell an empty ghost back: $0 refund (no cash appears)
 - [ ] Buy the Shed Blueprint at the General Store (box to the counter):
       the price is what it was ($600), and a rolled plan (cream roll, blue wax seal)
       appears in your hotbar named "Shed Blueprint"
 - [ ] Hold it and click (RT, tap): it vanishes, a toast says you learned it,
-      and the Shed is now in the hammer list; placing it costs the kit fee ($240)
-      and puts down a ghost you fill with 60 plank units of your own planks
+      and the Shed is now in the hammer list; placing it costs nothing (Connor,
+      13 Oct 2026: the $600 is the whole price; no $240 kit fee) and puts down a ghost you fill with 60 plank units of your own planks
 - [ ] Buying it again before you use it, or after: refused, nothing charged
 - [ ] Hold a plan and press Drop (Q, Backspace, B on a pad, or a long
       press on the hotbar on a phone; two presses): it lies on the ground with a Pick up prompt; only
