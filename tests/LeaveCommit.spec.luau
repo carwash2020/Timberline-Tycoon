@@ -114,6 +114,7 @@ return function(t)
 		}
 		local loader = t.loader({
 			services = { Players = players },
+			globals = { task = { delay = function() end, wait = function() end } },
 			mocks = {
 				ProfileStore = {
 					SetConstant = function() end,

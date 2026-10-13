@@ -1636,13 +1636,24 @@ local function onPlayerAdded(player: Player)
 		print(string.format("[GameServer] %s: %s (%.1fs)", player.Name, what, os.clock() - joinStart))
 	end
 	joinLap("loading the save")
-	local profile, err = ProfileService.LoadProfile(player)
+	local profile, err, failInfo = ProfileService.LoadProfile(player)
 	if profile then
 		joinLap("save loaded")
 	end
 	if not profile then
 		if err == "failed" then
-			player:Kick("Timberline Tycoon couldn't load your save right now. Your progress is safe. Please rejoin.")
+			local reason = if failInfo then failInfo.reason else "unknown"
+			local waited = if failInfo then math.floor(failInfo.waited + 0.5) else 0
+			local tries = if failInfo then failInfo.attempts else 0
+			joinLap(string.format("save load failed (reason=%s, waited %ds, %d tries); kicking", reason, waited, tries))
+			player:Kick(
+				string.format(
+					"Timberline Tycoon couldn't load your save right now. Your progress is safe. "
+						.. "Please rejoin. (Reason: %s, waited %ds)",
+					reason,
+					waited
+				)
+			)
 		end
 		return -- "left": they're already gone
 	end
