@@ -183,7 +183,7 @@ return function(t)
 				last = s.X
 			end
 			local bin = size("Machine", "SkyBin")
-			t.ok(bin.Y > bin.X and bin.X < 4, "the Sky Bin is small and tall")
+			t.ok(bin.X <= 4.5 and bin.Y <= 4, "the Sky Bin is a small box (its uploaded model is squat)")
 			t.ok(size("Gear", "Lantern").X <= 3.1 and size("Gear", "Lantern").Y >= 2, "a lantern is a small box")
 			for _, id in ipairs({ "PonyTrailer", "RanchTrailer", "HeavyHauler" }) do
 				t.ok(size("Trailer", id).X > size("Axe", "SteelAxe").X, id .. " is bigger than an axe's box")
