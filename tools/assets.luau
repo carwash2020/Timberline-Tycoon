@@ -61,6 +61,44 @@ for _, record in ipairs(records) do
 	table.insert(group.uses, record)
 end
 
+-- The vehicle meshes whose GLB changed in the 12 October 2026 vehicle pass (assets/meshes/vehicles,
+-- from Connor's branch phase-2/v1-store-items): every piece's mesh id is kept in VehicleModels so
+-- nothing breaks, but the file behind it is new and Roblox still holds the old mesh. Glass is the
+-- one role whose triangles did not change (byte for byte the same vertices in all five trucks), so
+-- it is not listed. The by_truck trailer variants have no ids of their own yet: they reuse their
+-- trailer's ids, stretched to each truck's width (VehicleModels.Trailer).
+local REUPLOAD_STATUS = "new GLB in repo, needs re-upload"
+local UNCHANGED_ROLES: { [string]: boolean } = { Glass = true }
+type Reupload = { glb: string, node: string, who: string }
+local reupload: { [string]: Reupload } = {}
+local reuploadOrder: { string } = {}
+-- One loader for the whole run (a second one registers the Roblox shim's methods again and errors).
+local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
+local sharedLoader = Loader.new()
+do
+	local VehicleModels = sharedLoader:load("ReplicatedStorage/Shared/Art/VehicleModels")
+	local ROLES = { "Body", "Glass", "Lights", "Bed", "Wheel", "Hitch" }
+	local function add(spec: any, glb: string, who: string)
+		for _, role in ipairs(ROLES) do
+			local piece = spec[role]
+			if piece == nil or UNCHANGED_ROLES[role] then
+				continue
+			end
+			local key = tostring(piece.meshId)
+			if reupload[key] == nil then
+				reupload[key] = { glb = glb, node = role, who = who }
+				table.insert(reuploadOrder, key)
+			end
+		end
+	end
+	for _, id in ipairs({ "Rustbucket", "Pickup", "ScoutATV", "Flatbed", "LoggingRig" }) do
+		add(VehicleModels.Truck(id), "assets/meshes/vehicles/" .. id .. "/" .. id .. ".glb", id)
+	end
+	for _, id in ipairs({ "PonyTrailer", "RanchTrailer", "HeavyHauler" }) do
+		add(VehicleModels.Trailer(id, nil), "assets/meshes/vehicles/" .. id .. "/" .. id .. ".glb", id)
+	end
+end
+
 local templateIds: { [string]: boolean } = {}
 local meshIds: { [string]: boolean } = {}
 for _, group in pairs(groups) do
@@ -188,8 +226,7 @@ emit("")
 -- over a GLB in the repo. A slot whose Roblox mesh id is not set yet is listed here
 -- (it is not an id, so the scan above does not see it) until Connor uploads it.
 do
-	local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
-	local Slots = Loader.new():shared("StoreModelSlots")
+	local Slots = sharedLoader:shared("StoreModelSlots")
 	emit("## Store item models (one slot per item: `Shared/StoreModelSlots.luau`)")
 	emit("")
 	emit("One model per item serves the shop box (and the carried box), the placed item and its ghost. A slot")
@@ -363,11 +400,34 @@ for _, kind in ipairs(KIND_ORDER) do
 			if string.find(first.use, "Collision", 1, true) then
 				status = "collision piece (not loaded), " .. status
 			end
+			if reupload[row.digits] then
+				status = REUPLOAD_STATUS .. "; " .. status
+			end
 		end
 		emit(line("| ", row.digits, " | ", usedBy, " | ", tostring(#row.uses), " | ", status, " |"))
 	end
 	emit("")
 end
+
+emit("## Creator Hub re-upload list: vehicle meshes (" .. tostring(#reuploadOrder) .. " ids)")
+emit("")
+emit("The vehicle GLBs in `assets/meshes/vehicles` were replaced on 12 Oct 2026 (the fixed wheels, fenders,")
+emit("mudflaps, stake beds and trim from Connor's branch `phase-2/v1-store-items`). The game still points at")
+emit("the OLD Roblox meshes, so nothing breaks, but the looks only change once each mesh below is uploaded")
+emit("again and its new id pasted over the old one in `src/ReplicatedStorage/Shared/Art/VehicleModels.luau`")
+emit('(steps: PHASE2_NOTES.md, "Vehicle meshes: re-upload"). No new id exists yet; none is invented here, and')
+emit("a Model id is never a MeshId. Each GLB holds one node per row (`Body`, `Lights`, ...), uploaded as its own")
+emit("mesh. `Glass` is unchanged in every GLB: keep its id. The `by_truck` trailer variants")
+emit("(`assets/meshes/vehicles/<Trailer>/by_truck/<Truck>/<Trailer>_<Truck>.glb`) have no ids of their own yet:")
+emit("until they are uploaded each variant draws its trailer's mesh below, stretched to the truck's width.")
+emit("")
+emit("| Old id (replace) | GLB (repo) | Node | Vehicle | Status |")
+emit("| --- | --- | --- | --- | --- |")
+for _, key in ipairs(reuploadOrder) do
+	local item = reupload[key]
+	emit(line("| ", key, " | `", item.glb, "` | ", item.node, " | ", item.who, " | ", REUPLOAD_STATUS, " |"))
+end
+emit("")
 
 emit("## Consumers and their fallback")
 emit("")
@@ -513,6 +573,7 @@ for _, kind in ipairs(KIND_ORDER) do
 			places = #group.uses,
 			priority = if PRIORITY[group.digits] then 1 else 2,
 			collision = kind == "mesh" and string.find(first.use, "Collision", 1, true) ~= nil,
+			status = if kind == "mesh" and reupload[group.digits] then REUPLOAD_STATUS else nil,
 		})
 	end
 end
