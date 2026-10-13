@@ -17,6 +17,7 @@ local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
 local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
+local PieceSize = require(ReplicatedStorage.Shared.PieceSize)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
@@ -757,6 +758,11 @@ local function cleanPlot(plot: any)
 					item.paid = nil
 				elseif type(item.paid) == "number" then
 					local price = EditLogic.Fee(bp, item)
+					if bp.placeFee ~= nil then
+						-- A save from before the fee was waived paid the per-unit fee: keep it
+						-- so selling back refunds what was paid (never more).
+						price = math.max(price, PieceSize.Units(bp, item) * PlotData.KitCashPerUnit)
+					end
 					if item.paid > price then
 						item.paid = price
 					end
