@@ -499,7 +499,8 @@ function BoxService.Make(opts: MakeOptions): Record
 		gold = robux ~= nil,
 		robuxKey = if robux ~= nil then robux.key else nil,
 		side = if relX ~= nil then BoxArt.AisleSide(relX) else nil,
-		wood = rec.shop == "HearthAndHome" or rec.shop == "Dealership", -- the General Store's boxes stand flush on wood tables, the showroom's on its wood-bordered mats
+		wood = rec.shop == "HearthAndHome" or rec.shop == "Sparkworks" or rec.shop == "Dealership", -- the General Store's and the Sparkworks' boxes stand flush on wood tables, the showroom's on its wood-bordered mats
+		cardColor = if rec.shop == "Sparkworks" then BoxArt.WoodTealCard else nil,
 	})
 	-- The price shows in a tag when a player aims at the box (Shared/HoverTag),
 	-- never printed on it. A Robux box carries Roblox's R$ text instead.

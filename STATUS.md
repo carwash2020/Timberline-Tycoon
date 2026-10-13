@@ -253,6 +253,30 @@ sale or buy-flow change; the lot, plinths, vehicles, boxes, bays and the sign-sp
   door-phone-667x375, interior-door, interior-night, interior-phone-667x375, plinth-closeup, name-sign, lot-row, table-closeup,
   counter-checkout, lobby-west-wall, front-wall, event-zone, event-zone-from-door, event-banner. The Dealership vehicles are part-built
   (no meshes), so these are the real parts. Not seen in Studio.
+## Sparkworks restyle (branch `phase-2/store-restyle-sparkworks`, 13 October 2026)
+
+The Hearth & Home look (#183) applied to the Sparkworks in its teal and copper. Look only: no price, stock, on-sale or buy-flow change.
+
+- **Tables and boxes:** `SteppedUnit(..., "table")`: a wood-top table on legs per row (9), a small price card per box (no tiers or gated
+  items here, so no flags and no lock cards), a spot over each table. `BoxArt` `spec.wood` now also reaches the Sparkworks boxes
+  (`BoxService`, one condition); a new optional `spec.cardColor` gives them a dark teal name card (`BoxArt.WoodTealCard`) on the same
+  wood base. Other stores unchanged.
+- **Street side:** `ShopFacade` `sparkworksFront` (from #184: plinth, doorstep, pilasters, fascia, copper conduit with spark lamps, rods,
+  lamp posts) plus `DoorFrame` and a teal and cream `StripedAwning`; the hours board sits over the awning. Room is 15 high (roof rests on
+  the walls), no porch posts or WIRE IT UP board.
+- **Inside:** two headers 10 wide (BELTS & INPUTS, LOGIC & OUTPUTS) fully inside the walls, CHECKOUT on the counter, a SPARKWORKS name
+  board over it (no sub-signs), wall shelves, six framed pictures, rug, plants, spools on a pallet, stock corner, conduit and fuse boxes.
+- **Event room:** `ShopEventKit` zone 12 x 10 in the back west corner against the west wall (turned so its open front faces the aisle),
+  hidden by default; banner by the counter's east end facing the door, off the aisle, hidden and blank. The room is only 35 wide and
+  the lanes fill both side walls to z 4.7 and 8.3, so the corner is 12 wide: `ShopEventKit.MinSize` 14 x 8 to 12 x 8 (its three table
+  spots come out about 2.3 wide there). The front corners are lane fronts, so the banner is not by the door (Awaiting Connor).
+- **Parts:** whole shop 419 (cap 400 to 440, `BuildingArt.spec`); interior within the 400 budget. 
+- **Specs:** `StoreOverlap.Sparkworks` (3D SAT, families for every part, unchecked-name guard, screen views), `StoreInterior.Sparkworks`
+  (tables, cards, spots, headers, floating, event zone and banner placement), `StoreExterior.Sparkworks` (cap, floating, door frame and
+  awning), `BoxArt`, `BoxService`, `ShopEventKit`. Pinned numbers moved (design moved): sign-pair counts 5000 to 4000 and 10 to 6 signs.
+- **Renders:** `previews/store-polish/sparkworks-v4-*.png` (scenes `store-sparkworks`, `-exterior`, `-event`). Not seen in Studio.
+- **Awaiting Connor:** (1) banner placement by the counter, not the door (no free floor by the door); (2) event tables 2.3 wide here;
+  (3) #184 is superseded by this branch (same room height, no sub-signs, exterior front).
 
 ## Store card images through the asset thumbnail (branch `phase-2/store-images-thumb`, 12 October 2026)
 

@@ -60,7 +60,7 @@ ShopEventKit.ZoneTag = "EventExpansion"
 ShopEventKit.BannerTag = "EventBanner"
 ShopEventKit.Kinds = StoreEvents.Stores -- ToolShed, HearthAndHome, Sparkworks, Dealership
 ShopEventKit.DefaultSize = V3(16, 0, 9) -- the zone's footprint (x, z); y is ignored
-ShopEventKit.MinSize = V3(14, 0, 8)
+ShopEventKit.MinSize = V3(12, 0, 8) -- (the Sparkworks' back corner is 12 wide; its tables come out narrower)
 ShopEventKit.TableCount = 3
 ShopEventKit.PartBudget = 36 -- the most the zone and banner use together
 
