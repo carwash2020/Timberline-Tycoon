@@ -576,6 +576,7 @@ local function export(name: string, def)
 		nightLighting = built.nightLighting,
 		fov = built.fov,
 		shadowRadius = built.shadowRadius,
+		shadowFollow = built.shadowFollow,
 		background = built.background,
 		hud = built.hud,
 	}

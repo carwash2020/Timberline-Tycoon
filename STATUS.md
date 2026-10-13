@@ -98,10 +98,28 @@ The coloured strips on the dealership's 8 plinths (the tier colour that matches 
   7.085, radius 1.7545, width 1.373; the Body mesh's arches are centred at z -9.75 and 7.0, flare top 3.97 over the tyre top
   3.509). What looked wheel-less: the wheel mesh shows its rim and hub on its +X face only and every wheel was placed the same
   way, so the Pickup's whole left (-X) side showed flat black tyre backs. The Pickup's left wheels are now turned half way
-  round about Y (`VehicleModels` `mirrorLeft`, `VehicleMeshes.swapWheel`); `TruckArt.Rig` keeps the Axle joint on the unturned
+  round about Y (`VehicleModels` `mirrorLeft`, `VehicleMeshes.swapWheel`; **off since the 13 Oct GLB pass below: the new wheel is
+  dished on both faces**); `TruckArt.Rig` keeps the Axle joint on the unturned
   frame (turn in C1), so spin and steering are unchanged. Look only: no physics, hitbox, price or stat. Other trucks show the
   same flat left side and are **not** changed (Awaiting Connor). `tests/PickupWheels.spec` pins all of it, and that no other
   truck changed. Renders: `previews/pickup-wheels/`; UI and board: `previews/robux-icons/` (placeholder art, real art needs Roblox).
+- **Vehicle GLB pass (branch `phase-2/vehicle-models-fixed`, 13 October 2026).** Connor's fixed vehicle GLBs
+  (`origin/phase-2/v1-store-items` at 86be542: 8 vehicles and 12 `by_truck` trailer variants) are in `assets/glb/vehicles` and
+  replace the files in `assets/meshes/vehicles` (same one-Wheel-per-GLB, copied per axle). **Roblox still holds the OLD meshes:
+  38 mesh ids need re-uploading in Creator Hub** (list in `ASSETS.md`, "Creator Hub re-upload list", Windows steps in
+  `PHASE2_NOTES.md`); every id stays in `VehicleModels`, so nothing breaks, and the looks change when each new id is pasted in.
+  Until then the new file only shows in previews. Changes: (1) every piece's `size` is its GLB node's own bounds (the Pickup
+  wheel is 1.377 x 3.52 x 3.51 around the game's radius 1.755, width 1.365, never resized) and carries `at`, its middle in the
+  GLB's assembly, which is where `VehicleMeshes` now puts it (the old hull rule dropped the Body 0.7 stud below its arches, so
+  tyres went through the body). (2) The Pickup's half-turn (`mirrorLeft`, PR #186) is off: the new wheel is dished on both
+  faces; the switch and its test stay for a one-sided mesh. (3) Part-built art (the Timber Classic for good, every truck while
+  its meshes load, the Dealership's trailer copies): fenders keep off the tyres, the Pickup's one mudflap hangs flush from the
+  rear fender (a meshed Pickup drops it; the mesh has its own), a dished cream rim with four lug nuts and a chrome cap on the
+  Pickup and Timber Classic wheels, the Classic's stake bed (posts and a top rail), stripes 0.04 proud, the Heavy Hauler's side
+  markers clear of its wheels. (4) New `tests/VehicleWheelClearance.spec`: no wheel overlaps its body, bed or arch parts, part-built
+  and meshed (real GLB triangles), with named, depth-capped exemptions. **No price, stat, hitbox or physics change.** Open: the
+  GLBs still put the wheel-well liner 0.2 stud inside the tyre and the Heavy Hauler's deck and marker lamps over its tyres
+  (hidden, capped in the spec; Connor to fix in the GLBs). Renders: `previews/vehicles-fixed/` (before, after, contact sheet).
 ## Store event expansion room (branch `phase-2/store-event-expansion`, system only, nothing on sale)
 
 Every store can grow for an event without a rebuild. This PR is the system; each store's builder places the geometry.

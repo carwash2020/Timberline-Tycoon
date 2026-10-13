@@ -1,8 +1,8 @@
 --!nocheck
 -- The Pickup's wheels (Connor, 12 October 2026: "the Pickup has no wheels in
 -- its file"). Pickup.glb, like every truck GLB in assets/meshes/vehicles, holds
--- ONE unplaced Wheel piece at its origin (a tyre of radius 1.7545 and width
--- 1.373), never four placed wheels; the game stands four copies of that piece
+-- ONE unplaced Wheel piece at its origin (a tyre of radius 1.755 and width
+-- 1.377 with its dished rim), never four placed wheels; the game stands four copies of that piece
 -- at the truck's wheel positions (VehicleMeshes swaps each part-built Wheel
 -- for the mesh, same centre, same Radius, so VehicleFX spins and steers them).
 -- This pins where the four go, against the Body mesh's wheel arches, and that
@@ -10,7 +10,8 @@
 --
 -- Recorded numbers (truck-local studs, nose toward -Z, chassis at the origin):
 --   wheel centres  x = +-4.7125, y = 1.7545, z = -9.685 (steers) and 7.085 (rear)
---   tyre radius    1.7545 (diameter 3.509), width 1.373
+--   tyre radius    1.755 (diameter 3.51), width 1.365 part-built; the mesh keeps its own
+--                  bounds 1.377 x 3.52 x 3.51 (never resized: the 12 October GLB pass)
 --   Body mesh arches (outer fender flare, from Pickup.glb vertices): front
 --   z -11.0 .. -8.5 (middle -9.75), rear z 5.5 .. 8.5 (middle 7.0), top of the
 --   flare y 3.97 (0.46 over the tyre top 3.509); the body's side is x +-5.555,
@@ -23,8 +24,9 @@ return function(t)
 	local ItemCatalog = t.shared("ItemCatalog")
 	local Instance = t.roblox.Instance
 
-	local R = 1.7545 -- tyre radius
-	local WIDTH = 1.373
+	local R = 1.755 -- tyre radius
+	local WIDTH = 1.365 -- the part-built tyre's width (TruckLayout)
+	local MESH = { 1.377, 3.52, 3.51 } -- the Wheel node's own size in Pickup.glb (VehicleModels)
 	local X = 4.7125
 	local ZS = { -9.685, 7.085 }
 	local EPS = 0.01
@@ -76,7 +78,7 @@ return function(t)
 		return false
 	end
 
-	local function checkFour(label, wheels, ref, ground)
+	local function checkFour(label, wheels, ref, ground, meshed)
 		t.eq(#wheels, 4, label .. " has four wheels")
 		local centres = localCentres(wheels, ref, ground)
 		for _, side in ipairs({ -1, 1 }) do
@@ -89,8 +91,18 @@ return function(t)
 				math.abs(w:GetAttribute("Radius") - R) < EPS,
 				label .. " Radius " .. tostring(w:GetAttribute("Radius"))
 			)
-			t.ok(math.abs(w.Size.Y - 2 * R) < EPS and math.abs(w.Size.Z - 2 * R) < EPS, label .. " tyre diameter")
-			t.ok(math.abs(w.Size.X - WIDTH) < EPS, label .. " tyre width")
+			if meshed then
+				-- The mesh keeps its own size: not stretched to the part-built tyre.
+				t.ok(
+					math.abs(w.Size.X - MESH[1]) < 0.002
+						and math.abs(w.Size.Y - MESH[2]) < 0.002
+						and math.abs(w.Size.Z - MESH[3]) < 0.002,
+					label .. " the mesh keeps its own size"
+				)
+			else
+				t.ok(math.abs(w.Size.Y - 2 * R) < EPS and math.abs(w.Size.Z - 2 * R) < EPS, label .. " tyre diameter")
+				t.ok(math.abs(w.Size.X - WIDTH) < EPS, label .. " tyre width")
+			end
 		end
 	end
 
@@ -105,7 +117,7 @@ return function(t)
 				local model = TruckArt.Build(def)
 				t.eq(model:GetAttribute("VehicleMesh"), true, "the mesh build applied")
 				local wheels = wheelsOf(model)
-				checkFour("meshed Pickup", wheels, model:FindFirstChild("Chassis", true).CFrame, 0)
+				checkFour("meshed Pickup", wheels, model:FindFirstChild("Chassis", true).CFrame, 0, true)
 				for _, w in ipairs(wheels) do
 					t.ok(w:IsA("MeshPart"), "the wheel is a mesh")
 					t.eq(
@@ -155,8 +167,8 @@ return function(t)
 				t.eq(wheelNodes, 1, id .. ".glb has one Wheel piece, not four placed wheels")
 				local acc = gltf.accessors[gltf.meshes[wheelMesh + 1].primitives[1].attributes.POSITION + 1]
 				if id == "Pickup" then
-					t.ok(math.abs(acc.max[2] - R) < 0.001 and math.abs(acc.max[3] - R) < 0.001, "Pickup wheel radius")
-					t.ok(math.abs(acc.max[1] - acc.min[1] - WIDTH) < 0.01, "Pickup wheel width")
+					t.ok(math.abs(acc.max[2] - R) < 0.006 and math.abs(acc.max[3] - R) < 0.006, "Pickup wheel radius")
+					t.ok(math.abs(acc.max[1] - acc.min[1] - MESH[1]) < 0.002, "Pickup wheel width")
 				end
 			end
 		end
@@ -191,57 +203,125 @@ return function(t)
 		end
 	)
 
+	-- Since the 12 October GLB pass every wheel is dished on both faces, so nothing turns a wheel
+	-- (VehicleModels: no mirrorLeft). The half-turn switch stays for a future one-sided mesh, and
+	-- this runs it, with the switch on for the Pickup for the length of the test.
 	t.test(
-		"the left (-X) wheels are turned about Y so their rim faces out; spin and steer axes stay the same",
+		"mirrorLeft (kept for a one-sided wheel mesh): the left (-X) wheels turn about Y; spin and steer axes stay the same",
 		function()
-			withMeshes(function()
-				local model = TruckArt.Build(ItemCatalog.GetTruck("Pickup"))
-				local chassis = model:FindFirstChild("Chassis", true)
-				local base = chassis.CFrame
-				TruckArt.Rig(model)
-				local left, right = 0, 0
-				for _, w in ipairs(wheelsOf(model)) do
-					local rel = base:ToObjectSpace(w.CFrame)
-					local axle = w:FindFirstChild("Axle")
-					local isLeft = base:PointToObjectSpace(w.CFrame.Position).X < 0
-					if isLeft then
-						left += 1
-						t.eq(w:GetAttribute("Mirror"), true, "a left wheel is marked turned")
-						t.ok(rel.RightVector.X < -0.999, "a left wheel's rim face (+X of the mesh) points to -X")
-						t.ok(axle.C1.RightVector.X < -0.999, "the half turn is in C1")
-					else
-						right += 1
-						t.eq(w:GetAttribute("Mirror"), nil, "a right wheel is not turned")
-						t.ok(rel.RightVector.X > 0.999, "a right wheel's rim face points to +X")
-						t.ok(axle.C1.RightVector.X > 0.999, "a right wheel has no turn in C1")
+			local wheelSpec = VehicleModels.Truck("Pickup").Wheel
+			wheelSpec.mirrorLeft = true
+			local ok, err = pcall(function()
+				withMeshes(function()
+					local model = TruckArt.Build(ItemCatalog.GetTruck("Pickup"))
+					local chassis = model:FindFirstChild("Chassis", true)
+					local base = chassis.CFrame
+					TruckArt.Rig(model)
+					local left, right = 0, 0
+					for _, w in ipairs(wheelsOf(model)) do
+						local rel = base:ToObjectSpace(w.CFrame)
+						local axle = w:FindFirstChild("Axle")
+						local isLeft = base:PointToObjectSpace(w.CFrame.Position).X < 0
+						if isLeft then
+							left += 1
+							t.eq(w:GetAttribute("Mirror"), true, "a left wheel is marked turned")
+							t.ok(rel.RightVector.X < -0.999, "a left wheel's rim face (+X of the mesh) points to -X")
+							t.ok(axle.C1.RightVector.X < -0.999, "the half turn is in C1")
+						else
+							right += 1
+							t.eq(w:GetAttribute("Mirror"), nil, "a right wheel is not turned")
+							t.ok(rel.RightVector.X > 0.999, "a right wheel's rim face points to +X")
+							t.ok(axle.C1.RightVector.X > 0.999, "a right wheel has no turn in C1")
+						end
+						-- Either way the joint acts about the unturned axle: Transform's spin (about X)
+						-- and steer (about Y) go the same way on both sides.
+						t.ok(axle.C0.RightVector.X > 0.999, "the joint frame's X is the axle on both sides")
+						t.ok(axle.C0.UpVector.Y > 0.999, "the joint frame is upright")
 					end
-					-- Either way the joint acts about the unturned axle: Transform's spin (about X)
-					-- and steer (about Y) go the same way on both sides.
-					t.ok(axle.C0.RightVector.X > 0.999, "the joint frame's X is the axle on both sides")
-					t.ok(axle.C0.UpVector.Y > 0.999, "the joint frame is upright")
-				end
-				t.eq(left, 2)
-				t.eq(right, 2)
+					t.eq(left, 2)
+					t.eq(right, 2)
+				end)
 			end)
+			wheelSpec.mirrorLeft = nil
+			if not ok then
+				error(err, 0)
+			end
 		end
 	)
 
-	t.test("only the Pickup turns its left wheels; every other truck's wheels are as before", function()
+	t.test("no truck turns a wheel: every wheel mesh is dished on both faces, left and right look alike", function()
 		withMeshes(function()
 			for _, def in ipairs(ItemCatalog.TruckList()) do
 				local spec = VehicleModels.Truck(def.id)
 				if spec == nil then
 					continue
 				end
-				t.eq(spec.Wheel.mirrorLeft, if def.id == "Pickup" then true else nil, def.id .. " mirrorLeft")
+				t.eq(spec.Wheel.mirrorLeft, nil, def.id .. " mirrorLeft")
 				local model = TruckArt.Build(def)
-				if def.id ~= "Pickup" then
-					for _, w in ipairs(wheelsOf(model)) do
-						t.eq(w:GetAttribute("Mirror"), nil, def.id .. " wheels are not turned")
-					end
+				local chassis = model:FindFirstChild("Chassis", true)
+				for _, w in ipairs(wheelsOf(model)) do
+					t.eq(w:GetAttribute("Mirror"), nil, def.id .. " wheels are not turned")
+					t.ok(
+						chassis.CFrame:ToObjectSpace(w.CFrame).RightVector.X > 0.999,
+						def.id .. " wheel faces +X like the mesh"
+					)
 				end
 			end
 		end)
+	end)
+
+	t.test("the Pickup's wheel GLB is the same on both faces (mirror-symmetric about x), so no half turn", function()
+		local fs = require("@lune/fs")
+		local serde = require("@lune/serde")
+		local bytes = fs.readFile("assets/meshes/vehicles/Pickup/Pickup.glb")
+		local jsonLen = string.unpack("<I4", bytes, 13)
+		local gltf = serde.decode("json", string.sub(bytes, 21, 20 + jsonLen))
+		local binAt = 20 + jsonLen + 8 + 1 -- the BIN chunk's data
+		local mesh
+		for _, node in ipairs(gltf.nodes) do
+			if node.name == "Wheel" then
+				mesh = node.mesh
+			end
+		end
+		local seen, total = {}, 0
+		local verts = {}
+		for _, prim in ipairs(gltf.meshes[mesh + 1].primitives) do
+			local acc = gltf.accessors[prim.attributes.POSITION + 1]
+			local view = gltf.bufferViews[acc.bufferView + 1]
+			for i = 0, acc.count - 1 do
+				local o = binAt + (view.byteOffset or 0) + (acc.byteOffset or 0) + i * (view.byteStride or 12)
+				local x, y, z = string.unpack("<fff", bytes, o)
+				table.insert(verts, { x, y, z })
+				seen[string.format(
+					"%d,%d,%d",
+					math.floor(x * 20 + 0.5),
+					math.floor(y * 20 + 0.5),
+					math.floor(z * 20 + 0.5)
+				)] =
+					true
+			end
+		end
+		local matched = 0
+		for _, v in ipairs(verts) do
+			total += 1
+			-- Within a 0.05 cell either side (rounding at a cell's edge).
+			local cx, cy, cz = math.floor(-v[1] * 20 + 0.5), math.floor(v[2] * 20 + 0.5), math.floor(v[3] * 20 + 0.5)
+			local hit = false
+			for dx = -1, 1 do
+				for dy = -1, 1 do
+					for dz = -1, 1 do
+						if seen[string.format("%d,%d,%d", cx + dx, cy + dy, cz + dz)] then
+							hit = true
+						end
+					end
+				end
+			end
+			if hit then
+				matched += 1
+			end
+		end
+		t.ok(total > 1000, "the wheel has its triangles")
+		t.ok(matched / total > 0.99, string.format("%.1f%% of the wheel mirrors across x", matched / total * 100))
 	end)
 
 	t.test("the Dealership's display copy has the same four wheels, resting on its plinth", function()
@@ -278,7 +358,7 @@ return function(t)
 					t.ok(chassis.CFrame:PointToObjectSpace(w.CFrame.Position).X < 0, "only a left wheel is turned")
 				end
 			end
-			t.eq(turned, 2, "the display copy turns its two left wheels, like the gameplay truck")
+			t.eq(turned, 0, "the display copy turns no wheel, like the gameplay truck")
 			local centres = localCentres(wheels, chassis.CFrame, top)
 			for _, side in ipairs({ -1, 1 }) do
 				for _, z in ipairs(ZS) do
@@ -288,7 +368,10 @@ return function(t)
 			for _, w in ipairs(wheels) do
 				t.ok(w:IsA("MeshPart"), "the display wheel is the mesh")
 				t.eq(w:GetAttribute("MeshId"), tostring(VehicleModels.Truck("Pickup").Wheel.meshId))
-				t.ok(math.abs(w.Size.Y - 2 * R) < EPS, "the display wheel is full size")
+				t.ok(
+					math.abs(w.Size.X - MESH[1]) < 0.002 and math.abs(w.Size.Y - MESH[2]) < 0.002,
+					"the display wheel is the mesh's own size"
+				)
 				local bottom = w.CFrame.Position.Y - w.Size.Y / 2
 				t.ok(
 					math.abs(bottom - top) < 0.05,
@@ -298,41 +381,44 @@ return function(t)
 		end)
 	end)
 
-	t.test("no other truck changed: wheel mesh ids, sizes and centres are as they were", function()
-		-- id, wheel mesh id, tyre width, tyre diameter, wheelX, front z, rear z (truck-local).
-		local pinned = {
-			Rustbucket = { 139390483847560, 1.308, 3.372 },
-			Pickup = { 124886704209701, 1.373, 3.509 },
-			ScoutATV = { 140001053768737, 1.82, 3.245 },
-			Flatbed = { 131955977341353, 1.43, 3.638 },
-			LoggingRig = { 81542757402029, 1.495, 4.548 },
-		}
-		for id, want in pairs(pinned) do
-			local wheel = VehicleModels.Truck(id).Wheel
-			t.eq(wheel.meshId, want[1], id .. " wheel mesh id")
-			t.ok(math.abs(wheel.size.X - want[2]) < 1e-3, id .. " wheel width")
-			t.ok(math.abs(wheel.size.Y - want[3]) < 1e-3, id .. " wheel diameter")
-		end
-		-- Every other truck's wheels are built the same way as the Pickup's: a MeshPart
-		-- "Wheel" per tyre, resting on the ground, with the part-built tyre's Radius.
-		withMeshes(function()
-			for _, def in ipairs(ItemCatalog.TruckList()) do
-				local spec = VehicleModels.Truck(def.id)
-				if spec == nil then
-					continue -- no uploaded pieces (a part-built truck): nothing to compare
-				end
-				local model = TruckArt.Build(def)
-				local meshId = tostring(spec.Wheel.meshId)
-				local n = 0
-				for _, w in ipairs(wheelsOf(model)) do
-					n += 1
-					t.ok(w:IsA("MeshPart"), def.id .. " wheel is a mesh")
-					t.eq(w:GetAttribute("MeshId"), meshId, def.id .. " wheel mesh")
-					local y = w.CFrame.Position.Y
-					t.ok(math.abs(y - w:GetAttribute("Radius")) < EPS, def.id .. " wheel on the ground")
-				end
-				t.ok(n >= 4, def.id .. " has wheels")
+	t.test(
+		"no other truck changed but its wheel mesh bounds (the 12 October GLB pass): ids and centres are as they were",
+		function()
+			-- id, wheel mesh id, tyre width, tyre diameter, wheelX, front z, rear z (truck-local).
+			local pinned = {
+				Rustbucket = { 139390483847560, 1.307, 3.39 },
+				Pickup = { 124886704209701, 1.377, 3.52 },
+				ScoutATV = { 140001053768737, 1.822, 3.26 },
+				Flatbed = { 131955977341353, 1.447, 3.65 },
+				LoggingRig = { 81542757402029, 1.546, 4.56 },
+			}
+			for id, want in pairs(pinned) do
+				local wheel = VehicleModels.Truck(id).Wheel
+				t.eq(wheel.meshId, want[1], id .. " wheel mesh id")
+				t.ok(math.abs(wheel.size.X - want[2]) < 1e-3, id .. " wheel width")
+				t.ok(math.abs(wheel.size.Y - want[3]) < 1e-3, id .. " wheel diameter")
 			end
-		end)
-	end)
+			-- Every other truck's wheels are built the same way as the Pickup's: a MeshPart
+			-- "Wheel" per tyre, resting on the ground, with the part-built tyre's Radius.
+			withMeshes(function()
+				for _, def in ipairs(ItemCatalog.TruckList()) do
+					local spec = VehicleModels.Truck(def.id)
+					if spec == nil then
+						continue -- no uploaded pieces (a part-built truck): nothing to compare
+					end
+					local model = TruckArt.Build(def)
+					local meshId = tostring(spec.Wheel.meshId)
+					local n = 0
+					for _, w in ipairs(wheelsOf(model)) do
+						n += 1
+						t.ok(w:IsA("MeshPart"), def.id .. " wheel is a mesh")
+						t.eq(w:GetAttribute("MeshId"), meshId, def.id .. " wheel mesh")
+						local y = w.CFrame.Position.Y
+						t.ok(math.abs(y - w:GetAttribute("Radius")) < EPS, def.id .. " wheel on the ground")
+					end
+					t.ok(n >= 4, def.id .. " has wheels")
+				end
+			end)
+		end
+	)
 end

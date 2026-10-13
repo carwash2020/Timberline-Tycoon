@@ -300,12 +300,14 @@ return function(t)
 			-- Per-tier caps. A trailer is counted on its own, at most 37.
 			local BUDGET = {
 				Rustbucket = 55,
-				Pickup = 70,
+				-- Pickup 90: the dished wheel (rim, dish, cap, four lug nuts) is 5 to 6 parts more a wheel.
+				Pickup = 90,
 				ScoutATV = 40,
 				Flatbed = 90,
 				LoggingRig = 120,
 				-- Pickup body, plus two door plates and the dash gauge.
-				TimberClassic = 76,
+				-- Plus the stake bed (six posts, two rails).
+				TimberClassic = 101,
 			}
 			local function trailerPart(part)
 				local node = part

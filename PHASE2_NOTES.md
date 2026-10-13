@@ -4059,3 +4059,39 @@ Nothing here was seen in Studio. Check on PC, phone and Xbox (the swap is server
 4. Pickup: buy or spawn a Pickup. Look at it from the LEFT (driver's) side and the right: both sides show a pale rim with a blue hub and bolts on all four wheels (before, the left side showed flat black tyres). Drive: all four wheels spin the same direction as the truck moves, and the front pair steers. Nothing else about driving, the hitch, the bed or the hitbox changes.
 5. Dealership: the Pickup on its plinth shows the same four wheels, standing on the plinth (none floating or sunk).
 6. Look at the other trucks: they are unchanged (their left wheels still show the flat side; see Awaiting Connor in the PR).
+
+## Vehicle meshes: re-upload and Studio checks (branch `phase-2/vehicle-models-fixed`, 13 October 2026)
+
+The vehicle GLBs in `assets/meshes/vehicles` are new (from Connor's branch). Roblox still holds the old meshes, so the game looks
+the same until you upload the new ones. The exact list is the table "Creator Hub re-upload list" in `ASSETS.md` (38 ids; `Glass`
+is unchanged in every file, keep its id). Nothing breaks in the meantime: every old id is still in `VehicleModels.luau`.
+
+**Re-uploading on Windows (first time)**
+
+1. Open File Explorer, go to the `Timberline-Tycoon` folder, then `assets`, `meshes`, `vehicles`. One folder per vehicle
+   (`Pickup`, `Rustbucket`, `ScoutATV`, `Flatbed`, `LoggingRig`, `PonyTrailer`, `RanchTrailer`, `HeavyHauler`); each holds one `.glb`.
+2. Open Roblox Studio, open the Timberline place, and go to the **Asset Manager** (View tab, "Asset Manager"; pick the Meshes
+   tab). Or use Creator Hub in your browser: create.roblox.com, Creations, then your experience, Associated Assets, Meshes.
+3. In Studio's Asset Manager click **Bulk Import**, choose the `.glb` (for example `Pickup.glb`). The 3D Importer window opens and
+   shows the pieces by name: `Body`, `Glass`, `Lights`, `Bed`, `Wheel`, `Hitch`. Leave the settings as they are, click **Import**.
+4. Each piece becomes its own MeshPart with its own mesh. For every piece in the `ASSETS.md` table (skip `Glass`): click the
+   imported piece, and in the Properties window copy its **MeshId** (it looks like `rbxassetid://123456789`; keep only the number).
+   Never use the id of the whole Model.
+5. Open `src/ReplicatedStorage/Shared/Art/VehicleModels.luau`, find the old id from the table's first column (use Ctrl+F) and
+   replace just that number. Leave `size` and `at` alone: they already match the new file.
+6. Do the same for each GLB (8 files). The trailer variants in `by_truck` have no ids yet: skip them for now (the game draws each
+   trailer's own mesh stretched to the truck's width). If you want them exact later, import them the same way and tell Claude the
+   new ids so each variant row can point at its own.
+7. Run `lune run tools/assets` and commit `ASSETS.md` and `tools/asset-ids.json` with the change (or ask Claude to).
+
+**Studio checks for Connor (PC, then phone and Xbox for the drive)**
+
+1. After a re-upload, drive each truck (Rustbucket, Pickup, Scout ATV, Flatbed, Logging Rig) and look at both sides and the wheels:
+   good is a dished cream rim with lug nuts and a chrome cap on both sides, tyres under the arches, flat mudflaps behind the
+   rear wheels, no black tyre backs, no sunk or floating wheel.
+2. Hitch each trailer (Pony, Ranch, Heavy Hauler) behind each truck: the deck sits on the frame, the wheels clear the sides.
+3. The Dealership copies of every truck and trailer: same wheels, resting on the plinths. (The trailer copies there are
+   part-built; they were never meshed.)
+4. Before any re-upload: the Timber Classic (part-built): wheels in front of the body, stake bed with posts and a rail, one flat
+   mudflap behind the rear wheel, door names readable.
+5. Everything still drives and tows as before; hitbox, speed and bed capacity are unchanged.
