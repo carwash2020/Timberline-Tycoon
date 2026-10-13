@@ -2174,12 +2174,15 @@ What changed:
       open the Land panel
 
 ### Studio checks: blueprints as items
+- [ ] Shed Blueprint, free placing (13 Oct 2026): buy the plan for $600 (cash drops by exactly $600); place the ghost: cash does not
+      change and no toast or "need $" message appears (try it with $0 spare cash too); the hover/book row says "free to place", not a fee;
+      fill it with 60 planks; it builds; sell an empty ghost back: $0 refund (no cash appears)
 - [ ] Buy the Shed Blueprint at the General Store (box to the counter):
       the price is what it was ($600), and a rolled plan (cream roll, blue wax seal)
       appears in your hotbar named "Shed Blueprint"
 - [ ] Hold it and click (RT, tap): it vanishes, a toast says you learned it,
-      and the Shed is now in the hammer list; placing it costs the kit fee ($240)
-      and puts down a ghost you fill with 60 plank units of your own planks
+      and the Shed is now in the hammer list; placing it costs nothing (Connor,
+      13 Oct 2026: the $600 is the whole price; no $240 kit fee) and puts down a ghost you fill with 60 plank units of your own planks
 - [ ] Buying it again before you use it, or after: refused, nothing charged
 - [ ] Hold a plan and press Drop (Q, Backspace, B on a pad, or a long
       press on the hotbar on a phone; two presses): it lies on the ground with a Pick up prompt; only
@@ -4124,6 +4127,21 @@ is unchanged in every file, keep its id). Nothing breaks in the meantime: every 
    mudflap behind the rear wheel, door names readable.
 5. Everything still drives and tows as before; hitbox, speed and bed capacity are unchanged.
 
+## All trucks: rim on the left side (Studio checks) (branch `phase-2/all-trucks-wheel-faces`, 13 October 2026)
+
+Why the left side looked flat again: the GLB wheel in the repo is dished on both faces, but Roblox still holds the OLD wheel
+uploads (rim, lugs and cap on one face only), so the left (-X) wheels of every vehicle showed a flat black tyre back. Every truck,
+the Scout ATV and every trailer now turns its left wheels half way round (look only; spin, steering, layout and the hitbox are
+unchanged). It stays correct after you re-upload the new wheel GLBs.
+
+1. Drive each of the five trucks and look at BOTH sides: a pale rim, dish, lug nuts and a chrome cap on all four (or six) wheels
+   on the left AND the right, no flat black tyre backs, no floating or sunk wheel. Front wheels steer and every wheel spins the way
+   the truck moves, left side included.
+2. Hitch each trailer (Pony, Ranch, Heavy Hauler) behind each truck: both sides of the trailer's wheels show the rim.
+3. Dealership: every truck and trailer copy on its plinth, walk round it: both sides show the rim.
+4. Timber Classic and a Paint Shop recolour: both sides show the cream rim, lugs and cap (part-built wheels, unchanged).
+5. Phone and Xbox: nothing about controls changes; just drive once and look at the left wheels.
+
 ## Tool Shed restyle (Studio checks)
 
 1. PC, phone (667 x 375), Xbox: walk in the barn door. Good: two rows of wooden display tables on legs (plank tops, a cream trim edge), each box on a wood base with a slim name card, a small price card on the table's front edge per box (axes that need an earlier axe also show a small "NEEDS ..." card beside it), a warm spot over each table; no coloured slabs under the boxes, no tier flags or purple/blue signs on posts.
@@ -4132,3 +4150,7 @@ is unchanged in every file, keep its id). Nothing breaks in the meantime: every 
 4. All: from the street the barn has a door frame (cream posts, a lantern on each, a stone threshold) and a striped red and cream awning; the barn-door leaves slide open to the outside of the posts and shut across the doorway; the hours board stands above the awning and shows the hours (it used to be buried in the wall). Two lit windows in each long wall at night; a flagstone path to the door.
 5. All: shop hours still shut the door (the DoorBlock) and the hours board still updates. Buying, the price shown on hover, the Robux table and the keeper are unchanged.
 6. Event room (only visible if an event runs, or in a Studio test that calls ShopEventKit.SetZoneActive / SetBannerActive): the roped mat in the back east corner (ropes up when idle, down when active, lamp on when active) and the banner at the west edge of the aisle by the door (invisible until active, blank). Good: neither blocks the walk to the counter, both stand on the floor, nothing is for sale there.
+
+## Save load kick (error 267): retry and reason codes (branch `phase-2/save-load-kick-fix`, 13 October 2026)
+A join no longer kicks on the first failed save load. ProfileService tries up to 3 times (2 for a Migrate error) with a 3 s then 6 s pause, only when the earlier try left no session and wrote nothing; the Migrate rollback to the stored copy is unchanged. A player who left is never retried. The kick says `(Reason: <code>, waited <n>s)`: start (StartSessionAsync raised), lock (no session within the budget: save held elsewhere or DataStore failing), contended (ProfileStore gave up early: another session overrode the lock request), migrate, error, closing. Output prints `[ProfileService] <name>: load attempt n/3 starting`, `... failed after Ns: reason=...` and `save load FAILED (reason=..., waited Ns over N tries)`. The loading card shows a waiting or "Trying again (2 of 3)" line (player attribute LoadNote).
+Studio checks: 1. Join with an existing save: it loads and no LoadNote line stays. 2. Leave and rejoin straight away (also on Xbox): the card may show the waiting line for up to about 45 s, then you load; if it fails the kick names a reason. 3. Join a cold server (first player): loads as before. 4. If kicked, copy the `[ProfileService]` lines from the server Output.

@@ -181,6 +181,7 @@ export type Blueprint = {
 	hinge: number?, -- local X the leaf swings around (toward +Z)
 	slot: { size: Vector3, offset: Vector3 }?, -- the opening a Door or Window must sit inside
 	overhang: number?, -- roof: how far it sticks out past the footprint (visual; overlap ignores it). Default RoofOverhang
+	placeFee: number?, -- kit: what placing the ghost costs, in place of woodUnits x KitCashPerUnit (the Shed Blueprint: 0). woodUnits still sets the fill
 	storePrice: number?, -- a store plan's shelf price when it is not the placing fee (a kit piece's fee is small)
 	storeName: string?, -- what the General Store calls the plan when it is not the building's name ("Shed Blueprint")
 	gated: boolean?, -- not a starter plan: learned from another plan's `family` (BlueprintBook)
@@ -196,6 +197,9 @@ export type Blueprint = {
 -- on an existing kit id is that old price, kept so a save with no `paid`
 -- sells back at the old rate.
 function PlotData.Price(bp: Blueprint): number
+	if type(bp.placeFee) == "number" then
+		return bp.placeFee
+	end
 	if bp.kit == true and type(bp.woodUnits) == "number" then
 		if bp.woodUnits == 0 then
 			return bp.priceCash -- Lane F slab and ingot pieces: their own fee
@@ -334,9 +338,10 @@ PlotData.Blueprints = {
 		category = "Buildings",
 		priceCash = 600,
 		woodUnits = 60,
-		kit = true, -- you build your own: place the ghost, then fill it with planks (60 units, the kit fee on place)
+		kit = true, -- you build your own: place the ghost (free, see placeFee), then fill it with planks (60 units)
 		unlock = true,
-		storePrice = 600, -- the shelf price is the old $600; the kit fee is on top of it, as for the glass plan
+		storePrice = 600, -- the shelf price is the old $600
+		placeFee = 0, -- Connor, 13 Oct 2026: placing the ghost is free; you pay $600 for the plan and 60 planks of your own wood
 		tier = 1,
 		footprint = Vector2.new(10, 8),
 		boxes = {

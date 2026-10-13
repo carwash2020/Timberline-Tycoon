@@ -110,6 +110,7 @@ return function(t)
 					spawn = function(fn, ...)
 						fn(...)
 					end,
+					delay = function() end,
 					wait = function(seconds)
 						table.insert(log, seconds or 0)
 						return seconds or 0
@@ -118,8 +119,13 @@ return function(t)
 			},
 		})
 		local Service = loader:server("ProfileService")
+		-- The older specs below are about one try; the retry specs ask for more.
+		Service.LoadAttempts = options.attempts or 1
 		local function newPlayer(id)
-			local p = { UserId = id, Name = "P" .. id, Parent = playersService }
+			local p = { UserId = id, Name = "P" .. id, Parent = playersService, attrs = {} }
+			function p:SetAttribute(name, value)
+				self.attrs[name] = value
+			end
 			function p:Kick(message)
 				table.insert(log.kicks, message)
 			end
@@ -161,7 +167,7 @@ return function(t)
 		t.eq(profile, nil)
 		t.eq(err, "failed")
 		t.eq(s.Service.GetProfile(p), nil, "no profile to play on")
-		t.eq(s.Service.Unsaveable(p), "load")
+		t.eq(s.Service.Unsaveable(p), "contended")
 		s.Service.Save(p)
 		s.Service.ReleaseProfile(p)
 		t.eq(s.log.saves, 0, "nothing was written")
@@ -249,7 +255,7 @@ return function(t)
 		})
 		local first = s.newPlayer(7)
 		s.Service.LoadProfile(first)
-		t.eq(s.Service.Unsaveable(first), "load")
+		t.eq(s.Service.Unsaveable(first), "contended")
 		local again = s.newPlayer(7) -- same user, new instance
 		local profile = s.Service.LoadProfile(again)
 		t.eq(profile.cash, 9)
@@ -347,7 +353,7 @@ return function(t)
 		})
 		local p = s.newPlayer(21)
 		s.Service.Prefetch(p)
-		t.eq(s.Service.Unsaveable(p), "load")
+		t.eq(s.Service.Unsaveable(p), "contended")
 		local profile, err = s.Service.LoadProfile(p)
 		t.eq({ profile, err }, { nil, "failed" })
 		local fine = setup()
@@ -376,5 +382,207 @@ return function(t)
 		p.Parent = nil
 		s.Service.PrefetchLeft(p)
 		t.eq(s.log.ended, 0, "GameServer's PlayerRemoving commits and releases it")
+	end)
+
+	-- Retry and reason codes (the join no longer kicks on the first failure).
+	local function failInfo(s, p)
+		local profile, err, info = s.Service.LoadProfile(p)
+		return profile, err, info
+	end
+
+	t.test("each way a load fails reports its own reason code, the wait and the tries", function()
+		local errored = setup({
+			attempts = 1,
+			start = function()
+				error("DataStore request was added to queue")
+			end,
+		})
+		local _, err, info = failInfo(errored, errored.newPlayer(50))
+		t.eq(err, "failed")
+		t.eq(info.reason, "start")
+		t.ok(string.find(info.detail, "added to queue", 1, true) ~= nil, "the error text is kept")
+		t.eq(info.attempts, 1)
+		t.ok(type(info.waited) == "number", "how long it waited")
+
+		local early = setup({
+			start = function()
+				return nil
+			end,
+		})
+		local _, _, info2 = failInfo(early, early.newPlayer(51))
+		t.eq(info2.reason, "contended")
+
+		local late = setup({
+			start = function()
+				return nil
+			end,
+		})
+		late.Service.LoadBudgetSec = -1
+		local _, _, info3 = failInfo(late, late.newPlayer(52))
+		t.eq(info3.reason, "lock")
+
+		local bad = setup({
+			migrate = function()
+				error("bad shape")
+			end,
+		})
+		local _, _, info4 = failInfo(bad, bad.newPlayer(53))
+		t.eq(info4.reason, "migrate")
+		t.ok(string.find(info4.detail, "bad shape", 1, true) ~= nil)
+	end)
+
+	t.test("a load that fails once is retried and succeeds on the second try", function()
+		local tries = 0
+		local s = setup({
+			attempts = 3,
+			start = function(_, make)
+				tries += 1
+				if tries == 1 then
+					error("HTTP 429 throttled")
+				end
+				return make({ cash = 42 })
+			end,
+		})
+		local p = s.newPlayer(54)
+		local profile, err = s.Service.LoadProfile(p)
+		t.eq(err, nil)
+		t.eq(profile.cash, 42)
+		t.eq(tries, 2)
+		t.eq(s.Service.Unsaveable(p), nil, "the failed try's mark is cleared by the one that worked")
+		t.eq(p.attrs.LoadNote, nil, "the loading card's retry line is cleared")
+		t.eq(s.log.saves, 0)
+	end)
+
+	t.test("a failure on every try gives up after LoadAttempts and says why", function()
+		local tries = 0
+		local s = setup({
+			attempts = 3,
+			start = function()
+				tries += 1
+				return nil
+			end,
+		})
+		local p = s.newPlayer(55)
+		local profile, err, info = s.Service.LoadProfile(p)
+		t.eq({ profile, err }, { nil, "failed" })
+		t.eq(tries, 3)
+		t.eq(info.attempts, 3)
+		t.eq(s.Service.Unsaveable(p), "contended")
+		t.eq(s.log.saves, 0)
+		t.eq(s.log.ended, 0)
+	end)
+
+	t.test("a migrate failure never writes the half-migrated copy, and a retry can still load", function()
+		local sessions = {}
+		local stored = { cash = 777, plot = { placed = { 1, 2, 3 } } }
+		local migrations = 0
+		local s = setup({
+			attempts = 3,
+			start = function(_, make)
+				local copy = { cash = stored.cash, plot = { placed = { 1, 2, 3 } } }
+				local session = make(copy)
+				table.insert(sessions, session)
+				return session
+			end,
+			migrate = function(data)
+				migrations += 1
+				if migrations == 1 then
+					data.cash = 0 -- half done...
+					data.plot.placed = {}
+					error("bad shape")
+				end
+				data.migrated = true
+			end,
+		})
+		local p = s.newPlayer(56)
+		local profile, err = s.Service.LoadProfile(p)
+		t.eq(err, nil)
+		t.eq(#sessions, 2)
+		t.eq(sessions[1].endedWith.cash, 777, "the first, failed copy was put back as stored before its session ended")
+		t.eq(#sessions[1].endedWith.plot.placed, 3)
+		t.eq(profile.cash, 777, "the retry loaded the real save, not the half-migrated one")
+		t.eq(#profile.plot.placed, 3)
+		t.eq(s.log.saves, 0, "nothing was written by a manual save")
+	end)
+
+	t.test("a migrate failure that repeats stops after MigrateAttempts and leaves the save as stored", function()
+		local sessions = {}
+		local s = setup({
+			attempts = 3,
+			start = function(_, make)
+				local session = make({ cash = 5, plot = { placed = { 1 } } })
+				table.insert(sessions, session)
+				return session
+			end,
+			migrate = function(data)
+				data.cash = 0
+				error("bad shape")
+			end,
+		})
+		local p = s.newPlayer(57)
+		local profile, err, info = s.Service.LoadProfile(p)
+		t.eq({ profile, err }, { nil, "failed" })
+		t.eq(info.reason, "migrate")
+		t.eq(#sessions, 2, "one more look, not endless")
+		for _, session in ipairs(sessions) do
+			t.eq(session.endedWith.cash, 5, "every copy ended as the DataStore gave it")
+		end
+	end)
+
+	t.test("a player who left is not retried", function()
+		local tries = 0
+		local s = setup({
+			attempts = 3,
+			start = function()
+				tries += 1
+				return nil
+			end,
+		})
+		local p = s.newPlayer(58)
+		p.Parent = nil
+		local _, err = s.Service.LoadProfile(p)
+		t.eq(err, "left")
+		t.eq(tries, 1)
+
+		-- Leaving while the first try is still waiting on the lock.
+		local tries2 = 0
+		local q
+		local s2 = setup({
+			attempts = 3,
+			start = function()
+				tries2 += 1
+				q.Parent = nil
+				return nil
+			end,
+		})
+		q = s2.newPlayer(59)
+		local _, err2 = s2.Service.LoadProfile(q)
+		t.eq(err2, "left")
+		t.eq(tries2, 1, "no second try for a player who is gone")
+		t.eq(s2.log.saves, 0)
+	end)
+
+	t.test("a load that raises inside ends the session it opened so the next try is not locked out", function()
+		local opened = {}
+		local tries = 0
+		local s = setup({
+			attempts = 2,
+			start = function(_, make)
+				tries += 1
+				local session = make({ cash = 3 })
+				table.insert(opened, session)
+				if tries == 1 then
+					function session:AddUserId()
+						error("boom")
+					end
+				end
+				return session
+			end,
+		})
+		local p = s.newPlayer(60)
+		local profile = s.Service.LoadProfile(p)
+		t.eq(profile.cash, 3)
+		t.eq(opened[1].active, false, "the first session was ended")
+		t.eq(opened[2].active, true)
 	end)
 end

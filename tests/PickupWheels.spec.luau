@@ -203,126 +203,104 @@ return function(t)
 		end
 	)
 
-	-- Since the 12 October GLB pass every wheel is dished on both faces, so nothing turns a wheel
-	-- (VehicleModels: no mirrorLeft). The half-turn switch stays for a future one-sided mesh, and
-	-- this runs it, with the switch on for the Pickup for the length of the test.
+	-- The repo's GLB wheels are dished on both faces (since the 12 October GLB pass), but the wheel
+	-- meshes live in Roblox are still the old one-sided uploads (rim, lugs and cap on +X only), so
+	-- every truck and trailer turns its left (-X) wheels half way round about Y (VehicleModels
+	-- mirrorLeft). A half turn of a two-sided wheel looks the same, so this holds after the
+	-- re-upload too. VehicleWheelFaces.spec runs it for every vehicle.
 	t.test(
-		"mirrorLeft (kept for a one-sided wheel mesh): the left (-X) wheels turn about Y; spin and steer axes stay the same",
+		"the Pickup's left (-X) wheels turn about Y so the rim faces out; spin and steer axes stay the same",
 		function()
-			local wheelSpec = VehicleModels.Truck("Pickup").Wheel
-			wheelSpec.mirrorLeft = true
-			local ok, err = pcall(function()
-				withMeshes(function()
-					local model = TruckArt.Build(ItemCatalog.GetTruck("Pickup"))
-					local chassis = model:FindFirstChild("Chassis", true)
-					local base = chassis.CFrame
-					TruckArt.Rig(model)
-					local left, right = 0, 0
-					for _, w in ipairs(wheelsOf(model)) do
-						local rel = base:ToObjectSpace(w.CFrame)
-						local axle = w:FindFirstChild("Axle")
-						local isLeft = base:PointToObjectSpace(w.CFrame.Position).X < 0
-						if isLeft then
-							left += 1
-							t.eq(w:GetAttribute("Mirror"), true, "a left wheel is marked turned")
-							t.ok(rel.RightVector.X < -0.999, "a left wheel's rim face (+X of the mesh) points to -X")
-							t.ok(axle.C1.RightVector.X < -0.999, "the half turn is in C1")
-						else
-							right += 1
-							t.eq(w:GetAttribute("Mirror"), nil, "a right wheel is not turned")
-							t.ok(rel.RightVector.X > 0.999, "a right wheel's rim face points to +X")
-							t.ok(axle.C1.RightVector.X > 0.999, "a right wheel has no turn in C1")
-						end
-						-- Either way the joint acts about the unturned axle: Transform's spin (about X)
-						-- and steer (about Y) go the same way on both sides.
-						t.ok(axle.C0.RightVector.X > 0.999, "the joint frame's X is the axle on both sides")
-						t.ok(axle.C0.UpVector.Y > 0.999, "the joint frame is upright")
+			t.eq(VehicleModels.Truck("Pickup").Wheel.mirrorLeft, true, "the Pickup's wheel has mirrorLeft")
+			withMeshes(function()
+				local model = TruckArt.Build(ItemCatalog.GetTruck("Pickup"))
+				local chassis = model:FindFirstChild("Chassis", true)
+				local base = chassis.CFrame
+				TruckArt.Rig(model)
+				local left, right = 0, 0
+				for _, w in ipairs(wheelsOf(model)) do
+					local rel = base:ToObjectSpace(w.CFrame)
+					local axle = w:FindFirstChild("Axle")
+					local isLeft = base:PointToObjectSpace(w.CFrame.Position).X < 0
+					if isLeft then
+						left += 1
+						t.eq(w:GetAttribute("Mirror"), true, "a left wheel is marked turned")
+						t.ok(rel.RightVector.X < -0.999, "a left wheel's rim face (+X of the mesh) points to -X")
+						t.ok(axle.C1.RightVector.X < -0.999, "the half turn is in C1")
+					else
+						right += 1
+						t.eq(w:GetAttribute("Mirror"), nil, "a right wheel is not turned")
+						t.ok(rel.RightVector.X > 0.999, "a right wheel's rim face points to +X")
+						t.ok(axle.C1.RightVector.X > 0.999, "a right wheel has no turn in C1")
 					end
-					t.eq(left, 2)
-					t.eq(right, 2)
-				end)
+					-- Either way the joint acts about the unturned axle: Transform's spin (about X)
+					-- and steer (about Y) go the same way on both sides.
+					t.ok(axle.C0.RightVector.X > 0.999, "the joint frame's X is the axle on both sides")
+					t.ok(axle.C0.UpVector.Y > 0.999, "the joint frame is upright")
+				end
+				t.eq(left, 2)
+				t.eq(right, 2)
 			end)
-			wheelSpec.mirrorLeft = nil
-			if not ok then
-				error(err, 0)
-			end
 		end
 	)
 
-	t.test("no truck turns a wheel: every wheel mesh is dished on both faces, left and right look alike", function()
-		withMeshes(function()
-			for _, def in ipairs(ItemCatalog.TruckList()) do
-				local spec = VehicleModels.Truck(def.id)
-				if spec == nil then
-					continue
-				end
-				t.eq(spec.Wheel.mirrorLeft, nil, def.id .. " mirrorLeft")
-				local model = TruckArt.Build(def)
-				local chassis = model:FindFirstChild("Chassis", true)
-				for _, w in ipairs(wheelsOf(model)) do
-					t.eq(w:GetAttribute("Mirror"), nil, def.id .. " wheels are not turned")
-					t.ok(
-						chassis.CFrame:ToObjectSpace(w.CFrame).RightVector.X > 0.999,
-						def.id .. " wheel faces +X like the mesh"
-					)
+	t.test(
+		"the Pickup's wheel GLB is the same on both faces (mirror-symmetric about x), so the half turn is harmless after the re-upload",
+		function()
+			local fs = require("@lune/fs")
+			local serde = require("@lune/serde")
+			local bytes = fs.readFile("assets/meshes/vehicles/Pickup/Pickup.glb")
+			local jsonLen = string.unpack("<I4", bytes, 13)
+			local gltf = serde.decode("json", string.sub(bytes, 21, 20 + jsonLen))
+			local binAt = 20 + jsonLen + 8 + 1 -- the BIN chunk's data
+			local mesh
+			for _, node in ipairs(gltf.nodes) do
+				if node.name == "Wheel" then
+					mesh = node.mesh
 				end
 			end
-		end)
-	end)
-
-	t.test("the Pickup's wheel GLB is the same on both faces (mirror-symmetric about x), so no half turn", function()
-		local fs = require("@lune/fs")
-		local serde = require("@lune/serde")
-		local bytes = fs.readFile("assets/meshes/vehicles/Pickup/Pickup.glb")
-		local jsonLen = string.unpack("<I4", bytes, 13)
-		local gltf = serde.decode("json", string.sub(bytes, 21, 20 + jsonLen))
-		local binAt = 20 + jsonLen + 8 + 1 -- the BIN chunk's data
-		local mesh
-		for _, node in ipairs(gltf.nodes) do
-			if node.name == "Wheel" then
-				mesh = node.mesh
+			local seen, total = {}, 0
+			local verts = {}
+			for _, prim in ipairs(gltf.meshes[mesh + 1].primitives) do
+				local acc = gltf.accessors[prim.attributes.POSITION + 1]
+				local view = gltf.bufferViews[acc.bufferView + 1]
+				for i = 0, acc.count - 1 do
+					local o = binAt + (view.byteOffset or 0) + (acc.byteOffset or 0) + i * (view.byteStride or 12)
+					local x, y, z = string.unpack("<fff", bytes, o)
+					table.insert(verts, { x, y, z })
+					seen[string.format(
+						"%d,%d,%d",
+						math.floor(x * 20 + 0.5),
+						math.floor(y * 20 + 0.5),
+						math.floor(z * 20 + 0.5)
+					)] =
+						true
+				end
 			end
-		end
-		local seen, total = {}, 0
-		local verts = {}
-		for _, prim in ipairs(gltf.meshes[mesh + 1].primitives) do
-			local acc = gltf.accessors[prim.attributes.POSITION + 1]
-			local view = gltf.bufferViews[acc.bufferView + 1]
-			for i = 0, acc.count - 1 do
-				local o = binAt + (view.byteOffset or 0) + (acc.byteOffset or 0) + i * (view.byteStride or 12)
-				local x, y, z = string.unpack("<fff", bytes, o)
-				table.insert(verts, { x, y, z })
-				seen[string.format(
-					"%d,%d,%d",
-					math.floor(x * 20 + 0.5),
-					math.floor(y * 20 + 0.5),
-					math.floor(z * 20 + 0.5)
-				)] =
-					true
-			end
-		end
-		local matched = 0
-		for _, v in ipairs(verts) do
-			total += 1
-			-- Within a 0.05 cell either side (rounding at a cell's edge).
-			local cx, cy, cz = math.floor(-v[1] * 20 + 0.5), math.floor(v[2] * 20 + 0.5), math.floor(v[3] * 20 + 0.5)
-			local hit = false
-			for dx = -1, 1 do
-				for dy = -1, 1 do
-					for dz = -1, 1 do
-						if seen[string.format("%d,%d,%d", cx + dx, cy + dy, cz + dz)] then
-							hit = true
+			local matched = 0
+			for _, v in ipairs(verts) do
+				total += 1
+				-- Within a 0.05 cell either side (rounding at a cell's edge).
+				local cx, cy, cz =
+					math.floor(-v[1] * 20 + 0.5), math.floor(v[2] * 20 + 0.5), math.floor(v[3] * 20 + 0.5)
+				local hit = false
+				for dx = -1, 1 do
+					for dy = -1, 1 do
+						for dz = -1, 1 do
+							if seen[string.format("%d,%d,%d", cx + dx, cy + dy, cz + dz)] then
+								hit = true
+							end
 						end
 					end
 				end
+				if hit then
+					matched += 1
+				end
 			end
-			if hit then
-				matched += 1
-			end
+			t.ok(total > 1000, "the wheel has its triangles")
+			t.ok(matched / total > 0.99, string.format("%.1f%% of the wheel mirrors across x", matched / total * 100))
 		end
-		t.ok(total > 1000, "the wheel has its triangles")
-		t.ok(matched / total > 0.99, string.format("%.1f%% of the wheel mirrors across x", matched / total * 100))
-	end)
+	)
 
 	t.test("the Dealership's display copy has the same four wheels, resting on its plinth", function()
 		withMeshes(function()
@@ -358,7 +336,7 @@ return function(t)
 					t.ok(chassis.CFrame:PointToObjectSpace(w.CFrame.Position).X < 0, "only a left wheel is turned")
 				end
 			end
-			t.eq(turned, 0, "the display copy turns no wheel, like the gameplay truck")
+			t.eq(turned, 2, "the display copy turns its two left wheels, like the gameplay truck")
 			local centres = localCentres(wheels, chassis.CFrame, top)
 			for _, side in ipairs({ -1, 1 }) do
 				for _, z in ipairs(ZS) do

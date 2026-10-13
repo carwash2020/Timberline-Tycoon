@@ -51,7 +51,12 @@ return function(t)
 					if piece.family or piece.id == "Shed" then true else nil,
 					piece.id .. " store unlock"
 				)
-				t.eq(PlotData.Price(piece), piece.woodUnits * 4, piece.id)
+				-- (the Shed Blueprint places free, Connor's 13 October 2026 decision: `placeFee = 0`; ShedBlueprint.spec pins it)
+				t.eq(
+					PlotData.Price(piece),
+					if piece.placeFee ~= nil then piece.placeFee else piece.woodUnits * 4,
+					piece.id
+				)
 				if not ModernKit.ById[piece.id] and piece.id ~= "Shed" then -- (the shed is part-built; its model slot is ItemModelSlots)
 					t.ok(KitMeshData.Get(piece.id) ~= nil, piece.id .. " has a mesh entry")
 				end

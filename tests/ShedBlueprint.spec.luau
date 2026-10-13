@@ -35,18 +35,95 @@ return function(t)
 		t.eq(bp.kit, true, "a kit piece: filled with planks")
 		t.eq(bp.woodUnits, 60)
 		t.eq(PlotLogic.Source(bp, 0, false, true), "store", "before you own it, it is the store's plan")
-		t.eq(PlotLogic.Source(bp, 0, true, true), "fee", "after, it is placed for the kit fee")
-		t.eq(PlotLogic.PlacePrice(bp, true), 60 * PlotData.KitCashPerUnit)
+		t.eq(PlotLogic.Source(bp, 0, true, true), "fee", "after, it is placed through the fee path, which is $0")
+		t.eq(PlotLogic.PlacePrice(bp, true), 0, "placing costs nothing")
 		t.eq(PlotLogic.FreeToPlace(bp), false, "no longer a free, prebuilt shed")
-		local ghost = { uid = "a", blueprintId = "Shed", x = 0, z = 0, rot = 0, fill = { units = 0 }, paid = 240 }
+		local ghost = { uid = "a", blueprintId = "Shed", x = 0, z = 0, rot = 0, fill = { units = 0 }, paid = 0 }
 		t.eq(PlotLogic.IsBuilt(bp, ghost), false, "a placed plan is an empty ghost")
 		local half = { uid = "b", blueprintId = "Shed", x = 0, z = 0, rot = 0, fill = { units = 30 }, paid = 240 }
 		t.eq(PlotLogic.IsBuilt(bp, half), false)
 		local done = { uid = "c", blueprintId = "Shed", x = 0, z = 0, rot = 0, fill = { units = 60 }, paid = 240 }
 		t.eq(PlotLogic.IsBuilt(bp, done), true, "filled with its own planks, it is built")
 		t.eq(BuildCost.Of(bp).woodUnits, 60)
-		t.eq(BuildCost.Of(bp).cash, 240)
-		t.eq(PlotLogic.SellPlan(bp, ghost).cash, 240, "an empty ghost refunds its fee")
+		t.eq(BuildCost.Of(bp).cash, 0)
+		t.eq(PlotLogic.SellPlan(bp, ghost).cash, 0, "an empty ghost placed for $0 refunds $0")
+	end)
+
+	t.test(
+		"Connor 13 Oct 2026: placing the Shed Blueprint costs $0; the shelf price and the 60-unit fill stay",
+		function()
+			local bp = PlotData.Blueprint("Shed")
+			t.eq(PlotData.Price(bp), 0)
+			t.eq(PlotData.StorePrice(bp), 600)
+			t.eq(StoreStock.UnitPrice("Blueprint", "Shed", false, 2), 600)
+			t.eq(bp.woodUnits, 60)
+			t.eq(BuildCost.Of(bp).woodUnits, 60)
+			t.eq(BuildCost.NewFill(bp).units, 0, "a new ghost starts empty")
+			t.eq(t.server("PlotFill").Fee(bp), 0, "the fee written onto the new ghost")
+			t.eq(t.shared("EditLogic").Fee(bp, nil), 0)
+		end
+	)
+
+	t.test("a shed placed for $0 sells back $0; old paid values sell back sensibly and never mint cash", function()
+		local bp = PlotData.Blueprint("Shed")
+		local function item(fill, paid)
+			return { uid = "s", blueprintId = "Shed", x = 0, z = 0, rot = 0, fill = fill, paid = paid }
+		end
+		for _, undo in ipairs({ false, true }) do
+			t.eq(PlotLogic.SellPlan(bp, item({ units = 0 }, 0), undo).cash, 0, "empty, paid 0")
+			t.eq(PlotLogic.SellPlan(bp, item({ units = 30 }, 0), undo).cash, 0, "part filled, paid 0")
+			t.eq(PlotLogic.SellPlan(bp, item(nil, 0), undo).cash, 0, "finished, paid 0")
+		end
+		-- old saves: paid 240 refunds at most what was paid
+		t.eq(PlotLogic.SellPlan(bp, item({ units = 0 }, 240)).cash, 240, "an old empty ghost gets its $240 back")
+		t.eq(PlotLogic.SellPlan(bp, item(nil, 240)).cash, 120, "an old finished shed: half of $240")
+		t.eq(PlotLogic.SellPlan(bp, item(nil, 240), true).cash, 240, "inside undo: what was paid")
+		-- old saves: no paid. An empty ghost refunds the new price (0); a finished shed the legacy half.
+		t.eq(PlotLogic.SellPlan(bp, item({ units = 0 }, nil)).cash, 0, "no paid, empty ghost")
+		t.eq(PlotLogic.SellPlan(bp, item({ units = 30 }, nil)).cash, 0, "no paid, part filled")
+		t.eq(PlotLogic.SellPlan(bp, item(nil, nil)).cash, 300, "no paid, finished: half the old $600, as before")
+		-- Migrate keeps an old paid of 240 and clamps junk
+		local data = Util.deepCopy(Schema.Template)
+		data.plot.claimed = true
+		data.plot.placed = {
+			{ uid = "a", blueprintId = "Shed", x = 0, z = 0, rot = 0, fill = { units = 10 }, paid = 240 },
+			{ uid = "b", blueprintId = "Shed", x = 20, z = 0, rot = 0, fill = { units = 10 }, paid = 9999 },
+			{ uid = "c", blueprintId = "Shed", x = 40, z = 0, rot = 0, fill = { units = 10 }, paid = 0 },
+		}
+		Schema.Migrate(data)
+		local byUid = {}
+		for _, p in ipairs(data.plot.placed) do
+			byUid[p.uid] = p
+		end
+		t.eq(byUid.a.paid, 240, "an old paid of $240 survives")
+		t.eq(byUid.b.paid, 240, "a paid above the old fee is clamped to it")
+		t.eq(byUid.c.paid, 0)
+	end)
+
+	t.test("no other plan's placing price moved", function()
+		local OLD_RULE = function(bp)
+			if bp.kit == true and type(bp.woodUnits) == "number" then
+				if bp.woodUnits == 0 then
+					return bp.priceCash
+				end
+				return bp.woodUnits * PlotData.KitCashPerUnit
+			end
+			if type(bp.woodUnits) == "number" then
+				return bp.woodUnits * 10
+			end
+			return bp.priceCash
+		end
+		local n = 0
+		for _, bp in ipairs(PlotData.Blueprints) do
+			n += 1
+			if bp.id == "Shed" then
+				t.eq(PlotData.Price(bp), 0)
+			else
+				t.eq(PlotData.Price(bp), OLD_RULE(bp), bp.id .. " price")
+				t.eq(bp.placeFee, nil, bp.id .. " has no placeFee")
+			end
+		end
+		t.ok(n > 20, "plans checked: " .. n)
 	end)
 
 	t.test(

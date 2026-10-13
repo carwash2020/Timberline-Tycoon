@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `4ecfa51` (#159).**
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `4ecfa51` (#159).**
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
 (#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
@@ -39,6 +39,13 @@ own loading card; `UITheme.HiddenSelection` on the Badges list (a
 panel-sized selection group); the plot-claim fade survives a failing hide.
 `tests/GreyBox.spec` builds the overlays and fails on any visible, big,
 translucent object. Needs Connor on Xbox: see the PR's checks.
+## Save load kick, error 267 (branch `phase-2/save-load-kick-fix`, 13 October 2026)
+
+A failed save load no longer kicks at once: ProfileService retries (3 tries, 2 for Migrate errors, only when no session
+was left and nothing written), the loading card says so, and the kick message and server Output carry a reason code
+(`start`, `lock`, `contended`, `migrate`, `error`, `closing`) and the seconds waited. Root cause not yet confirmed: it
+needs Connor's server Output lines `[ProfileService] ... load attempt` / `FAILED (reason=...)`. Details and Studio checks:
+PHASE2_NOTES.md "Save load kick".
 
 ## Store item models (branch `phase-2/store-item-models`, 12 October 2026)
 
@@ -111,8 +118,7 @@ The coloured strips on the dealership's 8 plinths (the tier colour that matches 
   7.085, radius 1.7545, width 1.373; the Body mesh's arches are centred at z -9.75 and 7.0, flare top 3.97 over the tyre top
   3.509). What looked wheel-less: the wheel mesh shows its rim and hub on its +X face only and every wheel was placed the same
   way, so the Pickup's whole left (-X) side showed flat black tyre backs. The Pickup's left wheels are now turned half way
-  round about Y (`VehicleModels` `mirrorLeft`, `VehicleMeshes.swapWheel`; **off since the 13 Oct GLB pass below: the new wheel is
-  dished on both faces**); `TruckArt.Rig` keeps the Axle joint on the unturned
+  round about Y (`VehicleModels` `mirrorLeft`, `VehicleMeshes.swapWheel`; **off for a day after the 13 Oct GLB pass below, then on for every vehicle (next bullet): Roblox still holds the one-sided wheel**); `TruckArt.Rig` keeps the Axle joint on the unturned
   frame (turn in C1), so spin and steering are unchanged. Look only: no physics, hitbox, price or stat. Other trucks show the
   same flat left side and are **not** changed (Awaiting Connor). `tests/PickupWheels.spec` pins all of it, and that no other
   truck changed. Renders: `previews/pickup-wheels/`; UI and board: `previews/robux-icons/` (placeholder art, real art needs Roblox).
@@ -133,6 +139,16 @@ The coloured strips on the dealership's 8 plinths (the tier colour that matches 
   and meshed (real GLB triangles), with named, depth-capped exemptions. **No price, stat, hitbox or physics change.** Open: the
   GLBs still put the wheel-well liner 0.2 stud inside the tyre and the Heavy Hauler's deck and marker lamps over its tyres
   (hidden, capped in the spec; Connor to fix in the GLBs). Renders: `previews/vehicles-fixed/` (before, after, contact sheet).
+- **Every truck and trailer shows its rim on the left side (branch `phase-2/all-trucks-wheel-faces`, 13 October 2026).** Connor: all
+  trucks need the fix. Cause: the 13 Oct GLB pass switched the Pickup's half turn off because the repo's new wheel GLBs are dished
+  on both faces (checked from the triangles and vertex colours: the same rim, dish, lugs and cap on +X and -X in all 8 vehicles and
+  all 12 `by_truck` files, see `tests/VehicleWheelFaces.spec`), **but the wheel meshes live in Roblox are still the old one-sided
+  uploads** (rim on +X only; the ids did not change and the re-upload list in `ASSETS.md` is not done), so in Studio every
+  left wheel was a flat black back again. Now `mirrorLeft` is on for every truck, the Scout ATV and every trailer variant in
+  `VehicleModels` (the half turn of a two-sided wheel looks identical, so it stays safe after the re-upload; remove it only when you
+  want, nothing needs it then). Part-built wheels (Timber Classic, Paint Shop recolours, the Dealership trailer copies, every truck
+  while meshes load) already show rim, dish, lugs and cap on both faces. Spin and steer axes, layout, sizes, hitbox, price and
+  stats unchanged (spec pins it). Renders: `previews/wheel-faces/` (before = the old uploaded wheel, after = fixed, contact sheet).
 ## Store event expansion room (branch `phase-2/store-event-expansion`, system only, nothing on sale)
 
 Every store can grow for an event without a rebuild. This PR is the system; each store's builder places the geometry.
@@ -248,7 +264,7 @@ Connor's fixes after the #183 renders. No price, on/off-sale or buy-flow change 
   cream trim along its front edge, two legs to the floor under each table's front corners, tables stepping up and meeting; the unit's
   solid core stays as an invisible collider. `store-hearth-event` scene shows the event zone and banner active; the banner now faces
   into the room (it faced the wall). Parts 451 (cap 460). Renders: `previews/store-polish/hearth-v4-*.png`.
-- **Awaiting Connor:** (1) placing the Shed costs the $240 kit fee on top of the $600 plan (default: the kit rule); (2) the Lantern and
+- **Awaiting Connor:** (1) DECIDED by Connor, 13 Oct 2026: placing the Shed Blueprint ghost is free (`placeFee = 0`); the plan is still $600 and the fill is still 60 plank units; an old save's `paid` 240 still sells back at half; (2) the Lantern and
   Flashlight have no held model in the game, so their held slot path waits for a held-gear feature; (3) the blue under each box is
   the box's own accent floor (BoxArt, shared by every store), not a plinth; (4) parts 444 against the old 350 cap.
 

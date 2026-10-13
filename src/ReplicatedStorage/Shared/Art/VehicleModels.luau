@@ -16,9 +16,12 @@ local VehicleModels = {}
 --                 trailer's `at` is relative to its bed's middle (VehicleMeshes adds the bed's z).
 --                 A piece with no `at` is placed from the hull instead (VehicleMeshes.Place). A
 --                 wheel has none: it goes where the part-built wheel was, one mesh copied per axle.
---   mirrorLeft    (a Wheel only) the half turn for a mesh whose rim shows on +X only. No wheel needs it
---                 now (every GLB wheel is dished on both faces); the switch stays for a future
---                 one-sided wheel. Look only: the axle, spin and steering are unchanged (TruckArt.Rig).
+--   mirrorLeft    (a Wheel only) the half turn for a mesh whose rim shows on +X only. Every wheel has it
+--                 on: the wheel meshes live in Roblox are still the one-sided uploads (rim, lugs and
+--                 cap on +X, a flat black tyre back on -X; the repo's GLBs are dished on both faces
+--                 but need the re-upload in ASSETS.md), and a half turn of a two-sided wheel looks
+--                 the same, so the flag is safe before and after the re-upload. Look only: the
+--                 axle, spin and steering are unchanged (TruckArt.Rig).
 export type Piece = { meshId: number, size: Vector3, at: Vector3?, mirrorLeft: boolean? }
 
 local trucks: { [string]: { [string]: Piece } } = {
@@ -39,7 +42,7 @@ local trucks: { [string]: { [string]: Piece } } = {
 			at = Vector3.new(0.01, 4.517, 0.741),
 		},
 		Bed = { meshId = 120734733805977, size = Vector3.new(8.68, 3.2, 14.057), at = Vector3.new(0, 4.425, 4.754) },
-		Wheel = { meshId = 139390483847560, size = Vector3.new(1.307, 3.39, 3.38) },
+		Wheel = { meshId = 139390483847560, size = Vector3.new(1.307, 3.39, 3.38), mirrorLeft = true },
 		Hitch = { meshId = 99956936383854, size = Vector3.new(0.7, 1.06, 1.68), at = Vector3.new(0, 2.005, 11.315) },
 	},
 	Pickup = {
@@ -51,7 +54,7 @@ local trucks: { [string]: { [string]: Piece } } = {
 		Glass = { meshId = 76718452145232, size = Vector3.new(10.098, 3.391, 3.395), at = Vector3.new(0, 7.471, -5.24) },
 		Lights = { meshId = 100056308278514, size = Vector3.new(8.54, 2.95, 25.03), at = Vector3.new(0, 4.225, -0.16) },
 		Bed = { meshId = 137659811327372, size = Vector3.new(9, 4.05, 15.815), at = Vector3.new(0, 4.375, 4.562) },
-		Wheel = { meshId = 124886704209701, size = Vector3.new(1.377, 3.52, 3.51) },
+		Wheel = { meshId = 124886704209701, size = Vector3.new(1.377, 3.52, 3.51), mirrorLeft = true },
 		Hitch = { meshId = 121507994255438, size = Vector3.new(0.7, 1.06, 1.68), at = Vector3.new(0, 2.005, 12.875) },
 	},
 	ScoutATV = {
@@ -62,7 +65,7 @@ local trucks: { [string]: { [string]: Piece } } = {
 			size = Vector3.new(9.4, 2.648, 10.999),
 			at = Vector3.new(0, 4.389, -0.014),
 		},
-		Wheel = { meshId = 140001053768737, size = Vector3.new(1.822, 3.26, 3.25) },
+		Wheel = { meshId = 140001053768737, size = Vector3.new(1.822, 3.26, 3.25), mirrorLeft = true },
 	},
 	Flatbed = {
 		Body = {
@@ -73,7 +76,7 @@ local trucks: { [string]: { [string]: Piece } } = {
 		Glass = { meshId = 98760659539151, size = Vector3.new(11.2, 3.947, 3.852), at = Vector3.new(0, 7.747, -9.073) },
 		Lights = { meshId = 111333312069489, size = Vector3.new(7.96, 8.76, 33.76), at = Vector3.new(0, 6.83, 0.275) },
 		Bed = { meshId = 139734928087096, size = Vector3.new(9.76, 7.475, 23.4), at = Vector3.new(0, 7.223, 4.745) },
-		Wheel = { meshId = 131955977341353, size = Vector3.new(1.447, 3.65, 3.64) },
+		Wheel = { meshId = 131955977341353, size = Vector3.new(1.447, 3.65, 3.64), mirrorLeft = true },
 		Hitch = { meshId = 140349480773545, size = Vector3.new(0.7, 1.06, 1.68), at = Vector3.new(0, 2.005, 17.035) },
 	},
 	LoggingRig = {
@@ -81,7 +84,7 @@ local trucks: { [string]: { [string]: Piece } } = {
 		Glass = { meshId = 110663013657387, size = Vector3.new(12.194, 4.44, 3.925), at = Vector3.new(0, 8.83, -13.27) },
 		Lights = { meshId = 82098165138477, size = Vector3.new(11.865, 9.605, 45.8), at = Vector3.new(0, 7.303, 0.495) },
 		Bed = { meshId = 124435372710468, size = Vector3.new(10.67, 7.325, 33.8), at = Vector3.new(0, 8.112, 5.785) },
-		Wheel = { meshId = 81542757402029, size = Vector3.new(1.546, 4.56, 4.55) },
+		Wheel = { meshId = 81542757402029, size = Vector3.new(1.546, 4.56, 4.55), mirrorLeft = true },
 		Hitch = { meshId = 103819640831326, size = Vector3.new(0.7, 1.06, 1.68), at = Vector3.new(0, 2.005, 23.275) },
 	},
 }
@@ -100,7 +103,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 2.925, 0.205),
 			},
 			Bed = { meshId = 90389536788385, size = Vector3.new(8.34, 2.14, 13), at = Vector3.new(0, 3.745, 0) },
-			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99) },
+			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99), mirrorLeft = true },
 			Hitch = {
 				meshId = 139471072919132,
 				size = Vector3.new(6.466, 3.51, 3.063),
@@ -119,7 +122,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 2.925, 0.205),
 			},
 			Bed = { meshId = 90389536788385, size = Vector3.new(9.64, 2.14, 13), at = Vector3.new(0, 3.745, 0) },
-			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99) },
+			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99), mirrorLeft = true },
 			Hitch = {
 				meshId = 139471072919132,
 				size = Vector3.new(7.739, 3.51, 3.072),
@@ -138,7 +141,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 2.925, 0.205),
 			},
 			Bed = { meshId = 90389536788385, size = Vector3.new(10.42, 2.14, 13), at = Vector3.new(0, 3.745, 0) },
-			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99) },
+			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99), mirrorLeft = true },
 			Hitch = {
 				meshId = 139471072919132,
 				size = Vector3.new(8.505, 3.51, 3.076),
@@ -157,7 +160,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 2.925, 0.205),
 			},
 			Bed = { meshId = 90389536788385, size = Vector3.new(8.86, 2.14, 13), at = Vector3.new(0, 3.745, 0) },
-			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99) },
+			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99), mirrorLeft = true },
 			Hitch = {
 				meshId = 139471072919132,
 				size = Vector3.new(6.974, 3.51, 3.067),
@@ -176,7 +179,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 2.925, 0.205),
 			},
 			Bed = { meshId = 90389536788385, size = Vector3.new(8.34, 2.14, 13), at = Vector3.new(0, 3.745, 0) },
-			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99) },
+			Wheel = { meshId = 109498505023571, size = Vector3.new(1.105, 3, 2.99), mirrorLeft = true },
 			Hitch = {
 				meshId = 139471072919132,
 				size = Vector3.new(6.466, 3.51, 3.063),
@@ -197,7 +200,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.072),
 			},
 			Bed = { meshId = 105565294587502, size = Vector3.new(9.16, 4.13, 18.27), at = Vector3.new(0, 4.74, -0.035) },
-			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12) },
+			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12), mirrorLeft = true },
 			Hitch = {
 				meshId = 124380880700146,
 				size = Vector3.new(6.974, 3.51, 3.067),
@@ -216,7 +219,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.073),
 			},
 			Bed = { meshId = 105565294587502, size = Vector3.new(9.94, 4.13, 18.27), at = Vector3.new(0, 4.74, -0.035) },
-			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12) },
+			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12), mirrorLeft = true },
 			Hitch = {
 				meshId = 124380880700146,
 				size = Vector3.new(7.739, 3.51, 3.072),
@@ -239,7 +242,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				size = Vector3.new(10.72, 4.13, 18.27),
 				at = Vector3.new(0, 4.74, -0.035),
 			},
-			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12) },
+			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12), mirrorLeft = true },
 			Hitch = {
 				meshId = 124380880700146,
 				size = Vector3.new(8.505, 3.51, 3.076),
@@ -258,7 +261,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.072),
 			},
 			Bed = { meshId = 105565294587502, size = Vector3.new(9.16, 4.13, 18.27), at = Vector3.new(0, 4.74, -0.035) },
-			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12) },
+			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12), mirrorLeft = true },
 			Hitch = {
 				meshId = 124380880700146,
 				size = Vector3.new(6.974, 3.51, 3.067),
@@ -273,7 +276,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.073),
 			},
 			Bed = { meshId = 105565294587502, size = Vector3.new(8.64, 4.13, 18.27), at = Vector3.new(0, 4.74, -0.035) },
-			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12) },
+			Wheel = { meshId = 131671997531071, size = Vector3.new(1.105, 3.13, 3.12), mirrorLeft = true },
 			Hitch = {
 				meshId = 124380880700146,
 				size = Vector3.new(6.466, 3.51, 3.063),
@@ -290,7 +293,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.082),
 			},
 			Bed = { meshId = 108656014869417, size = Vector3.new(10.74, 4.15, 26.08), at = Vector3.new(0, 4.75, -0.04) },
-			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25) },
+			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25), mirrorLeft = true },
 			Hitch = {
 				meshId = 128380567399095,
 				size = Vector3.new(8.505, 3.51, 3.076),
@@ -309,7 +312,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.083),
 			},
 			Bed = { meshId = 108656014869417, size = Vector3.new(9.96, 4.15, 26.08), at = Vector3.new(0, 4.75, -0.04) },
-			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25) },
+			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25), mirrorLeft = true },
 			Hitch = {
 				meshId = 128380567399095,
 				size = Vector3.new(7.739, 3.51, 3.072),
@@ -324,7 +327,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.082),
 			},
 			Bed = { meshId = 108656014869417, size = Vector3.new(10.74, 4.15, 26.08), at = Vector3.new(0, 4.75, -0.04) },
-			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25) },
+			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25), mirrorLeft = true },
 			Hitch = {
 				meshId = 128380567399095,
 				size = Vector3.new(8.505, 3.51, 3.076),
@@ -343,7 +346,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.083),
 			},
 			Bed = { meshId = 108656014869417, size = Vector3.new(9.18, 4.15, 26.08), at = Vector3.new(0, 4.75, -0.04) },
-			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25) },
+			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25), mirrorLeft = true },
 			Hitch = {
 				meshId = 128380567399095,
 				size = Vector3.new(6.974, 3.51, 3.067),
@@ -362,7 +365,7 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 				at = Vector3.new(0, 4.845, 0.083),
 			},
 			Bed = { meshId = 108656014869417, size = Vector3.new(8.66, 4.15, 26.08), at = Vector3.new(0, 4.75, -0.04) },
-			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25) },
+			Wheel = { meshId = 81074969756089, size = Vector3.new(1.172, 3.26, 3.25), mirrorLeft = true },
 			Hitch = {
 				meshId = 128380567399095,
 				size = Vector3.new(6.466, 3.51, 3.063),
