@@ -322,6 +322,16 @@ return function(t)
 		end
 	end)
 
+	t.test("the Sparkworks (not in SHOPS: its own specs have its footprint) stays at 440 parts", function()
+		-- Store polish took the shop, facade, door, interior and lamps (without the boxes, which StoreStock counts) to
+		-- 400. The restyle (display tables on legs with price cards and spots, the door frame and striped awning, wall
+		-- shelves with coils, cells and jars, pictures, a rug, plants, the spools) plus the event room and the event
+		-- banner (about 36 parts, ShopEventKit) makes the whole shop about 420 parts; cap 400 to 440.
+		local model = BuildingArt.Shop("Sparkworks", "SPARKWORKS", C3.fromRGB(46, 139, 139))
+		t.ok(#parts(model) <= 440, "Sparkworks parts: " .. #parts(model))
+		t.ok(model:FindFirstChild("Counter"), "Counter")
+	end)
+
 	t.test("an unknown shop kind still builds a store with a Counter", function()
 		local model = BuildingArt.Shop("Bakery", "BAKERY", C3.fromRGB(200, 120, 80))
 		t.ok(model:FindFirstChild("Counter"), "Counter")
