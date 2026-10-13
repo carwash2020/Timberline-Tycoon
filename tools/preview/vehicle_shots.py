@@ -30,7 +30,7 @@ import shutil
 import subprocess
 import sys
 
-OUT = "previews/vehicles-fixed"
+OUT = os.environ.get("SHOT_OUT", "previews/vehicles-fixed")
 RENDER_HOME = os.path.expanduser(os.environ.get("RENDER_HOME", "~/.cache/timberline-render"))
 DEALER = [
     "Truck:Rustbucket",

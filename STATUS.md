@@ -98,8 +98,7 @@ The coloured strips on the dealership's 8 plinths (the tier colour that matches 
   7.085, radius 1.7545, width 1.373; the Body mesh's arches are centred at z -9.75 and 7.0, flare top 3.97 over the tyre top
   3.509). What looked wheel-less: the wheel mesh shows its rim and hub on its +X face only and every wheel was placed the same
   way, so the Pickup's whole left (-X) side showed flat black tyre backs. The Pickup's left wheels are now turned half way
-  round about Y (`VehicleModels` `mirrorLeft`, `VehicleMeshes.swapWheel`; **off since the 13 Oct GLB pass below: the new wheel is
-  dished on both faces**); `TruckArt.Rig` keeps the Axle joint on the unturned
+  round about Y (`VehicleModels` `mirrorLeft`, `VehicleMeshes.swapWheel`; **off for a day after the 13 Oct GLB pass below, then on for every vehicle (next bullet): Roblox still holds the one-sided wheel**); `TruckArt.Rig` keeps the Axle joint on the unturned
   frame (turn in C1), so spin and steering are unchanged. Look only: no physics, hitbox, price or stat. Other trucks show the
   same flat left side and are **not** changed (Awaiting Connor). `tests/PickupWheels.spec` pins all of it, and that no other
   truck changed. Renders: `previews/pickup-wheels/`; UI and board: `previews/robux-icons/` (placeholder art, real art needs Roblox).
@@ -120,6 +119,16 @@ The coloured strips on the dealership's 8 plinths (the tier colour that matches 
   and meshed (real GLB triangles), with named, depth-capped exemptions. **No price, stat, hitbox or physics change.** Open: the
   GLBs still put the wheel-well liner 0.2 stud inside the tyre and the Heavy Hauler's deck and marker lamps over its tyres
   (hidden, capped in the spec; Connor to fix in the GLBs). Renders: `previews/vehicles-fixed/` (before, after, contact sheet).
+- **Every truck and trailer shows its rim on the left side (branch `phase-2/all-trucks-wheel-faces`, 13 October 2026).** Connor: all
+  trucks need the fix. Cause: the 13 Oct GLB pass switched the Pickup's half turn off because the repo's new wheel GLBs are dished
+  on both faces (checked from the triangles and vertex colours: the same rim, dish, lugs and cap on +X and -X in all 8 vehicles and
+  all 12 `by_truck` files, see `tests/VehicleWheelFaces.spec`), **but the wheel meshes live in Roblox are still the old one-sided
+  uploads** (rim on +X only; the ids did not change and the re-upload list in `ASSETS.md` is not done), so in Studio every
+  left wheel was a flat black back again. Now `mirrorLeft` is on for every truck, the Scout ATV and every trailer variant in
+  `VehicleModels` (the half turn of a two-sided wheel looks identical, so it stays safe after the re-upload; remove it only when you
+  want, nothing needs it then). Part-built wheels (Timber Classic, Paint Shop recolours, the Dealership trailer copies, every truck
+  while meshes load) already show rim, dish, lugs and cap on both faces. Spin and steer axes, layout, sizes, hitbox, price and
+  stats unchanged (spec pins it). Renders: `previews/wheel-faces/` (before = the old uploaded wheel, after = fixed, contact sheet).
 ## Store event expansion room (branch `phase-2/store-event-expansion`, system only, nothing on sale)
 
 Every store can grow for an event without a rebuild. This PR is the system; each store's builder places the geometry.

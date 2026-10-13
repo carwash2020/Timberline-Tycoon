@@ -4124,6 +4124,21 @@ is unchanged in every file, keep its id). Nothing breaks in the meantime: every 
    mudflap behind the rear wheel, door names readable.
 5. Everything still drives and tows as before; hitbox, speed and bed capacity are unchanged.
 
+## All trucks: rim on the left side (Studio checks) (branch `phase-2/all-trucks-wheel-faces`, 13 October 2026)
+
+Why the left side looked flat again: the GLB wheel in the repo is dished on both faces, but Roblox still holds the OLD wheel
+uploads (rim, lugs and cap on one face only), so the left (-X) wheels of every vehicle showed a flat black tyre back. Every truck,
+the Scout ATV and every trailer now turns its left wheels half way round (look only; spin, steering, layout and the hitbox are
+unchanged). It stays correct after you re-upload the new wheel GLBs.
+
+1. Drive each of the five trucks and look at BOTH sides: a pale rim, dish, lug nuts and a chrome cap on all four (or six) wheels
+   on the left AND the right, no flat black tyre backs, no floating or sunk wheel. Front wheels steer and every wheel spins the way
+   the truck moves, left side included.
+2. Hitch each trailer (Pony, Ranch, Heavy Hauler) behind each truck: both sides of the trailer's wheels show the rim.
+3. Dealership: every truck and trailer copy on its plinth, walk round it: both sides show the rim.
+4. Timber Classic and a Paint Shop recolour: both sides show the cream rim, lugs and cap (part-built wheels, unchanged).
+5. Phone and Xbox: nothing about controls changes; just drive once and look at the left wheels.
+
 ## Tool Shed restyle (Studio checks)
 
 1. PC, phone (667 x 375), Xbox: walk in the barn door. Good: two rows of wooden display tables on legs (plank tops, a cream trim edge), each box on a wood base with a slim name card, a small price card on the table's front edge per box (axes that need an earlier axe also show a small "NEEDS ..." card beside it), a warm spot over each table; no coloured slabs under the boxes, no tier flags or purple/blue signs on posts.
