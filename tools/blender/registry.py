@@ -72,19 +72,19 @@ STORE = [
     ("Lantern", 100706399609275, 103276353286757, "ModelSlots", "Lantern store item; replaces environment/Lantern"),
     ("WoodSign", 104427150009380, 115661985339638, "ModelSlots", "WoodSign store item; replaces items/WoodSign"),
     ("ShedBlueprint", 117955534652171, 88429889818385, "ModelSlots", "Shed Blueprint; replaces Small Shed (items/Shed)"),
-    ("Barrel", 103482280552543, 101451260913674, "StoreData", "Barrel store item"),
-    ("Crate", 100788396065808, 78298003526634, "StoreData", "Crate store item"),
-    ("GlowWire", 140023205654551, 139395535150744, "StoreData", "GlowWire store item"),
-    ("SkyBin", 136000065218099, 130081290755053, "StoreData", "SkyBin store item"),
-    ("RobuxCoins", 76084140639988, 140571825691428, "StoreData", "Robux box display"),
-    ("Parcel", 106272982653382, 106468421600012, "StoreData", "fallback for any item without a model"),
+    ("Barrel", 103482280552543, 101451260913674, "StoreModelSlots", "Barrel store item"),
+    ("Crate", 100788396065808, 78298003526634, "StoreModelSlots", "Crate store item"),
+    ("GlowWire", 140023205654551, 139395535150744, "StoreModelSlots", "GlowWire store item"),
+    ("SkyBin", 136000065218099, 130081290755053, "StoreModelSlots", "SkyBin store item"),
+    ("RobuxCoins", 76084140639988, 140571825691428, "StoreModelSlots", "Robux box display"),
+    ("Parcel", 106272982653382, 106468421600012, "StoreModelSlots", "fallback for any item without a model"),
 ]
 
 
 def store_rows() -> list[dict]:
     rows = []
     for name, mesh_id, tex_id, wired, why in STORE:
-        glb = Path(f"assets/glb/store-items/baked/{name}.glb")
+        glb = Path(f"assets/glb/store-items/{name}.glb")
         s = stats(glb)
         rows.append(
             {
@@ -224,7 +224,9 @@ HEADER = """--!strict
 -- every triangle in its GLB(s). collision is the intent: Box for small
 -- props, Hull for medium ones, Parts (invisible part collision) for big
 -- buildings, vehicles and trees. Textures are vertex colours today, so
--- every textures table is empty and any texture id is 0.
+-- every textures table is empty and any texture id is 0, except store rows
+-- (one baked colour texture). Store rows mirror ModelSlots / StoreModelSlots,
+-- which preload them, so MeshIds() skips them.
 -- MeshManifest preloads MeshIds() (none of status repo or planned, so
 -- nothing changes in game while those ids are 0).
 
@@ -284,7 +286,7 @@ function BlenderAssets.MeshIds(): { number }
 \tlocal out: { number } = {}
 \tlocal seen: { [number]: boolean } = {}
 \tfor _, entry in ipairs(ROWS) do
-\t\tif entry.status ~= "backlog" and entry.meshId ~= 0 and not seen[entry.meshId] then
+\t\tif entry.status ~= "backlog" and entry.status ~= "store" and entry.meshId ~= 0 and not seen[entry.meshId] then
 \t\t\tseen[entry.meshId] = true
 \t\t\ttable.insert(out, entry.meshId)
 \t\tend

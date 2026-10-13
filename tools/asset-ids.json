@@ -2588,7 +2588,7 @@
       "expectTypeId": 4,
       "id": "103482280552543",
       "kind": "mesh",
-      "places": 1,
+      "places": 2,
       "priority": 2,
       "usedBy": "BlenderAssets.luau "
     },
@@ -2597,7 +2597,7 @@
       "expectTypeId": 4,
       "id": "100788396065808",
       "kind": "mesh",
-      "places": 1,
+      "places": 2,
       "priority": 2,
       "usedBy": "BlenderAssets.luau "
     },
@@ -2615,7 +2615,7 @@
       "expectTypeId": 4,
       "id": "140023205654551",
       "kind": "mesh",
-      "places": 1,
+      "places": 2,
       "priority": 2,
       "usedBy": "BlenderAssets.luau "
     },
@@ -2633,7 +2633,7 @@
       "expectTypeId": 4,
       "id": "106272982653382",
       "kind": "mesh",
-      "places": 1,
+      "places": 2,
       "priority": 2,
       "usedBy": "BlenderAssets.luau "
     },
@@ -2642,7 +2642,7 @@
       "expectTypeId": 4,
       "id": "76084140639988",
       "kind": "mesh",
-      "places": 1,
+      "places": 2,
       "priority": 2,
       "usedBy": "BlenderAssets.luau "
     },
@@ -2660,7 +2660,7 @@
       "expectTypeId": 4,
       "id": "136000065218099",
       "kind": "mesh",
-      "places": 1,
+      "places": 2,
       "priority": 2,
       "usedBy": "BlenderAssets.luau "
     },
@@ -8739,7 +8739,7 @@
       "places": 1,
       "priority": 2,
       "status": "new GLB in repo, needs re-upload",
-      "usedBy": "VehicleModels.luau LoggingRig Lights"
+      "usedBy": "VehicleModels.luau LoggingRig "
     },
     {
       "collision": false,

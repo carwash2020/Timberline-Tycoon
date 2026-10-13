@@ -176,13 +176,14 @@ return function(t)
 		t.eq(W.ItemModel.Get("Axe", "SteelAxe").fallback, false)
 	end)
 
-	t.test("unset ids never error: every item keeps its part-built look, in the box and on the plot", function()
+	t.test("uploaded ids never error: every item still builds its box and its plot model", function()
 		local W = world(false)
 		t.eq(W.Slots.PreviewIds, nil)
 		for _, slot in ipairs(W.Slots.All) do
 			if slot.source == "store-items" then
-				t.eq(W.Slots.IsUploaded(slot), false, slot.id .. " is not uploaded")
-				t.eq(W.Slots.HasMesh(slot), false, slot.id .. " has no mesh to load")
+				-- 13 Oct 2026: every store-items model is uploaded (one baked mesh each).
+				t.eq(W.Slots.IsUploaded(slot), true, slot.id .. " is uploaded")
+				t.eq(W.Slots.HasMesh(slot), true, slot.id .. " has a mesh to load")
 			end
 		end
 		for _, item in ipairs(ITEMS) do
@@ -281,6 +282,14 @@ return function(t)
 		end
 		-- Id unset: the display is the part build's, exactly as before the slot existed.
 		local bare = world(false)
+		-- Every store model is uploaded now, so take the ids away to see the part build.
+		for _, slot in ipairs(bare.Slots.All) do
+			if slot.source == "store-items" then
+				for _, piece in ipairs(slot.pieces) do
+					piece.meshId = 0
+				end
+			end
+		end
 		for _, item in ipairs({ { "Blueprint", "Barrel" }, { "Blueprint", "Crate" }, { "Logic", "GlowWire" } }) do
 			t.ok(#bare.ItemModel.Get(item[1], item[2]).parts > 0, item[2])
 		end
@@ -522,10 +531,13 @@ return function(t)
 	t.test("a made-up id is only a preview seam: with it off an unset id stays 0", function()
 		local W = world(false)
 		local barrel = W.Slots.Get("Barrel")
+		local uploaded = barrel.pieces[1].meshId
+		barrel.pieces[1].meshId = 0
 		t.eq(W.Slots.MeshIdOf(barrel, barrel.pieces[1]), 0)
 		W.Slots.PreviewIds = { ["Barrel/Barrel"] = 123 }
 		t.eq(W.Slots.MeshIdOf(barrel, barrel.pieces[1]), 123)
 		W.Slots.PreviewIds = nil
 		t.eq(W.Slots.MeshIdOf(barrel, barrel.pieces[1]), 0)
+		barrel.pieces[1].meshId = uploaded
 	end)
 end

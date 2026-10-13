@@ -93,7 +93,15 @@ local ALL: { Slot } = {
 		fit = V(1.75, 2.2, 1.75), -- DecorData Barrel: 1.6 x 2.2 body, 1.75 hoop
 		yaw = 0,
 		fallback = false,
-		pieces = { { name = "Barrel", meshId = 0, textureId = 0, size = V(2.19, 3.26, 2.19), centre = V(0, 1.63, 0) } },
+		pieces = {
+			{
+				name = "Barrel",
+				meshId = 103482280552543,
+				textureId = 101451260913674,
+				size = V(2.19, 3.26, 2.19),
+				centre = V(0, 1.63, 0),
+			},
+		},
 	},
 	{
 		id = "Crate",
@@ -104,7 +112,15 @@ local ALL: { Slot } = {
 		fit = V(2, 2, 2), -- DecorData Crate: 1.8 body, 2 wide lid, 2 high
 		yaw = 0,
 		fallback = false,
-		pieces = { { name = "Crate", meshId = 0, textureId = 0, size = V(2.6, 2.5, 2.6), centre = V(0, 1.25, 0) } },
+		pieces = {
+			{
+				name = "Crate",
+				meshId = 100788396065808,
+				textureId = 78298003526634,
+				size = V(2.6, 2.5, 2.6),
+				centre = V(0, 1.25, 0),
+			},
+		},
 	},
 	{
 		id = "GlowWire",
@@ -116,7 +132,13 @@ local ALL: { Slot } = {
 		yaw = 90, -- the GLB is a wire spool on its side with its tail along Z: turned so the discs face the front and the tail runs along the 4 stud side
 		fallback = false,
 		pieces = {
-			{ name = "GlowWire", meshId = 0, textureId = 0, size = V(1.02, 1.3, 2.16), centre = V(0.02, 0.65, 0.43) },
+			{
+				name = "GlowWire",
+				meshId = 140023205654551,
+				textureId = 139395535150744,
+				size = V(1.02, 1.3, 2.16),
+				centre = V(0.02, 0.65, 0.43),
+			},
 		},
 	},
 	{
@@ -128,7 +150,15 @@ local ALL: { Slot } = {
 		fit = V(4, 4, 4), -- BuildingArt.SkyBin's "SkyBin" part, 4 x 4 x 4 (the flume and cloud are not in the GLB)
 		yaw = 0,
 		fallback = false,
-		pieces = { { name = "SkyBin", meshId = 0, textureId = 0, size = V(3.82, 3.36, 3.82), centre = V(0, 1.68, 0) } },
+		pieces = {
+			{
+				name = "SkyBin",
+				meshId = 136000065218099,
+				textureId = 130081290755053,
+				size = V(3.82, 3.36, 3.82),
+				centre = V(0, 1.68, 0),
+			},
+		},
 	},
 	{
 		id = "RobuxCoins",
@@ -142,8 +172,8 @@ local ALL: { Slot } = {
 		pieces = {
 			{
 				name = "RobuxCoins",
-				meshId = 0,
-				textureId = 0,
+				meshId = 76084140639988,
+				textureId = 140571825691428,
 				size = V(2.709, 0.782, 2.51),
 				centre = V(0.6755, 0.391, 0.375),
 			},
@@ -159,7 +189,13 @@ local ALL: { Slot } = {
 		yaw = 0,
 		fallback = true,
 		pieces = {
-			{ name = "Parcel", meshId = 0, textureId = 0, size = V(1.44, 1.57, 1.45), centre = V(0, 0.785, 0.005) },
+			{
+				name = "Parcel",
+				meshId = 106272982653382,
+				textureId = 106468421600012,
+				size = V(1.44, 1.57, 1.45),
+				centre = V(0, 0.785, 0.005),
+			},
 		},
 	},
 	-- Models uploaded earlier (the ids live in BacklogModels / ItemMeshData). Gear is

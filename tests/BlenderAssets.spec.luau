@@ -16,7 +16,10 @@ return function(t)
 			seen[entry.name] = true
 			t.eq(entry.name:match("^[^/]+"), entry.group, entry.name .. " group")
 			t.ok(
-				entry.status == "repo" or entry.status == "backlog" or entry.status == "planned",
+				entry.status == "repo"
+					or entry.status == "backlog"
+					or entry.status == "store"
+					or entry.status == "planned",
 				entry.name .. " status"
 			)
 			t.ok(
@@ -64,11 +67,17 @@ return function(t)
 			if entry.status == "backlog" then
 				t.ok(entry.meshId > 0, entry.name .. " backlog id")
 				t.eq(entry.wiredBy, "BacklogModels")
+			elseif entry.status == "store" then
+				t.ok(entry.meshId > 0, entry.name .. " store id")
+				t.ok((entry.textures.Color or 0) > 0, entry.name .. " baked colour texture")
+				t.ok(entry.wiredBy == "ModelSlots" or entry.wiredBy == "StoreModelSlots", entry.name .. " wiredBy")
 			else
 				t.eq(entry.meshId, 0, entry.name .. " meshId")
 			end
-			for key, id in pairs(entry.textures) do
-				t.eq(id, 0, entry.name .. " texture " .. key)
+			if entry.status ~= "store" then
+				for key, id in pairs(entry.textures) do
+					t.eq(id, 0, entry.name .. " texture " .. key)
+				end
 			end
 		end
 	end)

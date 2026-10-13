@@ -187,16 +187,18 @@ return function(t)
 			end
 			table.sort(names)
 			if #names > 1 then
-				t.eq(
-					names,
-					{ "BacklogModels.luau", "BlenderAssets.luau" },
-					"mesh " .. digits .. " is shared between modules"
+				local key = table.concat(names, "+")
+				t.ok(
+					key == "BacklogModels.luau+BlenderAssets.luau"
+						or key == "BlenderAssets.luau+ModelSlots.luau"
+						or key == "BlenderAssets.luau+StoreModelSlots.luau",
+					"mesh " .. digits .. " is shared between modules: " .. key
 				)
 				mirrored += 1
 			end
 		end
 		t.ok(
-			mirrored <= 20,
+			mirrored <= 30,
 			"the Blender registry mirrors the backlog; more than this is new sharing (" .. mirrored .. ")"
 		)
 	end)

@@ -63,15 +63,16 @@ return function(t)
 		return out
 	end
 
-	t.test("the four items have one slot each, named, with no model yet", function()
+	t.test("the four items have one slot each, named, with their uploaded model", function()
 		t.eq(#ModelSlots.Slots, 4)
 		for _, item in ipairs(ITEMS) do
 			local slot = ModelSlots.For(item.kind, item.id)
 			t.ok(slot, item.name .. " has a slot")
 			t.eq(slot.name, item.name)
 			t.eq(ModelSlots.Named(item.name), slot, "one slot, found by name or by item")
-			t.eq(slot.meshId, 0, item.name .. ": the model is not made yet, so the part-built look stays")
-			t.eq(ModelSlots.IsSet(slot), false)
+			t.ok(slot.meshId > 0, item.name .. ": the baked model is uploaded")
+			t.ok((slot.textureId or 0) > 0, item.name .. ": with its baked colour texture")
+			t.eq(ModelSlots.IsSet(slot), true)
 			t.ok(#slot.pivot > 10, item.name .. " says what pivot the model needs")
 		end
 		t.eq(ModelSlots.For("Gear", "InsulatedCoat"), nil, "other items have none")
