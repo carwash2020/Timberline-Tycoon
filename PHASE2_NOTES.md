@@ -1,5 +1,21 @@
 # Phase 2+ build notes
 
+## Dealership restyle (Studio checks, branch `phase-2/store-restyle-dealership`)
+
+None of this has been seen in Studio. Do each on PC, then phone (667x375), then Xbox where it has a button.
+1. All: stand at the lobby door. Good: cream posts on stone footings either side of the opening, a striped blue and cream fabric awning over it with
+   a stepped edge, the hours board above the awning's back (not through it), a flush threshold you cross without a bump or a step.
+2. All: walk in. Good: the TRUCKS / TRAILERS / SHOWROOM headers read and do not overlap; CHECKOUT stands on the counter's front edge over the register;
+   wooden tables (reception, finance) on rugs, shelves with binders and model trucks, framed pictures on the walls, plants. Nothing blocks the way from the
+   door to the counter or the aisle between the rows.
+3. All: look at a plinth from the aisle. Good: the box sits on a thin coloured mat inside a wood border lying flat on the plinth top (no loose slab, no
+   gap, no flicker); the T-flag colour matches the band and stripe on that plinth; the name sign is a slim board against the plinth.
+4. All: nothing floats (look under the shelves, at the table legs, the awning posts, the banner feet) and nothing sinks into a wall or the floor.
+5. All: the roped-off event room by the west wall (three tables on pads, brass rope up) and nothing in it for sale. With no event running the banner by the entrance
+   is invisible. When `StoreEventService` activates the Dealership: ropes drop, the lamp comes on, the banner shows its text facing the door aisle.
+6. Phone: the headers and CHECKOUT are readable at 667x375 and the taps on boxes and the counter still work. Xbox: the selection ring and A on a box,
+   the counter and the vehicle prompts work as before; B closes panels.
+7. Buying a vehicle (hover tag, price, spawn pad) behaves exactly as before.
 ## Sparkworks restyle (13 October 2026, branch `phase-2/store-restyle-sparkworks`)
 
 Studio checks (none of this has been seen in Studio; details in STATUS.md):

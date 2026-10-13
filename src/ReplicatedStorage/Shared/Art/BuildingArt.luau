@@ -1451,11 +1451,13 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- A stone footing round the foot of every wall, and the accent stripe.
 	local foot = Kit.shade(CONCRETE, -0.2)
 	dBox(model, "Footing", V3(2 * hx + 2 * T + 0.6, 1.4, 0.5), CF(0, FLOOR + 0.7, hz + T + 0.15), foot, MAT.Slate)
+	-- (the front footing starts past the door frame's right post and its stone base, which stand beside the opening)
+	local footX0, footX1 = doorX1 + 1.9, hx + 0.7
 	dBox(
 		model,
 		"Footing",
-		V3(hx - doorX1 + T + 0.6, 1.4, 0.5),
-		CF((doorX1 + hx) / 2, FLOOR + 0.7, -hz - T - 0.15),
+		V3(footX1 - footX0, 1.4, 0.5),
+		CF((footX0 + footX1) / 2, FLOOR + 0.7, -hz - T - 0.15),
 		foot,
 		MAT.Slate
 	)
@@ -1497,7 +1499,8 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- The porch lantern hangs on the awning's east post (ShopFacade's awning: posts
 	-- 9.3 either side of the door's middle, at the canopy's front edge), where a second
 	-- pair of porch posts used to stand beside them.
-	local porchGlow = Kit.lantern(model, CF(doorCx + 8.8, 7.2, -hz - T - ShopFacade.AwningReach + 0.4), 0.8)
+	local awn = ShopFacade.DealerAwning
+	local porchGlow = Kit.lantern(model, CF(doorCx + 8.8, 7.2, -hz - T - awn.reach * math.cos(awn.tilt) + 0.2), 0.8)
 	local porchLight = porchGlow:FindFirstChildOfClass("PointLight")
 	if porchLight then
 		porchLight.Brightness = 1
@@ -2237,7 +2240,9 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		if board and board:IsA("BasePart") then
 			local face = -DealershipLot.Hall().innerD / 2 - 0.8
 			local at = board.CFrame.Position
-			board.CFrame = CFrame.new(at.X, at.Y, face - board.Size.Z / 2)
+			-- (and clear over the striped canopy's back, which stands over the door header: ShopFacade.DealerAwning)
+			local y = math.max(at.Y, ShopFacade.DealerAwning.backY + 0.15 + board.Size.Y / 2)
+			board.CFrame = CFrame.new(at.X, y, face - board.Size.Z / 2)
 		end
 	end
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.

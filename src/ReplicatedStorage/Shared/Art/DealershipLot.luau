@@ -58,8 +58,13 @@ DealershipLot.BackMargin = 3.5
 DealershipLot.BoxGap = 0.6 -- between a box and the plinth's edge, and the vehicle
 DealershipLot.Aisle = 14 -- the clear central walkway between the rows' plinths
 DealershipLot.PlinthHeight = 1.2
-DealershipLot.BlockHeight = 0.3 -- the accent-coloured block a vehicle's box stands on
-DealershipLot.BlockMargin = 0.25 -- the block is this much bigger than the box all round
+-- The vehicle's box stands on a flush inlay, not a slab (store restyle): a thin accent-coloured mat (BoxBlock) inside a
+-- wood border (BoxMatFrame), both painted straight onto the plinth's top and never taller than a coat of paint, so
+-- nothing reads as a loose pad sitting on the plinth. The border's edge meets the aisle stripe's inner edge.
+DealershipLot.BlockHeight = 0.1 -- the accent-coloured mat a vehicle's box stands on
+DealershipLot.BlockMargin = 0.12 -- the mat is this much bigger than the box all round
+DealershipLot.FrameMargin = 0.13 -- and the wood border this much bigger again
+DealershipLot.FrameHeight = 0.05
 
 -- The tier stand each plinth wears (store polish; display only, the catalog has no
 -- vehicle tier: StoreTier ranks a vehicle by price within its kind). The plinth's
@@ -67,11 +72,11 @@ DealershipLot.BlockMargin = 0.25 -- the block is this much bigger than the box a
 -- post stands beside the box (the same parts as ShopKit.TierStand makes for a
 -- shelf: TierPost, TierBacking, TierFlag, and a LockChip when StoreTier.LockOf
 -- names a lock, none for a vehicle today).
-DealershipLot.NameSignSize = Vector3.new(6.0, 2.6, 0.3) -- the plinth's name sign: the name, and under it what it hauls
-DealershipLot.FlagSize = Vector3.new(3.4, 2.0, 0.2)
+DealershipLot.NameSignSize = Vector3.new(5.0, 1.9, 0.16) -- the plinth's name sign: the name, and under it what it hauls
+DealershipLot.FlagSize = Vector3.new(2.8, 1.6, 0.16)
 DealershipLot.ChipSize = Vector3.new(5.0, 1.0, 0.16)
 DealershipLot.FlagYaw = math.rad(12) -- the flag is turned this far, so it never stands edge-on to the aisle
-DealershipLot.FlagHeight = 5.0 -- the flag's middle, above the plinth's top
+DealershipLot.FlagHeight = 4.6 -- the flag's middle, above the plinth's top
 DealershipLot.BandHeight = 0.55
 DealershipLot.StripeWidth = 0.3 -- the aisle-edge stripe: at the very edge, clear of the box's block
 -- The tier stripe and band are paint, not slabs: thin skins (decal-style parts, never
@@ -558,6 +563,18 @@ function DealershipLot.Build(): Model
 		-- front row's aisle is at +Z, so those boxes are turned half way round.
 		local block = DealershipLot.BlockHeight
 		local blockMargin = DealershipLot.BlockMargin
+		local frameMargin = blockMargin + DealershipLot.FrameMargin
+		Kit.decor(
+			Kit.part(
+				lot,
+				"BoxMatFrame",
+				Vector3.new(bay.box.X + 2 * frameMargin, DealershipLot.FrameHeight, bay.box.Z + 2 * frameMargin),
+				CFrame.new(cx, top + DealershipLot.FrameHeight / 2, oz + bay.boxZ),
+				Color3.fromRGB(106, 69, 38),
+				Enum.Material.Wood
+			),
+			false
+		)
 		Kit.decor(
 			Kit.part(
 				lot,
