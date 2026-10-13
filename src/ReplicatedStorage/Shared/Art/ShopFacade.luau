@@ -387,6 +387,77 @@ local function hearthDressing(model: Model, spec: Spec)
 	end
 end
 
+-- The Tool Shed's street side in the Hearth & Home restyle: the door frame (cream posts on stone footings, the shell's
+-- own header above, a stone threshold) with a lantern on each post, a barn-red and cream striped awning over the door
+-- (its back at 12.4: over the door track and under the hours board, which stands on the wall above it), two lit windows
+-- in each long wall, and a flagstone path from the doormat to the street. The sliding barn-door leaves stand clear of
+-- the posts when open (ShopDoor `openShift`). All looks only; the doorway and the 2-stud walk to it stay empty.
+local function toolShedDressing(model: Model, spec: Spec)
+	local hw, fz = spec.halfW, spec.frontZ
+	local postX = spec.doorHalf + ShopFacade.FrameGap + 0.45
+	-- The barn's floor is 0.75 above the lawn (a ramp climbs to the door), and everything out front stands on the LAWN:
+	-- the door posts and the awning posts go down to y 0, not to the floor's level where they would hover.
+	local lawn = table.clone(spec)
+	lawn.groundY = 0
+	ShopFacade.DoorFrame(model, lawn, { postTop = spec.doorTop + 0.75 })
+	local threshold = model:FindFirstChild("DoorThreshold")
+	if threshold and threshold:IsA("BasePart") then
+		threshold.CFrame = threshold.CFrame + V3(0, spec.groundY, 0) -- (the threshold is in the doorway, at the floor's level)
+	end
+	ShopFacade.StripedAwning(model, lawn, {
+		backY = 12.4,
+		reach = 4.2,
+		colorA = hex("#963E2C"),
+		colorB = hex("#F2E7CF"),
+		stripes = 6,
+		tilt = 0.13,
+		valance = 0.7,
+	})
+	-- a lantern on each door post: an iron arm out from the post's face and the lantern at its end
+	for _, s in ipairs({ -1, 1 }) do
+		local x = spec.doorCx + s * postX
+		local faceZ = fz - 0.55 - 0.03
+		box(model, "LampArm", V3(0.2, 0.2, 0.8), CF(x, 8.6, faceZ - 0.4), IRON, MAT.Metal)
+		local glow = Kit.lantern(model, CF(x, 7.8, faceZ - 0.8), 0.8)
+		for _, d in ipairs(glow:GetChildren()) do
+			if d:IsA("PointLight") then
+				d.Brightness = 0.9
+				d.Range = 14
+				d.Color = Color3.fromRGB(255, 206, 150)
+				d.Shadows = false
+			end
+		end
+	end
+	-- two lit windows in each long wall (the sides were bare boards): a cream frame on the wall's outside face, the
+	-- glass in front of it (it glows at night like every window), a sill under it
+	for _, side in ipairs({ -1, 1 }) do
+		for _, z in ipairs({ -9, 9 }) do
+			local x = side * (hw + 0.45)
+			box(model, "SideWindowFrame", V3(0.3, 4.4, 4.4), CF(x + side * 0.15, 7.6, z), TRIM)
+			local pane =
+				box(model, "WindowGlass", V3(0.12, 3.6, 3.6), CF(x + side * 0.36, 7.6, z), hex("#BFD9E6"), MAT.Glass)
+			pane.Transparency = 0.45
+			pane.CastShadow = false
+		end
+	end
+	-- a flagstone path from the doormat out to the lane (two stones, the doormat is 2.2 deep)
+	local matEnd = fz - 2.65
+	for i, depth in ipairs({ 2.0, 2.0 }) do
+		box(
+			model,
+			"PathStone",
+			V3(if i == 1 then 6 else 5.2, 0.15, depth),
+			CF(spec.doorCx, 0.075, matEnd - depth * (i - 0.5)),
+			if i == 1 then hex("#A39A86") else hex("#948B78"),
+			MAT.Slate
+		)
+	end
+	-- (the grindstone and the chopping block stand out front, so the yard has no planters or sandwich board)
+	barrel(model, -hw + 0.9, 0, fz - 2.4)
+	crate(model, hw - 2.6, 0, fz - 2.6, 1.7)
+	chimney(model, -6, 6, spec.roofTop - 2.4, 5)
+end
+
 -- The Sparkworks' street side, in its electric teal: it stands on a stone plinth with a doorstep, the corners are
 -- teal pilasters, the roof edge a teal fascia with two lightning rods, and a copper conduit with spark lamps runs
 -- along the front and down both side walls. The door has a real frame and a teal-and-cream striped awning
@@ -593,12 +664,7 @@ local function shopSpecific(model: Model, spec: Spec)
 	elseif spec.kind == "Sparkworks" then
 		sparkworksFront(model, spec) -- (the sandwich board says "OPEN ALL DAY": Sparkworks has no hours)
 	elseif spec.kind == "ToolShed" then
-		-- (The grindstone and the chopping block stand out front, and the door
-		-- header carries the hours board, so the yard has no planters or sandwich
-		-- board; the barrel and the crate stand by the west wall.)
-		barrel(model, -hw + 4.2, gy, fz - 2.4)
-		crate(model, hw - 4.2, gy, fz - 2.6, 1.7)
-		chimney(model, -6, 6, spec.roofTop - 2.4, 5)
+		toolShedDressing(model, spec)
 	else
 		-- The showroom: a canopy over the lobby door, planters, a bench and a
 		-- sandwich board, a flag pole and roof units (its windows are the glass band).

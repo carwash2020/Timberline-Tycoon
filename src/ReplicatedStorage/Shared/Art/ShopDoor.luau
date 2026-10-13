@@ -32,6 +32,7 @@ export type Spec = {
 	z: number, -- the door plane
 	color: Color3, -- the leaves
 	trim: Color3,
+	openShift: number?, -- "slide": each leaf stands this much further out along the wall when open (default 0)
 }
 
 ShopDoor.BlockThick = 1.4
@@ -184,7 +185,7 @@ function ShopDoor.Add(model: Model, spec: Spec): Model?
 			local lh = if side == -1 then h - ShopDoor.LeafHeightCut else h
 			local defs = slideDefs(w, lh, spec.color, spec.trim)
 			local closed = CF(cx + side * (width / 4 - 0.15), spec.y0 + h / 2 + 0.05, lz)
-			local open = CF(cx + side * (width * 3 / 4 + 0.05), spec.y0 + h / 2 + 0.05, lz)
+			local open = CF(cx + side * (width * 3 / 4 + 0.05 + (spec.openShift or 0)), spec.y0 + h / 2 + 0.05, lz)
 			addLeaf(door, reference, defs, closed, open)
 		end
 	elseif spec.style == "swing" then

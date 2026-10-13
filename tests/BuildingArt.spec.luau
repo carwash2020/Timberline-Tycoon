@@ -291,9 +291,12 @@ return function(t)
 			-- General Store restyle (display tables with price cards and spots, door frame, striped awning, wall shelves with
 			-- jars, books and baskets, pictures, a rug, plants) plus the event expansion room (zone and banner, about 34 parts,
 			-- ShopEventKit): the whole shop is about 450 parts; cap 350 to 460 (tables on legs, oak tops).
+			-- Tool Shed restyle (the same kit as Hearth & Home: wooden display tables on legs with price cards and spots, door frame,
+			-- striped awning, wall shelves, pictures, pegboards, rug, plants, the event room, lit side windows, a path): the whole
+			-- shop is about 450 parts (the tier stands' flags, posts and chips are gone, the porch posts too); cap 400 to 460.
 			-- Dealership restyle (wooden tables, wall shelving, pictures, rugs, door frame, striped awning, the event room and its
 			-- banner, 55 parts with its tables): the whole hall is 408 parts; cap 400 to 420.
-			local budget = ({ ToolShed = 400, HearthAndHome = 460, Dealership = 420 })[shop.kind]
+			local budget = ({ ToolShed = 460, HearthAndHome = 460, Dealership = 420 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
@@ -1112,16 +1115,17 @@ return function(t)
 			end
 			t.ok(ok, label .. " rests wholly on a table or shelf top")
 		end
-		-- A Tool Shed box stands on a PLINTH (a block in its accent colour) which stands
-		-- on its row's STEP of the stepped display unit.
-		local function standsOnPlinth(model, steps, place, size, label)
-			sits(model, { Plinth = true }, place, size, label .. " (box on plinth)")
-			local plinthPlace = { x = place.x, z = place.z, y = place.y - StoreStock.PlinthHeight }
-			sits(model, steps, plinthPlace, size, label .. " (plinth on step)")
-		end
+		-- A Tool Shed box stands straight on its row's wood-top display table (Hearth & Home restyle: no plinth).
 		local shed = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
 		for _, place in ipairs(StoreStock.Placements("ToolShed")) do
-			standsOnPlinth(shed, { DisplayTableStep = true }, place, place.size, place.slotId)
+			local depth = place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
+			sits(
+				shed,
+				{ TableTop = true },
+				place,
+				V3.new(place.size.X, place.size.Y, depth),
+				place.slotId .. " (box on table)"
+			)
 		end
 		local robuxSize = loader:shared("BoxSize").Class(RobuxShelf.Class).size
 		for _, place in ipairs(RobuxShelf.Placements()) do

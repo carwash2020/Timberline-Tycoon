@@ -47,7 +47,10 @@ function Store.scene(opts)
 					color = color,
 					gold = gold,
 					side = BoxArt.AisleSide(at.X),
-					wood = opts.kind == "HearthAndHome" or opts.kind == "Sparkworks",
+					wood = opts.kind == "HearthAndHome"
+						or opts.kind == "Sparkworks"
+						or opts.kind == "Dealership"
+						or (opts.kind == "ToolShed" and not gold),
 					cardColor = if opts.kind == "Sparkworks" then BoxArt.WoodTealCard else nil,
 				})
 				model.Parent = root

@@ -122,14 +122,20 @@ function ShopEventKit.Footprint(size: Vector3?): { minX: number, maxX: number, m
 end
 
 -- Builds the zone (see the header). Returns the model, which is tagged and
--- inactive. Errors for an unknown store or a footprint under MinSize.
-function ShopEventKit.BuildZone(parent: Instance, kind: string, anchor: CFrame, size: Vector3?): Model
+-- inactive. Errors for an unknown store or a footprint under MinSize (or under
+-- `minSize`, an optional lower floor for a store whose room has no clear 14 x 8
+-- patch: the Tool Shed's tables fill its floor).
+function ShopEventKit.BuildZone(
+	parent: Instance,
+	kind: string,
+	anchor: CFrame,
+	size: Vector3?,
+	minSize: Vector3?
+): Model
 	assert(known(kind), "ShopEventKit.BuildZone: unknown store " .. tostring(kind))
 	local s = size or ShopEventKit.DefaultSize
-	assert(
-		s.X >= ShopEventKit.MinSize.X and s.Z >= ShopEventKit.MinSize.Z,
-		"ShopEventKit.BuildZone: footprint is under " .. tostring(ShopEventKit.MinSize)
-	)
+	local least = minSize or ShopEventKit.MinSize
+	assert(s.X >= least.X and s.Z >= least.Z, "ShopEventKit.BuildZone: footprint is under " .. tostring(least))
 	local sx, sz = s.X, s.Z
 	local accent = ACCENT[kind]
 	local model = Kit.model("EventExpansion", parent)

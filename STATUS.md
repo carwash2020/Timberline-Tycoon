@@ -221,6 +221,42 @@ Connor's fixes after the #183 renders. No price, on/off-sale or buy-flow change 
   Flashlight have no held model in the game, so their held slot path waits for a held-gear feature; (3) the blue under each box is
   the box's own accent floor (BoxArt, shared by every store), not a plinth; (4) parts 444 against the old 350 cap.
 
+## Tool Shed restyle (branch `phase-2/store-restyle-toolshed`, look only; no price, item, stock, on-sale or buy-flow change)
+
+The Hearth & Home restyle (#183, #185) applied to the Tool Shed. Each store stays its own building. Not seen in Studio.
+- **Tables:** `ShopKit.SteppedUnit(..., "table")` on both units: a wood-top `DisplayTable` per row of boxes (plank top, cream trim edge,
+  two legs), a small price card per box (`SpotTag`, the price from `StoreStock.UnitPrice`), a lock card for a gated axe, a spot over the
+  middle of each table. The coloured plinths, tier flags on posts and "NEEDS ..." chips on posts are gone. Boxes get the wood base and
+  slim name card (`BoxArt` `spec.wood`): `BoxService` passes it for `ToolShed` too (not for the gold Robux boxes, not for other stores).
+- **Signs:** two headers (AXES & BELTS, MACHINES) 8.6 wide, toward the aisle, hung on short chains from a cross beam (the collar ties
+  stuck through the lower roof slope and floated; they are gone, `ShopKit.SectionSigns` got an optional `noTie`); no sub-signs; rack
+  name plates 2.4 x 1.0 (were 3.0 x 1.3); CHECKOUT on two posts on the counter's front edge (no plaque).
+- **Street side:** `ShopFacade.DoorFrame` (cream posts on stone footings, a lantern each, threshold) and `ShopFacade.StripedAwning`
+  (barn red and cream) over the barn door, which still slides: its open leaves stand 2.1 further out (`ShopDoor.Spec.openShift`, optional)
+  so they clear the posts. The porch posts are gone. From #181: two lit windows in each long wall, a flagstone path, the firewood
+  moved off the wall. The hours board used to sit inside the wall (invisible): it stands on the wall's face above the awning and the
+  door track.
+- **Room fill:** two shelves with tools and cans over the tables each side, four framed pictures, a pegboard of tools each side of the
+  door, a rug and two plants before the counter, a plant by the door; the back-room door moved to the west wall.
+- **Event room:** the roped zone (11.9 x 8.6, `ShopEventKit.BuildZone`) in the back east corner and the blank banner at the aisle's west
+  edge just inside the door, both hidden by default, nothing on sale. **The tables fill both sides, so no 14 x 8 patch of floor is free:**
+  `BuildZone` got an optional `minSize` (the Tool Shed passes 11 x 8; other stores unchanged) and the banner cannot be off the 6-stud
+  middle of the aisle (the aisle is 10 wide; it stands in the west 3.5 of it, clear of the 3-stud walk and of the table).
+- **Parts:** 452 whole shop (cap 400 to 460, `BuildingArt.spec`); interior budget unchanged (400).
+- **Specs:** `StoreOverlap.ToolShed` (new: oriented-box overlap over the whole shop plus a stand-in per box, sign/sign, sign/building,
+  prop/prop, props vs walls and roof, nothing up in the barn through the roof, screen-space from the door, phone, entrance and street,
+  and a guard that every part name is classified), `StoreInterior.ToolShed` (rewritten for tables, headers, CHECKOUT, dressing, event
+  room, nothing floats), `BuildingArt` (box on its table; cap 460), `BoxService` (wood look for the Tool Shed, not for gold boxes).
+- **Out front:** the barn's floor is 0.75 over the lawn (a ramp climbs to the door), and the facade props used to stand at the floor's
+  level, hovering: the door posts, awning posts, barrel, crate and doormat now stand on the lawn (the threshold stays at the floor);
+  the grindstone moved 0.6 west so its leg is clear of the awning post.
+- **Renders:** `previews/store-polish/toolshed-v4-*.png`, 25 of them (exterior front, three-quarter, night, side, phone 667x375, door
+  close-up, awning and hours board, door post and lantern, both yards; interior from the door, phone 667x375, night, table close-up,
+  counter and CHECKOUT, from above, stock corner, machine table, west wall, pegboard; event zone, from above, at night, banner).
+  Scenes `store-toolshed`, `store-toolshed-exterior`, `store-toolshed-event` (the last shows the event room active).
+- **Awaiting Connor:** (1) event room is 11.9 x 8.6 (not 16 x 9) and the banner stands at the aisle's west edge, because the tables leave
+  no other floor; (2) the barn door's open leaves slide 2.1 further out than before; (3) the CHECKOUT board hides the middle two rack
+  name plates from some angles (it stands on the counter in front of the rack).
 ## Dealership restyle in the Hearth & Home look (branch `phase-2/store-restyle-dealership`, 12 October 2026)
 
 The Hearth & Home cleanup (#183, with the event kit #185) applied to the showroom hall. Looks and layout only: no price, economy, stock,
