@@ -2586,6 +2586,96 @@
     {
       "collision": false,
       "expectTypeId": 4,
+      "id": "103482280552543",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "100788396065808",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "104730694619580",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "140023205654551",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "100706399609275",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "106272982653382",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "76084140639988",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "117955534652171",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "136000065218099",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "104427150009380",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
       "id": "82316315960701",
       "kind": "mesh",
       "places": 1,

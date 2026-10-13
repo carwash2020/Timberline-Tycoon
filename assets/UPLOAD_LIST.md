@@ -131,6 +131,7 @@ Every other registry row is uploaded and Approved. Status `repo`: the GLB is in
 | `kit/Wall4` | repo | KitMeshData | 120 | 4 x 6 x 1 | Hull |
 | `kit/Window` | repo | KitMeshData | 108 | 3.8 x 2.9 x 0.75 | Box |
 | `kit/WindowWall8` | repo | KitMeshData | 240 | 8 x 6 x 1 | Hull |
+| `kit/backlog` | repo | KitMeshData | 2,824 | 8.3 x 7.925 x 4.05 | Hull |
 | `npcs/Dale` | repo | TownModels | 1,448 | 3.8 x 5.665 x 1.915 | Box |
 | `npcs/Gus` | repo | TownModels | 1,472 | 3.78 x 5.775 x 1.79 | Box |
 | `npcs/Hazel` | repo | TownModels | 1,564 | 3.78 x 5.748 x 1.66 | Box |
@@ -173,6 +174,16 @@ Every other registry row is uploaded and Approved. Status `repo`: the GLB is in
 | `shops/OddsAndEnds` | backlog | BacklogModels | 3,320 | 20 x 11.4 x 16 | Parts |
 | `shops/SkyForgeCourt` | backlog | BacklogModels | 1,676 | 30.6 x 18.9 x 24.15 | Parts |
 | `shops/Sparkworks` | backlog | BacklogModels | 4,304 | 20 x 13.85 x 16.008 | Parts |
+| `store/Barrel` | store | StoreData | 2,240 | 2.19 x 3.26 x 2.19 | Box |
+| `store/Crate` | store | StoreData | 2,284 | 2.6 x 2.5 x 2.6 | Box |
+| `store/Flashlight` | store | ModelSlots | 3,328 | 0.851 x 0.214 x 0.214 | Box |
+| `store/GlowWire` | store | StoreData | 2,052 | 1.02 x 1.3 x 2.16 | Box |
+| `store/Lantern` | store | ModelSlots | 2,814 | 0.509 x 1.306 x 0.509 | Box |
+| `store/Parcel` | store | StoreData | 1,348 | 1.44 x 1.57 x 1.45 | Box |
+| `store/RobuxCoins` | store | StoreData | 2,736 | 2.709 x 0.782 x 2.51 | Box |
+| `store/ShedBlueprint` | store | ModelSlots | 1,488 | 1.4 x 3.045 x 1.807 | Box |
+| `store/SkyBin` | store | StoreData | 2,480 | 3.82 x 3.36 x 3.82 | Box |
+| `store/WoodSign` | store | ModelSlots | 938 | 2.2 x 3.75 x 0.395 | Box |
 | `trees/Birch` | repo | TreeModels | 1,798 | 9.265 x 18.309 x 9.117 | Parts |
 | `trees/Emberwood` | repo | TreeModels | 1,844 | 19.251 x 9.53 x 22.388 | Parts |
 | `trees/Frostwood` | repo | TreeModels | 1,248 | 15.179 x 36.257 x 15.217 | Parts |

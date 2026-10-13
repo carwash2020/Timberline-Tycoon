@@ -82,7 +82,11 @@ local trucks: { [string]: { [string]: Piece } } = {
 	LoggingRig = {
 		Body = { meshId = 84804800200555, size = Vector3.new(12.99, 14.281, 46.67), at = Vector3.new(0, 7.84, 0) },
 		Glass = { meshId = 110663013657387, size = Vector3.new(12.194, 4.44, 3.925), at = Vector3.new(0, 8.83, -13.27) },
-		Lights = { meshId = 140436189658598, size = Vector3.new(11.865, 9.605, 45.8), at = Vector3.new(0, 7.303, 0.495) },
+		Lights = {
+			meshId = 140436189658598,
+			size = Vector3.new(11.865, 9.605, 45.8),
+			at = Vector3.new(0, 7.303, 0.495),
+		},
 		Bed = { meshId = 94574370000217, size = Vector3.new(10.67, 7.325, 33.8), at = Vector3.new(0, 8.112, 5.785) },
 		Wheel = { meshId = 88377082453341, size = Vector3.new(1.546, 4.56, 4.55), mirrorLeft = true },
 		Hitch = { meshId = 79514319620242, size = Vector3.new(0.7, 1.06, 1.68), at = Vector3.new(0, 2.005, 23.275) },

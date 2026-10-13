@@ -42,7 +42,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 | Kind | Distinct ids | Places written | Written in |
 | --- | ---: | ---: | --- |
-| mesh | 1053 | 1314 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, RockModels.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau |
+| mesh | 1063 | 1328 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, RockModels.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau |
 | model | 206 | 206 | BacklogModels.luau, MachineMeshes.luau, TownModels.luau |
 | template | 996 | 996 | src/ReplicatedStorage/MeshTemplates |
 | image | 18 | 18 | StoreData.luau, UIArt.luau, UITheme.luau, WeatherController.luau |
@@ -53,7 +53,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 Not asset ids, so not listed: `rbxasset://` built-ins (engine particle textures, `FellSound`, most of
 `SoundData`), empty sound slots (`id = ""`, silent), badge ids (all 0 by decision), and the owner user id.
-`meshId = 0` slots (no upload yet, part build kept by design): 161. They are not listed.
+`meshId = 0` slots (no upload yet, part build kept by design): 158. They are not listed.
 
 ## Store item models (one slot per item: `Shared/StoreModelSlots.luau`)
 
@@ -89,7 +89,7 @@ Not wired by these slots (another lane wires them; no slot here):
 | `assets/glb/store-items/ShedBlueprint.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 | `assets/glb/store-items/WoodSign.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 
-## Meshes (MeshId, loaded by MeshKit) (1053)
+## Meshes (MeshId, loaded by MeshKit) (1063)
 
 | Id | Used by | Places | Status |
 | --- | --- | ---: | --- |
@@ -380,6 +380,16 @@ Not wired by these slots (another lane wires them; no slot here):
 | 120413308807087 | BacklogModels.luau SeedOrb Glow | 1 | template, format ok, not checked yet |
 | 117488161778832 | BacklogModels.luau SawdustPileV2 Body | 1 | template, format ok, not checked yet |
 | 116491733478344 | BacklogModels.luau PathRoundV2 Body | 1 | template, format ok, not checked yet |
+| 103482280552543 | BlenderAssets.luau  | 1 | no template, format ok, not checked yet |
+| 100788396065808 | BlenderAssets.luau  | 1 | no template, format ok, not checked yet |
+| 104730694619580 | BlenderAssets.luau  (also BlenderAssets.luau, ModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 140023205654551 | BlenderAssets.luau  | 1 | no template, format ok, not checked yet |
+| 100706399609275 | BlenderAssets.luau  (also BlenderAssets.luau, ModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 106272982653382 | BlenderAssets.luau  | 1 | no template, format ok, not checked yet |
+| 76084140639988 | BlenderAssets.luau  | 1 | no template, format ok, not checked yet |
+| 117955534652171 | BlenderAssets.luau  (also BlenderAssets.luau, ModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 136000065218099 | BlenderAssets.luau  | 1 | no template, format ok, not checked yet |
+| 104427150009380 | BlenderAssets.luau  (also BlenderAssets.luau, ModelSlots.luau) | 2 | no template, format ok, not checked yet |
 | 82316315960701 | MachineMeshes.luau SawmillRickety Body | 1 | template, format ok, not checked yet |
 | 79470088816517 | MachineMeshes.luau SawmillRickety Belt | 2 | template, format ok, not checked yet |
 | 71616383391365 | MachineMeshes.luau SawmillRickety  | 1 | template, format ok, not checked yet |
