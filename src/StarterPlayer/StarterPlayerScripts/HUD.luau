@@ -2229,6 +2229,11 @@ local function refreshLoading()
 		-- The server's milestone (LoadStage) drives the line and the bar, so
 		-- the wait reads as progress ("Shaping the land... 40%"), not a freeze.
 		local fill, stageText = LoadStages.Describe(workspace:GetAttribute("LoadStage"), remotes, loaded)
+		-- A slow or retried save load says so (ProfileService "LoadNote").
+		local note = player:GetAttribute("LoadNote")
+		if type(note) == "string" and note ~= "" then
+			stageText = note
+		end
 		local shown = string.format("%s %s", stageText or text, LoadStages.Percent(fill))
 		if label.Text ~= shown then
 			label.Text = shown
@@ -2268,6 +2273,7 @@ local function buildLoading(gui: ScreenGui)
 	card.outer.Parent = gui
 	loadingCard, loadingLabel = card.outer, label
 	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(refreshLoading)
+	player:GetAttributeChangedSignal("LoadNote"):Connect(refreshLoading)
 	workspace:GetAttributeChangedSignal("LoadStage"):Connect(refreshLoading)
 	refreshLoading()
 end
