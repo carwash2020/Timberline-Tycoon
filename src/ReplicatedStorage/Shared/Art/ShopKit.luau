@@ -893,7 +893,14 @@ function ShopKit.SectionSigns(
 	parent: Instance,
 	shop: string,
 	sections: { Section },
-	cfg: { headerY: number, headerZ: number, tieY: number, subShift: number?, tieTop: number? }
+	cfg: {
+		headerY: number,
+		headerZ: number,
+		tieY: number,
+		subShift: number?,
+		tieTop: number?,
+		noTie: boolean?,
+	}
 )
 	local placements = StoreStock.Placements(shop)
 	local lanes: { [string]: ShelfLayout.Lane? } = {}
@@ -911,6 +918,9 @@ function ShopKit.SectionSigns(
 			return
 		end
 		tied[key] = true
+		if cfg.noTie then
+			return -- (the chains end on a ceiling beam the store built at this z: no tie of its own)
+		end
 		-- (with cfg.tieTop the tie is a deep beam that reaches up to the roof's underside)
 		local bottom = cfg.tieY - 0.25
 		local height = if cfg.tieTop then cfg.tieTop - bottom else 0.5

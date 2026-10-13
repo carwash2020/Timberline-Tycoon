@@ -47,7 +47,7 @@ function Store.scene(opts)
 					color = color,
 					gold = gold,
 					side = BoxArt.AisleSide(at.X),
-					wood = opts.kind == "HearthAndHome",
+					wood = opts.kind == "HearthAndHome" or (opts.kind == "ToolShed" and not gold),
 				})
 				model.Parent = root
 			end

@@ -1333,12 +1333,8 @@ local function toolShed(model: Model, title: string, accent: Color3)
 		dBox(model, "SignPost", V3(0.5, h, 0.5), CF(s * 4.6, roofY - 0.5 + h / 2, signZ + 0.5), TIMBER)
 		gooseneck(model, CF(s * 5.2, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 	end
-	-- Porch: two posts flanking the opening, one lantern on the east post.
-	-- Clear of the grindstone (x ±7.6) and of the door-width scan at the wall.
-	for _, s in ipairs({ -1, 1 }) do
-		Kit.part(model, "PorchPost", V3(0.45, 6.4, 0.45), CF(s * 6.2, 3.2, -HZ - 1.15), TIMBER, MAT.Wood)
-	end
-	Kit.lantern(model, CF(6.2, 5.8, -HZ - 1.15), 0.75)
+	-- (The porch posts and their lantern are gone: the door frame and the striped awning of the Hearth & Home restyle,
+	-- ShopFacade.DoorFrame and StripedAwning, frame the doorway, and the open barn-door leaves slide clear of them.)
 	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
 	-- The counter stands at the back (final studs: BuildingArt.ToolShedCounterZ).
 	local CZ = BuildingArt.ToolShedCounterZ / BuildingArt.Scale.ToolShed
@@ -1351,12 +1347,12 @@ local function toolShed(model: Model, title: string, accent: Color3)
 
 	-- Out front: the grindstone and the chopping block; firewood stacked by
 	-- the west wall (all of it solid; it was the east wall until the shed grew wider).
-	grindstone(model, CF(-7.6, 0, -HZ - 2.2))
+	grindstone(model, CF(-8.2, 0, -HZ - 2.2)) -- (0.6 further west: its leg stood in the awning post)
 	choppingBlock(model, CF(7.6, 0, -HZ - 2.2), rng)
 	for row = 0, 1 do
 		for i = 0, 1 - row do
 			local z = -2 + (i - (1 - row) / 2) * 1.55
-			log(model, CF(-(HX + 1.25), 0.75 + row * 1.32, z), 2, 1.5, rng, 1, true)
+			log(model, CF(-(HX + 1.4), 0.75 + row * 1.32, z), 2, 1.5, rng, 1, true) -- (1.4 out: the log ends clear the wall)
 		end
 	end
 end
@@ -1937,6 +1933,13 @@ local function addHoursBoard(model: Model, shopId: string)
 	if shopId == "HearthAndHome" and y - h / 2 < 12.7 then
 		y = 12.7 + h / 2
 	end
+	-- The Tool Shed's barn-door track runs across the front at 11.85 and its striped awning (ShopFacade) reaches up to
+	-- 12.4 on the wall over the door: the board stands on the wall's face above both (it used to sit inside the wall).
+	local toolShedWallFace: number? = nil
+	if shopId == "ToolShed" then
+		y = math.max(y, 12.45 + h / 2)
+		toolShedWallFace = -(BuildingArt.ToolShedHalfDepth * BuildingArt.Scale.ToolShed + 0.45)
+	end
 	-- The board hangs on the wall's outside face, not inside it: if a front wall stands over
 	-- the host at this height, the board's back rests on that wall's front face.
 	local z = at.Z
@@ -1956,6 +1959,9 @@ local function addHoursBoard(model: Model, shopId: string)
 				z = faceZ - depth / 2
 			end
 		end
+	end
+	if toolShedWallFace then
+		z = toolShedWallFace - depth / 2
 	end
 	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, z), SIGN_BOARD, MAT.Wood)
 	Kit.decor(board)
@@ -2051,6 +2057,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			wallTop = 9 * s,
 			roofTop = 14.8 * s + 0.75,
 			groundY = 0.5 * s,
+			matY = 0, -- the lawn: the barn's floor is 0.75 above it (a ramp climbs to the door), so the mat lies on the grass past the ramp
 			accent = accent,
 		}
 	elseif kind == "Dealership" then
@@ -2110,6 +2117,8 @@ function BuildingArt.DoorSpec(kind: string, s: number, accent: Color3): ShopDoor
 			z = -(BuildingArt.ToolShedHalfDepth + 0.5) * s,
 			color = Kit.shade(accent, -0.2),
 			trim = TRIM,
+			-- (open, each leaf slides this much further out along the wall so it stands clear of the door frame's posts)
+			openShift = 2.1,
 		}
 	elseif kind == "Dealership" then
 		local hall = DealershipLot.Hall()

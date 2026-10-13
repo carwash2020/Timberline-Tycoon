@@ -658,6 +658,50 @@ return function(t)
 		})
 	end
 
+	t.test(
+		"the Tool Shed's shelf boxes get the wood look (a wood base), like Hearth & Home's; no other box does",
+		function()
+			local _, Box = boot()
+			local counter = counterPart()
+			local BoxArt = t.load("ReplicatedStorage/Shared/Art/BoxArt")
+			local function baseOf(rec)
+				return rec.model:FindFirstChild("Base", true)
+			end
+			local function make(uid, shop, kind, itemId, name)
+				return Box.Make({
+					uid = uid,
+					shop = shop,
+					itemKind = kind,
+					itemId = itemId,
+					displayName = name,
+					cf = CFrame.new(Vector3.new(0, 4.5, 0)),
+					counter = counter,
+					zoneCf = CFrame.new(),
+					zoneSize = Vector3.new(18, 1, 14),
+					onShelf = true,
+				})
+			end
+			t.eq(
+				baseOf(make("w-1", "ToolShed", "Axe", "SteelAxe", "Steel Axe")).Color,
+				BoxArt.Wood.base,
+				"Tool Shed: wood"
+			)
+			t.eq(
+				baseOf(make("w-2", "HearthAndHome", "Gear", "Flashlight", "Flashlight")).Color,
+				BoxArt.Wood.base,
+				"Hearth: wood"
+			)
+			t.ok(
+				baseOf(make("w-3", "Sparkworks", "Machine", "ChopSaw", "Chop Saw")).Color ~= BoxArt.Wood.base,
+				"Sparkworks: plain"
+			)
+			t.ok(
+				baseOf(robuxBox(Box, counter, Vector3.new(0, 4.5, 0))).Color ~= BoxArt.Wood.base,
+				"the gold Robux boxes keep their look"
+			)
+		end
+	)
+
 	t.test("a Robux box is gold, tagged R$, and never charges cash", function()
 		local _, Box, charges, profile = boot()
 		local counter = counterPart()
