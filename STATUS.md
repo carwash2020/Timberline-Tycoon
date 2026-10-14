@@ -27,6 +27,10 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## What's New centred, no scrim (branch `phase-2/whats-new-centre`, 14 October 2026)
+
+The grey box was NewsUI's full-screen Scrim button (removed; the card is alone in its ScreenGui) and the short-screen placement that moved the card off centre (now always centred). Spec in GreyBox.spec; previews are computed diagrams in `previews/whats-new/`. Studio checks: PHASE2_NOTES.md "What's New centred". Max Players = 12 is set by Connor in Game Settings (LAUNCH.md Studio setup; PlaceCheck points to it).
+
 ## Grey box after the join (branch `phase-2/grey-box-after-load`, 13 October 2026)
 
 Connor on Xbox: once the game loaded, a grey veil lay over the screen.
