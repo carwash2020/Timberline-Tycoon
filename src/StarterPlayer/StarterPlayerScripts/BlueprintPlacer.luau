@@ -28,6 +28,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
+local ClientBoot = require(ReplicatedStorage.Shared.ClientBoot)
 local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
@@ -500,6 +501,7 @@ end
 
 -- Starts placing `bp` (or moving the placed item `options.moveUid`).
 function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
+	ClientBoot.Ensure("BlueprintPlacer") -- its Start is deferred until after the player can play (first use starts it now)
 	BlueprintPlacer.Stop()
 	local opts: Options = options or {}
 	local ghost = MachineArt.BuildAny(bp.id, true) or BlueprintModels.Build(bp, true)
@@ -705,6 +707,10 @@ local function onWorldFx(kind: unknown, payload: unknown)
 		BlueprintPlacer.Begin(bp, { boxUid = uid })
 	end
 end
+
+-- Client.client hands over a "PlaceBox" that arrived before this controller's
+-- deferred Start had connected its own listener (ClientBoot).
+BlueprintPlacer.HandleWorldFx = onWorldFx
 
 function BlueprintPlacer.Start()
 	Net.Remote("WorldFX").OnClientEvent:Connect(onWorldFx)

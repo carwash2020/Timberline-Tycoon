@@ -150,4 +150,52 @@ return function(t)
 		LoadState.Gates.Set("world")
 		t.eq(LoadState.Gates.IsReady("world"), true)
 	end)
+
+	-- Launch performance (14 October 2026): one frame budget for all the server's background work.
+	t.test("the shared frame budget is 30 ms until a player can play, 10 ms in all after", function()
+		local LoadState = setup()
+		t.eq(LoadState.Frame.Limit(), 0.03, "nobody plays yet: more of each frame")
+		LoadState.PlayerCanPlay("Connor")
+		t.eq(LoadState.Frame.Limit(), 0.01, "a player can play: the forest, terrain and queue together take 10 ms")
+		t.eq(LoadState.BudgetWhilePlaying, 0.01)
+	end)
+
+	t.test("the deferred queue's steps are held to that shared budget", function()
+		local LoadState, _, clock = setup()
+		LoadState.PlayerCanPlay("Connor")
+		local yields = 0
+		-- A step of 1 ms units that asks the slice after each: with a 10 ms frame it yields
+		-- inside the step about every 10 units.
+		LoadState.Queue.Add({
+			name = "decor",
+			tier = 2,
+			run = function(slice)
+				for _ = 1, 35 do
+					clock.now += 0.001
+					if slice() then
+						yields += 1
+						clock.now += 0.016 -- the rest of the frame passes while the step waits
+					end
+				end
+			end,
+		})
+		LoadState.Queue.Start()
+		t.ok(yields >= 3 and yields <= 4, "the step yielded " .. yields .. " times inside the shared 10 ms frame")
+	end)
+
+	t.test("workspace.WorldBuilt is set when everything is built (the client's [Perf] probe prints on it)", function()
+		local LoadState, _, _, ws = setup()
+		t.eq(ws:GetAttribute("WorldBuilt"), nil)
+		LoadState.Seal()
+		t.eq(ws:GetAttribute("WorldBuilt"), true)
+	end)
+
+	t.test("the near ring is a gate of its own, not one the first player waits for", function()
+		local LoadState = setup()
+		local JoinFlow = t.shared("JoinFlow")
+		t.eq(LoadState.Gates.IsReady("nearRing"), false)
+		t.eq(table.find(JoinFlow.FirstPlayerGates, "nearRing"), nil, "the join is not held for the trees")
+		LoadState.Gates.Set("nearRing")
+		t.eq(LoadState.Gates.IsReady("nearRing"), true)
+	end)
 end

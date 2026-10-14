@@ -36,6 +36,8 @@
 -- part-built model. Collision is Box unless the caller passes Hull
 -- (a wheel, or any shape a box would misrepresent).
 
+local FrameBudget = require(script.Parent.Parent.FrameBudget)
+local NearFirst = require(script.Parent.Parent.NearFirst)
 local WorkPool = require(script.Parent.Parent.WorkPool)
 
 local MeshKit = {}
@@ -56,6 +58,7 @@ type Waiter = {
 	tries: number,
 	alive: Instance?,
 	attempt: () -> any,
+	at: NearFirst.Point?, -- where it is (found once, for nearest-first)
 }
 
 local waiting: { [number]: { Waiter } } = {}
@@ -90,6 +93,17 @@ MeshKit.Scheduler = {
 MeshKit.EngineLoad = nil :: ((number, Enum.CollisionFidelity) -> (MeshPart?, string?))?
 MeshKit.RequestConcurrency = 24 -- background loads started by Create misses at once
 MeshKit.SwapBudget = 0.004 -- seconds of dressing per Pump (one frame's slice)
+-- Swap-ins land in bursts (696 in one Studio start: the shops, the boxes, the
+-- vehicles, the machines), so a frame's drain is capped three ways: this many
+-- swaps, SwapBudget seconds, and the shared frame budget when there is one.
+-- A swap is always at least one a frame, so the queue never stalls.
+MeshKit.SwapMaxPerFrame = 6
+-- The budget the server's other background work shares (Shared/FrameBudget),
+-- set by LoadState; nil on a client (it has its own frame to protect).
+MeshKit.SwapFrame = nil :: FrameBudget.Budget?
+-- Where the players are (their characters, or the camera): the swaps nearest
+-- them run first. nil, or no points: the order they became ready in.
+MeshKit.Focus = nil :: (() -> { NearFirst.Point })?
 
 -- Lune has no AssetService. Remember that so every tree doesn't pay for the miss.
 local noAssetService = false
@@ -436,13 +450,65 @@ local function resolved(meshId: number)
 	end
 end
 
+-- Where a waiting dressing is, on the ground: its model's pivot or its part's
+-- position; the origin when that cannot be read.
+local function positionOf(waiter: Waiter): NearFirst.Point
+	local known = waiter.at
+	if known then
+		return known
+	end
+	local x, z = 0, 0
+	local inst = waiter.alive
+	if inst then
+		local ok, at = pcall(function(): Vector3?
+			if inst:IsA("Model") then
+				return inst:GetPivot().Position
+			elseif inst:IsA("BasePart") then
+				return inst.Position
+			end
+			return nil
+		end)
+		if ok and at then
+			x, z = at.X, at.Z
+		end
+	end
+	local made = { x = x, z = z }
+	waiter.at = made
+	return made
+end
+
+-- Puts the ready swaps in the order of the players' distance, nearest first.
+local function orderReady()
+	local focusFn = MeshKit.Focus
+	if focusFn == nil or #ready - readyHead < 1 then
+		return
+	end
+	local focus = focusFn()
+	if #focus == 0 then
+		return
+	end
+	local pending = table.move(ready, readyHead, #ready, 1, {})
+	local sorted = NearFirst.Order(pending, positionOf, focus, { x = 0, z = 0 })
+	table.move(sorted, 1, #sorted, readyHead, ready)
+end
+
 -- Runs ready swaps until `budget` seconds are spent (at least one runs).
 -- Returns how many ran. The drain loop calls this once a frame; specs call it.
+-- With no `budget` (the drain's frame) the swaps are also capped at
+-- MeshKit.SwapMaxPerFrame, held to the shared frame budget, and the ones
+-- nearest the players go first. An explicit budget is the caller's own: only
+-- the time limit applies.
 function MeshKit.Pump(budget: number?): number
 	local limit = budget or MeshKit.SwapBudget
+	local frameCall = budget == nil
+	local maxRun = if frameCall then MeshKit.SwapMaxPerFrame else math.huge
+	local frame = if frameCall then MeshKit.SwapFrame else nil
 	local clock = MeshKit.Scheduler.clock
 	local startedAt = clock()
 	local ran = 0
+	if frameCall then
+		orderReady()
+	end
 	while readyHead <= #ready do
 		local waiter = ready[readyHead]
 		ready[readyHead] = nil :: any
@@ -468,7 +534,7 @@ function MeshKit.Pump(budget: number?): number
 		else
 			swapSkipped += 1
 		end
-		if clock() - startedAt >= limit then
+		if clock() - startedAt >= limit or ran >= maxRun or (frame ~= nil and frame.Over()) then
 			break
 		end
 	end

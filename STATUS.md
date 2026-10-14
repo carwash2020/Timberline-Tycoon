@@ -27,6 +27,20 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Launch performance (branch `phase-2/launch-perf`, 14 October 2026)
+
+Connor's Studio log: playable at +4.6 s but heavy work ran until +11.9 s (the points-of-interest plan one 5.07 s step, 1,205 trees over
+8.1 s, the terrain write 9.2 s, the client's filler plan 4.8 s, client Starts about 1.4 s each, 696 mesh swap-ins in bursts). Claude cannot
+run Studio: nothing below is measured there. **What changed** (full list and Studio checks: PHASE2_NOTES.md "Launch performance"):
+one shared per-frame budget for the server's background work (`Shared/FrameBudget`; 30 ms while nobody plays, 10 ms in all once a player
+can play, where the forest, terrain and deferred queue each took 12 ms before); the POI plan and every other `(plan)` step run on the
+step's slice (`WorldPlan.PlanPointsOfInterest(pause)`, byte-identical output: `PoiPlanSplit.spec`); the forest is planted nearest the
+players first (`Shared/NearFirst`, re-sorted as they move) while the planner is still working; the later terrain blocks go to the players
+first; the client's deferrable Starts run after "can play" through `Shared/ClientBoot` (start on first use as a fallback); ForestFiller
+waits for them and adapts to slow frames; mesh swap-ins are capped per frame and nearest-first (`MeshKit.Pump`); the loading card waits
+(at most 6 s) for the trees round the spawn (`NearRingBuilt`); `[Perf]` lines on the server and the client (`Shared/PerfProbe`).
+**Open:** Connor reads the `[Perf]` lines from one cold-server join and sends them back; the budgets (10 ms, 6 swaps, 2 Starts a frame,
+6 s card wait) are guesses until then.
 ## Axe heads were backwards (branch `phase-2/axe-grip-forward`, 14 October 2026)
 Connor: every axe is held with the blade toward the player and the head the wrong way round. Cause: Roblox's import turns the Blender axe meshes a half turn about Y from their GLBs (the NPC meshes do the same, `TownModels.NpcMeshYaw`), so the mesh's cutting edge landed on +Z while the haft, the Lux points, the swing and the preview all assume the edge is at -Z. The grip was right all along (the Handle's -Z is the blade; the grip frame's -Z is the look vector with the arm raised), so `AxeArt.Grip` is unchanged. Fix, in one place: `AxeModels.MeshYaw` (a half turn) is applied to the handle, head and glow mesh in `AxeArt.applyAxeNow`; the held tool, dropped axe, shop rack, box display and temper effects all come from `AxeArt.Build`, so they follow. `tools/preview/export.luau` turns the `axes/` GLBs the same half turn so renders show the engine (`PREVIEW_AXE_TURN=0` for raw GLBs). New `tests/AxeGrip.spec` (every axe incl. Lux and the Maul, part-built and meshed: edge forward and head up in the hand frame, one shared grip). Renders: `previews/axe-grip/` (`contact-before.png`, `contact-after.png`, close-ups in `before-single/` and `after-single/`; scene `tools/preview/scenes/axe-grip.luau`). The Hermit's Maul is part-built and was never affected.
 Studio checks (not run, Claude cannot run Studio): 1. Equip each axe incl. the Lux Axe: in third person the handle is in the hand, the head is on top, the cutting edge points away from you at the tree; the same in first person. 2. Swing at a tree: the edge goes into the trunk, and the Lux glow arc and trail are at the edge. 3. Hotbar icon and shop rack/box display: the blade faces the way it did in the renders. 4. Drop an axe (Q): it lies on its side, head intact. If the blade is still backward, set `AxeModels.MeshYaw = 0`: the import turn assumption was wrong for the axes.

@@ -13,7 +13,7 @@ return function(t)
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
 	local QualityBudgets = t.shared("QualityBudgets")
 
-	local function world(tier, player)
+	local function world(tier, player, boot)
 		local w = { clock = 0, heartbeat = {}, tier = tier or "high", builtPerFrame = 0, player = player }
 		w.workspace = Instance.new("Workspace")
 		w.camera = Instance.new("Camera")
@@ -36,6 +36,8 @@ return function(t)
 						return QualityBudgets.For(w.tier)
 					end,
 				},
+				-- ClientBoot (the deferred Start queue) is the real module unless a spec hands one in.
+				ClientBoot = boot,
 			},
 			globals = {
 				workspace = w.workspace,
@@ -43,9 +45,9 @@ return function(t)
 					spawn = function(fn, ...)
 						fn(...)
 					end,
-					wait = function()
+					wait = function(seconds)
 						if w.onWait then
-							w.onWait()
+							w.onWait(seconds)
 						end
 					end,
 				},
@@ -223,6 +225,98 @@ return function(t)
 		w.settle(4000)
 		local near = count(w.folder())
 		t.ok(near > 0, "and then built the forest")
+	end)
+
+	-- Launch performance (14 October 2026): the filler forest's plan starts after
+	-- the deferred controllers (ClientBoot) have all started, then a settle.
+	t.test("the plan waits for the deferred controllers to start, then settles 1.5 s", function()
+		local drainedAt, waits = 30, 0
+		local boot = {
+			Default = {
+				Released = function()
+					return true
+				end,
+				Drained = function()
+					return waits >= drainedAt
+				end,
+			},
+		}
+		local player = {
+			Character = {},
+			GetAttribute = function(_, name)
+				return if name == "ProfileLoaded" then true else nil
+			end,
+		}
+		local w = world("low", player, boot)
+		local settled = false
+		w.onWait = function(seconds)
+			waits += 1
+			if waits < drainedAt then
+				t.eq(w.folder(), nil, "nothing built while controllers are still starting")
+				t.ok(w.WorldPlan.TreesReady and not w.WorldPlan.TreesReady(), "and no plan step has run")
+			end
+			if seconds == 1.5 then
+				settled = true
+				t.ok(waits >= drainedAt, "the settle comes after the last controller started")
+			end
+		end
+		w.look(Vector3.new(125, 8, -510))
+		w.ForestFiller.Start()
+		t.ok(settled, "a 1.5 s settle for the HUD")
+		w.onWait = nil
+		w.settle(4000)
+		t.ok(count(w.folder()) > 0, "and then built the forest")
+	end)
+
+	t.test("a controller that never finishes starting cannot hold the forest back for ever", function()
+		local boot = {
+			Default = {
+				Released = function()
+					return true
+				end,
+				Drained = function()
+					return false -- a Start that never returns
+				end,
+			},
+		}
+		local player = {
+			Character = {},
+			GetAttribute = function(_, name)
+				return if name == "ProfileLoaded" then true else nil
+			end,
+		}
+		local w = world("low", player, boot)
+		w.look(Vector3.new(125, 8, -510))
+		w.ForestFiller.Start()
+		w.settle(4000)
+		t.ok(count(w.folder()) > 0, "the forest was built after the wait ran out")
+	end)
+
+	t.test("a frame that was already slow builds fewer cells than a normal one, but still builds", function()
+		local function cellsPerFrame(dt)
+			local w = world("high")
+			w.look(Vector3.new(125, 8, -510))
+			w.ForestFiller.Start()
+			local most, seen = 0, 0
+			for _ = 1, 30 do
+				for _, fn in ipairs(w.heartbeat) do
+					fn(dt)
+				end
+				local folder = w.folder()
+				local n = if folder then #folder:GetChildren() else 0
+				most = math.max(most, n - seen)
+				seen = n
+			end
+			return most, seen
+		end
+		local normalMost, normalSeen = cellsPerFrame(1 / 60)
+		local slowMost, slowSeen = cellsPerFrame(0.1) -- a 100 ms frame: something else is hitching
+		t.ok(normalMost >= 2, "a normal frame built " .. normalMost .. " cells at most")
+		t.ok(slowMost < normalMost, "a slow frame built " .. slowMost .. " cells at most")
+		t.ok(
+			slowSeen > 0 and slowSeen < normalSeen,
+			"but it still builds: " .. slowSeen .. " cells against " .. normalSeen
+		)
 	end)
 
 	t.test("it spreads the work over frames, nearest cells first", function()

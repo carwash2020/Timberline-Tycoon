@@ -218,7 +218,17 @@ return function(t)
 						return s.loaded
 					end,
 				},
-				workspace = { CurrentCamera = { ViewportSize = options.viewport or Vector2.new(667, 375) } },
+				workspace = {
+					CurrentCamera = { ViewportSize = options.viewport or Vector2.new(667, 375) },
+					-- The server's word on the area round the spawn: false until `nearRingAt`
+					-- (never, when nil); no attribute at all when the option is absent.
+					GetAttribute = function(_, name)
+						if name == "NearRingBuilt" and options.nearRing then
+							return options.nearRingAt ~= nil and s.now >= options.nearRingAt
+						end
+						return nil
+					end,
+				},
 				task = {
 					wait = function(seconds)
 						advance(seconds or FRAME)
@@ -439,6 +449,29 @@ return function(t)
 			end
 		end
 		t.ok(fading.backdropTransparency > 0 and fading.backdropTransparency < 1, "a fade, not a cut")
+	end)
+
+	-- Launch performance (14 October 2026): the card stays until the area round the
+	-- spawn is built (the server's NearRingBuilt), with a hard timeout.
+	t.test("it holds for the area round the spawn once the character and the save are in", function()
+		local s = run({ character = 1, profile = 2, nearRing = true, nearRingAt = 5 })
+		t.ok(shownThroughout(s, 0, 5), "still up while the trees round the spawn are planted")
+		local gone = lastShown(s)
+		t.ok(gone >= 5 and gone <= 5 + 0.6 + 2 * FRAME, "faded out once the ring was built: " .. tostring(gone))
+		t.eq(#s.playerGui:GetChildren(), 0)
+	end)
+
+	t.test("the wait for the area round the spawn has a hard timeout and never hangs", function()
+		local s = run({ character = 1, profile = 2, nearRing = true }) -- the ring is never reported built
+		t.ok(shownThroughout(s, 0, 7.9), "up for the whole wait (6 s after the save)")
+		t.ok(lastShown(s) <= 2 + 6 + 0.6 + 3 * FRAME, "gone 6 s after the save: " .. tostring(lastShown(s)))
+		t.eq(#s.playerGui:GetChildren(), 0)
+		t.ok(s.finished)
+	end)
+
+	t.test("a server that says nothing about the area costs no wait", function()
+		local s = run({ character = 1, profile = 2 })
+		t.ok(lastShown(s) <= 2 + 0.6 + 2 * FRAME, "faded as soon as the character and the save were in")
 	end)
 
 	t.test("a character alone isn't enough: it waits for the save, up to 30 s", function()

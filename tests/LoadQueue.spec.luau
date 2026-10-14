@@ -289,4 +289,137 @@ return function(t)
 		queue.Start()
 		t.eq(order, { "first", "east", "west" })
 	end)
+
+	-- Launch performance (14 October 2026).
+	t.test("a heavy step reports [Perf] stage with its longest single step; a light one prints nothing", function()
+		local now = 0
+		local perf = {}
+		local queue = LoadQueue.new({
+			clock = function()
+				return now
+			end,
+			wait = function() end,
+			spawn = function(fn)
+				fn()
+			end,
+			log = function() end,
+			perf = function(line)
+				table.insert(perf, line)
+			end,
+			budget = 0.010,
+		})
+		queue.Add({
+			name = "Points of interest (plan)",
+			tier = 2,
+			run = function(slice)
+				-- Units of 4 ms: the slice yields after each 12 ms, so the longest stretch is 12 ms.
+				for _ = 1, 100 do
+					now += 0.004
+					slice()
+				end
+			end,
+		})
+		queue.Add({
+			name = "tiny",
+			tier = 3,
+			run = function()
+				now += 0.001
+			end,
+		})
+		queue.Add({
+			name = "one big step",
+			tier = 3,
+			run = function()
+				now += 0.120 -- 120 ms in one go: the number to see
+			end,
+		})
+		queue.Start()
+		t.eq(#perf, 2, table.concat(perf, "\n"))
+		t.ok(
+			string.find(perf[1], "[Perf] stage Points of interest (plan): total 0.40s, longest step 12 ms", 1, true),
+			perf[1]
+		)
+		t.ok(string.find(perf[2], "[Perf] stage one big step: total 0.12s, longest step 120 ms", 1, true), perf[2])
+	end)
+
+	t.test("a group reports once, for its longest step", function()
+		local now = 0
+		local perf = {}
+		local queue = LoadQueue.new({
+			clock = function()
+				return now
+			end,
+			wait = function() end,
+			spawn = function(fn)
+				fn()
+			end,
+			log = function() end,
+			perf = function(line)
+				table.insert(perf, line)
+			end,
+		})
+		for i = 1, 4 do
+			queue.Add({
+				name = "cell " .. i,
+				tier = 2,
+				group = "Scenery",
+				groupSize = 4,
+				run = function()
+					now += if i == 3 then 0.060 else 0.010
+				end,
+			})
+		end
+		queue.Start()
+		t.eq(#perf, 1)
+		t.ok(string.find(perf[1], "stage Scenery: total 0.09s, longest step 60 ms (4 steps)", 1, true), perf[1])
+	end)
+
+	t.test("with a shared frame budget, every step's slice yields when ANY job has spent the frame", function()
+		local FrameBudget = t.shared("FrameBudget")
+		local now = 0
+		local frame = 1
+		local budget = FrameBudget.new({
+			budget = 0.010,
+			clock = function()
+				return now
+			end,
+			frame = function()
+				return frame
+			end,
+		})
+		local yields = 0
+		local queue = LoadQueue.new({
+			frame = budget,
+			clock = function()
+				return now
+			end,
+			wait = function()
+				yields += 1
+				frame += 1
+			end,
+			spawn = function(fn)
+				fn()
+			end,
+			log = function() end,
+		})
+		budget.Begin()
+		-- Another job (the forest) has already spent 9 ms of this frame.
+		now += 0.009
+		budget.Over()
+		queue.Add({
+			name = "decor",
+			tier = 2,
+			run = function(slice)
+				for _ = 1, 5 do
+					now += 0.002
+					slice()
+				end
+			end,
+		})
+		queue.Start()
+		-- One yield inside the step, after its first unit (the frame was nearly spent: 9 ms
+		-- by the forest, 2 more by the step), and the queue's one between steps. On its own
+		-- slice of 12 ms the step would not have yielded at all.
+		t.eq(yields, 2, "yields: " .. yields)
+	end)
 end

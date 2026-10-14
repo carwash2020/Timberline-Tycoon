@@ -22,6 +22,13 @@ return function(t)
 			end,
 		}
 		lastOrder = {}
+		-- The real ClientBoot (the deferred queue) and PerfProbe, fresh for each run:
+		-- ClientBoot keeps its queue in the module, so runs must not share it.
+		local realLoader = t.loader({ isolated = true })
+		local real = {
+			ClientBoot = realLoader:load("ReplicatedStorage/Shared/ClientBoot"),
+			PerfProbe = realLoader:load("ReplicatedStorage/Shared/PerfProbe"),
+		}
 		local function fake(name)
 			return {
 				Start = function()
@@ -51,6 +58,12 @@ return function(t)
 				end
 				if name == "JoinFlow" then
 					return { ClientReadyTries = 30, ClientReadyEvery = 3 }
+				end
+				if name == "ClientBoot" or name == "PerfProbe" then
+					return real[name]
+				end
+				if name == "MeshKit" then
+					return {} -- the swap focus Client.client sets: not a controller, nothing to start
 				end
 				if failingLoad[name] then
 					error(name .. " broke at load") -- its top level errors
@@ -85,7 +98,12 @@ return function(t)
 		})
 		loader:load("StarterPlayer/StarterPlayerScripts/Client.client")
 		lastFired = fired
-		return started, loader.warnings, prints, fakes
+		-- (the deferred queue lives in the real ClientBoot, loaded by its own loader: its warnings too)
+		local warnings = table.clone(loader.warnings)
+		for _, w in ipairs(realLoader.warnings) do
+			table.insert(warnings, w)
+		end
+		return started, warnings, prints, fakes
 	end
 
 	local function failures(warnings, what)
@@ -97,6 +115,18 @@ return function(t)
 			end
 		end
 		return names
+	end
+
+	-- The DEFERRED table in Client.client: name -> priority.
+	local function deferredTable()
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/Client.client.luau")
+		local body = string.match(source, "local DEFERRED[^=]*= (%b{})")
+		local out = {}
+		for name, priority in string.gmatch(body, "([%w_]+) = (%d+)") do
+			out[name] = tonumber(priority)
+		end
+		return out
 	end
 
 	t.test("everything starts, the HUD first, and the client says so", function()
@@ -116,8 +146,22 @@ return function(t)
 	-- remotes, so the server waits for the client to say its handlers are in.
 	t.test("the client says ClientReady once every controller has started, even if one broke", function()
 		local started = run({ QuestUI = true })
+		local deferred = deferredTable()
+		local deferredStarted = 0
+		for _, name in ipairs(started) do
+			if deferred[name] then
+				deferredStarted += 1
+			end
+		end
+		t.ok(deferredStarted > 0, "the deferred controllers started too (after the player could play)")
 		t.eq(lastFired, 1, "one handshake (the save was already in, so no repeats)")
-		t.eq(lastOrder, { "ClientReady after " .. #started .. " starts" }, "after every Start returned")
+		-- The critical controllers' handlers must be connected first; the deferred
+		-- ones (effects, news, the tools) start after the player can play.
+		t.eq(
+			lastOrder,
+			{ "ClientReady after " .. (#started - deferredStarted) .. " starts" },
+			"after every critical Start returned"
+		)
 		local _, _, prints = run({})
 		local found = false
 		for _, line in ipairs(prints) do
@@ -235,5 +279,79 @@ return function(t)
 		t.ok(not table.find(started, "HUD"))
 		t.eq(failures(warnings, "load"), { "HUD" })
 		t.eq(prints[#prints], "[Client] Timberline Tycoon client started.")
+	end)
+
+	-- Launch performance (14 October 2026): the effects and the tools' controllers
+	-- start after the player can play, not in the first seconds. What must NOT
+	-- wait is pinned by name.
+	t.test("the deferred controllers start after every critical one, soonest-needed first", function()
+		local started = run({})
+		local deferred = deferredTable()
+		local names = {}
+		for name in pairs(deferred) do
+			table.insert(names, name)
+		end
+		t.ok(#names >= 10, "a real deferred list")
+		local lastCritical, firstDeferred = 0, math.huge
+		for i, name in ipairs(started) do
+			if deferred[name] then
+				firstDeferred = math.min(firstDeferred, i)
+			else
+				lastCritical = i
+			end
+		end
+		t.ok(lastCritical < firstDeferred, "every critical Start comes before the first deferred one")
+		table.sort(names, function(a, b)
+			return deferred[a] < deferred[b]
+		end)
+		local order = {}
+		for _, name in ipairs(started) do
+			if deferred[name] then
+				table.insert(order, name)
+			end
+		end
+		t.eq(order, names, "every deferred controller started once, in priority order")
+	end)
+
+	t.test("what is needed to play never waits", function()
+		local deferred = deferredTable()
+		for _, name in ipairs({
+			"HUD",
+			"Quality",
+			"QualityPickerUI",
+			"CarryController",
+			"DragController",
+			"CutController",
+			"ChopController",
+			"AxeController",
+			"SprintController",
+			"PromptUI",
+			"ShopUI",
+			"PlotPickerUI",
+			"SaveSlotUI",
+			"QuestUI",
+			"NPCController",
+			"VehicleController",
+			"LightingController",
+			"IdlePing",
+			"BuilderTools",
+			"WireTool",
+			"PlotUI",
+			"SettingsUI",
+			"QuickMenuUI",
+		}) do
+			t.eq(deferred[name], nil, name .. " is critical: it starts at once")
+		end
+		-- The ones the brief names.
+		for _, name in ipairs({ "WoodFX", "LuxFX", "DialogueUI", "BlueprintPlacer", "HammerController" }) do
+			t.ok(deferred[name] ~= nil, name .. " is deferred")
+		end
+	end)
+
+	t.test("a deferred controller that fails to start warns once and the rest still start", function()
+		local started, warnings = run({ WoodFX = true })
+		local all = run({})
+		t.eq(started, all, "the same controllers, in the same order")
+		t.eq(failures(warnings), { "WoodFX" })
 	end)
 end

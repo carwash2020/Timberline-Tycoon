@@ -222,4 +222,124 @@ return function(t)
 		t.eq(yields2.n, afterNear2, "never yields with an endless slice")
 		t.ok(blocks > 500)
 	end)
+
+	-- Launch performance (14 October 2026): the later blocks go to the players
+	-- first, on the one frame budget the forest and the deferred queue share.
+	t.test("Order with players: pad ground first, then nearest the nearest player", function()
+		local TerrainBuilder = loadBuilder(fakeTerrain({}), { n = 0 })
+		local far = Vector2.new(-622, 439) -- Pine Bend: a pad
+		local player = { x = 700, z = -650 }
+		local blocks = TerrainBuilder.Order(TerrainBuilder.Split(TerrainBuilder.Jobs(), 16), { far }, { player })
+		local function nearSpot(b)
+			local dx = math.max(b.x0 - far.X, 0, far.X - (b.x0 + b.nx * 4))
+			local dz = math.max(b.z0 - far.Y, 0, far.Y - (b.z0 + b.nz * 4))
+			return dx <= TerrainBuilder.SpotReach and dz <= TerrainBuilder.SpotReach
+		end
+		local function away(b)
+			local mx, mz = b.x0 + b.nx * 2 - player.x, b.z0 + b.nz * 2 - player.z
+			return math.sqrt(mx * mx + mz * mz)
+		end
+		local firstOther
+		for i, b in ipairs(blocks) do
+			if not nearSpot(b) then
+				firstOther = i
+				break
+			end
+		end
+		t.ok(firstOther and firstOther > 1, "the pads still lead")
+		for i = firstOther + 1, #blocks do
+			t.ok(away(blocks[i - 1]) <= away(blocks[i]) + 1e-9, "outward from the player, not the sawmill")
+		end
+		-- No players: the same order as without the argument.
+		local plain = TerrainBuilder.Order(TerrainBuilder.Split(TerrainBuilder.Jobs(), 16), { far })
+		local none = TerrainBuilder.Order(TerrainBuilder.Split(TerrainBuilder.Jobs(), 16), { far }, {})
+		for i = 1, #plain do
+			t.ok(plain[i].x0 == none[i].x0 and plain[i].z0 == none[i].z0, "no players: unchanged")
+		end
+	end)
+
+	t.test("the second stage writes near the players first and re-sorts when one has moved", function()
+		local frame = {
+			Begin = function() end,
+			Over = function()
+				return true -- the frame is always spent: one block, then a yield
+			end,
+		}
+		-- The player is out at one corner until 40 blocks are written, then runs to the other.
+		local log, yields = {}, { n = 0 }
+		local builder = loadBuilder(fakeTerrain(log), yields)
+		local base
+		local function focus()
+			if base and #log - base >= 40 then
+				return { { x = -800, z = -800 } }
+			end
+			return { { x = 800, z = 800 } }
+		end
+		local _, rest = builder.Build(nil, { nearRadius = builder.NearRadius, frame = frame, focus = focus })
+		base = #log
+		rest()
+		local writes = {}
+		for i = base + 1, #log do
+			if type(log[i]) == "table" then
+				table.insert(writes, log[i])
+			end
+		end
+		t.ok(#writes > 500, #writes .. " blocks written in the second stage")
+		local function distance(w, p)
+			local mx, mz = (w.x0 + w.x1) / 2 - p.x, (w.z0 + w.z1) / 2 - p.z
+			return math.sqrt(mx * mx + mz * mz)
+		end
+		local first, second = { x = 800, z = 800 }, { x = -800, z = -800 }
+		-- Before the move: outward from the first player (a block is 64 studs wide).
+		for i = 2, 30 do
+			t.ok(
+				distance(writes[i - 1], first) <= distance(writes[i], first) + 70,
+				"climbing away from the first player"
+			)
+		end
+		-- After it: the blocks round the new place come next, not the rest of the first corner.
+		local after = writes[60]
+		t.ok(distance(after, second) < distance(after, first), "it followed the player")
+		t.ok(distance(writes[60], second) < distance(writes[300], second), "and outward from there")
+	end)
+
+	t.test("with a shared frame budget it yields when the frame is spent, not on a timer of its own", function()
+		local log, yields = {}, { n = 0 }
+		local builder = loadBuilder(fakeTerrain(log), yields)
+		local overAfter = math.huge
+		local asked = 0
+		local frame = {
+			Begin = function() end,
+			Over = function()
+				asked += 1
+				return asked % overAfter == 0
+			end,
+		}
+		local _, rest = builder.Build(nil, { nearRadius = builder.NearRadius, frame = frame })
+		local afterNear = yields.n
+		overAfter = 5 -- the frame is spent after every fifth block
+		rest()
+		local blocks = #builder.Split(builder.Jobs(), builder.SubColumns)
+		local used = yields.n - afterNear
+		t.ok(
+			used > 50 and used < blocks,
+			"yields follow the shared budget: " .. used .. " for ~" .. blocks .. " blocks"
+		)
+		t.ok(asked >= blocks - 5, "the budget is asked after every block")
+		-- And an always-open budget never yields.
+		local log2, yields2 = {}, { n = 0 }
+		local builder2 = loadBuilder(fakeTerrain(log2), yields2)
+		local _, rest2 = builder2.Build(nil, {
+			nearRadius = builder2.NearRadius,
+			frame = {
+				Begin = function() end,
+				Over = function()
+					return false
+				end,
+			},
+		})
+		local base = yields2.n
+		rest2()
+		t.eq(yields2.n, base, "never yields while the shared budget has room")
+	end)
 end

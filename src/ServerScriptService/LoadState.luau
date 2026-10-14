@@ -24,6 +24,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local FrameBudget = require(ReplicatedStorage.Shared.FrameBudget)
 local LoadQueue = require(ReplicatedStorage.Shared.LoadQueue)
 local LoadStages = require(ReplicatedStorage.Shared.LoadStages)
 local ReadyGates = require(ReplicatedStorage.Shared.ReadyGates)
@@ -47,6 +48,7 @@ for _, name in ipairs({
 	"meshes",
 	"terrain",
 	"terrainFull",
+	"nearRing", -- the trees round the spawn are planted (the client's loading card waits for it)
 	"town",
 	"world",
 	"services",
@@ -85,9 +87,30 @@ local function focus(): { LoadQueue.Point }
 	return points
 end
 
+LoadState.Focus = focus
+
+-- ONE frame budget for all the server's background building: the forest
+-- planter, the terrain's later blocks and this queue's steps used to take a
+-- 12 ms slice each (36 ms a frame when all three ran). While nobody plays
+-- yet there is nothing to protect, so it takes more of each frame; once a
+-- player can play, the three together take 10 ms.
+LoadState.BudgetBeforePlay = 0.03
+LoadState.BudgetWhilePlaying = 0.01
+LoadState.Frame = FrameBudget.new({
+	budget = function(): number
+		return if LoadState.Gates.IsReady("firstPlayer")
+			then LoadState.BudgetWhilePlaying
+			else LoadState.BudgetBeforePlay
+	end,
+	frame = FrameBudget.HeartbeatCounter(),
+})
+
 LoadState.Queue = LoadQueue.new({
-	budget = 0.012,
+	frame = LoadState.Frame,
 	focus = focus,
+	perf = function(line: string)
+		print(line)
+	end,
 	log = function(line: string)
 		print(string.format("%s (done at +%.1fs)", line, LoadState.Since()))
 	end,
@@ -132,6 +155,9 @@ local function checkBuilt()
 	end
 	builtAt = LoadState.Since()
 	LoadState.Gates.Set("deferred")
+	pcall(function()
+		workspace:SetAttribute("WorldBuilt", true) -- the client's [Perf] probe prints "fully built" on this
+	end)
 	local stats = LoadState.Queue.Stats()
 	LoadState.Line(
 		string.format(
