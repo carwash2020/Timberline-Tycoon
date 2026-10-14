@@ -10,7 +10,7 @@
 -- grey selection box never draws over them. Run at a PC and a phone size.
 return function(t)
 	local roblox = t.roblox
-	local Instance, Vector2, Enum = roblox.Instance, roblox.Vector2, roblox.Enum
+	local Instance, Vector2, Enum, UDim2 = roblox.Instance, roblox.Vector2, roblox.Enum, roblox.UDim2
 	local fs = require("@lune/fs")
 
 	local BIG = 0.35
@@ -215,30 +215,104 @@ return function(t)
 		return UI
 	end
 
-	for _, viewport in ipairs(SIZES) do
-		local label = string.format("%dx%d", viewport.X, viewport.Y)
+	-- What's new: no scrim at all (13-14 October: the full-screen Scrim
+	-- TextButton was the grey box behind the card), and the card is dead
+	-- centre. Lune has no layout engine, so the card's bounds are computed
+	-- from its properties: the ScreenGui area (viewport less insets) over
+	-- the UIScale gives the space the card's scale resolves against; its
+	-- height is its padding plus the visible rows of its list.
+	local CENTRE_SIZES = {
+		{ name = "1920x1080 Xbox/PC", vp = Vector2.new(1920, 1080), inset = { 0, 0, 0, 0 } },
+		{ name = "667x375 phone", vp = Vector2.new(667, 375), inset = { 0, 0, 0, 0 } },
+		{ name = "812x375 notched phone", vp = Vector2.new(812, 375), inset = { 44, 0, 44, 21 } },
+		{ name = "1920x1080 TV-safe margin", vp = Vector2.new(1920, 1080), inset = { 48, 27, 48, 27 } },
+	}
 
-		t.test("What's new leaves no scrim behind while it is closed (" .. label .. ")", function()
-			local c = client(viewport, { ProfileLoaded = true, NewsV1Seen = true, TutorialStep = 99 })
-			news(c)
-			local gui = c.playerGui:FindFirstChild("NewsUI")
-			t.ok(gui ~= nil, "the screen exists")
-			t.ok(gui.Enabled, "and is enabled, so the scrim must hide itself")
-			local list = offenders(c.playerGui, viewport, {})
-			t.eq(#list, 0, "idle: " .. describe(list))
-			t.eq(gui.Scrim.Visible, false)
-			-- The audit does catch a dim left on (the bug as it was).
-			gui.Scrim.Visible = true
-			t.eq(#offenders(c.playerGui, viewport, {}), 1, "a visible dim is flagged")
-			t.eq(#offenders(c.playerGui, viewport, { Scrim = true }), 0, "unless it is an allow-listed open modal")
-		end)
+	local function cardHeight(card)
+		local face = card.Face
+		local pad = face:FindFirstChildOfClass("UIPadding")
+		local list = face:FindFirstChildOfClass("UIListLayout")
+		local h = pad.PaddingTop.Offset + pad.PaddingBottom.Offset
+		local n = 0
+		for _, child in ipairs(face:GetChildren()) do
+			if child:IsA("GuiObject") and child.Visible then
+				h += child.Size.Y.Offset
+				n += 1
+			end
+		end
+		return h + list.Padding.Offset * math.max(n - 1, 0)
 	end
 
-	t.test("the news dim is hidden in the source until the card opens", function()
+	for _, case in ipairs(CENTRE_SIZES) do
+		for _, open in ipairs({ false, true }) do
+			t.test(
+				"What's new is centred with no backing at " .. case.name .. (open and " (open)" or " (closed)"),
+				function()
+					local viewport = case.vp
+					local c = client(viewport, { ProfileLoaded = true, NewsV1Seen = true, TutorialStep = 99 })
+					local UI = news(c)
+					if open then
+						UI.Open()
+					end
+					local gui = c.playerGui:FindFirstChild("NewsUI")
+					t.ok(gui ~= nil, "the screen exists")
+					local card = gui:FindFirstChild("WhatsNew")
+					t.ok(card ~= nil, "the card exists")
+					t.eq(card.Visible, open)
+					t.eq(card.AnchorPoint, Vector2.new(0.5, 0.5))
+					t.eq(card.Position, UDim2.new(0.5, 0, 0.5, 0))
+					-- Nothing between the card and the ScreenGui paints.
+					local node = card.Parent
+					while node ~= nil and not node:IsA("ScreenGui") do
+						t.ok(
+							not (node:IsA("GuiObject") and node.Visible and node.BackgroundTransparency < 1),
+							"ancestor " .. node.Name .. " paints a backing"
+						)
+						node = node.Parent
+					end
+					t.ok(node == gui, "the card is under the NewsUI screen")
+					t.eq(gui:FindFirstChild("Scrim"), nil, "no scrim")
+					-- The ScreenGui holds the card and no other GuiObject (no
+					-- full-screen frame, button or dim behind it).
+					for _, child in ipairs(gui:GetChildren()) do
+						if child:IsA("GuiObject") then
+							t.eq(child.Name, "WhatsNew", "stray GuiObject in the screen: " .. child.Name)
+						end
+					end
+					-- Nothing else in the PlayerGui is a veil either.
+					t.eq(#offenders(c.playerGui, viewport, { WhatsNew = true }), 0)
+					-- Computed bounds.
+					local scale = gui:FindFirstChildOfClass("UIScale").Scale
+					local areaW = viewport.X - case.inset[1] - case.inset[3]
+					local areaH = viewport.Y - case.inset[2] - case.inset[4]
+					local logicW, logicH = areaW / scale, areaH / scale
+					local limit = card:FindFirstChildOfClass("UISizeConstraint")
+					local w = math.min(card.Size.X.Scale * logicW + card.Size.X.Offset, limit.MaxSize.X)
+					local h = cardHeight(card)
+					local px, py = w * scale, h * scale
+					local cx = case.inset[1] + areaW * card.Position.X.Scale + card.Position.X.Offset * scale
+					local cy = case.inset[2] + areaH * card.Position.Y.Scale + card.Position.Y.Offset * scale
+					local left, top = cx - px * card.AnchorPoint.X, cy - py * card.AnchorPoint.Y
+					t.ok(left >= 0 and top >= 0, "card starts on screen")
+					t.ok(left + px <= viewport.X and top + py <= viewport.Y, "card ends on screen")
+					t.ok(left >= case.inset[1] and top >= case.inset[2], "inside the safe area (top left)")
+					t.ok(
+						left + px <= viewport.X - case.inset[3] and top + py <= viewport.Y - case.inset[4],
+						"inside the safe area (bottom right)"
+					)
+					t.ok(math.abs((left + px / 2) - (case.inset[1] + areaW / 2)) <= 1, "centred across")
+					t.ok(math.abs((top + py / 2) - (case.inset[2] + areaH / 2)) <= 1, "centred down")
+				end
+			)
+		end
+	end
+
+	t.test("the news source has no scrim and no offset placement", function()
 		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/NewsUI.luau")
-		t.ok(string.find(src, "scrim.Visible = false", 1, true), "built hidden")
-		t.ok(string.find(src, "scrimBack.Visible = true", 1, true), "shown with the card")
-		t.ok(string.find(src, "scrimBack.Visible = false", 1, true), "hidden with the card")
+		t.eq(string.find(src, 'Instance.new("TextButton")', 1, true), nil, "no full-screen button")
+		t.eq(string.find(src, "scrimBack", 1, true), nil)
+		t.eq(string.find(src, "AbsolutePosition", 1, true), nil, "placement ignores the screen's offset")
+		t.ok(string.find(src, "UDim2.fromScale(0.5, 0.5)", 1, true), "centred")
 	end)
 
 	for _, viewport in ipairs(SIZES) do
@@ -292,7 +366,7 @@ return function(t)
 	t.test("every full-screen dim lives in a disabled screen or starts hidden", function()
 		local dir = "src/StarterPlayer/StarterPlayerScripts/"
 		local checked = 0
-		for _, file in ipairs({ "NewsUI.luau", "QuickMenuUI.luau", "ShopUI.luau", "QualityPickerUI.luau" }) do
+		for _, file in ipairs({ "QuickMenuUI.luau", "ShopUI.luau", "QualityPickerUI.luau" }) do
 			local src = fs.readFile(dir .. file)
 			local hiddenOrDisabled = string.find(src, "scrim.Visible = false", 1, true)
 				or string.find(src, "screen.Enabled = false", 1, true)
@@ -300,6 +374,6 @@ return function(t)
 			t.ok(hiddenOrDisabled, file .. ": its dim is not on screen at join")
 			checked += 1
 		end
-		t.eq(checked, 4)
+		t.eq(checked, 3) -- What's new has no dim at all (see above)
 	end)
 end
