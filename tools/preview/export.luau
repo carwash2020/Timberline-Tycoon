@@ -90,6 +90,17 @@ if fs.isFile("assets/meshes/manifest.json") then
 	end
 end
 
+-- The game's import turns the axes/ meshes a half turn about Y from their
+-- GLBs (AxeModels.MeshYaw undoes it in code), so the preview turns them too
+-- and shows what the engine shows. PREVIEW_AXE_TURN=0 renders the raw GLBs.
+if process.env.PREVIEW_AXE_TURN ~= "0" then
+	for _, info in pairs(manifest) do
+		if type(info) == "table" and type(info.file) == "string" and string.sub(info.file, 1, 5) == "axes/" then
+			info.turn = 180
+		end
+	end
+end
+
 -- A preview-only manifest (PREVIEW_MESHES=<json>) adds meshes that are not
 -- in the repo yet, such as the uploaded backlog models job 17 wires in:
 -- { "<meshId>": { "file": "<path to the .glb>", "node": ..., "initialSize": ... } }.

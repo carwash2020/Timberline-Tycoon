@@ -51,6 +51,9 @@ local LEAN = 0.15
 -- eye of the head sits on the haft (the haft is 0.32 deep).
 local HEAD_BACK = 0.06
 
+-- The half turn that puts an imported mesh's cutting edge on -Z (AxeModels.MeshYaw).
+local MESH_TURN = CFrame.Angles(0, AxeModels.MeshYaw, 0)
+
 type Ctx = { model: Model, handle: Part, len: number }
 
 ---------------------------------------------------------------------------
@@ -513,12 +516,12 @@ local function applyAxeNow(model: Model, def: AxeDef): boolean
 	-- The visual haft is longer than the tool's Handle. Its foot stays at
 	-- y = 0; it is not scaled down to the gameplay haft.
 	local visualLen = handleMesh.Size.Y
-	handleMesh.CFrame = CFrame.new(0, visualLen / 2, 0)
+	handleMesh.CFrame = CFrame.new(0, visualLen / 2, 0) * MESH_TURN
 	local function placeOnBlade(mesh: MeshPart)
 		local meshSize = mesh.Size
 		local meshY = visualLen - meshSize.Y / 2 + 0.05
 		local meshZ = AxeModels.BladeFrontZ + meshSize.Z / 2
-		mesh.CFrame = CFrame.new(0, meshY, meshZ)
+		mesh.CFrame = CFrame.new(0, meshY, meshZ) * MESH_TURN
 	end
 	placeOnBlade(headMesh)
 	if glowMesh then
@@ -665,7 +668,8 @@ local TEMPER_NAMES = { "TemperTrim", "TemperEdge", "TemperFx" }
 local function headBounds(model: Model): (CFrame, Vector3)
 	local mesh = model:FindFirstChild("MeshHead")
 	if mesh ~= nil and mesh:IsA("BasePart") then
-		return mesh.CFrame, mesh.Size
+		-- Undo the import turn: the box's -Z is the edge side again.
+		return mesh.CFrame * MESH_TURN:Inverse(), mesh.Size
 	end
 	local pieces: { BasePart } = {}
 	for _, d in ipairs(model:GetDescendants()) do

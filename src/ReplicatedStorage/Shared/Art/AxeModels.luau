@@ -22,6 +22,21 @@ export type AxeMesh = {
 -- too far forward or back, this is the number to move.
 AxeModels.BladeFrontZ = -1.41
 
+-- Roblox's import turns these Blender meshes a half turn about Y from the
+-- GLBs in assets/meshes (the GLB front, where the cutting edge is, is -Z;
+-- in the engine the same mesh's edge lands on +Z, so every axe was held with
+-- the blade back toward the player and the head the wrong way round; the
+-- NPC meshes do the same, see TownModels.NpcMeshYaw). The grip itself was
+-- right all along: Roblox maps the Handle's Grip point onto the hand's
+-- RightGripAttachment, whose -Z points down the arm, and the raised arm
+-- points forward, so a Handle whose -Z is the blade faces the tree. This
+-- one constant turns every axe mesh piece (handle, head, glow) back so the
+-- edge is at -Z, and everything built from AxeArt.Build (the held tool, the
+-- dropped axe, the shop rack, the box display, the hotbar icon) follows.
+-- tools/preview/export.luau applies the same half turn to the axes/ GLBs
+-- so renders show the engine; tests/AxeGrip.spec pins the result.
+AxeModels.MeshYaw = math.pi
+
 -- Blender positions on the visual handle, measured from its foot (y = 0),
 -- blade toward -Z. AxeArt subtracts half the gameplay handle's length to
 -- put them in the Handle part's space.
