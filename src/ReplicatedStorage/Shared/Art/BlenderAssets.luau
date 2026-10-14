@@ -9,6 +9,8 @@
 --            here is 0: the registry never overrides those modules.
 --   backlog  uploaded with the Blender backlog (8 Oct 2026, Approved) and
 --            wired by BacklogModels (job 17). meshId is its main piece.
+--   store    a store item model (one mesh, one baked colour texture in
+--            textures.Color), uploaded 13 Oct 2026. meshId is the live id.
 --   planned  on Lane H's list with no model yet (assets/UPLOAD_LIST.md).
 --            Nothing is uploaded; the part-built model stays.
 --
@@ -16,14 +18,16 @@
 -- every triangle in its GLB(s). collision is the intent: Box for small
 -- props, Hull for medium ones, Parts (invisible part collision) for big
 -- buildings, vehicles and trees. Textures are vertex colours today, so
--- every textures table is empty and any texture id is 0.
+-- every textures table is empty and any texture id is 0, except store rows
+-- (one baked colour texture). Store rows mirror ModelSlots / StoreModelSlots,
+-- which preload them, so MeshIds() skips them.
 -- MeshManifest preloads MeshIds() (none of status repo or planned, so
 -- nothing changes in game while those ids are 0).
 
 local BlenderAssets = {}
 
 export type Collision = "Box" | "Hull" | "Parts"
-export type Status = "repo" | "backlog" | "planned"
+export type Status = "repo" | "backlog" | "store" | "planned"
 
 export type Entry = {
 	name: string,
@@ -1342,6 +1346,18 @@ local ROWS: { Entry } = {
 		wiredBy = "KitMeshData",
 	},
 	{
+		name = "kit/backlog",
+		group = "kit",
+		file = "assets/meshes/kit/backlog/CopperTrim4.glb",
+		tris = 2824,
+		size = V(8.3, 7.925, 4.05),
+		collision = "Hull",
+		meshId = 0,
+		textures = {},
+		status = "repo",
+		wiredBy = "KitMeshData",
+	},
+	{
 		name = "npcs/Dale",
 		group = "npcs",
 		file = "assets/meshes/npcs/Dale/Dale.glb",
@@ -1870,6 +1886,126 @@ local ROWS: { Entry } = {
 		wiredBy = "BacklogModels",
 	},
 	{
+		name = "store/Barrel",
+		group = "store",
+		file = "assets/glb/store-items/Barrel.glb",
+		tris = 2240,
+		size = V(2.19, 3.26, 2.19),
+		collision = "Box",
+		meshId = 103482280552543,
+		textures = { Color = 101451260913674 },
+		status = "store",
+		wiredBy = "StoreModelSlots",
+	},
+	{
+		name = "store/Crate",
+		group = "store",
+		file = "assets/glb/store-items/Crate.glb",
+		tris = 2284,
+		size = V(2.6, 2.5, 2.6),
+		collision = "Box",
+		meshId = 100788396065808,
+		textures = { Color = 78298003526634 },
+		status = "store",
+		wiredBy = "StoreModelSlots",
+	},
+	{
+		name = "store/Flashlight",
+		group = "store",
+		file = "assets/glb/store-items/Flashlight.glb",
+		tris = 3328,
+		size = V(0.851, 0.214, 0.214),
+		collision = "Box",
+		meshId = 104730694619580,
+		textures = { Color = 110889000263791 },
+		status = "store",
+		wiredBy = "ModelSlots",
+	},
+	{
+		name = "store/GlowWire",
+		group = "store",
+		file = "assets/glb/store-items/GlowWire.glb",
+		tris = 2052,
+		size = V(1.02, 1.3, 2.16),
+		collision = "Box",
+		meshId = 140023205654551,
+		textures = { Color = 139395535150744 },
+		status = "store",
+		wiredBy = "StoreModelSlots",
+	},
+	{
+		name = "store/Lantern",
+		group = "store",
+		file = "assets/glb/store-items/Lantern.glb",
+		tris = 2814,
+		size = V(0.509, 1.306, 0.509),
+		collision = "Box",
+		meshId = 100706399609275,
+		textures = { Color = 103276353286757 },
+		status = "store",
+		wiredBy = "ModelSlots",
+	},
+	{
+		name = "store/Parcel",
+		group = "store",
+		file = "assets/glb/store-items/Parcel.glb",
+		tris = 1348,
+		size = V(1.44, 1.57, 1.45),
+		collision = "Box",
+		meshId = 106272982653382,
+		textures = { Color = 106468421600012 },
+		status = "store",
+		wiredBy = "StoreModelSlots",
+	},
+	{
+		name = "store/RobuxCoins",
+		group = "store",
+		file = "assets/glb/store-items/RobuxCoins.glb",
+		tris = 2736,
+		size = V(2.709, 0.782, 2.51),
+		collision = "Box",
+		meshId = 76084140639988,
+		textures = { Color = 140571825691428 },
+		status = "store",
+		wiredBy = "StoreModelSlots",
+	},
+	{
+		name = "store/ShedBlueprint",
+		group = "store",
+		file = "assets/glb/store-items/ShedBlueprint.glb",
+		tris = 1488,
+		size = V(1.4, 3.045, 1.807),
+		collision = "Box",
+		meshId = 117955534652171,
+		textures = { Color = 88429889818385 },
+		status = "store",
+		wiredBy = "ModelSlots",
+	},
+	{
+		name = "store/SkyBin",
+		group = "store",
+		file = "assets/glb/store-items/SkyBin.glb",
+		tris = 2480,
+		size = V(3.82, 3.36, 3.82),
+		collision = "Box",
+		meshId = 136000065218099,
+		textures = { Color = 130081290755053 },
+		status = "store",
+		wiredBy = "StoreModelSlots",
+	},
+	{
+		name = "store/WoodSign",
+		group = "store",
+		file = "assets/glb/store-items/WoodSign.glb",
+		tris = 938,
+		size = V(2.2, 3.75, 0.395),
+		collision = "Box",
+		meshId = 104427150009380,
+		textures = { Color = 115661985339638 },
+		status = "store",
+		wiredBy = "ModelSlots",
+	},
+	{
 		name = "trees/Birch",
 		group = "trees",
 		file = "assets/meshes/trees/Birch/Leaves_A.glb",
@@ -2102,7 +2238,7 @@ function BlenderAssets.MeshIds(): { number }
 	local out: { number } = {}
 	local seen: { [number]: boolean } = {}
 	for _, entry in ipairs(ROWS) do
-		if entry.status ~= "backlog" and entry.meshId ~= 0 and not seen[entry.meshId] then
+		if entry.status ~= "backlog" and entry.status ~= "store" and entry.meshId ~= 0 and not seen[entry.meshId] then
 			seen[entry.meshId] = true
 			table.insert(out, entry.meshId)
 		end

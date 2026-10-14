@@ -64,6 +64,47 @@ PLANNED = [
 ]
 
 
+# Store item models, joined into one mesh with one baked 1024px colour texture
+# (emissive parts baked bright; there is no glow slot). Uploaded 13 Oct 2026.
+# (name, meshId, colour texture id, wiredBy, what it is for)
+STORE = [
+    ("Flashlight", 104730694619580, 110889000263791, "ModelSlots", "Flashlight store item; replaces the old Flashlight"),
+    ("Lantern", 100706399609275, 103276353286757, "ModelSlots", "Lantern store item; replaces environment/Lantern"),
+    ("WoodSign", 104427150009380, 115661985339638, "ModelSlots", "WoodSign store item; replaces items/WoodSign"),
+    ("ShedBlueprint", 117955534652171, 88429889818385, "ModelSlots", "Shed Blueprint; replaces Small Shed (items/Shed)"),
+    ("Barrel", 103482280552543, 101451260913674, "StoreModelSlots", "Barrel store item"),
+    ("Crate", 100788396065808, 78298003526634, "StoreModelSlots", "Crate store item"),
+    ("GlowWire", 140023205654551, 139395535150744, "StoreModelSlots", "GlowWire store item"),
+    ("SkyBin", 136000065218099, 130081290755053, "StoreModelSlots", "SkyBin store item"),
+    ("RobuxCoins", 76084140639988, 140571825691428, "StoreModelSlots", "Robux box display"),
+    ("Parcel", 106272982653382, 106468421600012, "StoreModelSlots", "fallback for any item without a model"),
+]
+
+
+def store_rows() -> list[dict]:
+    rows = []
+    for name, mesh_id, tex_id, wired, why in STORE:
+        glb = Path(f"assets/glb/store-items/{name}.glb")
+        s = stats(glb)
+        rows.append(
+            {
+                "key": f"store/{name}",
+                "group": "store",
+                "file": glb.as_posix(),
+                "files": 1,
+                "tris": s["tris"],
+                "size": s["size"],
+                "collision": collision_for("store", s["size"]),
+                "meshId": mesh_id,
+                "textures": {"Color": tex_id},
+                "status": "store",
+                "wiredBy": wired,
+                "why": why,
+            }
+        )
+    return rows
+
+
 def collision_for(group: str, size: list[float]) -> str:
     if group in ("buildings", "vehicles", "trees", "shops"):
         return "Parts"
@@ -174,6 +215,8 @@ HEADER = """--!strict
 --            here is 0: the registry never overrides those modules.
 --   backlog  uploaded with the Blender backlog (8 Oct 2026, Approved) and
 --            wired by BacklogModels (job 17). meshId is its main piece.
+--   store    a store item model (one mesh, one baked colour texture in
+--            textures.Color), uploaded 13 Oct 2026. meshId is the live id.
 --   planned  on Lane H's list with no model yet (assets/UPLOAD_LIST.md).
 --            Nothing is uploaded; the part-built model stays.
 --
@@ -181,14 +224,16 @@ HEADER = """--!strict
 -- every triangle in its GLB(s). collision is the intent: Box for small
 -- props, Hull for medium ones, Parts (invisible part collision) for big
 -- buildings, vehicles and trees. Textures are vertex colours today, so
--- every textures table is empty and any texture id is 0.
+-- every textures table is empty and any texture id is 0, except store rows
+-- (one baked colour texture). Store rows mirror ModelSlots / StoreModelSlots,
+-- which preload them, so MeshIds() skips them.
 -- MeshManifest preloads MeshIds() (none of status repo or planned, so
 -- nothing changes in game while those ids are 0).
 
 local BlenderAssets = {}
 
 export type Collision = "Box" | "Hull" | "Parts"
-export type Status = "repo" | "backlog" | "planned"
+export type Status = "repo" | "backlog" | "store" | "planned"
 
 export type Entry = {
 \tname: string,
@@ -241,7 +286,7 @@ function BlenderAssets.MeshIds(): { number }
 \tlocal out: { number } = {}
 \tlocal seen: { [number]: boolean } = {}
 \tfor _, entry in ipairs(ROWS) do
-\t\tif entry.status ~= "backlog" and entry.meshId ~= 0 and not seen[entry.meshId] then
+\t\tif entry.status ~= "backlog" and entry.status ~= "store" and entry.meshId ~= 0 and not seen[entry.meshId] then
 \t\t\tseen[entry.meshId] = true
 \t\t\ttable.insert(out, entry.meshId)
 \t\tend
@@ -266,7 +311,7 @@ def luau(rows: list[dict]) -> str:
             f"\t\tsize = V({sx}, {sy}, {sz}),\n"
             f'\t\tcollision = "{r["collision"]}",\n'
             f"\t\tmeshId = {r['meshId']},\n"
-            "\t\ttextures = {},\n"
+            "\t\ttextures = {" + "".join(f" {k} = {v}," for k, v in sorted(r.get("textures", {}).items())).rstrip(",") + (" }" if r.get("textures") else "}") + ",\n"
             f'\t\tstatus = "{r["status"]}",\n'
             f'\t\twiredBy = "{r["wiredBy"]}",\n'
             "\t},\n"
@@ -326,11 +371,11 @@ def upload_list(rows: list[dict]) -> str:
 def main() -> int:
     backlog_json = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/workspace/roblox/handoff/assets/uploaded-backlog.json")
     pack_models = backlog_json.parent / "models" / "backlog"
-    rows = repo_rows() + backlog_rows(backlog_json, pack_models) + planned_rows()
+    rows = repo_rows() + backlog_rows(backlog_json, pack_models) + store_rows() + planned_rows()
     rows.sort(key=lambda r: r["key"])
     OUT_LUAU.write_text(luau(rows))
     OUT_LIST.write_text(upload_list(rows))
-    print(f"{len(rows)} rows: " + ", ".join(f"{s} {sum(1 for r in rows if r['status'] == s)}" for s in ("repo", "backlog", "planned")))
+    print(f"{len(rows)} rows: " + ", ".join(f"{s} {sum(1 for r in rows if r['status'] == s)}" for s in ("repo", "backlog", "store", "planned")))
     return 0
 
 

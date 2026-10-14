@@ -364,11 +364,11 @@ return function(t)
 		function()
 			-- id, wheel mesh id, tyre width, tyre diameter, wheelX, front z, rear z (truck-local).
 			local pinned = {
-				Rustbucket = { 139390483847560, 1.307, 3.39 },
-				Pickup = { 124886704209701, 1.377, 3.52 },
-				ScoutATV = { 140001053768737, 1.822, 3.26 },
-				Flatbed = { 131955977341353, 1.447, 3.65 },
-				LoggingRig = { 81542757402029, 1.546, 4.56 },
+				Rustbucket = { 96000510170326, 1.307, 3.39 },
+				Pickup = { 100358820661876, 1.377, 3.52 },
+				ScoutATV = { 108444483567193, 1.822, 3.26 },
+				Flatbed = { 94524411538210, 1.447, 3.65 },
+				LoggingRig = { 88377082453341, 1.546, 4.56 },
 			}
 			for id, want in pairs(pinned) do
 				local wheel = VehicleModels.Truck(id).Wheel

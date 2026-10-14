@@ -42,7 +42,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 | Kind | Distinct ids | Places written | Written in |
 | --- | ---: | ---: | --- |
-| mesh | 1053 | 1314 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, RockModels.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau |
+| mesh | 1063 | 1334 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau |
 | model | 206 | 206 | BacklogModels.luau, MachineMeshes.luau, TownModels.luau |
 | template | 996 | 996 | src/ReplicatedStorage/MeshTemplates |
 | image | 18 | 18 | StoreData.luau, UIArt.luau, UITheme.luau, WeatherController.luau |
@@ -53,7 +53,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 Not asset ids, so not listed: `rbxasset://` built-ins (engine particle textures, `FellSound`, most of
 `SoundData`), empty sound slots (`id = ""`, silent), badge ids (all 0 by decision), and the owner user id.
-`meshId = 0` slots (no upload yet, part build kept by design): 161. They are not listed.
+`meshId = 0` slots (no upload yet, part build kept by design): 152. They are not listed.
 
 ## Store item models (one slot per item: `Shared/StoreModelSlots.luau`)
 
@@ -69,12 +69,12 @@ item's own part-built size; a box shows it at the same fit, inside the box's own
 
 | Slot | Item | GLB (repo) | GLB size | fit | yaw | scale | Roblox mesh id | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Barrel | Barrel | `assets/glb/store-items/Barrel.glb` | 2.19 x 3.26 x 2.19 | 1.75 x 2.20 x 1.75 | 0 | 0.675 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
-| Crate | Crate | `assets/glb/store-items/Crate.glb` | 2.60 x 2.50 x 2.60 | 2.00 x 2.00 x 2.00 | 0 | 0.769 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
-| GlowWire | GlowWire | `assets/glb/store-items/GlowWire.glb` | 1.02 x 1.30 x 2.16 | 4.00 x 1.30 x 2.00 | 90 | 1.000 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
-| SkyBin | SkyBin | `assets/glb/store-items/SkyBin.glb` | 3.82 x 3.36 x 3.82 | 4.00 x 4.00 x 4.00 | 0 | 1.047 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
-| RobuxCoins | the Robux box | `assets/glb/store-items/RobuxCoins.glb` | 2.71 x 0.78 x 2.51 | 2.30 x 0.80 x 2.30 | 0 | 0.849 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
-| Parcel | any item with no model (fallback) | `assets/glb/store-items/Parcel.glb` | 1.44 x 1.57 x 1.45 | 1.40 x 1.60 x 1.40 | 0 | 0.966 | unset | GLB in repo, not uploaded: no Roblox mesh id yet |
+| Barrel | Barrel | `assets/glb/store-items/Barrel.glb` | 2.19 x 3.26 x 2.19 | 1.75 x 2.20 x 1.75 | 0 | 0.675 | Barrel 103482280552543 | hooked: uploaded store-items model (id read from ItemMeshData) |
+| Crate | Crate | `assets/glb/store-items/Crate.glb` | 2.60 x 2.50 x 2.60 | 2.00 x 2.00 x 2.00 | 0 | 0.769 | Crate 100788396065808 | hooked: uploaded store-items model (id read from ItemMeshData) |
+| GlowWire | GlowWire | `assets/glb/store-items/GlowWire.glb` | 1.02 x 1.30 x 2.16 | 4.00 x 1.30 x 2.00 | 90 | 1.000 | GlowWire 140023205654551 | hooked: uploaded store-items model (id read from ItemMeshData) |
+| SkyBin | SkyBin | `assets/glb/store-items/SkyBin.glb` | 3.82 x 3.36 x 3.82 | 4.00 x 4.00 x 4.00 | 0 | 1.047 | SkyBin 136000065218099 | hooked: uploaded store-items model (id read from ItemMeshData) |
+| RobuxCoins | the Robux box | `assets/glb/store-items/RobuxCoins.glb` | 2.71 x 0.78 x 2.51 | 2.30 x 0.80 x 2.30 | 0 | 0.849 | RobuxCoins 76084140639988 | hooked: uploaded store-items model (id read from ItemMeshData) |
+| Parcel | any item with no model (fallback) | `assets/glb/store-items/Parcel.glb` | 1.44 x 1.57 x 1.45 | 1.40 x 1.60 x 1.40 | 0 | 0.966 | Parcel 106272982653382 | hooked: uploaded store-items model (id read from ItemMeshData) |
 | InsulatedCoat | InsulatedCoat | `assets/glb/backlog/gear/InsulatedCoat/InsulatedCoat.glb` | 2.95 x 3.35 x 1.23 | 2.50 x 1.90 x 1.00 | 0 | 0.567 | Body 99030148403072 | hooked: uploaded backlog model (id read from BacklogModels) |
 | HeatBoots | HeatBoots | `assets/glb/backlog/gear/HeatBoots/HeatBoots.glb` | 2.35 x 1.83 x 1.55 | 2.05 x 1.40 x 1.50 | 0 | 0.765 | Body 139085752917781, Glow 107828580898545 | hooked: uploaded backlog model (id read from BacklogModels) |
 | FeatherfallCloak | FeatherfallCloak | `assets/glb/backlog/gear/FeatherfallCloak/FeatherfallCloak.glb` | 2.96 x 3.30 x 1.28 | 2.00 x 2.25 x 0.70 | 0 | 0.547 | Body 94301951001026, Glow 72963108243627 | hooked: uploaded backlog model (id read from BacklogModels) |
@@ -89,7 +89,7 @@ Not wired by these slots (another lane wires them; no slot here):
 | `assets/glb/store-items/ShedBlueprint.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 | `assets/glb/store-items/WoodSign.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 
-## Meshes (MeshId, loaded by MeshKit) (1053)
+## Meshes (MeshId, loaded by MeshKit) (1063)
 
 | Id | Used by | Places | Status |
 | --- | --- | ---: | --- |
@@ -380,6 +380,16 @@ Not wired by these slots (another lane wires them; no slot here):
 | 120413308807087 | BacklogModels.luau SeedOrb Glow | 1 | template, format ok, not checked yet |
 | 117488161778832 | BacklogModels.luau SawdustPileV2 Body | 1 | template, format ok, not checked yet |
 | 116491733478344 | BacklogModels.luau PathRoundV2 Body | 1 | template, format ok, not checked yet |
+| 103482280552543 | BlenderAssets.luau  (also BlenderAssets.luau, StoreModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 100788396065808 | BlenderAssets.luau  (also BlenderAssets.luau, StoreModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 104730694619580 | BlenderAssets.luau  (also BlenderAssets.luau, ModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 140023205654551 | BlenderAssets.luau  (also BlenderAssets.luau, StoreModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 100706399609275 | BlenderAssets.luau  (also BlenderAssets.luau, ModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 106272982653382 | BlenderAssets.luau  (also BlenderAssets.luau, StoreModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 76084140639988 | BlenderAssets.luau  (also BlenderAssets.luau, StoreModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 117955534652171 | BlenderAssets.luau  (also BlenderAssets.luau, ModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 136000065218099 | BlenderAssets.luau  (also BlenderAssets.luau, StoreModelSlots.luau) | 2 | no template, format ok, not checked yet |
+| 104427150009380 | BlenderAssets.luau  (also BlenderAssets.luau, ModelSlots.luau) | 2 | no template, format ok, not checked yet |
 | 82316315960701 | MachineMeshes.luau SawmillRickety Body | 1 | template, format ok, not checked yet |
 | 79470088816517 | MachineMeshes.luau SawmillRickety Belt | 2 | template, format ok, not checked yet |
 | 71616383391365 | MachineMeshes.luau SawmillRickety  | 1 | template, format ok, not checked yet |
@@ -1027,49 +1037,49 @@ Not wired by these slots (another lane wires them; no slot here):
 | 94998985796939 | TreeModels.luau ironwood Facet | 2 | template, format ok, not checked yet |
 | 113121369608961 | TreeModels.luau ironwood Facet | 2 | template, format ok, not checked yet |
 | 126069617401030 | TreeModels.luau ironwood Facet | 2 | template, format ok, not checked yet |
-| 120725616537680 | VehicleModels.luau Rustbucket  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 135063576797220 | VehicleModels.luau Rustbucket  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 135044303797643 | VehicleModels.luau Rustbucket  | 1 | template, format ok, not checked yet |
-| 124493769904792 | VehicleModels.luau Rustbucket  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 120734733805977 | VehicleModels.luau Rustbucket Bed | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 139390483847560 | VehicleModels.luau Rustbucket Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 99956936383854 | VehicleModels.luau Rustbucket Hitch | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 110946981942122 | VehicleModels.luau Pickup  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 100118337585227 | VehicleModels.luau Rustbucket  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 138924268082867 | VehicleModels.luau Rustbucket Bed | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 96000510170326 | VehicleModels.luau Rustbucket Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 103950687746451 | VehicleModels.luau Rustbucket Hitch | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 132220778486341 | VehicleModels.luau Pickup  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 76718452145232 | VehicleModels.luau Pickup Glass | 1 | template, format ok, not checked yet |
-| 100056308278514 | VehicleModels.luau Pickup Lights | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 137659811327372 | VehicleModels.luau Pickup Bed | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 124886704209701 | VehicleModels.luau Pickup Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 121507994255438 | VehicleModels.luau Pickup Hitch | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 131883902524854 | VehicleModels.luau ScoutATV Body | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 137894921214259 | VehicleModels.luau Pickup Lights | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 73313476424595 | VehicleModels.luau Pickup Bed | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 100358820661876 | VehicleModels.luau Pickup Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 130679096877652 | VehicleModels.luau Pickup Hitch | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 135899530798267 | VehicleModels.luau ScoutATV Body | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 93031171745389 | VehicleModels.luau ScoutATV Glass | 1 | template, format ok, not checked yet |
-| 117328552905839 | VehicleModels.luau ScoutATV  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 140001053768737 | VehicleModels.luau ScoutATV Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 101615123184878 | VehicleModels.luau Flatbed  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 102368590223260 | VehicleModels.luau ScoutATV  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 108444483567193 | VehicleModels.luau ScoutATV Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 137271532937493 | VehicleModels.luau Flatbed  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 98760659539151 | VehicleModels.luau Flatbed Glass | 1 | template, format ok, not checked yet |
-| 111333312069489 | VehicleModels.luau Flatbed Lights | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 139734928087096 | VehicleModels.luau Flatbed Bed | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 131955977341353 | VehicleModels.luau Flatbed Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 140349480773545 | VehicleModels.luau Flatbed Hitch | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 106201918511427 | VehicleModels.luau LoggingRig Body | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 75034398950940 | VehicleModels.luau Flatbed Lights | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 77252595923073 | VehicleModels.luau Flatbed Bed | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 94524411538210 | VehicleModels.luau Flatbed Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 112169540184474 | VehicleModels.luau Flatbed Hitch | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 84804800200555 | VehicleModels.luau LoggingRig Body | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 110663013657387 | VehicleModels.luau LoggingRig Glass | 1 | template, format ok, not checked yet |
-| 82098165138477 | VehicleModels.luau LoggingRig Lights | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 124435372710468 | VehicleModels.luau LoggingRig Bed | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 81542757402029 | VehicleModels.luau LoggingRig Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 103819640831326 | VehicleModels.luau LoggingRig Hitch | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 107003020182290 | VehicleModels.luau PonyTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 88163132342304 | VehicleModels.luau PonyTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 90389536788385 | VehicleModels.luau PonyTrailer Bed | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 109498505023571 | VehicleModels.luau PonyTrailer Wheel | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 139471072919132 | VehicleModels.luau PonyTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 101057277743396 | VehicleModels.luau RanchTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 97749142571629 | VehicleModels.luau RanchTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 105565294587502 | VehicleModels.luau RanchTrailer Bed | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 131671997531071 | VehicleModels.luau RanchTrailer Wheel | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 124380880700146 | VehicleModels.luau RanchTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 93977628567245 | VehicleModels.luau HeavyHauler Body | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 90030662798643 | VehicleModels.luau HeavyHauler  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 108656014869417 | VehicleModels.luau HeavyHauler Bed | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 81074969756089 | VehicleModels.luau HeavyHauler Wheel | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
-| 128380567399095 | VehicleModels.luau HeavyHauler  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 140436189658598 | VehicleModels.luau LoggingRig  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 94574370000217 | VehicleModels.luau LoggingRig Bed | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 88377082453341 | VehicleModels.luau LoggingRig Wheel | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 79514319620242 | VehicleModels.luau LoggingRig Hitch | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 123304918392077 | VehicleModels.luau PonyTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 133463511111788 | VehicleModels.luau PonyTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 80093608141805 | VehicleModels.luau PonyTrailer Bed | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 137072790984838 | VehicleModels.luau PonyTrailer Wheel | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 116050139782151 | VehicleModels.luau PonyTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 71494115864794 | VehicleModels.luau RanchTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 84284546831741 | VehicleModels.luau RanchTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 90363231220918 | VehicleModels.luau RanchTrailer Bed | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 75586028370689 | VehicleModels.luau RanchTrailer Wheel | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 72831025595179 | VehicleModels.luau RanchTrailer  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 84731895539673 | VehicleModels.luau HeavyHauler Body | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 126727044946144 | VehicleModels.luau HeavyHauler  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 111192039401543 | VehicleModels.luau HeavyHauler Bed | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 76485456462102 | VehicleModels.luau HeavyHauler Wheel | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 76951151154210 | VehicleModels.luau HeavyHauler  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 85233243499195 | ItemMeshData.luau Wall | 1 | no template, format ok, not checked yet |
 | 134684216163207 | ItemMeshData.luau Floor | 1 | no template, format ok, not checked yet |
 | 121239833575865 | ItemMeshData.luau Door | 1 | no template, format ok, not checked yet |
@@ -1445,44 +1455,44 @@ until they are uploaded each variant draws its trailer's mesh below, stretched t
 
 | Old id (replace) | GLB (repo) | Node | Vehicle | Status |
 | --- | --- | --- | --- | --- |
-| 120725616537680 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Body | Rustbucket | new GLB in repo, needs re-upload |
-| 124493769904792 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Lights | Rustbucket | new GLB in repo, needs re-upload |
-| 120734733805977 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Bed | Rustbucket | new GLB in repo, needs re-upload |
-| 139390483847560 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Wheel | Rustbucket | new GLB in repo, needs re-upload |
-| 99956936383854 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Hitch | Rustbucket | new GLB in repo, needs re-upload |
-| 110946981942122 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Body | Pickup | new GLB in repo, needs re-upload |
-| 100056308278514 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Lights | Pickup | new GLB in repo, needs re-upload |
-| 137659811327372 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Bed | Pickup | new GLB in repo, needs re-upload |
-| 124886704209701 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Wheel | Pickup | new GLB in repo, needs re-upload |
-| 121507994255438 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Hitch | Pickup | new GLB in repo, needs re-upload |
-| 131883902524854 | `assets/meshes/vehicles/ScoutATV/ScoutATV.glb` | Body | ScoutATV | new GLB in repo, needs re-upload |
-| 117328552905839 | `assets/meshes/vehicles/ScoutATV/ScoutATV.glb` | Lights | ScoutATV | new GLB in repo, needs re-upload |
-| 140001053768737 | `assets/meshes/vehicles/ScoutATV/ScoutATV.glb` | Wheel | ScoutATV | new GLB in repo, needs re-upload |
-| 101615123184878 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Body | Flatbed | new GLB in repo, needs re-upload |
-| 111333312069489 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Lights | Flatbed | new GLB in repo, needs re-upload |
-| 139734928087096 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Bed | Flatbed | new GLB in repo, needs re-upload |
-| 131955977341353 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Wheel | Flatbed | new GLB in repo, needs re-upload |
-| 140349480773545 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Hitch | Flatbed | new GLB in repo, needs re-upload |
-| 106201918511427 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Body | LoggingRig | new GLB in repo, needs re-upload |
-| 82098165138477 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Lights | LoggingRig | new GLB in repo, needs re-upload |
-| 124435372710468 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Bed | LoggingRig | new GLB in repo, needs re-upload |
-| 81542757402029 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Wheel | LoggingRig | new GLB in repo, needs re-upload |
-| 103819640831326 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Hitch | LoggingRig | new GLB in repo, needs re-upload |
-| 107003020182290 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Body | PonyTrailer | new GLB in repo, needs re-upload |
-| 88163132342304 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Lights | PonyTrailer | new GLB in repo, needs re-upload |
-| 90389536788385 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Bed | PonyTrailer | new GLB in repo, needs re-upload |
-| 109498505023571 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Wheel | PonyTrailer | new GLB in repo, needs re-upload |
-| 139471072919132 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Hitch | PonyTrailer | new GLB in repo, needs re-upload |
-| 101057277743396 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Body | RanchTrailer | new GLB in repo, needs re-upload |
-| 97749142571629 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Lights | RanchTrailer | new GLB in repo, needs re-upload |
-| 105565294587502 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Bed | RanchTrailer | new GLB in repo, needs re-upload |
-| 131671997531071 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Wheel | RanchTrailer | new GLB in repo, needs re-upload |
-| 124380880700146 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Hitch | RanchTrailer | new GLB in repo, needs re-upload |
-| 93977628567245 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Body | HeavyHauler | new GLB in repo, needs re-upload |
-| 90030662798643 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Lights | HeavyHauler | new GLB in repo, needs re-upload |
-| 108656014869417 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Bed | HeavyHauler | new GLB in repo, needs re-upload |
-| 81074969756089 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Wheel | HeavyHauler | new GLB in repo, needs re-upload |
-| 128380567399095 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Hitch | HeavyHauler | new GLB in repo, needs re-upload |
+| 135063576797220 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Body | Rustbucket | new GLB in repo, needs re-upload |
+| 100118337585227 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Lights | Rustbucket | new GLB in repo, needs re-upload |
+| 138924268082867 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Bed | Rustbucket | new GLB in repo, needs re-upload |
+| 96000510170326 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Wheel | Rustbucket | new GLB in repo, needs re-upload |
+| 103950687746451 | `assets/meshes/vehicles/Rustbucket/Rustbucket.glb` | Hitch | Rustbucket | new GLB in repo, needs re-upload |
+| 132220778486341 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Body | Pickup | new GLB in repo, needs re-upload |
+| 137894921214259 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Lights | Pickup | new GLB in repo, needs re-upload |
+| 73313476424595 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Bed | Pickup | new GLB in repo, needs re-upload |
+| 100358820661876 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Wheel | Pickup | new GLB in repo, needs re-upload |
+| 130679096877652 | `assets/meshes/vehicles/Pickup/Pickup.glb` | Hitch | Pickup | new GLB in repo, needs re-upload |
+| 135899530798267 | `assets/meshes/vehicles/ScoutATV/ScoutATV.glb` | Body | ScoutATV | new GLB in repo, needs re-upload |
+| 102368590223260 | `assets/meshes/vehicles/ScoutATV/ScoutATV.glb` | Lights | ScoutATV | new GLB in repo, needs re-upload |
+| 108444483567193 | `assets/meshes/vehicles/ScoutATV/ScoutATV.glb` | Wheel | ScoutATV | new GLB in repo, needs re-upload |
+| 137271532937493 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Body | Flatbed | new GLB in repo, needs re-upload |
+| 75034398950940 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Lights | Flatbed | new GLB in repo, needs re-upload |
+| 77252595923073 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Bed | Flatbed | new GLB in repo, needs re-upload |
+| 94524411538210 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Wheel | Flatbed | new GLB in repo, needs re-upload |
+| 112169540184474 | `assets/meshes/vehicles/Flatbed/Flatbed.glb` | Hitch | Flatbed | new GLB in repo, needs re-upload |
+| 84804800200555 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Body | LoggingRig | new GLB in repo, needs re-upload |
+| 140436189658598 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Lights | LoggingRig | new GLB in repo, needs re-upload |
+| 94574370000217 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Bed | LoggingRig | new GLB in repo, needs re-upload |
+| 88377082453341 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Wheel | LoggingRig | new GLB in repo, needs re-upload |
+| 79514319620242 | `assets/meshes/vehicles/LoggingRig/LoggingRig.glb` | Hitch | LoggingRig | new GLB in repo, needs re-upload |
+| 123304918392077 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Body | PonyTrailer | new GLB in repo, needs re-upload |
+| 133463511111788 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Lights | PonyTrailer | new GLB in repo, needs re-upload |
+| 80093608141805 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Bed | PonyTrailer | new GLB in repo, needs re-upload |
+| 137072790984838 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Wheel | PonyTrailer | new GLB in repo, needs re-upload |
+| 116050139782151 | `assets/meshes/vehicles/PonyTrailer/PonyTrailer.glb` | Hitch | PonyTrailer | new GLB in repo, needs re-upload |
+| 71494115864794 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Body | RanchTrailer | new GLB in repo, needs re-upload |
+| 84284546831741 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Lights | RanchTrailer | new GLB in repo, needs re-upload |
+| 90363231220918 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Bed | RanchTrailer | new GLB in repo, needs re-upload |
+| 75586028370689 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Wheel | RanchTrailer | new GLB in repo, needs re-upload |
+| 72831025595179 | `assets/meshes/vehicles/RanchTrailer/RanchTrailer.glb` | Hitch | RanchTrailer | new GLB in repo, needs re-upload |
+| 84731895539673 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Body | HeavyHauler | new GLB in repo, needs re-upload |
+| 126727044946144 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Lights | HeavyHauler | new GLB in repo, needs re-upload |
+| 111192039401543 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Bed | HeavyHauler | new GLB in repo, needs re-upload |
+| 76485456462102 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Wheel | HeavyHauler | new GLB in repo, needs re-upload |
+| 76951151154210 | `assets/meshes/vehicles/HeavyHauler/HeavyHauler.glb` | Hitch | HeavyHauler | new GLB in repo, needs re-upload |
 
 ## Consumers and their fallback
 

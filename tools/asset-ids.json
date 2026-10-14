@@ -2586,6 +2586,96 @@
     {
       "collision": false,
       "expectTypeId": 4,
+      "id": "103482280552543",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "100788396065808",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "104730694619580",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "140023205654551",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "100706399609275",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "106272982653382",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "76084140639988",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "117955534652171",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "136000065218099",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "104427150009380",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "BlenderAssets.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
       "id": "82316315960701",
       "kind": "mesh",
       "places": 1,
@@ -8409,7 +8499,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "120725616537680",
+      "id": "135063576797220",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8428,7 +8518,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "124493769904792",
+      "id": "100118337585227",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8438,7 +8528,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "120734733805977",
+      "id": "138924268082867",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8448,7 +8538,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "139390483847560",
+      "id": "96000510170326",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8458,7 +8548,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "99956936383854",
+      "id": "103950687746451",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8468,7 +8558,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "110946981942122",
+      "id": "132220778486341",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8487,7 +8577,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "100056308278514",
+      "id": "137894921214259",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8497,7 +8587,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "137659811327372",
+      "id": "73313476424595",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8507,7 +8597,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "124886704209701",
+      "id": "100358820661876",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8517,7 +8607,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "121507994255438",
+      "id": "130679096877652",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8527,7 +8617,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "131883902524854",
+      "id": "135899530798267",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8546,7 +8636,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "117328552905839",
+      "id": "102368590223260",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8556,7 +8646,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "140001053768737",
+      "id": "108444483567193",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8566,7 +8656,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "101615123184878",
+      "id": "137271532937493",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8585,7 +8675,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "111333312069489",
+      "id": "75034398950940",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8595,7 +8685,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "139734928087096",
+      "id": "77252595923073",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8605,7 +8695,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "131955977341353",
+      "id": "94524411538210",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8615,7 +8705,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "140349480773545",
+      "id": "112169540184474",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8625,7 +8715,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "106201918511427",
+      "id": "84804800200555",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8644,17 +8734,17 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "82098165138477",
+      "id": "140436189658598",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
       "status": "new GLB in repo, needs re-upload",
-      "usedBy": "VehicleModels.luau LoggingRig Lights"
+      "usedBy": "VehicleModels.luau LoggingRig "
     },
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "124435372710468",
+      "id": "94574370000217",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8664,7 +8754,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "81542757402029",
+      "id": "88377082453341",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8674,7 +8764,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "103819640831326",
+      "id": "79514319620242",
       "kind": "mesh",
       "places": 1,
       "priority": 2,
@@ -8684,7 +8774,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "107003020182290",
+      "id": "123304918392077",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8694,7 +8784,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "88163132342304",
+      "id": "133463511111788",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8704,7 +8794,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "90389536788385",
+      "id": "80093608141805",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8714,7 +8804,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "109498505023571",
+      "id": "137072790984838",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8724,7 +8814,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "139471072919132",
+      "id": "116050139782151",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8734,7 +8824,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "101057277743396",
+      "id": "71494115864794",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8744,7 +8834,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "97749142571629",
+      "id": "84284546831741",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8754,7 +8844,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "105565294587502",
+      "id": "90363231220918",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8764,7 +8854,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "131671997531071",
+      "id": "75586028370689",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8774,7 +8864,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "124380880700146",
+      "id": "72831025595179",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8784,7 +8874,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "93977628567245",
+      "id": "84731895539673",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8794,7 +8884,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "90030662798643",
+      "id": "126727044946144",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8804,7 +8894,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "108656014869417",
+      "id": "111192039401543",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8814,7 +8904,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "81074969756089",
+      "id": "76485456462102",
       "kind": "mesh",
       "places": 5,
       "priority": 2,
@@ -8824,7 +8914,7 @@
     {
       "collision": false,
       "expectTypeId": 4,
-      "id": "128380567399095",
+      "id": "76951151154210",
       "kind": "mesh",
       "places": 5,
       "priority": 2,

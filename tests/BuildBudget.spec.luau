@@ -527,7 +527,8 @@ return function(t)
 		local MeshManifest = t.shared("Art/MeshManifest")
 		-- 685 + 5: the store item model slots (StoreModelSlots, group "store") preload the gear's
 		-- ids (InsulatedCoat 1, HeatBoots 2, FeatherfallCloak 2); the lamp post's two are already
-		-- in the "items" group, and the slots with no Roblox id yet add none.
-		t.eq(#MeshManifest.Flat(false), 690, "690 ids start loading in the background; none is awaited")
+		-- in the "items" group. +6: the baked store models (Barrel, Crate, GlowWire, SkyBin,
+		-- RobuxCoins, Parcel; 13 Oct upload).
+		t.eq(#MeshManifest.Flat(false), 696, "696 ids start loading in the background; none is awaited")
 	end)
 end

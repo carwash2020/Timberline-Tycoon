@@ -36,6 +36,7 @@ export type Slot = {
 	kind: string, -- StoreStock kind of the item
 	itemId: string, -- ItemCatalog / PlotData id
 	meshId: number, -- 0 = not made yet; the part-built look stays
+	textureId: number?, -- the mesh's baked colour texture (0 or nil = none)
 	glb: string, -- Connor's model file in the repo (the preview loads it; there is no Roblox id yet)
 	glbSize: Vector3, -- that file's bounding box
 	fit: number, -- uniform scale from the GLB to game studs
@@ -58,7 +59,8 @@ ModelSlots.Slots = {
 		name = "Flashlight",
 		kind = "Gear",
 		itemId = "Flashlight",
-		meshId = 0,
+		meshId = 104730694619580,
+		textureId = 110889000263791, -- baked colour texture (BlenderAssets store/Flashlight)
 		glb = "assets/glb/store-items/Flashlight.glb",
 		glbSize = V3(0.851, 0.214, 0.214),
 		fit = 2.7,
@@ -70,7 +72,8 @@ ModelSlots.Slots = {
 		name = "Lantern",
 		kind = "Gear",
 		itemId = "Lantern",
-		meshId = 0,
+		meshId = 100706399609275,
+		textureId = 103276353286757, -- baked colour texture (BlenderAssets store/Lantern)
 		glb = "assets/glb/store-items/Lantern.glb",
 		glbSize = V3(0.509, 1.306, 0.509),
 		fit = 1.19,
@@ -82,7 +85,8 @@ ModelSlots.Slots = {
 		name = "WoodSign",
 		kind = "Blueprint",
 		itemId = "WoodSign",
-		meshId = 0,
+		meshId = 104427150009380,
+		textureId = 115661985339638, -- baked colour texture (BlenderAssets store/WoodSign)
 		glb = "assets/glb/store-items/WoodSign.glb",
 		glbSize = V3(2.2, 3.75, 0.395),
 		fit = 1.04,
@@ -94,7 +98,8 @@ ModelSlots.Slots = {
 		name = "ShedBlueprint",
 		kind = "Blueprint",
 		itemId = "Shed",
-		meshId = 0,
+		meshId = 117955534652171,
+		textureId = 88429889818385, -- baked colour texture (BlenderAssets store/ShedBlueprint)
 		glb = "assets/glb/store-items/ShedBlueprint.glb",
 		glbSize = V3(1.4, 3.045, 1.807),
 		fit = 1.5,
@@ -154,6 +159,9 @@ function ModelSlots.Dress(parent: Instance, slot: Slot, centre: CFrame, role: Ro
 			return false
 		end
 		MeshKit.Visual(part, slot.meshId)
+		if slot.textureId and slot.textureId ~= 0 and part:IsA("MeshPart") then
+			(part :: MeshPart).TextureID = "rbxassetid://" .. slot.textureId
+		end
 		part:SetAttribute("ModelSlot", slot.name)
 		part:SetAttribute("SlotRole", role)
 		part.CFrame = centre
