@@ -20,11 +20,11 @@ local F = UITheme.Fonts
 
 local CLOSE_ACTION = "NewsClose"
 local SEEN_ATTR = "NewsV1Seen"
+NewsUI.CardMaxWidth = 520 -- offsets, before the screen's UIScale
 local CLOSE_GAP = 8 -- between the last row and the Close button
 
 local player = Players.LocalPlayer
 local panel: Frame? = nil
-local scrimBack: TextButton? = nil -- the dim behind the card
 local closeFace: GuiButton? = nil
 local closeBound = false
 
@@ -128,9 +128,6 @@ local function dismiss()
 		return
 	end
 	root.Visible = false
-	if scrimBack then
-		scrimBack.Visible = false -- the dim goes with the card, never alone
-	end
 	unbind()
 	MenuPad.Close(root)
 	player:SetAttribute(SEEN_ATTR, true)
@@ -167,9 +164,6 @@ function NewsUI.Open()
 		return
 	end
 	root.Visible = true
-	if scrimBack then
-		scrimBack.Visible = true
-	end
 	bindClose()
 	MenuPad.Open(face, root)
 end
@@ -189,20 +183,9 @@ end
 
 function NewsUI.Start()
 	local gui = UITheme.Screen("NewsUI", UITheme.Layers.News)
-	local scrim = Instance.new("TextButton")
-	scrim.Name = "Scrim"
-	scrim.Size = UDim2.fromScale(1, 1)
-	scrim.BackgroundColor3 = C.PanelAlt
-	scrim.BackgroundTransparency = 0.45
-	scrim.AutoButtonColor = false
-	scrim.Text = ""
-	scrim.Selectable = false
-	-- Hidden until the card opens: a full-screen dim with no card on it is
-	-- the grey veil over the whole game (and it would eat every tap).
-	scrim.Visible = false
-	scrim.Parent = gui
-	scrimBack = scrim
-
+	-- No scrim, no backing frame: the ScreenGui holds the card and nothing
+	-- else. (The old full-screen Scrim TextButton, PanelAlt at 0.45, was the
+	-- grey box behind the card whenever it was open.)
 	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, false)
 	card.outer.Name = "WhatsNew"
 	card.outer.Visible = false
@@ -211,7 +194,7 @@ function NewsUI.Start()
 	card.face.AutomaticSize = Enum.AutomaticSize.Y
 	card.face.Size = UDim2.fromScale(1, 0)
 	local limit = Instance.new("UISizeConstraint")
-	limit.MaxSize = Vector2.new(640, 2000)
+	limit.MaxSize = Vector2.new(NewsUI.CardMaxWidth, 2000)
 	limit.Parent = card.outer
 	UITheme.padding(card.face, 8, 10, 8, 10)
 	UITheme.list(card.face, 4)
@@ -297,15 +280,11 @@ function NewsUI.Start()
 	close.root.Position = UDim2.new(0.5, 0, 0, CLOSE_GAP)
 	close.root.Parent = closeRow
 
-	-- On a short screen the card is only as tall as its rows. Its bottom
-	-- sits above the jump box (70px, top-left 95 from the right and 90 up)
-	-- and the card stays right of the thumbstick (left 40% of the bottom
-	-- half), so Close cannot land on either. A wide screen centres it.
+	-- On a short screen the rows tighten so the whole card fits the height;
+	-- the card itself is centred the same way everywhere.
 	local function placeCard()
 		local cam = workspace.CurrentCamera
 		local vp = if cam then cam.ViewportSize else Vector2.zero
-		local parent = card.outer.Parent
-		local origin = if parent and parent:IsA("GuiBase2d") then parent.AbsolutePosition else Vector2.zero
 		local scale = math.max(UITheme.Scale(), 0.05)
 		local short = math.min(vp.X, vp.Y)
 		local compact = vp.X >= 200 and vp.Y >= 200 and short < 600
@@ -367,19 +346,14 @@ function NewsUI.Start()
 		end
 		closeRow.Size = UDim2.new(1, 0, 0, CLOSE_GAP + tap + UITheme.ButtonDrop)
 		close.root.Size = UDim2.fromOffset(tap, tap + UITheme.ButtonDrop)
-		if compact then
-			local margin = 8
-			local left = vp.X * 0.4 + margin
-			local right = vp.X - margin
-			local bottom = vp.Y - 90 - margin
-			card.outer.AnchorPoint = Vector2.new(0.5, 1)
-			card.outer.Position = UDim2.fromOffset(((left + right) / 2 - origin.X) / scale, (bottom - origin.Y) / scale)
-			card.outer.Size = UDim2.fromOffset(math.max(180, (right - left) / scale), 0)
-		else
-			card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
-			card.outer.Position = UDim2.fromScale(0.5, 0.46)
-			card.outer.Size = UDim2.fromOffset(520, 0)
-		end
+		-- Always dead centre, on every screen: the width is 92% of the
+		-- screen (UISizeConstraint caps it), so it never leaves the viewport.
+		-- The ScreenGui's own insets (notch, TV-safe margin) are what the
+		-- scale resolves against, and UIScale is above it; nothing here
+		-- reads the screen position or offsets the card.
+		card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
+		card.outer.Position = UDim2.fromScale(0.5, 0.5)
+		card.outer.Size = UDim2.fromScale(0.92, 0)
 	end
 	UITheme.WatchLayout(placeCard)
 	close.face.NextSelectionUp = close.face
@@ -388,8 +362,6 @@ function NewsUI.Start()
 	close.face.NextSelectionRight = close.face
 	close.face.Activated:Connect(dismiss)
 	closeFace = close.face
-
-	scrim.Activated:Connect(dismiss)
 
 	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(consider)
 	player:GetAttributeChangedSignal("TutorialStep"):Connect(consider)

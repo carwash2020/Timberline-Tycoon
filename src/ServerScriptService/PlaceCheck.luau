@@ -69,7 +69,8 @@ PlaceCheck.Expected = {
 		value = 12,
 		atMost = true,
 		fix = "Game Settings > Places > Max Players = 12."
-			.. " A fresh build.rbxlx does not set this: Roblox stores Max Players on the place, not in the file",
+			.. " A fresh build.rbxlx does not set this: Roblox stores Max Players on the place, not in the file."
+			.. " Set it yourself in Studio (Home > Game Settings), see LAUNCH.md > Studio setup",
 	},
 } :: { Expectation }
 
