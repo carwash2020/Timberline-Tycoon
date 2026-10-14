@@ -556,6 +556,7 @@ function WorldPlan.CountryStands(): { Stand }
 	local planted = 0
 	-- A stand of `most` (4-9) trees round the middle `at(radius)` gives, if 4+ fit.
 	local function plant(at: (radius: number) -> Vector2, road: WorldLayout.Road?, most: number): Stand?
+		breathe()
 		local want = math.min(rng:int(4, most), STAND_MAX - planted)
 		if want < 4 then
 			return nil
@@ -578,6 +579,7 @@ function WorldPlan.CountryStands(): { Stand }
 		local attempts = 0
 		while #trees < want and attempts < want * 30 do
 			attempts += 1
+			breathe()
 			local angle = rng:range(0, math.pi * 2)
 			local r = math.sqrt(rng:next()) * radius
 			-- Rounded the way a Vector3 stores it, so what's checked is what's spawned.
@@ -937,49 +939,61 @@ export type PointOfInterest = {
 
 local cachedPoints: { PointOfInterest }? = nil
 
-function WorldPlan.PointsOfInterest(): { PointOfInterest }
-	if cachedPoints then
-		return cachedPoints
-	end
-	local out: { PointOfInterest } = {}
-	local taken: { Vector2 } = {}
-	for index, anchor in ipairs(RegionLogic.Anchors()) do
-		local rng = Kit.rng(hashString("poi " .. anchor.id))
-		local found: Vector2? = nil
-		local slope = if anchor.kind == "Cave" then 1.05 else 0.72
-		for _ = 1, 90 do
-			local ang = rng:range(0, math.pi * 2)
-			local rad = rng:next() * anchor.search
-			local x = anchor.x + math.cos(ang) * rad
-			local z = anchor.z + math.sin(ang) * rad
-			local clear = WorldLayout.FlatWeight(x, z) < 0.35
-				and TerrainGen.WaterLevelAt(x, z) == nil
-				and TerrainGen.RoadClearance(x, z) >= 8
-				and TerrainGen.SlopeAt(x, z) < slope
-				and TerrainGen.HeightAt(x, z) < 96
-				and not nearTree(x, z, 11)
-			if clear then
-				for _, q in ipairs(taken) do
-					if (q - Vector2.new(x, z)).Magnitude < 22 then
-						clear = false
-						break
+-- The points of interest worked out fresh (not cached), one anchor at a time.
+-- Given a `pause` (a time slice's step) the work is a queue of small units:
+-- the forest plan they are placed against (the seconds-long part: a point may
+-- not stand on a tree, so WorldPlan.Trees is asked for first, on the same
+-- pause), then one try after another, a yield whenever the slice is spent.
+-- The list is the same with or without it (tests/PoiPlanSplit.spec).
+function WorldPlan.PlanPointsOfInterest(pause: (() -> ())?): { PointOfInterest }
+	return WorldPlan.WithPause(pause, function(): any
+		if pause then
+			WorldPlan.Trees(pause)
+		end
+		-- One anchor's point: the first of 90 tries that is clear ground, off every
+		-- tree and 22 studs from the points already `taken` (which it adds to), or nil
+		-- when none is. `breathe` hands the frame back to a paused caller between
+		-- tries; it changes nothing about the result.
+		local function planPoint(index: number, anchor: RegionLogic.Anchor, taken: { Vector2 }): PointOfInterest?
+			local rng = Kit.rng(hashString("poi " .. anchor.id))
+			local found: Vector2? = nil
+			local slope = if anchor.kind == "Cave" then 1.05 else 0.72
+			for _ = 1, 90 do
+				breathe()
+				local ang = rng:range(0, math.pi * 2)
+				local rad = rng:next() * anchor.search
+				local x = anchor.x + math.cos(ang) * rad
+				local z = anchor.z + math.sin(ang) * rad
+				local clear = WorldLayout.FlatWeight(x, z) < 0.35
+					and TerrainGen.WaterLevelAt(x, z) == nil
+					and TerrainGen.RoadClearance(x, z) >= 8
+					and TerrainGen.SlopeAt(x, z) < slope
+					and TerrainGen.HeightAt(x, z) < 96
+					and not nearTree(x, z, 11)
+				if clear then
+					for _, q in ipairs(taken) do
+						if (q - Vector2.new(x, z)).Magnitude < 22 then
+							clear = false
+							break
+						end
 					end
 				end
+				if clear then
+					found = Vector2.new(x, z)
+					break
+				end
 			end
-			if clear then
-				found = Vector2.new(x, z)
-				break
+			local at = found
+			if at == nil then
+				return nil
 			end
-		end
-		local at = found
-		if at then
 			table.insert(taken, at)
 			local y = TerrainGen.HeightAt(at.X, at.Y)
 			local dirx, dirz = anchor.x - at.X, anchor.z - at.Y
 			if dirx * dirx + dirz * dirz < 4 then
 				dirx, dirz = 0, -1
 			end
-			table.insert(out, {
+			return {
 				id = anchor.id,
 				name = anchor.name,
 				kind = anchor.kind,
@@ -988,9 +1002,27 @@ function WorldPlan.PointsOfInterest(): { PointOfInterest }
 				seed = 7000 + index * 17,
 				secret = anchor.secret,
 				text = anchor.text,
-			})
+			}
 		end
+
+		local out: { PointOfInterest } = {}
+		local taken: { Vector2 } = {}
+		for index, anchor in ipairs(RegionLogic.Anchors()) do
+			local point = planPoint(index, anchor, taken)
+			if point then
+				table.insert(out, point)
+			end
+			breathe()
+		end
+		return out
+	end) :: { PointOfInterest }
+end
+
+function WorldPlan.PointsOfInterest(pause: (() -> ())?): { PointOfInterest }
+	if cachedPoints then
+		return cachedPoints
 	end
+	local out = WorldPlan.PlanPointsOfInterest(pause)
 	cachedPoints = out
 	return out
 end
@@ -3827,6 +3859,7 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 			return nil
 		end
 		local lowest = h
+		breathe()
 		for _, p in ipairs(WorldPlan.ClusterFootprint(x, z, size)) do
 			lowest = math.min(lowest, TerrainGen.HeightAt(p.X, p.Y))
 		end
@@ -4744,6 +4777,9 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 	for ix = 0, steps do
 		breathe()
 		for iz = 0, steps do
+			if iz % 6 == 0 then
+				breathe() -- a row is about 50 ms in Lune: six cells a pause
+			end
 			local x, z = -STAND_EDGE + ix * 12, -STAND_EDGE + iz * 12
 			local c, ring = WorldLayout.ForestCover(x, z)
 			if c > 0.18 and c < 0.42 then

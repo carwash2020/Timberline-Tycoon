@@ -17,6 +17,13 @@
 --   * Every step logs one `[Load] deferred <name> took Xs` line (the log
 --     function is injected), so Studio's Output shows what the background
 --     build costs and when it finished.
+--   * A heavy step (over PerfTotalSeconds in all, or with a stretch of work
+--     over PerfStepSeconds between two yields) also reports
+--     `[Perf] stage <name>: total Xs, longest step Y ms` through `perf`, so
+--     a single long step shows up by name. A group reports once, for its
+--     longest step. Nothing is printed for a step that is neither.
+--   * `frame` (Shared/FrameBudget) makes every step's slice share one frame
+--     budget with the other background jobs (the forest, the terrain).
 --   * Start() begins running; steps added later start it again when it has
 --     gone idle. OnIdle fires each time the queue empties.
 --
@@ -41,7 +48,9 @@ export type Step = {
 }
 
 export type Options = {
-	budget: number?, -- seconds of work per slice (default TimeSlice's 0.012)
+	budget: number?, -- seconds of work per slice (default TimeSlice's 0.012; none of its own with `frame`)
+	frame: TimeSlice.FrameBudgetLike?, -- a budget shared with the other background jobs
+	perf: ((line: string) -> ())?, -- gets the `[Perf] stage ...` lines of heavy steps
 	clock: (() -> number)?,
 	wait: (() -> ())?,
 	spawn: ((fn: () -> ()) -> ())?,
@@ -69,6 +78,9 @@ export type Queue = {
 }
 
 local DEFAULT_TIER = 2
+
+LoadQueue.PerfTotalSeconds = 0.25 -- a step (or group) this long in all is reported
+LoadQueue.PerfStepSeconds = 0.02 -- and one with a stretch of work this long between yields
 
 local function distance(a: Point, b: Point): number
 	local dx, dz = a.x - b.x, a.z - b.z
@@ -180,24 +192,46 @@ function LoadQueue.new(options: Options?): Queue
 	local running = false
 	local ran, failed = 0, 0
 	local busy = 0
-	local groups: { [string]: { done: number, seconds: number, failed: number } } = {}
+	local groups: { [string]: { done: number, seconds: number, failed: number, longest: number } } = {}
+	local perf = options and options.perf
 	local order: { string } = {}
 	local queue = {} :: Queue
 
+	local function report(name: string, total: number, longest: number, count: number?)
+		if perf and (total >= LoadQueue.PerfTotalSeconds or longest >= LoadQueue.PerfStepSeconds) then
+			perf(
+				string.format(
+					"[Perf] stage %s: total %.2fs, longest step %.0f ms%s",
+					name,
+					total,
+					longest * 1000,
+					if count and count > 1 then string.format(" (%d steps)", count) else ""
+				)
+			)
+		end
+	end
+
 	local function runAll()
 		running = true
-		local slice = TimeSlice.new({ budget = options and options.budget, clock = clock, wait = waitFn })
 		while #steps > 0 do
 			local focus = if focusFn then focusFn() else nil
 			local index = LoadQueue.Next(steps, focus) :: number
 			local step = table.remove(steps, index) :: Step
 			local at = clock()
-			slice.reset()
+			-- One slice a step, so its longest stretch is its own.
+			local slice = TimeSlice.new({
+				budget = options and options.budget,
+				frame = options and options.frame,
+				clock = clock,
+				wait = waitFn,
+			})
 			local ok, err = xpcall(function(): any
 				step.run(slice.step)
 				return nil
 			end, handler)
+			slice.finish()
 			local took = clock() - at
+			local longest = slice.longest()
 			busy += took
 			ran += 1
 			table.insert(order, step.name)
@@ -208,16 +242,18 @@ function LoadQueue.new(options: Options?): Queue
 			if group then
 				local g = groups[group]
 				if not g then
-					g = { done = 0, seconds = 0, failed = 0 }
+					g = { done = 0, seconds = 0, failed = 0, longest = 0 }
 					groups[group] = g
 				end
 				g.done += 1
 				g.seconds += took
+				g.longest = math.max(g.longest, longest)
 				if not ok then
 					g.failed += 1
 					log(string.format("[Load] deferred %s FAILED after %.2fs: %s", step.name, took, tostring(err)))
 				end
 				if g.done >= (step.groupSize or 1) then
+					report(group, g.seconds, g.longest, g.done)
 					log(
 						string.format(
 							"[Load] deferred %s: %d steps took %.2fs in all%s",
@@ -230,6 +266,7 @@ function LoadQueue.new(options: Options?): Queue
 				end
 			elseif ok then
 				log(string.format("[Load] deferred %s took %.2fs", step.name, took))
+				report(step.name, took, longest)
 			else
 				log(string.format("[Load] deferred %s FAILED after %.2fs: %s", step.name, took, tostring(err)))
 			end

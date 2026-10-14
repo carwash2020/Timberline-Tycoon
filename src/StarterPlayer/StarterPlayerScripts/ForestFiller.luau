@@ -8,11 +8,14 @@
 --     out to FillerFar, one or two dark canopy blocks, so the forest reads
 --     from far off. A cell keeps its look WorldPlan.FillerHysteresis past
 --     its radius, so walking along an edge doesn't flip it to and fro.
---   * The work is spread out: WorldPlan's plan (the trees, rocks and
---     scenery the filler keeps clear of) is worked out one step a frame at
---     start; then each frame builds cells, nearest first, for at most
---     FillerBuildMs, and unloads a few. A cell's new look is in before its
---     old one goes, so nothing pops out.
+--   * The work is spread out: it starts only after the player can play, the
+--     deferred controllers (ClientBoot) have all started and the HUD has
+--     settled (SETTLE_SECONDS), so it never lands on top of them. WorldPlan's
+--     plan (the trees, rocks and scenery the filler keeps clear of) is
+--     worked out a slice a frame; then each frame builds cells, nearest
+--     first, for at most FillerBuildMs (less when the last frame was already
+--     slow: FrameBudget.Adapt), and unloads a few. A cell's new look is in
+--     before its old one goes, so nothing pops out.
 --   * Everything is decoration (Kit.decor: no collisions, clicks or
 --     touches; a collider only this client had would fight the trucks,
 --     which their drivers' clients simulate) and casts no shadow. Parts are
@@ -30,6 +33,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ClientBoot = require(ReplicatedStorage.Shared.ClientBoot)
+local FrameBudget = require(ReplicatedStorage.Shared.FrameBudget)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
@@ -83,7 +88,7 @@ local function root(): Folder
 end
 
 -- Each kind's looks, built once from PropArt's builders.
-local function makeLooks()
+local function makeLooks(step: (() -> boolean)?)
 	for _, kind in ipairs(PropArt.FillerKinds) do
 		local list: { Look } = {}
 		for variant = 1, PropArt.FillerVariants do
@@ -116,6 +121,9 @@ local function makeLooks()
 			model:Destroy()
 			local crownY = if lo < hi then (lo + hi) / 2 else 0
 			table.insert(list, { parts = parts, crownY = crownY, crownR = math.max(reach, (hi - lo) / 2) })
+			if step then
+				step() -- one look is a unit; the frame goes back between them
+			end
 		end
 		looks[kind] = list
 	end
@@ -318,7 +326,7 @@ local function scan()
 	end)
 end
 
-local function work()
+local function work(frameDt: number)
 	local n = 0
 	while #unloads > 0 and n < UNLOADS_PER_FRAME do
 		unload(table.remove(unloads) :: number)
@@ -329,8 +337,13 @@ local function work()
 		n += 1
 	end
 	local started = os.clock()
-	local budget = Quality.Budget().FillerBuildMs / 1000
-	while #queue > 0 and os.clock() - started < budget do
+	-- A frame that was already slow (a hitch from anywhere) builds less this time.
+	-- (One cell at least, so a run of slow frames cannot stop the forest for good.)
+	local shape = Quality.Budget()
+	local budget = FrameBudget.Adapt(shape.FillerBuildMs, frameDt, 1 / math.max(shape.CosmeticHz, 1)) / 1000
+	local built = 0
+	while #queue > 0 and (built == 0 or os.clock() - started < budget) do
+		built += 1
 		local job = table.remove(queue) :: Job
 		if job.mode == "tuft" then
 			if not tuftCells[job.key] then
@@ -397,6 +410,8 @@ end
 -- never delays the load (LOAD-01). At most WAIT_READY seconds.
 local WAIT_READY = 40
 local PLAN_SLICE = 0.008 -- seconds of planning per frame
+local SETTLE_SECONDS = 1.5 -- after the player can play and the deferred controllers have started: the HUD's frames settle
+local BOOT_WAIT = 10 -- the most it waits for the deferred controllers (a Start that never returns must not hold the forest back)
 local function waitUntilPlaying()
 	local player = Players.LocalPlayer
 	if player == nil then
@@ -409,7 +424,15 @@ local function waitUntilPlaying()
 		end
 		task.wait(0.25)
 	end
-	task.wait(1) -- the loading card's fade
+	-- The deferred controllers start one or two a frame once the player can play
+	-- (ClientBoot); the plan waits for the last of them. (ClientBoot not released
+	-- at all, as in a client without the queue: no wait.)
+	local boot = ClientBoot.Default
+	local bootWaited = os.clock()
+	while boot.Released() and not boot.Drained() and os.clock() - bootWaited < BOOT_WAIT do
+		task.wait()
+	end
+	task.wait(SETTLE_SECONDS) -- the loading card's fade, and the HUD's first frames
 end
 
 function ForestFiller.Start()
@@ -437,8 +460,16 @@ function ForestFiller.Start()
 			end
 			task.wait()
 		end
-		makeLooks()
+		makeLooks(planSlice.step)
+		planSlice.finish()
 		print(string.format("[ForestFiller] plan ready in %.1f s", os.clock() - started))
+		print(
+			string.format(
+				"[Perf] client ForestFiller plan: total %.1fs, longest step %.0f ms",
+				os.clock() - started,
+				planSlice.longest() * 1000
+			)
+		)
 		print(
 			string.format("[Load] client ForestFiller plan took %.1fs (after the player was in)", os.clock() - started)
 		)
@@ -461,7 +492,7 @@ function ForestFiller.Start()
 				sinceScan = 0
 				scan()
 			end
-			work()
+			work(dt)
 			if sinceFade >= FADE_EVERY then
 				sinceFade = 0
 				fade()

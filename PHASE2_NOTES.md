@@ -4154,3 +4154,51 @@ unchanged). It stays correct after you re-upload the new wheel GLBs.
 ## Save load kick (error 267): retry and reason codes (branch `phase-2/save-load-kick-fix`, 13 October 2026)
 A join no longer kicks on the first failed save load. ProfileService tries up to 3 times (2 for a Migrate error) with a 3 s then 6 s pause, only when the earlier try left no session and wrote nothing; the Migrate rollback to the stored copy is unchanged. A player who left is never retried. The kick says `(Reason: <code>, waited <n>s)`: start (StartSessionAsync raised), lock (no session within the budget: save held elsewhere or DataStore failing), contended (ProfileStore gave up early: another session overrode the lock request), migrate, error, closing. Output prints `[ProfileService] <name>: load attempt n/3 starting`, `... failed after Ns: reason=...` and `save load FAILED (reason=..., waited Ns over N tries)`. The loading card shows a waiting or "Trying again (2 of 3)" line (player attribute LoadNote).
 Studio checks: 1. Join with an existing save: it loads and no LoadNote line stays. 2. Leave and rejoin straight away (also on Xbox): the card may show the waiting line for up to about 45 s, then you load; if it fails the kick names a reason. 3. Join a cold server (first player): loads as before. 4. If kicked, copy the `[ProfileService]` lines from the server Output.
+
+## Launch performance (branch `phase-2/launch-perf`, 14 October 2026, no price, economy or gameplay-rule change)
+
+**Why.** Connor's Studio log of a cold server: the player could play at +4.6 s, but heavy work kept running until about +11.9 s, and the
+first launch glitched. `Points of interest (plan)` was ONE 5.07 s step; the forest planted 1,205 trees over 8.1 s and the background terrain
+took 9.2 s; the client's ForestFiller plan took 4.8 s; each of a dozen client `Start` calls (WoodFX, LuxFX, DialogueUI, BlueprintPlacer,
+HammerController, ...) took about 1.4 s; 696 meshes swapped in as they loaded, in bursts. Goal: no single step over about 50 ms, no frame over
+about 33 ms after "can play". **Claude cannot run Studio, so none of those times is measured after the change.** Lune only says the logic and the
+split are right (the longest stretch between two pauses of the plan in Lune is about 50 to 70 ms; the one-time 200 ms start-up of
+`WorldPlan.Town()` is left alone).
+
+**What changed**
+
+| # | Stage | Change | Where |
+|---|-------|--------|-------|
+| 1 | POI plan (5.07 s) | The `(plan)` step runs on its own time slice (`WorldPlan.WithPause`), so the forest plan it needs (a point may not stand on a tree) hands the frame back all through; `WorldPlan.PlanPointsOfInterest(pause)` is a queue of small units (one try, then one anchor) with a yield between; more `breathe()` in `CountryStands`, `BoulderClusters`, `ForestTrees`. Same output byte for byte (`PoiPlanSplit.spec`, checksum taken from origin/main). Every other `deferPlanned` plan (scenery, boulders, signs, trails) gets the same pause. | `Shared/World/WorldPlan.luau` (`PlanPointsOfInterest`, `breathe` calls), `ServerScriptService/MapBuilder.server.luau` (`deferPlanned`) |
+| 2a | Shared budget | `Shared/FrameBudget`: one budget per frame that the forest planter, the terrain writer, the deferred queue and the mesh swaps spend together (a job always finishes its unit, so none starves). `TimeSlice` takes it (`frame`) and reports its longest stretch. 30 ms while nobody has played yet, 10 ms in all after (it was 12 + 12 + 12). | `Shared/FrameBudget.luau`, `Shared/TimeSlice.luau`, `ServerScriptService/LoadState.luau` (`LoadState.Frame`), `Shared/LoadQueue.luau` |
+| 2b | Forest (1,205 trees) | Every site the planner hands over goes into one pool; a planting thread takes the nearest to the PLAYERS (the spawn while nobody is in) each time and asks again as it goes (`Shared/NearFirst.Queue` re-sorts when someone has moved 40 studs), while the planner is still working. The tutorial oaks are unchanged. | `MapBuilder.server.luau` (`plant`), `Shared/NearFirst.luau` |
+| 2c | Terrain (9.2 s) | The later blocks are written nearest the players first (plot pads still lead), re-ordered when a player moves 48 studs, paced by the shared budget; the cave boxes yield too. The final ground is identical (`TerrainStaged.spec`). | `ServerScriptService/TerrainBuilder.luau` (`Order(blocks, spots, focus)`, `finish`, `Carve`) |
+| 3 | Client ForestFiller (4.8 s) | Starts after the player can play, after every deferred controller has started (up to 10 s) and a 1.5 s settle; the looks are built one at a time with a frame between; its cell budget shrinks when the last frame was slow (`FrameBudget.Adapt`, at least one cell a frame). | `StarterPlayerScripts/ForestFiller.luau` |
+| 4 | Client Starts (1.4 s each) | `Shared/ClientBoot`: the critical controllers start at once as before; WoodFX, LuxFX, DialogueUI, BlueprintPlacer, HammerController, DailyUI, NewsUI, TownMarkers, TreeCosmetics, WindSway, RegionFX, TownFX, LifeFX, AmbientLife, AmbientSound, CanopyFade, StoreStandState and ForestFiller are queued and start one or two a frame after "can play" (ProfileLoaded + 30 frames), in the priority order of `DEFERRED` in `Client.client`. Used before their turn they start on the spot (`ClientBoot.Ensure`): `BlueprintPlacer.Begin`, `HammerController.Equip`, `DialogueUI.Talk`, `DailyUI.OpenForeman`, `NewsUI.Open`, and any Tool put in the hand starts the hammer and the placer. A double Start is guarded. | `Shared/ClientBoot.luau`, `StarterPlayerScripts/Client.client.luau`, the five modules named |
+| 5 | Mesh swap-ins (696) | They already all went through `MeshKit.Attempt` and one drain; the drain now swaps at most 6 a frame (`MeshKit.SwapMaxPerFrame`), inside the shared frame budget on the server, nearest the players (server) or the camera (client) first. Part-first is unchanged (`BuildBudget.spec`, `MachineSwap.spec`, `AssetIds.spec` untouched and green). | `Shared/Art/MeshKit.luau` (`Pump`), `MapBuilder.server.luau`, `Client.client.luau` |
+| 6 | Loading card | The server sets `NearRingBuilt` = false when the world starts and true when the trees within 160 studs of the spawn are planted (the terrain there is written before anyone is let in); the card waits for it, at most 6 s after the character and the save are in, and never when the attribute is missing. The #195 failsafe, the 30 s cap, the backstop and the HUD's LoadNote card are untouched. | `ReplicatedFirst/LoadingScreen.client.luau`, `MapBuilder.server.luau` |
+| 7 | Instrumentation | Server: `[Perf] stage <name>: total Xs, longest step Y ms` for any deferred step or group over 0.25 s or with a 20 ms stretch, plus `[Perf] stage forest planting`, `terrain near ring` and `terrain background`; the workspace attribute `WorldBuilt` when everything is built. Client (`Shared/PerfProbe`, wired in `Client.client`): `[Perf] can play at +X.Xs`, `[Perf] fully built at +X.Xs`, `[Perf] worst frame after spawn: N ms at +X.Xs, frames over 33 ms: n, over 50 ms: m` every 5 s and once at +30 s (about nine lines in all); `[Perf] client <name> Start took N ms` only for a Start over 20 ms. | `Shared/PerfProbe.luau`, `LoadQueue.luau`, `TerrainBuilder.luau`, `MapBuilder.server.luau` |
+
+**Budgets (guesses until Connor sends the log):** 10 ms a frame for all server background work once a player can play (30 ms before); 6 swaps and
+4 ms a frame for mesh swaps; 2 client Starts and 4 ms a frame; ForestFiller 1.5 s settle; the loading card holds for the near ring at most 6 s;
+the near ring is 160 studs; the terrain re-sorts at 48 studs, the forest at 40.
+
+**Not changed on purpose:** the first call of `WorldPlan.Town()` is a single 200 ms step in Lune (a one-time start-up of the town's data); the server
+has it warm already, the client's first filler step pays it once. A single tree's `SpawnTree`, a single terrain block, one filler look and one swap are
+units the engine cannot split; the log says how long each is (`longest tree`, `longest step`).
+
+**Studio checks (PC, then phone 667 x 375, then Xbox).** Join on a COLD server (Stop, then Play: a server that has run a while has the forest built already)
+and read the Output.
+1. Send back every `[Perf] ...` and `[Load] ...` line: `[Perf] stage ...`, `[Perf] can play at ...`, `[Perf] fully built at ...`, all the
+   `[Perf] worst frame after spawn: ...` lines, `[Load] near ring built ...`, `[Load] ready for play at ...; fully built at ...`.
+2. Good: `[Perf] worst frame after spawn` stays at or under about 33 ms from "can play" (0 or a few frames over 33 ms, none over 50); no `[Perf] stage` line with a
+   longest step over about 50 ms (a few over 20 ms are listed on purpose).
+3. Walk away from the spawn straight after joining (and on a second client run to a far corner): the trees and the ground nearest you appear first, the far
+   forest fills in later. The loading card stays until the trees round the spawn stand (at most 6 s after the save is in), then fades; it never hangs.
+4. Use a deferred feature the moment you can move: hold the hammer and click, open a blueprint and place it, talk to Murph and Rook (the dialogue box, the daily board
+   after Rook's talk), open Settings > What's new, chop a tree (chips, lux glow), then do the same 10 s later: identical. No `failed to start` line in Output.
+5. Phone: touch controls are unchanged (taps of 44 px); the same checks. Xbox: the same; B closes panels; nothing is bound to ButtonR2.
+6. The shops, boxes, trucks and machines still show their parts first and their meshes a moment later, nearest you first, without a hitch.
+
+**Awaiting Connor.** The defaults above stand until the log says otherwise: the 6 s card wait, the 10 ms background budget, the deferral list (move a controller out of
+`DEFERRED` in `Client.client` to start it at once).

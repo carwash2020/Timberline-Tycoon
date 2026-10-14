@@ -127,6 +127,40 @@ end
 local Players = game:GetService("Players")
 local JoinFlow = require(SharedFolder:WaitForChild("JoinFlow", SHARED_WAIT))
 local Net = require(SharedFolder:WaitForChild("Net", SHARED_WAIT))
+local ClientBoot = require(SharedFolder:WaitForChild("ClientBoot", SHARED_WAIT))
+local PerfProbe = require(SharedFolder:WaitForChild("PerfProbe", SHARED_WAIT))
+
+-- Which controllers wait until the player can play (ClientBoot), and in what
+-- order (lowest first: what a player reaches soonest). Everything else starts
+-- at once, as it always did: input, the HUD, camera, grab and drag, chop, the
+-- tools, the join screens (plot picker, save slots, quality), the shops, the
+-- quest card, vehicles, prompts and the loading handoff are needed to play.
+-- A deferred one used before its turn starts on first use (ClientBoot.Ensure:
+-- the tools when one is equipped or begun, the dialogue box when a talk opens,
+-- the news and the foreman's board when opened). None of them is something
+-- the server's join resend (JoinSync: cash, plot offer, save slots) targets.
+local DEFERRED: { [string]: number } = {
+	HammerController = 10, -- until a hammer is held (the tool watcher below, or Equip)
+	BlueprintPlacer = 11, -- until a blueprint is held (Begin)
+	DialogueUI = 12, -- the talk box (Talk)
+	DailyUI = 13, -- the foreman's job board (OpenForeman)
+	WoodFX = 14,
+	LuxFX = 15,
+	NewsUI = 16, -- (Open)
+	TownMarkers = 17,
+	TreeCosmetics = 18,
+	WindSway = 19,
+	RegionFX = 20,
+	TownFX = 21,
+	LifeFX = 22,
+	AmbientLife = 23,
+	AmbientSound = 24,
+	CanopyFade = 25,
+	StoreStandState = 26,
+	ForestFiller = 30, -- last: it plans the filler forest on its own, after the player is in
+}
+-- Frames the queue waits after the player can play (the loading card's fade).
+local RELEASE_SETTLE_FRAMES = 30
 
 type Controller = { Start: () -> () }
 
@@ -562,10 +596,26 @@ print(
 	)
 )
 
-totalStarts = #loaded
+-- The critical controllers start now, all at once; the handshake below waits
+-- for these. The deferred ones are queued (ClientBoot) and start after the
+-- player can play, one or two a frame.
+local criticalStarts = 0
 for _, c in ipairs(loaded) do
-	task.spawn(start, c.name, c.module)
+	local priority = DEFERRED[c.name]
+	local module = c.module
+	if priority ~= nil and module ~= nil then
+		ClientBoot.Default.Register(c.name, {
+			priority = priority,
+			start = function()
+				module.Start()
+			end,
+		})
+	else
+		criticalStarts += 1
+		task.spawn(start, c.name, c.module)
+	end
 end
+totalStarts = criticalStarts
 
 -- The join handshake. The controllers now start at +0.2 s, long before the
 -- server has made its remotes, and each connects its handlers when its Start
@@ -611,6 +661,115 @@ task.spawn(function()
 			return
 		end
 	end
+end)
+
+-- The deferred controllers (DEFERRED above) start once the player can play: the
+-- save is in (ProfileLoaded), the loading card has faded, then one or two a
+-- frame, soonest-needed first. A save that never loads does not keep them away
+-- for good (a timeout). Used before their turn, they start on first use.
+task.spawn(function()
+	local localPlayer = Players.LocalPlayer
+	ClientBoot.ReleaseWhenPlaying(ClientBoot.Default, function(): boolean
+		return localPlayer ~= nil and localPlayer:GetAttribute("ProfileLoaded") == true
+	end, { settleFrames = RELEASE_SETTLE_FRAMES, timeout = 30 })
+end)
+
+-- A server event that a deferred controller listens for, arriving before that
+-- controller's Start has connected its own listener, would be lost: a box opened
+-- in the first seconds (WorldFX "PlaceBox" starts the placer), Old Hank's or a
+-- keeper's line (Dialogue). A light listener here starts the controller on the
+-- spot and hands it the event it missed; once started, its own listener has it.
+local EARLY_EVENTS: { { remote: string, name: string, handler: string, only: string? } } = {
+	{ remote = "WorldFX", name = "BlueprintPlacer", handler = "HandleWorldFx", only = "PlaceBox" },
+	{ remote = "Dialogue", name = "DialogueUI", handler = "HandleServer", only = nil },
+}
+for _, early in ipairs(EARLY_EVENTS) do
+	task.spawn(function()
+		pcall(function()
+			local module: any = nil
+			for _, c in ipairs(loaded) do
+				if c.name == early.name then
+					module = c.module
+				end
+			end
+			if module == nil or module[early.handler] == nil then
+				return
+			end
+			Net.Remote(early.remote).OnClientEvent
+				:Connect(ClientBoot.EarlyHandler(ClientBoot.Default, early.name, module, early.handler, early.only))
+		end)
+	end)
+end
+
+-- A tool in the hand (the hammer, a rolled plan) starts the two tool
+-- controllers at once if their turn has not come yet: they bind the tool's
+-- Activated, and a click on a tool that nothing listens to would do nothing.
+pcall(function()
+	local localPlayer = Players.LocalPlayer
+	local function equipped(child: Instance)
+		if child:IsA("Tool") then
+			ClientBoot.Ensure("HammerController")
+			ClientBoot.Ensure("BlueprintPlacer")
+		end
+	end
+	local function watchCharacter(character: Model)
+		for _, child in ipairs(character:GetChildren()) do
+			equipped(child)
+		end
+		character.ChildAdded:Connect(equipped)
+	end
+	localPlayer.CharacterAdded:Connect(watchCharacter)
+	if localPlayer.Character then
+		watchCharacter(localPlayer.Character)
+	end
+end)
+
+-- Mesh swap-ins on this client (a dressing whose mesh landed late) go nearest
+-- the camera first, a few a frame (MeshKit.Pump).
+pcall(function()
+	local MeshKit = require(SharedFolder:WaitForChild("Art"):WaitForChild("MeshKit"))
+	MeshKit.Focus = function(): { { x: number, z: number } }
+		local camera = workspace.CurrentCamera
+		if camera == nil then
+			return {}
+		end
+		local at = camera.CFrame.Position
+		return { { x = at.X, z = at.Z } }
+	end
+end)
+
+-- [Perf] lines (Shared/PerfProbe): can play, fully built, and the worst frame
+-- after the character spawned, every 5 s and once at +30 s. Cheap: one
+-- Heartbeat function until the 30 s are up, then nothing.
+pcall(function()
+	local localPlayer = Players.LocalPlayer
+	local probe = PerfProbe.new({ log = print })
+	local beat: RBXScriptConnection? = nil
+	beat = game:GetService("RunService").Heartbeat:Connect(function(dt: number)
+		probe.Frame(dt)
+		if probe.Done() and beat then
+			beat:Disconnect()
+			beat = nil
+		end
+	end)
+	if localPlayer.Character then
+		probe.MarkSpawn()
+	end
+	localPlayer.CharacterAdded:Connect(probe.MarkSpawn)
+	local function playable()
+		if localPlayer:GetAttribute("ProfileLoaded") == true then
+			probe.MarkCanPlay()
+		end
+	end
+	playable()
+	localPlayer:GetAttributeChangedSignal("ProfileLoaded"):Connect(playable)
+	local function built()
+		if workspace:GetAttribute("WorldBuilt") == true then
+			probe.MarkBuilt()
+		end
+	end
+	built()
+	workspace:GetAttributeChangedSignal("WorldBuilt"):Connect(built)
 end)
 
 print(string.format("[Load] client controllers started in %.2fs", os.clock() - clientStart))

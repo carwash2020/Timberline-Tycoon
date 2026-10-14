@@ -67,6 +67,7 @@ local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local MeshKit = require(ReplicatedStorage.Shared.Art.MeshKit)
 local MeshManifest = require(ReplicatedStorage.Shared.Art.MeshManifest)
 local LoadQueue = require(ReplicatedStorage.Shared.LoadQueue)
+local NearFirst = require(ReplicatedStorage.Shared.NearFirst)
 local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
 local BuildTimings = require(ReplicatedStorage.Shared.BuildTimings)
 local LoadState = require(script.Parent.LoadState)
@@ -89,6 +90,12 @@ local TreeService = require(script.Parent.TreeService)
 local WorldClock = require(script.Parent.WorldClock)
 
 local started = os.clock()
+
+-- Mesh swap-ins (MeshKit.Attempt's dressings, once their meshes have landed) run
+-- a few a frame, the ones nearest the players first, inside the same frame
+-- budget the forest, the terrain and the deferred queue share.
+MeshKit.Focus = LoadState.Focus
+MeshKit.SwapFrame = LoadState.Frame
 
 -- Which core loop this server runs (V2_PLAN.md §0), decided once, before
 -- anything is built: every server module and client reads CoreLoopActive.
@@ -148,6 +155,10 @@ for _, child in ipairs(workspace:GetChildren()) do
 		child:Destroy()
 	end
 end
+
+-- The client's loading card holds for the area round the spawn: false until the
+-- forest planter has planted the trees there (LoadingScreen, "NearRingBuilt").
+workspace:SetAttribute("NearRingBuilt", false)
 
 -- 1. The folder.
 local map = Instance.new("Folder")
@@ -218,12 +229,11 @@ step("3. Terrain", function()
 	end, {
 		nearRadius = TerrainBuilder.NearRadius,
 		firstSpots = PlotData.Slots,
-		sliceSeconds = function(): number
-			-- Nobody is in yet: take more of each frame. Once a player can play, the same share as the forest.
-			return if LoadState.Gates.IsReady("firstPlayer")
-				then TerrainBuilder.BackgroundSliceSeconds
-				else TerrainBuilder.SliceSeconds
-		end,
+		-- The frame budget the forest planter and the deferred queue share (LoadState.Frame):
+		-- more of each frame while nobody is in yet, 10 ms in all once a player can play.
+		-- The blocks after the near ring go to the players first, nearest them.
+		frame = LoadState.Frame,
+		focus = LoadState.Focus,
 	})
 	terrainSeconds = seconds
 	terrainFinish = finish
@@ -374,16 +384,27 @@ end
 -- over a second): one step plans it (tier 1 lower so it runs first of its
 -- tier, and it is its own step so the server breathes after it), and the
 -- cells it finds are added to the queue then.
+--
+-- The plan runs on the step's own time slice (WorldPlan.WithPause): every
+-- planner's loops hand the frame back when the shared budget is spent, so the
+-- step is many small units, not one. "Points of interest (plan)" was ONE
+-- 5.07 s step (Studio, 14 October 2026): a point may not stand on a tree, so
+-- it needs the whole forest plan, and it ran with no pause. The list is the
+-- same either way (tests/PoiPlanSplit.spec). A plan that takes the pause
+-- itself (WorldPlan.PointsOfInterest) gets it as its argument too.
 local function deferPlanned<T>(
 	name: string,
 	tier: number,
-	plan: () -> { T },
+	plan: (pause: (() -> ())?) -> { T },
 	positionOf: (item: T) -> Vector3,
 	size: number,
 	build: (cell: { T }, slice: () -> boolean) -> ()
 )
-	defer(name .. " (plan)", tier, nil, function(_slice)
-		deferCells(name, tier, plan(), positionOf, size, build)
+	defer(name .. " (plan)", tier, nil, function(slice)
+		local items = WorldPlan.WithPause(slice, function(): any
+			return plan(slice)
+		end) :: { T }
+		deferCells(name, tier, items, positionOf, size, build)
 	end)
 end
 
@@ -636,7 +657,6 @@ LoadState.Stage("town")
 -- Set by step 5: plants the world's trees (see there). Run once, after the
 -- sell area under v2.
 local forestPlanter: ((yielding: boolean) -> ())? = nil
-local FOREST_SLICE = 0.012 -- seconds of planting per frame; the deferred queue takes as much again (LoadState.Queue), so the server keeps its frame rate
 
 step("5. The trees", function()
 	if V2 then
@@ -685,54 +705,32 @@ step("5. The trees", function()
 		local firstCount = treesSpawned
 		type Entry = { spot: WorldPlan.TreeSpot, reach: boolean, order: number }
 		local failed, firstErr = 0, nil
-		local slice = TimeSlice.new({ budget = FOREST_SLICE })
+		local spawn = WorldLayout.Spawn
+		-- The planting and the planning each run on their own slice of the ONE
+		-- frame budget the whole server's background work shares (LoadState.Frame).
+		local plantSlice = TimeSlice.new({ frame = LoadState.Frame })
+		local planSlice = TimeSlice.new({ frame = LoadState.Frame })
+		local longestTree = 0
 		local spawnedAny = false
-		-- Spawns `entries` (nearest the spawn first when yielding), a frame's
-		-- worth at a time. One tree that fails to build (a bad seed) mustn't take
-		-- the rest of the forest with it: each on its own, one warning for all.
-		local function spawnAll(entries: { Entry })
-			if yielding then
-				local spawn = WorldLayout.Spawn
-				local keyed: { [Entry]: number } = {}
-				for _, e in ipairs(entries) do
-					local dx, dz = e.spot.position.X - spawn.X, e.spot.position.Z - spawn.Z
-					keyed[e] = dx * dx + dz * dz
+
+		-- One tree. One that fails to build (a bad seed) mustn't take the rest of the
+		-- forest with it: each on its own, one warning for all.
+		local function plantOne(e: Entry)
+			local spot = e.spot
+			local startedTree = os.clock()
+			local ok, err = pcall(function(): any
+				spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
+				return nil
+			end)
+			longestTree = math.max(longestTree, os.clock() - startedTree)
+			if not ok then
+				if e.reach then
+					warn(string.format("[MapBuilder] reach tree failed: %s", tostring(err)))
+				else
+					failed += 1
+					firstErr = firstErr
+						or string.format("%s at %s: %s", spot.woodId, tostring(spot.position), tostring(err))
 				end
-				table.sort(entries, function(a: Entry, b: Entry): boolean
-					if keyed[a] ~= keyed[b] then
-						return keyed[a] < keyed[b]
-					end
-					return a.order < b.order
-				end)
-			end
-			for _, e in ipairs(entries) do
-				local spot = e.spot
-				local ok, err = pcall(function(): any
-					spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
-					return nil
-				end)
-				if not ok then
-					if e.reach then
-						warn(string.format("[MapBuilder] reach tree failed: %s", tostring(err)))
-					else
-						failed += 1
-						firstErr = firstErr
-							or string.format("%s at %s: %s", spot.woodId, tostring(spot.position), tostring(err))
-					end
-				end
-				if yielding and slice.step() then
-					workspace:SetAttribute("MapTrees", treesSpawned)
-				end
-			end
-			if yielding and #entries > 0 and not spawnedAny then
-				spawnedAny = true
-				loadLine(
-					string.format(
-						"first forest trees planted: %d in %.2fs",
-						treesSpawned - firstCount,
-						os.clock() - before
-					)
-				)
 			end
 		end
 		local function entriesOf(list: { WorldPlan.TreeSpot }, reach: boolean, startOrder: number): { Entry }
@@ -742,15 +740,7 @@ step("5. The trees", function()
 			end
 			return entries
 		end
-		local order = 0
-		-- Each planner is one block of CPU the engine cannot split, so the
-		-- server gets a frame between them when it is planting after the
-		-- players are in (a player's physics and remotes run in those frames).
-		local function breathe()
-			if yielding then
-				task.wait()
-			end
-		end
+
 		if not yielding then
 			-- The rollback's one pass, in the order it always had.
 			local entries: { Entry } = {}
@@ -768,66 +758,192 @@ step("5. The trees", function()
 			collect(WorldPlan.ReachTrees(), true)
 			collect(WorldPlan.RegionTrees(), false)
 			loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
-			spawnAll(entries)
-		else
-			-- The first batch, nearest the spawn first. It pauses on the slice
-			-- like everything the planner does.
-			local planted: { [WorldPlan.TreeSpot]: boolean } = {}
-			local first = WorldPlan.WithPause(slice.step, function(): any
-				return WorldPlan.FirstTrees()
-			end) :: { WorldPlan.TreeSpot }
-			for _, spot in ipairs(first) do
-				planted[spot] = true
+			for _, e in ipairs(entries) do
+				plantOne(e)
 			end
-			spawnAll(entriesOf(first, false, order))
-			order += #first
-			-- Then each batch the planner finishes, as it finishes it.
-			local all = WorldPlan.Trees(slice.step, function(batch: { WorldPlan.TreeSpot })
-				local fresh: { WorldPlan.TreeSpot } = {}
-				for _, spot in ipairs(batch) do
-					if not planted[spot] then
-						planted[spot] = true
-						table.insert(fresh, spot)
+		else
+			-- Nearest the PLAYERS first (the spawn while nobody is in): every site the
+			-- planner hands over goes into one pool, and a planting thread takes the
+			-- nearest one each time, asking where the players are again as it goes
+			-- (NearFirst.Queue re-sorts the pool when someone has moved). It plants
+			-- while the planner is still working out the rest, so the town's trees
+			-- (handed over second) beat the far groves of the first batch that are
+			-- still waiting. Both threads spend the one shared frame budget.
+			local pool = NearFirst.Queue(function(e: Entry): NearFirst.Point
+				return { x = e.spot.position.X, z = e.spot.position.Z }
+			end, {
+				focus = LoadState.Focus,
+				fallback = { x = spawn.X, z = spawn.Z },
+			})
+			local planning = true -- the planner may still hand over sites
+			local running = false -- the planting thread is alive
+			-- The near ring: every site within NEAR_RING studs of the spawn that
+			-- has been handed over is planted, and the town's batch (the trees
+			-- round the spawn) has been handed over. The client's loading card
+			-- waits for it (LoadingScreen), with a timeout of its own.
+			local NEAR_RING = 160
+			local nearPending, nearOpen = 0, false
+			local ringDone = false
+			local function nearSpot(e: Entry): boolean
+				local dx, dz = e.spot.position.X - spawn.X, e.spot.position.Z - spawn.Z
+				return dx * dx + dz * dz <= NEAR_RING * NEAR_RING
+			end
+			local function closeRing(why: string)
+				if ringDone then
+					return
+				end
+				ringDone = true
+				LoadState.Gates.Set("nearRing")
+				workspace:SetAttribute("NearRingBuilt", true)
+				loadLine(string.format("near ring built (%s): %d trees planted so far", why, treesSpawned - firstCount))
+			end
+			local function checkRing()
+				if not ringDone and nearPending == 0 and (nearOpen or not planning) then
+					closeRing("the trees round the spawn")
+				end
+			end
+
+			-- The planting thread: takes the nearest site each time until the pool is
+			-- empty, then ends (a batch handed over later starts it again).
+			local function plantPool()
+				local ok, err = xpcall(function(): any
+					while true do
+						local e = pool.Next()
+						if e == nil then
+							break
+						end
+						plantOne(e)
+						if nearSpot(e) then
+							nearPending -= 1
+							checkRing()
+						end
+						if not spawnedAny then
+							spawnedAny = true
+							loadLine(
+								string.format(
+									"first forest trees planted: %d in %.2fs",
+									treesSpawned - firstCount,
+									os.clock() - before
+								)
+							)
+						end
+						if plantSlice.step() then
+							workspace:SetAttribute("MapTrees", treesSpawned)
+						end
+					end
+					return nil
+				end, traceback)
+				if not ok then
+					warn(string.format("[MapBuilder] the forest planting failed:\n%s", tostring(err)))
+				end
+				running = false
+			end
+			local function add(entries: { Entry })
+				for _, e in ipairs(entries) do
+					if nearSpot(e) then
+						nearPending += 1
 					end
 				end
-				spawnAll(entriesOf(fresh, false, order))
-				order += #fresh
-			end)
-			-- Whatever the planner did not hand over on the way (nothing, once
-			-- its batches all came): the rest of the list.
-			local rest: { WorldPlan.TreeSpot } = {}
-			for _, spot in ipairs(all) do
-				if not planted[spot] then
+				pool.Add(entries)
+				if not running and #entries > 0 then
+					running = true -- claimed now: two batches in one frame start one thread
+					plantSlice.reset()
+					task.spawn(plantPool)
+				end
+			end
+
+			local planOk, planErr = xpcall(function(): any
+				local order = 0
+				-- The first batch (the meadow and the wild groves), paused on the slice like
+				-- everything the planner does.
+				local planted: { [WorldPlan.TreeSpot]: boolean } = {}
+				local first = WorldPlan.WithPause(planSlice.step, function(): any
+					return WorldPlan.FirstTrees()
+				end) :: { WorldPlan.TreeSpot }
+				for _, spot in ipairs(first) do
 					planted[spot] = true
-					table.insert(rest, spot)
 				end
-			end
-			spawnAll(entriesOf(rest, false, order))
-			order += #rest
-			breathe()
-			-- Strip and ferry sites share one warning, so one bad wood is still
-			-- one line. Lanternwood waits until WoodData has the row (B12).
-			local tail: { Entry } = {}
-			local function collect(list: { WorldPlan.TreeSpot }, reach: boolean)
-				for _, e in ipairs(entriesOf(list, reach, order)) do
-					table.insert(tail, e)
+				add(entriesOf(first, false, order))
+				order += #first
+				-- Then each batch the planner finishes, as it finishes it. The first one
+				-- is the town's trees, the ring round the spawn.
+				local all = WorldPlan.Trees(planSlice.step, function(batch: { WorldPlan.TreeSpot })
+					local fresh: { WorldPlan.TreeSpot } = {}
+					for _, spot in ipairs(batch) do
+						if not planted[spot] then
+							planted[spot] = true
+							table.insert(fresh, spot)
+						end
+					end
+					add(entriesOf(fresh, false, order))
+					order += #fresh
+					nearOpen = true
+				end)
+				-- Whatever the planner did not hand over on the way (nothing, once
+				-- its batches all came): the rest of the list.
+				local rest: { WorldPlan.TreeSpot } = {}
+				for _, spot in ipairs(all) do
+					if not planted[spot] then
+						planted[spot] = true
+						table.insert(rest, spot)
+					end
 				end
-				order += #list
+				add(entriesOf(rest, false, order))
+				order += #rest
+				nearOpen = true
+				-- Strip and ferry sites share one warning, so one bad wood is still
+				-- one line. Lanternwood waits until WoodData has the row (B12). Each
+				-- planner runs paused on the slice, so a frame goes back between them.
+				local tail: { Entry } = {}
+				local function collect(list: { WorldPlan.TreeSpot }, reach: boolean)
+					for _, e in ipairs(entriesOf(list, reach, order)) do
+						table.insert(tail, e)
+					end
+					order += #list
+				end
+				WorldPlan.WithPause(planSlice.step, function(): any
+					collect(WorldPlan.StripTrees(), false)
+					collect(WorldPlan.FerryPalms(), false)
+					if WoodData.Get("lanternwood") then
+						collect(WorldPlan.Lanternwood(), false)
+					end
+					-- The Petrified Reach, planned after the fingerprint trees, so none of
+					-- those move.
+					collect(WorldPlan.ReachTrees(), true)
+					-- Bog Cypress in the Bayou and Ironwood on Red Mesa (Lane R).
+					collect(WorldPlan.RegionTrees(), false)
+					return nil
+				end)
+				loadLine(string.format("forest planned: %d sites in %.2fs", #all + #tail, os.clock() - before))
+				add(tail)
+				return nil
+			end, traceback)
+			planning = false
+			checkRing()
+			-- The planter finishes what is in the pool (a planner that failed still
+			-- leaves what it handed over standing).
+			while running or pool.Remaining() > 0 do
+				if not running then
+					running = true -- (a failed planting thread left sites behind: finish them here)
+					task.spawn(plantPool)
+				end
+				task.wait()
 			end
-			collect(WorldPlan.StripTrees(), false)
-			collect(WorldPlan.FerryPalms(), false)
-			breathe()
-			if WoodData.Get("lanternwood") then
-				collect(WorldPlan.Lanternwood(), false)
+			planSlice.finish()
+			plantSlice.finish()
+			closeRing("the forest is planted") -- never left shut, whatever happened
+			print(
+				string.format(
+					"[Perf] stage forest planting: total %.2fs, longest step %.0f ms (longest tree %.0f ms, %d trees)",
+					os.clock() - before,
+					math.max(planSlice.longest(), plantSlice.longest()) * 1000,
+					longestTree * 1000,
+					treesSpawned - firstCount
+				)
+			)
+			if not planOk then
+				error(planErr, 0)
 			end
-			-- The Petrified Reach, planned after the fingerprint trees, so none of
-			-- those move.
-			collect(WorldPlan.ReachTrees(), true)
-			-- Bog Cypress in the Bayou and Ironwood on Red Mesa (Lane R).
-			collect(WorldPlan.RegionTrees(), false)
-			breathe()
-			loadLine(string.format("forest planned: %d sites in %.2fs", #all + #tail, os.clock() - before))
-			spawnAll(tail)
 		end
 		if failed > 0 then
 			warn(string.format("[MapBuilder] %d tree(s) failed to build; the first: %s", failed, tostring(firstErr)))
@@ -1466,6 +1582,11 @@ workspace:SetAttribute("MapBuildFailures", failedSteps)
 local planter = forestPlanter
 if planter then
 	LoadState.Track("forest")
+else
+	-- Nothing planted after the world gate (the v1 rollback plants in its own step):
+	-- the near ring is as built as it will get, so the client's card need not wait.
+	LoadState.Gates.Set("nearRing")
+	workspace:SetAttribute("NearRingBuilt", true)
 end
 
 -- The world is ready: GameServer starts when the sell area appears.

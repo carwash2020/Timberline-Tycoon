@@ -12,6 +12,12 @@
 --   * Fades out once the LocalPlayer has a Character, the save is in (the
 --     "ProfileLoaded" attribute GameServer sets) and the game has loaded,
 --     or after MAX_SECONDS whatever happens. Then it destroys itself.
+--   * It also waits for the area round the spawn to be built: the server
+--     sets the workspace attribute "NearRingBuilt" to false when the world
+--     starts and to true once the trees round the spawn are planted (its
+--     terrain there is written before anyone is let in). The card holds
+--     for that for at most NEAR_RING_WAIT seconds after the character and
+--     the save are in; no attribute (an older server) means no wait.
 --   * It never leaves the screen blocked: an error removes the card at
 --     once, and a backstop removes it a little after MAX_SECONDS even if
 --     this script stalls.
@@ -51,6 +57,7 @@ end
 local LoadingTips = loadTips()
 
 local MAX_SECONDS = 30 -- the card never stays up longer than this
+local NEAR_RING_WAIT = 6 -- seconds past "character and save in" the card waits for the area round the spawn
 local FADE_SECONDS = 0.6
 local BACKSTOP_SECONDS = MAX_SECONDS + FADE_SECONDS + 5
 local FAILSAFE_SECONDS = 4 -- after the hand-over, one last look for a card left behind
@@ -264,13 +271,34 @@ local function build(): Card
 	return { gui = screen, draw = draw }
 end
 
--- Ready to play: a character in the world, the save loaded, the game in.
+-- The server's word on the area round the spawn: false while its trees are
+-- being planted, true once they stand, nil when the server says nothing.
+local function nearRing(): boolean?
+	local ok, value = pcall(function(): any
+		return workspace:GetAttribute("NearRingBuilt")
+	end)
+	if ok and type(value) == "boolean" then
+		return value
+	end
+	return nil
+end
+
+-- Ready to play: a character in the world, the save loaded, the game in, and
+-- (for at most NEAR_RING_WAIT seconds) the area round the spawn built.
+local readySince: number? = nil
 local function ready(): boolean
 	local character = player.Character
-	return character ~= nil
+	local basics = character ~= nil
 		and character.Parent ~= nil
 		and player:GetAttribute("ProfileLoaded") == true
 		and game:IsLoaded()
+	if not basics then
+		readySince = nil
+		return false
+	end
+	local since = readySince or os.clock()
+	readySince = since
+	return nearRing() ~= false or os.clock() - since >= NEAR_RING_WAIT
 end
 
 -- PlayerGui, waiting in short tries (never a bare WaitForChild).

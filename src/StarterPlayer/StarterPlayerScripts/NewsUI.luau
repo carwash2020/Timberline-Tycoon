@@ -7,6 +7,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ClientBoot = require(ReplicatedStorage.Shared.ClientBoot)
 local NewsLogic = require(ReplicatedStorage.Shared.NewsLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
@@ -162,6 +163,7 @@ local function bindClose()
 end
 
 function NewsUI.Open()
+	ClientBoot.Ensure("NewsUI") -- its Start is deferred until after the player can play (first use starts it now)
 	local root, face = panel, closeFace
 	if root == nil or face == nil then
 		return

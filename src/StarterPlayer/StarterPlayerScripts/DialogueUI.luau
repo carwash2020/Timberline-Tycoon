@@ -28,6 +28,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local ClientBoot = require(ReplicatedStorage.Shared.ClientBoot)
 local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
 local DialogueFlow = require(ReplicatedStorage.Shared.DialogueFlow)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
@@ -59,14 +60,26 @@ local impl: {
 	isOpen: (() -> boolean)?,
 	talkingTo: ((Instance?) -> boolean)?,
 	pageChars: (() -> number)?,
+	show: ((payload: any) -> ())?,
 } =
 	{}
 
 -- Opens a conversation. Returns false when the box is not ready or there is
 -- nothing to say.
 function DialogueUI.Talk(talk: Talk): boolean
+	ClientBoot.Ensure("DialogueUI") -- its Start is deferred until after the player can play (first use starts it now)
 	local open = impl.talk
 	return open ~= nil and open(talk)
+end
+
+-- A line the server sent (the keeper's greeting, Old Hank, the Hermit). Client.client
+-- hands over one that arrived before this controller's deferred Start had connected
+-- its own listener (ClientBoot).
+function DialogueUI.HandleServer(payload: any)
+	local f = impl.show
+	if f then
+		f(payload)
+	end
 end
 
 function DialogueUI.Close()
@@ -609,6 +622,7 @@ function DialogueUI.Start()
 		end
 	end)
 
+	impl.show = show
 	Net.Remote("Dialogue").OnClientEvent:Connect(show)
 	gui.Parent = player:WaitForChild("PlayerGui")
 	-- A respawn or a leave never strands the box (or the prompts).

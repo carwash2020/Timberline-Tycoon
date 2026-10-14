@@ -62,6 +62,19 @@ return function(t)
 			return p
 		end
 		local players = { player("Waiting", false), player("Here", true) }
+		if options.playerAt then
+			-- "Here" stands at this spot (a character with a root part).
+			players[2].Character = {
+				FindFirstChild = function()
+					return {
+						IsA = function()
+							return true
+						end,
+						Position = options.playerAt,
+					}
+				end,
+			}
+		end
 		local Players = setmetatable({}, {
 			__index = function(_, key)
 				if key == "CharacterAutoLoads" then
@@ -144,6 +157,9 @@ return function(t)
 								s.forestAfterSellArea = (s.forestAfterSellArea ~= false) and sellAreaIn()
 								s.forestOrder = s.forestOrder or {}
 								table.insert(s.forestOrder, _cf.Position)
+								if s.ringAtFirstTree == nil then
+									s.ringAtFirstTree = ws:GetAttribute("NearRingBuilt")
+								end
 							end
 						end
 					end,
@@ -579,6 +595,55 @@ return function(t)
 			last = d2(order[i])
 		end
 		t.ok(ordered, "then the town's trees, nearest the spawn first, before any of the far forest")
+	end)
+
+	-- Launch performance (14 October 2026): the forest comes nearest the PLAYERS
+	-- first, and the client's loading card waits for the ring round the spawn.
+	t.test("v2: the forest is planted nearest the player first, not the spawn, when one is in", function()
+		local fresh = t.loader({ isolated = true }):load("ReplicatedStorage/Shared/World/WorldPlan")
+		local firstTrees = fresh.FirstTrees()
+		-- The player stands at the first-batch tree farthest from the spawn.
+		local spawn = t.shared("World/WorldLayout").Spawn
+		local farthest = firstTrees[1].position
+		for _, spot in ipairs(firstTrees) do
+			local a = (spot.position.X - spawn.X) ^ 2 + (spot.position.Z - spawn.Z) ^ 2
+			local b = (farthest.X - spawn.X) ^ 2 + (farthest.Z - spawn.Z) ^ 2
+			if a > b then
+				farthest = spot.position
+			end
+		end
+		local s = build({
+			loop = 2,
+			playerAt = farthest,
+			worldPlan = { Trees = fresh.Trees, FirstTrees = fresh.FirstTrees },
+		})
+		local planAt = {}
+		for _, spot in ipairs(firstTrees) do
+			planAt[tostring(spot.position)] = true
+		end
+		local order = {}
+		for _, p in ipairs(s.forestOrder) do
+			if planAt[tostring(p)] then
+				table.insert(order, p)
+			end
+		end
+		t.eq(#order, #firstTrees, "every first-batch tree is planted once")
+		local function d2(p)
+			return (p.X - farthest.X) ^ 2 + (p.Z - farthest.Z) ^ 2
+		end
+		local last, ordered = -1, true
+		for _, p in ipairs(order) do
+			ordered = ordered and d2(p) >= last
+			last = d2(p)
+		end
+		t.ok(ordered, "nearest the player first")
+		t.ok(d2(order[1]) < 1, "the tree the player stands by is the first planted")
+	end)
+
+	t.test("v2: NearRingBuilt is false while the world builds and true once the trees round the spawn stand", function()
+		local s = build({ loop = 2 })
+		t.eq(s.ringAtFirstTree, false, "the client's card is told to wait until the ring is planted")
+		t.eq(s.workspace:GetAttribute("NearRingBuilt"), true, "and told it is built when the forest is in")
 	end)
 
 	t.test("a live server (no Studio override) builds the v2 loop's section trees", function()

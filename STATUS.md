@@ -27,6 +27,21 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Launch performance (branch `phase-2/launch-perf`, 14 October 2026)
+
+Connor's Studio log: playable at +4.6 s but heavy work ran until +11.9 s (the points-of-interest plan one 5.07 s step, 1,205 trees over
+8.1 s, the terrain write 9.2 s, the client's filler plan 4.8 s, client Starts about 1.4 s each, 696 mesh swap-ins in bursts). Claude cannot
+run Studio: nothing below is measured there. **What changed** (full list and Studio checks: PHASE2_NOTES.md "Launch performance"):
+one shared per-frame budget for the server's background work (`Shared/FrameBudget`; 30 ms while nobody plays, 10 ms in all once a player
+can play, where the forest, terrain and deferred queue each took 12 ms before); the POI plan and every other `(plan)` step run on the
+step's slice (`WorldPlan.PlanPointsOfInterest(pause)`, byte-identical output: `PoiPlanSplit.spec`); the forest is planted nearest the
+players first (`Shared/NearFirst`, re-sorted as they move) while the planner is still working; the later terrain blocks go to the players
+first; the client's deferrable Starts run after "can play" through `Shared/ClientBoot` (start on first use as a fallback); ForestFiller
+waits for them and adapts to slow frames; mesh swap-ins are capped per frame and nearest-first (`MeshKit.Pump`); the loading card waits
+(at most 6 s) for the trees round the spawn (`NearRingBuilt`); `[Perf]` lines on the server and the client (`Shared/PerfProbe`).
+**Open:** Connor reads the `[Perf]` lines from one cold-server join and sends them back; the budgets (10 ms, 6 swaps, 2 Starts a frame,
+6 s card wait) are guesses until then.
+
 ## Grey box after the join (branch `phase-2/grey-box-after-load`, 13 October 2026)
 
 Connor on Xbox: once the game loaded, a grey veil lay over the screen.

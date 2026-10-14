@@ -25,6 +25,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local ClientBoot = require(ReplicatedStorage.Shared.ClientBoot)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local EventData = require(ReplicatedStorage.Shared.EventData)
@@ -354,6 +355,7 @@ end
 -- Rook's panel: NPCController calls it as his talk box closes. During the
 -- tutorial there is nothing to show (his line sent you back to Murph).
 function DailyUI.OpenForeman()
+	ClientBoot.Ensure("DailyUI") -- its Start is deferred until after the player can play (first use starts it now)
 	if ((player:GetAttribute("TutorialStep") :: number?) or 0) > 0 then
 		return
 	end

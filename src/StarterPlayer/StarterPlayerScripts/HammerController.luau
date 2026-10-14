@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local ClientBoot = require(ReplicatedStorage.Shared.ClientBoot)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local HammerArt = require(ReplicatedStorage.Shared.Art.HammerArt)
 local HammerLogic = require(ReplicatedStorage.Shared.HammerLogic)
@@ -115,6 +116,7 @@ end
 
 -- Takes the hammer out (the HAMMER button on a phone).
 function HammerController.Equip()
+	ClientBoot.Ensure("HammerController") -- its Start is deferred until after the player can play (first use starts it now)
 	local h = humanoid()
 	local tool = hammerTool()
 	if h and tool and held == nil then
