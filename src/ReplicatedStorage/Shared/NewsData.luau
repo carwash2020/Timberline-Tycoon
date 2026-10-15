@@ -22,7 +22,11 @@ NewsData.Entries = {
 		detail = "Every truck rebuilt. See the Dealership.",
 		icon = "gondola",
 	},
-	{ line = "New items in the stores.", detail = "Fresh stock at Hearth, Sparkworks and the shed.", icon = "spark" },
+	{
+		line = "Sparkworks sells logic pieces, belts and lasers.",
+		detail = "Up the road past the Land Office. A plot first.",
+		icon = "spark",
+	},
 	{ line = "Refreshed shop icons.", detail = "Clearer pictures on every shelf and sign.", icon = "blueprint" },
 	{
 		line = "Axes are held the right way round.",

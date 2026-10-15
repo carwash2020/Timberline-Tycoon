@@ -19,7 +19,7 @@ return function(t)
 		end
 		for _, word in ipairs({
 			"vehicles",
-			"stores",
+			"Sparkworks",
 			"icons",
 			"Axes",
 			"first load",
