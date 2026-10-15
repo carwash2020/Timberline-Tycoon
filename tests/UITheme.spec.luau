@@ -39,7 +39,15 @@ return function(t)
 						return configs[className]
 					end,
 				},
-				UserInputService = { TouchEnabled = device.touch, KeyboardEnabled = device.keyboard },
+				UserInputService = {
+					TouchEnabled = device.touch,
+					KeyboardEnabled = device.keyboard,
+					GetLastInputType = function()
+						return if device.touch and not device.keyboard
+							then roblox.Enum.UserInputType.Touch
+							else roblox.Enum.UserInputType.Keyboard
+					end,
+				},
 			},
 			globals = {
 				workspace = { CurrentCamera = if device.viewport then { ViewportSize = device.viewport } else nil },
@@ -130,14 +138,45 @@ return function(t)
 		t.eq(UITheme.GlyphText("ButtonR2"), "R2")
 	end)
 
-	-- UI-15: a TV (the ten-foot interface) gets the desktop sizes, never the phone's.
-	t.test("a console's TV reads the desktop sizes, not the phone's", function()
+	-- A TV (the ten-foot interface) gets the console table, never the phone's.
+	t.test("a console's TV reads the console sizes: every text 16 or more, 24 px at 1080p", function()
 		local UITheme = theme({}, { touch = false, keyboard = false, tenFoot = true })
 		t.eq(UITheme.Device(), "console")
 		t.eq(UITheme.IsPhone(), false)
 		t.eq(select(1, UITheme.Margin()), 64, "inside a TV's safe area")
-		t.ok(UITheme.Sized("Clock") == UITheme.Sizes.desktop.Clock)
-		t.ok(UITheme.Sized("SettingsToggle") == UITheme.Sizes.desktop.SettingsToggle)
+		t.ok(UITheme.Sized("Clock") == UITheme.Sizes.console.Clock)
+		t.ok(UITheme.Sized("SettingsToggle") == UITheme.Sizes.console.SettingsToggle)
+		local scale = UITheme.ScaleFor(Vector2.new(1920, 1080), false, true)
+		t.eq(scale, 1.5)
+		for name in pairs(UITheme.Sizes.desktop) do
+			local spec = UITheme.Sizes.console[name]
+			t.ok(spec ~= nil, name .. " has a console size")
+			if name == "PromptObject" then
+				t.ok(spec.text >= 12, "the prompt's object text stays 12 base (the card is scaled up)")
+			else
+				t.ok(spec.text * scale >= 24, name .. ": " .. spec.text * scale .. " px is under 24 at 1080p")
+			end
+			local desk = UITheme.Sizes.desktop[name]
+			if spec.size and desk.size then
+				t.ok(spec.size.X >= desk.size.X and spec.size.Y >= desk.size.Y, name .. " is not smaller on a TV")
+			end
+		end
+		for name in pairs(UITheme.Sizes.console) do
+			t.ok(UITheme.Sizes.desktop[name], name .. " is a console-only size")
+		end
+	end)
+
+	t.test("a phone's text is raised until it is at least 14 px after the screen's scale", function()
+		local UITheme = theme({})
+		for _, scale in ipairs({ 0.7, 0.78, 0.81, 0.85, 1 }) do
+			for name, spec in pairs(UITheme.Sizes.phone) do
+				local text = UITheme.PhoneTextFor(spec.text, scale)
+				t.ok(text >= spec.text, name .. " never shrinks")
+				t.ok(text * scale >= 14 - 1e-9, name .. " at scale " .. scale .. ": " .. text * scale .. " px")
+			end
+		end
+		t.eq(UITheme.PhoneTextFor(20, 0.78), 20, "a large text (the Settings cog's 20) is left alone")
+		t.eq(UITheme.PhoneTextFor(13, 0.78), 18, "the compact clock's 13 becomes ceil(14 / scale)")
 	end)
 
 	-- UI-07: the phone sizes (UITheme.Sizes.phone), what Sized() reads on a phone.

@@ -95,7 +95,7 @@ return function(t)
 
 	-- A client: PlayerGui, a player whose attributes are set here, the
 	-- services the overlays touch.
-	local function client(viewport, attrs)
+	local function client(viewport, attrs, tenFoot)
 		local c = { attributes = table.clone(attrs or {}), listeners = {} }
 		local playerGui = Instance.new("Folder")
 		playerGui.Name = "PlayerGui"
@@ -137,7 +137,7 @@ return function(t)
 			GuiService = {
 				SelectedObject = nil,
 				IsTenFootInterface = function()
-					return false
+					return tenFoot == true
 				end,
 				GetPropertyChangedSignal = function()
 					return ev()
@@ -242,6 +242,25 @@ return function(t)
 		end
 		return h + list.Padding.Offset * math.max(n - 1, 0)
 	end
+
+	-- A TV (1920 x 1080 tenFoot, UIScale 1.5): every text in the What's new
+	-- card is at least 24 px on screen (16 base).
+	t.test("What's new on a TV: no text under 24 px at 1080p", function()
+		local c = client(Vector2.new(1920, 1080), { ProfileLoaded = true, NewsV1Seen = true, TutorialStep = 99 }, true)
+		news(c)
+		local gui = c.playerGui:FindFirstChild("NewsUI")
+		t.ok(gui ~= nil, "the screen exists")
+		local scale = gui:FindFirstChildOfClass("UIScale").Scale
+		t.eq(scale, 1.5)
+		local seen = 0
+		for _, d in ipairs(gui:GetDescendants()) do
+			if d:IsA("TextLabel") or d:IsA("TextButton") then
+				seen += 1
+				t.ok(d.TextSize * scale >= 24, d.Name .. ": " .. d.TextSize * scale .. " px")
+			end
+		end
+		t.ok(seen >= 10, "the headlines, details, title and Close were checked")
+	end)
 
 	for _, case in ipairs(CENTRE_SIZES) do
 		for _, open in ipairs({ false, true }) do
