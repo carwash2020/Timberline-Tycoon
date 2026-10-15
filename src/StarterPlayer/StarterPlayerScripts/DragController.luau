@@ -1073,7 +1073,7 @@ local function startLoop()
 	local since = 0
 	-- What the grab itself sees, for CutController's [Chop] line (a swing that
 	-- does nothing on a pad): its own toolOut and whether a piece is held.
-	local function publish()
+	local function publishNow()
 		local char = player.Character
 		local out = char ~= nil and toolOut(char)
 		if player:GetAttribute("DragToolOut") ~= out then
@@ -1083,6 +1083,9 @@ local function startLoop()
 		if player:GetAttribute("GrabHeld") ~= held then
 			player:SetAttribute("GrabHeld", held)
 		end
+	end
+	local function publish()
+		pcall(publishNow) -- diagnostics only: never let it stop the grab
 	end
 	RunService.Heartbeat:Connect(function(dt: number)
 		publish()
