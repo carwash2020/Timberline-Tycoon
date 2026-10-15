@@ -335,6 +335,19 @@ function HudLayout.MarkTextLeft(): number
 	return HudLayout.MarkLeft + HudLayout.MarkSize + HudLayout.MarkGap
 end
 
+-- A UIPadding moves where its children's Positions start: a child at x sits
+-- at padLeft + x on the face. To put an icon `want` px from the face's left
+-- edge, its Position X offset is want - padLeft.
+function HudLayout.PaddedX(want: number, padLeft: number): number
+	return want - padLeft
+end
+
+-- The Field Guide's page icon: 16 wide, 8 from the face's left; the label's
+-- padding starts at GuideTextLeft.
+HudLayout.GuideIconLeft = 8
+HudLayout.GuideIconWidth = 16
+HudLayout.GuideTextLeft = 28
+
 -- A world marker drawn on screen (the tutorial beacon's arrow and distance
 -- pill) is cut off if a HUD button is drawn over it. `box` is where it
 -- would be (screen pixels), `obstacles` the HUD's boxes, `bounds` the
@@ -424,11 +437,18 @@ function HudLayout.TopRow(
 	textHeight: number,
 	leftSafe: number,
 	rightSafe: number,
-	fallbackTop: number
+	fallbackTop: number,
+	sideMargin: number?,
+	minTop: number?
 ): TopRowPlace
+	-- A TV's safe area (UITheme.Margin, scaled, in screen px): the row stays
+	-- that far in from the right edge and that far down from the top. 0 and 0
+	-- everywhere else.
+	local inset = math.max(TOP_MARGIN, sideMargin or 0)
+	local topFloor = minTop or 0
 	local function underBar(): TopRowPlace
 		local limit = viewport.X - rightSafe
-		local right = limit - TOP_MARGIN
+		local right = limit - inset
 		-- Keep the left edge out of a left notch when the row still fits
 		-- in the safe width.
 		if right - row.X < leftSafe then
@@ -437,7 +457,7 @@ function HudLayout.TopRow(
 				right = pinned
 			end
 		end
-		return { right = right, top = fallbackTop, inBar = false }
+		return { right = right, top = math.max(fallbackTop, topFloor), inBar = false }
 	end
 
 	local barW, barH = topbar.Width, topbar.Height
@@ -447,12 +467,12 @@ function HudLayout.TopRow(
 		return underBar()
 	end
 
-	local right = math.min(topbar.Max.X, viewport.X - rightSafe) - TOP_MARGIN
+	local right = math.min(topbar.Max.X, viewport.X - rightSafe) - inset
 	local left = right - row.X
 	if left < math.max(topbar.Min.X, leftSafe) or right > topbar.Max.X then
 		return underBar()
 	end
-	local top = topbar.Min.Y + (barH - row.Y) / 2
+	local top = math.max(topbar.Min.Y + (barH - row.Y) / 2, topFloor)
 	return { right = right, top = top, inBar = true }
 end
 

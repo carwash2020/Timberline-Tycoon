@@ -197,9 +197,18 @@ local function buildClock()
 	-- Which line it's in (or none) for the device and the tutorial.
 	local function place()
 		local compact = UITheme.Compact()
-		local box = if compact then Vector2.new(92, 28) else (spec.size or Vector2.new(100, 30))
+		-- A compact clock was 13 base: raised until it is at least 14 px after
+		-- the screen's UIScale, with the box widened in proportion.
+		local compactText = math.ceil(14 / math.max(UITheme.Scale(), 0.01))
+		local box = if compact
+			then Vector2.new(math.ceil(92 * math.max(compactText, 13) / 13), 28)
+			else (spec.size or Vector2.new(100, 30))
 		label.Size = UDim2.fromOffset(box.X, box.Y)
-		label.TextSize = if compact then 13 else spec.text
+		label.TextSize = if compact then math.max(compactText, 13) else spec.text
+		-- "Day N" under it: 16 on a TV (24 px at 1080p), else as it was.
+		local console = UITheme.Device() == "console" and not compact
+		dayLabel.TextSize = if console then 16 else 14
+		dayLabel.Size = if console then UDim2.fromOffset(112, 20) else UDim2.fromOffset(92, 16)
 		-- (nil while the save loads: hidden on a phone until it's in)
 		local spot = HudLayout.ClockLine(UITheme.IsPhone(), player:GetAttribute("TutorialStep"))
 		local under = HUD.UnderCash()

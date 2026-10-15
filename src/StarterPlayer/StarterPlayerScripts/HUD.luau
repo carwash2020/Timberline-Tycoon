@@ -1357,10 +1357,20 @@ local function layoutSide(side: Side, device: UITheme.Device)
 		local marked = side.button.face:FindFirstChild("Mark") ~= nil and not asIcon
 		local left = if marked then HudLayout.MarkTextLeft() else 6
 		pad.PaddingLeft = UDim.new(0, (if console then 36 else 0) + left)
+		-- A child's Position is inside the padding: take the padding off so
+		-- the mark sits at HudLayout.MarkLeft on the face, left of the text.
+		local markObj = side.button.face:FindFirstChild("Mark")
+		if markObj and markObj:IsA("GuiObject") then
+			markObj.Position = UDim2.new(0, HudLayout.PaddedX(HudLayout.MarkLeft, pad.PaddingLeft.Offset), 0.5, 0)
+		end
 		side.button.face.TextXAlignment = if marked then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center
 		if asIcon then
 			pad.PaddingLeft = UDim.new(0, 0)
 			pad.PaddingRight = UDim.new(0, 0)
+			local iconMark = side.button.face:FindFirstChild("Mark")
+			if iconMark and iconMark:IsA("GuiObject") then
+				iconMark.Position = UDim2.new(0, HudLayout.MarkLeft, 0.5, 0)
+			end
 		else
 			pad.PaddingRight = UDim.new(0, 6)
 		end
@@ -1793,6 +1803,12 @@ local function placeTopRow()
 		leftSafe = pos.X
 		rightSafe = viewport.X - (pos.X + size.X)
 	end
+	-- On a console the row stays inside the TV's safe area (UITheme.Margin,
+	-- scaled: 96 px in, 54 px down at 1080p); elsewhere 0 and 0.
+	local console = GuiService:IsTenFootInterface()
+	local marginSide, marginTop = UITheme.Margin()
+	local sideMargin = if console then marginSide * UITheme.Scale() else 0
+	local minTop = if console then marginTop * UITheme.Scale() else 0
 	local place = HudLayout.TopRow(
 		viewport,
 		GuiService.TopbarInset,
@@ -1800,7 +1816,9 @@ local function placeTopRow()
 		cashTextSize() * math.max(1, UITheme.Scale()),
 		leftSafe,
 		rightSafe,
-		UITheme.TopBar() + 4
+		UITheme.TopBar() + 4,
+		sideMargin,
+		minTop
 	)
 	local s = if topScale and topScale.Scale > 0 then topScale.Scale else 1
 	row.AnchorPoint = Vector2.new(1, 0)
@@ -1823,7 +1841,14 @@ local function placeTopRow()
 				(lifted.X - gui.AbsolutePosition.X) / scale,
 				(lifted.Y - gui.AbsolutePosition.Y) / scale
 			)
-			else UDim2.new(1, -UITheme.Margin(), 0, HudLayout.CornerTopPad)
+			else UDim2.new(
+				1,
+				-UITheme.Margin(),
+				0,
+				-- Console: the shelf follows the row's safe-area top so the clock
+				-- and Store sit level with the cash row and never overlap it.
+				if console then (place.top - gui.AbsolutePosition.Y) / scale else HudLayout.CornerTopPad
+			)
 		local have = frame.Position
 		if
 			math.abs(have.X.Offset - want.X.Offset) > 0.5

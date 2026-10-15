@@ -827,7 +827,9 @@ return function(t)
 				26 * s,
 				0,
 				rightSafe,
-				UITheme.TopBar() + 4
+				UITheme.TopBar() + 4,
+				64 * s, -- a TV's safe area: UITheme.Margin, scaled
+				36 * s
 			)
 			local rx = row.Position.X.Offset * s
 			local ry = row.Position.Y.Offset * s

@@ -184,7 +184,7 @@ local function consider()
 end
 
 function NewsUI.Start()
-	local gui = UITheme.Screen("NewsUI", UITheme.Layers.News)
+	local gui = UITheme.Screen("NewsUI", UITheme.Layers.News, "device") -- the whole screen, so the card is truly centred
 	-- No scrim, no backing frame: the ScreenGui holds the card and nothing
 	-- else. (The old full-screen Scrim TextButton, PanelAlt at 0.45, was the
 	-- grey box behind the card whenever it was open.)
@@ -198,6 +198,9 @@ function NewsUI.Start()
 	-- the face draws; its own stroke is the border.
 	card.outer.BackgroundTransparency = 1
 	UITheme.stroke(card.face, C.AmberEdge, UITheme.Stroke)
+	-- No grey gamepad selection box over the card (BadgeUI does the same).
+	card.outer.SelectionImageObject = UITheme.HiddenSelection()
+	card.face.SelectionImageObject = UITheme.HiddenSelection()
 	card.outer.AutomaticSize = Enum.AutomaticSize.Y
 	card.face.AutomaticSize = Enum.AutomaticSize.Y
 	card.face.Size = UDim2.fromScale(1, 0)
@@ -259,7 +262,8 @@ function NewsUI.Start()
 		line.Position = UDim2.fromOffset(44, 2)
 		line.Size = UDim2.new(1, -44, 0, 20)
 		line.TextTruncate = Enum.TextTruncate.AtEnd
-		local detail = UITheme.label(row, entry.detail, F.Body, 15, C.Muted)
+		local detail =
+			UITheme.label(row, entry.detail, F.Body, if UITheme.Device() == "console" then 16 else 15, C.Muted)
 		detail.Name = "Detail"
 		detail.Position = UDim2.fromOffset(44, 22)
 		detail.Size = UDim2.new(1, -44, 0, 18)
@@ -342,14 +346,18 @@ function NewsUI.Start()
 			word.Position = UDim2.fromOffset(10, 8)
 			word.Size = UDim2.new(1, -16, 0, 26)
 			title.Visible = true
+			-- A TV (scale 1.5 at 1080p) needs 16 base for 24 px of text, so its
+			-- rows are a little taller; everyone else is as it was.
+			local console = UITheme.Device() == "console"
 			for i, row in ipairs(rows) do
-				row.Size = UDim2.new(1, 0, 0, 44)
+				row.Size = UDim2.new(1, 0, 0, if console then 48 else 44)
 				local line = headlines[i]
 				local sub = details[i]
 				line.Position = UDim2.fromOffset(44, 2)
 				line.Size = UDim2.new(1, -48, 0, 20)
-				sub.Position = UDim2.fromOffset(44, 22)
-				sub.Size = UDim2.new(1, -48, 0, 18)
+				sub.TextSize = if console then 16 else 15
+				sub.Position = UDim2.fromOffset(44, if console then 23 else 22)
+				sub.Size = UDim2.new(1, -48, 0, if console then 22 else 18)
 			end
 		end
 		closeRow.Size = UDim2.new(1, 0, 0, CLOSE_GAP + tap + UITheme.ButtonDrop)

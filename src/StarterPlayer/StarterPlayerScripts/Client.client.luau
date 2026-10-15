@@ -763,6 +763,23 @@ pcall(function()
 	end
 	playable()
 	localPlayer:GetAttributeChangedSignal("ProfileLoaded"):Connect(playable)
+	-- Once, on a TV: the numbers the safe-area layout reads, to check against a photo.
+	if game:GetService("GuiService"):IsTenFootInterface() then
+		task.delay(3, function()
+			local UITheme = require(script.Parent.UITheme)
+			local side, bottom = UITheme.Margin()
+			local camera = workspace.CurrentCamera
+			print(
+				string.format(
+					"[Safe] tenFoot=true margin=(%d, %d) scale=%.3f viewport=%s",
+					side,
+					bottom,
+					UITheme.Scale(),
+					tostring(if camera then camera.ViewportSize else "none")
+				)
+			)
+		end)
+	end
 	-- TEMPORARY grey-box debug (remove once the offender is fixed): 3 s after
 	-- can play, list every big painted GuiObject on screen.
 	local function greyBoxDump()

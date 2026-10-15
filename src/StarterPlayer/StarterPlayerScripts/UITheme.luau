@@ -367,14 +367,71 @@ UITheme.Sizes = {
 		Beacon = { text = 12 },
 		PromptObject = { text = 12 },
 	} :: { [string]: SizeSpec },
+	-- A TV at 1080p scales by 1.5 (ScaleFor, 720 base), so a base size of 16
+	-- is 24 px on screen: readable from a sofa. Every text is at least 16 and
+	-- the rows and buttons are a little taller to hold it. (PromptObject is a
+	-- billboard: PromptUI scales the whole card up instead, and the object
+	-- text stays 12 at its own base.)
+	console = {
+		SideButton = { size = Vector2.new(150, 44), text = 16, tap = true },
+		Hint = { text = 16 },
+		LoadChip = { text = 16 },
+		Toast = { text = 16 },
+		Settings = { size = Vector2.new(44, 44), text = 22, tap = true },
+		Store = { size = Vector2.new(110, 38), text = 16, tap = true },
+		Clock = { size = Vector2.new(112, 38), text = 16 },
+		Pouch = { size = Vector2.new(100, 38), text = 16, tap = true },
+		DailyHeading = { text = 16 },
+		DailyFooter = { text = 16 },
+		DailyCountdown = { text = 16 },
+		PouchList = { text = 16 },
+		SettingsToggle = { size = Vector2.new(210, 44), text = 16, tap = true },
+		ShopBuy = { size = Vector2.new(124, 44), text = 16, tap = true },
+		ShopClose = { size = Vector2.new(48, 48), text = 22, tap = true },
+		ShopSubtitle = { text = 16 },
+		ShopOwn = { text = 16 },
+		ShopDetail = { text = 16 },
+		FieldGuide = { size = Vector2.new(170, 42), text = 16, tap = true },
+		TrackerStep = { text = 16 },
+		Skip = { size = Vector2.new(132, 34), text = 16, tap = true },
+		MurphName = { text = 16 },
+		MurphLine = { text = 16 },
+		Beacon = { text = 16 },
+		PromptObject = { text = 12 },
+	} :: { [string]: SizeSpec },
 }
 
--- `name`'s size on this device (a phone's, or everyone else's).
+-- `name`'s size on this device: a TV's (the console table), a phone's, or
+-- everyone else's. A phone's text never lands under S.TextMin on screen: the
+-- screen scales it by Scale() (0.7 to 0.85), so the size asked for is raised
+-- until size * scale is at least 14.
 function UITheme.Sized(name: string): SizeSpec
-	local sizes = if UITheme.IsPhone() then UITheme.Sizes.phone else UITheme.Sizes.desktop
+	local phone = UITheme.IsPhone()
+	local sizes = if phone
+		then UITheme.Sizes.phone
+		elseif UITheme.Device() == "console" then UITheme.Sizes.console
+		else UITheme.Sizes.desktop
 	local spec = sizes[name]
 	assert(spec, "[UITheme] no size for " .. name)
+	if phone then
+		local floor = UITheme.PhoneText(spec.text)
+		if floor ~= spec.text then
+			local raised = table.clone(spec)
+			raised.text = floor
+			return raised
+		end
+	end
 	return spec
+end
+
+-- A text size made big enough to be at least S.TextMin (14) px after the
+-- phone's UIScale.
+function UITheme.PhoneTextFor(text: number, scale: number): number
+	return math.max(text, math.ceil(S.TextMin / math.max(scale, 0.01)))
+end
+
+function UITheme.PhoneText(text: number): number
+	return UITheme.PhoneTextFor(text, UITheme.Scale())
 end
 
 -- The bottom of Roblox's top bar, in screen pixels down from the top of
@@ -497,6 +554,11 @@ local function placeLeft()
 	-- the screen: with chat closed that parked the tutorial in the middle
 	-- of the view, and on a short window only its end stayed on screen.
 	local yPx = math.max(UITheme.TopBar(), 36) + 8
+	if GuiService:IsTenFootInterface() then
+		-- A TV's safe-area top (54 px at 1080p) is a floor.
+		local _, top = UITheme.Margin()
+		yPx = math.max(yPx, top * math.max(currentScale, 0.01))
+	end
 	if not UITheme.IsPhone() then
 		local bottom = chatBottom()
 		if bottom > yPx then

@@ -4,7 +4,7 @@
 -- kept clear of the corner and the tutorial tracker, at the screen sizes
 -- the layout has to work on.
 return function(t)
-	local Vector2 = t.roblox.Vector2
+	local Vector2, Rect = t.roblox.Vector2, t.roblox.Rect
 	local HudLayout = t.load("StarterPlayer/StarterPlayerScripts/HudLayout")
 	-- The sizes the screens build with (UITheme.Sizes), phone and desktop.
 	local UITheme = t.loader({
@@ -715,6 +715,58 @@ return function(t)
 		t.eq(HudLayout.CornerInBar(inBar, row, v(0, 0), 0), nil, "no line yet")
 		t.ok(HudLayout.CornerTopPad < 8, "the default spot is also higher than the old 8 px")
 	end)
+
+	t.test("TV safe area: the cash row stays 96 px in and 54 px down at 1920 x 1080 (tenFoot)", function()
+		local viewport = v(1920, 1080)
+		local row = v(300, 54)
+		local scale = 1080 / 720 -- UITheme.ScaleFor on a TV
+		local side, top = 64 * scale, 36 * scale
+		local empty = Rect.new(0, 0, 0, 0)
+		-- The top bar is empty on a TV, so the row goes under it at the fallback top.
+		local place = HudLayout.TopRow(viewport, empty, row, 30, 0, 0, 40, side, top)
+		t.ok(place.right <= 1920 - 96, "right edge " .. place.right .. " is inside the 96 px margin")
+		t.ok(place.top >= 54, "top " .. place.top .. " is below the 54 px margin")
+		-- In a bar that reaches the corner the row still keeps the margin.
+		local bar = Rect.new(0, 0, 1920, 120)
+		local inBar = HudLayout.TopRow(viewport, bar, row, 30, 0, 0, 40, side, top)
+		t.ok(inBar.right <= 1920 - 96 and inBar.top >= 54, "inside the bar too")
+		-- Not a console: unchanged.
+		local plain = HudLayout.TopRow(viewport, empty, row, 30, 0, 0, 40)
+		t.eq(plain.right, 1920 - 12)
+		t.eq(plain.top, 40)
+	end)
+
+	t.test(
+		"UIPadding shifts children: the mark and the page icon end left of their text on pc, phone and tv",
+		function()
+			-- layoutSide: the label's padding is MarkTextLeft, plus 36 on a console
+			-- (room for the pad glyph). FieldGuideUI: GuideTextLeft.
+			for name, extra in pairs({ pc = 0, phone = 0, tv = 36 }) do
+				local padLeft = extra + HudLayout.MarkTextLeft()
+				for _, button in ipairs({ "Saves", "Hammer" }) do
+					local x = HudLayout.PaddedX(HudLayout.MarkLeft, padLeft)
+					local markLeft = padLeft + x -- where the Position puts it on the face
+					local markRight = markLeft + HudLayout.MarkSize
+					t.eq(markLeft, HudLayout.MarkLeft, button .. " " .. name .. ": mark stays where designed")
+					t.ok(
+						markRight <= padLeft,
+						button .. " " .. name .. ": mark right " .. markRight .. " <= text left " .. padLeft
+					)
+				end
+				local guideX = HudLayout.PaddedX(HudLayout.GuideIconLeft, HudLayout.GuideTextLeft)
+				local iconRight = HudLayout.GuideTextLeft + guideX + HudLayout.GuideIconWidth
+				t.ok(
+					iconRight <= HudLayout.GuideTextLeft,
+					"Field Guide "
+						.. name
+						.. ": icon right "
+						.. iconRight
+						.. " <= text left "
+						.. HudLayout.GuideTextLeft
+				)
+			end
+		end
+	)
 
 	t.test("a side button's mark and its label never share pixels (the S behind the SAVES icon)", function()
 		local left = HudLayout.MarkTextLeft()
