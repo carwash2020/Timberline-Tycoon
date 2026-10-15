@@ -517,15 +517,21 @@ local function applyAxeNow(model: Model, def: AxeDef): boolean
 	-- y = 0; it is not scaled down to the gameplay haft.
 	local visualLen = handleMesh.Size.Y
 	handleMesh.CFrame = CFrame.new(0, visualLen / 2, 0) * MESH_TURN
-	local function placeOnBlade(mesh: MeshPart)
+	local function placeOnBlade(mesh: MeshPart, piece: AxeModels.Piece)
+		local at = piece.at
+		if at then
+			-- Authored: the piece's centre from the haft mesh's centre.
+			mesh.CFrame = CFrame.new(at.X, visualLen / 2 + at.Y, at.Z) * MESH_TURN
+			return
+		end
 		local meshSize = mesh.Size
 		local meshY = visualLen - meshSize.Y / 2 + 0.05
 		local meshZ = AxeModels.BladeFrontZ + meshSize.Z / 2
 		mesh.CFrame = CFrame.new(0, meshY, meshZ) * MESH_TURN
 	end
-	placeOnBlade(headMesh)
-	if glowMesh then
-		placeOnBlade(glowMesh)
+	placeOnBlade(headMesh, spec.Head)
+	if glowMesh and spec.Glow then
+		placeOnBlade(glowMesh, spec.Glow)
 	end
 	local drop: { Instance } = {}
 	for _, d in ipairs(model:GetDescendants()) do

@@ -502,6 +502,7 @@ function SaveSlotUI.Start()
 	savedLabel = saved
 
 	local rows = Instance.new("ScrollingFrame")
+	rows.SelectionImageObject = UITheme.HiddenSelection() -- panel-sized: no selection box over the whole list
 	rows.Name = "Rows"
 	rows.BackgroundTransparency = 1
 	rows.BorderSizePixel = 0

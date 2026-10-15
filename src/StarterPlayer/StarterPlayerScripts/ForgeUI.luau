@@ -512,6 +512,7 @@ function ForgeUI.Ensure(viewport: Vector2, phone: boolean?): ScreenGui
 	end
 	local top = 56 + ForgeUI.Target + UITheme.ButtonDrop + 8
 	local list = Instance.new("ScrollingFrame")
+	list.SelectionImageObject = UITheme.HiddenSelection() -- panel-sized: no selection box over the whole list
 	list.Name = "Rows"
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0

@@ -24,6 +24,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
@@ -39,6 +40,7 @@ local DragController = require(script.Parent.DragController)
 local HammerController = require(script.Parent.HammerController)
 local GamepadNav = require(script.Parent.GamepadNav)
 local HUD = require(script.Parent.HUD)
+local HudRules = require(script.Parent.HudRules)
 local HudNav = require(script.Parent.HudNav)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
@@ -285,7 +287,7 @@ function PlotUI.Refresh()
 	local b = hammerButton
 	if b then
 		-- A phone has no number keys: a button takes the hammer out on your plot.
-		b.root.Visible = UITheme.Device() == "phone" and not HammerController.Held() and onMyPlot()
+		b.root.Visible = HudRules.HammerButtonShown(UITheme.TouchOnly(), HammerController.Held(), onMyPlot())
 	end
 	local bar = modeBar
 	if bar then
@@ -512,6 +514,7 @@ local function mountLand(gui: ScreenGui)
 
 	-- One scrolling column: Plot size, then Expand.
 	local body = Instance.new("ScrollingFrame")
+	body.SelectionImageObject = UITheme.HiddenSelection() -- panel-sized: no selection box over the whole list
 	body.Name = "Body"
 	body.BackgroundTransparency = 1
 	body.BorderSizePixel = 0
@@ -584,6 +587,11 @@ function PlotUI.Start()
 	local gui = UITheme.Screen("PlotUI", UITheme.Layers.PlotUI) -- its bar draws over any side button spilling that far
 
 	-- On a phone: take the hammer out (the hotbar's number keys are not there).
+	-- The button follows the hardware, so it is refreshed when the input
+	-- type changes (a pad or a keyboard appearing hides it).
+	UserInputService.LastInputTypeChanged:Connect(function()
+		PlotUI.Refresh()
+	end)
 	hammerButton = HUD.SideButton({
 		name = "Hammer",
 		text = "HAMMER",

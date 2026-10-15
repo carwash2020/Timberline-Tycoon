@@ -109,6 +109,7 @@ function SettingsUI.Start()
 	card.outer.Size = UDim2.fromOffset(340, 300)
 	local cardWidth = 340 -- five tabs on one row (GAME, VISIT, BOARD, REPORT, CODES)
 	local scroll = Instance.new("ScrollingFrame")
+	scroll.SelectionImageObject = UITheme.HiddenSelection() -- panel-sized: no selection box over the whole list
 	scroll.Name = "Rows"
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0

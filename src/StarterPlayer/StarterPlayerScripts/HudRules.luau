@@ -409,4 +409,13 @@ function HudRules.LoadChipV2(
 	return HudRules.BedChip(bedVolume, bedRoom, bedValue, modal)
 end
 
+-- The HAMMER side button takes the physical Hammer out on a phone, which has
+-- no hotbar number keys. It is for a touch-only device (touch, no keyboard,
+-- no gamepad, read from the hardware, not from the last input: a PC or Xbox
+-- player who once touched the screen must not keep it), on your plot, while
+-- the hammer is not already in hand. The Hammer tool itself is unaffected.
+function HudRules.HammerButtonShown(touchOnly: boolean, held: boolean, onMyPlot: boolean): boolean
+	return touchOnly and not held and onMyPlot
+end
+
 return HudRules

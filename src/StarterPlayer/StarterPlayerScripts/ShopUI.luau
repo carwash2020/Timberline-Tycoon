@@ -894,6 +894,7 @@ local function buildPanel()
 	end)
 
 	local scroll = Instance.new("ScrollingFrame")
+	scroll.SelectionImageObject = UITheme.HiddenSelection() -- panel-sized: no selection box over the whole list
 	scroll.Name = "Items"
 	scroll.Position = UDim2.fromOffset(0, headerHeight)
 	scroll.Size = UDim2.new(1, 0, 1, -headerHeight)

@@ -528,4 +528,36 @@ return function(t)
 		t.eq(HudRules.BadgesButton(nil), false, "while the save loads")
 		t.eq(HudRules.BadgesButton(0), true)
 	end)
+
+	t.test("the HAMMER button shows on a touch-only phone on your plot, and for nobody else", function()
+		t.eq(HudRules.HammerButtonShown(true, false, true), true, "touch-only, empty hands, my plot")
+		t.eq(HudRules.HammerButtonShown(false, false, true), false, "a PC or an Xbox (keyboard or gamepad present)")
+		t.eq(HudRules.HammerButtonShown(true, true, true), false, "the hammer is already in hand")
+		t.eq(HudRules.HammerButtonShown(true, false, false), false, "not on my plot")
+	end)
+
+	t.test(
+		"touch-only reads the hardware: a keyboard or a gamepad makes it false, whatever was touched last",
+		function()
+			local function theme(touch, keyboard, gamepad)
+				return t.loader({
+					services = {
+						GuiService = {},
+						Players = { LocalPlayer = {} },
+						TextChatService = {},
+						UserInputService = {
+							TouchEnabled = touch,
+							KeyboardEnabled = keyboard,
+							GamepadEnabled = gamepad,
+						},
+					},
+				}):load("StarterPlayer/StarterPlayerScripts/UITheme")
+			end
+			t.eq(theme(true, false, false).TouchOnly(), true, "a phone")
+			t.eq(theme(true, true, false).TouchOnly(), false, "a touch laptop")
+			t.eq(theme(true, false, true).TouchOnly(), false, "a tablet with a controller")
+			t.eq(theme(false, false, true).TouchOnly(), false, "an Xbox")
+			t.eq(theme(false, true, false).TouchOnly(), false, "a PC")
+		end
+	)
 end
