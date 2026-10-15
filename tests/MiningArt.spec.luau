@@ -127,4 +127,31 @@ return function(t)
 			clean(model)
 		end
 	end)
+
+	t.test("held tools are unanchored once HoldReady runs (an anchored handle teleports its holder)", function()
+		local fs = require("@lune/fs")
+		local service = fs.readFile("src/ServerScriptService/MiningService.luau")
+		t.ok(service:find("MiningArt.HoldReady(model)", 1, true) ~= nil, "toolFrom frees the parts")
+		local models = { MiningArt.Bomb(false), MiningArt.MinersLamp() }
+		for _, id in ipairs(PickaxeData.Order or {}) do
+			table.insert(models, MiningArt.Pickaxe(PickaxeData.Get(id)))
+		end
+		table.insert(models, MiningArt.Pickaxe(PickaxeData.Get("RustyPick") or PickaxeData.Get(PickaxeData.LuxId)))
+		for _, model in ipairs(models) do
+			local anchoredBefore = false
+			walk(model, function(inst)
+				if inst:IsA("BasePart") and inst.Anchored then
+					anchoredBefore = true
+				end
+			end)
+			MiningArt.HoldReady(model)
+			walk(model, function(inst)
+				if inst:IsA("BasePart") then
+					t.eq(inst.Anchored, false, model.Name .. "." .. inst.Name .. " anchored")
+					t.eq(inst.CanCollide, false, model.Name .. "." .. inst.Name .. " collides")
+				end
+			end)
+			t.ok(anchoredBefore, model.Name .. " was built anchored (the bug this guards)")
+		end
+	end)
 end

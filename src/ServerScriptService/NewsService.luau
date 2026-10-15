@@ -1,6 +1,6 @@
 --!strict
 -- NewsService: the "What's new" flag. The client asks once (NewsSeen);
--- the save already has onboarding, so this only sets onboarding["News:V1"].
+-- the save already has onboarding, so this only sets onboarding["News:V2"].
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

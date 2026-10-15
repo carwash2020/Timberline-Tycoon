@@ -26,6 +26,6 @@ return function(t)
 		local flags = {}
 		Logic.Mark(flags)
 		Logic.Mark(flags)
-		t.eq(flags["News:V1"], true)
+		t.eq(flags["News:V2"], true)
 	end)
 end

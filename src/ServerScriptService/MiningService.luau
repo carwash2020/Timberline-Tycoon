@@ -361,6 +361,7 @@ local function toolFrom(model: Model, name: string, attr: string, value: string)
 	tool.CanBeDropped = false
 	tool:SetAttribute(attr, value)
 	local handle = model.PrimaryPart
+	MiningArt.HoldReady(model)
 	for _, child in ipairs(model:GetChildren()) do
 		child.Parent = tool
 	end

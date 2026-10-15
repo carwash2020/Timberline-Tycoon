@@ -1,6 +1,6 @@
 --!strict
--- NewsUI: "What's new in V1". Once, after the tutorial, on the first join
--- that has not stored onboarding["News:V1"]. Also from Settings. One Close
+-- NewsUI: "What's new". Once, after the tutorial, on the first join
+-- that has not stored onboarding["News:V2"]. Also from Settings. One Close
 -- button. B closes. The right trigger is not bound.
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -192,6 +192,12 @@ function NewsUI.Start()
 	card.outer.Name = "WhatsNew"
 	card.outer.Visible = false
 	card.outer.Active = true
+	-- Card() paints the outer frame in the edge colour (the drop edge under the
+	-- face). The face is resized here to fromScale(1, 0) with AutomaticSize Y,
+	-- so that outer fill showed round and behind it: the grey/amber box. Only
+	-- the face draws; its own stroke is the border.
+	card.outer.BackgroundTransparency = 1
+	UITheme.stroke(card.face, C.AmberEdge, UITheme.Stroke)
 	card.outer.AutomaticSize = Enum.AutomaticSize.Y
 	card.face.AutomaticSize = Enum.AutomaticSize.Y
 	card.face.Size = UDim2.fromScale(1, 0)
@@ -230,7 +236,7 @@ function NewsUI.Start()
 	wordStroke.Color = C.PanelAlt
 	wordStroke.Thickness = 1
 	wordStroke.Parent = word
-	local title = UITheme.label(hero, "WHAT'S NEW IN V1", F.Title, 16, C.Cream)
+	local title = UITheme.label(hero, "WHAT'S NEW", F.Title, 16, C.Cream)
 	title.Name = "Title"
 	title.Size = UDim2.new(1, -16, 0, 20)
 	title.Position = UDim2.fromOffset(10, 36)

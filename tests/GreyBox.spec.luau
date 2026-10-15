@@ -271,6 +271,20 @@ return function(t)
 						node = node.Parent
 					end
 					t.ok(node == gui, "the card is under the NewsUI screen")
+					-- The outer frame (the node named WhatsNew) must not paint:
+					-- only its Face does, and nothing else in the card tree is
+					-- a sibling or ancestor backing the face.
+					t.eq(card.BackgroundTransparency, 1, "the outer card frame paints a backing")
+					local face = card:FindFirstChild("Face")
+					t.ok(face ~= nil and face.BackgroundTransparency < 1, "the face is the one painted surface")
+					for _, sibling in ipairs(card:GetChildren()) do
+						if sibling ~= face and sibling:IsA("GuiObject") then
+							t.ok(
+								sibling.BackgroundTransparency >= 1,
+								"sibling " .. sibling.Name .. " of the face paints"
+							)
+						end
+					end
 					t.eq(gui:FindFirstChild("Scrim"), nil, "no scrim")
 					-- The ScreenGui holds the card and no other GuiObject (no
 					-- full-screen frame, button or dim behind it).

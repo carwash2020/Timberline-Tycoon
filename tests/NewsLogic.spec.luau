@@ -4,9 +4,9 @@
 return function(t)
 	local News = t.load("ReplicatedStorage/Shared/NewsLogic")
 
-	t.test("at most seven V1 headlines, each with an icon name", function()
+	t.test("at most seven headlines, each with an icon name", function()
 		t.ok(#News.Entries >= 1 and #News.Entries <= 7, "count " .. #News.Entries)
-		t.eq(News.Key, "News:V1")
+		t.eq(News.Key, "News:V2")
 		local blob = ""
 		for _, entry in ipairs(News.Entries) do
 			t.ok(#entry.line > 0 and #entry.line <= 70, entry.line)
@@ -18,15 +18,13 @@ return function(t)
 			blob ..= " " .. entry.line .. " " .. entry.detail
 		end
 		for _, word in ipairs({
+			"vehicles",
+			"stores",
+			"icons",
+			"Axes",
+			"first load",
 			"Bayou",
-			"Red Mesa",
 			"ore",
-			"blueprint",
-			"Rook",
-			"streak",
-			"Temper",
-			"Sparkworks",
-			"gondola",
 		}) do
 			t.ok(string.find(blob, word, 1, true) ~= nil, word)
 		end
@@ -40,9 +38,9 @@ return function(t)
 		t.eq(News.ShouldAutoShow(3, true), false)
 		local book = {}
 		News.Mark(book)
-		t.eq(book["News:V1"], true)
+		t.eq(book["News:V2"], true)
 		News.Mark(book)
-		t.eq(book["News:V1"], true, "closing twice still stores the one key")
+		t.eq(book["News:V2"], true, "closing twice still stores the one key")
 	end)
 
 	t.test("brand-new means still in the first tutorial, not a refresher or a replay", function()

@@ -1,13 +1,13 @@
 --!strict
 -- NewsLogic: the "What's new in V1" lines, and when the panel shows itself.
--- The seen flag is profile.onboarding["News:V1"] (ProfileSchema already
+-- The seen flag is profile.onboarding["News:V2"] (ProfileSchema already
 -- stores that table). No new save field.
 
 local NewsData = require(script.Parent.NewsData)
 
 local NewsLogic = {}
 
-NewsLogic.Key = "News:V1"
+NewsLogic.Key = "News:V2" -- V2 (14 October): saves that closed the V1 notes see this one
 
 export type Entry = NewsData.Entry
 
