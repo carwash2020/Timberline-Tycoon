@@ -113,6 +113,12 @@ local function keyName(key: Enum.KeyCode): string
 	return names[key.Name] or key.Name
 end
 
+-- How much a prompt card grows: on a TV by the screen's scale (1.5 at 1080p),
+-- never under 1; everywhere else 1.
+function PromptUI.Grow(console: boolean, scale: number): number
+	return if console then math.max(1, scale) else 1
+end
+
 function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInputType)
 	local adornee, studs = PromptUI.Adornee(prompt.Parent)
 	if not adornee then
@@ -120,6 +126,10 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	end
 	local touch = inputType == Enum.ProximityPromptInputType.Touch
 	local gamepad = inputType == Enum.ProximityPromptInputType.Gamepad
+
+	-- A TV prompt grows with the screen (a billboard has no UIScale of its
+	-- own): the card gets a UIScale of k and the billboard is k times bigger.
+	local k = PromptUI.Grow(UITheme.Device() == "console", UITheme.Scale())
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Prompt"
@@ -131,12 +141,12 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	if studs then
 		-- Tail at the head offset; the card grows up. Empty space below
 		-- may cross the head. The pixel lift would not stay clear up close.
-		billboard.Size = UDim2.fromOffset(WIDTH, HEIGHT * 2)
+		billboard.Size = UDim2.fromOffset(WIDTH * k, HEIGHT * 2 * k)
 		billboard.StudsOffset = studs
 		billboard.SizeOffset = Vector2.zero
 	else
-		billboard.Size = UDim2.fromOffset(WIDTH, HEIGHT)
-		billboard.SizeOffset = Vector2.new(prompt.UIOffset.X / WIDTH, prompt.UIOffset.Y / HEIGHT)
+		billboard.Size = UDim2.fromOffset(WIDTH * k, HEIGHT * k)
+		billboard.SizeOffset = Vector2.new(prompt.UIOffset.X / (WIDTH * k), prompt.UIOffset.Y / (HEIGHT * k))
 	end
 
 	local card = UITheme.Card(C.Paper, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true, "Panel")
@@ -146,6 +156,11 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	else
 		card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 		card.outer.Position = UDim2.fromScale(0.5, 0.5)
+	end
+	if k ~= 1 then
+		local grow = Instance.new("UIScale")
+		grow.Scale = k
+		grow.Parent = card.outer
 	end
 	UITheme.padding(card.face, 8, 18, 8, 8)
 	local row = UITheme.list(card.face, 12, true)

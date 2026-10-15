@@ -59,9 +59,21 @@ return function(t)
 		t.eq(lift, nil)
 	end)
 
+	t.test("a TV prompt grows by the screen's scale, never under 1; other devices stay at 1", function()
+		local PromptUI = load()
+		t.eq(PromptUI.Grow(true, 1.5), 1.5)
+		t.eq(PromptUI.Grow(true, 0.7), 1)
+		t.eq(PromptUI.Grow(false, 1.5), 1)
+	end)
+
 	t.test("a gamepad prompt leaves the selection alone", function()
 		local Enum = t.roblox.Enum
-		local guiService = { SelectedObject = nil }
+		local guiService = {
+			SelectedObject = nil,
+			IsTenFootInterface = function()
+				return false
+			end,
+		}
 		local player = Instance.new("Folder")
 		local pg = Instance.new("Folder")
 		pg.Name = "PlayerGui"
@@ -92,7 +104,14 @@ return function(t)
 				GuiService = guiService,
 				Players = { LocalPlayer = player },
 				TextChatService = {},
-				UserInputService = { TouchEnabled = false, KeyboardEnabled = true, InputBegan = signal() },
+				UserInputService = {
+					TouchEnabled = false,
+					KeyboardEnabled = true,
+					InputBegan = signal(),
+					GetLastInputType = function()
+						return Enum.UserInputType.Keyboard
+					end,
+				},
 				ProximityPromptService = {},
 				TweenService = {},
 				CollectionService = {},

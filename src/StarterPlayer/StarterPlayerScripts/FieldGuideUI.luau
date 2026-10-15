@@ -26,6 +26,7 @@ local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local HUD = require(script.Parent.HUD)
+local HudLayout = require(script.Parent.HudLayout)
 local HudNav = require(script.Parent.HudNav)
 local MenuPad = require(script.Parent.MenuPad)
 local ShopUI = require(script.Parent.ShopUI)
@@ -262,7 +263,10 @@ function FieldGuideUI.Start()
 		local compact = UITheme.Compact()
 		local pad = b.face:FindFirstChildOfClass("UIPadding")
 		if pad then
-			pad.PaddingLeft = UDim.new(0, 28)
+			pad.PaddingLeft = UDim.new(0, HudLayout.GuideTextLeft)
+			-- Children sit inside the padding: take it off so the page icon
+			-- stays 8 px from the face's left edge, clear of the text.
+			icon.Position = UDim2.new(0, HudLayout.PaddedX(HudLayout.GuideIconLeft, pad.PaddingLeft.Offset), 0.5, 0)
 		end
 		if compact then
 			-- Book icon plus a short label. The words stay, so it is not an empty square.

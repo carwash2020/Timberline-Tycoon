@@ -742,12 +742,12 @@ local function bindTool(tool: Tool)
 		holding = true
 		-- TEMPORARY Xbox chop debug (remove once fixed).
 		print(
-			string.format(
-				"[Chop] Activated %s lastInput=%s selected=%s",
-				tostring(tool.Name),
-				tostring(UserInputService:GetLastInputType().Name),
-				tostring(game:GetService("GuiService").SelectedObject)
-			)
+			"[Chop] Activated "
+				.. tostring(tool.Name)
+				.. " lastInput="
+				.. tostring(UserInputService:GetLastInputType().Name)
+				.. " selected="
+				.. tostring(game:GetService("GuiService").SelectedObject)
 		)
 		-- Touch: TouchTapInWorld swings with the finger on this tap. Activated
 		-- on a phone runs first, before that position exists, so wait a
