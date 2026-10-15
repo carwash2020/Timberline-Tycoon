@@ -580,6 +580,7 @@ local function cancelArmed()
 end
 
 CutController.WhiffToastEvery = 1.5
+CutController.WhiffSwingSeconds = 0.5 -- the empty swing's length
 local lastWhiffToast = 0
 
 local function toastRefuse(fromClick: boolean, refused: Target?, now: number)
@@ -587,13 +588,18 @@ local function toastRefuse(fromClick: boolean, refused: Target?, now: number)
 		return
 	end
 	local why = if refused and refused.problem then refused.problem else "no target"
-	chopNote("rejected: " .. why)
+	-- The reasons the log names: cooldown, no target, out of range ("far"),
+	-- too hard, and grab held (trySwing).
+	chopNote("rejected: " .. (if why == "far" then "out of range" else why))
 	if why == "no target" and now - lastWhiffToast > CutController.WhiffToastEvery then
 		-- A swing with nothing in range is not silent: the swing sound and a
 		-- short note, at most every WhiffToastEvery seconds.
 		lastWhiffToast = now
 		SoundData.Play(SoundData.SwingFor(nil))
 		HUD.Toast("Nothing in range to chop.")
+		-- And the arm swings through the air (local only: nothing is sent).
+		swingSerial += 1
+		pcall(SwingPose.BeginLocal, swingSerial, CutController.WhiffSwingSeconds)
 	end
 	if refused and refused.problem == "far" then
 		HUD.Toast(SectionLogic.Message("far") :: string)
@@ -664,6 +670,14 @@ local function trySwing(fromClick: boolean)
 	if now < cooldownUntil then
 		if fromClick then
 			chopNote("rejected: cooldown")
+		end
+		return
+	end
+	if player:GetAttribute("GrabHeld") == true then
+		-- A piece is in the hands (DragController): no swing. Not reachable with
+		-- an axe out today (the grab ignores the trigger then), logged if it is.
+		if fromClick then
+			chopNote("rejected: grab held")
 		end
 		return
 	end
@@ -764,12 +778,18 @@ local function activateBound(): string
 	if not ok or type(all) ~= "table" then
 		return "unreadable"
 	end
+	-- Every bound action whose name contains "activate" (any case), and how
+	-- many actions are bound in all, so the engine's real name shows in the
+	-- log whatever it is called.
+	local total, names = 0, {}
 	for name in pairs(all) do
+		total += 1
 		if string.find(string.lower(tostring(name)), "activate", 1, true) then
-			return "yes(" .. tostring(name) .. ")"
+			table.insert(names, tostring(name))
 		end
 	end
-	return "none"
+	table.sort(names)
+	return string.format("%d of %d [%s]", #names, total, table.concat(names, ","))
 end
 
 local function activatedNote(tool: Tool)
@@ -788,10 +808,12 @@ local function activatedNote(tool: Tool)
 	end
 	chopNote(
 		string.format(
-			"Activated: tool=%s lastInput=%s toolOut=%s selected=%s activateBinding=%s",
+			"Activated: tool=%s lastInput=%s charTool=%s dragToolOut=%s grabHeld=%s selected=%s activateBinding=%s",
 			tostring(tool.Name),
 			tostring(UserInputService:GetLastInputType().Name),
 			tostring(out),
+			tostring(player:GetAttribute("DragToolOut")),
+			tostring(player:GetAttribute("GrabHeld")),
 			tostring(GuiService.SelectedObject),
 			activateBound()
 		)

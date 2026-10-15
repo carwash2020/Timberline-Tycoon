@@ -157,6 +157,10 @@ local function toolOut(char: Model): boolean
 	return char:FindFirstChildOfClass("Tool") ~= nil
 end
 
+-- A Tool parented to the character counts at once (equipping, and a fresh
+-- respawn's first tool), not only after the next frame.
+DragController.ToolOut = toolOut
+
 -- The loose piece (a Model tagged Wood) `inst` is part of.
 local function pieceOf(inst: Instance): Model?
 	local node: Instance? = inst
@@ -1067,7 +1071,21 @@ local function startLoop()
 
 	RunService.RenderStepped:Connect(placeBalls)
 	local since = 0
+	-- What the grab itself sees, for CutController's [Chop] line (a swing that
+	-- does nothing on a pad): its own toolOut and whether a piece is held.
+	local function publish()
+		local char = player.Character
+		local out = char ~= nil and toolOut(char)
+		if player:GetAttribute("DragToolOut") ~= out then
+			player:SetAttribute("DragToolOut", out)
+		end
+		local held = DragController.Holding()
+		if player:GetAttribute("GrabHeld") ~= held then
+			player:SetAttribute("GrabHeld", held)
+		end
+	end
 	RunService.Heartbeat:Connect(function(dt: number)
+		publish()
 		checkPending()
 		since += dt
 		if since >= POLL then

@@ -35,7 +35,7 @@ return function(t)
 				Debris = { AddItem = function() end },
 				ContextActionService = {
 					GetAllBoundActionInfo = function()
-						return { RobloxActivate = {} }
+						return { FakeBoundAction = {}, FakeActivateBinding = {} } -- neutral names: the engine's real one is read from the log
 					end,
 				},
 				GuiService = {},
@@ -356,12 +356,13 @@ return function(t)
 				return nil
 			end,
 		}
+		local playerAttrs = {} -- DragController's published "DragToolOut" and "GrabHeld"
 		local player = {
 			UserId = 1,
 			Character = char,
 			CharacterAdded = signal(),
 			GetAttribute = function(_, key)
-				return if key == "CarriedLogs" then carried else nil
+				return if key == "CarriedLogs" then carried else playerAttrs[key]
 			end,
 		}
 		local hitInstance: any = section
@@ -390,7 +391,7 @@ return function(t)
 				Debris = { AddItem = function() end },
 				ContextActionService = {
 					GetAllBoundActionInfo = function()
-						return { RobloxActivate = {} }
+						return { FakeBoundAction = {}, FakeActivateBinding = {} } -- neutral names: the engine's real one is read from the log
 					end,
 				},
 				GuiService = guiService,
@@ -496,6 +497,7 @@ return function(t)
 			end
 		end
 		return {
+			attrs = playerAttrs,
 			controller = controller,
 			fires = fires,
 			rays = rays,
@@ -684,6 +686,30 @@ return function(t)
 		t.eq(#chops, 1)
 		t.ok(chops[1].args[1] == w.section)
 		t.eq(#w.rays, 0, "no pointer")
+	end)
+
+	t.test("a gamepad Activated with a tool out proceeds through trySwing (the grab sees the tool)", function()
+		local w = swingWorld()
+		w.attrs.DragToolOut = true -- DragController's own toolOut: the tool is out
+		w.attrs.GrabHeld = false
+		w.input("Gamepad1")
+		w.hit(nil)
+		w.radius({ w.section })
+		w.activate()
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1, "toolOut true: Activated swings")
+	end)
+
+	t.test("a swing is refused while a piece is held, and the log says so", function()
+		local w = swingWorld()
+		w.attrs.GrabHeld = true
+		w.input("Gamepad1")
+		w.hit(nil)
+		w.radius({ w.section })
+		w.activate()
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 0, "grab held: no chop")
+		t.eq(#named(w.fires, "Swing"), 0, "and no swing")
 	end)
 
 	t.test("a gamepad's raw trigger press is not read: only Activated swings, once", function()
