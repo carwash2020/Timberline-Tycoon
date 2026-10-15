@@ -763,6 +763,56 @@ pcall(function()
 	end
 	playable()
 	localPlayer:GetAttributeChangedSignal("ProfileLoaded"):Connect(playable)
+	-- TEMPORARY grey-box debug (remove once the offender is fixed): 3 s after
+	-- can play, list every big painted GuiObject on screen.
+	local function greyBoxDump()
+		local gui = localPlayer:FindFirstChildOfClass("PlayerGui")
+		if gui == nil then
+			return
+		end
+		local found = 0
+		for _, d in ipairs(gui:GetDescendants()) do
+			if
+				d:IsA("GuiObject")
+				and d.BackgroundTransparency < 1
+				and d.AbsoluteSize.X > 200
+				and d.AbsoluteSize.Y > 200
+			then
+				local shown, node = true, d :: Instance?
+				while node ~= nil and node ~= gui do
+					if (node:IsA("GuiObject") and not node.Visible) or (node:IsA("ScreenGui") and not node.Enabled) then
+						shown = false
+					end
+					node = node.Parent
+				end
+				if shown then
+					found += 1
+					print(
+						string.format(
+							"[GreyBox] %s  colour=%s  transparency=%.2f  size=%dx%d",
+							d:GetFullName(),
+							tostring(d.BackgroundColor3),
+							d.BackgroundTransparency,
+							d.AbsoluteSize.X,
+							d.AbsoluteSize.Y
+						)
+					)
+				end
+			end
+		end
+		print(string.format("[GreyBox] %d visible painted GuiObject(s) over 200x200", found))
+	end
+	local dumped = false
+	localPlayer:GetAttributeChangedSignal("ProfileLoaded"):Connect(function()
+		if localPlayer:GetAttribute("ProfileLoaded") == true and not dumped then
+			dumped = true
+			task.delay(3, greyBoxDump)
+		end
+	end)
+	if localPlayer:GetAttribute("ProfileLoaded") == true and not dumped then
+		dumped = true
+		task.delay(3, greyBoxDump)
+	end
 	local function built()
 		if workspace:GetAttribute("WorldBuilt") == true then
 			probe.MarkBuilt()

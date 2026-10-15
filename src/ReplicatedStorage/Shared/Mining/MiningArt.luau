@@ -49,6 +49,20 @@ local function weldAll(model: Model, handle: BasePart)
 	end
 end
 
+-- Held tools must not be anchored: Kit.part anchors everything, and an
+-- anchored Handle stays where it was built (the origin) while the hand weld
+-- drags the character to it: the pickaxe teleported its holder under the
+-- map. Free every part, drop collisions and mass so it just rides the hand.
+function MiningArt.HoldReady(model: Instance)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = false
+			d.CanCollide = false
+			d.Massless = true
+		end
+	end
+end
+
 local function countParts(model: Instance): number
 	local n = 0
 	for _, d in ipairs(model:GetDescendants()) do

@@ -78,7 +78,7 @@ Net.RemoteNames = {
 	"StoreOpened", -- client -> server: () the Robux store was opened; analytics only (GameAnalytics)
 	"RedeemCode", -- client -> server: (code) redeem a code from the Settings Codes tab (CodeService)
 	"CodeResult", -- server -> client: (ok, message) what the Codes tab shows after a redeem
-	"NewsSeen", -- client -> server: () the player closed What's new; stored as onboarding["News:V1"]
+	"NewsSeen", -- client -> server: () the player closed What's new; stored as onboarding["News:V2"]
 	"SkyQuest", -- client -> server: the Gondola Pass quest
 	"ForgeAction", -- client -> server: a forge order
 	"ForgeOpen", -- client -> server: open the forge
