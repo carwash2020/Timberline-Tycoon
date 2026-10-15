@@ -31,6 +31,7 @@ return function(t)
 				GuiService = {},
 				Players = { LocalPlayer = player },
 				ProximityPromptService = {},
+				UserInputService = { LastInputTypeChanged = { Connect = function() end } },
 			},
 			mocks = {
 				UITheme = {

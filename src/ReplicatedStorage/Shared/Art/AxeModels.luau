@@ -127,7 +127,12 @@ end
 -- for MeshManifest's preload.
 function AxeModels.MeshIds(): { number }
 	local ids: { number } = {}
-	for _, axe in pairs(axes) do
+	for axeId, axe in pairs(axes) do
+		-- The Hermit's Maul is a quest reward: its meshes load when it is
+		-- built, not in the join preload (the manifest is budgeted).
+		if axeId == "HermitsMaul" then
+			continue
+		end
 		for _, key in ipairs({ "Handle", "Head", "Glow" }) do
 			local piece = (axe :: any)[key] :: Piece?
 			if piece and piece.meshId ~= 0 then
