@@ -744,8 +744,8 @@ local function bindTool(tool: Tool)
 		print(
 			string.format(
 				"[Chop] Activated %s lastInput=%s selected=%s",
-				tool.Name,
-				UserInputService:GetLastInputType().Name,
+				tostring(tool.Name),
+				tostring(UserInputService:GetLastInputType().Name),
 				tostring(game:GetService("GuiService").SelectedObject)
 			)
 		)
