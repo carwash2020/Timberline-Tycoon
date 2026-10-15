@@ -83,10 +83,25 @@ return function(t)
 		end)
 	end)
 
-	t.test("the half turn is untouched and the Lux trail points still sit on the blade", function()
+	t.test("the half turn is untouched", function()
 		t.ok(math.abs(math.abs(AxeModels.MeshYaw) - math.pi) < 1e-6)
-		for name, point in pairs(AxeModels.LuxPoints) do
-			t.ok(point.Z < 0, name .. " is on the blade side (-Z)")
-		end
+	end)
+
+	t.test("each Lux trail point lies inside the built Lux blade's box, grown by 0.3 studs", function()
+		withMeshes(function()
+			local model = AxeArt.Build(ItemCatalog.GetAxe("LuxAxe"))
+			local head = model:FindFirstChild("MeshHead")
+			t.ok(head ~= nil, "the Lux head is meshed")
+			local half = head.Size / 2 + Vector3.new(0.3, 0.3, 0.3)
+			for name, point in pairs(AxeModels.LuxPoints) do
+				-- LuxPoints are measured from the haft's foot (y = 0), which is the
+				-- built model's own origin plane.
+				local local_ = head.CFrame:PointToObjectSpace(point)
+				t.ok(
+					math.abs(local_.X) <= half.X and math.abs(local_.Y) <= half.Y and math.abs(local_.Z) <= half.Z,
+					name .. " " .. tostring(point) .. " is outside the blade box (local " .. tostring(local_) .. ")"
+				)
+			end
+		end)
 	end)
 end

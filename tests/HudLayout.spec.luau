@@ -768,6 +768,48 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"side buttons Saves, Hammer, Truck and Field Guide: mark right edge + gap <= text left at phone, PC and TV",
+		function()
+			-- The padding and the mark position are what HUD.layoutSide applies (it calls
+			-- HudLayout.SidePadding); a child's Position starts inside the padding, so
+			-- the mark's left on the face is padding + Position.X.
+			local fs = require("@lune/fs")
+			local hud = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HUD.luau")
+			t.ok(string.find(hud, "HudLayout.SidePadding(marked, console, asIcon)", 1, true), "layoutSide uses it")
+			local GAP = 6 -- the least clear space between the mark and the first letter
+			local DEVICES = {
+				{ name = "phone", console = false, width = PHONE.SideButton.size.X },
+				{ name = "pc", console = false, width = DESK.SideButton.size.X },
+				{ name = "tv", console = true, width = 150 },
+			}
+			for _, button in ipairs({ "Saves", "Hammer", "Truck" }) do
+				for _, d in ipairs(DEVICES) do
+					local pad, markX = HudLayout.SidePadding(true, d.console, false)
+					local markLeft = pad + markX
+					local markRight = markLeft + HudLayout.MarkSize
+					t.ok(markRight + GAP <= pad, string.format("%s on %s: a clear gap", button, d.name))
+					t.ok(
+						markRight <= pad,
+						string.format("%s on %s: mark right %d <= text left %d", button, d.name, markRight, pad)
+					)
+					t.ok(markLeft >= 0, button .. " on " .. d.name .. ": the mark is inside the face")
+					local room = d.width - pad - 6
+					t.ok(room >= 56, button .. " on " .. d.name .. ": " .. room .. " px for the label")
+				end
+			end
+			-- An icon-only button (the phone's MENU, HAMMER, Sell here): no padding, the mark at MarkLeft.
+			local pad, markX = HudLayout.SidePadding(false, false, true)
+			t.eq({ pad, markX }, { 0, HudLayout.MarkLeft })
+			-- Field Guide: the page icon is GuideIconLeft in, GuideIconWidth wide; the label starts at GuideTextLeft.
+			t.ok(
+				HudLayout.GuideIconLeft + HudLayout.GuideIconWidth + GAP <= HudLayout.GuideTextLeft + 2,
+				"Field Guide: the icon ends before the label"
+			)
+			t.ok(HudLayout.GuideIconLeft + HudLayout.GuideIconWidth <= HudLayout.GuideTextLeft)
+		end
+	)
+
 	t.test("a side button's mark and its label never share pixels (the S behind the SAVES icon)", function()
 		local left = HudLayout.MarkTextLeft()
 		t.eq(left, HudLayout.MarkLeft + HudLayout.MarkSize + HudLayout.MarkGap)
@@ -863,7 +905,10 @@ return function(t)
 		local quest = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
 		t.ok(string.find(quest, "HudLayout.ClearOfRects(box, HUD.Obstacles(), bounds, 6)", 1, true))
 		local hud = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HUD.luau")
-		t.ok(string.find(hud, "HudLayout.MarkTextLeft()", 1, true))
+		t.ok(
+			string.find(hud, "HudLayout.SidePadding(", 1, true),
+			"the label padding comes from HudLayout.SidePadding (MarkTextLeft)"
+		)
 		local badge = fs.readFile("src/StarterPlayer/StarterPlayerScripts/BadgeUI.luau")
 		t.ok(string.find(badge, "HudRules.BadgesButton", 1, true), "BADGES waits for the end of the tutorial")
 	end)

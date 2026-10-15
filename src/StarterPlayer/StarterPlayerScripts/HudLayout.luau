@@ -335,6 +335,21 @@ function HudLayout.MarkTextLeft(): number
 	return HudLayout.MarkLeft + HudLayout.MarkSize + HudLayout.MarkGap
 end
 
+-- The side buttons' label padding and mark position, the one place both
+-- come from (HUD.layoutSide uses it; the spec reads the same numbers).
+-- `marked`: the face has a mark (SAVES, BUILD, the truck) and is not a phone
+-- icon button. `console`: a pad glyph takes 36 px on the left first.
+-- Returns (the face's left padding, the mark's Position X offset). The mark
+-- sits MarkLeft px from the face's left edge whatever the padding is.
+function HudLayout.SidePadding(marked: boolean, console: boolean, asIcon: boolean): (number, number)
+	if asIcon then
+		return 0, HudLayout.MarkLeft
+	end
+	local left = if marked then HudLayout.MarkTextLeft() else 6
+	local pad = (if console then 36 else 0) + left
+	return pad, HudLayout.MarkLeft - pad
+end
+
 -- A UIPadding moves where its children's Positions start: a child at x sits
 -- at padLeft + x on the face. To put an icon `want` px from the face's left
 -- edge, its Position X offset is want - padLeft.
