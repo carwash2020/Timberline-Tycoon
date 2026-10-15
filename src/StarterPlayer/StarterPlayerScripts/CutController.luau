@@ -44,6 +44,8 @@
 -- amber too far or too hard), checked 30 times a second (15 on low).
 
 local CollectionService = game:GetService("CollectionService")
+local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -577,12 +579,22 @@ local function cancelArmed()
 	end
 end
 
+CutController.WhiffToastEvery = 1.5
+local lastWhiffToast = 0
+
 local function toastRefuse(fromClick: boolean, refused: Target?, now: number)
 	if not fromClick then
 		return
 	end
 	local why = if refused and refused.problem then refused.problem else "no target"
 	chopNote("rejected: " .. why)
+	if why == "no target" and now - lastWhiffToast > CutController.WhiffToastEvery then
+		-- A swing with nothing in range is not silent: the swing sound and a
+		-- short note, at most every WhiffToastEvery seconds.
+		lastWhiffToast = now
+		SoundData.Play(SoundData.SwingFor(nil))
+		HUD.Toast("Nothing in range to chop.")
+	end
 	if refused and refused.problem == "far" then
 		HUD.Toast(SectionLogic.Message("far") :: string)
 	elseif refused and refused.problem == "hard" then
@@ -650,6 +662,9 @@ SwingPose.HookImpact(deliver)
 local function trySwing(fromClick: boolean)
 	local now = os.clock()
 	if now < cooldownUntil then
+		if fromClick then
+			chopNote("rejected: cooldown")
+		end
 		return
 	end
 	local block = bodyBlock()
@@ -733,6 +748,56 @@ local function updateOutline()
 	end
 end
 
+-- One throttled [Chop] line when the engine fires Tool.Activated, for the
+-- Xbox "axe will not swing" hunt: whether it fired at all, what the last input
+-- was, whether a tool is out (the grab ignores the trigger then), what the pad
+-- has selected (a selected GUI object takes the trigger), and whether the
+-- engine's Activate binding is among the bound actions (the controls module
+-- binds it in Enable; a Disable that is never undone drops it). Everything
+-- here is read-only.
+local lastActivatedNote = 0
+
+local function activateBound(): string
+	local ok, all = pcall(function()
+		return ContextActionService:GetAllBoundActionInfo()
+	end)
+	if not ok or type(all) ~= "table" then
+		return "unreadable"
+	end
+	for name in pairs(all) do
+		if string.find(string.lower(tostring(name)), "activate", 1, true) then
+			return "yes(" .. tostring(name) .. ")"
+		end
+	end
+	return "none"
+end
+
+local function activatedNote(tool: Tool)
+	local now = os.clock()
+	if now - lastActivatedNote < 0.75 then
+		return
+	end
+	lastActivatedNote = now
+	local char = player.Character
+	local out = false
+	if char then
+		local ok, found = pcall(function()
+			return char:FindFirstChildWhichIsA("Tool")
+		end)
+		out = ok and found ~= nil
+	end
+	chopNote(
+		string.format(
+			"Activated: tool=%s lastInput=%s toolOut=%s selected=%s activateBinding=%s",
+			tostring(tool.Name),
+			tostring(UserInputService:GetLastInputType().Name),
+			tostring(out),
+			tostring(GuiService.SelectedObject),
+			activateBound()
+		)
+	)
+end
+
 local function bindTool(tool: Tool)
 	if bound[tool] or type(tool:GetAttribute("AxeId")) ~= "string" then
 		return
@@ -740,15 +805,7 @@ local function bindTool(tool: Tool)
 	bound[tool] = true
 	tool.Activated:Connect(function()
 		holding = true
-		-- TEMPORARY Xbox chop debug (remove once fixed).
-		print(
-			string.format(
-				"[Chop] Activated %s lastInput=%s selected=%s",
-				tostring(tool.Name),
-				tostring(UserInputService:GetLastInputType().Name),
-				tostring(game:GetService("GuiService").SelectedObject)
-			)
-		)
+		activatedNote(tool)
 		-- Touch: TouchTapInWorld swings with the finger on this tap. Activated
 		-- on a phone runs first, before that position exists, so wait a
 		-- frame and only swing if the tap didn't (a device that fires

@@ -22,6 +22,7 @@ local MiningLogic = require(ReplicatedStorage.Shared.Mining.MiningLogic)
 local MiningSchema = require(ReplicatedStorage.Shared.Mining.MiningSchema)
 local OreData = require(ReplicatedStorage.Shared.Mining.OreData)
 local PickaxeData = require(ReplicatedStorage.Shared.Mining.PickaxeData)
+local GearMeshes = require(ReplicatedStorage.Shared.Art.GearMeshes)
 
 local MiningService = {}
 
@@ -354,7 +355,7 @@ local function onSwing(player: Player, tool: Tool)
 	breakNode(player, node)
 end
 
-local function toolFrom(model: Model, name: string, attr: string, value: string): Tool
+local function toolFrom(model: Model, name: string, attr: string, value: string, gearId: string?): Tool
 	local tool = Instance.new("Tool")
 	tool.Name = name
 	tool.RequiresHandle = true
@@ -368,6 +369,12 @@ local function toolFrom(model: Model, name: string, attr: string, value: string)
 	model:Destroy()
 	if handle then
 		tool.Grip = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-80), 0, 0)
+	end
+	-- The uploaded meshes go on the Tool itself (it outlives the model), and
+	-- a mesh that is not loaded yet is swapped in later; the part-built tool
+	-- stays until then and whenever there is no mesh.
+	if gearId then
+		GearMeshes.Dress(tool, gearId)
 	end
 	return tool
 end
@@ -398,7 +405,7 @@ local function givePick(player: Player, mining: MiningSchema.Mining)
 		return
 	end
 	stripTools(player, "PickId")
-	local tool = toolFrom(MiningArt.Pickaxe(pick), pick.name, "PickId", pick.id)
+	local tool = toolFrom(MiningArt.Pickaxe(pick), pick.name, "PickId", pick.id, pick.id)
 	tool.Activated:Connect(function()
 		onSwing(player, tool)
 	end)

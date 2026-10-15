@@ -205,6 +205,14 @@ function UITheme.Device(): Device
 	return "desktop"
 end
 
+-- A touch-only device: touch, and neither a keyboard nor a gamepad. Hardware,
+-- not the last input, so a PC or an Xbox never counts as a phone.
+function UITheme.TouchOnly(): boolean
+	return UserInputService.TouchEnabled
+		and not UserInputService.KeyboardEnabled
+		and not UserInputService.GamepadEnabled
+end
+
 -- A small touch screen (the spec's phone sizes: smaller buttons).
 function UITheme.IsPhone(): boolean
 	local camera = workspace.CurrentCamera

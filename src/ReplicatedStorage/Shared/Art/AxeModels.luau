@@ -6,9 +6,14 @@
 -- TrailBottom and LuxBurst are created in code from the Blender points
 -- below (the FBX _Att names are not used).
 
+local BacklogModels = require(script.Parent.BacklogModels)
+
 local AxeModels = {}
 
-export type Piece = { meshId: number, size: Vector3 }
+-- `at`: the piece's centre measured from the Handle mesh's centre, blade
+-- toward -Z, authored in Blender (the uploaded meshes do not share one blade
+-- plane). Without it AxeArt falls back to BladeFrontZ.
+export type Piece = { meshId: number, size: Vector3, at: Vector3? }
 
 export type AxeMesh = {
 	Handle: Piece,
@@ -49,50 +54,70 @@ AxeModels.LuxPoints = {
 local axes: { [string]: AxeMesh } = {
 	RustyAxe = {
 		Handle = { meshId = 125228989315064, size = Vector3.new(0.295, 3.6, 0.396) },
-		Head = { meshId = 132884007738463, size = Vector3.new(0.445, 0.938, 1.738) },
+		Head = { meshId = 132884007738463, size = Vector3.new(0.445, 0.938, 1.738), at = Vector3.new(0, 1.336, -0.394) },
 	},
 	SteelAxe = {
 		Handle = { meshId = 80550306632305, size = Vector3.new(0.295, 3.75, 0.396) },
-		Head = { meshId = 139649051325358, size = Vector3.new(0.445, 1.092, 1.919) },
+		Head = { meshId = 139649051325358, size = Vector3.new(0.445, 1.092, 1.919), at = Vector3.new(0, 1.398, -0.463) },
 	},
 	HardenedAxe = {
 		Handle = { meshId = 82273669284316, size = Vector3.new(0.295, 3.874, 0.396) },
-		Head = { meshId = 73648959184321, size = Vector3.new(0.509, 2.111, 2.279) },
+		Head = { meshId = 73648959184321, size = Vector3.new(0.509, 2.111, 2.279), at = Vector3.new(0, 0.913, -0.336) },
 	},
 	SilverAxe = {
 		Handle = { meshId = 80860699331818, size = Vector3.new(0.312, 3.832, 0.405) },
-		Head = { meshId = 75426342751786, size = Vector3.new(0.445, 1.426, 1.972) },
+		Head = { meshId = 75426342751786, size = Vector3.new(0.445, 1.426, 1.972), at = Vector3.new(0, 1.219, -0.536) },
 	},
 	CobaltAxe = {
 		Handle = { meshId = 126941607721593, size = Vector3.new(0.295, 3.882, 0.396) },
-		Head = { meshId = 96144513964536, size = Vector3.new(0.445, 1.264, 2.438) },
+		Head = { meshId = 96144513964536, size = Vector3.new(0.445, 1.264, 2.438), at = Vector3.new(0, 1.518, -0.256) },
 	},
 	GoldAxe = {
 		Handle = { meshId = 124343533685558, size = Vector3.new(0.328, 3.945, 0.413) },
-		Head = { meshId = 95238469359825, size = Vector3.new(0.551, 1.081, 2.586) },
+		Head = { meshId = 95238469359825, size = Vector3.new(0.551, 1.081, 2.586), at = Vector3.new(0, 1.464, -0.031) },
 	},
 	ObsidianAxe = {
 		Handle = { meshId = 130646054040528, size = Vector3.new(0.295, 3.9, 0.383) },
-		Head = { meshId = 115239214273651, size = Vector3.new(0.547, 1.718, 2.491) },
+		Head = { meshId = 115239214273651, size = Vector3.new(0.547, 1.718, 2.491), at = Vector3.new(0, 1.501, -0.671) },
 	},
 	InfernoAxe = {
 		Handle = { meshId = 121962083793739, size = Vector3.new(0.295, 3.953, 0.396) },
-		Head = { meshId = 92529563640180, size = Vector3.new(0.445, 1.23, 1.993) },
-		Glow = { meshId = 106039931444640, size = Vector3.new(0.233, 2.824, 1.626) },
+		Head = { meshId = 92529563640180, size = Vector3.new(0.445, 1.23, 1.993), at = Vector3.new(0, 1.446, -0.479) },
+		Glow = { meshId = 106039931444640, size = Vector3.new(0.233, 2.824, 1.626), at = Vector3.new(0, 1.072, -0.663) },
 	},
 	StarfallAxe = {
 		Handle = { meshId = 92965386864498, size = Vector3.new(0.295, 4.042, 0.396) },
-		Head = { meshId = 121084898724236, size = Vector3.new(0.466, 2.26, 2.046) },
-		Glow = { meshId = 87927667111212, size = Vector3.new(0.127, 2.437, 0.858) },
+		Head = { meshId = 121084898724236, size = Vector3.new(0.466, 2.26, 2.046), at = Vector3.new(0, 1.565, -0.082) },
+		Glow = { meshId = 87927667111212, size = Vector3.new(0.127, 2.437, 0.858), at = Vector3.new(0, 1.565, -0.771) },
 	},
 	LuxAxe = {
 		Handle = { meshId = 99836533054151, size = Vector3.new(0.328, 4.053, 0.413) },
-		Head = { meshId = 102328618104359, size = Vector3.new(0.477, 1.251, 2.035) },
-		Glow = { meshId = 128937745363899, size = Vector3.new(0.424, 1.251, 2.088) },
+		Head = { meshId = 102328618104359, size = Vector3.new(0.477, 1.251, 2.035), at = Vector3.new(0, 1.497, -0.508) },
+		Glow = { meshId = 128937745363899, size = Vector3.new(0.424, 1.251, 2.088), at = Vector3.new(0, 1.497, -0.482) },
 		-- Invisible guide only. Not spawned.
 		Trail = { meshId = 122126725797799, size = Vector3.new(0.021, 1.145, 0.021) },
 	},
 }
+
+-- The Hermit's Maul (a quest reward) is an uploaded gear model: its pieces
+-- come from BacklogModels, with the head's authored offset.
+do
+	local maul = BacklogModels.Get("HermitsMaul")
+	local handle: Piece? = nil
+	local head: Piece? = nil
+	if maul then
+		for _, piece in ipairs(maul.pieces) do
+			if piece.name == "Handle" then
+				handle = { meshId = piece.meshId, size = piece.size }
+			elseif piece.name == "Head" then
+				head = { meshId = piece.meshId, size = piece.size, at = Vector3.new(0, 1.503, -0.253) }
+			end
+		end
+	end
+	if handle and head then
+		axes.HermitsMaul = { Handle = handle, Head = head }
+	end
+end
 
 function AxeModels.Get(axeId: string): AxeMesh?
 	return axes[axeId]

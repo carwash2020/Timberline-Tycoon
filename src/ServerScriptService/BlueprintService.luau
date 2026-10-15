@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BlueprintArt = require(ReplicatedStorage.Shared.Art.BlueprintArt)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local GearMeshes = require(ReplicatedStorage.Shared.Art.GearMeshes)
 local HammerArt = require(ReplicatedStorage.Shared.Art.HammerArt)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
@@ -177,6 +178,7 @@ function BlueprintService.GiveHammer(player: Player): Tool?
 	tool:SetAttribute("Hammer", true)
 	tool.Grip = HammerArt.Grip()
 	prepare(HammerArt.Held(), tool)
+	GearMeshes.Dress(tool, "Hammer") -- the uploaded hammer, when its meshes are loaded; else the part-built one
 	tool.Parent = backpack
 	return tool
 end

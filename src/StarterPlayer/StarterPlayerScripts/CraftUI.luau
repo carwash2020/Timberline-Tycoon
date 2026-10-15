@@ -79,6 +79,7 @@ local function build(viewport: Vector2): ScreenGui
 	close.Position = UDim2.new(1, -64, 0, 0)
 	close.Parent = shop
 	local rows = Instance.new("ScrollingFrame")
+	rows.SelectionImageObject = UITheme.HiddenSelection() -- panel-sized: no selection box over the whole list
 	rows.Name = "Rows"
 	rows.BackgroundTransparency = 1
 	rows.BorderSizePixel = 0

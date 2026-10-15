@@ -1731,6 +1731,7 @@ local function build()
 	-- The scrolling body; the pad's selection scrolls it along. Its place
 	-- under the tabs is set by relayout().
 	local scroll = Instance.new("ScrollingFrame")
+	scroll.SelectionImageObject = UITheme.HiddenSelection() -- panel-sized: no selection box over the whole list
 	scroll.Name = "Body"
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0

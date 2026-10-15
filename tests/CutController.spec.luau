@@ -33,6 +33,11 @@ return function(t)
 		local loader = t.loader({
 			services = {
 				Debris = { AddItem = function() end },
+				ContextActionService = {
+					GetAllBoundActionInfo = function()
+						return { RobloxActivate = {} }
+					end,
+				},
 				GuiService = {},
 				Players = { LocalPlayer = { UserId = 1, CharacterAdded = sig } },
 				RunService = { Heartbeat = sig },
@@ -383,6 +388,11 @@ return function(t)
 		local loader = t.loader({
 			services = {
 				Debris = { AddItem = function() end },
+				ContextActionService = {
+					GetAllBoundActionInfo = function()
+						return { RobloxActivate = {} }
+					end,
+				},
 				GuiService = guiService,
 				Players = { LocalPlayer = player },
 				RunService = { Heartbeat = heartbeat },
