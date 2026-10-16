@@ -39,6 +39,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ChopFeelLogic = require(ReplicatedStorage.Shared.ChopFeelLogic)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local LightingController = require(script.Parent.LightingController)
 local Quality = require(script.Parent.Quality)
@@ -75,6 +76,9 @@ local cursor = 1 -- where in `order` the next frame's walk starts
 
 local moveParts: { BasePart } = {}
 local moveFrames: { CFrame } = {}
+
+-- A tree at 80 percent through a cut rocks once (WoodFX asks): tree -> when it began.
+local nudges: { [Model]: number } = setmetatable({}, { __mode = "k" }) :: any
 
 local windDir = BASE_WIND.Unit
 local windStrength = 0.25
@@ -353,6 +357,15 @@ local function swayOne(i: number)
 	local gust = math.noise(now * 0.3 + s.phase, s.phase * 0.7)
 	local lean = strength * 0.015 + gust * strength * 0.03
 	local angle = lean + math.sin(now * s.freq + s.phase) * amplitude
+	local began = nudges[s.tree]
+	if began then
+		local t = now - began
+		if t >= ChopFeelLogic.SwaySeconds then
+			nudges[s.tree] = nil
+		else
+			angle += ChopFeelLogic.SwayAngle * ChopFeelLogic.SwayEnvelope(t) * math.sin(t * ChopFeelLogic.SwayHz)
+		end
+	end
 	local side = math.sin(now * s.freq * 0.71 + s.phase * 1.7) * amplitude * 0.35
 	local turn = CFrame.fromAxisAngle(frameAxis, angle) * CFrame.fromAxisAngle(frameDir, side)
 	local sway = CFrame.new(s.top) * turn * CFrame.new(-s.top)
@@ -395,6 +408,13 @@ local function updateWind(now: number)
 	workspace.GlobalWind = windDir * speed
 	-- Gusts lean the trees a little further.
 	windStrength = env.wind * (0.8 + 0.4 * (gust - 0.75) / 0.5)
+end
+
+-- A short extra rock of one tree's canopy (a cut 80 percent through). Only
+-- a tree already swaying (in range, inside the per-frame budget) moves; the
+-- trunk sections are never touched.
+function WindSway.Nudge(tree: Model)
+	nudges[tree] = os.clock()
 end
 
 function WindSway.Start()

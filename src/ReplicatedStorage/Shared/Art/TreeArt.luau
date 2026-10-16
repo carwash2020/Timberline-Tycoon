@@ -1605,11 +1605,19 @@ local function ride(p: BasePart, section: BasePart)
 	p.Anchored = false
 end
 
+-- What a cut face and a notch look like: the wood's core colour on plain
+-- WoodPlanks, never Neon, Ice or Foil (a glowing stump face is not wanted).
+-- TreeArt.Core is untouched: buildings and the wood effects read it.
+function TreeArt.FaceLook(def: WoodDef): (Color3, Enum.Material)
+	local color = TreeArt.Core(def)
+	return color, Enum.Material.WoodPlanks
+end
+
 -- The fresh face on one end of a cut section (`top` = its +Y end): a thin
 -- plate of the wood's core, 0.86 of the section's width, just proud of the
 -- end. Parented beside the section; never collides, can't be queried.
 function TreeArt.CutFace(def: WoodDef, section: BasePart, top: boolean): Part
-	local color, material = TreeArt.Core(def)
+	local color, material = TreeArt.FaceLook(def)
 	local t = widthOf(section) * TreeArt.CutFaceInset
 	local th = TreeArt.CutFaceThickness
 	local y = (section.Size.Y / 2 + th / 2 - 0.01) * (if top then 1 else -1)
@@ -1652,7 +1660,7 @@ function TreeArt.Notch(
 	damage: number,
 	required: number
 ): Part
-	local color, material = TreeArt.Core(def)
+	local color, material = TreeArt.FaceLook(def)
 	local cf = section.CFrame
 	local lx, lz = cf.XVector:Dot(normal), cf.ZVector:Dot(normal)
 	local t = widthOf(section)

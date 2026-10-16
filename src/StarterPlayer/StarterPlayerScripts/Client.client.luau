@@ -40,6 +40,7 @@ local MODULES = {
 	"CarryController",
 	"CarryPose",
 	"ChopController",
+	"ChopHaptics",
 	"ChopSawController",
 	"CraftUI",
 	"CutController",

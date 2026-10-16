@@ -39,6 +39,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local ChopFeelLogic = require(ReplicatedStorage.Shared.ChopFeelLogic)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
@@ -51,6 +52,7 @@ local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local CameraShake = require(script.Parent.CameraShake)
+local ChopHaptics = require(script.Parent.ChopHaptics)
 local Quality = require(script.Parent.Quality)
 
 type WoodDef = WoodData.WoodDef
@@ -60,10 +62,10 @@ local WoodFX = {}
 WoodFX.FxRange = 150 -- studs from the camera; farther effects aren't drawn
 WoodFX.ShakeRange = 40 -- a landing shakes the camera this near ...
 WoodFX.ShakeMass = 5 -- ... if it's heavier than this
-WoodFX.ChipsPerHit = 5
+WoodFX.ChipsPerHit = 6
 WoodFX.ChipMin = 0.3 -- studs; the long side of a chip never starts under this
 WoodFX.ChipsPerOffcut = 10
-WoodFX.LeavesPerFall = 14
+WoodFX.LeavesPerFall = 10
 WoodFX.RingDots = 16
 WoodFX.RingHold = 2.5 -- seconds the ring stays after the last swing
 WoodFX.SpringFrom = 0.72 -- a tree that grew springs up from this much of its size
@@ -401,9 +403,25 @@ function WoodFX.Shakes(distance: number, mass: number): boolean
 	return distance <= WoodFX.ShakeRange and mass > WoodFX.ShakeMass
 end
 
--- How hard: heavier lands harder, at most a big shake.
-function WoodFX.ShakeStrength(mass: number): number
-	return math.clamp(0.25 + mass / 80, 0.25, 0.9)
+-- How hard: heavier lands harder, at most a big shake; a phone gets at most
+-- 0.6 (ChopFeelLogic.ShakeCap). `device` is "phone", "console" or "desktop"
+-- (desktop when not given).
+function WoodFX.ShakeStrength(mass: number, device: string?): number
+	return ChopFeelLogic.ShakeStrength(mass, device or "desktop")
+end
+
+-- The device now, from UITheme (loaded lazily: it is not needed headless).
+local function deviceNow(): string
+	local ok, theme = pcall(function(): any
+		return require(script.Parent.UITheme)
+	end)
+	if ok and type(theme) == "table" and type(theme.Device) == "function" then
+		local got, device = pcall(theme.Device)
+		if got and type(device) == "string" then
+			return device
+		end
+	end
+	return "desktop"
 end
 
 -- How many of `dots` a ring lights for `progress` (0-1).
@@ -606,11 +624,29 @@ local function randomAxis(): Vector3
 	return if v.Magnitude > 0.01 then v.Unit else Vector3.xAxis
 end
 
+-- Every third chip is bark colour, the rest the wood's core.
+function WoodFX.IsBarkChip(i: number): boolean
+	return i % 3 == 0
+end
+
+-- Chips live at once if `players` each swing every `interval` seconds and a
+-- chip lives `life` seconds, before the pool's cap. The pool recycles its
+-- oldest chip past QualityBudgets.ChipCount, so the live count never passes it.
+function WoodFX.ChipDemand(players: number, interval: number, life: number): number
+	return players * math.ceil(life / math.max(interval, 0.05)) * WoodFX.ChipsPerHit
+end
+
+-- Chips in flight or resting right now (never above the tier's ChipCount).
+function WoodFX.LiveChips(): number
+	return #chipBatch.out
+end
+
 -- `n` chips out of `pos` along `normal`, in the wood's core (and a few in
 -- its bark) colour.
-local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number)
+local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number): { BasePart }
+	local made: { BasePart } = {}
 	if not nearCamera(pos) then
-		return
+		return made
 	end
 	local core = TreeArt.Core(def)
 	local bark = def.trunkColor
@@ -631,10 +667,12 @@ local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number)
 		)
 		local chip = takePart(chipBatch)
 		chip.Size = Vector3.new(WoodFX.ChipMin + math.random() * 0.16, 0.16, WoodFX.ChipMin + math.random() * 0.22)
-		chip.Color = if i % 4 == 0 then bark else core
+		chip.Color = if WoodFX.IsBarkChip(i) then bark else core
 		local rest = TreeLogic.Upright(groundNormal) * CFrame.Angles(0, math.random() * math.pi * 2, 0)
 		launch(chipBatch, chip, flight, rest, randomAxis(), 10 + math.random() * 10, 0)
+		table.insert(made, chip)
 	end
+	return made
 end
 
 -- Leaves flutter down from `points` in the wood's colours.
@@ -829,6 +867,96 @@ local function woodOf(payload: { [string]: any }): WoodDef?
 	return if type(id) == "string" then WoodData.Get(id) else nil
 end
 
+---------------------------------------------------------------------------
+-- Prediction: the swinger's chips and thunk on the impact frame
+---------------------------------------------------------------------------
+
+-- The swinger's own swings not yet answered by the server's "Cut": each holds
+-- the chips it popped. One that is not answered inside PredictWindow, or that
+-- meets a "Clink", gives its chips back to the pool (hide, back to idle).
+local ledger = ChopFeelLogic.NewLedger()
+-- The last progress the server confirmed for a section (the thunk's pitch
+-- never guesses this hit), and whether its 80 percent creak has fired.
+local confirmed: { [Instance]: number } = setmetatable({}, { __mode = "k" }) :: any
+local creaked: { [Instance]: boolean? } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Hides `parts` (chips from a swing that did not happen) and returns them to
+-- the pool; no Instance.new.
+local function releaseChips(parts: { BasePart })
+	local mine: { [BasePart]: boolean } = {}
+	for _, part in ipairs(parts) do
+		mine[part] = true
+	end
+	local i = 1
+	while i <= #chipBatch.out do
+		local piece = chipBatch.out[i]
+		if mine[piece.part] then
+			table.remove(chipBatch.out, i)
+			piece.part.Parent = nil
+			table.insert(chipBatch.idle, piece.part)
+		else
+			i += 1
+		end
+	end
+end
+
+local function sweepLedger()
+	for _, p in ipairs(ChopFeelLogic.Sweep(ledger, os.clock())) do
+		releaseChips(p.token :: { BasePart })
+	end
+end
+
+-- The swing lands at `pos` on `part`'s section: chips and the thunk now, at
+-- the impact frame, before the server answers. No cash, number or progress
+-- is predicted; the pitch uses the section's last confirmed progress (0 when
+-- none). A thunk already played cannot be recalled if the server refuses.
+function WoodFX.Predict(def: WoodDef, pos: Vector3, normal: Vector3, part: Instance?)
+	sweepLedger()
+	local made = chips(def, pos, normal, WoodFX.ChipsPerHit)
+	local progress = if part then confirmed[part] or 0 else 0
+	SoundData.PlayAt("Chop", pos, ChopFeelLogic.ThunkPitch(progress))
+	ChopFeelLogic.Add(ledger, pos, made, os.clock())
+	ChopHaptics.Bite()
+	task.delay(ChopFeelLogic.PredictWindow + 0.05, sweepLedger)
+end
+
+-- The tree model a trunk section belongs to (it carries HomePivot), or nil.
+local function treeOf(part: Instance): Model?
+	local at: Instance? = part.Parent
+	while at do
+		if at:IsA("Model") and at:GetAttribute("HomePivot") ~= nil then
+			return at
+		end
+		at = at.Parent
+	end
+	return nil
+end
+
+-- At CreakAt of the way through a cut, once per section per cut: a creak and
+-- a small rock of that tree's canopy (WindSway; the trunk is never moved).
+-- TreeCreak has no sound id yet, so it is silent until one is supplied.
+local function progressFeel(part: Instance, pos: Vector3, progress: number)
+	confirmed[part] = progress
+	if ChopFeelLogic.Rearm(progress) then
+		creaked[part] = nil
+	end
+	local fire, latch = ChopFeelLogic.CreakStep(progress, creaked[part] == true)
+	creaked[part] = if latch then true else nil
+	if not fire or nearCamera(pos) ~= true then
+		return
+	end
+	SoundData.PlayAt("TreeCreak", pos)
+	local tree = treeOf(part)
+	if tree then
+		local ok, sway = pcall(function(): any
+			return require(script.Parent.WindSway)
+		end)
+		if ok and type(sway) == "table" and type(sway.Nudge) == "function" then
+			sway.Nudge(tree)
+		end
+	end
+end
+
 local function onWorldFX(kind: string, payload: any)
 	if type(payload) ~= "table" then
 		return
@@ -838,22 +966,43 @@ local function onWorldFX(kind: string, payload: any)
 		if not def or typeof(pos) ~= "Vector3" or typeof(normal) ~= "Vector3" then
 			return
 		end
-		chips(def, pos, normal, WoodFX.ChipsPerHit)
 		local part = payload.part
-		if payload.through == true and payload.felled == true and nearCamera(pos) then
+		local mine = payload.userId == player.UserId
+		local through = payload.through == true
+		local progress = if type(payload.progress) == "number" then math.clamp(payload.progress, 0, 1) else 0
+		-- The swinger's own hit was already shown at the impact frame: this
+		-- answer takes that prediction instead of playing chips and thunk twice.
+		local predicted = mine and ChopFeelLogic.Consume(ledger, pos, os.clock()) ~= nil
+		if not predicted then
+			chips(def, pos, normal, WoodFX.ChipsPerHit)
+		end
+		if through and payload.felled == true and nearCamera(pos) then
 			-- A trunk is coming down: creak, crack and whoosh (the thud is "Felled").
 			local mass = 40
 			if typeof(part) == "Instance" and part:IsA("BasePart") then
 				mass = part.Size.X * part.Size.Y * part.Size.Z
 			end
-			SoundData.PlayAt("ChopFinal", pos)
+			if not predicted then
+				SoundData.PlayAt("ChopFinal", pos, ChopFeelLogic.ThunkPitch(progress))
+			end
 			SoundData.PlayFell("start", pos, mass)
-		else
-			SoundData.PlayAt(if payload.through == true then "ChopFinal" else "Chop", pos)
+			if mine then
+				local from = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+				if from and from:IsA("BasePart") and WoodFX.Shakes((from.Position - pos).Magnitude, mass) then
+					CameraShake.Shake(ChopFeelLogic.FinishShake(deviceNow()), 0.15)
+				end
+			end
+		elseif not predicted then
+			SoundData.PlayAt(if through then "ChopFinal" else "Chop", pos, ChopFeelLogic.ThunkPitch(progress))
 		end
-		if payload.userId == player.UserId and typeof(part) == "Instance" and part:IsA("BasePart") then
-			local progress = if type(payload.progress) == "number" then payload.progress else 0
-			showRing(part, pos, progress, payload.through == true)
+		if mine and through then
+			ChopHaptics.Final()
+		end
+		if typeof(part) == "Instance" and part:IsA("BasePart") then
+			progressFeel(part, pos, progress)
+			if mine then
+				showRing(part, pos, progress, through)
+			end
 		end
 	elseif kind == "LeafFall" then
 		local def = woodOf(payload)
@@ -883,7 +1032,7 @@ local function onWorldFX(kind: string, payload: any)
 		local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
 		local from = if hrp and hrp:IsA("BasePart") then hrp.Position elseif camera then camera.CFrame.Position else nil
 		if from and WoodFX.Shakes((from - pos).Magnitude, mass) then
-			CameraShake.Shake(WoodFX.ShakeStrength(mass), 0.4)
+			CameraShake.Shake(WoodFX.ShakeStrength(mass, deviceNow()), 0.4)
 		end
 	elseif kind == "Chips" then
 		local def, pos = woodOf(payload), payload.pos
@@ -894,6 +1043,10 @@ local function onWorldFX(kind: string, payload: any)
 		local pos = payload.pos
 		if typeof(pos) == "Vector3" then
 			SoundData.PlayAt("ChopTooHard", pos)
+			-- The swing that bit here did not: its chips go back to the pool.
+			for _, p in ipairs(ChopFeelLogic.Cancel(ledger, pos)) do
+				releaseChips(p.token :: { BasePart })
+			end
 		end
 	elseif kind == "Sold" then
 		local pos, amount = payload.pos, payload.amount
