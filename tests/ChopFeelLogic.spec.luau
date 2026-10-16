@@ -116,7 +116,8 @@ return function(t)
 	end)
 
 	t.test("feel table: hits to fell the oak's base per axe, from code", function()
-		local WoodData, ItemCatalog, SectionLogic = t.shared("WoodData"), t.shared("ItemCatalog"), t.shared("SectionLogic")
+		local WoodData, ItemCatalog, SectionLogic =
+			t.shared("WoodData"), t.shared("ItemCatalog"), t.shared("SectionLogic")
 		local oak = WoodData.Get("oak")
 		t.eq(oak.v2.shape.trunkThickness, 2.0)
 		local want = {

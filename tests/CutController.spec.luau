@@ -767,57 +767,67 @@ return function(t)
 		t.eq(#named(w.fires, "Chop"), 2)
 	end)
 
-	t.test("the bite shows at the impact frame: one press, one Chop, one prediction, on mouse, touch and gamepad", function()
-		local Enum = roblox.Enum
-		-- Mouse.
-		local before = #predicts
-		local mouse = swingWorld()
-		mouse.input("MouseButton1")
-		mouse.activate()
-		t.eq(#predicts, before, "nothing on the press: the swing winds up first")
-		mouse.land()
-		t.eq(#named(mouse.fires, "Chop"), 1)
-		t.eq(#predicts, before + 1, "the prediction rides the same impact frame as the Chop")
-		t.ok(predicts[#predicts][4] == mouse.section, "at the section it hit")
-		-- Touch.
-		before = #predicts
-		local touch = swingWorld()
-		touch.tap(roblox.Vector2.new(500, 100), false)
-		touch.land()
-		t.eq(#named(touch.fires, "Chop"), 1)
-		t.eq(#predicts, before + 1)
-		-- Gamepad.
-		before = #predicts
-		local pad = swingWorld()
-		pad.input("Gamepad1")
-		pad.hit(nil)
-		pad.radius({ pad.section })
-		pad.activate()
-		pad.land()
-		t.eq(#named(pad.fires, "Chop"), 1)
-		t.eq(#predicts, before + 1)
-		-- A swing that is cancelled sends nothing and shows nothing.
-		before = #predicts
-		local dropped = swingWorld()
-		dropped.input("MouseButton1")
-		dropped.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
-		dropped.unequip()
-		dropped.land()
-		t.eq(#named(dropped.fires, "Chop"), 0)
-		t.eq(#predicts, before, "no Chop, no prediction")
-	end)
+	t.test(
+		"the bite shows at the impact frame: one press, one Chop, one prediction, on mouse, touch and gamepad",
+		function()
+			local Enum = roblox.Enum
+			-- Mouse.
+			local before = #predicts
+			local mouse = swingWorld()
+			mouse.input("MouseButton1")
+			mouse.activate()
+			t.eq(#predicts, before, "nothing on the press: the swing winds up first")
+			mouse.land()
+			t.eq(#named(mouse.fires, "Chop"), 1)
+			t.eq(#predicts, before + 1, "the prediction rides the same impact frame as the Chop")
+			t.ok(predicts[#predicts][4] == mouse.section, "at the section it hit")
+			-- Touch.
+			before = #predicts
+			local touch = swingWorld()
+			touch.tap(roblox.Vector2.new(500, 100), false)
+			touch.land()
+			t.eq(#named(touch.fires, "Chop"), 1)
+			t.eq(#predicts, before + 1)
+			-- Gamepad.
+			before = #predicts
+			local pad = swingWorld()
+			pad.input("Gamepad1")
+			pad.hit(nil)
+			pad.radius({ pad.section })
+			pad.activate()
+			pad.land()
+			t.eq(#named(pad.fires, "Chop"), 1)
+			t.eq(#predicts, before + 1)
+			-- A swing that is cancelled sends nothing and shows nothing.
+			before = #predicts
+			local dropped = swingWorld()
+			dropped.input("MouseButton1")
+			dropped.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
+			dropped.unequip()
+			dropped.land()
+			t.eq(#named(dropped.fires, "Chop"), 0)
+			t.eq(#predicts, before, "no Chop, no prediction")
+		end
+	)
 
-	t.test("aim assist: touch and gamepad take the nearest in the 25 degree cone; a mouse takes the best overall", function()
-		local list = {
-			{ score = 3, inCone = false }, -- nearest, but off to the side
-			{ score = 5, inCone = true },
-			{ score = 4, inCone = true },
-		}
-		t.eq(CutController.NearChoice(list, true), 3, "the nearest inside the cone")
-		t.eq(CutController.NearChoice(list, false), 1, "a mouse is unchanged")
-		t.eq(CutController.NearChoice({ { score = 2, inCone = false } }, true), 1, "none in the cone: the old behaviour")
-		t.eq(CutController.NearChoice({}, true), nil)
-	end)
+	t.test(
+		"aim assist: touch and gamepad take the nearest in the 25 degree cone; a mouse takes the best overall",
+		function()
+			local list = {
+				{ score = 3, inCone = false }, -- nearest, but off to the side
+				{ score = 5, inCone = true },
+				{ score = 4, inCone = true },
+			}
+			t.eq(CutController.NearChoice(list, true), 3, "the nearest inside the cone")
+			t.eq(CutController.NearChoice(list, false), 1, "a mouse is unchanged")
+			t.eq(
+				CutController.NearChoice({ { score = 2, inCone = false } }, true),
+				1,
+				"none in the cone: the old behaviour"
+			)
+			t.eq(CutController.NearChoice({}, true), nil)
+		end
+	)
 
 	t.test("the cut guide sits at the seam of a standing trunk, and on the cut line of a felled log", function()
 		local CFrame, Vector3 = roblox.CFrame, roblox.Vector3

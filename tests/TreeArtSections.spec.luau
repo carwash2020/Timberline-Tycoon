@@ -480,7 +480,11 @@ return function(t)
 			t.eq(color, core, def.id .. " keeps its core colour")
 			t.eq(material, Enum.Material.WoodPlanks, def.id)
 		end
-		t.eq(select(2, TreeArt.Core(WoodData.Get("lumenwood"))), Enum.Material.Neon, "buildings still read the Neon core")
+		t.eq(
+			select(2, TreeArt.Core(WoodData.Get("lumenwood"))),
+			Enum.Material.Neon,
+			"buildings still read the Neon core"
+		)
 	end)
 
 	t.test("a notch cuts in from the face it was hit on, as deep as the damage", function()

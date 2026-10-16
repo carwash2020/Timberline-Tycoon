@@ -117,7 +117,9 @@ return function(t)
 			local demand = WoodFX.ChipDemand(6, 0.35, life)
 			local live = math.min(demand, cap)
 			t.ok(live <= cap)
-			print(string.format("6 players felling, %s: chip demand %d, live peak %d (cap %d)", tier, demand, live, cap))
+			print(
+				string.format("6 players felling, %s: chip demand %d, live peak %d (cap %d)", tier, demand, live, cap)
+			)
 		end
 		t.eq(WoodFX.LiveChips(), 0, "nothing live before any swing")
 	end)

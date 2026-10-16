@@ -1430,38 +1430,41 @@ return function(t)
 	end)
 
 	-- CHOP-T325: what the server already says about a cut, and what it counts.
-	t.test("every Cut carries progress between 0 and 1, rising to 1 on the cut-through (overkill never passes it)", function()
-		local s = setup()
-		local rec = s.tree("oak")
-		local p = s.player(1)
-		local GoldAxe = s.ItemCatalog.GetAxe("GoldAxe")
-		local saved = GoldAxe.v2.vs
-		GoldAxe.v2.vs = { oak = { damage = 100, cooldown = 0.4 } } -- far more than the section needs
-		s.axe = "GoldAxe"
-		s.cutThrough(p, rec.sections[1])
-		GoldAxe.v2.vs = saved
-		s.axe = "RustyAxe"
-		local cuts = s.fxOf("Cut")
-		t.ok(#cuts >= 1, "a Cut went out")
-		for _, c in ipairs(cuts) do
-			t.ok(type(c.payload.progress) == "number", "progress rides every Cut")
-			t.ok(c.payload.progress >= 0 and c.payload.progress <= 1, "clamped to 0..1")
-		end
-		t.eq(cuts[#cuts].payload.progress, 1, "the overkill hit reads exactly 1")
+	t.test(
+		"every Cut carries progress between 0 and 1, rising to 1 on the cut-through (overkill never passes it)",
+		function()
+			local s = setup()
+			local rec = s.tree("oak")
+			local p = s.player(1)
+			local GoldAxe = s.ItemCatalog.GetAxe("GoldAxe")
+			local saved = GoldAxe.v2.vs
+			GoldAxe.v2.vs = { oak = { damage = 100, cooldown = 0.4 } } -- far more than the section needs
+			s.axe = "GoldAxe"
+			s.cutThrough(p, rec.sections[1])
+			GoldAxe.v2.vs = saved
+			s.axe = "RustyAxe"
+			local cuts = s.fxOf("Cut")
+			t.ok(#cuts >= 1, "a Cut went out")
+			for _, c in ipairs(cuts) do
+				t.ok(type(c.payload.progress) == "number", "progress rides every Cut")
+				t.ok(c.payload.progress >= 0 and c.payload.progress <= 1, "clamped to 0..1")
+			end
+			t.eq(cuts[#cuts].payload.progress, 1, "the overkill hit reads exactly 1")
 
-		local other = s.tree("oak", Vector3.new(60, 0, 0))
-		local q = s.player(2, Vector3.new(64, 3, 0))
-		local before = #s.fxOf("Cut")
-		s.cutThrough(q, other.sections[1])
-		local seen = {}
-		for i = before + 1, #s.fxOf("Cut") do
-			table.insert(seen, s.fxOf("Cut")[i].payload.progress)
+			local other = s.tree("oak", Vector3.new(60, 0, 0))
+			local q = s.player(2, Vector3.new(64, 3, 0))
+			local before = #s.fxOf("Cut")
+			s.cutThrough(q, other.sections[1])
+			local seen = {}
+			for i = before + 1, #s.fxOf("Cut") do
+				table.insert(seen, s.fxOf("Cut")[i].payload.progress)
+			end
+			for i = 2, #seen do
+				t.ok(seen[i] >= seen[i - 1], "progress never goes back within a cut")
+			end
+			t.eq(seen[#seen], 1)
 		end
-		for i = 2, #seen do
-			t.ok(seen[i] >= seen[i - 1], "progress never goes back within a cut")
-		end
-		t.eq(seen[#seen], 1)
-	end)
+	)
 
 	t.test("Net.RemoteNames still has 74 remotes: the chop feel pass added none", function()
 		t.eq(#t.shared("Net").RemoteNames, 74)
@@ -1498,29 +1501,32 @@ return function(t)
 		t.eq(s.Trees.RejectCounts(1).cooldown, 0)
 	end)
 
-	t.test("the cut-through tree falls away from the cutter, the stump stays, and it grows back on the timer", function()
-		local s = setup()
-		s.Trees._roll = function()
-			return 0.5
+	t.test(
+		"the cut-through tree falls away from the cutter, the stump stays, and it grows back on the timer",
+		function()
+			local s = setup()
+			s.Trees._roll = function()
+				return 0.5
+			end
+			local rec = s.tree("oak")
+			local p = s.player(1)
+			local falls = 0
+			s.Trees.OnFelled = function(_, _, _, dir)
+				falls += 1
+				t.ok(dir.X < 0, "the cutter stands at +X: it falls toward -X")
+			end
+			local rootPos = p.root.Position
+			s.cutThrough(p, rec.sections[1])
+			t.eq(falls, 1)
+			t.ok(rec.felled and not rec.slot, "the stump is still there")
+			t.eq(p.root.Position, rootPos, "a fall never pushes the player")
+			-- Cutting the stump through once more is the cut, not a second fell.
+			t.eq(falls, 1, "no second fell")
+			s.now = (rec.regrowAt or 0) + 1
+			s.Trees.GrowTick(s.now)
+			t.ok(not rec.felled and rec.stage == 0, "regrown on the existing timer")
 		end
-		local rec = s.tree("oak")
-		local p = s.player(1)
-		local falls = 0
-		s.Trees.OnFelled = function(_, _, _, dir)
-			falls += 1
-			t.ok(dir.X < 0, "the cutter stands at +X: it falls toward -X")
-		end
-		local rootPos = p.root.Position
-		s.cutThrough(p, rec.sections[1])
-		t.eq(falls, 1)
-		t.ok(rec.felled and not rec.slot, "the stump is still there")
-		t.eq(p.root.Position, rootPos, "a fall never pushes the player")
-		-- Cutting the stump through once more is the cut, not a second fell.
-		t.eq(falls, 1, "no second fell")
-		s.now = (rec.regrowAt or 0) + 1
-		s.Trees.GrowTick(s.now)
-		t.ok(not rec.felled and rec.stage == 0, "regrown on the existing timer")
-	end)
+	)
 
 	t.test("two players split the damage on an Elder; the finishing piece goes to whoever did more", function()
 		local s = setup()
