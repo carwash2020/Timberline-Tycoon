@@ -238,6 +238,22 @@ function QualityBudgets.GlowLightCap(tier: string): number
 	return QualityBudgets.GlowLights.high
 end
 
+-- Buildings of an effect wood (ember, gloam) that may carry sparks on this
+-- tier (WOODFX-T316): none on low, colour only.
+QualityBudgets.EffectHosts = table.freeze({
+	low = 0,
+	medium = 4,
+	high = 8,
+} :: { [string]: number })
+
+function QualityBudgets.EffectHostCap(tier: string): number
+	local n = QualityBudgets.EffectHosts[tier]
+	if type(n) == "number" then
+		return n
+	end
+	return QualityBudgets.EffectHosts.high
+end
+
 -- Client nature parts (rocks, plants, cave dressing) near the camera.
 -- These sit inside AmbientLife's MaxDecor model cap; they are not a second stack.
 QualityBudgets.NatureMax = table.freeze({

@@ -27,6 +27,8 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## Wood effects on buildings (branch `phase-2/wood-effects`, 16 October 2026, draft)
+Frost, ember, gloam and lumen doors take an accent colour; ember, gloam and lantern doors glow at night; ember and gloam buildings get a few sparks (capped 8 high, 4 medium, 0 low). Cosmetic and client-side; no price, save or remote change. Details and Studio checks: PHASE2_NOTES.md "Wood effects on buildings".
 ## Launch performance (branch `phase-2/launch-perf`, 14 October 2026)
 
 Connor's Studio log: playable at +4.6 s but heavy work ran until +11.9 s (the points-of-interest plan one 5.07 s step, 1,205 trees over

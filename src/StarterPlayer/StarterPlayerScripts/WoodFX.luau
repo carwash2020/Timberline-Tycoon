@@ -49,6 +49,7 @@ local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
+local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local CameraShake = require(script.Parent.CameraShake)
 local Quality = require(script.Parent.Quality)
@@ -115,6 +116,20 @@ end
 
 local GLOW = Color3.fromHex(WoodData.LanternGlow)
 
+-- The night colour of a tracked model: its wood's Effect glow (a Palette name,
+-- or the lantern's own hex), else the lantern's.
+local function glowFor(model: Model): Color3
+	local row = WoodData.EffectOf(model:GetAttribute("WoodId"))
+	local name = if row then row.glow else nil
+	if name == nil then
+		return GLOW
+	end
+	if string.sub(name, 1, 1) == "#" then
+		return Color3.fromHex(name)
+	end
+	return Palette.Get(name)
+end
+
 type DayLook = {
 	color: Color3,
 	material: Enum.Material,
@@ -136,6 +151,9 @@ local seenOrder = weakKeys() -- [Model] = number, tie-break when distances match
 local nextOrder = 0
 local paintedNight: boolean? = nil
 local lightAt = -math.huge
+local effectEmitters = weakKeys() -- [Model] = ParticleEmitter
+local effectAt = -math.huge
+local effectNight: boolean? = nil
 
 -- SurfaceAppearance has no Enabled. Park it in a folder under the part at
 -- night so the neon shows, and so a streaming cleanup still destroys it.
@@ -183,7 +201,7 @@ local function paintGlow(model: Model, part: BasePart, night: boolean)
 		return
 	end
 	if night then
-		part.Color = GLOW
+		part.Color = glowFor(model)
 		part.Material = Enum.Material.Neon
 		local hold = if #day.surfaces > 0 then holdFolder(part) else nil
 		for _, surface in ipairs(day.surfaces) do
@@ -241,7 +259,7 @@ local function ensureLight(model: Model, on: boolean)
 		light = made
 	end
 	if light and light:IsA("PointLight") then
-		light.Color = GLOW
+		light.Color = glowFor(model)
 		light.Range = WoodFX.GlowRange
 		light.Brightness = WoodFX.GlowBrightness
 		light.Shadows = false
@@ -255,11 +273,46 @@ local function modelOrigin(model: Model): Vector3
 	return model:GetPivot().Position
 end
 
+-- Paint wins: a cached part whose NightGlow is gone (painted, or marked
+-- Painted) is dropped, its saved day look forgotten and its surfaces put back,
+-- and the old day colour is never written onto it (that would undo the paint
+-- at dawn). Returns the parts still glowing.
+local function pruneStale(model: Model): { BasePart }
+	local parts = lanternParts[model] :: { BasePart }?
+	if not parts then
+		return {}
+	end
+	local kept: { BasePart } = {}
+	local looks = looksFor(model)
+	for _, part in ipairs(parts) do
+		if part.Parent and part:GetAttribute("NightGlow") == true and part:GetAttribute("Painted") ~= true then
+			table.insert(kept, part)
+		else
+			local day = looks[part]
+			if day and part.Parent then
+				for _, surface in ipairs(day.surfaces) do
+					if surface.Parent ~= part then
+						surface.Parent = part
+					end
+				end
+				local hold = part:FindFirstChild(HOLD_NAME)
+				if hold and #hold:GetChildren() == 0 then
+					hold:Destroy()
+				end
+			end
+			looks[part] = nil
+		end
+	end
+	lanternParts[model] = kept
+	return kept
+end
+
 local function paintCached(model: Model, night: boolean): number
 	local parts = lanternParts[model] :: { BasePart }?
 	if not parts or model.Parent == nil then
 		return 0
 	end
+	parts = pruneStale(model)
 	local painted = 0
 	for _, part in ipairs(parts) do
 		if part.Parent then
@@ -289,7 +342,16 @@ function WoodFX.TrackLantern(model: Model, night: boolean): number
 	return paintCached(model, night)
 end
 
+local function dropEmitter(model: Model)
+	local e = effectEmitters[model] :: ParticleEmitter?
+	if e then
+		e:Destroy()
+	end
+	effectEmitters[model] = nil
+end
+
 function WoodFX.ForgetLantern(model: Model)
+	dropEmitter(model)
 	lanternParts[model] = nil
 	dayLook[model] = nil
 	phase[model] = nil
@@ -307,6 +369,9 @@ function WoodFX.ResetLanterns()
 	nextOrder = 0
 	paintedNight = nil
 	lightAt = -math.huge
+	effectEmitters = weakKeys()
+	effectAt = -math.huge
+	effectNight = nil
 end
 
 local function assignLights(night: boolean, tier: string, eye: Vector3)
@@ -360,15 +425,126 @@ function WoodFX.StepLanterns(night: boolean, now: number, tier: string, eye: Vec
 	return painted
 end
 
+---------------------------------------------------------------------------
+-- Sparks on ember and gloam buildings (WOODFX-T316)
+---------------------------------------------------------------------------
+
+local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds" -- the dust's own built-in texture
+WoodFX.EffectFxName = "WoodEffectFx"
+
+export type EffectHost = { id: string, distance: number }
+
+-- Which hosts carry sparks: the nearest first (ties by id), only those within
+-- `range` studs of the eye (WoodFX.FxRange when not given), never more than the
+-- tier's QualityBudgets.EffectHosts cap.
+function WoodFX.EffectHostIds(hosts: { EffectHost }, tier: string, range: number?): { string }
+	local limit = range or WoodFX.FxRange
+	local near: { EffectHost } = {}
+	for _, host in ipairs(hosts) do
+		if host.distance <= limit then
+			table.insert(near, host)
+		end
+	end
+	table.sort(near, function(a: EffectHost, b: EffectHost): boolean
+		if a.distance ~= b.distance then
+			return a.distance < b.distance
+		end
+		return a.id < b.id
+	end)
+	local cap = math.min(#near, QualityBudgets.EffectHostCap(tier))
+	local out: { string } = {}
+	for i = 1, cap do
+		table.insert(out, near[i].id)
+	end
+	return out
+end
+
+local function makeEmitter(model: Model, color: Color3): ParticleEmitter?
+	local root = model.PrimaryPart
+	if not root then
+		return nil
+	end
+	local e = Instance.new("ParticleEmitter")
+	e.Name = WoodFX.EffectFxName
+	e:SetAttribute("ClientFx", true)
+	e.Texture = DUST_TEXTURE
+	e.Rate = 2 -- at most 3 a second
+	e.Lifetime = NumberRange.new(1.2, 2) -- never over 2 seconds
+	e.Speed = NumberRange.new(0.4, 1)
+	e.SpreadAngle = Vector2.new(30, 30)
+	e.EmissionDirection = Enum.NormalId.Top
+	e.Color = ColorSequence.new(color)
+	e.LightEmission = 0.3
+	e.LightInfluence = 0
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
+	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+	e.Parent = root
+	return e
+end
+
+-- Sparks follow the buildings that have an emitter row (ember, gloam), still
+-- have a glowing Door part and are not painted: the nearest few within
+-- FxRange, up to the tier's cap (none on low: colour only). Re-sorts at most
+-- every GlowLightInterval, and when the day flips. Returns the live emitters.
+function WoodFX.StepEffects(night: boolean, now: number, tier: string, eye: Vector3): number
+	local flipped = effectNight ~= night
+	if not flipped and effectAt >= 0 and now - effectAt < WoodFX.GlowLightInterval then
+		local live = 0
+		for model in pairs(effectEmitters) do
+			if (model :: Model).Parent then
+				live += 1
+			end
+		end
+		return live
+	end
+	effectAt = now
+	effectNight = night
+	local hosts: { EffectHost } = {}
+	local byId: { [string]: Model } = {}
+	for model in pairs(lanternParts) do
+		local host = model :: Model
+		local row = if host.Parent then WoodData.EffectOf(host:GetAttribute("WoodId")) else nil
+		if row and row.emitter ~= nil then
+			if #pruneStale(host) > 0 then
+				local id = string.format("%08d", (seenOrder[host] :: number?) or 0)
+				byId[id] = host
+				table.insert(hosts, { id = id, distance = (modelOrigin(host) - eye).Magnitude })
+			end
+		end
+	end
+	local want: { [Model]: boolean } = {}
+	for _, id in ipairs(WoodFX.EffectHostIds(hosts, tier, WoodFX.FxRange)) do
+		want[byId[id]] = true
+	end
+	for model in pairs(effectEmitters) do
+		local host = model :: Model
+		if not want[host] or host.Parent == nil then
+			dropEmitter(host)
+		end
+	end
+	local live = 0
+	for model in pairs(want) do
+		if not effectEmitters[model] then
+			local made = makeEmitter(model, glowFor(model))
+			effectEmitters[model] = made
+		end
+		if effectEmitters[model] then
+			live += 1
+		end
+	end
+	return live
+end
+
 -- Client-only night swap. The tag listener caches parts; this only flips
 -- the paint and, about once a second, the lights.
 local function refreshLanterns()
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
-	WoodFX.StepLanterns(WoodFX.NightGlowOn(), os.clock(), Quality.Budget().Tier, eye)
+	local night = WoodFX.NightGlowOn()
+	WoodFX.StepLanterns(night, os.clock(), Quality.Budget().Tier, eye)
+	WoodFX.StepEffects(night, os.clock(), Quality.Budget().Tier, eye)
 end
 
-local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local LEAF_FLAT = CFrame.Angles(0, 0, math.pi / 2)
 local LEAF_ROCK = math.rad(40)
 local LEAF_FLUTTER = 8
@@ -1092,6 +1268,16 @@ local function startLoop()
 	end
 	CollectionService:GetInstanceAddedSignal("Lanternwood"):Connect(onLantern)
 	CollectionService:GetInstanceRemovedSignal("Lanternwood"):Connect(function(inst: Instance)
+		if inst:IsA("Model") then
+			WoodFX.ForgetLantern(inst)
+		end
+	end)
+	-- The other effect woods (frost, ember, gloam, lumen) are tracked the same way.
+	for _, inst in ipairs(CollectionService:GetTagged("WoodEffect")) do
+		onLantern(inst)
+	end
+	CollectionService:GetInstanceAddedSignal("WoodEffect"):Connect(onLantern)
+	CollectionService:GetInstanceRemovedSignal("WoodEffect"):Connect(function(inst: Instance)
 		if inst:IsA("Model") then
 			WoodFX.ForgetLantern(inst)
 		end
