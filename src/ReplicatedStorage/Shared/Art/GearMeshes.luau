@@ -10,8 +10,9 @@
 -- Never blocks and never breaks a tool: a missing or still-loading mesh, or
 -- an id of 0, leaves the part-built tool exactly as it was, and a swap that
 -- could not run yet is retried in the background by MeshKit.Attempt.
--- Not yet done (listed in the PR): Bomb, MinersLamp, Lantern, Flashlight and
--- the wearables; their offsets are in the Blender audit.
+-- Worn gear is not here: the coat, boots, cloak, hardhat, the belt with the
+-- Lantern and the Flashlight, the rope ladder and the V2 blueprint scroll are
+-- dressed by Art/GearWear, MiningArt and BlueprintArt from Art/WornModels.
 
 local AxeModels = require(script.Parent.AxeModels)
 local BacklogModels = require(script.Parent.BacklogModels)
@@ -49,13 +50,11 @@ GearMeshes.Offsets = {
 -- The BacklogModels id for the Lantern is "GearLantern".
 local ASSET_ID: { [string]: string } = { Lantern = "GearLantern" }
 
--- What is built in the game today to carry each mesh. The held ones are
--- dressed (Bomb, MinersLamp, Hammer, the pickaxes). The rest have offsets
--- here and tested but no dress wired: the Lantern, Flashlight, wearables and
--- Rope Ladder are inventory flags with no held or worn model yet, and the
--- Blueprint Scroll would replace every plan's rolled model (a sideways
--- cylinder Handle, with the Wood Sign and Shed Blueprint slots), which needs
--- a Studio look first.
+-- What is dressed here: the held tools (Bomb, MinersLamp, Hammer, the
+-- pickaxes). The offsets of the other entries (Lantern, Flashlight, the
+-- wearables, Rope Ladder, Blueprint Scroll) are kept and tested, but they
+-- are worn or built by GearWear, MiningArt and BlueprintArt with the newer
+-- WornModels meshes, not dressed from this table.
 GearMeshes.Held = {
 	Hammer = true,
 	RustyPick = true,

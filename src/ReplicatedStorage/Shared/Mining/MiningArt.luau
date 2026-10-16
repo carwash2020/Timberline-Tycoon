@@ -352,10 +352,10 @@ local LADDER_TURN = CFrame.Angles(0, AxeModels.MeshYaw, 0)
 MiningArt.LadderSegments = { 2, 6, 10 }
 MiningArt.LadderTopAt = Vector3.new(0, 12.37, 0.375)
 
-local function dressLadder(model: Model, left: BasePart)
+local function dressLadder(ladder: Model, left: BasePart)
 	pcall(function()
-		MeshKit.Attempt(model, function(): boolean
-			if model:FindFirstChild("LadderTop") then
+		MeshKit.Attempt(ladder, function(): boolean
+			if ladder:FindFirstChild("LadderTop") then
 				return true
 			end
 			local seg = WornModels.Piece("RopeLadderSeg", "Body")
@@ -391,7 +391,7 @@ local function dressLadder(model: Model, left: BasePart)
 				return false
 			end
 			local drop: { Instance } = {}
-			for _, d in ipairs(model:GetChildren()) do
+			for _, d in ipairs(ladder:GetChildren()) do
 				if d.Name == "Rung" or d.Name == "Hook" then
 					table.insert(drop, d)
 				elseif d:IsA("BasePart") and d.Name == "Rail" then
@@ -402,7 +402,7 @@ local function dressLadder(model: Model, left: BasePart)
 				d:Destroy()
 			end
 			for _, mesh in ipairs(made) do
-				mesh.Parent = model
+				mesh.Parent = ladder
 				local w = Instance.new("Weld")
 				w.Name = "Weld"
 				w.Part0 = left

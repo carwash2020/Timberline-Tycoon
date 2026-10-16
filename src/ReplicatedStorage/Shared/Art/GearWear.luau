@@ -269,11 +269,11 @@ local function buildBelt(character: Model, model: Model, owned: { [string]: bool
 	end
 	-- The real belt replaces the fallback once it is up.
 	MeshKit.Attempt(model, function(): boolean
-		if model:FindFirstChild("GearBelt_LowerTorso") then
+		if model:FindFirstChild("Belt_LowerTorso") then
 			return true
 		end
 		local ok = dressEntries(character, model, { "Belt" })
-		if ok and model:FindFirstChild("GearBelt_LowerTorso") then
+		if ok and model:FindFirstChild("Belt_LowerTorso") then
 			for _, part in ipairs(fallback) do
 				part:Destroy()
 			end
