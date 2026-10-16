@@ -253,6 +253,10 @@ return function(t)
 		local s = setup(function()
 			error("AwardBadge must not run for id 0")
 		end)
+		-- Both ids are pasted now: put them back to 0 for this case, restored below.
+		local bayou, mesa = s.BadgeData.Ids.AreaBayou, s.BadgeData.Ids.AreaMesa
+		s.BadgeData.Ids.AreaBayou = 0
+		s.BadgeData.Ids.AreaMesa = 0
 		local WorldLayout = t.shared("World/WorldLayout")
 		local b, m = WorldLayout.Bayou, WorldLayout.RedMesa
 		stand(s.player, b.x, 0, b.z)
@@ -264,6 +268,21 @@ return function(t)
 		t.eq(s.profile.badgesAwarded.AreaMesa, true)
 		t.eq(s.profile.areasVisited.redmesa, true)
 		t.eq(s.calls, {})
+		s.BadgeData.Ids.AreaBayou = bayou
+		s.BadgeData.Ids.AreaMesa = mesa
+	end)
+
+	t.test("with the pasted ids the Bayou and Red Mesa badges are sent", function()
+		local s = setup()
+		local WorldLayout = t.shared("World/WorldLayout")
+		local b, m = WorldLayout.Bayou, WorldLayout.RedMesa
+		stand(s.player, b.x, 0, b.z)
+		s.BadgeService.Poll(s.player)
+		stand(s.player, m.x, 30, m.z)
+		s.BadgeService.Poll(s.player)
+		t.eq(s.profile.badgesAwarded.AreaBayou, true)
+		t.eq(s.profile.badgesAwarded.AreaMesa, true)
+		t.ok(#s.calls >= 2, "AwardBadge ran for both (" .. #s.calls .. " calls)")
 	end)
 
 	t.test("Bog Cypress and Ironwood award once from the field guide", function()

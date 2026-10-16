@@ -33,6 +33,7 @@ local MODULES = {
 	"BadgeUI",
 	"BlueprintPlacer",
 	"BoxPoof",
+	"BuildMenuUI",
 	"BuilderTools",
 	"CameraShake",
 	"CanopyFade",

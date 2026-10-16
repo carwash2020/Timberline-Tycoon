@@ -50,6 +50,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 | sound | 9 | 11 | SoundData.luau |
 | pass | 2 | 2 | StoreData.luau |
 | product | 2 | 2 | StoreData.luau |
+| badge | 5 | 5 | BadgeData.luau |
 
 Not asset ids, so not listed: `rbxasset://` built-ins (engine particle textures, `FellSound`, most of
 `SoundData`), empty sound slots (`id = ""`, silent), badge ids (all 0 by decision), and the owner user id.
@@ -1459,6 +1460,16 @@ Templates matching a mesh id in the code: 1015 of 1015. Orphans: 0.
 | --- | --- | ---: | --- |
 | 3716312861 | CreatorIds.Cash1k | 1 | format ok, not checked yet |
 | 3716312899 | CreatorIds.Cash10k | 1 | format ok, not checked yet |
+
+## Badges (Creator Hub ids pasted into BadgeData.Ids; not downloadable assets) (5)
+
+| Id | Used by | Places | Status |
+| --- | --- | ---: | --- |
+| 445495016044438 | AreaBayou | 1 | format ok, not checked yet |
+| 2531827516027353 | AreaMesa | 1 | format ok, not checked yet |
+| 1458073487503517 | WoodCypress | 1 | format ok, not checked yet |
+| 389236177819440 | WoodIronwood | 1 | format ok, not checked yet |
+| 4201850974776664 | FirstBuild | 1 | format ok, not checked yet |
 
 ## Creator Hub re-upload list: vehicle meshes (38 ids)
 
