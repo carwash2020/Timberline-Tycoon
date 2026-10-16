@@ -49,19 +49,53 @@ return function(t)
 		return n
 	end
 
-	t.test("a pending mesh has no id, so the part-built art stays", function()
+	-- The five MeshIds uploaded on 15 October 2026 (the MeshPart ids, never the
+	-- Model containers).
+	local EXPECTED = {
+		Pumpkin = 114164133748804,
+		PumpkinPatch = 75317089677312,
+		PumpkinHat = 123436760448077,
+		LavaRock = 132224124506530,
+		Roots = 96379929372711,
+	}
+
+	t.test("the table is exactly the five uploaded ids, and Id() returns each", function()
 		local n = 0
 		for name, id in pairs(Pending.Ids) do
 			n += 1
-			t.ok(id == 0 or id > 1e9, name .. " is 0 (pending) or a real upload id")
-			if id == 0 then
-				t.eq(Pending.Id(name), nil, name)
-			else
-				t.eq(Pending.Id(name), id, name)
-			end
+			t.ok(EXPECTED[name] ~= nil, name .. " is one of the five")
+			t.eq(id, EXPECTED[name], name .. " is the uploaded MeshId")
+			t.ok(id ~= 0, name .. " is no longer pending")
+			t.eq(Pending.Id(name), id, name)
 		end
-		t.ok(n >= 5, "Pumpkin, PumpkinPatch, PumpkinHat, LavaRock and Roots are listed")
+		t.eq(n, 5, "exactly Pumpkin, PumpkinPatch, PumpkinHat, LavaRock and Roots")
 		t.eq(Pending.Id("NoSuchMesh"), nil)
+		-- 0 still means pending.
+		withId("Roots", 0, function()
+			t.eq(Pending.Id("Roots"), nil, "a 0 is pending")
+		end)
+	end)
+
+	t.test("each mesh has its MeshTemplates file, in the shape of the others", function()
+		local fs = require("@lune/fs")
+		for name, id in pairs(EXPECTED) do
+			local text = fs.readFile("src/ReplicatedStorage/MeshTemplates/" .. id .. ".model.json")
+			t.eq(
+				text,
+				'{\n\t"className": "MeshPart",\n\t"properties": {\n\t\t"MeshId": "rbxassetid://' .. id .. '"\n\t}\n}\n',
+				name .. " template"
+			)
+		end
+	end)
+
+	t.test("the swapped-in mesh carries vertex colours: white Color, no texture", function()
+		withMeshes(function()
+			local model = EventArt.Pumpkin(7)
+			local mesh = model:FindFirstChild("PumpkinMesh", true)
+			t.ok(mesh ~= nil)
+			t.eq(mesh.Color, roblox.Color3.new(1, 1, 1), "white: it multiplies the vertex colours")
+			t.eq(mesh.TextureID, "", "no texture")
+		end)
 	end)
 
 	-- Each builder: id 0 = the part-built prop, no mesh; a fake id = the mesh.
@@ -102,10 +136,11 @@ return function(t)
 		local name, build = case[1], case[2]
 		t.test(name .. ": id 0 keeps the part-built version", function()
 			withMeshes(function()
-				t.eq(Pending.Ids[name], 0)
-				local model = build()
-				t.ok(parts(model) > 0, "the part-built prop")
-				t.ok(model:FindFirstChild(name .. "Mesh", true) == nil, "no mesh")
+				withId(name, 0, function()
+					local model = build()
+					t.ok(parts(model) > 0, "the part-built prop")
+					t.ok(model:FindFirstChild(name .. "Mesh", true) == nil, "no mesh")
+				end)
 			end)
 		end)
 

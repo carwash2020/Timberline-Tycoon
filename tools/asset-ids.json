@@ -3720,6 +3720,51 @@
     {
       "collision": false,
       "expectTypeId": 4,
+      "id": "114164133748804",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "PendingMeshes.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "75317089677312",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "PendingMeshes.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "123436760448077",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "PendingMeshes.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "132224124506530",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "PendingMeshes.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "96379929372711",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "PendingMeshes.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
       "id": "80686921861072",
       "kind": "mesh",
       "places": 2,

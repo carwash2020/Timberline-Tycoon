@@ -47,6 +47,7 @@ local MESH_TABLE_FILES = {
 	["TreeModels.luau"] = true,
 	["KitMeshData.luau"] = true,
 	["RockModels.luau"] = true,
+	["PendingMeshes.luau"] = true, -- the event and cave prop meshes (Pumpkin, PumpkinPatch, PumpkinHat, LavaRock, Roots)
 }
 
 local function base(path: string): string
