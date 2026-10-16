@@ -26,7 +26,7 @@ local Scan = luau.load(fs.readFile("tools/assetscan.luau"), { debugName = "tools
 
 local records = Scan.Scan()
 
-local KIND_ORDER = { "mesh", "model", "template", "image", "texture", "sound", "pass", "product" }
+local KIND_ORDER = { "mesh", "model", "template", "image", "texture", "sound", "pass", "product", "badge" }
 local KIND_TITLE = {
 	mesh = "Meshes (MeshId, loaded by MeshKit)",
 	model = "Model containers (Open Cloud uploads; never a MeshId)",
@@ -36,6 +36,7 @@ local KIND_TITLE = {
 	sound = "Sounds",
 	pass = "Game passes",
 	product = "Developer products",
+	badge = "Badges (Creator Hub ids pasted into BadgeData.Ids; not downloadable assets)",
 }
 
 local function short(path: string): string
@@ -535,8 +536,8 @@ emit("")
 
 local text = table.concat(out, "\n") .. "\n"
 
--- tools/asset-ids.json: what scripts/check-assets.ps1 reads. Templates, passes and
--- products are not downloadable assets, so they are left out. Priority 1 = the
+-- tools/asset-ids.json: what scripts/check-assets.ps1 reads. Templates, passes,
+-- products and badges are not downloadable assets, so they are left out. Priority 1 = the
 -- four machine meshes that did not load in Studio.
 local PRIORITY = {
 	["124635139968707"] = true,
