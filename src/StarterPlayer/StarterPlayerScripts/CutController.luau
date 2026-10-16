@@ -51,6 +51,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local ChopFeelLogic = require(ReplicatedStorage.Shared.ChopFeelLogic)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -63,10 +64,12 @@ local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local SwingLogic = require(ReplicatedStorage.Shared.SwingLogic)
 local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
+local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local FaceTarget = require(script.Parent.FaceTarget)
 local HUD = require(script.Parent.HUD)
 local Quality = require(script.Parent.Quality)
 local SwingPose = require(script.Parent.SwingPose)
+local WoodFX = require(script.Parent.WoodFX)
 
 local CutController = {}
 
@@ -441,7 +444,28 @@ function CutController.NearScore(offset: Vector3, look: Vector3?): number
 	return d + (1 - facing) / 2 * CutController.NearAhead
 end
 
+-- Of candidates ({ score, inCone }), which wins: touch and gamepad prefer the
+-- best score among those inside the aim cone (ChopFeelLogic.AimConeDegrees);
+-- with none in the cone, or with `useCone` false (a mouse), the best score
+-- overall. Returns the index, or nil for no candidates. It only chooses the
+-- target: reach is checked before anything is a candidate.
+function CutController.NearChoice(list: { { score: number, inCone: boolean } }, useCone: boolean): number?
+	local best, bestScore = nil, math.huge
+	local bestCone, bestConeScore = nil, math.huge
+	for i, c in ipairs(list) do
+		if c.score < bestScore then
+			best, bestScore = i, c.score
+		end
+		if useCone and c.inCone and c.score < bestConeScore then
+			bestCone, bestConeScore = i, c.score
+		end
+	end
+	return bestCone or best
+end
+
 -- The nearest section within the axe's reach (a gamepad, a missed tap).
+-- Touch and gamepad snap to the nearest one inside a 25 degree cone of the
+-- camera's look; a mouse is unchanged.
 local function nearest(hrp: BasePart, axe: ItemCatalog.AxeDef): Target?
 	local range = if axe.v2 then axe.v2.range else GameConfig.ChopRange
 	useOverlapGroup()
@@ -460,20 +484,33 @@ local function nearest(hrp: BasePart, axe: ItemCatalog.AxeDef): Target?
 			look = Vector3.new(forward.X, 0, forward.Z)
 		end
 	end
-	local best: Target? = nil
-	local bestScore = math.huge
+	local useCone = pointerKind(UserInputService:GetLastInputType().Name) ~= "mouse"
+	local eye: Vector3? = nil
+	local look3: Vector3? = nil
+	if camera and useCone then
+		local ok, cf = pcall(function()
+			return camera.CFrame
+		end)
+		if ok and typeof(cf) == "CFrame" then
+			eye, look3 = cf.Position, cf.LookVector
+		end
+	end
+	local targets: { Target } = {}
+	local scored: { { score: number, inCone: boolean } } = {}
 	for _, p in ipairs(parts) do
 		local part, model, kind = CutController.TargetOf(p)
 		if part and model and kind and kind ~= "node" then
 			local target = describe(part, model, kind, axe, hrp.Position, nil, nil)
-			local offset = target.hit - hrp.Position
-			local score = CutController.NearScore(offset, look)
-			if target.problem == nil and score < bestScore then
-				best, bestScore = target, score
+			if target.problem == nil then
+				local offset = target.hit - hrp.Position
+				local inCone = eye ~= nil and ChopFeelLogic.InCone(target.hit - eye, look3)
+				table.insert(targets, target)
+				table.insert(scored, { score = CutController.NearScore(offset, look), inCone = inCone })
 			end
 		end
 	end
-	return best
+	local pick = CutController.NearChoice(scored, useCone)
+	return if pick then targets[pick] else nil
 end
 
 local function pickTarget(hrp: BasePart, axe: ItemCatalog.AxeDef): (Target?, Target?)
@@ -651,6 +688,10 @@ local function deliver(id: number)
 		-- off each hit), not v2.hardness.
 		local woodId = target.woodId
 		local wood = if type(woodId) == "string" then WoodData.Get(woodId) else nil
+		-- The bite shows at the impact frame, not when the server answers.
+		if wood and target.kind ~= "node" then
+			WoodFX.Predict(wood, target.hit, target.normal, target.part)
+		end
 		if wood and HintLogic.Underpowered(listedDamage(axe, wood.biome), wood.hardness) then
 			if now - lastHardToast > CutController.HardToastEvery then
 				lastHardToast = now
@@ -732,18 +773,122 @@ local function clickSwing()
 	trySwing(true)
 end
 
+---------------------------------------------------------------------------
+-- The cut guide: one reused, client-only ring part showing where this swing
+-- would cut, and (on a felled log) about what each side is worth
+---------------------------------------------------------------------------
+
+CutController.GuideThickness = 0.15 -- studs
+CutController.GuideTransparency = 0.6
+
+-- Where the guide sits for `kind` on a section with `cf` and `size` (its long
+-- axis is local Y): a standing trunk ("tree") at the seam under the pointer
+-- (the section's base); a felled log ("wood") at the cut line this swing
+-- lands on (the hit, kept CutEdge inside the ends). Returns the guide's
+-- CFrame and the height up the section from its bottom.
+function CutController.GuideAt(kind: string, cf: CFrame, size: Vector3, hit: Vector3): (CFrame, number)
+	local h = 0
+	if kind == "wood" then
+		h = SectionLogic.ClampHeight(cf:PointToObjectSpace(hit).Y, size.Y)
+	end
+	return cf * CFrame.new(0, h - size.Y / 2, 0), h
+end
+
+local guide: Part? = nil
+local guideLabel: TextLabel? = nil
+local guideGui: BillboardGui? = nil
+
+local function makeGuide(): Part
+	local p = Instance.new("Part")
+	p.Name = "CutGuide"
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Transparency = CutController.GuideTransparency
+	p.Size = Vector3.new(1, CutController.GuideThickness, 1)
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "CutGuideTag"
+	gui.Size = UDim2.fromOffset(190, 44)
+	gui.StudsOffsetWorldSpace = Vector3.new(0, 1.2, 0)
+	gui.AlwaysOnTop = true
+	gui.LightInfluence = 0
+	gui.MaxDistance = 40
+	gui.Adornee = p
+	gui.Parent = p
+	guideGui = gui
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 16
+	label.TextColor3 = READY_COLOR
+	label.TextStrokeTransparency = 0.3
+	label.TextWrapped = true
+	label.Text = ""
+	label.Parent = gui
+	guideLabel = label
+	return p
+end
+
+local function hideGuide()
+	local g = guide
+	if g and g.Parent ~= nil then
+		g.Parent = nil
+	end
+end
+
+-- Shows the guide for `target` (or hides it). The label (felled logs only)
+-- is hidden on a touch screen, where nothing may sit over the chop target.
+local function showGuide(target: Target?, def: WoodData.WoodDef?, touch: boolean)
+	if not target or target.kind == "node" or not def then
+		hideGuide()
+		return
+	end
+	local g = guide or makeGuide()
+	guide = g
+	local part = target.part
+	local at, h = CutController.GuideAt(target.kind, part.CFrame, part.Size, target.hit)
+	local color, material = TreeArt.FaceLook(def)
+	local width = math.max(part.Size.X, part.Size.Z) + 0.2
+	g.Size = Vector3.new(width, CutController.GuideThickness, width)
+	g.Color = color
+	g.Material = material
+	g.CFrame = at
+	local label = guideLabel
+	if label then
+		local text = ""
+		if target.kind == "wood" and not touch then
+			local volume, value = target.model:GetAttribute("Volume"), target.model:GetAttribute("Value")
+			if type(volume) == "number" and type(value) == "number" then
+				local low, high = ChopFeelLogic.SplitVolumes(part.Size.X, part.Size.Y, part.Size.Z, h)
+				text = ChopFeelLogic.SideText(low, volume, value) .. "\n" .. ChopFeelLogic.SideText(high, volume, value)
+			end
+		end
+		label.Text = text
+		if guideGui then
+			guideGui.Enabled = text ~= ""
+		end
+	end
+	g.Parent = workspace
+end
+
 -- Outlines what you'd cut (see the header).
 local function updateOutline()
 	local hl = highlight
 	if not hl then
+		hideGuide()
 		return
 	end
 	local _tool, axe, hrp = equipped()
 	local adornee: Instance? = nil
 	local color = READY_COLOR
 	local onWood, tooHard, thick = false, false, false
+	local aimed: Target? = nil
 	if axe and hrp then
 		local target, refused = pickTarget(hrp, axe)
+		aimed = target
 		if target then
 			adornee = target.part
 		elseif refused and refused.problem == "hard" then
@@ -752,6 +897,8 @@ local function updateOutline()
 		onWood, tooHard, thick = CutController.PointingFacts(target or refused, axe)
 	end
 	HUD.SetPointing(onWood, tooHard, thick)
+	local aimedWood = if aimed and type(aimed.woodId) == "string" then WoodData.Get(aimed.woodId) else nil
+	showGuide(aimed, aimedWood, pointerKind(UserInputService:GetLastInputType().Name) == "touch")
 	if adornee then
 		hl.Adornee = adornee
 		hl.OutlineColor = color

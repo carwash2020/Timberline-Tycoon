@@ -876,6 +876,10 @@ local function build()
 	skip.root.Parent = header
 	skipRoot, skipWidth = skip.root, skipSize.X + 8
 	skipFace = skip.face
+	-- A gamepad can land on Skip (the first control of the tracker) and sees where it is:
+	-- a gold stroke with an Ink ring, not Roblox's default box.
+	skip.face.Selectable = true
+	skip.face.SelectionImageObject = UITheme.FocusRing(3)
 	local armed = 0
 	local function onSkip()
 		if armed > 0 then
