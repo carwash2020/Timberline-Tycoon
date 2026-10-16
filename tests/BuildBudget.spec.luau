@@ -531,8 +531,9 @@ return function(t)
 			-- ids (InsulatedCoat 1, HeatBoots 2, FeatherfallCloak 2); the lamp post's two are already
 			-- in the "items" group. +6: the baked store models (Barrel, Crate, GlowWire, SkyBin,
 			-- RobuxCoins, Parcel; 13 Oct upload). +14: the worn gear (WornModels, group "worn": coat,
-			-- sleeve, boots, cloak, hardhat, belt, ladder tiles, scroll V2; 16 Oct upload).
-			t.eq(#MeshManifest.Flat(false), 710, "710 ids start loading in the background; none is awaited")
+			-- sleeve, boots, cloak, hardhat, belt, ladder tiles, scroll V2; 16 Oct upload). +12:
+			-- Cherry and Willow (TreeModels: 3 sections and 3 crowns each; WORLD-T323).
+			t.eq(#MeshManifest.Flat(false), 722, "722 ids start loading in the background; none is awaited")
 		end
 	)
 end

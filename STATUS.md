@@ -27,6 +27,8 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## World additions (branch `phase-2/world-t323`, 16 October 2026, draft)
+Cherry and Willow woods with meshes, Amber and Garnet ores (Mix and mining pins updated), 100 added trees and the teasers that pass the stage rule (outside `BiomeData.trees`, so the economy supply caps do not move). Deviations and Studio checks: PHASE2_NOTES.md "World additions".
 ## Launch performance (branch `phase-2/launch-perf`, 14 October 2026)
 
 Connor's Studio log: playable at +4.6 s but heavy work ran until +11.9 s (the points-of-interest plan one 5.07 s step, 1,205 trees over

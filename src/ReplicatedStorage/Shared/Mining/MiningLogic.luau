@@ -35,8 +35,8 @@ MiningLogic.HaulStuds = { [1] = 40, [2] = 70, [3] = 110 }
 -- One chamber, the mix the economy model mines. Heartstone is one node.
 MiningLogic.Mix = {
 	[1] = { { id = "Coal", n = 3 }, { id = "Copper", n = 3 }, { id = "Iron", n = 2 } },
-	[2] = { { id = "Silver", n = 3 }, { id = "Gold", n = 2 } },
-	[3] = { { id = "TimberOpal", n = 3 }, { id = "Heartstone", n = 1 } },
+	[2] = { { id = "Silver", n = 2 }, { id = "Gold", n = 2 }, { id = "Amber", n = 1 } },
+	[3] = { { id = "TimberOpal", n = 2 }, { id = "Garnet", n = 1 }, { id = "Heartstone", n = 1 } },
 }
 
 -- Best wood $/h the player can already reach, from ECONOMY.md's

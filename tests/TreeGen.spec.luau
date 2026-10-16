@@ -210,6 +210,8 @@ return function(t)
 			lanternwood = 48,
 			bogcypress = 44, -- Lane R
 			ironwood = 44, -- Lane R
+			cherry = 38, -- WORLD-T323
+			willow = 40, -- WORLD-T323
 		})
 		local line = {}
 		for _, def in ipairs(woods) do

@@ -56,6 +56,8 @@ Current: **0.50 (a guess)**. For reference, the ideal model earns $32/min on bir
 | Lumenwood | Aether Isles | 2000 | 120 | 10 | $120 | $1,200 | $60 | gondola + Cloud Chute |
 | Bog Cypress | Bayou | 320 | 18 | 6 | $14 | $84 | $26 | 1330 studs by truck |
 | Ironwood | Red Mesa | 1000 | 60 | 8 | $60 | $480 | $48 | 1200 studs by truck |
+| Cherry | Starter Forest | 45 | 0 | 3 | $3 | $9 | $20 | 260 studs by truck |
+| Willow | Bayou | 280 | 16 | 6 | $11 | $66 | $24 | 1330 studs by truck |
 
 ## Best wood for each axe
 
@@ -98,17 +100,17 @@ The whole world, with a player who always buys whichever upgrade pays for itself
 
 ## Hits to fell one tree
 
-| Axe (damage) | Oak (30 HP, hardness 0) | Birch (60 HP, hardness 0) | Pine (100 HP, hardness 4) | Maple (200 HP, hardness 10) | Palmwood (300 HP, hardness 15) | Frostwood (400 HP, hardness 20) | Emberwood (900 HP, hardness 50) | Gloamwood (1200 HP, hardness 70) | Lumenwood (2000 HP, hardness 120) | Bog Cypress (320 HP, hardness 18) | Ironwood (1000 HP, hardness 60) |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Rusty Axe (5) | 6 | 12 | 100 | — | — | — | — | — | — | — | — |
-| Steel Axe (12) | 3 | 5 | 13 | 100 | — | — | — | — | — | — | — |
-| Hardened Axe (25) | 2 | 3 | 5 | 14 | 30 | 80 | — | — | — | 46 | — |
-| Silver Axe (45) | 1 | 2 | 3 | 6 | 10 | 16 | — | — | — | 12 | — |
-| Cobalt Axe (60) | 1 | 1 | 2 | 4 | 7 | 10 | 90 | — | — | 8 | — |
-| Gold Axe (80) | 1 | 1 | 2 | 3 | 5 | 7 | 30 | 120 | — | 6 | 50 |
-| Obsidian Axe (120) | 1 | 1 | 1 | 2 | 3 | 4 | 13 | 24 | — | 4 | 17 |
-| Inferno Axe (150*) | 1 | 1 | 1 | 2 | 3 | 4 | 6 | 15 | 67 | 3 | 12 |
-| Starfall Axe (180*) | 1 | 1 | 1 | 2 | 2 | 3 | 7 | 11 | 12 | 2 | 9 |
+| Axe (damage) | Oak (30 HP, hardness 0) | Birch (60 HP, hardness 0) | Pine (100 HP, hardness 4) | Maple (200 HP, hardness 10) | Palmwood (300 HP, hardness 15) | Frostwood (400 HP, hardness 20) | Emberwood (900 HP, hardness 50) | Gloamwood (1200 HP, hardness 70) | Lumenwood (2000 HP, hardness 120) | Bog Cypress (320 HP, hardness 18) | Ironwood (1000 HP, hardness 60) | Cherry (45 HP, hardness 0) | Willow (280 HP, hardness 16) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Rusty Axe (5) | 6 | 12 | 100 | — | — | — | — | — | — | — | — | 9 | — |
+| Steel Axe (12) | 3 | 5 | 13 | 100 | — | — | — | — | — | — | — | 4 | — |
+| Hardened Axe (25) | 2 | 3 | 5 | 14 | 30 | 80 | — | — | — | 46 | — | 2 | 32 |
+| Silver Axe (45) | 1 | 2 | 3 | 6 | 10 | 16 | — | — | — | 12 | — | 1 | 10 |
+| Cobalt Axe (60) | 1 | 1 | 2 | 4 | 7 | 10 | 90 | — | — | 8 | — | 1 | 7 |
+| Gold Axe (80) | 1 | 1 | 2 | 3 | 5 | 7 | 30 | 120 | — | 6 | 50 | 1 | 5 |
+| Obsidian Axe (120) | 1 | 1 | 1 | 2 | 3 | 4 | 13 | 24 | — | 4 | 17 | 1 | 3 |
+| Inferno Axe (150*) | 1 | 1 | 1 | 2 | 3 | 4 | 6 | 15 | 67 | 3 | 12 | 1 | 3 |
+| Starfall Axe (180*) | 1 | 1 | 1 | 2 | 2 | 3 | 7 | 11 | 12 | 2 | 9 | 1 | 2 |
 
 — = can't cut it: the wood's hardness is at least the axe's damage. \* Deals more to some biomes (ItemCatalog `biomeDamage`).
 
@@ -138,6 +140,7 @@ An Elder (1.7× size, 6× HP, 3× logs, always Quilted or Burl) pays each helper
 | Frostwood | $26 | 2400 | 21 | $1,565 | $156 |
 | Emberwood | $66 | 5400 | 24 | $3,934 | $393 |
 | Gloamwood | $88 | 7200 | 27 | $5,230 | $523 |
+| Cherry | $1 | 270 | 9 | $80 | $8 |
 
 ## Assumptions
 

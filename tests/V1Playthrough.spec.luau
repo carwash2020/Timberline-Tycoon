@@ -159,8 +159,13 @@ return function(t)
 				t.ok(hits <= 40, wood.id .. " takes " .. hits .. " hits for its trunk with the best axe")
 			end
 		end
-		-- Planted somewhere: a biome's trees table, or a WorldPlan site the palms and the lantern use.
+		-- Planted somewhere: a biome's trees table, or a WorldPlan site the palms and the lantern use,
+		-- or an added group (TreeFill.AddedRows: Cherry and Willow, WORLD-T323).
 		local sited = { palmwood = true, [WoodData.LanternId] = true }
+		local TreeFill = t.load("ReplicatedStorage/Shared/World/TreeFill")
+		for _, row in ipairs(TreeFill.AddedRows) do
+			sited[row.wood] = true
+		end
 		for _, biome in ipairs(BiomeData.All()) do
 			for woodId in pairs(biome.trees or {}) do
 				t.ok(seen[woodId], biome.id .. " plants unknown wood " .. woodId)

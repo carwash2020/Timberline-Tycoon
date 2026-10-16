@@ -757,6 +757,7 @@ step("5. The trees", function()
 			end
 			collect(WorldPlan.ReachTrees(), true)
 			collect(WorldPlan.RegionTrees(), false)
+			collect(WorldPlan.AddedTrees(), false) -- WORLD-T323
 			loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
 			for _, e in ipairs(entries) do
 				plantOne(e)
@@ -912,6 +913,8 @@ step("5. The trees", function()
 					collect(WorldPlan.ReachTrees(), true)
 					-- Bog Cypress in the Bayou and Ironwood on Red Mesa (Lane R).
 					collect(WorldPlan.RegionTrees(), false)
+					-- The 100 added trees and the teasers (WORLD-T323), last of all.
+					collect(WorldPlan.AddedTrees(planSlice.step), false)
 					return nil
 				end)
 				loadLine(string.format("forest planned: %d sites in %.2fs", #all + #tail, os.clock() - before))
