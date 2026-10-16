@@ -32,6 +32,7 @@ local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldClock = require(script.Parent.WorldClock)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
+local GearWear = require(ReplicatedStorage.Shared.Art.GearWear)
 
 local BiomeService = {}
 
@@ -85,8 +86,15 @@ function BiomeService.CanChop(player: Player, wood: { biome: string, displayName
 		)
 end
 
-local function setLantern(root: BasePart, on: boolean)
+-- The night light of the Lantern: on the worn Lantern's mesh when there is
+-- one (GearWear), else on the root as before. Same colour, range, brightness
+-- and shadows either way; a light left on the other part moves over.
+local function setLantern(root: BasePart, on: boolean, lanternMesh: BasePart?)
+	local home: BasePart = lanternMesh or root
 	local light = root:FindFirstChild(LANTERN_LIGHT)
+	if light == nil and lanternMesh ~= nil then
+		light = lanternMesh:FindFirstChild(LANTERN_LIGHT)
+	end
 	if on and not light then
 		local l = Instance.new("PointLight")
 		l.Name = LANTERN_LIGHT
@@ -94,11 +102,15 @@ local function setLantern(root: BasePart, on: boolean)
 		l.Range = 24
 		l.Brightness = 2
 		l.Shadows = true
-		l.Parent = root
+		l.Parent = home
+	elseif on and light and light.Parent ~= home then
+		light.Parent = home
 	elseif not on and light then
 		light:Destroy()
 	end
 end
+
+BiomeService.SetLantern = setLantern -- for the spec
 
 local function update(player: Player)
 	local char = player.Character
@@ -166,7 +178,7 @@ local function update(player: Player)
 	if climateDamage > 0 then
 		humanoid:TakeDamage(climateDamage)
 	end
-	setLantern(root, gear.Lantern == true and WorldClock.IsNight())
+	setLantern(root, gear.Lantern == true and WorldClock.IsNight(), if char then GearWear.LanternMesh(char) else nil)
 end
 
 -- `notifyFn` shows a toast (GameServer's notify).

@@ -7,10 +7,12 @@
 -- gameplay and the fallback look. The furnace is the sawmill's sibling: timber
 -- frame, stone base, gable, lantern, one light.
 
+local AxeModels = require(script.Parent.Parent.Art.AxeModels)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local MachineMeshes = require(script.Parent.Parent.Art.MachineMeshes)
 local MachineSkin = require(script.Parent.Parent.Art.MachineSkin)
 local MeshKit = require(script.Parent.Parent.Art.MeshKit)
+local WornModels = require(script.Parent.Parent.Art.WornModels)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local LuxEffect = require(script.Parent.Parent.LuxEffect)
 local OreData = require(script.Parent.OreData)
@@ -340,6 +342,79 @@ function MiningArt.Hardhat(): Model
 	return model
 end
 
+-- The rope ladder's uploaded tiles (Art/WornModels): three 4-stud segments
+-- and the top with its hooks, in the ladder's frame (origin at the foot, the
+-- hooks reaching back toward +Z). Placed relative to the left rail, so it is
+-- right wherever the ladder is put. The part-built rails stay as invisible
+-- collision and anchor proxies; the rungs and the hook go, only once every
+-- mesh is up. An id of 0, or a mesh still loading, keeps the part-built ladder.
+local LADDER_TURN = CFrame.Angles(0, AxeModels.MeshYaw, 0)
+MiningArt.LadderSegments = { 2, 6, 10 }
+MiningArt.LadderTopAt = Vector3.new(0, 12.37, 0.375)
+
+local function dressLadder(ladder: Model, left: BasePart)
+	pcall(function()
+		MeshKit.Attempt(ladder, function(): boolean
+			if ladder:FindFirstChild("LadderTop") then
+				return true
+			end
+			local seg = WornModels.Piece("RopeLadderSeg", "Body")
+			local top = WornModels.Piece("RopeLadderTop", "Body")
+			if not seg or not top or seg.meshId == 0 or top.meshId == 0 then
+				return true -- nothing to put on: the part-built ladder stays
+			end
+			-- The ladder's frame: the foot, centred between the rails.
+			local frame = left.CFrame * CFrame.new(0.55, -left.Size.Y / 2, 0)
+			local made: { MeshPart } = {}
+			local function add(piece: WornModels.Piece, name: string, at: Vector3): boolean
+				local mesh = MeshKit.Create(piece.meshId, name, piece.size)
+				if not mesh then
+					for _, m in ipairs(made) do
+						m:Destroy()
+					end
+					return false
+				end
+				MeshKit.Visual(mesh, piece.meshId)
+				mesh.Color = Color3.new(1, 1, 1) -- vertex colours carry the look
+				mesh.TextureID = ""
+				mesh.CFrame = frame * CFrame.new(at) * LADDER_TURN
+				mesh.Anchored = left.Anchored
+				table.insert(made, mesh)
+				return true
+			end
+			for i, y in ipairs(MiningArt.LadderSegments) do
+				if not add(seg, "LadderSeg" .. i, Vector3.new(0, y, 0)) then
+					return false
+				end
+			end
+			if not add(top, "LadderTop", MiningArt.LadderTopAt) then
+				return false
+			end
+			local drop: { Instance } = {}
+			for _, d in ipairs(ladder:GetChildren()) do
+				if d.Name == "Rung" or d.Name == "Hook" then
+					table.insert(drop, d)
+				elseif d:IsA("BasePart") and d.Name == "Rail" then
+					d.Transparency = 1 -- the proxy stays
+				end
+			end
+			for _, d in ipairs(drop) do
+				d:Destroy()
+			end
+			for _, mesh in ipairs(made) do
+				mesh.Parent = ladder
+				local w = Instance.new("Weld")
+				w.Name = "Weld"
+				w.Part0 = left
+				w.Part1 = mesh
+				w.C0 = left.CFrame:Inverse() * mesh.CFrame
+				w.Parent = mesh
+			end
+			return true
+		end)
+	end)
+end
+
 function MiningArt.RopeLadder(): Model
 	local model = Instance.new("Model")
 	model.Name = "RopeLadder"
@@ -379,6 +454,7 @@ function MiningArt.RopeLadder(): Model
 	Kit.decor(hook, false)
 	weldAll(model, left)
 	model:SetAttribute("Length", height)
+	dressLadder(model, left)
 	return model
 end
 

@@ -95,8 +95,17 @@ shelves changed while the ids are unset: every item keeps its part-built look an
   part-built / on their old uploaded meshes: the new store models are the shop and plot items, not the scenery.
 - **Lamp post.** The store's lamp is `assets/meshes/items/LampPost` (1.25 x 8.4, the plot item ItemMeshData already places),
   not `environment/LampPost` (the 10.6 stud street lamp with its arm, town scenery). Only the box display is new for it.
-- **Gear is box-only.** Nothing in the game wears or holds the coat, boots or cloak (they are owned flags), so "held/worn" does not
-  apply; the carried box is the held path. Preloaded (`MeshManifest` group "store": 5 ids; `BuildBudget` pin 685 to 690).
+- **Gear is worn now (16 October 2026).** The store boxes still show the old BacklogModels coat, boots and cloak (preloaded:
+  `MeshManifest` group "store", 5 ids). The character wears the uploaded `Art/WornModels` meshes, visual only, no Tool
+  (`Art/GearWear`, started by `GearWearService` on spawn and when `OwnedGear` changes; R15 only): the coat body and both sleeves,
+  the heat boots with their glow, the wader boots, the Featherfall Cloak with its glow, and a belt (`GearBelt`, or plain Parts
+  when its id is 0) carrying the Lantern and the Flashlight from their store slots (moved 0.35 back under the cloak; the night
+  light of `BiomeService` sits on the worn lantern mesh). The hardhat is dressed with `HardhatWorn` (`MiningService.wearHat`
+  keeps its `HeadWeld`; `GearWear.DressHardhat`), the rope ladder is three `RopeLadderSeg` tiles and a `RopeLadderTop`
+  (`MiningArt.RopeLadder`, `Length` 12, rails kept as invisible proxies) and the blueprint scroll is the V2 roll with a tinted
+  seal (`BlueprintArt`, scale 0.625; `BlueprintArt.SealTint = false` keeps the wax ball and tail instead). Every piece has a
+  white `Color` (vertex colours carry the look, no texture). An id of 0 falls back to what the game showed before. The 14
+  meshes are preloaded (`MeshManifest` group "worn"; `BuildBudget` pin 696 to 710). Specs: `WornModels`, `GearWear`, `WornDress`.
 - **Previews.** `tools/preview/export.luau` registers every slot's GLB (a made-up id for an unset piece, `Slots.PreviewIds`), so
   renders show the real models; `PREVIEW_STORE_GLBS=0` shows the part-built look. Scenes `store-item-models`,
   `store-item-models-placed`, `store-models-raw`. Renders (37 PNGs, `previews/store-item-models/`): `contact-sheet.png`,
