@@ -102,9 +102,19 @@ return function(t)
 		t.eq(PhoneHud.StackGap(3), 5)
 	end)
 
-	t.test("the deep green icon style carries cream on green at 3:1 or more", function()
+	t.test("the icon style carries Ink on the sale green at 4.5:1 or more", function()
 		t.eq(PhoneHud.IconStyle.Hammer, "iconGreen")
 		t.eq(PhoneHud.IconStyle.InstantDelivery, "iconGreen")
-		t.ok(UITheme.Styles.iconGreen, "the style exists")
+		local style = UITheme.Styles.iconGreen
+		t.ok(style, "the style exists")
+		local function lin(c)
+			return if c <= 0.04045 then c / 12.92 else ((c + 0.055) / 1.055) ^ 2.4
+		end
+		local function lum(color)
+			return 0.2126 * lin(color.R) + 0.7152 * lin(color.G) + 0.0722 * lin(color.B)
+		end
+		local hi, lo = math.max(lum(style.ink), lum(style.fill)), math.min(lum(style.ink), lum(style.fill))
+		t.ok((hi + 0.05) / (lo + 0.05) >= 4.5, "Ink on SaleGreen is " .. (hi + 0.05) / (lo + 0.05))
+		t.eq(style.ink, UITheme.Skin.Ink)
 	end)
 end

@@ -73,11 +73,11 @@ BadgeData.Ids = {
 	WoodLumenwood = 0, -- PASTE: Engagement → Badges → Lumenwood → ID
 	WoodLanternwood = 0, -- PASTE: Engagement → Badges → Lanternwood → ID
 	-- Lane X. Create these in this order (five free a day).
-	AreaBayou = 0, -- PASTE: Engagement → Badges → The Bayou → ID
-	AreaMesa = 0, -- PASTE: Engagement → Badges → Red Mesa → ID
-	WoodCypress = 0, -- PASTE: Engagement → Badges → Bog Cypress → ID
-	WoodIronwood = 0, -- PASTE: Engagement → Badges → Ironwood → ID
-	FirstBuild = 0, -- PASTE: Engagement → Badges → First Build → ID
+	AreaBayou = 445495016044438,
+	AreaMesa = 2531827516027353,
+	WoodCypress = 1458073487503517,
+	WoodIronwood = 389236177819440,
+	FirstBuild = 4201850974776664,
 	Homestead = 0, -- PASTE: Engagement → Badges → Homestead → ID
 	Stonemason = 0, -- PASTE: Engagement → Badges → Stonemason → ID
 	Millionaire = 0, -- PASTE: Engagement → Badges → Millionaire → ID
@@ -327,9 +327,11 @@ function BadgeData.RobloxId(key: string): number
 end
 
 -- True when `id` is a real badge id. 0 (and anything that isn't a positive
--- whole id) is not awarded: skip AwardBadge, don't error.
+-- whole id) is not awarded: skip AwardBadge, don't error. Creator Hub badge ids
+-- run into the quadrillions (4.2e15 and up); a number holds every whole value
+-- up to 2^53 - 1 exactly, so that is the ceiling.
 function BadgeData.IsLive(id: number): boolean
-	return type(id) == "number" and id > 0 and id == math.floor(id) and id < 1e15
+	return type(id) == "number" and id > 0 and id == math.floor(id) and id <= 9007199254740991
 end
 
 function BadgeData.ForMark(name: string): string?

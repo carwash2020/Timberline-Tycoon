@@ -88,4 +88,14 @@ return function(t)
 		local sound = fs.readFile("src/ReplicatedStorage/Shared/SoundData.luau")
 		t.ok(string.find(sound, "SoundData.SfxEnabled", 1, true) and string.find(sound, "SoundData.SfxVolume", 1, true))
 	end)
+	t.test("PlayAt takes an optional pitch that multiplies the sound's playback speed", function()
+		-- PlayAt parents its sound under workspace.Terrain, which a headless run does
+		-- not have, so the rule is read from the source: a trailing, optional
+		-- `pitch` that is multiplied into PlaybackSpeed (callers without it unchanged).
+		local src = require("@lune/fs").readFile("src/ReplicatedStorage/Shared/SoundData.luau")
+		t.ok(string.find(src, "function SoundData.PlayAt(name: string, position: Vector3, pitch: number?)", 1, true))
+		t.ok(string.find(src, "s.PlaybackSpeed *= pitch", 1, true))
+		t.ok(SoundData.Sounds.TreeCreak ~= nil, "the creak has an entry")
+		t.eq(SoundData.Sounds.TreeCreak.id, "", "and no id yet: silent until one is supplied, no stand-in")
+	end)
 end

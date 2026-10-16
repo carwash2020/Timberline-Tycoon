@@ -20,6 +20,7 @@ return function(t)
 			return self.attrs[key]
 		end
 		local begun, toasts, reopened, closes, fires = {}, {}, {}, {}, {}
+		local menuOpens, menuCloses = {}, {}
 		local C = setmetatable({}, {
 			__index = function()
 				return roblox.Color3.new(0, 0, 0)
@@ -54,6 +55,15 @@ return function(t)
 						table.insert(reopened, focus)
 					end,
 					Refresh = function() end,
+				},
+				BuildMenuUI = {
+					Start = function() end,
+					Open = function(o)
+						table.insert(menuOpens, o)
+					end,
+					Close = function()
+						table.insert(menuCloses, true)
+					end,
 				},
 				BlueprintPlacer = {
 					PlotCFrame = function()
@@ -105,6 +115,8 @@ return function(t)
 			reopened = reopened,
 			closes = closes,
 			fires = fires,
+			menuOpens = menuOpens,
+			menuCloses = menuCloses,
 			-- The mocked plot is centred on the origin.
 			stand = function(on)
 				char.HumanoidRootPart.Position = if on then Vector3.new(0, 3, 0) else Vector3.new(-3000, 3, -3000)
@@ -312,5 +324,59 @@ return function(t)
 		local client = fs.readFile(dir .. "Client.client.luau")
 		t.ok(string.find(client, '"HammerController"', 1, true))
 		t.ok(string.find(client, "require(script.Parent.HammerController)", 1, true))
+	end)
+
+	t.test("the hammer's list opens the build menu, not the row list; a card places through planRow", function()
+		local s = setup({ Blueprints = "Bench,Wall,Shed", PlotTier = 3, Cash = 1000 })
+		s.PlotUI.OpenPlans()
+		t.eq(#s.reopened, 0, "the ShopUI row list is not opened")
+		t.eq(#s.menuOpens, 1, "the build menu is")
+		local o = s.menuOpens[1]
+		t.eq(type(o.land), "function")
+		-- Its entries are the whole book, unfiltered, locked rows last.
+		local ids = {}
+		for _, e in ipairs(o.entries()) do
+			ids[e.id] = true
+		end
+		t.ok(ids.Bench and ids.Wall and ids.Shed, "the book's plans are on the cards")
+		t.eq(o.ctx().tier, 3)
+		t.eq(o.ctx().cash, 1000)
+		-- A ready card on your plot: the menu closes (not ShopUI), the ghost starts.
+		local wall
+		for _, e in ipairs(o.entries()) do
+			if e.id == "Wall" then
+				wall = e
+			end
+		end
+		o.place(wall)
+		t.eq(#s.menuCloses, 1, "the build menu closed")
+		t.eq(#s.closes, 0, "ShopUI.Close was not used for it")
+		t.eq(#s.begun, 1)
+		t.eq(s.begun[1].bp.id, "Wall", "BlueprintPlacer.Begin got the right blueprint")
+	end)
+
+	t.test("a card off your plot or locked toasts the reason and starts nothing", function()
+		local s = setup({ Blueprints = "Bench,Wall,Shed", PlotTier = 1, Cash = 1000 })
+		s.PlotUI.OpenPlans()
+		local o = s.menuOpens[1]
+		local bench
+		local locked
+		for _, e in ipairs(o.entries()) do
+			if e.id == "Bench" then
+				bench = e
+			end
+			if e.unlockStage ~= nil then
+				locked = e
+			end
+		end
+		s.stand(false)
+		o.place(bench)
+		t.eq(#s.begun, 0, "off your plot nothing starts")
+		t.ok(#s.toasts >= 1 and string.find(s.toasts[#s.toasts], "plot", 1, true), "the plot toast")
+		s.stand(true)
+		o.place(locked)
+		t.eq(#s.begun, 0, "a locked card never places")
+		t.ok(#s.toasts >= 2, "and says why")
+		t.eq(#s.menuCloses, 0, "the menu stays open on a refusal")
 	end)
 end

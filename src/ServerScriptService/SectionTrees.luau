@@ -65,6 +65,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ChopFeelLogic = require(ReplicatedStorage.Shared.ChopFeelLogic)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -1219,7 +1220,7 @@ end
 -- part to the hit), the hit inside the section's box (+0.6), a clear
 -- sight line from the eyes, BiomeService.CanChop, damage > 0, and for a
 -- loose piece GrabLogic.CanGrab. Returns whether it cut, and why not.
-function SectionTrees.Chop(
+local function chopChecked(
 	player: Player,
 	part: unknown,
 	hitPos: unknown,
@@ -1364,6 +1365,43 @@ function SectionTrees.Chop(
 			freed = if result then result.pieces else {},
 			feller = nil,
 		}
+end
+
+-- The Chop remote with reject telemetry around the checks above (their order
+-- is untouched). Log only: a per-player count of cooldown, far, noLOS and rate
+-- rejects, a throttled line every ChopFeelLogic.RejectEvery, a summary on leave.
+local rejects: { [number]: ChopFeelLogic.RejectCounts } = {}
+
+function SectionTrees.RejectCounts(userId: number): ChopFeelLogic.RejectCounts
+	return rejects[userId] or ChopFeelLogic.NewRejects()
+end
+
+function SectionTrees.PlayerLeft(userId: number)
+	local counts = rejects[userId]
+	rejects[userId] = nil
+	if counts and ChopFeelLogic.RejectTotal(counts) > 0 then
+		print(ChopFeelLogic.RejectLine(userId, counts) .. " (left)")
+	end
+end
+
+function SectionTrees.Chop(
+	player: Player,
+	part: unknown,
+	hitPos: unknown,
+	normal: unknown
+): (boolean, string?, SwingResult?)
+	local ok, why, result = chopChecked(player, part, hitPos, normal)
+	if not ok then
+		local counts = rejects[player.UserId]
+		if not counts then
+			counts = ChopFeelLogic.NewRejects()
+			rejects[player.UserId] = counts
+		end
+		if ChopFeelLogic.CountReject(counts, why) then
+			print(ChopFeelLogic.RejectLine(player.UserId, counts))
+		end
+	end
+	return ok, why, result
 end
 
 ---------------------------------------------------------------------------
@@ -1649,6 +1687,11 @@ function SectionTrees.Init(newDeps: Deps)
 		return
 	end
 	started = true
+	if not newDeps.manual then
+		Players.PlayerRemoving:Connect(function(left: Player)
+			SectionTrees.PlayerLeft(left.UserId)
+		end)
+	end
 	local sites, standing = SectionTrees.Counts()
 	print(string.format("[SectionTrees] %d trees on %d sites", standing, sites))
 	if newDeps.manual then
@@ -1676,6 +1719,7 @@ function SectionTrees._reset()
 	table.clear(claimOf)
 	table.clear(byModel)
 	table.clear(counters)
+	table.clear(rejects)
 	table.clear(folders)
 	deps = nil
 	started = false

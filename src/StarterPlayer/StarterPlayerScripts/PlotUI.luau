@@ -36,6 +36,7 @@ local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
+local BuildMenuUI = require(script.Parent.BuildMenuUI)
 local DragController = require(script.Parent.DragController)
 local HammerController = require(script.Parent.HammerController)
 local GamepadNav = require(script.Parent.GamepadNav)
@@ -133,7 +134,9 @@ local function forPlacer(bp: PlotData.Blueprint, stocked: number): PlotData.Blue
 	return bp
 end
 
-local function planRow(entry: BlueprintBook.Entry): ShopUI.RowView
+-- `closeMenu` is what closes the list the card was tapped in (the ShopUI list
+-- by default; the build menu passes its own).
+local function planRow(entry: BlueprintBook.Entry, closeMenu: (() -> ())?): ShopUI.RowView
 	local ctx: BlueprintBook.Context = { tier = tier(), cash = cash(), boxed = ShopLogic.ShelfMenusHidden() }
 	local row = BlueprintBook.Row(entry, ctx)
 	local bp = entry.bp
@@ -169,7 +172,11 @@ local function planRow(entry: BlueprintBook.Entry): ShopUI.RowView
 				HUD.Toast(BlueprintBook.Message(why, bp))
 				return
 			end
-			ShopUI.Close()
+			if closeMenu then
+				closeMenu()
+			else
+				ShopUI.Close()
+			end
 			BlueprintPlacer.Begin(forPlacer(bp, entry.stock), { onStop = PlotUI.Refresh })
 			PlotUI.Refresh()
 		end,
@@ -259,8 +266,24 @@ local function openPlans()
 	if building then
 		Net.Remote("TutorialSeen"):FireServer("build")
 	end
-	ShopUI.OpenCustom(STORE)
+	-- The category rail and picture cards (BuildMenuUI) replace the row list here.
+	-- PlotUI.Plans() and STORE stay: the rules, the rows and the specs read them.
+	BuildMenuUI.Start()
+	BuildMenuUI.Open({
+		entries = function()
+			return BlueprintBook.Entries(myBook(), myStock(), true)
+		end,
+		ctx = function()
+			return { tier = tier(), cash = cash(), boxed = ShopLogic.ShelfMenusHidden() }
+		end,
+		place = function(entry: BlueprintBook.Entry)
+			planRow(entry, BuildMenuUI.Close).onClick()
+		end,
+		land = openLandPanel,
+	})
 end
+
+PlotUI.OpenPlans = openPlans -- the specs open the menu through this
 
 ---------------------------------------------------------------------------
 -- The hammer in hand
@@ -277,6 +300,7 @@ local function setBuilding(on: boolean)
 	if not on then
 		BlueprintPlacer.Stop()
 		ShopUI.Close()
+		BuildMenuUI.Close()
 	end
 	PlotUI.Refresh()
 end
@@ -640,6 +664,7 @@ function PlotUI.Start()
 	wire.root.Parent = bar.row
 	wire.face.Activated:Connect(function()
 		ShopUI.Close()
+		BuildMenuUI.Close()
 		setLand(false)
 		WireTool.Begin(PlotUI.Refresh)
 		PlotUI.Refresh()

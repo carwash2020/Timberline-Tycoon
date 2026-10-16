@@ -589,11 +589,12 @@ return function(t)
 			t.ok(ratio(K.Bark, ground) >= 4.5, "Bark on " .. ground:ToHex())
 		end
 		-- Button labels and the phone icons on their fills.
-		t.ok(ratio(K.Cream, C.Green) >= 3, "Cream on the deep green")
+		t.ok(ratio(K.Cream, C.Green) >= 3, "Cream on the deep green (the Robux and confirm buttons)")
 		t.ok(ratio(K.Ink, C.Amber) >= 3, "Ink on amber")
 		t.ok(ratio(C.ConfirmInk, C.Amber) >= 3, "the amber style's ink on amber")
-		t.eq(UITheme.Styles.iconGreen.ink, C.Cream)
-		t.eq(UITheme.Styles.iconGreen.fill, C.Green)
+		t.eq(UITheme.Styles.iconGreen.ink, K.Ink, "the phone icons are Ink")
+		t.eq(UITheme.Styles.iconGreen.fill:ToHex(), "4CC36A", "on the sale green (Palette.SaleGreen)")
+		t.ok(ratio(K.Ink, UITheme.Styles.iconGreen.fill) >= 4.5, "Ink on the sale green clears 4.5:1")
 		t.eq(UITheme.Styles.starter.outline, K.Muted, "the starter style is the one with a Muted stroke")
 		for name, style in pairs(UITheme.Styles) do
 			if name ~= "starter" then
@@ -642,5 +643,23 @@ return function(t)
 			"the ring is the selection colour, Ring px"
 		)
 		t.eq(string.find(source, "brighten(style.fill, 0.11)", 1, true), nil, "the resting fill is not lifted")
+	end)
+
+	t.test("Screen's optional scale function: default unchanged, an override honoured now and on resize", function()
+		local UITheme, _ = theme({}, { touch = false, keyboard = true, viewport = Vector2.new(1920, 1080) })
+		local plain = UITheme.Screen("Plain", 1)
+		local base = plain:FindFirstChildOfClass("UIScale").Scale
+		local seen = {}
+		local custom = UITheme.Screen("Custom", 2, nil, function(b)
+			table.insert(seen, b)
+			return 1
+		end)
+		t.eq(custom:FindFirstChildOfClass("UIScale").Scale, 1, "the function decides the scale")
+		t.ok(#seen >= 1 and seen[1] == base, "it is given the base scale")
+		local halved = UITheme.Screen("Half", 3, "device", function(b)
+			return b / 2
+		end)
+		t.eq(halved:FindFirstChildOfClass("UIScale").Scale, base / 2, "and may scale from it")
+		t.eq(plain:FindFirstChildOfClass("UIScale").Scale, base, "a screen without one is the base scale")
 	end)
 end

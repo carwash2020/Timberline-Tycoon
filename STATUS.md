@@ -29,6 +29,12 @@ never bound; `NoButtonR2.spec`), no Robux price in code.
 
 ## World additions (branch `phase-2/world-t323`, 16 October 2026, draft)
 Cherry and Willow woods with meshes, Amber and Garnet ores (Mix and mining pins updated), 100 added trees and the teasers that pass the stage rule (outside `BiomeData.trees`, so the economy supply caps do not move). Deviations and Studio checks: PHASE2_NOTES.md "World additions".
+
+## Wood effects on buildings (branch `phase-2/wood-effects`, 16 October 2026, draft)
+Frost, ember, gloam and lumen doors take an accent colour; ember, gloam and lantern doors glow at night; ember and gloam buildings get a few sparks (capped 8 high, 4 medium, 0 low). Cosmetic and client-side; no price, save or remote change. Details and Studio checks: PHASE2_NOTES.md "Wood effects on buildings".
+
+## Chop feel pass (branch `phase-2/chop-feel-t325`, 16 October 2026, draft)
+Chips and thunk at the impact frame (predicted, then taken by the server's own Cut or handed back), thunk pitch and a canopy rock as a cut nears its end, a cut guide ring with per-side value on felled logs, aim cone for touch and gamepad, Small-motor rumble (unverified on a real pad), per-device landing-shake caps, `TreeArt.FaceLook` (WoodPlanks, never Neon) for stump faces and notches, Chop reject telemetry, `tools/chop_feel`. No new remote, no economy change. `TreeCreak` stays silent until Connor supplies a sound id. Details and Studio checks: PHASE2_NOTES.md "Chop feel pass".
 ## Launch performance (branch `phase-2/launch-perf`, 14 October 2026)
 
 Connor's Studio log: playable at +4.6 s but heavy work ran until +11.9 s (the points-of-interest plan one 5.07 s step, 1,205 trees over

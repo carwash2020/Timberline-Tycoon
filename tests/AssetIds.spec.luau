@@ -104,6 +104,7 @@ return function(t)
 		sound = { 8, 16 },
 		pass = { 9, 11 },
 		product = { 9, 11 },
+		badge = { 13, 16 }, -- Creator Hub badge ids (BadgeData.Ids), 15 to 16 digits today
 	}
 
 	t.test("every id is well formed for its kind: no leading zero, not a placeholder, sane length", function()

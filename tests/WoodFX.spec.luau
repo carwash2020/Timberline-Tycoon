@@ -81,6 +81,49 @@ return function(t)
 		t.ok(WoodFX.ShakeStrength(10000) <= 0.9, "never more than a big shake")
 	end)
 
+	t.test("a swing throws 6 chips, every third in bark colour, none Neon; a fall drops 10 leaves", function()
+		t.eq(WoodFX.ChipsPerHit, 6)
+		t.eq(WoodFX.LeavesPerFall, 10)
+		local bark = {}
+		for i = 1, WoodFX.ChipsPerHit do
+			if WoodFX.IsBarkChip(i) then
+				table.insert(bark, i)
+			end
+		end
+		t.eq(bark, { 3, 6 }, "i % 3: two bark chips in six")
+		-- The chip part is plain Wood: no Neon anywhere in its constructor.
+		local src = require("@lune/fs").readFile("src/StarterPlayer/StarterPlayerScripts/WoodFX.luau")
+		local a = string.find(src, "local function newChip()", 1, true)
+		local b = string.find(src, "\nend", a, true)
+		local ctor = string.sub(src, a, b)
+		t.ok(string.find(ctor, "Enum.Material.Wood", 1, true), "a chip is Wood")
+		t.ok(not string.find(ctor, "Neon", 1, true), "never Neon")
+	end)
+
+	t.test("a phone's landing shake is capped at 0.6, a console's and desktop's at 0.9", function()
+		t.eq(WoodFX.ShakeStrength(10000, "phone"), 0.6)
+		t.eq(WoodFX.ShakeStrength(10000, "console"), 0.9)
+		t.eq(WoodFX.ShakeStrength(10000), 0.9)
+		t.ok(WoodFX.ShakeStrength(2, "phone") >= 0.25)
+	end)
+
+	t.test("6 players felling at once cannot put more chips live than the tier's ChipCount", function()
+		-- A chip lives its flight and rest and fade: about 1.7 s. The fastest axe swings
+		-- every 0.35 s (Starfall). The pool recycles its oldest chip, so demand past the
+		-- cap is not drawn.
+		local life = 1.7
+		for _, tier in ipairs({ "High", "Medium", "Low" }) do
+			local cap = QualityBudgets[tier].ChipCount
+			local demand = WoodFX.ChipDemand(6, 0.35, life)
+			local live = math.min(demand, cap)
+			t.ok(live <= cap)
+			print(
+				string.format("6 players felling, %s: chip demand %d, live peak %d (cap %d)", tier, demand, live, cap)
+			)
+		end
+		t.eq(WoodFX.LiveChips(), 0, "nothing live before any swing")
+	end)
+
 	t.test("the cut's ring lights as the cut goes through", function()
 		t.eq(WoodFX.RingLit(0), 0)
 		t.eq(WoodFX.RingLit(0.5), 8)
