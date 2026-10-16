@@ -23,6 +23,7 @@ local MiningSchema = require(ReplicatedStorage.Shared.Mining.MiningSchema)
 local OreData = require(ReplicatedStorage.Shared.Mining.OreData)
 local PickaxeData = require(ReplicatedStorage.Shared.Mining.PickaxeData)
 local GearMeshes = require(ReplicatedStorage.Shared.Art.GearMeshes)
+local GearWear = require(ReplicatedStorage.Shared.Art.GearWear)
 
 local MiningService = {}
 
@@ -477,6 +478,9 @@ local function wearHat(player: Player, mining: MiningSchema.Mining)
 		joint.C0 = CFrame.new(0, 0.6, 0)
 		joint.C1 = CFrame.new()
 	end
+	-- The uploaded hat on top of it once its meshes are up; id 0 or still
+	-- loading keeps the part-built hat (GearWear.DressHardhat never throws).
+	GearWear.DressHardhat(character, hat)
 end
 
 function MiningService.Fuse(player: Player, root: BasePart?)

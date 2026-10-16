@@ -18,7 +18,10 @@
 
 local PlotData = require(script.Parent.Parent.PlotData)
 local Kit = require(script.Parent.Kit)
+local AxeModels = require(script.Parent.AxeModels)
+local MeshKit = require(script.Parent.MeshKit)
 local ModelSlots = require(script.Parent.ModelSlots)
+local WornModels = require(script.Parent.WornModels)
 
 local BlueprintArt = {}
 
@@ -48,6 +51,90 @@ end
 local function upright(y: number): CFrame
 	-- Kit.cylinder runs along X: stand it up.
 	return CFrame.new(0, y, 0) * CFrame.Angles(0, 0, math.pi / 2)
+end
+
+-- The V2 roll (Art/WornModels BlueprintScrollV2): the uploaded roll and wax seal
+-- on top of the part-built Handle. Scaled 0.625 (the roll's 2.4 becomes the
+-- part-built LEN of 1.5 with the rest of the model); moved up so the middle of
+-- the roll stays in the hand. The Handle stays as the Tool's handle, invisible.
+-- The seal mesh is white and MeshPart.Color multiplies vertex colours, so the
+-- seal is tinted with SealColor(id). If that tint does not show in Studio, set
+-- SealTint to false: the part-built wax ball and tail then stay on top of the
+-- V2 roll (a one-line switch). Plans with their own slot mesh (the Wood Sign,
+-- the Shed Blueprint) are unchanged. Id 0, or a mesh still loading, keeps the
+-- part-built roll.
+BlueprintArt.SealTint = true
+BlueprintArt.V2Scale = 0.625
+BlueprintArt.V2Lift = (1.281 - 1.2) * 0.625
+BlueprintArt.V2SealAt = Vector3.new(0.023, 0.212, -0.355) * 0.625
+
+local V2_TURN = CFrame.Angles(0, AxeModels.MeshYaw, 0)
+
+local function dressScroll(model: Model, id: string, handle: BasePart)
+	pcall(function()
+		MeshKit.Attempt(model, function(): boolean
+			if model:FindFirstChild("ScrollRoll") then
+				return true
+			end
+			local roll = WornModels.Piece("BlueprintScrollV2", "Handle")
+			local seal = WornModels.Piece("BlueprintScrollV2", "Seal")
+			if not roll or roll.meshId == 0 then
+				return true -- nothing to put on: the part-built roll stays
+			end
+			local wantSeal = BlueprintArt.SealTint and seal ~= nil and seal.meshId ~= 0
+			local scale = BlueprintArt.V2Scale
+			-- The handle's own frame is a cylinder along X; turn it back upright.
+			local upFrame = handle.CFrame * CFrame.Angles(0, 0, -math.pi / 2) * CFrame.new(0, BlueprintArt.V2Lift, 0)
+			local made: { MeshPart } = {}
+			local function add(piece: WornModels.Piece, name: string, centre: CFrame, color: Color3): boolean
+				local mesh = MeshKit.Create(piece.meshId, name, piece.size * scale)
+				if not mesh then
+					for _, m in ipairs(made) do
+						m:Destroy()
+					end
+					return false
+				end
+				MeshKit.Visual(mesh, piece.meshId)
+				mesh.Color = color
+				mesh.TextureID = ""
+				mesh.CFrame = centre
+				mesh.Anchored = handle.Anchored
+				table.insert(made, mesh)
+				return true
+			end
+			if not add(roll, "ScrollRoll", upFrame * V2_TURN, Color3.new(1, 1, 1)) then
+				return false
+			end
+			if wantSeal and seal then
+				local at = BlueprintArt.V2SealAt
+				if not add(seal, "ScrollSeal", upFrame * CFrame.new(at) * V2_TURN, BlueprintArt.SealColor(id)) then
+					return false
+				end
+			end
+			-- Up: the part-built roll goes (the Handle stays, invisible).
+			local drop = { "Edge", "Twine", "Curl" }
+			if wantSeal then
+				table.insert(drop, "Seal")
+				table.insert(drop, "Tail")
+			end
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") and table.find(drop, d.Name) then
+					d:Destroy()
+				end
+			end
+			handle.Transparency = 1
+			for _, mesh in ipairs(made) do
+				mesh.Parent = model
+				local w = Instance.new("Weld")
+				w.Name = "Weld"
+				w.Part0 = handle
+				w.Part1 = mesh
+				w.C0 = handle.CFrame:Inverse() * mesh.CFrame
+				w.Parent = mesh
+			end
+			return true
+		end)
+	end)
 end
 
 function BlueprintArt.Build(id: string): Model
@@ -104,6 +191,9 @@ function BlueprintArt.Build(id: string): Model
 			w.C0 = handle.CFrame:Inverse() * d.CFrame
 			w.Parent = d
 		end
+	end
+	if ModelSlots.For("Blueprint", id) == nil then
+		dressScroll(model, id, handle)
 	end
 	return model
 end

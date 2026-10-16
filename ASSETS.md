@@ -42,9 +42,9 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 | Kind | Distinct ids | Places written | Written in |
 | --- | ---: | ---: | --- |
-| mesh | 1068 | 1339 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, PendingMeshes.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau |
+| mesh | 1082 | 1353 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, PendingMeshes.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau, WornModels.luau |
 | model | 206 | 206 | BacklogModels.luau, MachineMeshes.luau, TownModels.luau |
-| template | 1001 | 1001 | src/ReplicatedStorage/MeshTemplates |
+| template | 1015 | 1015 | src/ReplicatedStorage/MeshTemplates |
 | image | 18 | 18 | StoreData.luau, UIArt.luau, UITheme.luau, WeatherController.luau |
 | texture | 9 | 9 | TimberGrass.model.json, TimberGround.model.json, TimberLeafy.model.json |
 | sound | 9 | 11 | SoundData.luau |
@@ -89,7 +89,7 @@ Not wired by these slots (another lane wires them; no slot here):
 | `assets/glb/store-items/ShedBlueprint.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 | `assets/glb/store-items/WoodSign.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 
-## Meshes (MeshId, loaded by MeshKit) (1068)
+## Meshes (MeshId, loaded by MeshKit) (1082)
 
 | Id | Used by | Places | Status |
 | --- | --- | ---: | --- |
@@ -1085,6 +1085,20 @@ Not wired by these slots (another lane wires them; no slot here):
 | 111192039401543 | VehicleModels.luau HeavyHauler Bed | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 76485456462102 | VehicleModels.luau HeavyHauler Wheel | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 76951151154210 | VehicleModels.luau HeavyHauler  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 115269271855313 | WornModels.luau CoatBody Body | 1 | template, format ok, not checked yet |
+| 73589596256678 | WornModels.luau CoatSleeve Body | 1 | template, format ok, not checked yet |
+| 116105552771338 | WornModels.luau HeatBoot Body | 1 | template, format ok, not checked yet |
+| 124000816344542 | WornModels.luau HeatBoot Glow | 1 | template, format ok, not checked yet |
+| 134517002979770 | WornModels.luau WaderBoot Body | 1 | template, format ok, not checked yet |
+| 124573428780738 | WornModels.luau CloakWorn Body | 1 | template, format ok, not checked yet |
+| 75740144633857 | WornModels.luau CloakWorn Glow | 1 | template, format ok, not checked yet |
+| 98991863528912 | WornModels.luau HardhatWorn Body | 1 | template, format ok, not checked yet |
+| 125383985331389 | WornModels.luau HardhatWorn Glow | 1 | template, format ok, not checked yet |
+| 114698783853944 | WornModels.luau GearBelt Body | 1 | template, format ok, not checked yet |
+| 110300531040960 | WornModels.luau RopeLadderSeg Body | 1 | template, format ok, not checked yet |
+| 121098136699219 | WornModels.luau RopeLadderTop Body | 1 | template, format ok, not checked yet |
+| 119840415336807 | WornModels.luau BlueprintScrollV2 Handle | 1 | template, format ok, not checked yet |
+| 87992443568498 | WornModels.luau BlueprintScrollV2 Seal | 1 | template, format ok, not checked yet |
 | 85233243499195 | ItemMeshData.luau Wall | 1 | no template, format ok, not checked yet |
 | 134684216163207 | ItemMeshData.luau Floor | 1 | no template, format ok, not checked yet |
 | 121239833575865 | ItemMeshData.luau Door | 1 | no template, format ok, not checked yet |
@@ -1373,13 +1387,13 @@ Not wired by these slots (another lane wires them; no slot here):
 | 101958118399557 | TownModels.luau OldHank | 1 | format ok, not checked yet |
 | 88871748192723 | TownModels.luau Foreman | 1 | format ok, not checked yet |
 
-## MeshTemplates files (Rojo MeshPart fallback, one per id) (1001)
+## MeshTemplates files (Rojo MeshPart fallback, one per id) (1015)
 
 Each file is a Rojo `MeshPart` whose MeshId is its own file name. MeshKit uses it only if the
 engine call fails. A template for an id no builder uses is dead weight; a mesh id with no template
 has no fallback (listed as `no template` in the mesh table).
 
-Templates matching a mesh id in the code: 1001 of 1001. Orphans: 0.
+Templates matching a mesh id in the code: 1015 of 1015. Orphans: 0.
 
 ## Images (ImageLabel, store cards, particle textures) (18)
 

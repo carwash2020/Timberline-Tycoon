@@ -523,12 +523,16 @@ return function(t)
 		t.ok(string.find(build, "buildTimings.OverBudget()", 1, true), "an over-budget build is warned")
 	end)
 
-	t.test("the manifest is the 685 meshes of the 12 October log plus the store gear (town meshes off)", function()
-		local MeshManifest = t.shared("Art/MeshManifest")
-		-- 685 + 5: the store item model slots (StoreModelSlots, group "store") preload the gear's
-		-- ids (InsulatedCoat 1, HeatBoots 2, FeatherfallCloak 2); the lamp post's two are already
-		-- in the "items" group. +6: the baked store models (Barrel, Crate, GlowWire, SkyBin,
-		-- RobuxCoins, Parcel; 13 Oct upload).
-		t.eq(#MeshManifest.Flat(false), 696, "696 ids start loading in the background; none is awaited")
-	end)
+	t.test(
+		"the manifest is the 685 meshes of the 12 October log plus the store gear and the worn gear (town meshes off)",
+		function()
+			local MeshManifest = t.shared("Art/MeshManifest")
+			-- 685 + 5: the store item model slots (StoreModelSlots, group "store") preload the gear's
+			-- ids (InsulatedCoat 1, HeatBoots 2, FeatherfallCloak 2); the lamp post's two are already
+			-- in the "items" group. +6: the baked store models (Barrel, Crate, GlowWire, SkyBin,
+			-- RobuxCoins, Parcel; 13 Oct upload). +14: the worn gear (WornModels, group "worn": coat,
+			-- sleeve, boots, cloak, hardhat, belt, ladder tiles, scroll V2; 16 Oct upload).
+			t.eq(#MeshManifest.Flat(false), 710, "710 ids start loading in the background; none is awaited")
+		end
+	)
 end

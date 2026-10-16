@@ -34,6 +34,7 @@
 
 local AxeModels = require(script.Parent.AxeModels)
 local BacklogModels = require(script.Parent.BacklogModels)
+local WornModels = require(script.Parent.WornModels)
 local BlenderAssets = require(script.Parent.BlenderAssets)
 local MachineMeshes = require(script.Parent.MachineMeshes)
 local StoreModelSlots = require(script.Parent.Parent.StoreModelSlots)
@@ -153,6 +154,11 @@ function MeshManifest.Groups(town: boolean?): { Group }
 	end)
 	add("backlog", function(out)
 		for _, id in ipairs(BacklogModels.MeshIds(BacklogModels.Wired)) do
+			table.insert(out, { id = id, hull = false })
+		end
+	end)
+	add("worn", function(out)
+		for _, id in ipairs(WornModels.MeshIds()) do
 			table.insert(out, { id = id, hull = false })
 		end
 	end)

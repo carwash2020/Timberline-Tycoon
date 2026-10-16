@@ -716,6 +716,7 @@ safely(
 safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop, remote.ForemanTurnIn)
 safely("EventService.InitEvent", EventService.InitEvent, notify)
 safely("BiomeService.Init", BiomeService.Init, notify)
+safely("GearWearService.Init", require(script.Parent.GearWearService).Init)
 safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)
 safely(
 	"MonetizationService.SetPassListener",

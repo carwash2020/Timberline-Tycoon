@@ -8969,6 +8969,132 @@
     {
       "collision": false,
       "expectTypeId": 4,
+      "id": "115269271855313",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau CoatBody Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "73589596256678",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau CoatSleeve Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "116105552771338",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau HeatBoot Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "124000816344542",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau HeatBoot Glow"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "134517002979770",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau WaderBoot Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "124573428780738",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau CloakWorn Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "75740144633857",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau CloakWorn Glow"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "98991863528912",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau HardhatWorn Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "125383985331389",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau HardhatWorn Glow"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "114698783853944",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau GearBelt Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "110300531040960",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau RopeLadderSeg Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "121098136699219",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau RopeLadderTop Body"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "119840415336807",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau BlueprintScrollV2 Handle"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "87992443568498",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WornModels.luau BlueprintScrollV2 Seal"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
       "id": "85233243499195",
       "kind": "mesh",
       "places": 1,
