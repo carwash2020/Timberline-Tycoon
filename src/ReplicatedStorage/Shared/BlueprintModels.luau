@@ -15,6 +15,7 @@ local KitPaint = require(script.Parent.KitPaint)
 local KitMeshes = require(script.Parent.KitMeshes)
 local LogicItems = require(script.Parent.LogicItems)
 local ModelSlots = require(script.Parent.Art.ModelSlots)
+local Palette = require(script.Parent.Art.Palette)
 local PlotData = require(script.Parent.PlotData)
 local StoreModelArt = require(script.Parent.Art.StoreModelArt)
 local TreeArt = require(script.Parent.Art.TreeArt)
@@ -233,9 +234,23 @@ function BlueprintModels.ApplyWood(model: Model, woodId: string?)
 	end
 	local color, material = TreeArt.Core(def)
 	local lantern = woodId == WoodData.LanternId
+	-- An effect wood (WoodData.Effect): its Door parts take the accent colour,
+	-- and are marked NightGlow only when the wood's glow is neon. It sets only
+	-- the tag, WoodId, NightGlow, Color and Material: no light, no part.
+	local effect = WoodData.EffectOf(woodId)
+	local accent: Color3? = nil
+	if effect and effect.accent then
+		accent = Palette.Get(effect.accent)
+	end
 	if lantern then
 		if not model:HasTag("Lanternwood") then
 			model:AddTag("Lanternwood")
+		end
+		model:SetAttribute("NightHost", "plank")
+		model:SetAttribute("WoodId", woodId)
+	elseif effect then
+		if not model:HasTag("WoodEffect") then
+			model:AddTag("WoodEffect")
 		end
 		model:SetAttribute("NightHost", "plank")
 		model:SetAttribute("WoodId", woodId)
@@ -248,6 +263,13 @@ function BlueprintModels.ApplyWood(model: Model, woodId: string?)
 				child.Material = material
 				if lantern then
 					child:SetAttribute("NightGlow", true)
+				elseif effect and role == "Door" then
+					if accent then
+						child.Color = accent
+					end
+					if effect.neon then
+						child:SetAttribute("NightGlow", true)
+					end
 				end
 			end
 		end

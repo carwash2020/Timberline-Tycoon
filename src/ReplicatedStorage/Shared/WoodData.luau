@@ -825,6 +825,28 @@ for _, def in ipairs(woods) do
 	byId[def.id] = def
 end
 
+-- Wood effects on buildings (WOODFX-T316): cosmetic only. Palette NAMES (a
+-- "#hex" only for the lantern's own LanternGlow), so this module needs no Art.
+-- accent: the Door part's colour; glow: the night colour (only a neon wood
+-- swaps to Neon, on a part still marked NightGlow); emitter: the sparks.
+-- Oak, birch, pine, maple and the rest have no row.
+export type Effect = { accent: string?, glow: string?, neon: boolean, emitter: string? }
+WoodData.Effect = table.freeze({
+	frostwood = table.freeze({ accent = "FrostTrim", glow = "FrostGlow", neon = false, emitter = nil }),
+	emberwood = table.freeze({ accent = "EmberGlow", glow = "EmberGlow", neon = true, emitter = "ember" }),
+	phantomwood = table.freeze({ accent = "GloamGlow", glow = "GloamGlow", neon = true, emitter = "gloam" }),
+	lumenwood = table.freeze({ accent = "LumenCream", glow = nil, neon = false, emitter = nil }),
+	[WoodData.LanternId] = table.freeze({ accent = nil, glow = WoodData.LanternGlow, neon = true, emitter = nil }),
+} :: { [string]: Effect })
+
+-- The effect row for a wood, or nil (every wood but those five).
+function WoodData.EffectOf(woodId: unknown): Effect?
+	if type(woodId) ~= "string" then
+		return nil
+	end
+	return WoodData.Effect[woodId :: string]
+end
+
 function WoodData.Get(woodId: string): WoodDef?
 	return byId[woodId]
 end

@@ -40,6 +40,8 @@ return function(t)
 		LumenGlow = "#FFF4C2",
 		StarfallGlow = "#BFD8FF",
 		SparkTeal = "#3FC9C0",
+		FrostTrim = "#E8F2FF",
+		LumenCream = "#F2E6C8",
 	}
 
 	t.test("every palette name is the pack hex", function()
@@ -53,7 +55,7 @@ return function(t)
 		for name in pairs(HEX) do
 			t.eq(seen[name], true, name .. " is listed")
 		end
-		t.eq(#Palette.Names(), 35)
+		t.eq(#Palette.Names(), 37)
 	end)
 
 	t.test("an unknown name fails", function()
