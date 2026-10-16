@@ -14,10 +14,22 @@ return function(t)
 		return list
 	end
 
-	t.test("every badge id is 0 until it is pasted, and 0 is not live", function()
+	-- The ids pasted from the Creator Hub so far (16 October 2026). Every other id is still 0.
+	local PASTED = {
+		AreaBayou = 445495016044438,
+		AreaMesa = 2531827516027353,
+		WoodCypress = 1458073487503517,
+		WoodIronwood = 389236177819440,
+		FirstBuild = 4201850974776664,
+	}
+
+	t.test("every badge id is 0 or a positive whole number; only the pasted ones are set; 0 is not live", function()
 		for _, key in ipairs(keys()) do
-			t.eq(BadgeData.Ids[key], 0, key)
-			t.eq(BadgeData.RobloxId(key), 0, key)
+			local id = BadgeData.Ids[key]
+			t.ok(id == 0 or BadgeData.IsLive(id), key .. " is 0 or a positive whole number")
+			t.eq(id, PASTED[key] or 0, key .. (if PASTED[key] then " is the pasted id" else " is not pasted yet, so 0"))
+			t.eq(BadgeData.RobloxId(key), id, key)
+			t.eq(BadgeData.IsLive(BadgeData.RobloxId(key)), PASTED[key] ~= nil, key .. " is live only when pasted")
 		end
 		t.eq(BadgeData.IsLive(0), false)
 		t.eq(BadgeData.IsLive(-1), false)

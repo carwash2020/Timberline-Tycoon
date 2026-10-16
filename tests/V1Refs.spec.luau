@@ -214,20 +214,25 @@ return function(t)
 		end
 	end)
 
-	t.test("the five off-sale ids and every badge id are still 0 (Connor pastes them, never code)", function()
-		local StoreData = t.shared("StoreData")
-		local BadgeData = t.shared("BadgeData")
-		local ids = StoreData.CreatorIds
-		for _, key in ipairs({ "TowService", "TimberClassic", "PaintShop" }) do
-			t.eq(ids.Passes[key], 0, key)
+	t.test(
+		"the five off-sale ids are still 0 and every badge id is 0 or a pasted live id (Connor pastes them, never code)",
+		function()
+			local StoreData = t.shared("StoreData")
+			local BadgeData = t.shared("BadgeData")
+			local ids = StoreData.CreatorIds
+			for _, key in ipairs({ "TowService", "TimberClassic", "PaintShop" }) do
+				t.eq(ids.Passes[key], 0, key)
+			end
+			for _, key in ipairs({ "DoubleWood", "InstantDelivery" }) do
+				t.eq(ids.Products[key], 0, key)
+			end
+			-- Badge ids are pasted by Connor from the Creator Hub (the first five on 16 October 2026): each is
+			-- still 0 or a real whole id, never a made-up number (BadgeData.spec pins exactly which are set).
+			for key, id in pairs(BadgeData.Ids) do
+				t.ok(id == 0 or BadgeData.IsLive(id), "badge " .. key .. " is 0 or a live id")
+			end
 		end
-		for _, key in ipairs({ "DoubleWood", "InstantDelivery" }) do
-			t.eq(ids.Products[key], 0, key)
-		end
-		for key, id in pairs(BadgeData.Ids) do
-			t.eq(id, 0, "badge " .. key)
-		end
-	end)
+	)
 
 	t.test("no Robux price is written in code (a price comes from Roblox's live answer)", function()
 		for _, path in ipairs(all) do
