@@ -1,11 +1,14 @@
 --!strict
--- PendingMeshes: meshes that are modelled in Blender (assets/models) but not
--- uploaded to Roblox yet. Every id is 0 until the upload exists: a 0 means
--- the swap is skipped and the part-built version stays. Do not invent ids;
--- paste the real MeshPart ids here after the upload (Creator Hub), then wire
--- each through MeshKit the way AxeArt and GearMeshes do, with the same
--- half-turn yaw (AxeModels.MeshYaw): the GLB's front is -Z and Roblox's
--- import turns the mesh.
+-- PendingMeshes: event and cave prop meshes modelled in Blender
+-- (assets/models). Pumpkin, PumpkinPatch, PumpkinHat, LavaRock and Roots were
+-- uploaded on 15 October 2026 and carry their real MeshPart ids below (the
+-- MeshPart ids, never the Model container ids). The table keeps its names; a
+-- 0 still means pending: the swap is skipped and the part-built version
+-- stays. Never invent ids. They are wired through MeshKit the way AxeArt and
+-- GearMeshes do it, with the same half-turn yaw (AxeModels.MeshYaw): the
+-- GLB's front is -Z and Roblox's import turns the mesh. These meshes have no
+-- texture: vertex colours carry the look, so no TextureID is set and the
+-- MeshPart's Color stays white (it multiplies the vertex colours).
 --
 -- Wired (a real id works the moment it is filled in; 0 keeps the part-built
 -- prop): Pumpkin, PumpkinPatch, PumpkinHat (EventArt), LavaRock (PropArt),
@@ -22,11 +25,11 @@ local PendingMeshes = {}
 local TURN = CFrame.Angles(0, AxeModels.MeshYaw, 0)
 
 PendingMeshes.Ids = {
-	Pumpkin = 0, -- PENDING UPLOAD
-	PumpkinPatch = 0, -- PENDING UPLOAD
-	PumpkinHat = 0, -- PENDING UPLOAD
-	LavaRock = 0, -- PENDING UPLOAD
-	Roots = 0, -- PENDING UPLOAD
+	Pumpkin = 114164133748804,
+	PumpkinPatch = 75317089677312,
+	PumpkinHat = 123436760448077,
+	LavaRock = 132224124506530,
+	Roots = 96379929372711,
 } :: { [string]: number }
 
 -- The id to swap in, or nil while it is still pending (keep the part-built art).
@@ -51,6 +54,10 @@ function PendingMeshes.Add(parent: Instance, name: string, size: Vector3, cf: CF
 		return false
 	end
 	MeshKit.Visual(mesh, id)
+	-- Vertex colours carry the look: a white Color (the MeshPart default is a
+	-- grey that would darken them) and no texture.
+	mesh.Color = Color3.new(1, 1, 1)
+	mesh.TextureID = ""
 	mesh.CFrame = cf * TURN
 	mesh.Parent = parent
 	return true

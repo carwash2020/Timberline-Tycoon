@@ -42,9 +42,9 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 | Kind | Distinct ids | Places written | Written in |
 | --- | ---: | ---: | --- |
-| mesh | 1063 | 1334 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau |
+| mesh | 1068 | 1339 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, PendingMeshes.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau |
 | model | 206 | 206 | BacklogModels.luau, MachineMeshes.luau, TownModels.luau |
-| template | 996 | 996 | src/ReplicatedStorage/MeshTemplates |
+| template | 1001 | 1001 | src/ReplicatedStorage/MeshTemplates |
 | image | 18 | 18 | StoreData.luau, UIArt.luau, UITheme.luau, WeatherController.luau |
 | texture | 9 | 9 | TimberGrass.model.json, TimberGround.model.json, TimberLeafy.model.json |
 | sound | 9 | 11 | SoundData.luau |
@@ -89,7 +89,7 @@ Not wired by these slots (another lane wires them; no slot here):
 | `assets/glb/store-items/ShedBlueprint.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 | `assets/glb/store-items/WoodSign.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 
-## Meshes (MeshId, loaded by MeshKit) (1063)
+## Meshes (MeshId, loaded by MeshKit) (1068)
 
 | Id | Used by | Places | Status |
 | --- | --- | ---: | --- |
@@ -506,6 +506,11 @@ Not wired by these slots (another lane wires them; no slot here):
 | 82339447914092 | MachineMeshes.luau Clock Body | 1 | template, format ok, not checked yet |
 | 120603346606193 | MachineMeshes.luau Clock Lamp | 1 | template, format ok, not checked yet |
 | 96783433225204 | MachineMeshes.luau Sustain Body | 1 | template, format ok, not checked yet |
+| 114164133748804 | PendingMeshes.luau  | 1 | template, format ok, not checked yet |
+| 75317089677312 | PendingMeshes.luau  | 1 | template, format ok, not checked yet |
+| 123436760448077 | PendingMeshes.luau  | 1 | template, format ok, not checked yet |
+| 132224124506530 | PendingMeshes.luau  | 1 | template, format ok, not checked yet |
+| 96379929372711 | PendingMeshes.luau  | 1 | template, format ok, not checked yet |
 | 80686921861072 | RockModels.luau Boulder Host | 2 | template, format ok, not checked yet |
 | 135285101472759 | RockModels.luau Boulder  | 2 | template, format ok, not checked yet |
 | 102587715074861 | RockModels.luau Boulder  | 2 | template, format ok, not checked yet |
@@ -1368,13 +1373,13 @@ Not wired by these slots (another lane wires them; no slot here):
 | 101958118399557 | TownModels.luau OldHank | 1 | format ok, not checked yet |
 | 88871748192723 | TownModels.luau Foreman | 1 | format ok, not checked yet |
 
-## MeshTemplates files (Rojo MeshPart fallback, one per id) (996)
+## MeshTemplates files (Rojo MeshPart fallback, one per id) (1001)
 
 Each file is a Rojo `MeshPart` whose MeshId is its own file name. MeshKit uses it only if the
 engine call fails. A template for an id no builder uses is dead weight; a mesh id with no template
 has no fallback (listed as `no template` in the mesh table).
 
-Templates matching a mesh id in the code: 996 of 996. Orphans: 0.
+Templates matching a mesh id in the code: 1001 of 1001. Orphans: 0.
 
 ## Images (ImageLabel, store cards, particle textures) (18)
 
