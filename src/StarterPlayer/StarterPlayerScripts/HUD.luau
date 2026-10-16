@@ -1335,6 +1335,11 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	local image, fallback = side.image, side.fallback
 	if image then
 		image.Visible = asIcon and not side.imageFailed and image.Image ~= ""
+		-- The uploaded icons are cream: the style's ink multiplies it (Ink on the sale green).
+		local iconStyle = UITheme.Styles[styleName]
+		if iconStyle then
+			image.ImageColor3 = iconStyle.ink
+		end
 	end
 	if fallback then
 		fallback.Visible = asIcon and (side.imageFailed or (image ~= nil and image.Image == ""))

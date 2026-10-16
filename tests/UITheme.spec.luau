@@ -589,11 +589,12 @@ return function(t)
 			t.ok(ratio(K.Bark, ground) >= 4.5, "Bark on " .. ground:ToHex())
 		end
 		-- Button labels and the phone icons on their fills.
-		t.ok(ratio(K.Cream, C.Green) >= 3, "Cream on the deep green")
+		t.ok(ratio(K.Cream, C.Green) >= 3, "Cream on the deep green (the Robux and confirm buttons)")
 		t.ok(ratio(K.Ink, C.Amber) >= 3, "Ink on amber")
 		t.ok(ratio(C.ConfirmInk, C.Amber) >= 3, "the amber style's ink on amber")
-		t.eq(UITheme.Styles.iconGreen.ink, C.Cream)
-		t.eq(UITheme.Styles.iconGreen.fill, C.Green)
+		t.eq(UITheme.Styles.iconGreen.ink, K.Ink, "the phone icons are Ink")
+		t.eq(UITheme.Styles.iconGreen.fill:ToHex(), "4CC36A", "on the sale green (Palette.SaleGreen)")
+		t.ok(ratio(K.Ink, UITheme.Styles.iconGreen.fill) >= 4.5, "Ink on the sale green clears 4.5:1")
 		t.eq(UITheme.Styles.starter.outline, K.Muted, "the starter style is the one with a Muted stroke")
 		for name, style in pairs(UITheme.Styles) do
 			if name ~= "starter" then

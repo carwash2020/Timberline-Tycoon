@@ -81,30 +81,8 @@ local lastTileId: string? = nil
 -- Small builders
 ---------------------------------------------------------------------------
 
--- The ring a focused card or row shows on a gamepad: 4 px gold and a 2 px Ink
--- ring outside it (gold alone on Cream is 1.4:1).
 local function focusRing(stroke: number): Frame
-	local ring = Instance.new("Frame")
-	ring.Name = "FocusRing"
-	ring.Size = UDim2.fromScale(1, 1)
-	ring.BackgroundTransparency = 1
-	ring.BorderSizePixel = 0
-	UITheme.corner(ring, 10)
-	local gold = Instance.new("UIStroke")
-	gold.Color = Palette.CoinGold
-	gold.Thickness = stroke
-	gold.Parent = ring
-	local outer = Instance.new("Frame")
-	outer.Name = "InkRing"
-	outer.AnchorPoint = Vector2.new(0.5, 0.5)
-	outer.Position = UDim2.fromScale(0.5, 0.5)
-	outer.Size = UDim2.new(1, stroke * 2 + 4, 1, stroke * 2 + 4)
-	outer.BackgroundTransparency = 1
-	outer.BorderSizePixel = 0
-	UITheme.corner(outer, 12)
-	UITheme.stroke(outer, UITheme.Skin.Ink, 2)
-	outer.Parent = ring
-	return ring
+	return UITheme.FocusRing(stroke)
 end
 
 -- AbsoluteSize / AbsolutePosition, or zero where they cannot be read (before

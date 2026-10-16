@@ -45,6 +45,7 @@ local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
 
 local UIArt = require(script.Parent.UIArt)
+local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 
 local UITheme = {}
 
@@ -177,9 +178,10 @@ UITheme.Styles = {
 	blue = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
 	amber = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
 	skip = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
-	-- The phone HUD's icon buttons: a deeper green, so a cream icon on it
-	-- clears 3:1 (cream on the bright confirm green does not).
-	iconGreen = { fill = C.Green, edge = C.GreenEdge, ink = C.Cream },
+	-- The phone HUD's icon buttons (Hammer, Sell here): the sale green with an Ink
+	-- icon (Skin.Ink on Palette.SaleGreen clears 4.5:1; Cream on this green was
+	-- 1.9:1). The uploaded icons are cream, so HUD tints them with this ink.
+	iconGreen = { fill = Palette.SaleGreen, edge = C.GreenEdge, ink = UITheme.Skin.Ink },
 } :: { [string]: Style }
 
 ---------------------------------------------------------------------------
@@ -1476,6 +1478,33 @@ end
 -- A selection image that draws nothing, for a panel-sized object the gamepad
 -- may land on (a selection group's own frame): the engine's default box over
 -- a whole panel reads as a grey slab. Its children carry the visible ring.
+-- The ring a focused card, row or button shows on a gamepad: a gold stroke
+-- (Palette.CoinGold, `stroke` px) and a 2 px Ink ring outside it, because gold
+-- alone on Cream is 1.4:1. Use it as a SelectionImageObject.
+function UITheme.FocusRing(stroke: number): Frame
+	local ring = Instance.new("Frame")
+	ring.Name = "FocusRing"
+	ring.Size = UDim2.fromScale(1, 1)
+	ring.BackgroundTransparency = 1
+	ring.BorderSizePixel = 0
+	UITheme.corner(ring, 10)
+	local gold = Instance.new("UIStroke")
+	gold.Color = Palette.CoinGold
+	gold.Thickness = stroke
+	gold.Parent = ring
+	local outer = Instance.new("Frame")
+	outer.Name = "InkRing"
+	outer.AnchorPoint = Vector2.new(0.5, 0.5)
+	outer.Position = UDim2.fromScale(0.5, 0.5)
+	outer.Size = UDim2.new(1, stroke * 2 + 4, 1, stroke * 2 + 4)
+	outer.BackgroundTransparency = 1
+	outer.BorderSizePixel = 0
+	UITheme.corner(outer, 12)
+	UITheme.stroke(outer, UITheme.Skin.Ink, 2)
+	outer.Parent = ring
+	return ring
+end
+
 function UITheme.HiddenSelection(): Frame
 	local empty = Instance.new("Frame")
 	empty.Name = "NoSelection"
