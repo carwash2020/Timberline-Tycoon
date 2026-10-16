@@ -369,6 +369,12 @@ local function toolFrom(model: Model, name: string, attr: string, value: string,
 	model:Destroy()
 	if handle then
 		tool.Grip = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-80), 0, 0)
+		-- A Tool's held part is named Handle (the Bomb's was "Body" and the
+		-- Miner's Lamp's "Cage"): without it the engine has nothing to put in
+		-- the hand, and the mesh dress looks for it.
+		if handle.Name ~= "Handle" and tool:FindFirstChild("Handle") == nil then
+			handle.Name = "Handle"
+		end
 	end
 	-- The uploaded meshes go on the Tool itself (it outlives the model), and
 	-- a mesh that is not loaded yet is swapped in later; the part-built tool
@@ -415,7 +421,7 @@ end
 
 local function giveBomb(player: Player)
 	stripTools(player, "Bomb")
-	local tool = toolFrom(MiningArt.Bomb(false), "Bomb", "Bomb", "1")
+	local tool = toolFrom(MiningArt.Bomb(false), "Bomb", "Bomb", "1", "Bomb")
 	tool.Activated:Connect(function()
 		MiningService.Fuse(player, rootOf(player))
 	end)
@@ -428,7 +434,7 @@ local function giveLamp(player: Player, mining: MiningSchema.Mining)
 	if not mining.lamp then
 		return
 	end
-	local tool = toolFrom(MiningArt.MinersLamp(), "Miner's Lamp", "MinersLamp", "1")
+	local tool = toolFrom(MiningArt.MinersLamp(), "Miner's Lamp", "MinersLamp", "1", "MinersLamp")
 	tool.Equipped:Connect(function()
 		local light = tool:FindFirstChild("LampLight", true)
 		if light and light:IsA("PointLight") then

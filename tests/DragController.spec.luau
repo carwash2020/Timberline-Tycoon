@@ -160,6 +160,7 @@ return function(t)
 		DragController.Start()
 		rec.workspace = workspace
 		rec.playerGui = playerGui
+		rec.controller = DragController
 		return rec
 	end
 
@@ -214,5 +215,34 @@ return function(t)
 		local reticle = rec.playerGui:FindFirstChild("DragReticle")
 		t.ok(reticle and reticle.IgnoreGuiInset, "the dot sits at the true centre, where the gamepad's ray goes")
 		t.eq(reticle:FindFirstChild("Dot").Visible, false)
+	end)
+
+	t.test("RT with a tool equipped never starts a grab; with no tool it still does", function()
+		local GrabLogic = t.load("ReplicatedStorage/Shared/GrabLogic")
+		local DragController = setup(2).controller or t.load("StarterPlayer/StarterPlayerScripts/DragController")
+		local char = Instance.new("Model")
+		t.eq(DragController.ToolOut(char), false, "empty hands")
+		t.eq(GrabLogic.PadGrabAllowed(DragController.ToolOut(char), false), true, "no tool: RT grabs")
+		-- Equip: the Tool is parented to the character this instant.
+		local tool = Instance.new("Tool")
+		tool.Parent = char
+		t.eq(DragController.ToolOut(char), true, "a Tool on the character counts at once")
+		t.eq(GrabLogic.PadGrabAllowed(DragController.ToolOut(char), false), false, "a tool out: RT is its swing")
+		-- A fresh respawn: a new character, the tool parented right away (stale
+		-- state from the old body must not matter: it is read from the character).
+		local respawned = Instance.new("Model")
+		t.eq(DragController.ToolOut(respawned), false, "a new body starts empty")
+		local again = Instance.new("Tool")
+		again.Parent = respawned
+		t.eq(GrabLogic.PadGrabAllowed(DragController.ToolOut(respawned), false), false, "tool parented at spawn")
+		-- A tool still in the backpack is not out.
+		local backpack = Instance.new("Folder")
+		local held = Instance.new("Tool")
+		held.Parent = backpack
+		t.eq(DragController.ToolOut(Instance.new("Model")), false)
+		-- The press handler asks exactly this, nothing else.
+		local fs = require("@lune/fs")
+		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/DragController.luau")
+		t.ok(string.find(src, "GrabLogic.PadGrabAllowed(toolOut(char), BlueprintPlacer.Active())", 1, true))
 	end)
 end

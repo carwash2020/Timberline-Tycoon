@@ -310,13 +310,14 @@ UITheme.Sizes = {
 		Hint = { text = S.TextMin },
 		LoadChip = { text = S.TextMin },
 		Toast = { text = S.TextMin },
-		-- The corner (HUD.TopRow, BesideCash, UnderCash): pills 36 tall, each
+		-- The corner (HUD.TopRow, BesideCash, UnderCash): pills 36 tall (a little wider
+		-- than before: Sized() raises the text to 18 base at scale 0.78), each
 		-- with a fingertip-tall hit area (the Daily Goals pill grows with
 		-- its text from 200).
 		Settings = { size = Vector2.new(38, 38), hit = S.Tap, text = 20, tap = true },
-		Store = { size = Vector2.new(90, 36), hit = S.Tap, text = S.TextMin, tap = true },
-		Clock = { size = Vector2.new(100, 36), text = S.TextMin },
-		Pouch = { size = Vector2.new(84, 36), hit = S.Tap, text = S.TextMin, tap = true },
+		Store = { size = Vector2.new(100, 36), hit = S.Tap, text = S.TextMin, tap = true },
+		Clock = { size = Vector2.new(116, 36), text = S.TextMin },
+		Pouch = { size = Vector2.new(96, 36), hit = S.Tap, text = S.TextMin, tap = true },
 		-- The corner's popups
 		DailyHeading = { text = S.TextMin },
 		DailyFooter = { text = S.TextMin },
@@ -370,8 +371,9 @@ UITheme.Sizes = {
 	-- A TV at 1080p scales by 1.5 (ScaleFor, 720 base), so a base size of 16
 	-- is 24 px on screen: readable from a sofa. Every text is at least 16 and
 	-- the rows and buttons are a little taller to hold it. (PromptObject is a
-	-- billboard: PromptUI scales the whole card up instead, and the object
-	-- text stays 12 at its own base.)
+	-- billboard: PromptUI scales the whole card up by the same 1.5, so its 16
+	-- is 24 px too; the card is automatic-sized and a billboard does not clip,
+	-- so the longer text fits.)
 	console = {
 		SideButton = { size = Vector2.new(150, 44), text = 16, tap = true },
 		Hint = { text = 16 },
@@ -397,7 +399,7 @@ UITheme.Sizes = {
 		MurphName = { text = 16 },
 		MurphLine = { text = 16 },
 		Beacon = { text = 16 },
-		PromptObject = { text = 12 },
+		PromptObject = { text = 16 },
 	} :: { [string]: SizeSpec },
 }
 

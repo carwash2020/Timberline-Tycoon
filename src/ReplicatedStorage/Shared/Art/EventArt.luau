@@ -10,6 +10,7 @@
 --                   (HatBase is the part that welds to the head)
 
 local Kit = require(script.Parent.Kit)
+local PendingMeshes = require(script.Parent.PendingMeshes)
 
 local EventArt = {}
 
@@ -103,7 +104,9 @@ end
 
 function EventArt.Pumpkin(seed: number): Model
 	local rng = Kit.rng(seed)
-	return pumpkin(nil :: any, 2.2 + rng:next() * 0.8, rng, true)
+	local model = pumpkin(nil :: any, 2.2 + rng:next() * 0.8, rng, true)
+	PendingMeshes.Dress(model, "Pumpkin") -- the uploaded mesh once it has an id; 0 keeps this
+	return model
 end
 
 -- A big jack-o'-lantern with a small unlit one beside it.
@@ -120,6 +123,7 @@ function EventArt.PumpkinPatch(seed: number): Model
 			d.CFrame = shift * d.CFrame
 		end
 	end
+	PendingMeshes.Dress(patch, "PumpkinPatch")
 	return patch
 end
 
@@ -141,6 +145,7 @@ function EventArt.Hat(): Model
 	Kit.decor(base, false)
 	base.Transparency = 1
 	model.PrimaryPart = base
+	PendingMeshes.Dress(model, "PumpkinHat", { "HatBase" }) -- HatBase stays: it welds to the head
 	return model
 end
 

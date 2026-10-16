@@ -17,6 +17,7 @@
 -- biome).
 
 local Kit = require(script.Parent.Kit)
+local PendingMeshes = require(script.Parent.PendingMeshes)
 local TownMeshes = require(script.Parent.TownMeshes)
 local TownModels = require(script.Parent.TownModels)
 
@@ -346,6 +347,7 @@ function PropArt.LavaRock(seed: number, size: number): Model
 	-- Embers glowing in the ground at its foot.
 	disc(model, "Embers", Vector3.new(0, 0.02, 0), 0.05, s * 1.3, hex("#C2400E"), Enum.Material.Neon).Transparency =
 		0.35
+	PendingMeshes.Dress(model, "LavaRock") -- the uploaded mesh once it has an id; 0 keeps this
 	return model
 end
 

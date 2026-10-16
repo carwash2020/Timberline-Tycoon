@@ -763,23 +763,28 @@ pcall(function()
 	end
 	playable()
 	localPlayer:GetAttributeChangedSignal("ProfileLoaded"):Connect(playable)
-	-- Once, on a TV: the numbers the safe-area layout reads, to check against a photo.
-	if game:GetService("GuiService"):IsTenFootInterface() then
-		task.delay(3, function()
-			local UITheme = require(script.Parent.UITheme)
-			local side, bottom = UITheme.Margin()
-			local camera = workspace.CurrentCamera
-			print(
-				string.format(
-					"[Safe] tenFoot=true margin=(%d, %d) scale=%.3f viewport=%s",
-					side,
-					bottom,
-					UITheme.Scale(),
-					tostring(if camera then camera.ViewportSize else "none")
-				)
+	-- Once, 3 s after start, on every device: the numbers the safe-area and
+	-- device layouts read, to check against a photo.
+	task.delay(3, function()
+		local UITheme = require(script.Parent.UITheme)
+		local UserInputService = game:GetService("UserInputService")
+		local side, bottom = UITheme.Margin()
+		local camera = workspace.CurrentCamera
+		print(
+			string.format(
+				"[Safe] tenFoot=%s device=%s gamepad=%s touch=%s keyboard=%s margin=(%d, %d) scale=%.3f viewport=%s",
+				tostring(game:GetService("GuiService"):IsTenFootInterface()),
+				tostring(UITheme.Device()),
+				tostring(UserInputService.GamepadEnabled),
+				tostring(UserInputService.TouchEnabled),
+				tostring(UserInputService.KeyboardEnabled),
+				side,
+				bottom,
+				UITheme.Scale(),
+				tostring(if camera then camera.ViewportSize else "none")
 			)
-		end)
-	end
+		)
+	end)
 	-- TEMPORARY grey-box debug (remove once the offender is fixed): 3 s after
 	-- can play, list every big painted GuiObject on screen.
 	local function greyBoxDump()

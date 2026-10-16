@@ -15,6 +15,7 @@ local CollectionService = game:GetService("CollectionService")
 
 local Kit = require(script.Parent.Kit)
 local MeshKit = require(script.Parent.MeshKit)
+local PendingMeshes = require(script.Parent.PendingMeshes)
 local OreData = require(script.Parent.Parent.OreData)
 local RockModels = require(script.Parent.RockModels)
 
@@ -1103,6 +1104,7 @@ local function buildOne(kind: string, seed: number, sizeName: string?, look: str
 		part(m, "Glint", Vector3.new(0.2, 0.7, 0.16), CFrame.new(0.05, 0.7, 0.05), hex("#E8F6FF"), Enum.Material.Neon)
 	elseif kind == "Roots" then
 		roots(m, 1)
+		PendingMeshes.Dress(m, "Roots") -- the uploaded mesh once it has an id; 0 keeps these
 	elseif kind == "Bat" then
 		bat(m, 1)
 	else

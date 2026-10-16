@@ -151,11 +151,7 @@ return function(t)
 		for name in pairs(UITheme.Sizes.desktop) do
 			local spec = UITheme.Sizes.console[name]
 			t.ok(spec ~= nil, name .. " has a console size")
-			if name == "PromptObject" then
-				t.ok(spec.text >= 12, "the prompt's object text stays 12 base (the card is scaled up)")
-			else
-				t.ok(spec.text * scale >= 24, name .. ": " .. spec.text * scale .. " px is under 24 at 1080p")
-			end
+			t.ok(spec.text * scale >= 24, name .. ": " .. spec.text * scale .. " px is under 24 at 1080p")
 			local desk = UITheme.Sizes.desktop[name]
 			if spec.size and desk.size then
 				t.ok(spec.size.X >= desk.size.X and spec.size.Y >= desk.size.Y, name .. " is not smaller on a TV")

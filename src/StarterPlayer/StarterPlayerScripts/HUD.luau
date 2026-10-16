@@ -1355,22 +1355,16 @@ local function layoutSide(side: Side, device: UITheme.Device)
 		-- ends (HudLayout.MarkTextLeft) and is left-aligned, so no letter can
 		-- ever sit behind the icon, whatever the label's width.
 		local marked = side.button.face:FindFirstChild("Mark") ~= nil and not asIcon
-		local left = if marked then HudLayout.MarkTextLeft() else 6
-		pad.PaddingLeft = UDim.new(0, (if console then 36 else 0) + left)
-		-- A child's Position is inside the padding: take the padding off so
-		-- the mark sits at HudLayout.MarkLeft on the face, left of the text.
+		-- The padding and the mark's position come from one place (HudLayout).
+		local padLeft, markX = HudLayout.SidePadding(marked, console, asIcon)
+		pad.PaddingLeft = UDim.new(0, padLeft)
 		local markObj = side.button.face:FindFirstChild("Mark")
 		if markObj and markObj:IsA("GuiObject") then
-			markObj.Position = UDim2.new(0, HudLayout.PaddedX(HudLayout.MarkLeft, pad.PaddingLeft.Offset), 0.5, 0)
+			markObj.Position = UDim2.new(0, markX, 0.5, 0)
 		end
 		side.button.face.TextXAlignment = if marked then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center
 		if asIcon then
-			pad.PaddingLeft = UDim.new(0, 0)
 			pad.PaddingRight = UDim.new(0, 0)
-			local iconMark = side.button.face:FindFirstChild("Mark")
-			if iconMark and iconMark:IsA("GuiObject") then
-				iconMark.Position = UDim2.new(0, HudLayout.MarkLeft, 0.5, 0)
-			end
 		else
 			pad.PaddingRight = UDim.new(0, 6)
 		end
