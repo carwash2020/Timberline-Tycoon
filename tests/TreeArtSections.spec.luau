@@ -473,6 +473,16 @@ return function(t)
 		t.ok(weld and weld.Part0 == loose and weld.Part1 == face, "welded to its section")
 	end)
 
+	t.test("FaceLook is the core colour on WoodPlanks for every wood, and Core is untouched", function()
+		for _, def in ipairs(WoodData.All()) do
+			local core = TreeArt.Core(def)
+			local color, material = TreeArt.FaceLook(def)
+			t.eq(color, core, def.id .. " keeps its core colour")
+			t.eq(material, Enum.Material.WoodPlanks, def.id)
+		end
+		t.eq(select(2, TreeArt.Core(WoodData.Get("lumenwood"))), Enum.Material.Neon, "buildings still read the Neon core")
+	end)
+
 	t.test("a notch cuts in from the face it was hit on, as deep as the damage", function()
 		local def = WoodData.Get("oak")
 		local model = build("oak", 1, 1)
@@ -489,6 +499,8 @@ return function(t)
 				local n = TreeArt.Notch(def, s, 1.2, case.normal, frac * 10, 10)
 				local depth = tW * math.min(TreeArt.NotchMaxDepth, frac)
 				t.eq(n.Name, "Notch")
+				t.eq(n.Material, Enum.Material.WoodPlanks, "a notch is plain planks too")
+				t.ok(n.Material ~= Enum.Material.Neon)
 				t.ok(math.abs(n.Size.Y - 0.35) < 1e-3, "0.35 tall")
 				local along = if case.axis == "X" then n.Size.X else n.Size.Z
 				local across = if case.axis == "X" then n.Size.Z else n.Size.X

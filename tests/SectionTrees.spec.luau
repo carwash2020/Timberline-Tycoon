@@ -1428,4 +1428,144 @@ return function(t)
 		local _, ok = s.cutThrough(q, other.sections[1])
 		t.ok(ok and other.slot, "cutting the stump takes it and opens the site")
 	end)
+
+	-- CHOP-T325: what the server already says about a cut, and what it counts.
+	t.test("every Cut carries progress between 0 and 1, rising to 1 on the cut-through (overkill never passes it)", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local p = s.player(1)
+		local GoldAxe = s.ItemCatalog.GetAxe("GoldAxe")
+		local saved = GoldAxe.v2.vs
+		GoldAxe.v2.vs = { oak = { damage = 100, cooldown = 0.4 } } -- far more than the section needs
+		s.axe = "GoldAxe"
+		s.cutThrough(p, rec.sections[1])
+		GoldAxe.v2.vs = saved
+		s.axe = "RustyAxe"
+		local cuts = s.fxOf("Cut")
+		t.ok(#cuts >= 1, "a Cut went out")
+		for _, c in ipairs(cuts) do
+			t.ok(type(c.payload.progress) == "number", "progress rides every Cut")
+			t.ok(c.payload.progress >= 0 and c.payload.progress <= 1, "clamped to 0..1")
+		end
+		t.eq(cuts[#cuts].payload.progress, 1, "the overkill hit reads exactly 1")
+
+		local other = s.tree("oak", Vector3.new(60, 0, 0))
+		local q = s.player(2, Vector3.new(64, 3, 0))
+		local before = #s.fxOf("Cut")
+		s.cutThrough(q, other.sections[1])
+		local seen = {}
+		for i = before + 1, #s.fxOf("Cut") do
+			table.insert(seen, s.fxOf("Cut")[i].payload.progress)
+		end
+		for i = 2, #seen do
+			t.ok(seen[i] >= seen[i - 1], "progress never goes back within a cut")
+		end
+		t.eq(seen[#seen], 1)
+	end)
+
+	t.test("Net.RemoteNames still has 74 remotes: the chop feel pass added none", function()
+		t.eq(#t.shared("Net").RemoteNames, 74)
+	end)
+
+	t.test("reject telemetry counts cooldown, far, noLOS and rate per player, in the checks' own order", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local part = rec.sections[1]
+		local p = s.player(1)
+		t.eq(s.Trees.RejectCounts(1).cooldown, 0)
+		t.ok(s.swing(p, part, 0))
+		for _ = 1, 3 do
+			local ok, why = s.swing(p, part, 0.1)
+			t.eq(why, "cooldown")
+		end
+		t.eq(s.Trees.RejectCounts(1).cooldown, 3)
+		local far = s.player(2, Vector3.new(30, 3, 0))
+		s.swing(far, part)
+		t.eq(s.Trees.RejectCounts(2).far, 1)
+		t.eq(s.Trees.RejectCounts(2).cooldown, 0, "a count belongs to its player")
+		local wall = Instance.new("Part")
+		s.rayHit = { Instance = wall, Position = Vector3.new(2.5, 2.6, 0) }
+		local q = s.player(3)
+		s.swing(q, part)
+		s.rayHit = nil
+		t.eq(s.Trees.RejectCounts(3).noLOS, 1)
+		-- Not tracked: a bad payload counts nowhere.
+		s.Trees.Chop(q, part, "junk", Vector3.xAxis)
+		local c = s.Trees.RejectCounts(3)
+		t.eq(c.cooldown + c.far + c.noLOS + c.rate, 1)
+		-- Leaving clears it.
+		s.Trees.PlayerLeft(1)
+		t.eq(s.Trees.RejectCounts(1).cooldown, 0)
+	end)
+
+	t.test("the cut-through tree falls away from the cutter, the stump stays, and it grows back on the timer", function()
+		local s = setup()
+		s.Trees._roll = function()
+			return 0.5
+		end
+		local rec = s.tree("oak")
+		local p = s.player(1)
+		local falls = 0
+		s.Trees.OnFelled = function(_, _, _, dir)
+			falls += 1
+			t.ok(dir.X < 0, "the cutter stands at +X: it falls toward -X")
+		end
+		local rootPos = p.root.Position
+		s.cutThrough(p, rec.sections[1])
+		t.eq(falls, 1)
+		t.ok(rec.felled and not rec.slot, "the stump is still there")
+		t.eq(p.root.Position, rootPos, "a fall never pushes the player")
+		-- Cutting the stump through once more is the cut, not a second fell.
+		t.eq(falls, 1, "no second fell")
+		s.now = (rec.regrowAt or 0) + 1
+		s.Trees.GrowTick(s.now)
+		t.ok(not rec.felled and rec.stage == 0, "regrown on the existing timer")
+	end)
+
+	t.test("two players split the damage on an Elder; the finishing piece goes to whoever did more", function()
+		local s = setup()
+		local ForestLogic = t.shared("ForestLogic")
+		local model = s.Trees.SpawnTree("oak", CFrame.new(0, 0, 0), {
+			seed = 5,
+			size = ForestLogic.ElderSize(s.WoodData.Get("oak")),
+			temporary = true,
+		})
+		local rec = s.Trees.GetTree(model:GetAttribute("Uid"))
+		local base = rec.sections[1]
+		local reach = base.Size.X / 2 + 3
+		local a = s.player(1, Vector3.new(reach, 3, 0))
+		local b = s.player(2, Vector3.new(reach, 3, 1))
+		local result
+		for _ = 1, 400 do
+			-- A swings twice for each of B's swings, so A deals the most.
+			for _, who in ipairs({ a, a, b }) do
+				local ok, _, r = s.swing(who, base)
+				if r and #r.freed > 0 then
+					result = r
+				end
+			end
+			if result then
+				break
+			end
+		end
+		t.ok(result, "the Elder came down")
+		local piece = result.freed[1]
+		t.eq(piece.ownerId, 1, "the finishing piece is the top contributor's, not the last swinger's")
+	end)
+
+	t.test("a cut-through base is not a second fell: its stump is cut as a stump, once", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local p = s.player(1)
+		local falls = 0
+		s.Trees.OnFelled = function()
+			falls += 1
+		end
+		s.cutThrough(p, rec.sections[1])
+		t.eq(falls, 1)
+		t.ok(rec.felled and not rec.slot, "a stump stands")
+		s.cutThrough(p, rec.sections[1]) -- the stump itself
+		t.eq(falls, 1, "cutting the stump never fells a tree again")
+		t.ok(rec.slot, "it clears the site instead")
+	end)
 end

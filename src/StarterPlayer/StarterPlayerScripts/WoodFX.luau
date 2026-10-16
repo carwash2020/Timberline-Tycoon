@@ -624,6 +624,23 @@ local function randomAxis(): Vector3
 	return if v.Magnitude > 0.01 then v.Unit else Vector3.xAxis
 end
 
+-- Every third chip is bark colour, the rest the wood's core.
+function WoodFX.IsBarkChip(i: number): boolean
+	return i % 3 == 0
+end
+
+-- Chips live at once if `players` each swing every `interval` seconds and a
+-- chip lives `life` seconds, before the pool's cap. The pool recycles its
+-- oldest chip past QualityBudgets.ChipCount, so the live count never passes it.
+function WoodFX.ChipDemand(players: number, interval: number, life: number): number
+	return players * math.ceil(life / math.max(interval, 0.05)) * WoodFX.ChipsPerHit
+end
+
+-- Chips in flight or resting right now (never above the tier's ChipCount).
+function WoodFX.LiveChips(): number
+	return #chipBatch.out
+end
+
 -- `n` chips out of `pos` along `normal`, in the wood's core (and a few in
 -- its bark) colour.
 local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number): { BasePart }
@@ -650,7 +667,7 @@ local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number): { 
 		)
 		local chip = takePart(chipBatch)
 		chip.Size = Vector3.new(WoodFX.ChipMin + math.random() * 0.16, 0.16, WoodFX.ChipMin + math.random() * 0.22)
-		chip.Color = if i % 3 == 0 then bark else core
+		chip.Color = if WoodFX.IsBarkChip(i) then bark else core
 		local rest = TreeLogic.Upright(groundNormal) * CFrame.Angles(0, math.random() * math.pi * 2, 0)
 		launch(chipBatch, chip, flight, rest, randomAxis(), 10 + math.random() * 10, 0)
 		table.insert(made, chip)
