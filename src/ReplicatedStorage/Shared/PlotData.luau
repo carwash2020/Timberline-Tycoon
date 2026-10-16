@@ -166,6 +166,7 @@ export type Blueprint = {
 	id: string,
 	displayName: string,
 	category: string, -- "Buildings" | "Decor"
+	kind: string?, -- the build menu's category (Walls, Floors, Doors, Stairs, Roofs, Fences, Indoor, Decor, Houses); nil lands in More. Not `group`: BlueprintBook.Group already means Buildings / Decor / Machines
 	priceCash: number,
 	tier: number, -- the plot tier it needs
 	footprint: Vector2, -- width (x) and depth (z) in studs at rot 0
@@ -688,9 +689,43 @@ for _, extra in ipairs(require(script.Parent.FurnitureData).Pieces :: { any }) d
 	table.insert(PlotData.Blueprints, extra :: Blueprint)
 end
 
+-- The build menu's categories (BuildMenuLogic): which `kind` each piece with
+-- card art is in. Every other piece (the held machines, the modern glass pieces,
+-- the Sparkworks logic, CopperTrim4, the granted furniture) has no kind and
+-- lands in More.
+PlotData.KindRows = {
+	Walls = {
+		"Wall4",
+		"Wall",
+		"Wall12",
+		"TallWall4",
+		"TallWall8",
+		"HalfWall8",
+		"DoorWall8",
+		"WindowWall8",
+		"SandWall4",
+	},
+	Floors = { "Floor4", "Floor", "Foundation8", "SandFloor4" },
+	Doors = { "Door", "Window", "SandArch8" },
+	Stairs = { "Stairs", "Ramp8" },
+	Roofs = { "FlatRoof8", "SlopedRoof8", "RoofCorner", "RoofRidge8", "Beam8" },
+	Fences = { "Fence", "FenceGate4", "Railing8", "Post" },
+	Indoor = { "Table", "Chair", "Bookshelf", "Rug", "Barrel", "Crate", "FirePit" },
+	Decor = { "Bench", "LampPost", "Mailbox", "Flag", "WoodSign", "FlowerBed", "LogPile", "PaintCan" },
+	Houses = { "Shed", "Cabin", "Warehouse", "AxeRack" },
+} :: { [string]: { string } }
+
 local byId: { [string]: Blueprint } = {}
 for _, bp in ipairs(PlotData.Blueprints) do
 	byId[bp.id] = bp
+end
+for kind, ids in pairs(PlotData.KindRows) do
+	for _, id in ipairs(ids) do
+		local bp = byId[id]
+		if bp then
+			bp.kind = kind
+		end
+	end
 end
 
 function PlotData.Blueprint(id: string): Blueprint?
