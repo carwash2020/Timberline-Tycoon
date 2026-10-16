@@ -195,7 +195,7 @@ plot for a 10% fee), cosmetic buildings.
 - Co-op hauling: friends can load each other's trucks.
 - Private servers for friend groups (monetized, see §7).
 
-## 6. Technical architecture (Claude Code builds this)
+## 6. Technical architecture (the build agent builds this)
 
 - **Rojo layout** (`src/`): server logic in ServerScriptService, shared
   modules + RemoteEvents in ReplicatedStorage, client scripts in
@@ -632,7 +632,7 @@ brown-on-green read.
 - Distant trees get LOD swaps; cap active physics logs.
 - Target: smooth on a mid-range phone in a busy server.
 
-## 14. Implementation spec (Claude Code handoff)
+## 14. Implementation spec (build agent handoff)
 
 Written so an AI coder can implement directly. Follow it; ask Connor before
 deviating from data values or architecture.

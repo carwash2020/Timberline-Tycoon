@@ -316,7 +316,7 @@ ConveyorSpeed = 4, LogicEvalsPerTick = 200, LogicTickSec = 0.1, MaxConveyorsPerP
 
 ---
 
-### 2h. Mill tiers, planers and belts (6 October 2026, `claude/mill-tiers`)
+### 2h. Mill tiers, planers and belts (6 October 2026, `mill-tiers`)
 
 Connor: "create different versions of the sawmill ... they progress in cost but also upgrade how much you get from the sold items", then planers, conveyors, and "an object in a box: you buy the box, open it, and the object is placed down as a one-time use".
 

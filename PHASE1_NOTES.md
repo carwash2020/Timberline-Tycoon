@@ -91,7 +91,7 @@ Numbers to report back (from the `[Stopwatch]` lines in the Output window):
       Rustbucket for ~10 minutes, then run the
       `lune run tools/economy --calibrate …` line the Output prints (in the
       repo folder), and commit `tools/calibration.json` + ECONOMY.md (or just
-      paste the line to Claude)
+      paste the line to the build agent)
 
 Things only a human can judge (report back):
 - [ ] Axe sits right in the hand and the swing animation plays

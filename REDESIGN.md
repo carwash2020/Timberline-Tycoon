@@ -1,6 +1,6 @@
 # Redesign (October 2026): models, a living world, and the Living Forest
 
-This is the build brief for the redesign (built on `claude/blissful-gates-dba9t3`, now on `main`):
+This is the build brief for the redesign (built on `blissful-gates-dba9t3`, now on `main`):
 what changed, why, and the rules the new code follows. GAME_DESIGN.md §16–17
 hold the design; this file is the engineering side. Keep it current.
 

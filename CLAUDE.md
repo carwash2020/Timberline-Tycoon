@@ -1,4 +1,4 @@
-# Timberline Tycoon: notes for Claude
+# Timberline Tycoon: rules for the build agent
 
 **Start with STATUS.md**: what has landed, Connor's standing decisions, the
 open items and the goals. Keep it current in the same PR as any change that
@@ -13,7 +13,7 @@ stands: V1_PLAN.md (keep it current). Playtest checklists: PHASE1_NOTES.md
 (phase 1), PHASE2_NOTES.md (everything since; all on main). Tonight's
 cleanup plan: HANDOFF.md.
 
-- Connor tests in Roblox Studio on a Mac; Claude can't run Studio. After a
+- Connor tests in Roblox Studio on a Mac; Studio cannot be run from the build environment. After a
   change, list exactly what to check in Studio.
 - Verify before pushing: `./scripts/check.sh` (StyLua, Selene, luau-lsp
   strict type check against the Roblox API, Lune unit tests, ECONOMY.md

@@ -94,7 +94,7 @@ and the smoke test). Skip the rest until something looks wrong.
 | 5 | **Test → Clients and Servers**, 2 players | The other player can't take your wood ("That's on your truck" / "That's Player1's wood"). Their truck moves smoothly on your screen |
 | 6 | Drive out of the lot and back onto the sell pad | You fit in the cab, you can turn, you hop out beside the door, nothing on the bed falls off on a straight road |
 | 7 | **Test → Device Emulator**, iPhone SE and iPhone 14 Pro, landscape | `[Quality] low` in Output. Buttons don't cover the cash. In town, the Starter Forest, and on the Snow Road, about 30 fps or better (View → Stats; a frame under 33 ms). Drive the Rustbucket at full speed toward the Snowfields: no long pause spinner |
-| 8 | Look north from the spawn, desktop and the phone emulator | The mountain backdrop is still there. Trees don't pop in on top of empty void at the forest edge. If the horizon is gone or a truck pauses the whole way, tell Claude before changing the stream radius |
+| 8 | Look north from the spawn, desktop and the phone emulator | The mountain backdrop is still there. Trees don't pop in on top of empty void at the forest edge. If the horizon is gone or a truck pauses the whole way, tell the build agent before changing the stream radius |
 | 9 | Look at the screen corner | A **STORE** button. 2x Cash, Lux Axe, Tow Service, Timber Classic, and Paint Shop are listed. 2x Wood and Instant Delivery are not (their ids are still 0) |
 
 On the live game the same server lines are in the in-game console: **F9**

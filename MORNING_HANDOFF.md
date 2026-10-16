@@ -116,5 +116,5 @@ Nothing from the overnight plan is still open.
 
 - `./scripts/check.sh` now finishes in about 8 minutes in the cloud container
   (it never finished before). `tests/run` prints each spec's seconds.
-- The overnight agents' working copies lived under `.claude/worktrees/` and are
+- The overnight agents' working copies lived under the agents' worktree folders and are
   not committed.

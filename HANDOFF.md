@@ -4,7 +4,7 @@
 
 ## 1. Read this first
 
-This is the brief for a fresh Claude Code session running ultracode on Timberline Tycoon tonight. The goal: real players can play tonight, on phones and computers, and the game looks as good as the evening allows. Two jobs, in this order. First, a first session that works end to end with nothing broken in front of a new player. Second, a cleanup of visuals, environment and style. All work lands on `main` in small green merges, and `main` stays playable the whole time. Read in this order: §2 (Connor's kickoff), §3 rules, §4 setup, §9 run plan, §8 workstreams, then the §7 backlog rows as you pick them up, and §10-§11 before the first merge. §5 and §6 are the context and the target. §12 is Connor's Studio checklist. Six audits on 2026-10-01 (renders plus Lune probes) produced the backlog. Their ids are stable, so keep them in commits and summaries.
+This is the brief for a fresh build-agent session running ultracode on Timberline Tycoon tonight. The goal: real players can play tonight, on phones and computers, and the game looks as good as the evening allows. Two jobs, in this order. First, a first session that works end to end with nothing broken in front of a new player. Second, a cleanup of visuals, environment and style. All work lands on `main` in small green merges, and `main` stays playable the whole time. Read in this order: §2 (Connor's kickoff), §3 rules, §4 setup, §9 run plan, §8 workstreams, then the §7 backlog rows as you pick them up, and §10-§11 before the first merge. §5 and §6 are the context and the target. §12 is Connor's Studio checklist. Six audits on 2026-10-01 (renders plus Lune probes) produced the backlog. Their ids are stable, so keep them in commits and summaries.
 
 ## 2. Kickoff (Connor pastes this into the new session)
 
@@ -38,7 +38,7 @@ From CLAUDE.md and REDESIGN.md, the ones that matter most tonight:
 - **Keep the contracts** in REDESIGN.md ("Contracts other code relies on"): part names, tags and attributes that other code finds. Raise a part budget in its spec on purpose. Never bypass or delete a test.
 - **Don't move** the town, the sawmill (0, 110), the sell zone (0, 86), the spawn (`town.spawn`, (0, 0.5, 40)), Murph's camp, or any biome centre or radius. The economy model and many specs measure from them.
 - **Tutorial step ids are save-migration keys.** Never rename or reorder them. Editing their text is safe.
-- **Claude can't run Studio.** Every change ships with exact Studio checks.
+- **Studio cannot be run from the build environment.** Every change ships with exact Studio checks.
 - **Land on `main`** (Connor asked for everything there), in small green merges. Commit messages: `phase-10: <ID> <what changed>`, e.g. `phase-10: TWN-03 spawn faces the sawmill`.
 - Ask Connor before deviating from GAME_DESIGN §14's data values or architecture.
 

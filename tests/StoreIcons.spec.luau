@@ -97,7 +97,7 @@ return function(t)
 		t.ok(string.find(ps, "thumbnails.roblox.com/v1/assets", 1, true) ~= nil)
 		t.ok(string.find(ps, "size=420x420", 1, true) ~= nil)
 		t.ok(string.find(ps, "STORE-ICONS-CHECK.md", 1, true) ~= nil)
-		t.ok(string.find(ps, "tell Claude which pair", 1, true) ~= nil, "swap note")
+		t.ok(string.find(ps, "tell the build agent which pair", 1, true) ~= nil, "swap note")
 		for _, state in ipairs({ "Completed", "Pending", "Blocked", "InReview" }) do
 			t.ok(string.find(ps, state, 1, true) ~= nil, state)
 		end

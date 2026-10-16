@@ -22,7 +22,7 @@ disagree about merge state, check `git log origin/main` and fix the stale one.
   ECONOMY.md and ECONOMY_V1.md current). CI runs the same script, one run per push event plus one per PR.
   After a balance change re-run `lune run tools/economy` and `tools/economy1` and commit the reports.
 - Working pattern that worked: one worktree agent per task (`isolation: "worktree"`), branch
-  `claude/<topic>`, the agent pushes but does not open the PR, you open the PR, subscribe, wait for CI,
+  `<topic>`, the agent pushes but does not open the PR, you open the PR, subscribe, wait for CI,
   merge. Agents often cannot re-run the full script after a late fix, so CI is the full check; after any
   merge of main into a branch with real code overlap, run `./scripts/check.sh` before pushing.
 - Merge conflicts have almost always been STATUS.md / PHASE2_NOTES.md only (every PR adds a section).
@@ -30,9 +30,9 @@ disagree about merge state, check `git log origin/main` and fix the stale one.
 - CodeRabbit comments ("does not receive automatic reviews") are noise. A Rokit/curl 403 on CI before
   any test ran is infrastructure: re-run the failed job once.
 - The GitHub MCP connection drops now and then (503). Retry later; do not claim a PR is green or merged
-  without reading its check runs. The branch `claude/new-session-7e3s9x` is a scratch branch that the
-  stop hook nags about: `git checkout -B claude/new-session-7e3s9x origin/main` then
-  `git push -u --force-with-lease origin claude/new-session-7e3s9x` makes it level with main.
+  without reading its check runs. The scratch branch is one that the
+  stop hook nags about: checking it out from origin/main and pushing it with
+  `--force-with-lease` makes it level with main.
 - Repo rules that matter most (CLAUDE.md has the rest): the server owns all state, remotes carry
   intents only and every handler validates and uses `RateLimiter`; only EconomyService changes cash;
   only ProfileService touches DataStores; new save fields go in `ProfileSchema` with an idempotent

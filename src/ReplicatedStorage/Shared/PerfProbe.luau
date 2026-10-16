@@ -2,7 +2,7 @@
 -- PerfProbe: what the first seconds after joining cost, in a few lines of
 -- Output, so a Studio run says whether the frames after "can play" are smooth.
 -- (Studio's log of 14 October 2026: playable at +4.6 s, but heavy work ran
--- until +11.9 s. Claude cannot run Studio, so this is how Connor reads it.)
+-- until +11.9 s. Studio cannot be run from the build environment, so this is how Connor reads it.)
 --
 -- The client feeds it every Heartbeat (`Frame(dt)`, dt = the frame's length)
 -- from the moment the character first spawns, and tells it three moments:

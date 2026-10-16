@@ -306,4 +306,4 @@ Write-Host ('Done in {0:N0} minutes.' -f ((Get-Date) - $started).TotalMinutes)
 Write-Host ('Will load: {0}   Must fix: {1}   Could not check: {2}' -f $yes.Count, ($bad.Count - $unk.Count), $unk.Count)
 Write-Host "Wrote $mdPath"
 Write-Host "Wrote $csvPath"
-Write-Host 'Send ASSETS-CHECK.md back to Claude (open it and copy the Must fix table).'
+Write-Host 'Send ASSETS-CHECK.md back to the build agent (open it and copy the Must fix table).'

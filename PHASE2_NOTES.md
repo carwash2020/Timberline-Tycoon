@@ -72,7 +72,7 @@ the world.
 1. PC, new server: Output shows `[Load] ... 3. Terrain took ~Ns` (the near chunks only, a few seconds), then `world ready
    for players`, `[Load] ... can play` and a long way later `the rest of the terrain is written (Ns in the background)` and
    `[Load] ... everything is built`. The first player stands on the ground at the spawn well before the last line.
-2. Walk or drive out of town in the first minute: the ground is there ahead of you (no void, no falling). Tell Claude if you
+2. Walk or drive out of town in the first minute: the ground is there ahead of you (no void, no falling). Tell the build agent if you
    ever see sky through the ground; the writing order is `TerrainBuilder.Order`.
 3. Claim a plot in the first 20 seconds: you stand on your pad, the grass round it is there.
 4. The Town ground line still reads `good` (y = 0.0x).
@@ -242,7 +242,7 @@ Studio checks:
 4. Phone: tap MENU. The quick menu opens with SAVES, STORE, BADGES and so on, plus SEND TRUCK HOME when your truck is away (and OWNER if you are the owner). Tap SAVES: the saves panel opens. Tap outside the menu: it closes.
 5. Phone: the loading card is 280 wide, centred a little above the middle; What's New (Settings, WHAT'S NEW) shows a square X Close under the last line, not touching the jump button or the thumbstick area.
 6. Xbox (controller or emulator): the HUD column keeps the wide buttons (MENU with the View glyph, SAVES, Send truck home). Press View: the quick menu lists SAVES and SEND TRUCK HOME, A opens them, B closes. RT still swings the axe.
-7. If an icon shows letters (MENU, BUILD, SELL) instead of a picture, the image id did not load in your Studio session; tell Claude which one.
+7. If an icon shows letters (MENU, BUILD, SELL) instead of a picture, the image id did not load in your Studio session; tell the build agent which one.
 
 What's here, each with its own checklist below:
 
@@ -261,16 +261,16 @@ What's here, each with its own checklist below:
 9. **The Field Guide**
 10. **The Aether Isles**: gondola, Lumenwood, Sky Shards, Cloud Chute, Sky Bin, the forge
 11. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
-12. **The new look**: every screen restyled from the Claude Design UI spec
+12. **The new look**: every screen restyled from the UI design spec
 
 15. **Mining and crafting** (8 October 2026, branch `phase-2/v1-m-mining`): ore rocks, picks, bombs, the smelting furnace, the craft bench
 
-14. **Trees in the spawn area** (8 October 2026, branch `claude/spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
+14. **Trees in the spawn area** (8 October 2026, branch `spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
 
 15. **V1 buildings, shops, props and palette** (8 October 2026, branch `phase-2/v1-c-buildings`): one style for the town buildings, shops at 250 parts or fewer, new small buildings, renders in `previews/v1-c/`
 16. **Sparkworks logic sandbox** (8 October 2026, branch `phase-2/v1-s-sparkworks`): wires, gates, timers, the settings panel, the demo board
 
-13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
+13. **Saves by hand, and Unload base** (8 October 2026, branch `plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
 15. **V1 nature looks** (8 October 2026, branch `phase-2/v1-g-nature`): first renders of trees, rocks, plants, cave dressing, critters and rain. Not placed in the world yet.
 
 Where the redesign changed something an older section describes (the
@@ -377,7 +377,7 @@ Picks are Tools, not shop axes. Swing with the tool button (mouse click, a phone
 
 Good: the five wood headline times in ECONOMY.md are unchanged (68 s, 7.9 min, 13.7 min, 51.4 min, 30.5 h). Mining ratios are in MINING.md (Hills 0.43 of Pine $17,136, Snow 0.57 of Frostwood $28,677, Gloam 0.67 of that same Frostwood). Steel or Lux at Gloam is about $10.7k/h. Obsidian is about $19.1k/h.
 
-## Trees in the spawn area (8 October 2026, branch `claude/spawn-trees`)
+## Trees in the spawn area (8 October 2026, branch `spawn-trees`)
 
 Connor: "We need more choppable trees in the spawn area too, near the pad, by
 the dealership. All over, it's a lumberjack game." The town used to have no
@@ -512,7 +512,7 @@ Studio checks (PC, the phone emulator, and Xbox). Good looks like this:
 10. Open the Output window and play: no `[NatureArt] ... mesh is missing` or `[MeshKit] ... did not load` lines for rocks, ore rocks or the mine mouth.
 11. Phone (667x375): rocks and the mine mouth look the same at Lower quality; no frame-rate drop near a rock-heavy meadow.
 
-## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
+## Saves by hand, and Unload base (8 October 2026, branch `plot-save-switch`)
 
 Connor: "with plots, they need a way to unload/save their base and switch to
 another"; "it shouldn't automatically load a save ... when picking a save, if
@@ -701,7 +701,7 @@ sets the hour (`nil` clears it); `workspace:SetAttribute("WeatherOverride",
 | 11 | `ClockOverride` 1, look round the spawn; then 6, 8, 10 | A grey-blue fog: the town clear, things past about 150-300 studs fading, still dark (lamps matter, a trunk reads at 30 studs). 6: a thick rose mist; 8: lifting; 10: exactly the daytime look |
 | 12 | Jump to (950, 1060) at 13:00 (stand in a truck or wear Heat Boots), then 01:00 | A thick red-orange fog, emberwood trees still findable at 60-100 studs; at night a dark red fog, not glowing. Walking out past the Volcano's edge it fades back in about 3 s |
 | 13 | Jump to (0, 1080) and (-565, -455), at 13:00 and 01:00 | The Snowfields: a light cold white-blue haze by day, no whiteout. The Gloam Hollow: a violet mist, the darkest place at night but never black |
-| 14 | Look at the shops from the spawn, the middle of the lot (about 80, 0, 24) and a truck on the street; again at 22:00 | DEALERSHIP, TIMBERLINE SAWMILL, TOOL SHED and HEARTH & HOME readable from the lot, letters filling the boards, nothing through a roof or blocking a door; two lamps light each sign at night. If the letters look small inside a big board, tell Claude |
+| 14 | Look at the shops from the spawn, the middle of the lot (about 80, 0, 24) and a truck on the street; again at 22:00 | DEALERSHIP, TIMBERLINE SAWMILL, TOOL SHED and HEARTH & HOME readable from the lot, letters filling the boards, nothing through a roof or blocking a door; two lamps light each sign at night. If the letters look small inside a big board, tell the build agent |
 | 15 | In the Rustbucket, then the Logging Rig: drive the Hills Road, the Snow Road, and through both splits (toward the Volcano near (30, 450), toward the Skyroot near (-20, 760)) | The haul roads are wide enough that the Rig isn't filling the lane; each split opens into a flare instead of a sharp corner; the road stays pale grey |
 | 16 | Drive east of the Dealership, north past the sawmill, onto the Snow Road; then south of the lot, around the loop, and up to the sell pad | A truck-wide road clears the mill and the shops and meets the Snow Road; the south loop lets a long rig turn without backing the length of the lot; backing onto the pad is a straight, wide approach; lamps and benches sit off the street |
 | 17 | Walk a birch, a pine and (if you can reach it) a frostwood or phantomwood; look at the crowns | Trunks are square boxes in that wood's colour; crowns are blocky cubes, not soft blobs; trees in a biome forest stand further apart than they used to, and the woods still read as a forest |
@@ -741,7 +741,7 @@ Update), so no server keeps running the old loop.
 
 | # | Do this | Good looks like |
 |---|---|---|
-| 1 | Play with Output open | `[CoreLoop] 2`, `[MapBuilder] N section trees in X s` (**paste this line to Claude**: it's the boot-time risk), `[SectionTrees] N trees on N sites`, `[GameServer] <you>'s save is now on the v2 loop (bought back $X, topped up $Y)` the first time, and a toast with the buy-back or Murph's $20. No red |
+| 1 | Play with Output open | `[CoreLoop] 2`, `[MapBuilder] N section trees in X s` (**paste this line to the build agent**: it's the boot-time risk), `[SectionTrees] N trees on N sites`, `[GameServer] <you>'s save is now on the v2 loop (bought back $X, topped up $Y)` the first time, and a toast with the buy-back or Murph's $20. No red |
 | 2 | Walk into the Starter Forest | Big, varied trees, some young |
 | 3 | Tutorial step 1: hit an oak's trunk at knee height with the Rusty Axe | A notch grows on the face you hit and a ring fills; on about hit 16 the tree tips away from you, its leaves drop about 1.5 s later, and a stub with a pale cut face stays |
 | 4 | Step 2: press 1 to put the axe away, then click and hold a log | It drags. A whole trunk is heavy: cut it in half (about 16 hits) and drag the halves. Cutting a limb where it joins frees it |
@@ -751,13 +751,13 @@ Update), so no server keeps running the old loop.
 | 8 | Stop and Play again with wood on the bed, parked in town | The load is back on the bed where it lay. Leave it out in the forest instead: "Your last load is waiting where you left your truck." |
 | 9 | **Test > Clients and Servers**, 2 players | Player 2 can't grab wood on your bed ("That's on <you>'s truck."); a log of theirs you sell pays them; no jitter on either screen |
 | 9b | Ownership (2 players): player 1 hits an oak once, then player 2 swings at it; player 1 fells it, then player 2 tries to grab the trunk; then player 1 leaves | Player 2: "Player1 is cutting this tree. Find another one."; then "That's Player1's wood."; once player 1 has left (and 45 s after the cut), player 2 can take it. A tree player 1 stops hitting for 60 s is free to take over |
-| 10 | If logs jitter on the bed: Server command bar `workspace:SetAttribute("Tune_BedAutoWeld", 1)` | Resting logs weld within a second; grabbing one unwelds it. Tell Claude if you needed it |
+| 10 | If logs jitter on the bed: Server command bar `workspace:SetAttribute("Tune_BedAutoWeld", 1)` | Resting logs weld within a second; grabbing one unwelds it. Tell the build agent if you needed it |
 | 11 | The isles: lay a Lumenwood piece on a Cloud Chute's hopper; at the mill press **Sell Sky Bin**; lay plain Lumenwood on the forge | "Sent 1 piece down the Cloud Chute. Sky Bin X/120 u³"; the bin sells with the usual toast; "Into the forge: X u³. Lumenwood X/60 u³ · Sky Shards ... · $20,000" |
 | 12 | Phone emulator + **View > MicroProfiler** during a felling in the Starter Forest | 30+ fps, no long spike when the tree lands |
 | 13 | Rollback check: in edit mode `workspace:SetAttribute("CoreLoop", 1)`, Play | Today's game as before (logs in hands, Load and Sell prompts). Clear the attribute afterwards (`nil`): PlaceCheck warns if it's left set |
 
 The stopwatch prints `lune run tools/economy --calibrate ...` once you've
-sold enough: paste it to Claude (it calibrates ECONOMY.md).
+sold enough: paste it to the build agent (it calibrates ECONOMY.md).
 
 ## Glitch wave 1 (after the first live session, 2 October 2026)
 
@@ -792,7 +792,7 @@ On the live game, the same Output lines are in the in-game console: press
 
 | # | Do this | Good looks like |
 |---|---|---|
-| 1 | Play with Output open | `[TerrainBuilder] Town ground: written at 0, drawn at 2.00; heights shifted -2.00 studs (tries: ...)` (the first Studio run read 2.00) and then `[TerrainBuilder] Town ground at y = 0.0x (6 probes): good`. **Paste both lines to Claude.** A yellow `Town ground is at y = ...` warning means the ground is still off |
+| 1 | Play with Output open | `[TerrainBuilder] Town ground: written at 0, drawn at 2.00; heights shifted -2.00 studs (tries: ...)` (the first Studio run read 2.00) and then `[TerrainBuilder] Town ground at y = 0.0x (6 probes): good`. **Paste both lines to the build agent.** A yellow `Town ground is at y = ...` warning means the ground is still off |
 | 2 | Look at the townsfolk: Millie by the sell pad, the three shopkeepers, Murph, the walkers (Rosa, Pip, ...), and Murph's camp | Feet on the ground, whole legs visible, nobody waist-deep. The tent, campfire and log seats stand on the ground |
 | 3 | Walk to the parking lot | Your truck sits on its wheels; every slot shows its pale lines, number and lamp |
 | 4 | Respawn a few times (reset your character) | You appear standing on the spawn pad, never inside the ground |
@@ -803,7 +803,7 @@ On the live game, the same Output lines are in the in-game console: press
 | 9 | Drive a Logging Rig from the street onto the sell pad, back out, and between the SELL LOGS HERE posts; walk from the spawn to Murph under TO THE WOODS | Nothing in the way (those boards stay walk-through on purpose) |
 | 10 | Cross each rope bridge on the isles and walk sideways into the rope | An invisible wall stops you; getting on and off at the ends is smooth |
 | 11 | Frame rate in the open country (about 1,650 more solid parts) | Same as before |
-| 12 | A little more Lumber Tycoon 2 (STY-01..05): stand on the spawn, then drive the Snow Road north out of town and look at the hills and mountains | A deeper green meadow, brown cliffs and ridges under white snow, and the haul roads with a pale gravel crown between dirt verges (the town's street stays dirt; day 3 made the roads pale grey edge to edge, see the top section). If the gravel looks like tiles, tell Claude (it's one setting) |
+| 12 | A little more Lumber Tycoon 2 (STY-01..05): stand on the spawn, then drive the Snow Road north out of town and look at the hills and mountains | A deeper green meadow, brown cliffs and ridges under white snow, and the haul roads with a pale gravel crown between dirt verges (the town's street stays dirt; day 3 made the roads pale grey edge to edge, see the top section). If the gravel looks like tiles, tell the build agent (it's one setting) |
 | 13 | West of the Starter Forest, about (-124, -177) and (-261, -189), and the Hills' grassland | Groups of 3-5 half-buried brown boulders; every lone boulder and outcrop is brown too. They block you, and none sit on a road or in water |
 | 14 | The timber footbridge over the river at about (-877, 575); the plank docks on Mirror Lake (-716, -111) and on the east coast (1194, -760) | You walk on and off the bridge without a hop, the rails stop you, TIMBER BRIDGE and MIRROR LAKE signs read. Each dock has a ladder, a lantern (lit at dusk) and a rowboat you can walk through |
 | 15 | On the spawn pad, look east | A small red-and-white lighthouse on the horizon just left of the PLOT DISTRICT sign. At night its lamp glows (Server command bar: `workspace:SetAttribute("ClockOverride", 22)`, `nil` to clear) |
@@ -811,7 +811,7 @@ On the live game, the same Output lines are in the in-game console: press
 | 17 | The forest ring (FOR-01..04): stand on the spawn and turn round, then walk into the forest about (-100, -450) and drive the Snow Road north | The town and plots stay an open lawn; a forest edge closes the view about 300 studs out; inside, blocky background trees all round (you walk through those; they fade if they'd hide you) and detailed choppable trees along the edges, clearings and road verges (771 on the ground now; the roomier plots took seven stand trees, and the lighthouse vista took two more). Output: `[ForestFiller] plan ready in X s` (under ~2 s), no `plan step N failed` |
 | 18 | The forest floor and grass | No grass blades under the forest (a leafy floor instead); blades on the town lawn, plots and meadows; fanned tufts with light tips along forest fringes, road edges, rocks and fence posts |
 | 19 | Phone emulator (iPhone SE, 14 Pro) in the deep south forest and on the Snow Road, with the frame-rate stats | 30+ fps, `[Quality] low` in Output, the `workspace.ForestFiller` folder about 4k parts or fewer (desktop about 7.5k or fewer) |
-| 20 | Optional: Roblox's textures on the ground. In Studio, MaterialService: GrassName = TimberGrass, LeafyGrassName = TimberLeafy, GroundName = TimberGround | Textured ground at a softer tiling, blades still on Grass. If it looks grey or flat, clear the three names again; if it looks good, tell Claude and they go into the project |
+| 20 | Optional: Roblox's textures on the ground. In Studio, MaterialService: GrassName = TimberGrass, LeafyGrassName = TimberLeafy, GroundName = TimberGround | Textured ground at a softer tiling, blades still on Grass. If it looks grey or flat, clear the three names again; if it looks good, tell the build agent and they go into the project |
 
 Left walk-through on purpose: town signpost boards (TO THE WOODS hangs
 over the spawn walk; SELL LOGS HERE over the rig's lane), rocks at
@@ -1020,7 +1020,7 @@ UI-11/17, PLAY-06 sounds (needs your ids), PLAY-12, PLAY-16, TWN-09/10/
   Play: one yellow `[PlaceCheck] Workspace.StreamingEnabled is false,
   expected true. Fix: ...`, no OK. Set Max Players to 20: a warning naming
   Max Players (if it doesn't warn, run `print(game.Players.MaxPlayers)` in
-  Play and tell Claude the number). Turn API access off: a warning that
+  Play and tell the build agent the number). Turn API access off: a warning that
   saves won't persist. Put each back. Three settings can't be read by
   scripts (StreamingTargetRadius, StreamingIntegrityMode,
   Terrain.Decoration); check those by eye in Properties.
@@ -1581,7 +1581,7 @@ test account), progress starts fresh each Play session.
 - [ ] A second player (Test → 2 players) sees your truck move smoothly, but
       can't drive it: trucks are owner-only since the redesign
 - [ ] Output has no `[AntiExploit] … truck moved` warnings during normal driving
-      (if it does, tell Claude: the speed check is too strict)
+      (if it does, tell the build agent: the speed check is too strict)
 - [ ] If physics driving feels bad: set `VehiclePhysics = false` and report
       what went wrong
 
@@ -1700,7 +1700,7 @@ server crash can't lose one or pay it twice.
 3. **Monetization → Developer Products** → Create: "$1,000", "$10,000",
    "2x Wood (48 hours)", "Instant Delivery", each with a price. Copy each ID.
 4. Paste the IDs into `src/ReplicatedStorage/Shared/StoreData.luau` (the
-   `id = 0` lines), or send them to Claude.
+   `id = 0` lines), or send them to the build agent.
 
 ### Playtest checklist (Studio purchases are free test purchases)
 - [ ] With the IDs in, the STORE button shows; the Store lists each item with
@@ -1868,9 +1868,9 @@ loads as slot 1; slots 2 and 3 start empty.
 - [ ] Buy a cash pack or spend an Instant Delivery on one slot, switch
       slots, and it is not granted again
 
-## The new look (Claude Design UI spec)
+## The new look (UI design spec)
 
-Every screen is rebuilt from the UI spec you made in Claude Design
+Every screen is rebuilt from the UI spec you made in the UI design
 (colours, sizes and states are in `UITheme.luau`; each screen builds from
 it):
 
@@ -2064,7 +2064,7 @@ What changed:
 - [ ] The Tool Shed from outside: deeper at the back, same front; nothing
       clips the Water Tower or the Cart behind it; the loading pad behind it
 - [ ] The Tool Shed mesh in Studio: the baked interior (workbench on the west
-      wall) may show through the west table; tell Claude if it clips
+      wall) may show through the west table; tell the build agent if it clips
 
 ## The Robux town board, bigger (arch, banner, marker)
 
@@ -2207,7 +2207,7 @@ What changed:
       shortcuts as before
 ## Real stores: designed boxes, bigger shops, doors, showroom hall, open-the-box
 
-What changed (branch `claude/real-stores`):
+What changed (branch `real-stores`):
 
 - **Boxes** are packaged goods: a kraft body, tape in the item's colour, a
   cream name label on the front (and on the side that faces the aisle), a
@@ -2286,7 +2286,7 @@ What changed (branch `claude/real-stores`):
       item. Open it at someone else's range or as someone else: refused.
 - [ ] Tutorial: Murph's steps still advance; the Rustbucket step needs the box
       opened on your plot (as before) at the Dealership (open 7 AM to 8 PM).
-## Pumpkins on the ground, walkers face forward, calmer grass (claude/fix-pumpkins-npcs)
+## Pumpkins on the ground, walkers face forward, calmer grass (fix-pumpkins-npcs)
 
 - Cause of the sunk pumpkins: EventService placed each patch with `PivotTo`,
   but a Model with no PrimaryPart pivots on its bounding-box centre, so the
@@ -2406,7 +2406,7 @@ Look at the Output when the server starts for `[MapBuilder] build check:` and
       falls as before; the tree stays cuttable above the cut.
 - [ ] Town: sawmill, shops, signs, roofs and floors sit on the ground and signs
       read. If something looks wrong, set the workspace attribute `TownMeshes`
-      to false (or the config) and tell Claude which model.
+      to false (or the config) and tell the build agent which model.
 - [ ] Plot kit, the plot sign, corner posts and rails, NPCs and trucks.
 
 ### Blender in the cloud session
@@ -2415,7 +2415,7 @@ works through the proxy (bpy 5.0.1 wheel for Python 3.11, about 375 MB) and apt
 lists `blender` 4.0.2. Headless `bpy` can build and export FBX/GLB here; the
 upload to Roblox (Creator Hub or Studio's Asset Manager) has to come from
 Connor's machine because uploads need his login.
-## Felling fix: the cut decides where the tree falls (claude/fix-felling)
+## Felling fix: the cut decides where the tree falls (fix-felling)
 
 Cause: #36 made a cut through the ground section free the whole rooted
 section ("no sliver, no stump"), so any cut on the lowest trunk section pulled
@@ -2609,7 +2609,7 @@ at the sawmill's sell pad like every later one.
 - [ ] An old save sitting on the sell step: the arrow now points at the sell pad.
 
 
-## Store polish: counters at the back, bigger spaced-out shops, a bigger showroom (claude/store-polish)
+## Store polish: counters at the back, bigger spaced-out shops, a bigger showroom (store-polish)
 
 Connor's notes after playing the real stores (#82), plus the follow-ups he sent
 while the branch was open.
@@ -2716,7 +2716,7 @@ while the branch was open.
       clean from standing height and from the camera pulled back.
 - [ ] Phone: from the spawn the AXES, GENERAL STORE and GONDOLA markers show
       without overlapping.
-## Owner hub (branch `claude/owner-hub`)
+## Owner hub (branch `owner-hub`)
 
 The owner menu is now a hub: PLAYERS / GIVE / WORLD / SELF tabs, a Find-a-tool box, one shared player pick, a status strip, confirmations, and an Xbox order with LB/RB tabs. Chat commands are unchanged and there are new ones (OWNER_TOOLS.md). Paste your UserId into `AdminLogic.OwnerUserIds` first (or test in Studio, where you count as owner).
 
@@ -2746,7 +2746,7 @@ Delegation checks (owner hub; use two test players, the second one is the delega
 - [ ] Chat: `/delegate Bob helper 1h`, `/delegates`, `/undelegate Bob`; `/delegate Bob tester 1h` only warns until you add `confirm`.
 
 
-## Sell station beside the mill (claude/sell-pad, 6 October 2026)
+## Sell station beside the mill (sell-pad, 6 October 2026)
 
 Connor: "move the sell logs here pad to the side of the saw mill, and add more to
 it." The sell pad no longer sits in front of the mill (on the spawn walk, in the
@@ -2800,7 +2800,7 @@ off the main street's north side and west of the mill road.
       The Dealership's boxes and the mill road beside the station are not in the
       way. Walk Millie's side: she stands by the Weigh House window.
 - [ ] Sound and feel: the sell toast, sale FX and figure reveal still show.
-## Xbox navigation and rotation (6 October 2026, branch `claude/xbox-nav`)
+## Xbox navigation and rotation (6 October 2026, branch `xbox-nav`)
 
 Connor: "it's really hard to get to boxes like SAVES, STORE" with the Xbox
 menu navigation, and "when rotating things it should be the left stick (the
@@ -2876,7 +2876,7 @@ movement stick) that rotates, not the right stick".
       alt-tab away and back: you are never stuck unable to walk
 - [ ] The hint line reads "LT + left stick: turn" while dragging and "RT place ·
       LT+left stick turn · B stop" while placing
-## NPC heads face the player (claude/npc-heads)
+## NPC heads face the player (npc-heads)
 
 - Heads look at you through `Shared/HeadLook.Aim` (clamped 70 degrees side to
   side, 35 up and down, eased; behind them they look ahead). Part-built faces
@@ -2892,10 +2892,10 @@ movement stick) that rotates, not the right stick".
 - [ ] Walkers still walk face first with the face and the toes on the same side
 - [ ] If the NPCs are Blender meshes and their faces or toes now point AWAY,
       set `TownModels.NpcMeshYaw = 0` (the meshes were already facing -Z) and
-      tell Claude; if it was backwards before and is right now, nothing to do
+      tell the build agent; if it was backwards before and is right now, nothing to do
 - [ ] Held items (Murph's lantern, Millie's clipboard) are still in the hand
 
-## The Sky Bin is an item (claude/sky-bin-item, 6 October 2026)
+## The Sky Bin is an item (sky-bin-item, 6 October 2026)
 
 Connor: "remove the skybox that collects dropped wood at the sawmill and make it an item sold with a box."
 
@@ -2922,7 +2922,7 @@ Connor: "remove the skybox that collects dropped wood at the sawmill and make it
 - [ ] Old save with wood in the Sky Bin (use a save from before this change, or set `skyWood` in Studio): you join with a Sky Bin in your stock and the wood still in it; place it, sell the wood. Rejoin: still exactly one bin
 - [ ] Preview: `bash tools/preview/shoot.sh town` shows the sell station with nothing in the north-west corner
 
-## Mill and planer tiers, belts, boxes that place once (claude/mill-tiers, 6 October 2026)
+## Mill and planer tiers, belts, boxes that place once (mill-tiers, 6 October 2026)
 
 Connor: "create different versions of the sawmill ... they progress in cost but also upgrade how much you get from the sold items", the same for a planer, a plank size you can set on both, conveyors "so players can build automated systems (log in -> sawmill -> plank belt -> planer -> board out)", and "an object in a box: you buy the box, open it, and the object is placed down as a one-time use". The tables and the reasoning are in V2_PLAN.md section 2h and 10a; this is what to check in Studio.
 
@@ -2984,7 +2984,7 @@ Sizes, shelves and the placer on phone and Xbox
 ### What it would take to make the Sky Bin (merged earlier) one-time boxed too
 Mark it `placeFromBox = true` in `ItemCatalog.Machines` (`BoxUnpack.Mode`, `AutomationLogic.PlacedFromBox` and `PlotService.Place` then do the rest), drop its entries from the stock paths (`ShopService.deliver`, `SkyBinLogic.Migrate` would hand an old owner a pending box in `profile.storage` instead of a stock id), and replace "Take back" (`HammerLogic.PieceActions`, `PlotService.Sell`'s Sky Bin branch, `SkyBinLogic.BackInStockLine`) with the sell-for-half rule. The one real decision: the bin holds wood (`profile.skyWood`), so selling or taking it apart must either be refused while it has wood in it or pay the wood out first (as "Sell Sky Bin" does); and the one-per-player rule (`skyBinOwned`) would count the box, the placed bin and nothing else. Specs to touch: SkyBinLogic, PlotService, ShopService, ProfileSchema, AetherServiceV2.
 
-## Store fixes: one grab, the carry cap, door flicker, one price (claude/store-fixes, 7 October 2026)
+## Store fixes: one grab, the carry cap, door flicker, one price (store-fixes, 7 October 2026)
 
 What Connor saw, and the cause of each (all found in code; none needs a Studio reproduction to explain):
 
@@ -3001,7 +3001,7 @@ Studio checks (Xbox, then phone, then mouse):
 - [ ] Doors: stand 5 to 10 studs from each door and walk across it (Tool Shed barn doors, General Store double doors, the Dealership shutter, the back-room doors inside both shops, the Sawmill cabin door): no two wood textures flickering on a door or its frame, open or closed; wait for night to see the closed pose with its sign.
 - [ ] Shelves: every box shows its name and ONE price under it on its front label; nothing floats over the shelf; no price plaques on the table edges. Gold Robux boxes show "R$" (the number appears a moment later). Prices equal what the keeper charges at the counter. Dealership: the price is on the sign beside each vehicle, not on its box.
 - [ ] Read the prices from the doorway and from the aisle on a phone: if the label's price is too small to read at your usual distance, tell me the distance and I will size it up (`BoxArt.Layout.pricedLabelH`, `priceShare`).
-## The dialogue box, text that stays out of walls, bigger rabbits (branch `claude/npc-dialogue-box`)
+## The dialogue box, text that stays out of walls, bigger rabbits (branch `npc-dialogue-box`)
 
 Connor's playtest (Xbox, phone, PC): "the bunnies are super small", "sometimes the text pops up in walls still", and "instead of chat bubble pop ups, if someone talks to a NPC it pops up with a chat box they have to press X again to continue or end talking".
 
@@ -3029,7 +3029,7 @@ Studio checks (nothing here has been seen in Studio)
 - [ ] **Text in walls**: stand inside the Tool Shed, Hearth and Home and the Dealership hall and watch the keeper: no half-hidden line in a wall or the ceiling (a bubble either shows whole, lower under the roof, or not at all); the name tag is above the hat, not in the roof. Walk round the outside of the shop: the keeper's name tag, bubble and the Talk card go when the wall is between you and them, and come back when it is not. A NPC at the counter next to a side wall: the bubble sits straight above the head
 - [ ] **Rabbits**: they are about the height of your hip next to your character, not a loaf. They hop, sit and nibble as before, with ears, tail and eyes in proportion; they flee when you get near (the same distance as before) and none appears on top of you. Winter hare too (snow biome)
 
-## Modern kit: paint, glass, overhang roofs, stairs, balcony, sample builds (branch `claude/kit-modern`, 7 October 2026)
+## Modern kit: paint, glass, overhang roofs, stairs, balcony, sample builds (branch `kit-modern`, 7 October 2026)
 
 Connor showed Lumber Tycoon 2 houses (white and dark-brown boxes, big glass, flat overhanging roofs, balconies, stairs, boxy shops) and asked for the same. What the kit already had: walls (Wall4/8/12, TallWall4/8, HalfWall8), DoorWall8 + Door, WindowWall8 + Window (one 4x3 pane), Floor/Floor4, Foundation8, Ramp8, the old Stairs (a 4x8 wedge rising 4), FlatRoof8 (0.5 overhang), SlopedRoof8, RoofCorner, RoofRidge8, FenceGate4, Post, Beam8, Railing8; planks fill a piece and the wood sets the look (`BlueprintModels.ApplyWood`); resize (walls, beams, floors), rotate, move, copy; caps MaxKit 400 and MaxItems 200 (kept, see below). What was missing: paint, a real glass wall, a roof that overhangs, stairs to a second storey, a balcony, and any way to see a finished building.
 
@@ -3055,7 +3055,7 @@ Studio checks (nothing here has been seen in Studio)
 - [ ] `/sample modern` on your plot facing open ground: the house stands in front of you, front toward you; walk in, climb the stairs, go through the glass door onto the balcony. View it from the road. `/sample shop`, `/sample barn`. `/sample clear` removes all. As a delegated TESTER, `/sample modern` is refused
 - [ ] Save and rejoin with a sample placed: it is all still there, painted
 - [ ] Trucks and storage unaffected: load and haul as before; the Sky Bin, sawmills and belts still place
-## The Sky Bin opens and places once; prices show when you aim (branch `claude/hover-prices-skybin`, 7 October 2026)
+## The Sky Bin opens and places once; prices show when you aim (branch `hover-prices-skybin`, 7 October 2026)
 
 Two decisions from Connor. **A, the Sky Bin:** "open and place", a one-time box exactly like the sawmills, planers and belts. **B, prices:** "not lose prices, just show prices when hovering over an item".
 
@@ -3095,7 +3095,7 @@ Hover tags (check on a PC, an Xbox pad and a phone)
 - [ ] Xbox: aim the centre dot at a box within about 12 studs: the card; look away: it goes after a moment. Press X on it (buy / open): it steps aside for a second and a half
 - [ ] Phone: tap a box: the card stays about 4 seconds; with no tap, walk up to a box (within 6 studs, facing it): its card; a box behind you or past a wall shows none
 - [ ] A Buy / Open prompt card on a box and its price card do not overlap
-## LT2 ground and plot platforms (claude/lt2-ground, 7 October 2026)
+## LT2 ground and plot platforms (lt2-ground, 7 October 2026)
 
 Connor, with Lumber Tycoon 2 screenshots: "I mean the actual ground, look at this with LT2, then for plots make it normal grass with a raised dark grey platform for players to build on, very slightly raised like 1 stud." Nothing here has been seen in Studio; the Lune preview (`bash tools/preview/shoot.sh plot`, `terrain`, `town`) shows colours and shapes only, not terrain textures.
 
@@ -3125,7 +3125,7 @@ Studio checks
 - [ ] Visit another player's plot, and set a visitor down past the north edge: lands on the grass past the ramp, not inside the platform.
 - [ ] Phone on Low quality: frame rate in the plot district is no worse than before (a plot is 5 to 40 anchored parts).
 
-## LT2 window boxes and stepped display shelves (branch `claude/lt2-boxes`, 7 October 2026)
+## LT2 window boxes and stepped display shelves (branch `lt2-boxes`, 7 October 2026)
 
 Connor sent two Lumber Tycoon 2 pictures: "Look at the Boxes in this image, I want our boxes to reflect closer to this" (a shop display case: items stand whole on stepped shelves, each on a solid colour block with its name) and "keep the box size accurate to the item inside" (a dark, near-black box with a see-through window face showing the real item model). Nothing here changes a price, a recipe or the economy (`lune run tools/economy` and `economy1` are unchanged).
 
@@ -3156,7 +3156,7 @@ Connor sent two Lumber Tycoon 2 pictures: "Look at the Boxes in this image, I wa
 - [ ] Performance in the busiest shop (the Tool Shed with 21 boxes, the rack and a few players, on a phone at Low): the frame rate is no worse than before the change (about 500 more parts than the cardboard boxes).
 - [ ] If an item looks wrong in its window (a model with stray parts, upside down, too small to read), send me the box's name: each item's look is one entry in `ItemModel` (turn, crop, part budget).
 
-## Spaced-out shelves and the Lower / Higher quality choice (branch `claude/quality-picker`, 7 October 2026)
+## Spaced-out shelves and the Lower / Higher quality choice (branch `quality-picker`, 7 October 2026)
 
 Connor, after the window boxes (#102): "space them out more, and to avoid issues with the phone vs higher end models like xbox and pc, just let them pick between lower quality (Phone) or higher quality at launch." Nothing here changes a price, a recipe or the economy (`lune run tools/economy` and `economy1` are unchanged).
 
@@ -3258,7 +3258,7 @@ Copy the whole `[Load]` output (server and client) and compare with the table ab
 - [ ] No red lines in Output; `[MapBuilder] ... failed` lines, if any, name the step (a deferred step's failure is warned once, with a traceback, and the rest still builds)
 
 
-### Join race fix (branch `claude/join-race-fix`, 7 October 2026)
+### Join race fix (branch `join-race-fix`, 7 October 2026)
 
 Connor, after the faster-load merge (#103): "Now it loads the player so fast it glitches and won't let you move, but loads the plot and won't let you select one." His Output (fresh server): world ready +6.4 s, the deferred build starts +6.6 s, `GameServer init done`, `Elucidhealer618: loading the save`, ten client controllers each `Start took 6.35s`, save loaded +8.4 s, `first player can play`, `joined (cash $83)`, deferred steps run to +11.9 s.
 
@@ -3293,7 +3293,7 @@ Copy the `[Load]` lines (server and client) if anything is off.
 - [ ] If Output says `still waiting on ... after 90s; letting them in anyway` or `no ClientReady after 12s`, send those lines: they name the gate or the client that never answered.
 
 
-## Owner hub 2: Paid items, and a calmer panel (branch `claude/owner-panel-2`, 7 October 2026)
+## Owner hub 2: Paid items, and a calmer panel (branch `owner-panel-2`, 7 October 2026)
 
 Connor: "the owner panel needs more refinement, and a way for me to give them paid items such as 2x and lux axe, plus any future ones we create."
 
@@ -3318,7 +3318,7 @@ How a grant works: `MonetizationService.OwnerGrant` runs the same effects as a p
 - [ ] The tool search (title box) still finds tools across tabs, now including paid items and unban; a delegate only finds what they may use.
 - [ ] Everything old still works: GO TO, BRING, HEAL, FREEZE, STATS, RESET TUTORIAL (now asks twice), KICK, BAN, GIVE/TAKE/SET CASH, UNLOCK ALL BUILDINGS, GIFT, the clock tools, ANNOUNCE, SHUT DOWN, SUPER RUN, GOD MODE, GO TO SPAWN, GRANT/REVOKE roles (REVOKE now asks twice).
 
-## Plot picker: you can see which pad you are choosing (branch `claude/plot-picker-view`, 7 October 2026)
+## Plot picker: you can see which pad you are choosing (branch `plot-picker-view`, 7 October 2026)
 
 Connor, after the join race fix: "when I load it's not showing me which plot it's selecting, it's just letting me pick one and then teleports me when it loads."
 
@@ -3339,7 +3339,7 @@ No new remotes, no server change, no economy change.
 - [ ] Claim: the screen fades to black with "Claimed <pad>!", then fades into your plot (no hard cut). "Not now" / B closes with no fade and the camera returns to your character.
 - [ ] Phone: the card does not touch the thumbstick or jump corners; Xbox: D-pad still walks Previous / Claim / Next (the card is not selectable).
 
-## Final pass over everything not yet seen in Studio (branch `claude/final-pass`, 7 October 2026)
+## Final pass over everything not yet seen in Studio (branch `final-pass`, 7 October 2026)
 
 A read-through of the join flow, boxes and store, owner hub and paid items, mill tiers, planers and belts, plot platforms and the load pipeline, looking only for real bugs. Fixed:
 - **No character after one failed load** (`GameServer`): `LoadCharacterAsync` was one pcall; a failure at join left the player with no character and a dead player's respawn failure left them dead for good. Now `JoinFlow.LoadWithRetry` (3 tries, 1 s apart, stops when the player leaves) for the join, the respawn, the save-slot swap and the fallback.
@@ -3358,11 +3358,11 @@ A read-through of the join flow, boxes and store, owner hub and paid items, mill
 
 Left alone, for Connor to decide: a log hand-dropped at a sawmill or planer that is busy waits; after `AutomationLogic.HandWindow` (4 s) untouched it counts as belt-fed, so rare or figured wood hand-fed behind another job is refused ("rare") and the throughput cap applies. Picking it up and dropping it again resets the clock.
 
-## NPCs turn to face you while you talk, and every NPC speaks in the dialogue box (branch `claude/npc-talk-lock`, 8 October 2026)
+## NPCs turn to face you while you talk, and every NPC speaks in the dialogue box (branch `npc-talk-lock`, 8 October 2026)
 
 Connor's playtest: "Dale the NPC doesn't have our new chat box system and when you talk to NPCs they should lock on you until the chat goes away."
 
-- **Dale and the other keepers.** Reading the code, Dale was already routed to the box like Tink and Hazel (`DialogueService` -> `DialogueUI`), but a keeper's plain hello was a single line (the shop's "Trucks are on the board..."), while everyone else gives a greeting plus a line of their own. A keeper's hello is now the same multi-line press-to-continue talk: their greeting, the shop's line, one of their own lines (`DialogueFlow.KeeperExtras`, `DialogueFlow.ServerLines`; offers and replies stay one short card with Yes / No). If Dale still shows only a small bubble in Studio, that is the walk-up chatter (`NPCDialogue.AutoBubbles`, left on by Connor's decision); tell Claude.
+- **Dale and the other keepers.** Reading the code, Dale was already routed to the box like Tink and Hazel (`DialogueService` -> `DialogueUI`), but a keeper's plain hello was a single line (the shop's "Trucks are on the board..."), while everyone else gives a greeting plus a line of their own. A keeper's hello is now the same multi-line press-to-continue talk: their greeting, the shop's line, one of their own lines (`DialogueFlow.KeeperExtras`, `DialogueFlow.ServerLines`; offers and replies stay one short card with Yes / No). If Dale still shows only a small bubble in Studio, that is the walk-up chatter (`NPCDialogue.AutoBubbles`, left on by Connor's decision); tell the build agent.
 - **Still on the old one-off path, now in the box:** Old Hank (with a plot, or the Land Office "come up to the counter" line, were server toasts: `PlotService.Speak`) and the Hermit's "too far to hear you" (was a toast). Murph, Millie, Gus, Rosa, Pip, Bram, Old Tolly and Cap'n Moss already used the box (generic client talk); Tink, Hazel, Dale and the Hermit's quest lines already came through the server's box.
 - **Lock on.** `NPCTalkService` (server) records who is talking to each NPC: set by the Talk prompt (in reach), ended by the box closing (new `"end"` intent on the Dialogue remote, rate limited, names an NPC id), or by itself when the player walks 30+ studs off, dies, leaves, the NPC is removed or lies down, or a box is left up past its 90 s timeout. While anyone is talking the NPC carries the attribute `TalkWith` (the UserId to face). Rules in `Shared/TalkLock` (specs `TalkLock.spec`, `NPCTalkService.spec`): the most recent talker wins, the nearer on a tie, the NPC lets go only when nobody is talking.
 - **Visual only.** NPC poses were already client-driven (standing NPCs turn toward you on each screen; walkers follow the shared clock), so the server only publishes the attribute. `NPCController` turns the body toward the partner at any distance (yaw about Y at the usual turn rate, head following), keeps all idle, work and wave animations running, and a walker holds where it stands while its partner talks (no sliding). When the attribute goes away it turns back to its normal facing; a walker eases back onto the clock like after any lag. This screen's own open box counts at once, before the attribute arrives.
@@ -3381,7 +3381,7 @@ Connor's playtest: "Dale the NPC doesn't have our new chat box system and when y
 
 Not verifiable without Studio: the exact feel of the turn and the walker's resume, and that a Talk press from the Xbox pad reaches the server prompt the same way (the existing Talk path).
 
-## Vehicle meshes (branch `claude/vehicle-models`)
+## Vehicle meshes (branch `vehicle-models`)
 
 Connor, Xbox playtest after #108: "The vehicle models are messed up as well". His picture is the dealership's back row: a red Logging Rig with a long plank deck lying at the plinth, black lumps, huge black tyres and pale poles, and a blue block.
 
@@ -3396,7 +3396,7 @@ Connor, Xbox playtest after #108: "The vehicle models are messed up as well". Hi
 - [ ] Spawn the Rustbucket, Pickup, Scout ATV, Flatbed and Logging Rig on your pad, each with and without a trailer: same checks, hitch at the back, the trailer's bed on its frame, tow and load logs as before.
 - [ ] Look at the vehicle through its box window: the little copy looks like the real one.
 - [ ] If a vehicle still looks wrong, send the vehicle and a side view: which piece (bed, glass, lights, hitch) is out tells which anchor to move.
-## Box hold: a grabbed shop box hangs steady (branch `claude/box-hold-axes`, 8 October 2026)
+## Box hold: a grabbed shop box hangs steady (branch `box-hold-axes`, 8 October 2026)
 
 Connor's Xbox video: a grabbed shop box (the Millmaster 100, a shelf box) tilts and swings round the grip. Cause: the pull was sized for wood (mass x 400, capped at 4000), but a big box weighs about 6900 (35 mass x 196), so it could not be lifted, and the grip is off-centre (`ApplyAtCenterOfMass = false`) with a torque of only 2 x the pull, less than the pull's lever on a box. Fix (box only, tag `ShopBox`; wood is unchanged): `GrabLogic.HoldForce` (never less than 1.6 x the box's weight), the pull taken at the centre of mass (`PullsAtCentre`), `GrabLogic.HoldTorque` (at least force x 2 x the box's radius), the hold orientation started upright at the box's yaw (`GrabLogic.Upright`), and the box's angular velocity zeroed when the server confirms the grab.
 
@@ -3409,7 +3409,7 @@ Connor's Xbox video: a grabbed shop box (the Millmaster 100, a shelf box) tilts 
 ### "Custom axes not working either" (looked at, not changed)
 - Buy -> box -> open -> equip (`BoxService` -> `ShopService.GrantItem` -> `AxeService.Grant` -> `EquipTool`) and owner grant -> equip (`MonetizationService.OwnerGrant` -> pass listener -> `AxeService.Ensure`) read correctly; no nil field or wrong tool name found. The rack on the Tool Shed wall builds each axe with `AxeArt.Build`, which uses the uploaded meshes only when they load (asset permissions, open item 3 in STATUS.md); if they do not, the part-built axe shows. Send the `[MapBuilder] build check:` and `[MeshKit]` Output lines to settle it.
 
-## Hotfix: Talk and Buy prompts dead after #107-#111 (branch `claude/fix-shop-talk-buy`, 8 October 2026)
+## Hotfix: Talk and Buy prompts dead after #107-#111 (branch `fix-shop-talk-buy`, 8 October 2026)
 
 Connor, Xbox: "talking to most shop NPCs is broken" and "can't buy anything". Both are ProximityPrompts (Talk, Buy at the counter), and `ProximityPromptService.Enabled` is one global switch that four client scripts flipped by saving "what it was" and putting that back: the dialogue box (`DialogueUI`), a held piece (`DragController`, which includes every shop box), the build placer and the wire tool. When two overlapped (a box grabbed while a keeper's box was up, or the 0.3 s re-enable window after a close), the later one saved "off" and put "off" back when it ended, with nothing left to turn prompts on. #111 made the keeper's box longer (greeting, shop line, own line) and #109 made boxes carried for the whole trip to the counter, so the overlap became easy to hit. Fix: `Shared/PromptGate` (pure) and `PromptSwitch` (client): each holder Holds and Releases under its own name, prompts are on exactly when nobody holds them. `DragController.grab` guards everything after the hold is recorded (a throw there used to leave `hold` set, so nothing could be grabbed again) and `drop` releases prompts first. `DialogueUI.hide` schedules the release before anything that can throw, and a server `Picking` left set only closes a box while the plot picker is really on screen. `DialogueService.Say` can no longer be stopped by the keeper-facing code (extras and `NPCTalkService.BeginById` are guarded). New output tags: server `[Talk]` (press, rate-limit drop, failures), client `[Talk]` (box open / box closed with the reason), client `[PromptSwitch]` (a hold over a minute, or the switch moved by something else), `[Drag]` (a hold that failed to start). Specs: `PromptGate.spec` (the old sequence reproduced and fixed, every order of four holders), `TalkFlow.spec` (Talk on each keeper, `end` costs no Dialogue budget, offer then end then Yes pays).
 
@@ -3418,7 +3418,7 @@ Connor, Xbox: "talking to most shop NPCs is broken" and "can't buy anything". Bo
 - [ ] Carry a shop box to the counter, say Yes: it is bought. Grab a shelf box while a keeper's box is still up, close the box, drop the box: Talk and Buy prompts are still there.
 - [ ] Talk to Millie, Gus, Pip and Old Hank: box opens, no stuck prompts afterwards.
 - [ ] If it still fails, send the Output lines tagged `[Talk]`, `[PromptSwitch]`, `[Drag]`, `[BootReport]` and any red error text, plus what you pressed.
-## Drop axe controls (branch `claude/drop-axe-controls`, 8 October 2026)
+## Drop axe controls (branch `drop-axe-controls`, 8 October 2026)
 
 Connor: "why is there a drop axe button, just make it B on Xbox and a similar button on PC and however you wanna do it on phone."
 
@@ -3442,7 +3442,7 @@ Connor: "why is there a drop axe button, just make it B on Xbox and a similar bu
 - [ ] Phone (device emulator or a phone): long-press the hotbar twice, about a second apart, with an axe equipped: it lands on the ground. A long press up in the world, or on the thumbstick or jump button, does nothing. A tap on the equipped slot still puts it away. Watch whether the first long press also unequips it (expected; the second press still drops it).
 - [ ] The one-time hint appears the first time you hold a droppable axe, with the right control for the device.
 
-## No floating speech bubbles (branch `claude/remove-bubbles`, 8 October 2026)
+## No floating speech bubbles (branch `remove-bubbles`, 8 October 2026)
 
 Connor: "If we have the pop up chats you can remove the floating chat bubbles."
 
@@ -3894,7 +3894,7 @@ Old lines that must be gone: `4. The shops done in 300s`, `[BaseBoot] no Remotes
 Cross-lane: none. Awaiting Connor: a GLB for the Glow Wire (default: it stays a part-built neon bar, silent).
 ## Client freeze and the late forest (branch `phase-2/fix-client-freeze`, 11 October 2026)
 
-What and why are in STATUS.md. Claude cannot run Studio: the Lune specs (`tests/ClientFreeze.spec.luau`, `MapBuilder.spec`) prove the causes with work counters and equivalence checks (the same 1,041 trees in the same order, `takenNear` equal to the scan on seeded random points, 0.4 distance checks a query at 1,300 trees against the scan's 1,300, the plan built once for three callers, 72,000 pauses and no stretch of planner work over 100 ms in Lune with the town warmed, the town's trees handed over after 22% of the work). Lune numbers are not Studio numbers: these checks are the part only Studio can answer.
+What and why are in STATUS.md. Studio cannot be run from the build environment: the Lune specs (`tests/ClientFreeze.spec.luau`, `MapBuilder.spec`) prove the causes with work counters and equivalence checks (the same 1,041 trees in the same order, `takenNear` equal to the scan on seeded random points, 0.4 distance checks a query at 1,300 trees against the scan's 1,300, the plan built once for three callers, 72,000 pauses and no stretch of planner work over 100 ms in Lune with the town warmed, the town's trees handed over after 22% of the work). Lune numbers are not Studio numbers: these checks are the part only Studio can answer.
 
 ### Studio checks
 
@@ -3902,7 +3902,7 @@ Use the MicroProfiler (Ctrl+F6) and the Script Performance window (View, Script 
 
 PC (keyboard and mouse)
 1. Output: no `TreeFill:380: Script timeout`, no `WeatherController Start took ...` over 0.1 s in the `[Load]` lines, no `Script timeout` of any kind in the first two minutes.
-2. Profiler while the forest fills in (the `[ForestFiller] plan ready in ... s` line says when it ends): no frame over 100 ms. The plan takes as long as before in total, spread over frames. A one-off hitch of up to about half a second when the town is first read (WorldPlan.Town, shared with the town markers) is known; tell Claude if it is longer.
+2. Profiler while the forest fills in (the `[ForestFiller] plan ready in ... s` line says when it ends): no frame over 100 ms. The plan takes as long as before in total, spread over frames. A one-off hitch of up to about half a second when the town is first read (WorldPlan.Town, shared with the town markers) is known; tell the build agent if it is longer.
 3. Spawn: the three tutorial oaks west of the spawn are there at once. Within a few seconds of spawning the meadow trees (south) and the trees in and round the town (the pad, the dealership, the lanes) stand; the far forest and the biome trees keep arriving after. Chop the nearest tree in the first minute: it works.
 4. Murph's "find an oak" beacon points at a tutorial oak from the first moment.
 5. Walk into a cave, the tunnel and the grotto in the first minutes: rain stops inside (the cave zones join once the plan is ready, a moment after the start), and cave nature parts and lights appear.
@@ -3917,7 +3917,7 @@ Xbox (controller)
 If a number is off, send the `[Load]` lines and the `loadLine` lines from the server (`first forest trees planted`, `forest planned`, `forest planted`).
 ## Startup errors (branch `phase-2/fix-startup-errors`, 11 October 2026)
 
-What and why are in STATUS.md. Claude can't run Studio: nothing below has been seen in Studio.
+What and why are in STATUS.md. Studio cannot be run from the build environment: nothing below has been seen in Studio.
 
 ### Studio checks
 
@@ -3935,7 +3935,7 @@ Xbox (controller)
 7. Same as 1 to 4: Settings has no Camera speed row, the right stick turns the camera as before, X talks to Murph and Old Hank, B closes the dialogue.
 
 Fallback (only if Murph's prompt is slow)
-8. If the log says "Murph's Talk prompt never streamed in", Murph's card must also show "I'm at my camp by the fire. Follow the amber arrow..." (it appears after 15 s). Tell Claude: that means the model did not stream in even as Persistent.
+8. If the log says "Murph's Talk prompt never streamed in", Murph's card must also show "I'm at my camp by the fire. Follow the amber arrow..." (it appears after 15 s). Tell the build agent: that means the model did not stream in even as Persistent.
 ## First screen UI fix (branch `phase-2/fix-first-screen-ui`, 11 October 2026)
 
 What and why are in STATUS.md. Rules: `Shared/JoinPickLogic` (`AutoPick`, `TutorialWaits`, `HintHidden`), `Shared/SaveSlotLogic` (`Panel`, `Layout`), `HudLayout` (`MarkTextLeft`, `ClearOfRects`), `HudRules.BadgesButton`, `Shared/TextAnchor.Probes`. Composites (not Studio screenshots) are in `previews/fix-first-screen/`.
@@ -4086,7 +4086,7 @@ Nothing here was seen in Studio. Check on PC, phone and Xbox (the swap is server
 
 1. PC, phone, Xbox: open the Robux store (STORE button). Passes tab: 2x Cash shows coins with 2x, Lux Axe a gold axe. Products tab: Small and Large Cash Pack show coin stacks; 2x Wood (a log pile) and Instant Delivery (a parcel with a lightning bolt) are "Coming soon" cards with no price and no Buy button. Tow Service, Timber Classic and Paint Shop show their older pictures. If a disc shows a letter or "2x" mark instead of a picture, that image is not loading (run `scripts/check-store-icons.ps1`, see below).
 2. All: the bulletin board in town shows the same pictures on 2x Cash, Lux Axe and Small Cash Pack (page 1) and Large Cash Pack (page 2); the "Coming soon" strip lists the rest.
-3. Windows PowerShell, from the repo folder: `powershell -ExecutionPolicy Bypass -File .\scripts\check-store-icons.ps1`. Every one of the six should say Completed; open each image URL to see it. Pending: wait and re-run. Blocked or InReview: moderation. If two pictures are swapped, tell Claude which pair.
+3. Windows PowerShell, from the repo folder: `powershell -ExecutionPolicy Bypass -File .\scripts\check-store-icons.ps1`. Every one of the six should say Completed; open each image URL to see it. Pending: wait and re-run. Blocked or InReview: moderation. If two pictures are swapped, tell the build agent which pair.
 4. Pickup: buy or spawn a Pickup. Look at it from the LEFT (driver's) side and the right: both sides show a pale rim with a blue hub and bolts on all four wheels (before, the left side showed flat black tyres). Drive: all four wheels spin the same direction as the truck moves, and the front pair steers. Nothing else about driving, the hitch, the bed or the hitbox changes.
 5. Dealership: the Pickup on its plinth shows the same four wheels, standing on the plinth (none floating or sunk).
 6. Look at the other trucks: they are unchanged (their left wheels still show the flat side; see Awaiting Connor in the PR).
@@ -4111,9 +4111,9 @@ is unchanged in every file, keep its id). Nothing breaks in the meantime: every 
 5. Open `src/ReplicatedStorage/Shared/Art/VehicleModels.luau`, find the old id from the table's first column (use Ctrl+F) and
    replace just that number. Leave `size` and `at` alone: they already match the new file.
 6. Do the same for each GLB (8 files). The trailer variants in `by_truck` have no ids yet: skip them for now (the game draws each
-   trailer's own mesh stretched to the truck's width). If you want them exact later, import them the same way and tell Claude the
+   trailer's own mesh stretched to the truck's width). If you want them exact later, import them the same way and tell the build agent the
    new ids so each variant row can point at its own.
-7. Run `lune run tools/assets` and commit `ASSETS.md` and `tools/asset-ids.json` with the change (or ask Claude to).
+7. Run `lune run tools/assets` and commit `ASSETS.md` and `tools/asset-ids.json` with the change (or ask the build agent to).
 
 **Studio checks for Connor (PC, then phone and Xbox for the drive)**
 
@@ -4161,7 +4161,7 @@ Studio checks: 1. Join with an existing save: it loads and no LoadNote line stay
 first launch glitched. `Points of interest (plan)` was ONE 5.07 s step; the forest planted 1,205 trees over 8.1 s and the background terrain
 took 9.2 s; the client's ForestFiller plan took 4.8 s; each of a dozen client `Start` calls (WoodFX, LuxFX, DialogueUI, BlueprintPlacer,
 HammerController, ...) took about 1.4 s; 696 meshes swapped in as they loaded, in bursts. Goal: no single step over about 50 ms, no frame over
-about 33 ms after "can play". **Claude cannot run Studio, so none of those times is measured after the change.** Lune only says the logic and the
+about 33 ms after "can play". **Studio cannot be run from the build environment, so none of those times is measured after the change.** Lune only says the logic and the
 split are right (the longest stretch between two pauses of the plan in Lune is about 50 to 70 ms; the one-time 200 ms start-up of
 `WorldPlan.Town()` is left alone).
 
@@ -4204,7 +4204,7 @@ and read the Output.
 `DEFERRED` in `Client.client` to start it at once).
 ## Axe heads were backwards (branch `phase-2/axe-grip-forward`, 14 October 2026)
 Connor: every axe is held with the blade toward the player and the head the wrong way round. Cause: Roblox's import turns the Blender axe meshes a half turn about Y from their GLBs (the NPC meshes do the same, `TownModels.NpcMeshYaw`), so the mesh's cutting edge landed on +Z while the haft, the Lux points, the swing and the preview all assume the edge is at -Z. The grip was right all along (the Handle's -Z is the blade; the grip frame's -Z is the look vector with the arm raised), so `AxeArt.Grip` is unchanged. Fix, in one place: `AxeModels.MeshYaw` (a half turn) is applied to the handle, head and glow mesh in `AxeArt.applyAxeNow`; the held tool, dropped axe, shop rack, box display and temper effects all come from `AxeArt.Build`, so they follow. `tools/preview/export.luau` turns the `axes/` GLBs the same half turn so renders show the engine (`PREVIEW_AXE_TURN=0` for raw GLBs). New `tests/AxeGrip.spec` (every axe incl. Lux and the Maul, part-built and meshed: edge forward and head up in the hand frame, one shared grip). Renders: `previews/axe-grip/` (`contact-before.png`, `contact-after.png`, close-ups in `before-single/` and `after-single/`; scene `tools/preview/scenes/axe-grip.luau`). The Hermit's Maul is part-built and was never affected.
-Studio checks (not run, Claude cannot run Studio): 1. Equip each axe incl. the Lux Axe: in third person the handle is in the hand, the head is on top, the cutting edge points away from you at the tree; the same in first person. 2. Swing at a tree: the edge goes into the trunk, and the Lux glow arc and trail are at the edge. 3. Hotbar icon and shop rack/box display: the blade faces the way it did in the renders. 4. Drop an axe (Q): it lies on its side, head intact. If the blade is still backward, set `AxeModels.MeshYaw = 0`: the import turn assumption was wrong for the axes.
+Studio checks (not run, Studio cannot be run from the build environment): 1. Equip each axe incl. the Lux Axe: in third person the handle is in the hand, the head is on top, the cutting edge points away from you at the tree; the same in first person. 2. Swing at a tree: the edge goes into the trunk, and the Lux glow arc and trail are at the edge. 3. Hotbar icon and shop rack/box display: the blade faces the way it did in the renders. 4. Drop an axe (Q): it lies on its side, head intact. If the blade is still backward, set `AxeModels.MeshYaw = 0`: the import turn assumption was wrong for the axes.
 ## What's New centred, no scrim (branch `phase-2/whats-new-centre`, 14 October 2026)
 The grey box was NewsUI's own full-screen `Scrim` TextButton (PanelAlt at 0.45 transparency, shown whenever the card was open; #195 only hid it while closed). It is gone: the NewsUI ScreenGui holds the card and nothing else (a tap outside no longer closes it; Close and B do). The card is always `AnchorPoint (0.5,0.5)`, `Position (0.5,0,0.5,0)`, width 92% of the screen capped at 520 (UISizeConstraint), so it is centred on a phone (667x375, notched) and on a 1920x1080 TV as well (the old short-screen placement that pushed it right of the thumbstick is removed; rows still tighten on a short screen so the card fits). QuickMenu, Shop and QualityPicker already centre their cards and keep their intentional dims. Spec: `tests/GreyBox.spec.luau` (computed bounds at 1920x1080, 667x375, 812x375 notched, TV-safe). `previews/whats-new/*.png` are computed layout diagrams (`tools/preview/whats_new_layout.py`), not screenshots. PlaceCheck's Max Players warning now points to LAUNCH.md > Studio setup (you set Max Players = 12 in Game Settings > Places yourself).
 Studio checks: 1. PC, phone, Xbox: open What's New (Settings > WHAT'S NEW, or a fresh finished-tutorial join). Good: the card is in the middle of the screen, nothing grey or dark behind it, the game visible all round it. 2. Close button, B (Xbox) and Esc/click Close all dismiss it. 3. Phone in both rotations (and a notched phone): the card is fully on screen and Close is 44px. 4. Game Settings > Places: Max Players = 12, then Play: `[PlaceCheck] OK`.
