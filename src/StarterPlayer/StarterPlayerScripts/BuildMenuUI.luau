@@ -18,7 +18,7 @@
 -- Gamepad: Open selects the first tile (or the one last used); the stick stays
 -- in the menu (SelectionGroups); LB and RB change category and select its first
 -- tile; B and Esc close and the selection goes back to the button that opened
--- it. Nothing is bound to ButtonR2 (RT grab and chop are untouched).
+-- it. Nothing is bound to the right trigger (grab and chop are untouched).
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -105,6 +105,22 @@ local function focusRing(stroke: number): Frame
 	UITheme.stroke(outer, UITheme.Skin.Ink, 2)
 	outer.Parent = ring
 	return ring
+end
+
+-- AbsoluteSize / AbsolutePosition, or zero where they cannot be read (before
+-- the first layout pass, and in the headless specs, which have no layout).
+local function absSize(obj: GuiObject): Vector2
+	local ok, v = pcall(function()
+		return obj.AbsoluteSize
+	end)
+	return if ok and typeof(v) == "Vector2" then v else Vector2.zero
+end
+
+local function absPos(obj: GuiObject): Vector2
+	local ok, v = pcall(function()
+		return obj.AbsolutePosition
+	end)
+	return if ok and typeof(v) == "Vector2" then v else Vector2.zero
 end
 
 local function lastInputIsGamepad(): boolean
@@ -255,19 +271,20 @@ end
 -- scroll-to-selection does the most; this is the fallback).
 local function scrollIntoView(button: GuiObject)
 	local list = gridList
-	if not list or list.AbsoluteSize.Y <= 0 then
+	if not list or absSize(list).Y <= 0 then
 		return
 	end
-	local top = button.AbsolutePosition.Y - list.AbsolutePosition.Y + list.CanvasPosition.Y
-	local bottom = top + button.AbsoluteSize.Y
-	local viewTop, viewBottom = list.CanvasPosition.Y, list.CanvasPosition.Y + list.AbsoluteSize.Y
+	local listSize = absSize(list)
+	local top = absPos(button).Y - absPos(list).Y + list.CanvasPosition.Y
+	local bottom = top + absSize(button).Y
+	local viewTop, viewBottom = list.CanvasPosition.Y, list.CanvasPosition.Y + listSize.Y
 	local target = list.CanvasPosition.Y
 	if top < viewTop then
 		target = top
 	elseif bottom > viewBottom then
-		target = bottom - list.AbsoluteSize.Y
+		target = bottom - listSize.Y
 	end
-	local maxY = math.max(0, list.AbsoluteCanvasSize.Y - list.AbsoluteSize.Y)
+	local maxY = math.max(0, list.AbsoluteCanvasSize.Y - listSize.Y)
 	list.CanvasPosition = Vector2.new(list.CanvasPosition.X, math.clamp(target, 0, maxY))
 end
 
@@ -376,7 +393,7 @@ local function buildGrid()
 	end
 	clearGrid()
 	local sizes = BuildMenuLogic.SizesFor(phoneNow)
-	local panelWidth = if panel then panel.AbsoluteSize.X / math.max(UITheme.Scale(), 0.01) else 0
+	local panelWidth = if panel then absSize(panel).X / math.max(UITheme.Scale(), 0.01) else 0
 	local grid = BuildMenuLogic.GridFor(
 		if panelWidth > 0 then panelWidth else BuildMenuLogic.Layout(667, phoneNow, 1).panelW,
 		phoneNow
@@ -395,11 +412,7 @@ local function buildGrid()
 		local btn = buildTile(entry, view, sizes, i)
 		btn.Parent = list
 		btn.Activated:Connect(function()
-			selectTile(entry.id)
-			local place = if opts then opts.place else nil
-			if place then
-				place(entry)
-			end
+			BuildMenuUI.Press(entry)
 		end)
 		table.insert(tiles, { entry = entry, button = btn, view = view })
 	end
@@ -518,7 +531,7 @@ local function fitPanel()
 		return
 	end
 	local scale = math.max(UITheme.Scale(), 0.01)
-	local screen = g.AbsoluteSize / scale
+	local screen = absSize(g) / scale
 	if screen.X <= 0 then
 		local cam = workspace.CurrentCamera
 		screen = if cam then cam.ViewportSize / scale else Vector2.new(667, 375)
@@ -526,8 +539,8 @@ local function fitPanel()
 	local fit = HudLayout.ShopArea(screen, UITheme.TopBar() / scale)
 	local row = HUD.TopRow()
 	if row then
-		local at = (row.AbsolutePosition - g.AbsolutePosition) / scale
-		local size = row.AbsoluteSize / scale
+		local at = (absPos(row) - absPos(g)) / scale
+		local size = absSize(row) / scale
 		local avoid = { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y }
 		fit = HudLayout.ClearOf(
 			fit,
@@ -546,7 +559,7 @@ local function reportModal()
 	if not isOpen or not p then
 		return
 	end
-	local at, size = p.AbsolutePosition, p.AbsoluteSize
+	local at, size = absPos(p), absSize(p)
 	HUD.SetModal({ left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y })
 end
 
@@ -836,6 +849,16 @@ function BuildMenuUI.Start()
 			reportModal()
 		end
 	end)
+end
+
+-- One tap, click or A on a card: remember it and hand it to PlotUI's place
+-- (a locked or too-dear card gets its toast there and nothing is placed).
+function BuildMenuUI.Press(entry: BlueprintBook.Entry)
+	selectTile(entry.id)
+	local place = if opts then opts.place else nil
+	if place then
+		place(entry)
+	end
 end
 
 -- For the specs.

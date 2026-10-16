@@ -283,6 +283,8 @@ local function openPlans()
 	})
 end
 
+PlotUI.OpenPlans = openPlans -- the specs open the menu through this
+
 ---------------------------------------------------------------------------
 -- The hammer in hand
 ---------------------------------------------------------------------------
