@@ -643,4 +643,22 @@ return function(t)
 		)
 		t.eq(string.find(source, "brighten(style.fill, 0.11)", 1, true), nil, "the resting fill is not lifted")
 	end)
+
+	t.test("Screen's optional scale function: default unchanged, an override honoured now and on resize", function()
+		local UITheme, _ = theme({}, { touch = false, keyboard = true, viewport = Vector2.new(1920, 1080) })
+		local plain = UITheme.Screen("Plain", 1)
+		local base = plain:FindFirstChildOfClass("UIScale").Scale
+		local seen = {}
+		local custom = UITheme.Screen("Custom", 2, nil, function(b)
+			table.insert(seen, b)
+			return 1
+		end)
+		t.eq(custom:FindFirstChildOfClass("UIScale").Scale, 1, "the function decides the scale")
+		t.ok(#seen >= 1 and seen[1] == base, "it is given the base scale")
+		local halved = UITheme.Screen("Half", 3, "device", function(b)
+			return b / 2
+		end)
+		t.eq(halved:FindFirstChildOfClass("UIScale").Scale, base / 2, "and may scale from it")
+		t.eq(plain:FindFirstChildOfClass("UIScale").Scale, base, "a screen without one is the base scale")
+	end)
 end

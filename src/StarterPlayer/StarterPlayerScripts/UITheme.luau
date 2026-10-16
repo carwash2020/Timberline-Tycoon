@@ -492,6 +492,7 @@ function UITheme.SetUserScale(multiplier: number)
 end
 
 local scales: { UIScale } = {}
+local scaleOverrides: { [UIScale]: (number) -> number } = {} -- a screen that wants its own scale (Screen's 4th parameter)
 local currentScale = 1
 local layoutWatchers: { () -> () } = {}
 local leftColumn: Frame? = nil
@@ -686,7 +687,16 @@ UITheme.Layers = {
 } :: { [string]: number }
 
 -- A ScreenGui for one of the game's screens, scaled for the device.
-function UITheme.Screen(name: string, displayOrder: number?, insets: Insets?): ScreenGui
+-- `scaleOf` (optional): the screen's UIScale as a function of the base scale
+-- (ScaleFor, the whole HUD's). The resize loop honours it too. The build menu
+-- passes one that returns 1 on a phone, so its names are 16 real px there.
+-- Every other screen leaves it nil and is unchanged.
+function UITheme.Screen(
+	name: string,
+	displayOrder: number?,
+	insets: Insets?,
+	scaleOf: ((base: number) -> number)?
+): ScreenGui
 	local gui = Instance.new("ScreenGui")
 	gui.Name = name
 	gui.ResetOnSpawn = false
@@ -702,7 +712,11 @@ function UITheme.Screen(name: string, displayOrder: number?, insets: Insets?): S
 		else Enum.ScreenInsets.CoreUISafeInsets
 	gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
 	local scale = Instance.new("UIScale")
-	scale.Scale = scaleFor()
+	local base = scaleFor()
+	scale.Scale = if scaleOf then scaleOf(base) else base
+	if scaleOf then
+		scaleOverrides[scale] = scaleOf
+	end
 	scale.Parent = gui
 	table.insert(scales, scale)
 	return gui
@@ -1478,7 +1492,8 @@ function UITheme.Start()
 	local function rescale()
 		currentScale = scaleFor()
 		for _, scale in ipairs(scales) do
-			scale.Scale = currentScale
+			local override = scaleOverrides[scale]
+			scale.Scale = if override then override(currentScale) else currentScale
 		end
 		placeLeft()
 		for _, fn in ipairs(layoutWatchers) do

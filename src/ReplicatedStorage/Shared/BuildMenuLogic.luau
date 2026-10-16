@@ -7,6 +7,7 @@
 -- BlueprintBook.Allowed and PlotLogic.Check say what the server will accept.
 
 local BlueprintBook = require(script.Parent.BlueprintBook)
+local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlotData = require(script.Parent.PlotData)
 local PlotLogic = require(script.Parent.PlotLogic)
 
@@ -164,38 +165,67 @@ function BuildMenuLogic.Columns(gridWidth: number, phone: boolean): number
 	return math.clamp(math.floor(gridWidth / 178), 3, 4)
 end
 
-export type Layout = {
-	phone: boolean,
-	sizes: Sizes,
-	panelW: number,
+export type Grid = {
 	gridW: number,
 	cols: number,
 	tileW: number, -- a card's real width
 	plateTextW: number, -- the room the name has inside its plate
 }
 
+-- The grid inside a panel `panelW` wide (design px): its width, columns and
+-- the card width that results.
+function BuildMenuLogic.GridFor(panelW: number, phone: boolean): Grid
+	local sizes = BuildMenuLogic.SizesFor(phone)
+	local gridW = panelW - BuildMenuLogic.Pad * 2 - sizes.rail - BuildMenuLogic.RailGap - BuildMenuLogic.Scrollbar
+	local cols = BuildMenuLogic.Columns(gridW, phone)
+	local tileW = (gridW - BuildMenuLogic.TileGap * (cols - 1)) / cols
+	return { gridW = gridW, cols = cols, tileW = tileW, plateTextW = tileW - BuildMenuLogic.PlatePad * 2 }
+end
+
+export type Layout = {
+	phone: boolean,
+	sizes: Sizes,
+	panelW: number,
+	gridW: number,
+	cols: number,
+	tileW: number,
+	plateTextW: number,
+}
+
 -- The numbers the menu is laid out with, in design px. `viewW` is the usable
 -- screen width in screen px and `scale` the UIScale (1 on a phone: the menu runs
 -- at scale 1 there so a name is 16 real px).
 function BuildMenuLogic.Layout(viewW: number, phone: boolean, scale: number): Layout
-	local sizes = BuildMenuLogic.SizesFor(phone)
 	local designW = viewW / math.max(scale, 0.01)
 	local panelW = math.min(
 		designW - BuildMenuLogic.Margin * 2,
 		if phone then BuildMenuLogic.PanelMax.phone else BuildMenuLogic.PanelMax.wide
 	)
-	local gridW = panelW - BuildMenuLogic.Pad * 2 - sizes.rail - BuildMenuLogic.RailGap - BuildMenuLogic.Scrollbar
-	local cols = BuildMenuLogic.Columns(gridW, phone)
-	local tileW = (gridW - BuildMenuLogic.TileGap * (cols - 1)) / cols
+	local grid = BuildMenuLogic.GridFor(panelW, phone)
 	return {
 		phone = phone,
-		sizes = sizes,
+		sizes = BuildMenuLogic.SizesFor(phone),
 		panelW = panelW,
-		gridW = gridW,
-		cols = cols,
-		tileW = tileW,
-		plateTextW = tileW - BuildMenuLogic.PlatePad * 2,
+		gridW = grid.gridW,
+		cols = grid.cols,
+		tileW = grid.tileW,
+		plateTextW = grid.plateTextW,
 	}
+end
+
+-- The colour a card shows when it has no picture (or the picture is still
+-- loading): the same swatch the Blueprints rows have always used.
+function BuildMenuLogic.Swatch(bp: any): string
+	local mill = ItemCatalog.GetSawmill(bp.id)
+	local machine = ItemCatalog.GetMachine(bp.id)
+	if mill then
+		return mill.color
+	elseif machine then
+		return machine.color
+	elseif bp.boxes and bp.boxes[1] then
+		return bp.boxes[1].color
+	end
+	return "#654321"
 end
 
 ---------------------------------------------------------------------------
