@@ -8,6 +8,7 @@
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
+	local predicts = {} -- what WoodFX.Predict was asked to show
 
 	local function load(loop)
 		local connected = 0
@@ -44,6 +45,11 @@ return function(t)
 				UserInputService = { InputBegan = sig },
 			},
 			mocks = {
+				WoodFX = {
+					Predict = function(...)
+						table.insert(predicts, { ... })
+					end,
+				},
 				HUD = { Toast = function() end },
 				Quality = {
 					Tier = function()
@@ -409,6 +415,11 @@ return function(t)
 				},
 			},
 			mocks = {
+				WoodFX = {
+					Predict = function(...)
+						table.insert(predicts, { ... })
+					end,
+				},
 				HUD = {
 					Toast = function() end,
 					SetPointing = function() end,

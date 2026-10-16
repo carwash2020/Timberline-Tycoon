@@ -153,13 +153,16 @@ local function removeWhenDone(s: Sound, holder: Instance)
 end
 
 -- Plays a one-shot sound at a point in the world.
-function SoundData.PlayAt(name: string, position: Vector3)
+function SoundData.PlayAt(name: string, position: Vector3, pitch: number?)
 	if not SoundData.SfxEnabled then
 		return
 	end
 	local s = SoundData.Make(name)
 	if not s then
 		return
+	end
+	if pitch then
+		s.PlaybackSpeed *= pitch -- multiplies the sound's own (random) speed
 	end
 	local holder = Instance.new("Attachment")
 	holder.Name = "Sound_" .. name

@@ -443,7 +443,9 @@ return function(t)
 			for _, top in ipairs({ true, false }) do
 				local face = TreeArt.CutFace(def, s, top)
 				t.eq(face.Name, "CutFace")
-				t.eq(face.Material, core[2])
+				t.eq(face.Material, Enum.Material.WoodPlanks, "a cut face is plain planks, never glowing")
+				t.ok(face.Material ~= Enum.Material.Neon, "never Neon")
+				t.eq(face.Color, color, "in the wood's core colour")
 				t.ok(math.abs(face.Size.Y - 0.06) < 1e-3, "0.06 thick")
 				t.ok(math.abs(face.Size.X - s.Size.X * 0.86) < 1e-3, "0.86 of the width")
 				t.ok(
