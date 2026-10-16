@@ -87,14 +87,14 @@ end
 
 -- AbsoluteSize / AbsolutePosition, or zero where they cannot be read (before
 -- the first layout pass, and in the headless specs, which have no layout).
-local function absSize(obj: GuiObject): Vector2
+local function absSize(obj: GuiBase2d): Vector2
 	local ok, v = pcall(function()
 		return obj.AbsoluteSize
 	end)
 	return if ok and typeof(v) == "Vector2" then v else Vector2.zero
 end
 
-local function absPos(obj: GuiObject): Vector2
+local function absPos(obj: GuiBase2d): Vector2
 	local ok, v = pcall(function()
 		return obj.AbsolutePosition
 	end)
@@ -328,14 +328,18 @@ local function wireTileNav(cols: number)
 	end
 	for i, row in ipairs(railRows) do
 		-- Right from the rail lands on the grid's first card.
-		row.NextSelectionRight = if tiles[1] then tiles[1].button else nil
+		if tiles[1] then
+			row.NextSelectionRight = tiles[1].button
+		end
 		row.NextSelectionUp = railRows[i - 1] or row
 		row.NextSelectionDown = railRows[i + 1] or landRow or row
 	end
 	if landRow then
 		landRow.NextSelectionUp = railRows[#railRows] or landRow
 		landRow.NextSelectionDown = landRow
-		landRow.NextSelectionRight = if tiles[1] then tiles[1].button else nil
+		if tiles[1] then
+			landRow.NextSelectionRight = tiles[1].button
+		end
 	end
 end
 
