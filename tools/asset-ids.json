@@ -11876,6 +11876,24 @@
     {
       "collision": false,
       "expectTypeId": 3,
+      "id": "140235385729394",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData TreeCreak"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
+      "id": "71299239323730",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData LogThud"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
       "id": "4110925712",
       "kind": "sound",
       "places": 3,
@@ -11890,6 +11908,15 @@
       "places": 1,
       "priority": 2,
       "usedBy": "SoundData Equip"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
+      "id": "79105838138081",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData Engine"
     },
     {
       "collision": false,
@@ -11921,6 +11948,15 @@
     {
       "collision": false,
       "expectTypeId": 3,
+      "id": "98495708270834",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData CricketsNight"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
       "id": "9117181540",
       "kind": "sound",
       "places": 1,
@@ -11930,11 +11966,56 @@
     {
       "collision": false,
       "expectTypeId": 3,
+      "id": "135011285595785",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData WindHowl"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
+      "id": "126238204708501",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData LavaRumble"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
       "id": "9120549564",
       "kind": "sound",
       "places": 1,
       "priority": 2,
       "usedBy": "SoundData WaterfallRoar"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
+      "id": "133814424706029",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData Wings"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
+      "id": "87844016813752",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData Quack"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 3,
+      "id": "88410345542803",
+      "kind": "sound",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "SoundData StormCrackle"
     },
     {
       "collision": false,
