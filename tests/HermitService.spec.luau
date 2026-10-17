@@ -195,6 +195,16 @@ return function(t)
 			t.ok(part:FindFirstChild("Secret"), "prompt")
 		end
 		t.ok(secrets:FindFirstChild("Secret_secretCaveBox"))
+		-- A phone tap ends before any hold completes, so a secret fires on the tap.
+		local seen = 0
+		for _, part in ipairs(secrets:GetChildren()) do
+			local prompt = part:FindFirstChild("Secret")
+			if prompt then
+				seen += 1
+				t.eq(prompt.HoldDuration, 0, part.Name .. " fires on a tap, no hold")
+			end
+		end
+		t.eq(seen, #s.Logic.Marks + 1, "five marks and the cave box")
 	end)
 
 	-- The sea.

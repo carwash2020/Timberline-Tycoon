@@ -202,7 +202,7 @@ local function secretPrompt(parent: Instance, key: string, x: number, y: number,
 	prompt.Name = "Secret"
 	prompt.ActionText = action
 	prompt.ObjectText = ""
-	prompt.HoldDuration = 0.3
+	prompt.HoldDuration = 0 -- a phone tap ends before any hold completes (playtest t351)
 	prompt.MaxActivationDistance = 8
 	prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
 	prompt.ClickablePrompt = true

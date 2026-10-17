@@ -492,6 +492,62 @@ local function trunkTop(rec: TreeRecord): Vector3?
 	return (best.CFrame * CFrame.new(0, best.Size.Y / 2, 0)).Position
 end
 
+-- A tree registered before its meshes loaded is part-built; when they land
+-- TreeMeshes replaces every Section with a MeshPart and destroys the old
+-- ones (it sets the model's TreeMesh attribute last). Without this the record
+-- kept pointing at the destroyed parts: FromPart no longer found the section,
+-- so a chop was "unknown" and a hidden tree's new parts stayed solid
+-- (playtest t351). Reads the model's Sections again and takes the new parts
+-- and effects with the tree's current visibility; the skeleton, depths and
+-- hp are unchanged.
+local function resync(rec: TreeRecord)
+	local model = rec.model
+	if model.Parent == nil then
+		return
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d.Name == "Section" then
+			local id = d:GetAttribute("Section")
+			if type(id) == "number" then
+				rec.sections[id] = d
+			end
+		end
+	end
+	for part in pairs(rec.parts) do
+		if part.Parent == nil then
+			rec.parts[part] = nil
+		end
+	end
+	for effect in pairs(rec.effects) do
+		if effect.Parent == nil then
+			rec.effects[effect] = nil
+		end
+	end
+	local parts, effects = snapshot(model)
+	for part, state in pairs(parts) do
+		if rec.parts[part] == nil then
+			rec.parts[part] = state
+		end
+	end
+	for effect, enabled in pairs(effects) do
+		if rec.effects[effect] == nil then
+			rec.effects[effect] = enabled
+		end
+	end
+	local first = rec.sections[1]
+	if first then
+		rec.radius = math.min(first.Size.X, first.Size.Z) / 2
+		model:SetAttribute("TrunkRadius", rec.radius)
+	end
+	model:SetAttribute("SwayTop", trunkTop(rec))
+	if rec.dormant then
+		setVisible(rec, false)
+	elseif rec.ghost then
+		setSolid(rec, false) -- the new meshes are solid; the ghost retry brings them back
+	end
+	refreshAlive(rec)
+end
+
 -- Builds (or rebuilds) the tree's model at its stage, swapping it in for
 -- the old one. `grew`: it grew (the clients' regrow spring).
 local function rebuild(rec: TreeRecord, grew: boolean)
@@ -559,6 +615,12 @@ local function rebuild(rec: TreeRecord, grew: boolean)
 	rec.parts, rec.effects = snapshot(model)
 	rec.stump, rec.stumpParts = nil, nil
 	byModel[model] = rec
+	-- The connection dies with the model when a rebuild replaces it.
+	model:GetAttributeChangedSignal("TreeMesh"):Connect(function()
+		if rec.model == model then
+			resync(rec)
+		end
+	end)
 	local onRebuilt = SectionTrees.OnRebuilt
 	if onRebuilt then
 		local ok, err = pcall(function(): any

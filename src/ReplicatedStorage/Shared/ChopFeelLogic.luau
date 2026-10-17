@@ -154,17 +154,27 @@ end
 ---------------------------------------------------------------------------
 
 ChopFeelLogic.RejectEvery = 25 -- one printed line per this many tracked rejects
-ChopFeelLogic.TrackedRejects = { "cooldown", "far", "noLOS", "rate" } :: { string }
+ChopFeelLogic.TrackedRejects = { "cooldown", "far", "noLOS", "rate", "unknown", "gone", "bad" } :: { string }
 
 local TRACKED: { [string]: boolean } = {}
 for _, reason in ipairs(ChopFeelLogic.TrackedRejects) do
 	TRACKED[reason] = true
 end
 
-export type RejectCounts = { cooldown: number, far: number, noLOS: number, rate: number }
+-- unknown, gone and bad are the silent ones (no toast): a part the server no
+-- longer knows as a section, one that streamed out, a malformed swing.
+export type RejectCounts = {
+	cooldown: number,
+	far: number,
+	noLOS: number,
+	rate: number,
+	unknown: number,
+	gone: number,
+	bad: number,
+}
 
 function ChopFeelLogic.NewRejects(): RejectCounts
-	return { cooldown = 0, far = 0, noLOS = 0, rate = 0 }
+	return { cooldown = 0, far = 0, noLOS = 0, rate = 0, unknown = 0, gone = 0, bad = 0 }
 end
 
 -- Counts `reason` (ignored unless tracked). Returns whether this one is a
@@ -179,17 +189,20 @@ function ChopFeelLogic.CountReject(counts: RejectCounts, reason: string?): boole
 end
 
 function ChopFeelLogic.RejectTotal(counts: RejectCounts): number
-	return counts.cooldown + counts.far + counts.noLOS + counts.rate
+	return counts.cooldown + counts.far + counts.noLOS + counts.rate + counts.unknown + counts.gone + counts.bad
 end
 
 function ChopFeelLogic.RejectLine(userId: number, counts: RejectCounts): string
 	return string.format(
-		"[Chop] user %d rejects: cooldown %d, far %d, noLOS %d, rate %d",
+		"[Chop] user %d rejects: cooldown %d, far %d, noLOS %d, rate %d, unknown %d, gone %d, bad %d",
 		userId,
 		counts.cooldown,
 		counts.far,
 		counts.noLOS,
-		counts.rate
+		counts.rate,
+		counts.unknown,
+		counts.gone,
+		counts.bad
 	)
 end
 

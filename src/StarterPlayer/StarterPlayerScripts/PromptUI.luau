@@ -119,6 +119,29 @@ function PromptUI.Grow(console: boolean, scale: number): number
 	return if console then math.max(1, scale) else 1
 end
 
+-- The card's touch and click press: down starts the prompt's hold, and a prompt
+-- with no hold triggers right there (a phone tap is down and up within a
+-- frame or two, so a hold never completes: playtest t351). Returns whether
+-- the input was a press.
+function PromptUI.PressDown(prompt: ProximityPrompt, input: InputObject): boolean
+	local kind = input.UserInputType
+	if kind == Enum.UserInputType.Touch or kind == Enum.UserInputType.MouseButton1 then
+		UITheme.Click()
+		prompt:InputHoldBegin()
+		return true
+	end
+	return false
+end
+
+function PromptUI.PressUp(prompt: ProximityPrompt, input: InputObject): boolean
+	local kind = input.UserInputType
+	if kind == Enum.UserInputType.Touch or kind == Enum.UserInputType.MouseButton1 then
+		prompt:InputHoldEnd()
+		return true
+	end
+	return false
+end
+
 function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInputType)
 	local adornee, studs = PromptUI.Adornee(prompt.Parent)
 	if not adornee then
@@ -291,17 +314,10 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	button.Parent = card.outer
 	if touch or prompt.ClickablePrompt then
 		on(button.InputBegan, function(input: InputObject)
-			local t = input.UserInputType
-			if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
-				UITheme.Click()
-				prompt:InputHoldBegin()
-			end
+			PromptUI.PressDown(prompt, input)
 		end)
 		on(button.InputEnded, function(input: InputObject)
-			local t = input.UserInputType
-			if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
-				prompt:InputHoldEnd()
-			end
+			PromptUI.PressUp(prompt, input)
 		end)
 	end
 
