@@ -230,4 +230,38 @@ return function(t)
 		t.ok(string.find(fs.readFile(dir .. "DailyUI.luau"), "MenuPad.Open(first, card)", 1, true))
 		t.ok(string.find(fs.readFile(dir .. "ShopUI.luau"), "GamepadNav.Focus(pick, panel)", 1, true))
 	end)
+	t.test("the selection is only set on a control inside the PlayerGui, and a failure never escapes", function()
+		reset()
+		local playerGui = Instance.new("Folder") -- stands in for the local PlayerGui
+		local inside = Instance.new("ScreenGui")
+		inside.Parent = playerGui
+		local insideButton = button("Close", inside)
+		local outside = Instance.new("ScreenGui") -- built, not yet parented to a PlayerGui
+		local outsideButton = button("Close", outside)
+		t.eq(GamepadNav.Reachable(insideButton, playerGui), true)
+		t.eq(GamepadNav.Reachable(outsideButton, playerGui), false)
+		t.eq(GamepadNav.Reachable(outsideButton, nil), true, "no PlayerGui to test against: nothing is refused")
+		t.eq(GamepadNav.Reachable(nil, playerGui), false)
+		local saved = GamepadNav.PlayerGui
+		GamepadNav.PlayerGui = function()
+			return playerGui
+		end
+		GamepadNav.Focus(outsideButton, outside)
+		t.eq(gui.SelectedObject, nil, "the focus call is skipped when the target has no PlayerGui ancestor")
+		GamepadNav.Focus(insideButton, inside)
+		t.eq(gui.SelectedObject, insideButton, "and made when it does")
+		-- Closing a panel that was never focused does not error either.
+		t.ok(pcall(function()
+			GamepadNav.Restore(inside)
+		end))
+		GamepadNav.PlayerGui = saved
+		reset()
+	end)
+
+	t.test("NewsUI opens its Close focus only for a gamepad, after the gui exists, and never lets it fail", function()
+		local src = require("@lune/fs").readFile("src/StarterPlayer/StarterPlayerScripts/NewsUI.luau")
+		t.ok(string.find(src, "HudRules.PadSelects(UITheme.Device())", 1, true), "gamepad only")
+		t.ok(string.find(src, "pcall(function()", 1, true), "wrapped")
+		t.ok(string.find(src, "MenuPad.Open(face, root)", 1, true))
+	end)
 end
