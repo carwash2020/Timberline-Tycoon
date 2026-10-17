@@ -30,6 +30,41 @@ type Entry = { root: GuiObject?, first: GuiObject?, opener: GuiObject? }
 local stack: { Entry } = {}
 local returnTo: GuiObject? = nil
 
+-- Roblox only lets GuiService.SelectedObject name a descendant of the local
+-- PlayerGui: anything else (a gui not yet parented there) raises an error.
+-- The PlayerGui to test against, or nil when there is none to test (a headless
+-- run, or before the player exists): then nothing is refused here.
+GamepadNav.PlayerGui = function(): Instance?
+	local ok, found = pcall(function(): Instance?
+		local lp = game:GetService("Players").LocalPlayer
+		return if lp then lp:FindFirstChildOfClass("PlayerGui") else nil
+	end)
+	return if ok then found else nil
+end
+
+-- Whether `target` may be selected: it is inside `playerGui` (or there is
+-- no PlayerGui to test against).
+function GamepadNav.Reachable(target: Instance?, playerGui: Instance?): boolean
+	if target == nil then
+		return false
+	end
+	if playerGui == nil then
+		return true
+	end
+	return target:IsDescendantOf(playerGui)
+end
+
+-- Sets the selection, only to a control inside the PlayerGui, and never lets a
+-- failure escape (a panel opening must not stop its Start). nil always clears.
+local function choose(target: GuiObject?)
+	if target ~= nil and not GamepadNav.Reachable(target, GamepadNav.PlayerGui()) then
+		return
+	end
+	pcall(function()
+		GuiService.SelectedObject = target
+	end)
+end
+
 local function alive(obj: Instance?): boolean
 	return obj ~= nil and obj.Parent ~= nil
 end
@@ -134,7 +169,7 @@ function GamepadNav.Focus(first: GuiObject?, root: GuiObject?)
 	end
 	returnTo = nil
 	if first then
-		GuiService.SelectedObject = first
+		choose(first)
 	end
 end
 
@@ -164,9 +199,9 @@ function GamepadNav.Restore(root: Instance?)
 		selected == nil
 	)
 	if verdict == "opener" and opener then
-		GuiService.SelectedObject = opener
+		choose(opener)
 	elseif verdict == "clear" then
-		GuiService.SelectedObject = nil
+		choose(nil)
 	end
 end
 

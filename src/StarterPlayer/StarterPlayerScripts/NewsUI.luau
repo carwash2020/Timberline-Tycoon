@@ -11,6 +11,7 @@ local ClientBoot = require(ReplicatedStorage.Shared.ClientBoot)
 local NewsLogic = require(ReplicatedStorage.Shared.NewsLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local HudRules = require(script.Parent.HudRules)
 local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
 
@@ -167,7 +168,13 @@ function NewsUI.Open()
 	end
 	root.Visible = true
 	bindClose()
-	MenuPad.Open(face, root)
+	-- Focus for the gamepad only, after the gui is in the PlayerGui; a failure
+	-- here never stops NewsUI (the Close button works by mouse and touch).
+	pcall(function()
+		if HudRules.PadSelects(UITheme.Device()) then
+			MenuPad.Open(face, root)
+		end
+	end)
 end
 
 local function consider()
