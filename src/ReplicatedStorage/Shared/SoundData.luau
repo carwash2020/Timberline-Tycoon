@@ -3,9 +3,10 @@
 -- to play them in the world (3D) or in your ears (2D). Clients only.
 --
 -- Picking sounds: since Roblox's 2022 audio privacy change only Roblox's
--- own uploads and your own are guaranteed to play. The defaults below are
--- either built into every Roblox client (rbxasset://sounds/...) or used in
--- Roblox's official tutorials. To swap one: in Studio open the Toolbox ->
+-- own uploads and your own are guaranteed to play. The ids below are original
+-- sounds uploaded by Connor's account, built into every Roblox client
+-- (rbxasset://sounds/...), or used in Roblox's official tutorials. A stand-in
+-- stays until its replacement's moderation state is Approved (see PHASE2_NOTES.md). To swap one: in Studio open the Toolbox ->
 -- Audio, filter Creator = Roblox, pick a sound, right-click -> Copy Asset ID,
 -- and paste it as "rbxassetid://<id>" below. An id that fails to load just
 -- stays silent (a warning in Output), it never breaks the game.
@@ -34,13 +35,15 @@ SoundData.Sounds = {
 	Swing = { id = "rbxasset://sounds/swordslash.wav", volume = 0.25, speed = { 0.75, 0.9 } },
 	LuxSwing = { id = "rbxasset://sounds/swordlunge.wav", volume = 0.32, speed = { 0.9, 1.05 } },
 	ChopTooHard = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.5, speed = { 2.4, 2.6 }, rolloff = 60 },
-	TreeCreak = { id = "", volume = 0.6, rolloff = 120 },
+	TreeCreak = { id = "rbxassetid://140235385729394", volume = 0.6, rolloff = 120 },
 	TreeFall = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.35, speed = { 0.5, 0.6 }, rolloff = 160 },
 	-- The hammer's knock when a piece goes down (HammerController): a dull
 	-- thud, a touch higher than a chop so it reads as wood on wood.
 	HammerKnock = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.7, speed = { 0.95, 1.1 }, rolloff = 90 },
 	-- Logs, trucks, selling
 	LogPickup = { id = "rbxasset://sounds/action_jump.mp3", volume = 0.45, speed = { 0.75, 0.85 }, rolloff = 50 },
+	-- A log landing (original sound). LogLoad should use it too once its id is approved.
+	LogThud = { id = "rbxassetid://71299239323730", volume = 0.7, speed = { 0.92, 1.06 }, rolloff = 80 },
 	LogLoad = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.6, speed = { 0.8, 0.9 }, rolloff = 60 },
 	Splash = { id = "rbxasset://sounds/impact_water.mp3", volume = 0.6, rolloff = 80 },
 	Sell = { id = "rbxassetid://4110925712", volume = 0.7 },
@@ -60,29 +63,27 @@ SoundData.Sounds = {
 	Equip = { id = "rbxassetid://282906960", volume = 0.4 },
 	-- Townsfolk murmur when the dialogue box opens for them (NPCController).
 	NPCChatter = { id = "rbxasset://sounds/button.wav", volume = 0.2, speed = { 1.3, 1.6 }, rolloff = 40 },
-	-- A truck's engine loop (VehicleFX sets the pitch per truck). Silent
-	-- until an id is picked: Toolbox > Audio, Creator = Roblox, "engine".
-	Engine = { id = "", volume = 0.35, looped = true, rolloff = 80 },
+	-- A truck's engine loop (VehicleFX sets the pitch per truck): a seamless 4 s loop.
+	Engine = { id = "rbxassetid://79105838138081", volume = 0.35, looped = true, rolloff = 80 },
 	-- Ambience (loops). River and the waterfall are public-domain Creator
 	-- Store sounds (Pro Sound Effects: "River Water 1", "Waterfall
 	-- Background Water Roar 1"). 6564308795 was a private upload Studio
 	-- refuses ("experience doesn't have access permission").
 	Rain = { id = "rbxassetid://1516791621", volume = 0.35, looped = true },
 	River = { id = "rbxassetid://9118187543", volume = 0.4, rolloff = 70, looped = true },
-	-- The living world (AmbientSound, AmbientLife, WeatherController). Empty
-	-- ids are slots waiting for a sound picked in Studio (Toolbox -> Audio,
-	-- Creator = Roblox): until then they stay silent and nothing breaks.
-	-- Same public Pro Sound Effects pack as River (9118…) and the waterfall.
+	-- The living world (AmbientSound, AmbientLife, WeatherController). Crickets,
+	-- wind, lava, wings, quack and the storm crackle are original sounds; the
+	-- rest use the public Pro Sound Effects pack as River (9118...) and the waterfall.
 	BirdsDay = { id = "rbxassetid://9116970949", volume = 0.28, looped = true }, -- morning forest birds
-	CricketsNight = { id = "", volume = 0.25, looped = true }, -- crickets and frogs, at night
+	CricketsNight = { id = "rbxassetid://98495708270834", volume = 0.25, looped = true }, -- crickets and frogs, at night (8 s loop)
 	Owl = { id = "rbxassetid://9117181540", volume = 0.2, looped = true }, -- a hoot in the woods at night
-	WindHowl = { id = "", volume = 0.35, looped = true }, -- the Snowfields, the isles, storms
-	LavaRumble = { id = "", volume = 0.4, looped = true }, -- a low rumble at the Volcano
+	WindHowl = { id = "rbxassetid://135011285595785", volume = 0.35, looped = true }, -- the Snowfields, the isles, storms (8 s loop)
+	LavaRumble = { id = "rbxassetid://126238204708501", volume = 0.4, looped = true }, -- a low rumble at the Volcano (8 s loop)
 	WaterfallRoar = { id = "rbxassetid://9120549564", volume = 0.7, rolloff = 260, looped = true },
 	FishSplash = { id = "rbxasset://sounds/impact_water.mp3", volume = 0.22, speed = { 1.5, 1.8 }, rolloff = 60 },
-	Wings = { id = "", volume = 0.4, rolloff = 60 }, -- a flock taking off
-	Quack = { id = "", volume = 0.35, rolloff = 50 },
-	StormCrackle = { id = "", volume = 0.5, rolloff = 200 }, -- the air crackles before a bolt
+	Wings = { id = "rbxassetid://133814424706029", volume = 0.4, rolloff = 60 }, -- a flock taking off
+	Quack = { id = "rbxassetid://87844016813752", volume = 0.35, rolloff = 50 },
+	StormCrackle = { id = "rbxassetid://88410345542803", volume = 0.5, rolloff = 200 }, -- the air crackles before a bolt
 	-- Music (loops; the Settings toggle turns it off)
 	MusicDay = { id = "rbxassetid://1841461968", volume = 0.18, looped = true },
 	MusicNight = { id = "rbxassetid://1848183670", volume = 0.14, looped = true },
@@ -175,9 +176,20 @@ function SoundData.PlayAt(name: string, position: Vector3, pitch: number?)
 end
 
 -- True when Connor has uploaded his own fell sound (GameConfig.FellSoundId):
--- it then replaces the procedural layers and plays once at the landing.
+-- it then replaces the procedural layers. The sound is a whole fall (creak,
+-- cracks, whoosh, then the thud at TreeLogic.FallTime), so it plays once at
+-- the START of the fall and nothing plays at the landing.
 function SoundData.FellOverridden(): boolean
 	return GameConfig.FellSoundId ~= ""
+end
+
+-- Which sound a fall stage plays when the fall is one uploaded sound: the whole
+-- fall at "start", nothing at "land". Nil when the procedural layers play.
+function SoundData.FellStageSound(stage: string, overridden: boolean): string?
+	if overridden and stage == "start" then
+		return "TreeFall"
+	end
+	return nil
 end
 
 local function playLayer(layer: FellSound.Layer, position: Vector3)
@@ -224,15 +236,16 @@ local function playLayer(layer: FellSound.Layer, position: Vector3)
 end
 
 -- Plays a stage of the layered tree-fall ("start": the cut goes through;
--- "land": it hits the ground) at `position`. With FellSoundId set, that
--- one sound plays at the landing and nothing at the start.
+-- "land": it hits the ground) at `position`. With FellSoundId set, that one
+-- whole-fall sound plays at the start and nothing at the landing.
 function SoundData.PlayFell(stage: "start" | "land", position: Vector3, mass: number, fallSec: number?)
 	if not SoundData.SfxEnabled then
 		return
 	end
 	if SoundData.FellOverridden() then
-		if stage == "land" then
-			SoundData.PlayAt("TreeFall", position)
+		local name = SoundData.FellStageSound(stage, true)
+		if name then
+			SoundData.PlayAt(name, position)
 		end
 		return
 	end

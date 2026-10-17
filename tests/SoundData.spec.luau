@@ -96,6 +96,42 @@ return function(t)
 		t.ok(string.find(src, "function SoundData.PlayAt(name: string, position: Vector3, pitch: number?)", 1, true))
 		t.ok(string.find(src, "s.PlaybackSpeed *= pitch", 1, true))
 		t.ok(SoundData.Sounds.TreeCreak ~= nil, "the creak has an entry")
-		t.eq(SoundData.Sounds.TreeCreak.id, "", "and no id yet: silent until one is supplied, no stand-in")
+		t.eq(SoundData.Sounds.TreeCreak.id, "rbxassetid://140235385729394", "the creak is the uploaded original sound")
+	end)
+	t.test("every sound has a non-empty id, rbxasset or rbxassetid", function()
+		for key, def in pairs(SoundData.Sounds) do
+			t.ok(def.id ~= "", key .. " has an id")
+			t.ok(
+				string.sub(def.id, 1, 11) == "rbxasset://" or string.sub(def.id, 1, 13) == "rbxassetid://",
+				key .. " id is a rbxasset or rbxassetid"
+			)
+		end
+	end)
+
+	t.test("the original sounds are exactly the uploaded ids, loops where they are loops", function()
+		local want = {
+			TreeCreak = { "rbxassetid://140235385729394", false },
+			LogThud = { "rbxassetid://71299239323730", false },
+			Engine = { "rbxassetid://79105838138081", true },
+			CricketsNight = { "rbxassetid://98495708270834", true },
+			WindHowl = { "rbxassetid://135011285595785", true },
+			LavaRumble = { "rbxassetid://126238204708501", true },
+			Wings = { "rbxassetid://133814424706029", false },
+			Quack = { "rbxassetid://87844016813752", false },
+			StormCrackle = { "rbxassetid://88410345542803", false },
+		}
+		for key, row in pairs(want) do
+			t.eq(SoundData.Sounds[key].id, row[1], key)
+			t.eq(SoundData.Sounds[key].looped == true, row[2], key .. " looped")
+		end
+		t.ok(SoundData.Sounds.LogThud.speed ~= nil and SoundData.Sounds.LogThud.rolloff == 80)
+		t.ok(SoundData.Sounds.TreeCreak.id ~= "rbxassetid://124981481503824", "never the older TreeFall upload")
+	end)
+
+	t.test("an uploaded fall sound plays the whole fall at the start and nothing at the landing", function()
+		t.eq(SoundData.FellStageSound("start", true), "TreeFall")
+		t.eq(SoundData.FellStageSound("land", true), nil)
+		t.eq(SoundData.FellStageSound("start", false), nil, "the procedural layers play when nothing is uploaded")
+		t.eq(SoundData.FellStageSound("land", false), nil)
 	end)
 end
