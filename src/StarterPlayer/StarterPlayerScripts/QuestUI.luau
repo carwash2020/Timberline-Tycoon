@@ -323,6 +323,13 @@ function QuestUI.TutorialTree(model: Model, elderUid: unknown): boolean
 	return not (type(elderUid) == "string" and elderUid ~= "" and uid == elderUid)
 end
 
+-- A tree of the spawn's first groves: Murph's three oaks (TutorialGrove) or the
+-- spawn's oak clumps (NearGrove). The beacon points at the nearest of them,
+-- not at a fixed spot.
+function QuestUI.InGrove(model: Model): boolean
+	return model:GetAttribute("TutorialGrove") == true or model:GetAttribute("NearGrove") == true
+end
+
 -- Whether someone else is cutting this tree (its ClaimedBy / ClaimedAt,
 -- SectionLogic.ClaimBlocks at server time `now`): the beacon looks for
 -- another one. `isHere` says who's in the server.
@@ -375,7 +382,7 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 	if target == "tree" then
 		if step.grove then
 			local grove = nearestTagged("Tree", from, function(model)
-				return choppable(model) and model:GetAttribute("TutorialGrove") == true
+				return choppable(model) and QuestUI.InGrove(model)
 			end)
 			if grove then
 				return grove

@@ -240,10 +240,14 @@ return function(t)
 	end
 
 	-- Palms, the north-strip stands, Lane R's region woods and the added trees and teasers
-	-- (WORLD-T323). Lanternwood is planted only once WoodData has the row (B12).
+	-- (WORLD-T323) and the spawn's oak clumps (WORLD-SPREAD). Lanternwood is planted only once WoodData has the row (B12).
 	local function extraTrees(WorldPlan)
 		local WoodData = t.shared("WoodData")
-		local n = #WorldPlan.StripTrees() + #WorldPlan.FerryPalms() + #WorldPlan.RegionTrees() + #WorldPlan.AddedTrees()
+		local n = #WorldPlan.StripTrees()
+			+ #WorldPlan.FerryPalms()
+			+ #WorldPlan.RegionTrees()
+			+ #WorldPlan.AddedTrees()
+			+ #WorldPlan.NearGrove()
 		if WoodData.Get("lanternwood") then
 			n += #WorldPlan.Lanternwood()
 		end

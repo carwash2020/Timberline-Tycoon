@@ -981,6 +981,36 @@ function WorldPlan.AddedTrees(pause: (() -> ())?): { TreeSpot }
 	return out
 end
 
+-- WORLD-SPREAD (T349): the oak clumps round the spawn (Shared/World/NearGrove).
+-- Planned against the first trees and the town's rings, the same inputs
+-- MapBuilder hands NearGrove.Plan the moment the town batch arrives, so the
+-- plan is identical. Not part of Trees(): nothing there moves. Cached in a
+-- field (WorldPlan is near the 200 locals limit, so none was added).
+-- NearGrove.Plan against `nearby` (the trees standing round the spawn), here
+-- so MapBuilder reaches it through the WorldPlan whose TreeFill is bound.
+function WorldPlan.NearGrovePlan(nearby: { Vector3 }, pause: (() -> ())?): { TreeSpot }
+	return require(script.Parent.NearGrove).Plan(nearby, pause)
+end
+
+function WorldPlan.NearGrove(): { TreeSpot }
+	local self: any = WorldPlan
+	if self._nearGrove then
+		return self._nearGrove
+	end
+	local nearby: { Vector3 } = {}
+	for _, spot in ipairs(WorldPlan.FirstTrees()) do
+		table.insert(nearby, spot.position)
+	end
+	for _, spot in ipairs(WorldPlan.Trees()) do
+		if spot.zone and string.sub(spot.zone.id, 1, 5) == "town:" then
+			table.insert(nearby, spot.position)
+		end
+	end
+	local out = WorldPlan.NearGrovePlan(nearby)
+	self._nearGrove = out
+	return out
+end
+
 export type PointOfInterest = {
 	id: string,
 	name: string,
