@@ -61,7 +61,7 @@ foreach ($icon in $Icons) {
     Start-Sleep -Milliseconds 400
 }
 
-$note = 'If a state is Pending, wait a few minutes and run it again. Blocked or InReview means Roblox moderation has not cleared that image. To see a picture, paste its image URL into a browser yourself. If two pictures are swapped (for example the Lux Axe shows coins), tell Claude which pair.'
+$note = 'If a state is Pending, wait a few minutes and run it again. Blocked or InReview means Roblox moderation has not cleared that image. To see a picture, paste its image URL into a browser yourself. If two pictures are swapped (for example the Lux Axe shows coins), tell the build agent which pair.'
 $lines.Add('')
 $lines.Add($note)
 $out = Join-Path (Get-Location) 'STORE-ICONS-CHECK.md'

@@ -1,6 +1,6 @@
 --!strict
 -- UITheme: the game's look, from the UI spec ("Timberline Tycoon UI",
--- Claude Design). Every screen builds from these parts so they match.
+-- the UI design spec). Every screen builds from these parts so they match.
 --   * Colours and fonts (GothamBold titles and buttons, Gotham body;
 --     Heading, Black and Bold are aliases of those, so older screens
 --     keep compiling).

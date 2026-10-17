@@ -52,7 +52,7 @@ flagged as you type.
 3. In Studio: **Plugins → Rojo → Connect**. Scripts appear under
    ServerScriptService, ReplicatedStorage and StarterPlayerScripts.
 4. Press **Play**. Keep **View → Output** open; errors show up there.
-5. Found a problem? Paste the Output text (or a screenshot) to Claude.
+5. Found a problem? Paste the Output text (or a screenshot) to the build agent.
 
 `./scripts/check.sh` runs everything that doesn't need Studio: the
 formatter check, the linter, a strict type check against the Roblox API,

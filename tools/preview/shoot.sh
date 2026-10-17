@@ -11,7 +11,7 @@
 # shoot one view at a time, and one scene at a time.
 #
 # Needs Node and Playwright with a Chromium (both come preinstalled in
-# Claude Code cloud sessions; elsewhere `npx playwright install chromium`).
+# cloud sessions; elsewhere `npx playwright install chromium`).
 # three.js and Playwright are linked once into $RENDER_HOME
 # (default ~/.cache/timberline-render), so renders work offline.
 set -euo pipefail

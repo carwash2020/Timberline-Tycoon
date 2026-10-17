@@ -154,7 +154,7 @@ Slices, in order:
 - 🟡 Settings menu (music, sound effects), saved with the profile
 - 🟡 Feel: the chop target outline, the cash count-up and "+$" pops,
   camera shake when a tree lands
-- 🟡 UI pass from the Claude Design spec: HUD, side buttons, shop panel,
+- 🟡 UI pass from the UI design spec: HUD, side buttons, shop panel,
   tutorial and Murph cards, beacon, custom prompts, console and phone
   sizes (UITheme). Still to do: upload the wood-grain and kraft textures
 - ⬜ Icon and thumbnail: layouts are in the UI spec (6a/6b, 7a/7b); they
@@ -172,7 +172,7 @@ Slices, in order:
 - Seasons and festivals (the build plan is in GAME_DESIGN §12)
 
 ## What only Connor can do
-- Play each build in Studio and report back (Claude can't run Studio)
+- Play each build in Studio and report back (Studio cannot be run from the build environment)
 - Decide prices, the cut line, and anything that changes the design's
   numbers
 - Art in Studio, publishing, Creator Hub settings

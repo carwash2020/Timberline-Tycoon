@@ -234,7 +234,7 @@ local function reportTown(terrain: Terrain, cast: Cast?): number?
 				hits,
 				if terrain:GetAttribute("Prebuilt") == true
 					then " The baked terrain is out of date: clear Workspace.Terrain's Prebuilt attribute and publish again."
-					else " Send this line to Claude."
+					else " Send this line to the build agent."
 			)
 		)
 	else

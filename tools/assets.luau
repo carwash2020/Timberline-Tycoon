@@ -10,7 +10,7 @@
 -- reads (so the PowerShell script never parses markdown).
 --
 -- STATUS here is what the repo can prove. Nothing in this file has been
--- checked against Roblox (the Claude sandbox cannot reach any Roblox
+-- checked against Roblox (the build sandbox cannot reach any Roblox
 -- endpoint) and nothing has been seen in Studio. "format ok" means the id is
 -- a well-formed number of the right length for its kind; it does not mean the
 -- asset exists, is the right type, or is allowed to load in the experience.

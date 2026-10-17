@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The pinned toolchain (rokit.toml) on a Linux x86_64 machine without Rokit,
-# e.g. a Claude Code cloud session. On a Mac use ./setup.sh instead.
+# e.g. a cloud session. On a Mac use ./setup.sh instead.
 #   bash scripts/cloud-setup.sh
 # Downloads the release binaries into ~/.local/tools and links them into
 # /usr/local/bin (or ~/.local/bin when that isn't writable). Safe to re-run.
