@@ -38,7 +38,11 @@ return function(t)
 	end)
 
 	t.test("wood goals ask for wood the player's axe can fell", function()
-		t.eq(DailyData.WoodsFor(1), { "oak", "birch" })
+		t.eq(
+			DailyData.WoodsFor(1),
+			{ "oak", "birch", "cherry" },
+			"cherry is a Starter Forest wood the Rusty Axe fells (WORLD-T323)"
+		)
 		local steel = DailyData.WoodsFor(2)
 		t.ok(table.find(steel, "pine") ~= nil, "the Steel Axe fells pine")
 		for tier = 1, #DailyData.Tiers do

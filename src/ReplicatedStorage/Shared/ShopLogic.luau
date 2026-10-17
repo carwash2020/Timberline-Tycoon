@@ -91,7 +91,15 @@ end
 function ShopLogic.FellSummary(axe: AxeDef, maxHits: number?, count: number?): string
 	local limit = maxHits or 30
 	local parts: { string } = {}
-	local woods = WoodData.All()
+	-- By tree HP, not list order: woods appended to the list later (Cherry,
+	-- Willow) must not take the place of a tougher wood on the card.
+	local woods = table.clone(WoodData.All())
+	table.sort(woods, function(a, b)
+		if a.treeHP ~= b.treeHP then
+			return a.treeHP < b.treeHP
+		end
+		return a.id < b.id
+	end)
 	for i = #woods, 1, -1 do
 		local wood = woods[i]
 		local damage = ItemCatalog.AxeDamage(axe, wood)

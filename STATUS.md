@@ -27,6 +27,9 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
+## World additions (branch `phase-2/world-t323`, 16 October 2026, draft)
+Cherry and Willow woods with meshes, Amber and Garnet ores (Mix and mining pins updated), 100 added trees and the teasers that pass the stage rule (outside `BiomeData.trees`, so the economy supply caps do not move). Deviations and Studio checks: PHASE2_NOTES.md "World additions".
+
 ## Wood effects on buildings (branch `phase-2/wood-effects`, 16 October 2026, draft)
 Frost, ember, gloam and lumen doors take an accent colour; ember, gloam and lantern doors glow at night; ember and gloam buildings get a few sparks (capped 8 high, 4 medium, 0 low). Cosmetic and client-side; no price, save or remote change. Details and Studio checks: PHASE2_NOTES.md "Wood effects on buildings".
 

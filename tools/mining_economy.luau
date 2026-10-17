@@ -25,6 +25,8 @@ local PROPOSAL = {
 	Gold = { chunk = 65, ingot = 180 },
 	TimberOpal = { chunk = 150, ingot = 400 },
 	Heartstone = { chunk = 400, ingot = 1050 },
+	Amber = { chunk = 50, ingot = nil }, -- WORLD-T323: added with its tuned values
+	Garnet = { chunk = 70, ingot = 190 }, -- WORLD-T323
 }
 
 local function supplyCap(marker: string): number?
@@ -208,7 +210,7 @@ add("")
 add("## Proposal, then the Frostwood retune")
 add("")
 add(
-	"Hills and Snow values are the proposal. Gloam is retuned against Frostwood ($28,677), not cut to fit Gloamwood. Timber Opal is $90 / $240, so a Steel Pick (level 4) can mine it. Heartstone is $210 / $560. Steel or Lux at Gloam earns about $10.7k/h. Obsidian earns about $19.1k/h, 0.67× Frostwood."
+	"Hills and Snow values are the proposal. Gloam is retuned against Frostwood ($28,677), not cut to fit Gloamwood. Timber Opal is $90 / $240, so a Steel Pick (level 4) can mine it. Heartstone is $210 / $560. Amber ($50, tier 2) and Garnet ($70 / $190, tier 3, Steel Pick) join the mix. Steel or Lux at Gloam earns about $10.0k/h. Obsidian earns about $18.4k/h, 0.64× Frostwood."
 )
 add("")
 add("| Ore | Proposal chunk / ingot | Tuned chunk / ingot |")
@@ -318,9 +320,9 @@ local function near(got: number, want: number, label: string)
 		error(string.format("%s is %.1f, expected about %.1f", label, got, want))
 	end
 end
-near(MiningLogic.Income(3, "SteelPick"), 10732.5, "Steel at Gloam")
-near(MiningLogic.Income(3, "LuxPickaxe"), 10732.5, "Lux at Gloam")
-near(MiningLogic.Income(3, "ObsidianPick"), 19110, "Obsidian at Gloam")
+near(MiningLogic.Income(3, "SteelPick"), 9982.5, "Steel at Gloam")
+near(MiningLogic.Income(3, "LuxPickaxe"), 9982.5, "Lux at Gloam")
+near(MiningLogic.Income(3, "ObsidianPick"), 18360, "Obsidian at Gloam")
 if bomb ~= 220 then
 	error("bomb price drifted from GameConfig.DynamitePrice 220")
 end

@@ -42,7 +42,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 | Kind | Distinct ids | Places written | Written in |
 | --- | ---: | ---: | --- |
-| mesh | 1082 | 1353 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, PendingMeshes.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau, WornModels.luau |
+| mesh | 1094 | 1371 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, PendingMeshes.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau, WornModels.luau |
 | model | 206 | 206 | BacklogModels.luau, MachineMeshes.luau, TownModels.luau |
 | template | 1015 | 1015 | src/ReplicatedStorage/MeshTemplates |
 | image | 18 | 18 | StoreData.luau, UIArt.luau, UITheme.luau, WeatherController.luau |
@@ -90,7 +90,7 @@ Not wired by these slots (another lane wires them; no slot here):
 | `assets/glb/store-items/ShedBlueprint.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 | `assets/glb/store-items/WoodSign.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 
-## Meshes (MeshId, loaded by MeshKit) (1082)
+## Meshes (MeshId, loaded by MeshKit) (1094)
 
 | Id | Used by | Places | Status |
 | --- | --- | ---: | --- |
@@ -982,6 +982,12 @@ Not wired by these slots (another lane wires them; no slot here):
 | 86692571898747 | TreeModels.luau  | 1 | template, format ok, not checked yet |
 | 105909881859734 | TreeModels.luau  | 1 | template, format ok, not checked yet |
 | 119571685053021 | TreeModels.luau  | 1 | template, format ok, not checked yet |
+| 79356553290404 | TreeModels.luau  | 1 | no template, format ok, not checked yet |
+| 97477811876012 | TreeModels.luau  | 1 | no template, format ok, not checked yet |
+| 113366252051468 | TreeModels.luau  | 1 | no template, format ok, not checked yet |
+| 96586093008955 | TreeModels.luau  | 1 | no template, format ok, not checked yet |
+| 107944902995245 | TreeModels.luau  | 1 | no template, format ok, not checked yet |
+| 137219565562843 | TreeModels.luau  | 1 | no template, format ok, not checked yet |
 | 104687332442263 | TreeModels.luau oak Leaves | 2 | template, format ok, not checked yet |
 | 125835772079020 | TreeModels.luau oak Leaves | 2 | template, format ok, not checked yet |
 | 125036188202077 | TreeModels.luau oak Leaves | 2 | template, format ok, not checked yet |
@@ -1043,6 +1049,12 @@ Not wired by these slots (another lane wires them; no slot here):
 | 94998985796939 | TreeModels.luau ironwood Facet | 2 | template, format ok, not checked yet |
 | 113121369608961 | TreeModels.luau ironwood Facet | 2 | template, format ok, not checked yet |
 | 126069617401030 | TreeModels.luau ironwood Facet | 2 | template, format ok, not checked yet |
+| 101745006486253 | TreeModels.luau cherry  | 2 | no template, format ok, not checked yet |
+| 92180340298006 | TreeModels.luau cherry  | 2 | no template, format ok, not checked yet |
+| 85408796934215 | TreeModels.luau cherry  | 2 | no template, format ok, not checked yet |
+| 122744791844738 | TreeModels.luau willow  | 2 | no template, format ok, not checked yet |
+| 118587333632223 | TreeModels.luau willow  | 2 | no template, format ok, not checked yet |
+| 121020528796354 | TreeModels.luau willow  | 2 | no template, format ok, not checked yet |
 | 135063576797220 | VehicleModels.luau Rustbucket  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 135044303797643 | VehicleModels.luau Rustbucket  | 1 | template, format ok, not checked yet |
 | 100118337585227 | VehicleModels.luau Rustbucket  | 1 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
