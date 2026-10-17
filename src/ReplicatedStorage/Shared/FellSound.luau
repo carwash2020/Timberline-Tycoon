@@ -11,7 +11,7 @@
 --
 -- To use a real recording instead, set GameConfig.FellSoundId to your
 -- uploaded "rbxassetid://<id>": it then replaces every layer here with
--- that one sound, played at the landing.
+-- that one whole-fall sound, played at the start of the fall (SoundData.PlayFell).
 
 local FellSound = {}
 

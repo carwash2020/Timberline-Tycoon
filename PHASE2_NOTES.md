@@ -1170,13 +1170,24 @@ In Studio's command bar while playing (server side, the "Server" view):
 - In chat (Studio only): `/giveaxe inferno` (any part of an axe's name)
   gives a temporary axe.
 
-### Sounds to pick
+### Sounds to pick (done: custom ids wired)
 
-Some new sounds have no id yet and stay silent until you pick one (Toolbox
-> Audio, Creator = Roblox, right-click > Copy Asset ID, paste as
-`"rbxassetid://<id>"` in `Shared/SoundData.luau`): **BirdsDay,
-CricketsNight, WindHowl, LavaRumble, Wings, Quack, StormCrackle, Engine**.
-An id that fails to load is just silent (a warning in Output).
+The empty sound slots now hold original sounds uploaded by Connor's account
+(`rbxassetid://<id>`): TreeCreak 140235385729394, Engine 79105838138081 (loop, 4 s),
+CricketsNight 98495708270834 (loop, 8 s), WindHowl 135011285595785 (loop, 8 s),
+LavaRumble 126238204708501 (loop, 8 s), Wings 133814424706029, Quack 87844016813752,
+StormCrackle 88410345542803, and a new LogThud 71299239323730. BirdsDay keeps its
+public sound. An id still in review stays silent and writes at most one "Failed to
+load sound" line until it is approved.
+
+**Still pending (stand-ins kept):** Chop (ChopWood A 133964837601909, speed 0.95 to 1.08),
+ChopFinal (ChopWood B 100703280019996, speed 0.95 to 1.05), TreeFall (122730459919628,
+volume 0.8, speed 0.97 to 1.03; also `GameConfig.FellSoundId` and `ChopSoundId`) and
+LogLoad (71299239323730) wait for their moderation state to read Approved. Their
+moderation list was not reachable when this was wired, so they were not switched.
+`SoundData.PlayFell` is ready for the uploaded fall sound: with `FellSoundId` set it plays
+the whole fall once at the start (creak, cracks, whoosh, thud at `TreeLogic.FallTime`) and
+nothing at the landing (`SoundData.FellStageSound`).
 
 ### Playtest checklist
 
