@@ -98,6 +98,21 @@ return function(t)
 		t.eq(part.Parent.Name, "ToolShed")
 	end)
 
+	-- WORLD-SPREAD (T349): the first-groves beacon points at the nearest tree of
+	-- Murph's oaks or the spawn's oak clumps, not at one fixed spot.
+	t.test("the first groves: Murph's oaks and the spawn's oak clumps, nothing else", function()
+		local function tree(attrs)
+			local model = Instance.new("Model")
+			for key, value in pairs(attrs) do
+				model:SetAttribute(key, value)
+			end
+			return model
+		end
+		t.eq(QuestUI.InGrove(tree({ TutorialGrove = true })), true)
+		t.eq(QuestUI.InGrove(tree({ NearGrove = true })), true)
+		t.eq(QuestUI.InGrove(tree({ HP = 40 })), false)
+	end)
+
 	-- PLAY-03: the plant step's fallback (and the first step's tree) never
 	-- point at an Elder: it leaves no stump to plant in.
 	t.test("the tutorial's trees: standing ones, never an Elder", function()

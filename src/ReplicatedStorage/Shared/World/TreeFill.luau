@@ -1019,10 +1019,10 @@ function TreeFill.TownGround(x: number, z: number): boolean
 	return TreeFill.TownWhy(x, z) == nil
 end
 
--- The ground test for a tree of `zone`: a town zone ("town:...") uses
--- TownGround; every other zone the general one.
+-- The ground test for a tree of `zone`: a town zone ("town:...") or the
+-- spawn's oak clumps ("neargrove:...", NearGrove) use TownGround; every other zone the general one.
 function TreeFill.GroundFor(zone: TreeZone?, x: number, z: number): boolean
-	if zone and string.sub(zone.id, 1, 5) == "town:" then
+	if zone and (string.sub(zone.id, 1, 5) == "town:" or string.sub(zone.id, 1, 10) == "neargrove:") then
 		return TreeFill.TownGround(x, z)
 	end
 	-- Lane R: the Bayou's and Red Mesa's trees keep off those regions' own builds.

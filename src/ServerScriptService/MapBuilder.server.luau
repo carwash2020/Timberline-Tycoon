@@ -316,6 +316,10 @@ local function spawnTree(woodId: string, at: Vector3, region: string, zone: Worl
 		else TreeService.SpawnTree(woodId, CFrame.new(at))
 	if model then
 		model:SetAttribute("Region", region)
+		-- The spawn's oak clumps (T349): a tutorial beacon may point at them.
+		if zone and string.sub(zone.id, 1, 10) == "neargrove:" then
+			model:SetAttribute("NearGrove", true)
+		end
 	end
 	treesSpawned += 1
 	return model
@@ -758,6 +762,7 @@ step("5. The trees", function()
 			collect(WorldPlan.ReachTrees(), true)
 			collect(WorldPlan.RegionTrees(), false)
 			collect(WorldPlan.AddedTrees(), false) -- WORLD-T323
+			collect(WorldPlan.NearGrove(), false) -- WORLD-SPREAD T349
 			loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
 			for _, e in ipairs(entries) do
 				plantOne(e)
@@ -868,6 +873,7 @@ step("5. The trees", function()
 				order += #first
 				-- Then each batch the planner finishes, as it finishes it. The first one
 				-- is the town's trees, the ring round the spawn.
+				local groveDone = false
 				local all = WorldPlan.Trees(planSlice.step, function(batch: { WorldPlan.TreeSpot })
 					local fresh: { WorldPlan.TreeSpot } = {}
 					for _, spot in ipairs(batch) do
@@ -876,10 +882,36 @@ step("5. The trees", function()
 							table.insert(fresh, spot)
 						end
 					end
+					-- The spawn's oak clumps (T349): planned against the first trees and
+					-- this town batch (the same inputs as WorldPlan.NearGrove), handed over
+					-- with it, so the near ring waits for them and they stand with the town.
+					if not groveDone then
+						groveDone = true
+						local standing: { Vector3 } = {}
+						for _, spot in ipairs(first) do
+							table.insert(standing, spot.position)
+						end
+						for _, spot in ipairs(fresh) do
+							if spot.zone and string.sub(spot.zone.id, 1, 5) == "town:" then
+								table.insert(standing, spot.position)
+							end
+						end
+						local grove = WorldPlan.NearGrovePlan(standing, planSlice.step)
+						add(entriesOf(grove, false, order))
+						order += #grove
+					end
 					add(entriesOf(fresh, false, order))
 					order += #fresh
 					nearOpen = true
 				end)
+				-- A plan that was already cached hands over no batches: the oak clumps
+				-- come from the same inputs here.
+				if not groveDone then
+					groveDone = true
+					local grove = WorldPlan.NearGrove()
+					add(entriesOf(grove, false, order))
+					order += #grove
+				end
 				-- Whatever the planner did not hand over on the way (nothing, once
 				-- its batches all came): the rest of the list.
 				local rest: { WorldPlan.TreeSpot } = {}
