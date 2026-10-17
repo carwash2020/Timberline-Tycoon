@@ -151,6 +151,56 @@ return function(t)
 		t.eq(press.Selectable, false)
 	end)
 
+	-- Playtest t351: "TAP Read the carving" did nothing on a phone. A tap puts the
+	-- card's Press face down and up within a frame or two, so a prompt with a
+	-- HoldDuration never completes; one with 0 triggers on the touch-down.
+	t.test("touch contract: a tap calls InputHoldBegin on the touch-down, and a no-hold prompt triggers", function()
+		local Enum = t.roblox.Enum
+		local loader = t.loader({
+			services = {
+				GuiService = {
+					IsTenFootInterface = function()
+						return false
+					end,
+				},
+				Players = { LocalPlayer = {} },
+				TextChatService = {},
+				UserInputService = { TouchEnabled = true, KeyboardEnabled = false },
+				ProximityPromptService = {},
+				TweenService = {},
+				CollectionService = {},
+				RunService = {},
+			},
+			globals = { task = { defer = function() end, spawn = function() end, delay = function() end } },
+		})
+		local PromptUI = loader:load("StarterPlayer/StarterPlayerScripts/PromptUI")
+		local began, ended, triggered = 0, 0, 0
+		local prompt
+		prompt = {
+			HoldDuration = 0,
+			InputHoldBegin = function()
+				began += 1
+				if prompt.HoldDuration == 0 then
+					triggered += 1 -- the engine triggers a no-hold prompt on the press
+				end
+			end,
+			InputHoldEnd = function()
+				ended += 1
+			end,
+		}
+		local touch = { UserInputType = Enum.UserInputType.Touch }
+		t.ok(PromptUI.PressDown(prompt, touch))
+		t.eq(began, 1, "touch-down starts the press")
+		t.eq(triggered, 1, "a prompt with no hold triggers on that tap")
+		t.ok(PromptUI.PressUp(prompt, touch))
+		t.eq(ended, 1)
+		t.ok(not PromptUI.PressDown(prompt, { UserInputType = Enum.UserInputType.Keyboard }), "a key is not a press")
+		t.eq(began, 1)
+		prompt.HoldDuration = 0.3
+		PromptUI.PressDown(prompt, touch)
+		t.eq(triggered, 1, "with a hold the touch-down alone does not trigger it")
+	end)
+
 	-- Client audit leftover (11 October 2026): Start used to walk every
 	-- descendant of the workspace in one frame, and restyle every instance
 	-- the forest added (an IsA call each). Now the scan is sliced and only

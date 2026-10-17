@@ -98,7 +98,9 @@ function ForemanData.Lines(state: State): { string }
 	if finished > 0 then
 		return { "Paid so far. Keep at it.", string.format("%d job%s left today.", open, if open == 1 then "" else "s") }
 	end
-	return { "Three jobs today.", "Finish one and come back for your pay." }
+	-- The goals are long ("Load 12 logs into your truck"), so the box points at
+	-- the board that opens as it closes instead of squeezing them in.
+	return { "Three jobs today.", "Tap Continue to see the board." }
 end
 
 return ForemanData

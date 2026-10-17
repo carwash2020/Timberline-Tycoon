@@ -269,10 +269,6 @@ local function refresh()
 		if slot then
 			slot.Visible = b.Visible
 		end
-		local p = panel
-		if p and not b.Visible then
-			p.Visible = false
-		end
 		local compact = UITheme.Compact()
 		b.AutomaticSize = if compact then Enum.AutomaticSize.None else Enum.AutomaticSize.X
 		if compact then

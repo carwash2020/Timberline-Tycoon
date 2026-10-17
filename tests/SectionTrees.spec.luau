@@ -1190,6 +1190,145 @@ return function(t)
 		MeshKit.Reset()
 	end)
 
+	-- Playtest t351: brown standing trees could not be chopped while their grey
+	-- pieces could. A tree registered before its meshes had loaded is part-built;
+	-- when the meshes land TreeMeshes swaps every Section for a MeshPart and
+	-- destroys the old ones, but the record still pointed at the destroyed parts,
+	-- so a chop on the new section was "unknown" (no toast, no count).
+	local function lateMeshes(s)
+		local MeshKit = s.loader:load("ReplicatedStorage/Shared/Art/MeshKit")
+		MeshKit.Reset()
+		MeshKit.Override = nil
+		MeshKit.Retries = 0
+		local jobs = {}
+		MeshKit.Scheduler = {
+			spawn = function(fn)
+				table.insert(jobs, fn)
+			end,
+			wait = function() end,
+			clock = os.clock,
+		}
+		MeshKit.EngineLoad = function(meshId)
+			local part = Instance.new("MeshPart")
+			part.Name = "Loaded" .. tostring(meshId)
+			part.Size = Vector3.new(1, 1, 1)
+			return part, nil
+		end
+		local TreeModels = s.loader:shared("Art/TreeModels")
+		return MeshKit,
+			function()
+				-- Every mesh the oak needs lands together (as a finished preload would
+				-- bring them), then the swap queue drains.
+				for sid = 1, 60 do
+					local id = TreeModels.SectionMesh("oak", sid)
+					if TreeModels.UsesMesh(id) then
+						MeshKit.Request(id)
+					end
+				end
+				for _, piece in ipairs(TreeModels.Crown("oak")) do
+					if TreeModels.UsesMesh(piece.meshId) then
+						MeshKit.Request(piece.meshId)
+					end
+				end
+				for _ = 1, 50 do
+					if #jobs == 0 then
+						break
+					end
+					pcall(table.remove(jobs, 1))
+				end
+			end
+	end
+
+	local function swapped(s, opts)
+		local MeshKit, land = lateMeshes(s)
+		local rec = s.tree("oak", Vector3.new(0, 0, 0), opts)
+		local before = rec.model
+		local firstId = rec.sections[1]
+		t.ok(firstId and not firstId:IsA("MeshPart"), "part-built while the meshes load")
+		land()
+		t.eq(rec.model:GetAttribute("TreeMesh"), true, "the meshes landed and the model swapped")
+		t.fireAttributeChanged(rec.model, "TreeMesh") -- the engine's signal for that SetAttribute
+		return MeshKit, rec, before
+	end
+
+	t.test("a tree whose meshes land late can be chopped on its new sections", function()
+		local s = setup()
+		local _, rec = swapped(s)
+		local trunk = nil
+		for _, d in ipairs(rec.model:GetDescendants()) do
+			if d:IsA("MeshPart") and d.Name == "Section" and d:GetAttribute("Section") == 1 then
+				trunk = d
+			end
+		end
+		t.ok(trunk, "a MeshPart trunk section")
+		local found, id = s.Trees.FromPart(trunk)
+		t.ok(found == rec and id == 1, "the swapped section is found again")
+		local p = s.player(1, trunk.CFrame.Position + Vector3.new(2.5, 0, 0))
+		local ok, why = s.swing(p, trunk)
+		t.ok(ok, "a chop on the swapped trunk lands: " .. tostring(why))
+		t.ok(rec.cuts[1] ~= nil, "it opened a cut on that section")
+		local cut = rec.cuts[1]
+		local ok2 = s.swing(p, trunk)
+		t.ok(ok2, "a second chop")
+		t.ok(rec.cuts[1] == cut, "adds to the same cut")
+	end)
+
+	t.test("a late-meshed tree still fells, leaves a cuttable stump and regrows on its timer", function()
+		local s = setup()
+		local _, rec = swapped(s)
+		local trunk = rec.sections[1]
+		local p = s.player(1, trunk.CFrame.Position + Vector3.new(2.5, 0, 0))
+		local _, ok, why, result = s.cutThrough(p, trunk)
+		t.ok(ok, tostring(why))
+		t.ok(result and #result.freed > 0, "the trunk fell as a piece")
+		s.clearSite(p, rec)
+		t.ok(s.Trees.RegrowsIn(rec.uid) ~= nil or rec.slot ~= nil, "the regrow timer is running")
+	end)
+
+	t.test("a dormant tree stays non-solid and non-queryable after its meshes land", function()
+		local s = setup()
+		local MeshKit, land = lateMeshes(s)
+		local rec = s.tree("oak", Vector3.new(0, 0, 0))
+		s.Trees.SetBiomeDormant(rec.def.biome, true)
+		t.ok(rec.dormant, "asleep before the meshes land")
+		land()
+		t.fireAttributeChanged(rec.model, "TreeMesh")
+		for _, d in ipairs(rec.model:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == "Section" then
+				t.eq(d.CanQuery, false, "a hidden section is not queryable")
+				t.eq(d.CanCollide, false, "or solid")
+			end
+		end
+		t.ok(MeshKit ~= nil)
+	end)
+
+	t.test("Cherry and Willow built with no mesh at all stay choppable (QA found their templates missing)", function()
+		for _, wood in ipairs({ "cherry", "willow" }) do
+			local s = setup()
+			local MeshKit = s.loader:load("ReplicatedStorage/Shared/Art/MeshKit")
+			MeshKit.Reset()
+			MeshKit.Override = function()
+				return nil -- no template, no upload: the load fails
+			end
+			local rec = s.tree(wood)
+			MeshKit.Override = nil
+			local trunk = rec.sections[1]
+			t.ok(trunk and not trunk:IsA("MeshPart"), wood .. " is part-built")
+			local p = s.player(1, trunk.CFrame.Position + Vector3.new(2.5, 0, 0))
+			local ok, why = s.swing(p, trunk)
+			t.ok(ok, wood .. " takes a chop: " .. tostring(why))
+		end
+	end)
+
+	t.test("a late-meshed tree keeps its trunk radius, home pivot and sway top", function()
+		local s = setup()
+		local _, rec = swapped(s)
+		t.ok(rec.radius > 0)
+		t.eq(rec.model:GetAttribute("TrunkRadius"), rec.radius)
+		t.ok(rec.model:GetAttribute("HomePivot") ~= nil)
+		t.ok(rec.model:GetAttribute("SwayTop") ~= nil)
+	end)
+
 	t.test("a boot tree standing in a haul road regrows off it within one tick", function()
 		local s = setup()
 		-- SectionTrees loads WorldPlan, which binds this loader's TreeFill.
@@ -1492,10 +1631,19 @@ return function(t)
 		s.swing(q, part)
 		s.rayHit = nil
 		t.eq(s.Trees.RejectCounts(3).noLOS, 1)
-		-- Not tracked: a bad payload counts nowhere.
-		s.Trees.Chop(q, part, "junk", Vector3.xAxis)
+		-- The silent ones count too: a bad payload, and a part that is not a section.
+		s.now += 1
+		local _, why = s.Trees.Chop(q, part, "junk", Vector3.xAxis)
+		t.eq(why, "bad")
+		t.eq(s.Trees.RejectCounts(3).bad, 1)
+		s.now += 1
+		local stray = Instance.new("Part")
+		stray.Parent = rec.model
+		local _, why2 = s.Trees.Chop(q, stray, Vector3.new(2, 2, 0), Vector3.xAxis)
+		t.eq(why2, "unknown")
+		t.eq(s.Trees.RejectCounts(3).unknown, 1)
 		local c = s.Trees.RejectCounts(3)
-		t.eq(c.cooldown + c.far + c.noLOS + c.rate, 1)
+		t.eq(c.cooldown + c.far + c.noLOS + c.rate, 1, "the loud reasons are unchanged")
 		-- Leaving clears it.
 		s.Trees.PlayerLeft(1)
 		t.eq(s.Trees.RejectCounts(1).cooldown, 0)

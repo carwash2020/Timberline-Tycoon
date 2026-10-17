@@ -25,6 +25,23 @@ local luau = require("@lune/luau")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 
+-- Lune's Instance has no GetAttributeChangedSignal. This one connects and keeps
+-- the callbacks; a spec fires them with t.fireAttributeChanged (the engine
+-- does it when SetAttribute changes a value; here SetAttribute does not).
+local attributeListeners: { [any]: { [string]: { () -> () } } } = setmetatable({}, { __mode = "k" }) :: any
+pcall(roblox.implementMethod, "Instance", "GetAttributeChangedSignal", function(self: any, name: string)
+	return {
+		Connect = function(_, fn: () -> ())
+			local byName = attributeListeners[self] or {}
+			attributeListeners[self] = byName
+			local list = byName[name] or {}
+			byName[name] = list
+			table.insert(list, fn)
+			return { Disconnect = function() end }
+		end,
+	}
+end)
+
 assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tests/run")
 
 local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
@@ -165,6 +182,12 @@ for _, file in ipairs(specs) do
 	local shared = Loader.new()
 	local tests = {}
 	local t = { roblox = roblox }
+	function t.fireAttributeChanged(inst: any, name: string)
+		local byName = attributeListeners[inst]
+		for _, fn in ipairs(if byName and byName[name] then table.clone(byName[name]) else {}) do
+			fn()
+		end
+	end
 	function t.test(name: string, fn: () -> ())
 		table.insert(tests, { name = name, fn = fn })
 	end

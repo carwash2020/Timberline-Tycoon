@@ -62,6 +62,11 @@ return function(t)
 		t.ok(string.find(ForemanData.Lines(cases[6])[2], "5h 12m", 1, true) ~= nil, "all done counts down")
 		t.ok(string.find(table.concat(ForemanData.Lines(cases[6]), " "), "omorrow", 1, true) == nil)
 		t.ok(string.find(ForemanData.Lines(cases[5])[1], "$", 1, true) ~= nil, "says what he owes")
+		t.eq(
+			ForemanData.Lines(cases[2]),
+			{ "Three jobs today.", "Tap Continue to see the board." },
+			"nothing finished: points at the board"
+		)
 	end)
 
 	t.test("the DailyGoals attribute carries the unpaid flag", function()

@@ -83,20 +83,31 @@ return function(t)
 		t.eq(Logic.Consume(ledger, Vector3.new(0, 0, 0), 6), nil)
 	end)
 
-	t.test("reject telemetry counts only cooldown, far, noLOS and rate, and asks for a line every 25", function()
-		local c = Logic.NewRejects()
-		for _ = 1, 24 do
-			t.ok(not Logic.CountReject(c, "cooldown"))
+	t.test(
+		"reject telemetry counts cooldown, far, noLOS, rate and the silent unknown, gone and bad, and asks for a line every 25",
+		function()
+			local c = Logic.NewRejects()
+			for _ = 1, 24 do
+				t.ok(not Logic.CountReject(c, "cooldown"))
+			end
+			t.ok(Logic.CountReject(c, "far"), "the 25th tracked reject prints")
+			t.ok(not Logic.CountReject(c, "tooHard"), "an untracked reason is ignored")
+			t.ok(not Logic.CountReject(c, nil))
+			t.eq(Logic.RejectTotal(c), 25)
+			t.eq(c.cooldown, 24)
+			t.eq(c.far, 1)
+			t.ok(string.find(Logic.RejectLine(7, c), "user 7", 1, true))
+			t.ok(string.find(Logic.RejectLine(7, c), "cooldown 24", 1, true))
+			t.ok(not Logic.CountReject(c, "unknown"))
+			t.ok(not Logic.CountReject(c, "gone"))
+			t.ok(not Logic.CountReject(c, "bad"))
+			t.eq(Logic.RejectTotal(c), 28)
+			t.ok(
+				string.find(Logic.RejectLine(7, c), "unknown 1, gone 1, bad 1", 1, true),
+				"the line shows the silent ones"
+			)
 		end
-		t.ok(Logic.CountReject(c, "far"), "the 25th tracked reject prints")
-		t.ok(not Logic.CountReject(c, "bad"), "an untracked reason is ignored")
-		t.ok(not Logic.CountReject(c, nil))
-		t.eq(Logic.RejectTotal(c), 25)
-		t.eq(c.cooldown, 24)
-		t.eq(c.far, 1)
-		t.ok(string.find(Logic.RejectLine(7, c), "user 7", 1, true))
-		t.ok(string.find(Logic.RejectLine(7, c), "cooldown 24", 1, true))
-	end)
+	)
 
 	t.test("a felled log's cut line: the sides' volumes add up, the label says about", function()
 		local lowV, highV = Logic.SplitVolumes(2, 10, 2, 4)

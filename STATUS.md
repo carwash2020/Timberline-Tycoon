@@ -31,6 +31,9 @@ never bound; `NoButtonR2.spec`), no Robux price in code.
 #201 What's New fixes, grey box backing, held-tool teleport; #202 console safe area and text sizes; #203 axe head placement, gear meshes, Xbox chop diagnostics; #204 remaining gear meshes, pending-mesh swap, real layout specs; #205 event and cave prop mesh ids; #206 worn gear meshes, rope ladder tiles, scroll V2; #207 first badge ids; #208 build menu; #209 chop feel; #210 wood effects on buildings; #211 Cherry, Willow, Amber, Garnet, added trees and teasers. Open draft: #213 (custom sound ids).
 Sound ids: #213 wires the custom ids for TreeCreak, Engine, CricketsNight, WindHowl, LavaRumble, Wings, Quack, StormCrackle and LogThud. Chop, ChopFinal, TreeFall and LogLoad keep their stand-ins until Connor confirms the uploads are Approved.
 
+## Playtest fixes (t351, branch `phase-2/playtest-fixes`, 17 October 2026, draft)
+Three phone-emulator bugs, each with a spec that failed on main. (1) Rook's job board closed the same frame it opened (`DailyUI.refresh` hid the panel); (2) the carving prompts had a 0.3 s hold, which a tap never completes; (3) a tree whose meshes loaded after it registered kept stale section parts, so chops on its new MeshPart sections were "unknown". Chop rejects `unknown`, `gone` and `bad` are now counted in the `[Chop]` line. Details and Studio checks: PHASE2_NOTES.md "Playtest fixes (t351)". Unconfirmed: that bug 3 is the whole story of the brown trees in the playtest (reproduced only in a simulated late swap).
+
 ## World additions (branch `phase-2/world-t323`, 16 October 2026, draft)
 Cherry and Willow woods with meshes, Amber and Garnet ores (Mix and mining pins updated), 100 added trees and the teasers that pass the stage rule (outside `BiomeData.trees`, so the economy supply caps do not move). Deviations and Studio checks: PHASE2_NOTES.md "World additions".
 
