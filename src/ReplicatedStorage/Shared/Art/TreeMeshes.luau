@@ -66,6 +66,11 @@ local function trunkFoot(model: Model, root: BasePart?): Vector3?
 	return Vector3.new(p.X, low, p.Z)
 end
 
+-- Which of a wood's three crown alternatives a tree wears: 1 to 3 from its seed.
+function TreeMeshes.VariantFor(seed: number): number
+	return (math.floor(seed) % 3) + 1
+end
+
 local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 	local crown = TreeModels.Crown(def.id)
 	if #crown == 0 then
@@ -99,7 +104,7 @@ local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 	end
 
 	local scale = if type(skel.scale) == "number" and skel.scale > 0 then skel.scale else 1
-	local visuals: { { mesh: MeshPart, section: number? } } = {}
+	local visuals: { { mesh: MeshPart, section: number?, centre: Vector3? } } = {}
 	for _, piece in ipairs(crown) do
 		if not TreeModels.UsesMesh(piece.meshId) then
 			destroyAll(made)
@@ -108,14 +113,21 @@ local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 		if piece.section ~= nil and sectionById(model, piece.section) == nil then
 			continue
 		end
+		-- Alternatives: only the tree's own variant is built.
+		if piece.variant ~= nil and piece.variant ~= TreeMeshes.VariantFor(skel.seed) then
+			continue
+		end
 		local mesh = MeshKit.Create(piece.meshId, piece.name, piece.size * scale)
 		if not mesh then
 			destroyAll(made)
 			return false
 		end
 		MeshKit.Visual(mesh, piece.meshId)
+		if piece.color then
+			mesh.Color = piece.color -- the mesh's own vertex colour is grayscale
+		end
 		table.insert(made, mesh)
-		table.insert(visuals, { mesh = mesh, section = piece.section })
+		table.insert(visuals, { mesh = mesh, section = piece.section, centre = piece.centre })
 	end
 
 	local center = crownCenter(model)
@@ -146,6 +158,10 @@ local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 		local mesh = visual.mesh
 		local host = if visual.section then sectionById(model, visual.section) else root
 		local at = if visual.section and host then host.CFrame.Position else center
+		if visual.centre and foot then
+			-- Tree space: the trunk foot plus the crown centre, scaled with the tree.
+			at = foot + visual.centre * scale
+		end
 		if mesh.Name == "Knees" and foot then
 			-- Around the trunk foot, not the crown. An authored pivot is the ground.
 			at = foot

@@ -48,11 +48,14 @@ u³ = (1.6 studs)³. Sizes roll small / normal / large at 25 / 50 / 25%.
 | Maple | 25.0 | 39.8 | 59.1 | 40.9 | 35% | 194.0 | 28.1 | 12.9 | 2.4 |
 | Palmwood | 10.8 | 17.4 | 26.3 | 18.0 | 100% | 85.6 | 31.1 | 7.0 | 0.0 |
 | Frostwood | 16.0 | 25.0 | 36.9 | 25.7 | 98% | 123.0 | 46.1 | 7.0 | 1.0 |
+| Lanternwood | 7.8 | 12.6 | 19.0 | 13.0 | 56% | 57.9 | 24.1 | 7.2 | 2.0 |
 | Emberwood | 20.3 | 32.0 | 47.5 | 33.0 | 49% | 155.4 | 28.1 | 11.6 | 3.0 |
 | Gloamwood | 11.0 | 17.6 | 26.4 | 18.2 | 48% | 84.1 | 26.1 | 17.5 | 2.5 |
 | Lumenwood | 30.7 | 47.8 | 70.3 | 49.1 | 68% | 233.6 | 39.1 | 10.7 | 2.4 |
 | Bog Cypress | 14.2 | 22.2 | 32.6 | 22.8 | 71% | 102.8 | 30.1 | 6.1 | 1.4 |
 | Ironwood | 16.3 | 25.4 | 37.1 | 26.1 | 44% | 119.5 | 23.0 | 9.4 | 2.5 |
+| Cherry | 8.5 | 12.5 | 17.6 | 12.8 | 84% | 59.5 | 22.0 | 5.0 | 2.0 |
+| Willow | 16.9 | 24.4 | 33.7 | 24.8 | 90% | 114.1 | 28.0 | 5.3 | 1.3 |
 
 ## $ per mature tree, logs / planks
 
@@ -66,27 +69,30 @@ Mean volume × the v2 price per u³ (the figured-wood bonus left out). The plan'
 | Maple | 3.2 | 10.56 | $131 | $432 | $88 / $830 |
 | Palmwood | 2.9 | 12.8 | $52 | $230 | $52 / $570 |
 | Frostwood | 9 | 48 | $232 | $1,235 | $240 / $2,830 |
+| Lanternwood | 9 | 36 | $117 | $468 | none |
 | Emberwood | 11.25 | 46 | $371 | $1,516 | $79 / $635 |
 | Gloamwood | 28.5 | 71.25 | $518 | $1,296 | $348 / $990 |
 | Lumenwood | 45 | 112.5 | $2,211 | $5,529 | $1,090 / $3,900 |
 | Bog Cypress | 6 | 24 | $137 | $547 | none |
 | Ironwood | 14 | 35 | $365 | $912 | none |
+| Cherry | 1.8 | 4.8 | $23 | $61 | none |
+| Willow | 5 | 21.6 | $124 | $536 | none |
 
 ## Hits to cut a mature trunk at its base
 
 `ceil(hardness × (t / 1.6)² / damage)`, t the shape's trunkThickness (V2_PLAN §2c; SectionLogic.spec pins it).
 
-| Axe | Oak 2.0 | Birch 1.6 | Pine 2.6 | Maple 2.4 | Palmwood 1.8 | Frostwood 2.2 | Emberwood 2.4 | Gloamwood 2.0 | Lumenwood 2.6 | Bog Cypress 2.2 | Ironwood 2.4 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Rusty Axe | 16 | 35 | 73 | 68 | 19 | 95 | 124 | 180 | 397 | 76 | 203 |
-| Steel Axe | 6 | 13 | 27 | 25 | 7 | 35 | 45 | 66 | 145 | 28 | 74 |
-| Hardened Axe | 4 | 8 | 16 | 15 | 4 | 21 | 27 | 39 | 86 | 17 | 44 |
-| Silver Axe | 3 | 5 | 11 | 10 | 3 | 14 | 18 | 25 | 55 | 11 | 28 |
-| Cobalt Axe | 2 | 5 | 10 | 9 | 3 | 12 | 16 | 23 | 50 | 10 | 26 |
-| Gold Axe | 2 | 5 | 9 | 9 | 3 | 12 | 15 | 22 | 48 | 10 | 25 |
-| Obsidian Axe | 1 | 3 | 5 | 4 | 2 | 6 | 8 | 11 | 24 | 5 | 12 |
-| Inferno Axe | 1 | 2 | 4 | 3 | 1 | 5 | 4 ★ | 8 | 18 | 4 | 9 |
-| Starfall Axe | 1 | 2 | 3 | 3 | 1 | 3 | 3 ★ | 6 | 7 ★ | 3 | 7 |
+| Axe | Oak 2.0 | Birch 1.6 | Pine 2.6 | Maple 2.4 | Palmwood 1.8 | Frostwood 2.2 | Lanternwood 1.8 | Emberwood 2.4 | Gloamwood 2.0 | Lumenwood 2.6 | Bog Cypress 2.2 | Ironwood 2.4 | Cherry 2.0 | Willow 2.6 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Rusty Axe | 16 | 35 | 73 | 68 | 19 | 95 | 89 | 124 | 180 | 397 | 76 | 203 | 24 | 93 |
+| Steel Axe | 6 | 13 | 27 | 25 | 7 | 35 | 33 | 45 | 66 | 145 | 28 | 74 | 9 | 34 |
+| Hardened Axe | 4 | 8 | 16 | 15 | 4 | 21 | 20 | 27 | 39 | 86 | 17 | 44 | 6 | 20 |
+| Silver Axe | 3 | 5 | 11 | 10 | 3 | 14 | 13 | 18 | 25 | 55 | 11 | 28 | 4 | 13 |
+| Cobalt Axe | 2 | 5 | 10 | 9 | 3 | 12 | 12 | 16 | 23 | 50 | 10 | 26 | 3 | 12 |
+| Gold Axe | 2 | 5 | 9 | 9 | 3 | 12 | 11 | 15 | 22 | 48 | 10 | 25 | 3 | 12 |
+| Obsidian Axe | 1 | 3 | 5 | 4 | 2 | 6 | 6 | 8 | 11 | 24 | 5 | 12 | 2 | 6 |
+| Inferno Axe | 1 | 2 | 4 | 3 | 1 | 5 | 4 | 4 ★ | 8 | 18 | 4 | 9 | 2 | 5 |
+| Starfall Axe | 1 | 2 | 3 | 3 | 1 | 3 | 3 | 3 ★ | 6 | 7 ★ | 3 | 7 | 1 | 3 |
 
 ★ the axe's specialist stats against that wood.
 

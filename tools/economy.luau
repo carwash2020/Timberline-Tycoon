@@ -157,14 +157,12 @@ local function verdict(value: number, lo: number, hi: number): string
 		else string.format("⚠️ %.1f× too slow", value / hi)
 end
 
--- Ferry Island is not on the buying path (W2 owns the biome). Leaving
--- lanternwood out holds the published headlines.
+-- Every wood in WoodData.All() gets a row (WORLD-T323 dropped the Ferry Island
+-- exclusion; the headlines and buying path do not move, only rows are added).
 local function economyWoods()
 	local list = {}
 	for _, wood in ipairs(WoodData.All()) do
-		if wood.biome ~= WoodData.LanternBiome then
-			table.insert(list, wood)
-		end
+		table.insert(list, wood)
 	end
 	return list
 end

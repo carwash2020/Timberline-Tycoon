@@ -139,6 +139,9 @@ return function(t)
 					RegionTrees = function()
 						return {}
 					end,
+					AddedRegionTrees = function()
+						return {}
+					end,
 				},
 			},
 			services = {

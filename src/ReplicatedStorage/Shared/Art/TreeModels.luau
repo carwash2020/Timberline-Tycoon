@@ -12,6 +12,16 @@ export type CrownPiece = {
 	meshId: number,
 	size: Vector3,
 	section: number?, -- Facet_Section_3 rides section 3 when that section exists
+	-- WORLD-T323 (cherry, willow): the crown pieces are three alternatives, not three
+	-- layers. A piece with a `variant` (1 to 3) is built only when it is the tree's
+	-- own, (seed % 3) + 1.
+	variant: number?,
+	-- Where the crown sits, in tree space at scale 1 (x, height, z from the trunk
+	-- foot), in place of the mean of the part-built dress.
+	centre: Vector3?,
+	-- The mesh's Color: the uploaded vertex colour is grayscale, so the wood's
+	-- leaf colour is set here (a little lighter than the older trees, on purpose).
+	color: Color3?,
 }
 
 local sections: { [string]: { number } } = {
@@ -29,6 +39,9 @@ local sections: { [string]: { number } } = {
 	lanternwood = { 136660817437574, 135281497863554, 87140397645792 },
 	bogcypress = { 83558961407178, 110249215661913, 107634601841802 },
 	ironwood = { 86692571898747, 119571685053021, 105909881859734 },
+	-- WORLD-T323, uploaded and Approved.
+	cherry = { 113366252051468, 97477811876012, 79356553290404 },
+	willow = { 137219565562843, 96586093008955, 107944902995245 },
 }
 
 local crowns: { [string]: { CrownPiece } } = {
@@ -117,6 +130,66 @@ local crowns: { [string]: { CrownPiece } } = {
 		{ name = "Facet", meshId = 94998985796939, size = Vector3.new(9.737, 7.029, 6.995), section = nil }, -- Facet_A
 		{ name = "Facet", meshId = 113121369608961, size = Vector3.new(9.614, 7.116, 7.1), section = nil }, -- Facet_B
 		{ name = "Facet", meshId = 126069617401030, size = Vector3.new(9.768, 7.056, 7.089), section = nil }, -- Facet_C
+	},
+	-- WORLD-T323. Leaves_A, _B and _C are alternatives (variant), placed at their
+	-- own crown centre and coloured by `color`; the trunk ends inside the crown.
+	cherry = {
+		{
+			name = "Leaves",
+			meshId = 101745006486253,
+			size = Vector3.new(23.831, 10.452, 12.705),
+			section = nil,
+			variant = 1,
+			centre = Vector3.new(0.160, 14.774, 0.011),
+			color = Color3.fromHex("#E9A9BC"),
+		},
+		{
+			name = "Leaves",
+			meshId = 92180340298006,
+			size = Vector3.new(21.596, 13.004, 14.378),
+			section = nil,
+			variant = 2,
+			centre = Vector3.new(0.488, 16.098, -0.632),
+			color = Color3.fromHex("#E9A9BC"),
+		},
+		{
+			name = "Leaves",
+			meshId = 85408796934215,
+			size = Vector3.new(21.437, 11.98, 14.417),
+			section = nil,
+			variant = 3,
+			centre = Vector3.new(0.436, 15.710, 1.585),
+			color = Color3.fromHex("#E9A9BC"),
+		},
+	},
+	willow = {
+		{
+			name = "Leaves",
+			meshId = 122744791844738,
+			size = Vector3.new(19.362, 23.375, 18.918),
+			section = nil,
+			variant = 1,
+			centre = Vector3.new(0.010, 15.913, 0.005),
+			color = Color3.fromHex("#8FA8A0"),
+		},
+		{
+			name = "Leaves",
+			meshId = 118587333632223,
+			size = Vector3.new(20.556, 24.538, 20.139),
+			section = nil,
+			variant = 2,
+			centre = Vector3.new(0.015, 15.731, 0.000),
+			color = Color3.fromHex("#8FA8A0"),
+		},
+		{
+			name = "Leaves",
+			meshId = 121020528796354,
+			size = Vector3.new(18.145, 22.122, 18.125),
+			section = nil,
+			variant = 3,
+			centre = Vector3.new(-0.007, 16.239, 0.016),
+			color = Color3.fromHex("#8FA8A0"),
+		},
 	},
 }
 

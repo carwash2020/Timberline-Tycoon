@@ -9,6 +9,9 @@
 
 local BiomeData = require(script.Parent.Parent.BiomeData)
 local ForestLogic = require(script.Parent.Parent.ForestLogic)
+local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local StageOf = require(script.Parent.Parent.StageOf)
+local WoodData = require(script.Parent.Parent.WoodData)
 local GameConfig = require(script.Parent.Parent.GameConfig)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local PlotData = require(script.Parent.Parent.PlotData)
@@ -1023,7 +1026,15 @@ function TreeFill.GroundFor(zone: TreeZone?, x: number, z: number): boolean
 		return TreeFill.TownGround(x, z)
 	end
 	-- Lane R: the Bayou's and Red Mesa's trees keep off those regions' own builds.
-	if zone and (zone.id == "bayou" or zone.id == "mesa") and WorldLayout.RegionBuildBlocked(x, z) then
+	if
+		zone
+		and (zone.id == "bayou" or zone.id == "mesa" or string.sub(zone.id, 1, 12) == "added:bayou:" or string.sub(
+			zone.id,
+			1,
+			11
+		) == "added:mesa:")
+		and WorldLayout.RegionBuildBlocked(x, z)
+	then
 		return false
 	end
 	return TreeFill.Ground(x, z)
@@ -1100,8 +1111,8 @@ end
 
 -- Tries to stand `n` trees (3 to 5) on a ring around `c`. Returns them
 -- only when every one of them fits; nothing is reserved otherwise.
-local function ring(c: Vector2, n: number, taken: { Vector3 }, rng: any): { Spot }?
-	local zone: TreeZone = { id = "wild", cx = c.X, cz = c.Y, radius = 20, cap = 120 }
+local function ring(c: Vector2, n: number, taken: { Vector3 }, rng: any, zoneId: string?, cap: number?): { Spot }?
+	local zone: TreeZone = { id = zoneId or "wild", cx = c.X, cz = c.Y, radius = 20, cap = cap or 120 }
 	local spin = rng:next() * math.pi * 2
 	local rad = 12 / (2 * math.sin(math.pi / n))
 	local batch: { Spot } = {}
@@ -1168,6 +1179,341 @@ function TreeFill.Clumps(taken: { Vector3 }, rng: any, pause: (() -> ())?): { Sp
 					table.insert(taken, spot.position)
 				end
 				nextSize += 1
+			end
+		end
+	end
+	return out
+end
+
+---------------------------------------------------------------------------
+-- The added trees (WORLD-T323): 100 trees and up to 4 teasers, planned after
+-- everything else. They are NOT in BiomeData.trees (that would move the
+-- economy's supply caps and the region budgets): like the town trees they stay
+-- out of the economy model. Nothing existing moves; every group has its own
+-- fixed seed and its own regrow zone `added:<biome>:<wood>` (cap = its count).
+---------------------------------------------------------------------------
+
+export type AddedRow = {
+	biome: string, -- the biome (or region) disc the group stands in
+	wood: string,
+	count: number,
+	rim: { number }?, -- stand between these fractions of the disc radius
+	arc: number?, -- and within this many degrees of +X
+	region: boolean?, -- a Lane R region: planned against the region's own trees only
+	landing: boolean?, -- the Bayou: within BayouData.Budgets.treesNearLanding of the landing
+	teaser: { road: string, stage: number }?, -- one lone tree beside a road
+}
+
+TreeFill.AddedRows = {
+	-- The Starter Forest and the Hills are full inside their discs (the ground test
+	-- and the 10 stud gap leave under 100 free square studs in the Starter disc),
+	-- so their rims reach past the disc edge (hi above 1): the first free ground
+	-- just outside it. Cherry's outer ring is 0.70 and out; its Hills share keeps
+	-- to the east edge, 0.55 and out, within 60 degrees of +X.
+	{ biome = "starter", wood = "oak", count = 4, rim = { 0, 1.25 } },
+	{ biome = "starter", wood = "birch", count = 2, rim = { 0, 1.25 } },
+	{ biome = "starter", wood = "cherry", count = 7, rim = { 0.70, 1.25 } },
+	{ biome = "hills", wood = "pine", count = 8, rim = { 0, 1.15 } },
+	{ biome = "hills", wood = "maple", count = 7, rim = { 0, 1.15 } },
+	{ biome = "hills", wood = "cherry", count = 7, rim = { 0.55, 1.15 }, arc = 60 },
+	{ biome = "snow", wood = "frostwood", count = 9 },
+	{ biome = "volcano", wood = "emberwood", count = 8 },
+	{ biome = "grove", wood = "phantomwood", count = 4 },
+	{ biome = "bayou", wood = "bogcypress", count = 8, region = true, landing = true },
+	{ biome = "bayou", wood = "willow", count = 12, region = true, landing = true },
+	{ biome = "mesa", wood = "ironwood", count = 6, region = true },
+} :: { AddedRow }
+
+-- Three clumps of six, on the wild clumps' ground rules.
+TreeFill.AddedClumps = { count = 3, size = 6 }
+
+-- One lone tree of the next wood beside each haul road, seen and not cut.
+-- `stage` is the stage its wood needs (BiomeData.needsStage; the Snowfields
+-- and the Volcano are gated by their gear and axe: S3 and S4).
+TreeFill.AddedTeasers = {
+	{ biome = "bayou", wood = "bogcypress", count = 1, teaser = { road = "BayouRoad", stage = 2 } },
+	{ biome = "snow", wood = "frostwood", count = 1, teaser = { road = "SnowRoad", stage = 3 } },
+	{ biome = "volcano", wood = "emberwood", count = 1, teaser = { road = "VolcanoRoad", stage = 4 } },
+	{ biome = "mesa", wood = "ironwood", count = 1, teaser = { road = "MesaRoad", stage = 4 } },
+} :: { AddedRow }
+
+TreeFill.TeaserOffset = { 24, 30 } -- studs off the road's centreline
+TreeFill.TeaserAlong = { 0.35, 0.60 } -- of the road's length
+
+-- The best axe a player at `stage` can own (StageOf.AxeStage by ladder rung).
+function TreeFill.BestAxeAt(stage: number): ItemCatalog.AxeDef?
+	local best: ItemCatalog.AxeDef? = nil
+	for rung, axe in ipairs(ItemCatalog.AxeLadder()) do
+		local rungStage = StageOf.AxeStage[rung]
+		if rungStage ~= nil and rungStage <= stage then
+			best = axe
+		end
+	end
+	return best
+end
+
+-- Whether a lone `woodId` tree is "seen, not cut" for a wood whose stage is
+-- `stage`: the best axe of the stage before it deals no damage to it, by the
+-- rule ItemCatalog.AxeDamage applies (damage minus the wood's hardness).
+function TreeFill.TeaserHidden(woodId: string, stage: number): boolean
+	local wood = WoodData.Get(woodId)
+	local axe = TreeFill.BestAxeAt(stage - 1)
+	if wood == nil or axe == nil then
+		return false
+	end
+	return ItemCatalog.AxeDamage(axe, wood) <= 0
+end
+
+-- The teaser rows that pass TeaserHidden (the others are dropped).
+function TreeFill.TeasersKept(): { AddedRow }
+	local kept: { AddedRow } = {}
+	for _, row in ipairs(TreeFill.AddedTeasers) do
+		local info = row.teaser
+		if info and TreeFill.TeaserHidden(row.wood, info.stage) then
+			table.insert(kept, row)
+		end
+	end
+	return kept
+end
+
+local function discOf(biomeId: string): { x: number, z: number, radius: number }?
+	local region = BiomeData.RegionDiscs[biomeId]
+	if region then
+		return region
+	end
+	local def = BiomeData.Get(biomeId)
+	local area = if def then def.area else nil
+	if area then
+		return { x = area.x, z = area.z, radius = area.radius }
+	end
+	return nil
+end
+
+local function addedZone(row: AddedRow): TreeZone
+	local id = if row.teaser then "added:teaser:" .. row.wood else "added:" .. row.biome .. ":" .. row.wood
+	return { id = id, cx = 0, cz = 0, radius = 1, cap = row.count, fixed = if row.teaser then true else nil }
+end
+
+-- Points `at` of the way along a road's centreline, and its unit normal.
+local function roadPoint(points: { Vector2 }, at: number): (Vector2, Vector2)
+	local total = 0
+	for i = 1, #points - 1 do
+		total += (points[i + 1] - points[i]).Magnitude
+	end
+	local want = total * at
+	for i = 1, #points - 1 do
+		local a, b = points[i], points[i + 1]
+		local len = (b - a).Magnitude
+		if want <= len or i == #points - 1 then
+			local f = math.clamp(want / math.max(len, 1e-6), 0, 1)
+			local dir = (b - a).Unit
+			return a + (b - a) * f, Vector2.new(-dir.Y, dir.X)
+		end
+		want -= len
+	end
+	return points[1], Vector2.new(0, 1)
+end
+
+local function bayouNear(x: number, z: number): boolean
+	local BayouData = require(script.Parent.Parent.Regions.BayouData)
+	local l = BayouData.Landing
+	return (x - l.x) ^ 2 + (z - l.z) ^ 2 <= BayouData.Budgets.treesNearLanding ^ 2
+end
+
+local function planGroup(row: AddedRow, taken: { Vector3 }, pause: (() -> ())?): { Spot }
+	local out: { Spot } = {}
+	local zone = addedZone(row)
+	local rng = Kit.rng(hashString("added " .. row.biome .. row.wood))
+	local tries = 0
+	local limit = row.count * 40
+	local function tick()
+		if pause then
+			pause()
+		end
+	end
+	local function accept(x: number, z: number): boolean
+		if takenNear(taken, x, z, TREE_GAP) then
+			return false
+		end
+		if not TreeFill.GroundFor(zone, x, z) then
+			return false
+		end
+		if (row.biome == "bayou" or row.biome == "mesa") and WorldLayout.RegionBuildBlocked(x, z) then
+			return false
+		end
+		if row.landing and not bayouNear(x, z) then
+			return false
+		end
+		return true
+	end
+	if row.teaser then
+		local road = nil
+		for _, r in ipairs(WorldLayout.Roads) do
+			if r.name == row.teaser.road then
+				road = r
+			end
+		end
+		if road == nil then
+			return out
+		end
+		limit = 120
+		while #out < row.count and tries < limit do
+			tries += 1
+			tick()
+			local at = rng:range(TreeFill.TeaserAlong[1], TreeFill.TeaserAlong[2])
+			local off = rng:range(TreeFill.TeaserOffset[1], TreeFill.TeaserOffset[2])
+				* (if rng:next() < 0.5 then -1 else 1)
+			local centre, normal = roadPoint(road.points, at)
+			local x, z = centre.X + normal.X * off, centre.Y + normal.Y * off
+			if accept(x, z) then
+				zone.cx, zone.cz = x, z
+				local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+				table.insert(taken, p)
+				table.insert(out, { woodId = row.wood, position = p, biome = "wild", zone = zone })
+			end
+		end
+		return out
+	end
+	local disc = discOf(row.biome)
+	if disc == nil then
+		return out
+	end
+	local radius = disc.radius - 6
+	local lo, hi = 0, 1
+	if row.rim then
+		lo, hi = row.rim[1], row.rim[2]
+	end
+	while #out < row.count and tries < limit do
+		tries += 1
+		tick()
+		local angle = rng:next() * math.pi * 2
+		if row.arc then
+			angle = rng:range(-row.arc, row.arc) * math.pi / 180
+		end
+		local r = radius * math.sqrt(lo * lo + rng:next() * (hi * hi - lo * lo))
+		local x, z = disc.x + math.cos(angle) * r, disc.z + math.sin(angle) * r
+		if accept(x, z) then
+			local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+			table.insert(taken, p)
+			table.insert(out, { woodId = row.wood, position = p, biome = row.biome, zone = zone })
+		end
+	end
+	-- A last pass on a grid, for a crowded disc the random samples missed (the
+	-- Hills): the first free spots from the disc's far side in, 4 studs apart.
+	if #out < row.count then
+		local step = 4
+		local reach = radius * math.max(hi, 1)
+		local x0 = disc.x - reach
+		while #out < row.count and x0 <= disc.x + reach do
+			local z0 = disc.z - reach
+			while #out < row.count and z0 <= disc.z + reach do
+				tick()
+				local d = dist(x0, z0, disc.x, disc.z) / radius
+				local inArc = true
+				if row.arc then
+					inArc = math.abs(math.deg(math.atan2(z0 - disc.z, x0 - disc.x))) <= row.arc
+				end
+				if d >= lo and d <= hi and inArc and accept(x0, z0) then
+					local p = Vector3.new(x0, TerrainGen.HeightAt(x0, z0) - 0.3, z0)
+					table.insert(taken, p)
+					table.insert(out, { woodId = row.wood, position = p, biome = row.biome, zone = zone })
+				end
+				z0 += step
+			end
+			x0 += step
+		end
+	end
+	-- The zone is a disc round its own spots (a felled tree grows back inside it).
+	if #out > 0 then
+		local sx, sz = 0, 0
+		for _, spot in ipairs(out) do
+			sx += spot.position.X
+			sz += spot.position.Z
+		end
+		zone.cx, zone.cz = sx / #out, sz / #out
+		local far = 0
+		for _, spot in ipairs(out) do
+			far = math.max(far, dist(spot.position.X, spot.position.Z, zone.cx, zone.cz))
+		end
+		zone.radius = far + 12
+	end
+	return out
+end
+
+local function planAddedClumps(taken: { Vector3 }, pause: (() -> ())?): { Spot }
+	local rng = Kit.rng(hashString("added wild clumps"))
+	local out: { Spot } = {}
+	local centers: { Vector2 } = {}
+	local half = SCENERY_EDGE - 40
+	local guard = 0
+	local want = TreeFill.AddedClumps.count
+	while #centers < want and guard < 25000 do
+		guard += 1
+		if pause then
+			pause()
+		end
+		local x, z = rng:range(-half, half), rng:range(-half, half)
+		if TreeFill.ClumpCenterOk(x, z, centers) then
+			local c = Vector2.new(x, z)
+			local batch = ring(
+				c,
+				TreeFill.AddedClumps.size,
+				taken,
+				rng,
+				"added:wild:" .. tostring(#centers + 1),
+				TreeFill.AddedClumps.size
+			)
+			if batch then
+				table.insert(centers, c)
+				for _, spot in ipairs(batch) do
+					table.insert(out, spot)
+					table.insert(taken, spot.position)
+				end
+			end
+		end
+	end
+	return out
+end
+
+-- The added trees, in this order: the Lane R region groups (`only` = "region"),
+-- then the rest and the clumps and the teasers (`only` = "land"); nil plans
+-- both. `taken` is every tree already standing that these keep 10 studs from;
+-- it grows by each tree planned. Deterministic: fixed seeds, bounded tries,
+-- `pause` after every attempt.
+function TreeFill.PlanAdded(taken: { Vector3 }, pause: (() -> ())?, only: string?): { Spot }
+	local out: { Spot } = {}
+	if only ~= "land" then
+		for _, row in ipairs(TreeFill.AddedRows) do
+			if row.region then
+				for _, spot in ipairs(planGroup(row, taken, pause)) do
+					table.insert(out, spot)
+				end
+			end
+		end
+		for _, row in ipairs(TreeFill.TeasersKept()) do
+			if row.biome == "bayou" or row.biome == "mesa" then
+				for _, spot in ipairs(planGroup(row, taken, pause)) do
+					table.insert(out, spot)
+				end
+			end
+		end
+	end
+	if only ~= "region" then
+		for _, row in ipairs(TreeFill.AddedRows) do
+			if not row.region then
+				for _, spot in ipairs(planGroup(row, taken, pause)) do
+					table.insert(out, spot)
+				end
+			end
+		end
+		for _, spot in ipairs(planAddedClumps(taken, pause)) do
+			table.insert(out, spot)
+		end
+		for _, row in ipairs(TreeFill.TeasersKept()) do
+			if row.biome ~= "bayou" and row.biome ~= "mesa" then
+				for _, spot in ipairs(planGroup(row, taken, pause)) do
+					table.insert(out, spot)
+				end
 			end
 		end
 	end

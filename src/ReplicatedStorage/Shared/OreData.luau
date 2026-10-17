@@ -64,6 +64,21 @@ local ores: { [string]: Ore } = {
 		material = Enum.Material.Neon,
 		glow = true,
 	},
+	-- WORLD-T323: sell-only ores, no light.
+	amber = {
+		id = "amber",
+		name = "Amber",
+		color = Color3.fromRGB(217, 138, 30),
+		material = Enum.Material.Glass,
+		glow = false,
+	},
+	garnet = {
+		id = "garnet",
+		name = "Garnet",
+		color = Color3.fromRGB(122, 32, 56),
+		material = Enum.Material.Metal,
+		glow = false,
+	},
 }
 
 function OreData.Get(oreId: string): Ore?

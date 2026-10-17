@@ -235,6 +235,9 @@ return function(t)
 			-- Lane R's two region woods go on the end (the Bayou's, then Red Mesa's).
 			"bogcypress",
 			"ironwood",
+			-- WORLD-T323 appends cherry, then willow.
+			"cherry",
+			"willow",
 		})
 		t.eq(s.Automation.FilterMatches(0, "oak"), true)
 		t.eq(s.Automation.FilterMatches(1, woods[1]), true)

@@ -33,8 +33,26 @@ return function(t)
 		"every WoodData field is filled, and the two woods end the list (detector filter indices keep still)",
 		function()
 			local all = WoodData.All()
-			t.eq(all[#all - 1].id, "bogcypress")
-			t.eq(all[#all].id, "ironwood")
+			-- WORLD-T323 appended cherry, then willow; the twelve before them are unchanged.
+			t.eq(all[#all - 1].id, "cherry")
+			t.eq(all[#all].id, "willow")
+			local first = {
+				"oak",
+				"birch",
+				"pine",
+				"maple",
+				"palmwood",
+				"frostwood",
+				"lanternwood",
+				"emberwood",
+				"phantomwood",
+				"lumenwood",
+				"bogcypress",
+				"ironwood",
+			}
+			for i, id in ipairs(first) do
+				t.eq(all[i].id, id, "index " .. i .. " keeps still (saved by index)")
+			end
 			for _, id in ipairs({ "bogcypress", "ironwood" }) do
 				local w = WoodData.Get(id)
 				for _, field in ipairs({

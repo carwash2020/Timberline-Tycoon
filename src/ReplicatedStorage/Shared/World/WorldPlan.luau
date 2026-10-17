@@ -926,6 +926,61 @@ function WorldPlan.RegionTrees(): { TreeSpot }
 	return out
 end
 
+-- WORLD-T323: the Lane R regions' share of the added trees (TreeFill.PlanAdded
+-- with only = "region"): 8 more Bog Cypress and 12 Willow in the Bayou, 6 more
+-- Ironwood on Red Mesa, and the two region teasers that pass TreeFill's rule.
+-- Planned against the forest (some wild trees stand in both discs) and
+-- RegionTrees, so asking for them waits for WorldPlan.Trees (RegionService's
+-- scatter does; the regions' art follows the forest plan). Cached in a field:
+-- WorldPlan is near the 200 locals limit, so none was added.
+function WorldPlan.AddedRegionTrees(): { TreeSpot }
+	local self: any = WorldPlan
+	if self._addedRegion then
+		return self._addedRegion
+	end
+	local TreeFill = require(script.Parent.TreeFill)
+	local taken: { Vector3 } = {}
+	for _, spot in ipairs(WorldPlan.Trees()) do
+		table.insert(taken, spot.position)
+	end
+	for _, spot in ipairs(WorldPlan.RegionTrees()) do
+		table.insert(taken, spot.position)
+	end
+	local out = TreeFill.PlanAdded(taken, nil, "region")
+	self._addedRegion = out
+	return out
+end
+
+-- WORLD-T323: the 100 added trees (74 of the existing woods, 26 Cherry and
+-- Willow) and the teasers that pass the stage rule, appended after
+-- RegionTrees() in both MapBuilder collects. Nothing existing moves. They are
+-- not in BiomeData.trees, so ECONOMY.md's supply caps and the region budgets do
+-- not change. `pause` (optional) is the planner's time slice.
+function WorldPlan.AddedTrees(pause: (() -> ())?): { TreeSpot }
+	local self: any = WorldPlan
+	if self._added then
+		return self._added
+	end
+	local TreeFill = require(script.Parent.TreeFill)
+	local out: { TreeSpot } = {}
+	local taken: { Vector3 } = {}
+	for _, spot in ipairs(WorldPlan.Trees(pause)) do
+		table.insert(taken, spot.position)
+	end
+	for _, spot in ipairs(WorldPlan.RegionTrees()) do
+		table.insert(taken, spot.position)
+	end
+	for _, spot in ipairs(WorldPlan.AddedRegionTrees()) do
+		table.insert(taken, spot.position)
+		table.insert(out, spot)
+	end
+	for _, spot in ipairs(TreeFill.PlanAdded(taken, pause, "land")) do
+		table.insert(out, spot)
+	end
+	self._added = out
+	return out
+end
+
 export type PointOfInterest = {
 	id: string,
 	name: string,
