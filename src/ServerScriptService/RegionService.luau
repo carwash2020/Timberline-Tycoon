@@ -328,6 +328,10 @@ local function scatter(parent: Instance, regionId: string, ground: RegionArt.Gro
 	for _, spot in ipairs(WorldPlan.RegionTrees()) do
 		table.insert(trees, spot.position)
 	end
+	-- The added Willow, Cypress and Ironwood (WORLD-T323) keep the scatter off too.
+	for _, spot in ipairs(WorldPlan.AddedRegionTrees()) do
+		table.insert(trees, spot.position)
+	end
 	local folder = Instance.new("Folder")
 	folder.Name = "Scatter_" .. regionId
 	for _, site in ipairs(RegionScatter.Sites(regionId, trees, TerrainGen.RoadClearance)) do

@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `990a944` (#206).**
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `92555e3` (#211).**
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
 (#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
@@ -27,10 +27,18 @@ Connor (it would raise cash packs about 25%).
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
 
-## #201 to #206 and open work
-#201 What's New fixes, grey box backing, held-tool teleport; #202 console safe area and text sizes; #203 axe head placement, gear meshes, Xbox chop diagnostics; #204 remaining gear meshes, pending-mesh swap, real layout specs; #205 event and cave prop mesh ids; #206 worn gear meshes, rope ladder tiles, scroll V2. Open drafts: #207 (first badge ids) and #208 (build menu).
-Connor must supply sound ids; these are empty: TreeCreak, Engine, CricketsNight, WindHowl, LavaRumble, Wings, Quack, StormCrackle.
+## #201 to #213 and open work
+#201 What's New fixes, grey box backing, held-tool teleport; #202 console safe area and text sizes; #203 axe head placement, gear meshes, Xbox chop diagnostics; #204 remaining gear meshes, pending-mesh swap, real layout specs; #205 event and cave prop mesh ids; #206 worn gear meshes, rope ladder tiles, scroll V2; #207 first badge ids; #208 build menu; #209 chop feel; #210 wood effects on buildings; #211 Cherry, Willow, Amber, Garnet, added trees and teasers. Open draft: #213 (custom sound ids).
+Sound ids: #213 wires the custom ids for TreeCreak, Engine, CricketsNight, WindHowl, LavaRumble, Wings, Quack, StormCrackle and LogThud. Chop, ChopFinal, TreeFall and LogLoad keep their stand-ins until Connor confirms the uploads are Approved.
 
+## World additions (branch `phase-2/world-t323`, 16 October 2026, draft)
+Cherry and Willow woods with meshes, Amber and Garnet ores (Mix and mining pins updated), 100 added trees and the teasers that pass the stage rule (outside `BiomeData.trees`, so the economy supply caps do not move). Deviations and Studio checks: PHASE2_NOTES.md "World additions".
+
+## Wood effects on buildings (branch `phase-2/wood-effects`, 16 October 2026, draft)
+Frost, ember, gloam and lumen doors take an accent colour; ember, gloam and lantern doors glow at night; ember and gloam buildings get a few sparks (capped 8 high, 4 medium, 0 low). Cosmetic and client-side; no price, save or remote change. Details and Studio checks: PHASE2_NOTES.md "Wood effects on buildings".
+
+## Chop feel pass (branch `phase-2/chop-feel-t325`, 16 October 2026, draft)
+Chips and thunk at the impact frame (predicted, then taken by the server's own Cut or handed back), thunk pitch and a canopy rock as a cut nears its end, a cut guide ring with per-side value on felled logs, aim cone for touch and gamepad, Small-motor rumble (unverified on a real pad), per-device landing-shake caps, `TreeArt.FaceLook` (WoodPlanks, never Neon) for stump faces and notches, Chop reject telemetry, `tools/chop_feel`. No new remote, no economy change. `TreeCreak` stays silent until Connor supplies a sound id. Details and Studio checks: PHASE2_NOTES.md "Chop feel pass".
 ## Launch performance (branch `phase-2/launch-perf`, 14 October 2026)
 
 Connor's Studio log: playable at +4.6 s but heavy work ran until +11.9 s (the points-of-interest plan one 5.07 s step, 1,205 trees over

@@ -338,6 +338,40 @@ local woods: { WoodDef } = {
 		trunkHeight = 10,
 		foliageSize = 12,
 	},
+	{
+		-- Cherry (WORLD-T323): a blossom cloud in the Starter Forest rim and the
+		-- Hills' east edge. Appended after ironwood: woods are saved by index.
+		-- The v1 numbers are a rollback proposal only; the v2 row is the live one.
+		id = "cherry",
+		displayName = "Cherry",
+		treeHP = 45,
+		hardness = 0,
+		logsPerTree = 3,
+		pricePerLog = 3,
+		biome = "starter",
+		respawnSec = 60,
+		silhouette = "cloud",
+		leafColor = hexColor("#E9A9BC"),
+		trunkColor = hexColor("#4B3B4A"),
+		trunkHeight = 12,
+		foliageSize = 12,
+	},
+	{
+		-- Willow (WORLD-T323): a Bayou tree with hanging strips. Rollback numbers only.
+		id = "willow",
+		displayName = "Willow",
+		treeHP = 280,
+		hardness = 16,
+		logsPerTree = 6,
+		pricePerLog = 11,
+		biome = "bayou",
+		respawnSec = 150,
+		silhouette = "weeping",
+		leafColor = hexColor("#8FA8A0"),
+		trunkColor = hexColor("#9AA08A"),
+		trunkHeight = 16,
+		foliageSize = 12,
+	},
 }
 
 -- Designer knob (B02). A plank's $/u³ is the plan's price (V2_PLAN §2b)
@@ -366,6 +400,8 @@ WoodData.PlanPlank = {
 	lumenwood = 90,
 	bogcypress = 60, -- Bayou (Lane R)
 	ironwood = 70, -- Red Mesa (Lane R)
+	cherry = 12, -- WORLD-T323
+	willow = 54, -- WORLD-T323
 } :: { [string]: number }
 
 -- Rarer woods pay more, and so does milling them: the further you go for a
@@ -500,6 +536,26 @@ local V2: { [string]: WoodV2 } = {
 		growSec = 900,
 		lifespan = { 3, 6 },
 		core = "#8C5A3C",
+		coreMaterial = "Wood",
+	},
+	-- Cherry (WORLD-T323): the cheap pink wood. Plain Wood core, no glow.
+	cherry = {
+		logPrice = 1.8,
+		plankPrice = WoodData.ScaledPlank(1.8, WoodData.PlanPlank.cherry),
+		hardness = 3,
+		growSec = 480,
+		lifespan = { 3, 6 },
+		core = "#C9737A",
+		coreMaterial = "Wood",
+	},
+	-- Willow (WORLD-T323): a Bayou wood that stays under Bog Cypress.
+	willow = {
+		logPrice = 5,
+		plankPrice = WoodData.ScaledPlank(5, WoodData.PlanPlank.willow),
+		hardness = 7,
+		growSec = 360,
+		lifespan = { 3, 6 },
+		core = "#BFD6A0",
 		coreMaterial = "Wood",
 	},
 	lumenwood = {
@@ -787,6 +843,56 @@ local SHAPES: { [string]: TreeShape } = {
 		leafColors = { "#7A8F5A", "#6A7F4C", "#8CA06A", "#5E7340" },
 		bark = "#3B3433",
 	},
+	-- Cherry (WORLD-T323): a rounded blossom cloud on a short dark trunk.
+	cherry = {
+		height = { 20, 24 },
+		trunkThickness = 2.0,
+		trunkLength = 12.6,
+		trunkSegments = 3,
+		taper = 0.9,
+		maxDepth = 1,
+		splitChance = { 1.0 },
+		minSplits = 2,
+		maxSplits = 2,
+		branchAngle = 40,
+		twistiness = 8,
+		firstBranchLength = 5,
+		lengthDecay = { 0.5, 0.65 },
+		thicknessDecay = 0.55,
+		minThickness = 0.6,
+		canopy = "clusters",
+		leafSize = 7,
+		clusterParts = { 3, 4 },
+		flares = 4,
+		maxSections = 10,
+		leafColors = { "#E9A9BC", "#F2BCCB", "#DE96AB", "#F6C9D5" },
+		bark = "#4B3B4A",
+	},
+	-- Willow (WORLD-T323): a tall trunk under a pale sage dome of hanging strips.
+	willow = {
+		height = { 26, 30 },
+		trunkThickness = 2.6,
+		trunkLength = 16.4,
+		trunkSegments = 4,
+		taper = 0.9,
+		maxDepth = 1,
+		splitChance = { 0.6 },
+		minSplits = 1,
+		maxSplits = 2,
+		branchAngle = 30,
+		twistiness = 5,
+		firstBranchLength = 5,
+		lengthDecay = { 0.4, 0.55 },
+		thicknessDecay = 0.5,
+		minThickness = 0.6,
+		canopy = "clusters",
+		leafSize = 8,
+		clusterParts = { 3, 4 },
+		flares = 5,
+		maxSections = 10,
+		leafColors = { "#8FA8A0", "#9DB5AD", "#809A92", "#ACC2BB" },
+		bark = "#9AA08A",
+	},
 	-- Tall, pale, layered light.
 	lumenwood = {
 		height = { 34, 44 },
@@ -823,6 +929,28 @@ for _, def in ipairs(woods) do
 	end
 	def.v2 = v2
 	byId[def.id] = def
+end
+
+-- Wood effects on buildings (WOODFX-T316): cosmetic only. Palette NAMES (a
+-- "#hex" only for the lantern's own LanternGlow), so this module needs no Art.
+-- accent: the Door part's colour; glow: the night colour (only a neon wood
+-- swaps to Neon, on a part still marked NightGlow); emitter: the sparks.
+-- Oak, birch, pine, maple and the rest have no row.
+export type Effect = { accent: string?, glow: string?, neon: boolean, emitter: string? }
+WoodData.Effect = table.freeze({
+	frostwood = table.freeze({ accent = "FrostTrim", glow = "FrostGlow", neon = false, emitter = nil }),
+	emberwood = table.freeze({ accent = "EmberGlow", glow = "EmberGlow", neon = true, emitter = "ember" }),
+	phantomwood = table.freeze({ accent = "GloamGlow", glow = "GloamGlow", neon = true, emitter = "gloam" }),
+	lumenwood = table.freeze({ accent = "LumenCream", glow = nil, neon = false, emitter = nil }),
+	[WoodData.LanternId] = table.freeze({ accent = nil, glow = WoodData.LanternGlow, neon = true, emitter = nil }),
+} :: { [string]: Effect })
+
+-- The effect row for a wood, or nil (every wood but those five).
+function WoodData.EffectOf(woodId: unknown): Effect?
+	if type(woodId) ~= "string" then
+		return nil
+	end
+	return WoodData.Effect[woodId :: string]
 end
 
 function WoodData.Get(woodId: string): WoodDef?

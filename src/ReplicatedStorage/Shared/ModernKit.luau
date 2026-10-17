@@ -186,7 +186,7 @@ ModernKit.Pieces = {
 	}),
 	piece({
 		id = "TallPictureWall12",
-		displayName = "Tall Long Picture Window",
+		displayName = "Tall Long Window",
 		woodUnits = 12,
 		edge = true,
 		gated = true,

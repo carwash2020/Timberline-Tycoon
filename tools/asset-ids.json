@@ -7995,6 +7995,60 @@
     {
       "collision": false,
       "expectTypeId": 4,
+      "id": "113366252051468",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "TreeModels.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "97477811876012",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "TreeModels.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "79356553290404",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "TreeModels.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "137219565562843",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "TreeModels.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "96586093008955",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "TreeModels.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "107944902995245",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "TreeModels.luau "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
       "id": "104687332442263",
       "kind": "mesh",
       "places": 2,
@@ -8540,6 +8594,60 @@
       "places": 2,
       "priority": 2,
       "usedBy": "TreeModels.luau ironwood Facet"
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "101745006486253",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "TreeModels.luau cherry "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "92180340298006",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "TreeModels.luau cherry "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "85408796934215",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "TreeModels.luau cherry "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "122744791844738",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "TreeModels.luau willow "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "118587333632223",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "TreeModels.luau willow "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "121020528796354",
+      "kind": "mesh",
+      "places": 2,
+      "priority": 2,
+      "usedBy": "TreeModels.luau willow "
     },
     {
       "collision": false,

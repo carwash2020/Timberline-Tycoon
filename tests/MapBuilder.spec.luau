@@ -239,11 +239,11 @@ return function(t)
 		t.eq(s.loaded, {}, "MapBuilder loads no character (it used to, at +6.5 s, before the save and the pads)")
 	end
 
-	-- Palms, the north-strip stands and Lane R's region woods. Lanternwood is planted only once
-	-- WoodData has the row (B12).
+	-- Palms, the north-strip stands, Lane R's region woods and the added trees and teasers
+	-- (WORLD-T323). Lanternwood is planted only once WoodData has the row (B12).
 	local function extraTrees(WorldPlan)
 		local WoodData = t.shared("WoodData")
-		local n = #WorldPlan.StripTrees() + #WorldPlan.FerryPalms() + #WorldPlan.RegionTrees()
+		local n = #WorldPlan.StripTrees() + #WorldPlan.FerryPalms() + #WorldPlan.RegionTrees() + #WorldPlan.AddedTrees()
 		if WoodData.Get("lanternwood") then
 			n += #WorldPlan.Lanternwood()
 		end
@@ -667,6 +667,11 @@ return function(t)
 		for _, spot in ipairs(WorldPlan.StripTrees()) do
 			if spot.woodId == "birch" then
 				stripBirch += 1
+			end
+		end
+		for _, spot in ipairs(WorldPlan.AddedTrees()) do
+			if spot.woodId == "birch" then
+				birches += 1 -- the added birches fail to build too (WORLD-T323)
 			end
 		end
 		local TutorialGrove = t.shared("TutorialGrove")

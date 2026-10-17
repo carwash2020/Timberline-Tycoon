@@ -1,6 +1,6 @@
 --!strict
 -- UITheme: the game's look, from the UI spec ("Timberline Tycoon UI",
--- Claude Design). Every screen builds from these parts so they match.
+-- the UI design spec). Every screen builds from these parts so they match.
 --   * Colours and fonts (GothamBold titles and buttons, Gotham body;
 --     Heading, Black and Bold are aliases of those, so older screens
 --     keep compiling).
@@ -45,6 +45,7 @@ local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
 
 local UIArt = require(script.Parent.UIArt)
+local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 
 local UITheme = {}
 
@@ -177,9 +178,10 @@ UITheme.Styles = {
 	blue = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
 	amber = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
 	skip = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
-	-- The phone HUD's icon buttons: a deeper green, so a cream icon on it
-	-- clears 3:1 (cream on the bright confirm green does not).
-	iconGreen = { fill = C.Green, edge = C.GreenEdge, ink = C.Cream },
+	-- The phone HUD's icon buttons (Hammer, Sell here): the sale green with an Ink
+	-- icon (Skin.Ink on Palette.SaleGreen clears 4.5:1; Cream on this green was
+	-- 1.9:1). The uploaded icons are cream, so HUD tints them with this ink.
+	iconGreen = { fill = Palette.SaleGreen, edge = C.GreenEdge, ink = UITheme.Skin.Ink },
 } :: { [string]: Style }
 
 ---------------------------------------------------------------------------
@@ -492,6 +494,7 @@ function UITheme.SetUserScale(multiplier: number)
 end
 
 local scales: { UIScale } = {}
+local scaleOverrides: { [UIScale]: (number) -> number } = {} -- a screen that wants its own scale (Screen's 4th parameter)
 local currentScale = 1
 local layoutWatchers: { () -> () } = {}
 local leftColumn: Frame? = nil
@@ -686,7 +689,16 @@ UITheme.Layers = {
 } :: { [string]: number }
 
 -- A ScreenGui for one of the game's screens, scaled for the device.
-function UITheme.Screen(name: string, displayOrder: number?, insets: Insets?): ScreenGui
+-- `scaleOf` (optional): the screen's UIScale as a function of the base scale
+-- (ScaleFor, the whole HUD's). The resize loop honours it too. The build menu
+-- passes one that returns 1 on a phone, so its names are 16 real px there.
+-- Every other screen leaves it nil and is unchanged.
+function UITheme.Screen(
+	name: string,
+	displayOrder: number?,
+	insets: Insets?,
+	scaleOf: ((base: number) -> number)?
+): ScreenGui
 	local gui = Instance.new("ScreenGui")
 	gui.Name = name
 	gui.ResetOnSpawn = false
@@ -702,7 +714,11 @@ function UITheme.Screen(name: string, displayOrder: number?, insets: Insets?): S
 		else Enum.ScreenInsets.CoreUISafeInsets
 	gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
 	local scale = Instance.new("UIScale")
-	scale.Scale = scaleFor()
+	local base = scaleFor()
+	scale.Scale = if scaleOf then scaleOf(base) else base
+	if scaleOf then
+		scaleOverrides[scale] = scaleOf
+	end
 	scale.Parent = gui
 	table.insert(scales, scale)
 	return gui
@@ -1462,6 +1478,33 @@ end
 -- A selection image that draws nothing, for a panel-sized object the gamepad
 -- may land on (a selection group's own frame): the engine's default box over
 -- a whole panel reads as a grey slab. Its children carry the visible ring.
+-- The ring a focused card, row or button shows on a gamepad: a gold stroke
+-- (Palette.CoinGold, `stroke` px) and a 2 px Ink ring outside it, because gold
+-- alone on Cream is 1.4:1. Use it as a SelectionImageObject.
+function UITheme.FocusRing(stroke: number): Frame
+	local ring = Instance.new("Frame")
+	ring.Name = "FocusRing"
+	ring.Size = UDim2.fromScale(1, 1)
+	ring.BackgroundTransparency = 1
+	ring.BorderSizePixel = 0
+	UITheme.corner(ring, 10)
+	local gold = Instance.new("UIStroke")
+	gold.Color = Palette.CoinGold
+	gold.Thickness = stroke
+	gold.Parent = ring
+	local outer = Instance.new("Frame")
+	outer.Name = "InkRing"
+	outer.AnchorPoint = Vector2.new(0.5, 0.5)
+	outer.Position = UDim2.fromScale(0.5, 0.5)
+	outer.Size = UDim2.new(1, stroke * 2 + 4, 1, stroke * 2 + 4)
+	outer.BackgroundTransparency = 1
+	outer.BorderSizePixel = 0
+	UITheme.corner(outer, 12)
+	UITheme.stroke(outer, UITheme.Skin.Ink, 2)
+	outer.Parent = ring
+	return ring
+end
+
 function UITheme.HiddenSelection(): Frame
 	local empty = Instance.new("Frame")
 	empty.Name = "NoSelection"
@@ -1478,7 +1521,8 @@ function UITheme.Start()
 	local function rescale()
 		currentScale = scaleFor()
 		for _, scale in ipairs(scales) do
-			scale.Scale = currentScale
+			local override = scaleOverrides[scale]
+			scale.Scale = if override then override(currentScale) else currentScale
 		end
 		placeLeft()
 		for _, fn in ipairs(layoutWatchers) do

@@ -30,9 +30,12 @@ return function(t)
 		-- at the end of the list so the detector filter's saved indices keep
 		-- still (LaneW W6); they are ordered by stage, not by HP, so the climb
 		-- is checked over the woods before them.
+		-- Cherry and Willow (WORLD-T323) are appended too, for the same reason, and
+		-- their v1 rows are a rollback proposal: they are checked for numbers only.
+		local appended = { cherry = true, willow = true }
 		local woods = {}
 		for _, wood in ipairs(WoodData.All()) do
-			if BiomeData.StageNeeded(wood.biome) == 0 then
+			if BiomeData.StageNeeded(wood.biome) == 0 and not appended[wood.id] then
 				table.insert(woods, wood)
 			end
 		end
@@ -42,7 +45,7 @@ return function(t)
 			t.ok(woods[i].pricePerLog > woods[i - 1].pricePerLog, woods[i].id .. " price")
 		end
 		for _, wood in ipairs(WoodData.All()) do
-			if BiomeData.StageNeeded(wood.biome) > 0 then
+			if BiomeData.StageNeeded(wood.biome) > 0 or appended[wood.id] then
 				t.ok(wood.treeHP > 0 and wood.pricePerLog > 0, wood.id .. " numbers")
 			end
 		end

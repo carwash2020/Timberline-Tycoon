@@ -503,4 +503,12 @@ return function(t)
 			end
 		end
 	end)
+	t.test("effect hosts: 8 on high, 4 on medium, 0 on low; an unknown tier falls back to high", function()
+		t.eq(QualityBudgets.EffectHosts, { low = 0, medium = 4, high = 8 })
+		t.eq(QualityBudgets.EffectHostCap("high"), 8)
+		t.eq(QualityBudgets.EffectHostCap("medium"), 4)
+		t.eq(QualityBudgets.EffectHostCap("low"), 0)
+		t.eq(QualityBudgets.EffectHostCap("ultra"), 8, "unknown falls back to high, like GlowLightCap")
+		t.ok(table.isfrozen(QualityBudgets.EffectHosts))
+	end)
 end

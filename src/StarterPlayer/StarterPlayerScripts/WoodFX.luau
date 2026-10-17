@@ -39,6 +39,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local ChopFeelLogic = require(ReplicatedStorage.Shared.ChopFeelLogic)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
@@ -49,8 +50,10 @@ local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
+local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local CameraShake = require(script.Parent.CameraShake)
+local ChopHaptics = require(script.Parent.ChopHaptics)
 local Quality = require(script.Parent.Quality)
 
 type WoodDef = WoodData.WoodDef
@@ -60,10 +63,10 @@ local WoodFX = {}
 WoodFX.FxRange = 150 -- studs from the camera; farther effects aren't drawn
 WoodFX.ShakeRange = 40 -- a landing shakes the camera this near ...
 WoodFX.ShakeMass = 5 -- ... if it's heavier than this
-WoodFX.ChipsPerHit = 5
+WoodFX.ChipsPerHit = 6
 WoodFX.ChipMin = 0.3 -- studs; the long side of a chip never starts under this
 WoodFX.ChipsPerOffcut = 10
-WoodFX.LeavesPerFall = 14
+WoodFX.LeavesPerFall = 10
 WoodFX.RingDots = 16
 WoodFX.RingHold = 2.5 -- seconds the ring stays after the last swing
 WoodFX.SpringFrom = 0.72 -- a tree that grew springs up from this much of its size
@@ -115,6 +118,20 @@ end
 
 local GLOW = Color3.fromHex(WoodData.LanternGlow)
 
+-- The night colour of a tracked model: its wood's Effect glow (a Palette name,
+-- or the lantern's own hex), else the lantern's.
+local function glowFor(model: Model): Color3
+	local row = WoodData.EffectOf(model:GetAttribute("WoodId"))
+	local name = if row then row.glow else nil
+	if name == nil then
+		return GLOW
+	end
+	if string.sub(name, 1, 1) == "#" then
+		return Color3.fromHex(name)
+	end
+	return Palette.Get(name)
+end
+
 type DayLook = {
 	color: Color3,
 	material: Enum.Material,
@@ -136,6 +153,9 @@ local seenOrder = weakKeys() -- [Model] = number, tie-break when distances match
 local nextOrder = 0
 local paintedNight: boolean? = nil
 local lightAt = -math.huge
+local effectEmitters = weakKeys() -- [Model] = ParticleEmitter
+local effectAt = -math.huge
+local effectNight: boolean? = nil
 
 -- SurfaceAppearance has no Enabled. Park it in a folder under the part at
 -- night so the neon shows, and so a streaming cleanup still destroys it.
@@ -183,7 +203,7 @@ local function paintGlow(model: Model, part: BasePart, night: boolean)
 		return
 	end
 	if night then
-		part.Color = GLOW
+		part.Color = glowFor(model)
 		part.Material = Enum.Material.Neon
 		local hold = if #day.surfaces > 0 then holdFolder(part) else nil
 		for _, surface in ipairs(day.surfaces) do
@@ -241,7 +261,7 @@ local function ensureLight(model: Model, on: boolean)
 		light = made
 	end
 	if light and light:IsA("PointLight") then
-		light.Color = GLOW
+		light.Color = glowFor(model)
 		light.Range = WoodFX.GlowRange
 		light.Brightness = WoodFX.GlowBrightness
 		light.Shadows = false
@@ -255,11 +275,46 @@ local function modelOrigin(model: Model): Vector3
 	return model:GetPivot().Position
 end
 
+-- Paint wins: a cached part whose NightGlow is gone (painted, or marked
+-- Painted) is dropped, its saved day look forgotten and its surfaces put back,
+-- and the old day colour is never written onto it (that would undo the paint
+-- at dawn). Returns the parts still glowing.
+local function pruneStale(model: Model): { BasePart }
+	local parts = lanternParts[model] :: { BasePart }?
+	if not parts then
+		return {}
+	end
+	local kept: { BasePart } = {}
+	local looks = looksFor(model)
+	for _, part in ipairs(parts) do
+		if part.Parent and part:GetAttribute("NightGlow") == true and part:GetAttribute("Painted") ~= true then
+			table.insert(kept, part)
+		else
+			local day = looks[part]
+			if day and part.Parent then
+				for _, surface in ipairs(day.surfaces) do
+					if surface.Parent ~= part then
+						surface.Parent = part
+					end
+				end
+				local hold = part:FindFirstChild(HOLD_NAME)
+				if hold and #hold:GetChildren() == 0 then
+					hold:Destroy()
+				end
+			end
+			looks[part] = nil
+		end
+	end
+	lanternParts[model] = kept
+	return kept
+end
+
 local function paintCached(model: Model, night: boolean): number
 	local parts = lanternParts[model] :: { BasePart }?
 	if not parts or model.Parent == nil then
 		return 0
 	end
+	parts = pruneStale(model)
 	local painted = 0
 	for _, part in ipairs(parts) do
 		if part.Parent then
@@ -289,7 +344,16 @@ function WoodFX.TrackLantern(model: Model, night: boolean): number
 	return paintCached(model, night)
 end
 
+local function dropEmitter(model: Model)
+	local e = effectEmitters[model] :: ParticleEmitter?
+	if e then
+		e:Destroy()
+	end
+	effectEmitters[model] = nil
+end
+
 function WoodFX.ForgetLantern(model: Model)
+	dropEmitter(model)
 	lanternParts[model] = nil
 	dayLook[model] = nil
 	phase[model] = nil
@@ -307,6 +371,9 @@ function WoodFX.ResetLanterns()
 	nextOrder = 0
 	paintedNight = nil
 	lightAt = -math.huge
+	effectEmitters = weakKeys()
+	effectAt = -math.huge
+	effectNight = nil
 end
 
 local function assignLights(night: boolean, tier: string, eye: Vector3)
@@ -360,15 +427,126 @@ function WoodFX.StepLanterns(night: boolean, now: number, tier: string, eye: Vec
 	return painted
 end
 
+---------------------------------------------------------------------------
+-- Sparks on ember and gloam buildings (WOODFX-T316)
+---------------------------------------------------------------------------
+
+local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds" -- the dust's own built-in texture
+WoodFX.EffectFxName = "WoodEffectFx"
+
+export type EffectHost = { id: string, distance: number }
+
+-- Which hosts carry sparks: the nearest first (ties by id), only those within
+-- `range` studs of the eye (WoodFX.FxRange when not given), never more than the
+-- tier's QualityBudgets.EffectHosts cap.
+function WoodFX.EffectHostIds(hosts: { EffectHost }, tier: string, range: number?): { string }
+	local limit = range or WoodFX.FxRange
+	local near: { EffectHost } = {}
+	for _, host in ipairs(hosts) do
+		if host.distance <= limit then
+			table.insert(near, host)
+		end
+	end
+	table.sort(near, function(a: EffectHost, b: EffectHost): boolean
+		if a.distance ~= b.distance then
+			return a.distance < b.distance
+		end
+		return a.id < b.id
+	end)
+	local cap = math.min(#near, QualityBudgets.EffectHostCap(tier))
+	local out: { string } = {}
+	for i = 1, cap do
+		table.insert(out, near[i].id)
+	end
+	return out
+end
+
+local function makeEmitter(model: Model, color: Color3): ParticleEmitter?
+	local root = model.PrimaryPart
+	if not root then
+		return nil
+	end
+	local e = Instance.new("ParticleEmitter")
+	e.Name = WoodFX.EffectFxName
+	e:SetAttribute("ClientFx", true)
+	e.Texture = DUST_TEXTURE
+	e.Rate = 2 -- at most 3 a second
+	e.Lifetime = NumberRange.new(1.2, 2) -- never over 2 seconds
+	e.Speed = NumberRange.new(0.4, 1)
+	e.SpreadAngle = Vector2.new(30, 30)
+	e.EmissionDirection = Enum.NormalId.Top
+	e.Color = ColorSequence.new(color)
+	e.LightEmission = 0.3
+	e.LightInfluence = 0
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
+	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+	e.Parent = root
+	return e
+end
+
+-- Sparks follow the buildings that have an emitter row (ember, gloam), still
+-- have a glowing Door part and are not painted: the nearest few within
+-- FxRange, up to the tier's cap (none on low: colour only). Re-sorts at most
+-- every GlowLightInterval, and when the day flips. Returns the live emitters.
+function WoodFX.StepEffects(night: boolean, now: number, tier: string, eye: Vector3): number
+	local flipped = effectNight ~= night
+	if not flipped and effectAt >= 0 and now - effectAt < WoodFX.GlowLightInterval then
+		local live = 0
+		for model in pairs(effectEmitters) do
+			if (model :: Model).Parent then
+				live += 1
+			end
+		end
+		return live
+	end
+	effectAt = now
+	effectNight = night
+	local hosts: { EffectHost } = {}
+	local byId: { [string]: Model } = {}
+	for model in pairs(lanternParts) do
+		local host = model :: Model
+		local row = if host.Parent then WoodData.EffectOf(host:GetAttribute("WoodId")) else nil
+		if row and row.emitter ~= nil then
+			if #pruneStale(host) > 0 then
+				local id = string.format("%08d", (seenOrder[host] :: number?) or 0)
+				byId[id] = host
+				table.insert(hosts, { id = id, distance = (modelOrigin(host) - eye).Magnitude })
+			end
+		end
+	end
+	local want: { [Model]: boolean } = {}
+	for _, id in ipairs(WoodFX.EffectHostIds(hosts, tier, WoodFX.FxRange)) do
+		want[byId[id]] = true
+	end
+	for model in pairs(effectEmitters) do
+		local host = model :: Model
+		if not want[host] or host.Parent == nil then
+			dropEmitter(host)
+		end
+	end
+	local live = 0
+	for model in pairs(want) do
+		if not effectEmitters[model] then
+			local made = makeEmitter(model, glowFor(model))
+			effectEmitters[model] = made
+		end
+		if effectEmitters[model] then
+			live += 1
+		end
+	end
+	return live
+end
+
 -- Client-only night swap. The tag listener caches parts; this only flips
 -- the paint and, about once a second, the lights.
 local function refreshLanterns()
 	local camera = workspace.CurrentCamera
 	local eye = if camera then camera.CFrame.Position else Vector3.zero
-	WoodFX.StepLanterns(WoodFX.NightGlowOn(), os.clock(), Quality.Budget().Tier, eye)
+	local night = WoodFX.NightGlowOn()
+	WoodFX.StepLanterns(night, os.clock(), Quality.Budget().Tier, eye)
+	WoodFX.StepEffects(night, os.clock(), Quality.Budget().Tier, eye)
 end
 
-local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local LEAF_FLAT = CFrame.Angles(0, 0, math.pi / 2)
 local LEAF_ROCK = math.rad(40)
 local LEAF_FLUTTER = 8
@@ -401,9 +579,25 @@ function WoodFX.Shakes(distance: number, mass: number): boolean
 	return distance <= WoodFX.ShakeRange and mass > WoodFX.ShakeMass
 end
 
--- How hard: heavier lands harder, at most a big shake.
-function WoodFX.ShakeStrength(mass: number): number
-	return math.clamp(0.25 + mass / 80, 0.25, 0.9)
+-- How hard: heavier lands harder, at most a big shake; a phone gets at most
+-- 0.6 (ChopFeelLogic.ShakeCap). `device` is "phone", "console" or "desktop"
+-- (desktop when not given).
+function WoodFX.ShakeStrength(mass: number, device: string?): number
+	return ChopFeelLogic.ShakeStrength(mass, device or "desktop")
+end
+
+-- The device now, from UITheme (loaded lazily: it is not needed headless).
+local function deviceNow(): string
+	local ok, theme = pcall(function(): any
+		return require(script.Parent.UITheme)
+	end)
+	if ok and type(theme) == "table" and type(theme.Device) == "function" then
+		local got, device = pcall(theme.Device)
+		if got and type(device) == "string" then
+			return device
+		end
+	end
+	return "desktop"
 end
 
 -- How many of `dots` a ring lights for `progress` (0-1).
@@ -606,11 +800,29 @@ local function randomAxis(): Vector3
 	return if v.Magnitude > 0.01 then v.Unit else Vector3.xAxis
 end
 
+-- Every third chip is bark colour, the rest the wood's core.
+function WoodFX.IsBarkChip(i: number): boolean
+	return i % 3 == 0
+end
+
+-- Chips live at once if `players` each swing every `interval` seconds and a
+-- chip lives `life` seconds, before the pool's cap. The pool recycles its
+-- oldest chip past QualityBudgets.ChipCount, so the live count never passes it.
+function WoodFX.ChipDemand(players: number, interval: number, life: number): number
+	return players * math.ceil(life / math.max(interval, 0.05)) * WoodFX.ChipsPerHit
+end
+
+-- Chips in flight or resting right now (never above the tier's ChipCount).
+function WoodFX.LiveChips(): number
+	return #chipBatch.out
+end
+
 -- `n` chips out of `pos` along `normal`, in the wood's core (and a few in
 -- its bark) colour.
-local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number)
+local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number): { BasePart }
+	local made: { BasePart } = {}
 	if not nearCamera(pos) then
-		return
+		return made
 	end
 	local core = TreeArt.Core(def)
 	local bark = def.trunkColor
@@ -631,10 +843,12 @@ local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number)
 		)
 		local chip = takePart(chipBatch)
 		chip.Size = Vector3.new(WoodFX.ChipMin + math.random() * 0.16, 0.16, WoodFX.ChipMin + math.random() * 0.22)
-		chip.Color = if i % 4 == 0 then bark else core
+		chip.Color = if WoodFX.IsBarkChip(i) then bark else core
 		local rest = TreeLogic.Upright(groundNormal) * CFrame.Angles(0, math.random() * math.pi * 2, 0)
 		launch(chipBatch, chip, flight, rest, randomAxis(), 10 + math.random() * 10, 0)
+		table.insert(made, chip)
 	end
+	return made
 end
 
 -- Leaves flutter down from `points` in the wood's colours.
@@ -829,6 +1043,96 @@ local function woodOf(payload: { [string]: any }): WoodDef?
 	return if type(id) == "string" then WoodData.Get(id) else nil
 end
 
+---------------------------------------------------------------------------
+-- Prediction: the swinger's chips and thunk on the impact frame
+---------------------------------------------------------------------------
+
+-- The swinger's own swings not yet answered by the server's "Cut": each holds
+-- the chips it popped. One that is not answered inside PredictWindow, or that
+-- meets a "Clink", gives its chips back to the pool (hide, back to idle).
+local ledger = ChopFeelLogic.NewLedger()
+-- The last progress the server confirmed for a section (the thunk's pitch
+-- never guesses this hit), and whether its 80 percent creak has fired.
+local confirmed: { [Instance]: number } = setmetatable({}, { __mode = "k" }) :: any
+local creaked: { [Instance]: boolean? } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Hides `parts` (chips from a swing that did not happen) and returns them to
+-- the pool; no Instance.new.
+local function releaseChips(parts: { BasePart })
+	local mine: { [BasePart]: boolean } = {}
+	for _, part in ipairs(parts) do
+		mine[part] = true
+	end
+	local i = 1
+	while i <= #chipBatch.out do
+		local piece = chipBatch.out[i]
+		if mine[piece.part] then
+			table.remove(chipBatch.out, i)
+			piece.part.Parent = nil
+			table.insert(chipBatch.idle, piece.part)
+		else
+			i += 1
+		end
+	end
+end
+
+local function sweepLedger()
+	for _, p in ipairs(ChopFeelLogic.Sweep(ledger, os.clock())) do
+		releaseChips(p.token :: { BasePart })
+	end
+end
+
+-- The swing lands at `pos` on `part`'s section: chips and the thunk now, at
+-- the impact frame, before the server answers. No cash, number or progress
+-- is predicted; the pitch uses the section's last confirmed progress (0 when
+-- none). A thunk already played cannot be recalled if the server refuses.
+function WoodFX.Predict(def: WoodDef, pos: Vector3, normal: Vector3, part: Instance?)
+	sweepLedger()
+	local made = chips(def, pos, normal, WoodFX.ChipsPerHit)
+	local progress = if part then confirmed[part] or 0 else 0
+	SoundData.PlayAt("Chop", pos, ChopFeelLogic.ThunkPitch(progress))
+	ChopFeelLogic.Add(ledger, pos, made, os.clock())
+	ChopHaptics.Bite()
+	task.delay(ChopFeelLogic.PredictWindow + 0.05, sweepLedger)
+end
+
+-- The tree model a trunk section belongs to (it carries HomePivot), or nil.
+local function treeOf(part: Instance): Model?
+	local at: Instance? = part.Parent
+	while at do
+		if at:IsA("Model") and at:GetAttribute("HomePivot") ~= nil then
+			return at
+		end
+		at = at.Parent
+	end
+	return nil
+end
+
+-- At CreakAt of the way through a cut, once per section per cut: a creak and
+-- a small rock of that tree's canopy (WindSway; the trunk is never moved).
+-- TreeCreak has no sound id yet, so it is silent until one is supplied.
+local function progressFeel(part: Instance, pos: Vector3, progress: number)
+	confirmed[part] = progress
+	if ChopFeelLogic.Rearm(progress) then
+		creaked[part] = nil
+	end
+	local fire, latch = ChopFeelLogic.CreakStep(progress, creaked[part] == true)
+	creaked[part] = if latch then true else nil
+	if not fire or nearCamera(pos) ~= true then
+		return
+	end
+	SoundData.PlayAt("TreeCreak", pos)
+	local tree = treeOf(part)
+	if tree then
+		local ok, sway = pcall(function(): any
+			return require(script.Parent.WindSway)
+		end)
+		if ok and type(sway) == "table" and type(sway.Nudge) == "function" then
+			sway.Nudge(tree)
+		end
+	end
+end
+
 local function onWorldFX(kind: string, payload: any)
 	if type(payload) ~= "table" then
 		return
@@ -838,22 +1142,43 @@ local function onWorldFX(kind: string, payload: any)
 		if not def or typeof(pos) ~= "Vector3" or typeof(normal) ~= "Vector3" then
 			return
 		end
-		chips(def, pos, normal, WoodFX.ChipsPerHit)
 		local part = payload.part
-		if payload.through == true and payload.felled == true and nearCamera(pos) then
+		local mine = payload.userId == player.UserId
+		local through = payload.through == true
+		local progress = if type(payload.progress) == "number" then math.clamp(payload.progress, 0, 1) else 0
+		-- The swinger's own hit was already shown at the impact frame: this
+		-- answer takes that prediction instead of playing chips and thunk twice.
+		local predicted = mine and ChopFeelLogic.Consume(ledger, pos, os.clock()) ~= nil
+		if not predicted then
+			chips(def, pos, normal, WoodFX.ChipsPerHit)
+		end
+		if through and payload.felled == true and nearCamera(pos) then
 			-- A trunk is coming down: creak, crack and whoosh (the thud is "Felled").
 			local mass = 40
 			if typeof(part) == "Instance" and part:IsA("BasePart") then
 				mass = part.Size.X * part.Size.Y * part.Size.Z
 			end
-			SoundData.PlayAt("ChopFinal", pos)
+			if not predicted then
+				SoundData.PlayAt("ChopFinal", pos, ChopFeelLogic.ThunkPitch(progress))
+			end
 			SoundData.PlayFell("start", pos, mass)
-		else
-			SoundData.PlayAt(if payload.through == true then "ChopFinal" else "Chop", pos)
+			if mine then
+				local from = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+				if from and from:IsA("BasePart") and WoodFX.Shakes((from.Position - pos).Magnitude, mass) then
+					CameraShake.Shake(ChopFeelLogic.FinishShake(deviceNow()), 0.15)
+				end
+			end
+		elseif not predicted then
+			SoundData.PlayAt(if through then "ChopFinal" else "Chop", pos, ChopFeelLogic.ThunkPitch(progress))
 		end
-		if payload.userId == player.UserId and typeof(part) == "Instance" and part:IsA("BasePart") then
-			local progress = if type(payload.progress) == "number" then payload.progress else 0
-			showRing(part, pos, progress, payload.through == true)
+		if mine and through then
+			ChopHaptics.Final()
+		end
+		if typeof(part) == "Instance" and part:IsA("BasePart") then
+			progressFeel(part, pos, progress)
+			if mine then
+				showRing(part, pos, progress, through)
+			end
 		end
 	elseif kind == "LeafFall" then
 		local def = woodOf(payload)
@@ -883,7 +1208,7 @@ local function onWorldFX(kind: string, payload: any)
 		local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
 		local from = if hrp and hrp:IsA("BasePart") then hrp.Position elseif camera then camera.CFrame.Position else nil
 		if from and WoodFX.Shakes((from - pos).Magnitude, mass) then
-			CameraShake.Shake(WoodFX.ShakeStrength(mass), 0.4)
+			CameraShake.Shake(WoodFX.ShakeStrength(mass, deviceNow()), 0.4)
 		end
 	elseif kind == "Chips" then
 		local def, pos = woodOf(payload), payload.pos
@@ -894,6 +1219,10 @@ local function onWorldFX(kind: string, payload: any)
 		local pos = payload.pos
 		if typeof(pos) == "Vector3" then
 			SoundData.PlayAt("ChopTooHard", pos)
+			-- The swing that bit here did not: its chips go back to the pool.
+			for _, p in ipairs(ChopFeelLogic.Cancel(ledger, pos)) do
+				releaseChips(p.token :: { BasePart })
+			end
 		end
 	elseif kind == "Sold" then
 		local pos, amount = payload.pos, payload.amount
@@ -1092,6 +1421,16 @@ local function startLoop()
 	end
 	CollectionService:GetInstanceAddedSignal("Lanternwood"):Connect(onLantern)
 	CollectionService:GetInstanceRemovedSignal("Lanternwood"):Connect(function(inst: Instance)
+		if inst:IsA("Model") then
+			WoodFX.ForgetLantern(inst)
+		end
+	end)
+	-- The other effect woods (frost, ember, gloam, lumen) are tracked the same way.
+	for _, inst in ipairs(CollectionService:GetTagged("WoodEffect")) do
+		onLantern(inst)
+	end
+	CollectionService:GetInstanceAddedSignal("WoodEffect"):Connect(onLantern)
+	CollectionService:GetInstanceRemovedSignal("WoodEffect"):Connect(function(inst: Instance)
 		if inst:IsA("Model") then
 			WoodFX.ForgetLantern(inst)
 		end

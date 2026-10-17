@@ -128,6 +128,37 @@ local LIST: { Ore } = {
 		shape = "boulder",
 		size = "large",
 	},
+	-- WORLD-T323. Appended after Heartstone: ids are append-only.
+	{
+		id = "Amber",
+		name = "Amber",
+		tier = 2,
+		hardness = 3,
+		chunkValue = 50,
+		ingotValue = nil, -- sell only: no ingot, no recipe
+		respawnSec = 150,
+		hp = 10,
+		color = Color3.fromRGB(217, 138, 30),
+		material = Enum.Material.Glass,
+		glow = false,
+		shape = "mossy",
+		size = "mid",
+	},
+	{
+		id = "Garnet",
+		name = "Garnet",
+		tier = 3,
+		hardness = 4,
+		chunkValue = 70,
+		ingotValue = 190,
+		respawnSec = 240,
+		hp = 16,
+		color = Color3.fromRGB(122, 32, 56),
+		material = Enum.Material.Metal,
+		glow = false, -- tier 3, but no light: only Opal and Heartstone glow
+		shape = "split",
+		size = "mid",
+	},
 }
 
 local BY_ID: { [string]: Ore } = {}
