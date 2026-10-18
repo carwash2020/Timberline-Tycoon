@@ -17,6 +17,7 @@ local Kit = require(script.Parent.Parent.Art.Kit)
 local PlotData = require(script.Parent.Parent.PlotData)
 local TownTreeData = require(script.Parent.Parent.TownTreeData)
 local TerrainGen = require(script.Parent.TerrainGen)
+local TreeSpreadData = require(script.Parent.TreeSpreadData)
 local WorldLayout = require(script.Parent.WorldLayout)
 
 local TreeFill = {}
@@ -580,6 +581,16 @@ function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?, emit: (({ Spot }
 		end
 	end
 
+	-- WORLD-SPREAD (T366): a few supply trees stand elsewhere in their own zone
+	-- (TreeSpreadData.Moved: same wood, biome and zone, same size class), so no
+	-- cell holds a blob. `taken` keeps their old spots, so nothing planted after
+	-- them moves.
+	for _, move in ipairs(TreeSpreadData.Moved) do
+		local spot = out[move.index - #existing]
+		if spot and spot.zone and spot.biome == spot.zone.id then
+			spot.position = Vector3.new(move.x, TerrainGen.HeightAt(move.x, move.z) - 0.3, move.z)
+		end
+	end
 	announce(table.move(out, 1, #out, 1, {}))
 	local announced = #out
 	local discs = world().GroveDiscs() :: { GroveDisc }
