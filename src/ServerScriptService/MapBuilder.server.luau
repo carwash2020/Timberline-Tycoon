@@ -321,6 +321,10 @@ local function spawnTree(woodId: string, at: Vector3, region: string, zone: Worl
 		if zone and string.sub(zone.id, 1, 10) == "neargrove:" then
 			model:SetAttribute("NearGrove", true)
 		end
+		-- The refill that spreads trees over the whole map (WORLD-SPREAD).
+		if zone and string.sub(zone.id, 1, 7) == "spread:" then
+			model:SetAttribute("Gen", "TreeSpread")
+		end
 	end
 	treesSpawned += 1
 	return model
@@ -767,6 +771,7 @@ step("5. The trees", function()
 			collect(WorldPlan.RegionTrees(), false)
 			collect(WorldPlan.AddedTrees(), false) -- WORLD-T323
 			collect(WorldPlan.NearGrove(), false) -- WORLD-SPREAD T349
+			collect(WorldPlan.SpreadTrees(), false) -- WORLD-SPREAD T356
 			loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
 			for _, e in ipairs(entries) do
 				plantOne(e)
@@ -951,6 +956,9 @@ step("5. The trees", function()
 					collect(WorldPlan.RegionTrees(), false)
 					-- The 100 added trees and the teasers (WORLD-T323), last of all.
 					collect(WorldPlan.AddedTrees(planSlice.step), false)
+					-- The refill that spreads trees over the map (WORLD-SPREAD T356), after
+					-- every older tree.
+					collect(WorldPlan.SpreadTrees(planSlice.step), false)
 					return nil
 				end)
 				loadLine(string.format("forest planned: %d sites in %.2fs", #all + #tail, os.clock() - before))

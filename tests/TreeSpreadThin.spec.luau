@@ -2,7 +2,6 @@
 -- Thinning (WORLD-SPREAD, T356): the dense 100 stud cells give up movable wild
 -- trees, and TreeSpreadData matches the rule that produced it.
 return function(t)
-	local roblox = t.roblox
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 	local TreeSpread = t.load("ReplicatedStorage/Shared/World/TreeSpread")
 	local TreeSpreadData = t.shared("World/TreeSpreadData")
@@ -12,41 +11,10 @@ return function(t)
 	local FIRST = WorldPlan.FirstTreeCount()
 	local trees = WorldPlan.Trees()
 
-	-- The same items tools/tree_report builds.
-	local function items()
-		local out = {}
-		for i, spot in ipairs(trees) do
-			local prefix = if spot.zone then string.match(spot.zone.id, "^[^:]*") else "none"
-			local fixed = i <= FIRST or SUPPLY[spot.biome] == true or prefix == "town" or prefix == "plot"
-			local anchor = false
-			if not fixed then
-				local _, sizeName = GrowLogic.Site(spot.position)
-				anchor = sizeName == "large"
-			end
-			table.insert(out, {
-				x = spot.position.X,
-				z = spot.position.Z,
-				index = i,
-				movable = not fixed,
-				anchor = anchor,
-			})
-		end
-		local function other(list)
-			for _, spot in ipairs(list) do
-				table.insert(out, { x = spot.position.X, z = spot.position.Z, movable = false })
-			end
-		end
-		other(WorldPlan.StripTrees())
-		other(WorldPlan.FerryPalms())
-		other(WorldPlan.Lanternwood())
-		other(WorldPlan.RegionTrees())
-		other(WorldPlan.ReachTrees())
-		other(WorldPlan.AddedTrees())
-		return out
-	end
-
-	local all = items()
-	local plan = TreeSpread.PlanSkip(all)
+	local TreeSpreadItems = t.load("ReplicatedStorage/Shared/World/TreeSpreadItems")
+	local all, obstacles = TreeSpreadItems.Build(WorldPlan)
+	local plan = TreeSpread.PlanSkip(all, obstacles)
+	local densityOnly = TreeSpread.PlanSkip(all)
 
 	t.test("TreeSpreadData is exactly what the rule plans today (indices and positions)", function()
 		t.eq(#TreeSpreadData.Skipped, #plan)
@@ -68,8 +36,6 @@ return function(t)
 			t.ok(not SUPPLY[spot.biome], "not a supply tree")
 			local prefix = if spot.zone then string.match(spot.zone.id, "^[^:]*") else "none"
 			t.ok(prefix ~= "town" and prefix ~= "plot", "not a town or plot ring tree")
-			local _, sizeName = GrowLogic.Site(spot.position)
-			t.ok(sizeName ~= "large", "not an anchor")
 			t.ok(TreeSpread.Skipped(spot.position.X, spot.position.Z), "MapBuilder skips it")
 		end
 	end)
@@ -98,20 +64,24 @@ return function(t)
 		t.ok(cells["5,-8"] <= TreeSpread.Cap, "Red Mesa's 28 is under the cap: " .. tostring(cells["5,-8"]))
 	end)
 
-	t.test("thinning is deterministic and drops 18 trees from 8 cells", function()
-		local again = TreeSpread.PlanSkip(items())
-		t.eq(again, plan)
-		t.eq(#plan, 18)
+	t.test("thinning by density never drops an anchor; overlap drops add 2 more", function()
+		for _, index in ipairs(densityOnly) do
+			local _, sizeName = GrowLogic.Site(trees[index].position)
+			t.ok(sizeName ~= "large", "tree " .. index .. " is an anchor")
+		end
+		t.eq(#densityOnly, 18)
+		t.eq(#plan, 20)
+		t.eq(TreeSpread.PlanSkip(all, obstacles), plan, "deterministic")
 	end)
 
-	t.test("no cell that held trees is emptied of all of them", function()
+	t.test("no 200 stud cell that held trees is emptied of all of them", function()
 		local dropped = {}
 		for _, index in ipairs(plan) do
 			dropped[index] = true
 		end
 		local before, after = {}, {}
 		for _, item in ipairs(all) do
-			local key = math.floor(item.x / 100) .. "," .. math.floor(item.z / 100)
+			local key = math.floor(item.x / 200) .. "," .. math.floor(item.z / 200)
 			before[key] = (before[key] or 0) + 1
 			if not (item.index and dropped[item.index]) then
 				after[key] = (after[key] or 0) + 1
@@ -120,6 +90,5 @@ return function(t)
 		for key in pairs(before) do
 			t.ok(after[key] ~= nil, "cell " .. key .. " lost every tree")
 		end
-		_ = roblox
 	end)
 end

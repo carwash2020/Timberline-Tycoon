@@ -248,6 +248,7 @@ return function(t)
 			+ #WorldPlan.RegionTrees()
 			+ #WorldPlan.AddedTrees()
 			+ #WorldPlan.NearGrove()
+			+ #WorldPlan.SpreadTrees()
 		if WoodData.Get("lanternwood") then
 			n += #WorldPlan.Lanternwood()
 		end
@@ -694,6 +695,11 @@ return function(t)
 		for _, spot in ipairs(WorldPlan.AddedTrees()) do
 			if spot.woodId == "birch" then
 				birches += 1 -- the added birches fail to build too (WORLD-T323)
+			end
+		end
+		for _, spot in ipairs(WorldPlan.SpreadTrees()) do
+			if spot.woodId == "birch" then
+				birches += 1 -- and so do the refill's (WORLD-SPREAD)
 			end
 		end
 		local TutorialGrove = t.shared("TutorialGrove")

@@ -100,23 +100,9 @@ addList("reach", WorldPlan.ReachTrees())
 addList("added", WorldPlan.AddedTrees())
 
 -- The thinning plan (TreeSpread.PlanSkip) over the same trees.
-local planItems = {}
-for i, tr in ipairs(trees) do
-	local isTrees = i <= #ground
-	local anchor = false
-	if isTrees and not tr.fixed then
-		local _, sizeName = GrowLogic.Site(roblox.Vector3.new(tr.x, 0, tr.z))
-		anchor = sizeName == "large"
-	end
-	table.insert(planItems, {
-		x = tr.x,
-		z = tr.z,
-		index = if isTrees then i else nil,
-		movable = isTrees and not tr.fixed,
-		anchor = anchor,
-	})
-end
-local skipPlan = TreeSpread.PlanSkip(planItems)
+local TreeSpreadItems = modules:shared("World/TreeSpreadItems")
+local planItems, planObstacles = TreeSpreadItems.Build(WorldPlan)
+local skipPlan = TreeSpread.PlanSkip(planItems, planObstacles)
 
 if ONLY_SKIP then
 	print("TreeSpreadData.Skipped = {")
@@ -127,6 +113,21 @@ if ONLY_SKIP then
 	print("} :: { Entry }")
 	return
 end
+
+-- From here on the report describes the map as planted: thinned trees are out,
+-- and the oak clumps by the spawn and the refill rows are in.
+do
+	local kept = {}
+	for i, tr in ipairs(trees) do
+		local isTrees = i <= #ground
+		if not (isTrees and TreeSpread.Skipped(tr.x, tr.z)) then
+			table.insert(kept, tr)
+		end
+	end
+	trees = kept
+end
+addList("near grove", WorldPlan.NearGrove())
+addList("spread", WorldPlan.SpreadTrees())
 
 local sky = WorldPlan.Sky()
 local skyCount = if sky then #sky.lumenwood else 0
