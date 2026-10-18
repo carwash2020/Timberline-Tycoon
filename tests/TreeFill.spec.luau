@@ -60,7 +60,9 @@ return function(t)
 		-- four boulder clusters and the scenery that stood in their discs are gone (they
 		-- stand on grass), and the extra trees those had kept clear of take their spots.
 		-- 123854960 before.
-		t.eq(hashOf(trees, PREFIX), 910269599, "existing trunks moved")
+		-- Re-pinned (WORLD-SPREAD T366): supply trees moved within their zone to thin
+		-- dense cells, counts unchanged (TreeSpreadData.Moved). 910269599 before.
+		t.eq(hashOf(trees, PREFIX), 526113470, "existing trunks moved")
 		t.eq(#reach, 6, "the Reach is 1.5x of 4, rounded down")
 		t.eq(hashOf(reach, 4), 419646000, "the first 4 Reach trees moved")
 	end)

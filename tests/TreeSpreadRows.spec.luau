@@ -157,7 +157,8 @@ return function(t)
 				local key = math.floor(tr.x / 100) .. "," .. math.floor(tr.z / 100)
 				cells[key] = (cells[key] or 0) + 1
 			end
-			local EXEMPT = { ["0,-2"] = 44, ["-5,1"] = 44, ["9,-1"] = 27, ["-1,-3"] = 27 }
+			-- (T366 moved nine supply trees inside their zones: Hills 44 to 37, Starter 27 to 26 and 44 to 43.)
+			local EXEMPT = { ["0,-2"] = 43, ["-5,1"] = 37, ["9,-1"] = 27, ["-1,-3"] = 26 }
 			for key, n in pairs(cells) do
 				if n > TreeSpread.Cap then
 					t.eq(n, EXEMPT[key], "cell " .. key)

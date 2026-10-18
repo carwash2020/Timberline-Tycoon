@@ -35,8 +35,10 @@ return function(t)
 
 	-- WorldPlan.Trees() on main before this change: the same 1,041 trees, in the
 	-- same order, with the same woods, biomes, zones and positions.
+	-- Re-pinned (WORLD-SPREAD T366): supply trees moved within their zone to thin
+	-- dense cells, counts unchanged (TreeSpreadData.Moved, 9 trees). 449351915 before.
 	local PLAN_COUNT = 1041
-	local PLAN_CHECKSUM = 449351915
+	local PLAN_CHECKSUM = 614640516
 	local function checksum(trees)
 		local h = 0
 		for i, s in ipairs(trees) do

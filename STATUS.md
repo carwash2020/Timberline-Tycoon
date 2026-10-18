@@ -31,6 +31,9 @@ never bound; `NoButtonR2.spec`), no Robux price in code.
 #201 What's New fixes, grey box backing, held-tool teleport; #202 console safe area and text sizes; #203 axe head placement, gear meshes, Xbox chop diagnostics; #204 remaining gear meshes, pending-mesh swap, real layout specs; #205 event and cave prop mesh ids; #206 worn gear meshes, rope ladder tiles, scroll V2; #207 first badge ids; #208 build menu; #209 chop feel; #210 wood effects on buildings; #211 Cherry, Willow, Amber, Garnet, added trees and teasers. Open draft: #213 (custom sound ids).
 Sound ids: #213 wires the custom ids for TreeCreak, Engine, CricketsNight, WindHowl, LavaRumble, Wings, Quack, StormCrackle and LogThud. Chop, ChopFinal, TreeFall and LogLoad keep their stand-ins until Connor confirms the uploads are Approved.
 
+## Spread supply (branch `phase-2/spread-supply`, 18 October 2026, draft)
+Nine supply trees moved inside their own zone (`TreeSpreadData.Moved`, `tools/spread_supply`); the zones are nearly full, so 40 could not be placed. `ClientFreeze` and `TreeFill` pins re-pinned with the reason. Details: PHASE2_NOTES.md "Spread supply".
+
 ## World-spread (branch `phase-2/world-spread-thin`, 18 October 2026, draft)
 Trees spread over the whole map without changing `WorldPlan.Trees()` (so `ClientFreeze` is untouched): `TreeSpread` (wood mix per zone, thinning of 20 movable trees, the refill rows), `NearGrove` (oak clumps by the spawn), `Clearance` and `OverlapCheck` (the one overlap pass). Tools: `lune run tools/tree_report` (`--exempt`, `--skip`), `lune run tools/overlap_report`. Details and the named exceptions: PHASE2_NOTES.md "World-spread".
 
