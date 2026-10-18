@@ -24,6 +24,8 @@
 
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
+local roblox = require("@lune/roblox")
+local process = require("@lune/process")
 
 assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tools/tree_report")
 
@@ -31,13 +33,18 @@ local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/
 local modules = Loader.new()
 local WorldPlan = modules:shared("World/WorldPlan")
 local WorldLayout = modules:shared("World/WorldLayout")
+local TreeSpread = modules:shared("World/TreeSpread")
+local GrowLogic = modules:shared("GrowLogic")
 local TerrainGen = modules:shared("World/TerrainGen")
 local BiomeData = modules:shared("BiomeData")
 
 local ONLY_EXEMPT = false
-for _, a in ipairs(process and process.args or {}) do
+local ONLY_SKIP = false
+for _, a in ipairs(process.args) do
 	if a == "--exempt" then
 		ONLY_EXEMPT = true
+	elseif a == "--skip" then
+		ONLY_SKIP = true
 	end
 end
 
@@ -91,6 +98,36 @@ addList("lanternwood", WorldPlan.Lanternwood())
 addList("region", WorldPlan.RegionTrees())
 addList("reach", WorldPlan.ReachTrees())
 addList("added", WorldPlan.AddedTrees())
+
+-- The thinning plan (TreeSpread.PlanSkip) over the same trees.
+local TreeSpreadItems = modules:shared("World/TreeSpreadItems")
+local planItems, planObstacles = TreeSpreadItems.Build(WorldPlan)
+local skipPlan = TreeSpread.PlanSkip(planItems, planObstacles)
+
+if ONLY_SKIP then
+	print("TreeSpreadData.Skipped = {")
+	for _, index in ipairs(skipPlan) do
+		local tr = trees[index]
+		print(string.format("\t{ index = %d, x = %.2f, z = %.2f },", index, tr.x, tr.z))
+	end
+	print("} :: { Entry }")
+	return
+end
+
+-- From here on the report describes the map as planted: thinned trees are out,
+-- and the oak clumps by the spawn and the refill rows are in.
+do
+	local kept = {}
+	for i, tr in ipairs(trees) do
+		local isTrees = i <= #ground
+		if not (isTrees and TreeSpread.Skipped(tr.x, tr.z)) then
+			table.insert(kept, tr)
+		end
+	end
+	trees = kept
+end
+addList("near grove", WorldPlan.NearGrove())
+addList("spread", WorldPlan.SpreadTrees())
 
 local sky = WorldPlan.Sky()
 local skyCount = if sky then #sky.lumenwood else 0

@@ -1011,6 +1011,59 @@ function WorldPlan.NearGrove(): { TreeSpot }
 	return out
 end
 
+-- WORLD-SPREAD (T356): the refill (TreeSpread.Rows): clumps of 3 in every
+-- treeable 200 stud cell with no tree, then in the sparsest cells until the
+-- trees thinning dropped are replaced with a net gain. Appended after every
+-- other tree list; nothing existing moves. Cached in fields (no new local).
+-- Returns the spots; `WorldPlan._spreadUnfilled` holds the cells with no legal
+-- ground. `pause` is the planner's time slice.
+function WorldPlan.SpreadTrees(pause: (() -> ())?): { TreeSpot }
+	local self: any = WorldPlan
+	if self._spread then
+		return self._spread
+	end
+	local TreeFill = require(script.Parent.TreeFill)
+	local TreeSpread = require(script.Parent.TreeSpread)
+	local positions: { Vector3 } = {}
+	local function add(list: { TreeSpot })
+		for _, spot in ipairs(list) do
+			if not TreeSpread.Skipped(spot.position.X, spot.position.Z) then
+				table.insert(positions, spot.position)
+			end
+		end
+	end
+	add(WorldPlan.Trees(pause))
+	add(WorldPlan.StripTrees())
+	add(WorldPlan.FerryPalms())
+	add(WorldPlan.Lanternwood())
+	add(WorldPlan.RegionTrees())
+	add(WorldPlan.ReachTrees())
+	add(WorldPlan.AddedTrees(pause))
+	add(WorldPlan.NearGrove())
+	for _, spot in ipairs(require(script.Parent.Parent.TutorialGrove).Trees) do
+		table.insert(positions, Vector3.new(spot.x, 0, spot.z))
+	end
+	local sea = WorldLayout.SeaLevel
+	local out, unfilled = TreeSpread.Rows({
+		trees = positions,
+		dropped = TreeSpread.SkipCount(),
+		isLand = function(x: number, z: number): boolean
+			return TerrainGen.HeightAt(x, z) > sea + 1
+		end,
+		groundFor = function(x: number, z: number): boolean
+			return TreeFill.Ground(x, z) and TreeFill.Clear(x, z)
+		end,
+		takenNear = TreeFill.TakenNear,
+		height = TerrainGen.HeightAt,
+		pause = pause,
+	}, function(seed: number): any
+		return Kit.rng(seed)
+	end)
+	self._spread = out
+	self._spreadUnfilled = unfilled
+	return out
+end
+
 export type PointOfInterest = {
 	id: string,
 	name: string,
@@ -2001,11 +2054,11 @@ function WorldPlan.Town(): Town
 		{ "Planter", -105, 85.5 }, -- (was -103.5, 88: the Tool Shed grew 6.6 wider, its west wall now reaches it)
 		{ "Mailbox", -121, 99, 0 }, -- ring map: the Hills Road (z 66 to 94) now starts at x -125, so 5 studs off its edge
 		{ "FlowerBox", -97, 85.3, 0 },
-		{ "LogPile", 35.5, 131, 0 }, -- east of the mill, clear of the yard lamp and the sell station
+		{ "LogPile", 33.8, 130, 0 }, -- east of the mill, clear of the yard lamp and the sell station (was 35.5, 131: its edge met the station's posts and rails)
 		{ "LogPile", 35.5, 137, 0.1 },
 		{ "Wheelbarrow", 20, 93, -0.6 },
 		{ "SawdustPile", 40, 125 }, -- by the lean-to, clear of the yard lamp
-		{ "SawdustPile", -29.5, 91 },
+		{ "SawdustPile", -26.5, 91 }, -- (was -29.5, 91: it sat on the Barrel and the Crate beside it)
 		{ "Lantern", lantern.X, lantern.Z, campYaw },
 		{ "Barrel", 34.5, 105 }, -- between the mill's lean-to and the Dealership
 		{ "Barrel", 34.5, 107.2 },

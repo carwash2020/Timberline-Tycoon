@@ -77,6 +77,7 @@ local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
+local TreeSpread = require(ReplicatedStorage.Shared.World.TreeSpread)
 local NodeService = require(script.Parent.NodeService)
 local SectionTrees = require(script.Parent.SectionTrees)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
@@ -319,6 +320,10 @@ local function spawnTree(woodId: string, at: Vector3, region: string, zone: Worl
 		-- The spawn's oak clumps (T349): a tutorial beacon may point at them.
 		if zone and string.sub(zone.id, 1, 10) == "neargrove:" then
 			model:SetAttribute("NearGrove", true)
+		end
+		-- The refill that spreads trees over the whole map (WORLD-SPREAD).
+		if zone and string.sub(zone.id, 1, 7) == "spread:" then
+			model:SetAttribute("Gen", "TreeSpread")
 		end
 	end
 	treesSpawned += 1
@@ -740,7 +745,10 @@ step("5. The trees", function()
 		local function entriesOf(list: { WorldPlan.TreeSpot }, reach: boolean, startOrder: number): { Entry }
 			local entries: { Entry } = {}
 			for i, spot in ipairs(list) do
-				table.insert(entries, { spot = spot, reach = reach, order = startOrder + i })
+				-- A thinned wild tree (TreeSpreadData, WORLD-SPREAD) is not planted.
+				if not TreeSpread.Skipped(spot.position.X, spot.position.Z) then
+					table.insert(entries, { spot = spot, reach = reach, order = startOrder + i })
+				end
 			end
 			return entries
 		end
@@ -763,6 +771,7 @@ step("5. The trees", function()
 			collect(WorldPlan.RegionTrees(), false)
 			collect(WorldPlan.AddedTrees(), false) -- WORLD-T323
 			collect(WorldPlan.NearGrove(), false) -- WORLD-SPREAD T349
+			collect(WorldPlan.SpreadTrees(), false) -- WORLD-SPREAD T356
 			loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
 			for _, e in ipairs(entries) do
 				plantOne(e)
@@ -947,6 +956,9 @@ step("5. The trees", function()
 					collect(WorldPlan.RegionTrees(), false)
 					-- The 100 added trees and the teasers (WORLD-T323), last of all.
 					collect(WorldPlan.AddedTrees(planSlice.step), false)
+					-- The refill that spreads trees over the map (WORLD-SPREAD T356), after
+					-- every older tree.
+					collect(WorldPlan.SpreadTrees(planSlice.step), false)
 					return nil
 				end)
 				loadLine(string.format("forest planned: %d sites in %.2fs", #all + #tail, os.clock() - before))
