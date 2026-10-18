@@ -77,6 +77,7 @@ local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
+local TreeSpread = require(ReplicatedStorage.Shared.World.TreeSpread)
 local NodeService = require(script.Parent.NodeService)
 local SectionTrees = require(script.Parent.SectionTrees)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
@@ -740,7 +741,10 @@ step("5. The trees", function()
 		local function entriesOf(list: { WorldPlan.TreeSpot }, reach: boolean, startOrder: number): { Entry }
 			local entries: { Entry } = {}
 			for i, spot in ipairs(list) do
-				table.insert(entries, { spot = spot, reach = reach, order = startOrder + i })
+				-- A thinned wild tree (TreeSpreadData, WORLD-SPREAD) is not planted.
+				if not TreeSpread.Skipped(spot.position.X, spot.position.Z) then
+					table.insert(entries, { spot = spot, reach = reach, order = startOrder + i })
+				end
 			end
 			return entries
 		end

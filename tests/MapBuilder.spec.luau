@@ -504,10 +504,19 @@ return function(t)
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local TutorialGrove = t.shared("TutorialGrove")
 		local extra = extraTrees(WorldPlan)
-		t.eq(s.spawned, #WorldPlan.Trees() + #WorldPlan.ReachTrees() + #TutorialGrove.Trees + extra)
+		t.eq(
+			s.spawned,
+			(#WorldPlan.Trees() - t.load("ReplicatedStorage/Shared/World/TreeSpread").SkipCount())
+				+ #WorldPlan.ReachTrees()
+				+ #TutorialGrove.Trees
+				+ extra
+		)
 		t.eq(
 			s.workspace:GetAttribute("MapTrees"),
-			#WorldPlan.Trees() + #WorldPlan.ReachTrees() + #TutorialGrove.Trees + extra
+			(#WorldPlan.Trees() - t.load("ReplicatedStorage/Shared/World/TreeSpread").SkipCount())
+				+ #WorldPlan.ReachTrees()
+				+ #TutorialGrove.Trees
+				+ extra
 		)
 		t.eq(s.workspace:GetAttribute("MapTerrainSeconds"), 1.25)
 		t.eq(s.workspace:GetAttribute("MapBuildFailures"), 0)
@@ -524,7 +533,11 @@ return function(t)
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(
 			s.sectionSpawned,
-			#WorldPlan.Trees() + #WorldPlan.ReachTrees() + #sky.lumenwood + #TutorialGrove.Trees + extraTrees(WorldPlan),
+			(#WorldPlan.Trees() - t.load("ReplicatedStorage/Shared/World/TreeSpread").SkipCount())
+				+ #WorldPlan.ReachTrees()
+				+ #sky.lumenwood
+				+ #TutorialGrove.Trees
+				+ extraTrees(WorldPlan),
 			"every site, the isles' lumenwood, the tutorial oaks, and the strip and ferry"
 		)
 		t.eq(s.workspace:GetAttribute("MapTrees"), s.sectionSpawned)
@@ -586,7 +599,11 @@ return function(t)
 				table.insert(order, p)
 			end
 		end
-		t.eq(#order, #fresh.Trees(), "every tree of the plan is planted once")
+		t.eq(
+			#order,
+			#fresh.Trees() - t.load("ReplicatedStorage/Shared/World/TreeSpread").SkipCount(),
+			"every tree of the plan is planted once, bar the thinned ones"
+		)
 		local last, ordered = -1, true
 		for i = 1, firstN do
 			ordered = ordered and d2(order[i]) >= last
@@ -661,8 +678,9 @@ return function(t)
 		local s = build({ failWood = "birch" })
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local birches = 0
+		local TreeSpread = t.load("ReplicatedStorage/Shared/World/TreeSpread")
 		for _, spot in ipairs(WorldPlan.Trees()) do
-			if spot.woodId == "birch" then
+			if spot.woodId == "birch" and not TreeSpread.Skipped(spot.position.X, spot.position.Z) then
 				birches += 1
 			end
 		end
@@ -681,7 +699,7 @@ return function(t)
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(
 			s.sectionSpawned,
-			#WorldPlan.Trees()
+			(#WorldPlan.Trees() - t.load("ReplicatedStorage/Shared/World/TreeSpread").SkipCount())
 				- birches
 				+ #WorldPlan.ReachTrees()
 				+ #TutorialGrove.Trees
@@ -884,7 +902,7 @@ return function(t)
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(
 			s.workspace:GetAttribute("MapTrees"),
-			#WorldPlan.Trees()
+			(#WorldPlan.Trees() - t.load("ReplicatedStorage/Shared/World/TreeSpread").SkipCount())
 				+ #WorldPlan.ReachTrees()
 				+ #WorldPlan.Sky().lumenwood
 				+ #TutorialGrove.Trees

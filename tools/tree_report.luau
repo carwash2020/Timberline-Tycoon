@@ -24,6 +24,8 @@
 
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
+local roblox = require("@lune/roblox")
+local process = require("@lune/process")
 
 assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tools/tree_report")
 
@@ -31,13 +33,18 @@ local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/
 local modules = Loader.new()
 local WorldPlan = modules:shared("World/WorldPlan")
 local WorldLayout = modules:shared("World/WorldLayout")
+local TreeSpread = modules:shared("World/TreeSpread")
+local GrowLogic = modules:shared("GrowLogic")
 local TerrainGen = modules:shared("World/TerrainGen")
 local BiomeData = modules:shared("BiomeData")
 
 local ONLY_EXEMPT = false
-for _, a in ipairs(process and process.args or {}) do
+local ONLY_SKIP = false
+for _, a in ipairs(process.args) do
 	if a == "--exempt" then
 		ONLY_EXEMPT = true
+	elseif a == "--skip" then
+		ONLY_SKIP = true
 	end
 end
 
@@ -91,6 +98,35 @@ addList("lanternwood", WorldPlan.Lanternwood())
 addList("region", WorldPlan.RegionTrees())
 addList("reach", WorldPlan.ReachTrees())
 addList("added", WorldPlan.AddedTrees())
+
+-- The thinning plan (TreeSpread.PlanSkip) over the same trees.
+local planItems = {}
+for i, tr in ipairs(trees) do
+	local isTrees = i <= #ground
+	local anchor = false
+	if isTrees and not tr.fixed then
+		local _, sizeName = GrowLogic.Site(roblox.Vector3.new(tr.x, 0, tr.z))
+		anchor = sizeName == "large"
+	end
+	table.insert(planItems, {
+		x = tr.x,
+		z = tr.z,
+		index = if isTrees then i else nil,
+		movable = isTrees and not tr.fixed,
+		anchor = anchor,
+	})
+end
+local skipPlan = TreeSpread.PlanSkip(planItems)
+
+if ONLY_SKIP then
+	print("TreeSpreadData.Skipped = {")
+	for _, index in ipairs(skipPlan) do
+		local tr = trees[index]
+		print(string.format("\t{ index = %d, x = %.2f, z = %.2f },", index, tr.x, tr.z))
+	end
+	print("} :: { Entry }")
+	return
+end
 
 local sky = WorldPlan.Sky()
 local skyCount = if sky then #sky.lumenwood else 0

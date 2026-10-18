@@ -13,11 +13,15 @@
 --     glow woods, stay in their own discs);
 --   * inside a 15 stud border band of another zone's disc, that zone's plain
 --     woods join at 25 percent.
+-- Skip(): the thinned trees (TreeSpreadData.Skipped), applied where MapBuilder
+-- plants WorldPlan.Trees(). PlanSkip is the rule that produced that data (the
+-- spec runs it again and compares, so the data cannot go stale).
 -- (The old wildWoodsNear only knew starter, hills, snow and volcano, so Bayou
 -- and Mesa filler would have got oak or birch.) Deterministic: PickWood hashes
 -- the seed and the point.
 
 local BiomeData = require(script.Parent.Parent.BiomeData)
+local TreeSpreadData = require(script.Parent.TreeSpreadData)
 
 local TreeSpread = {}
 
@@ -165,6 +169,106 @@ function TreeSpread.PickWood(x: number, z: number, seed: number): string
 		end
 	end
 	return mix[#mix].woodId
+end
+
+---------------------------------------------------------------------------
+-- Thinning
+---------------------------------------------------------------------------
+
+TreeSpread.Cell = 100 -- the density grid
+TreeSpread.Cap = 25 -- no cell holds more (the spec's ceiling)
+TreeSpread.Target = 14 -- movable trees are thinned toward this where the cell can reach it
+
+export type Item = {
+	x: number,
+	z: number,
+	index: number?, -- the tree's place in WorldPlan.Trees(); nil for trees of other lists
+	movable: boolean, -- a wild tree of a stand, the forest ring, a clump or a grove clump
+	anchor: boolean?, -- a clump's largest size class (never dropped)
+}
+
+local function hashString(s: string): number
+	local h = 7
+	for i = 1, #s do
+		h = (h * 31 + string.byte(s, i)) % 1000003
+	end
+	return h
+end
+
+-- Which movable trees to drop: for every 100 stud cell holding more than
+-- Target trees (all lists counted), movable non-anchor trees go, lowest seeded
+-- hash rank first, until the cell is at Target or the movable trees run out.
+-- Cells are walked in order of x, then z. Fixed trees (supply, the first 331,
+-- the town and plot rings, the added trees, the strip, palms, Lanternwood and
+-- the Reach) and anchors never go. Returns the dropped items' indices, sorted.
+function TreeSpread.PlanSkip(items: { Item }): { number }
+	local cells: { [string]: { total: number, movable: { Item }, cx: number, cz: number } } = {}
+	for _, item in ipairs(items) do
+		local cx, cz = math.floor(item.x / TreeSpread.Cell), math.floor(item.z / TreeSpread.Cell)
+		local key = cx .. "," .. cz
+		local cell = cells[key]
+		if not cell then
+			cell = { total = 0, movable = {}, cx = cx, cz = cz }
+			cells[key] = cell
+		end
+		cell.total += 1
+		if item.movable and not item.anchor and item.index ~= nil then
+			table.insert(cell.movable, item)
+		end
+	end
+	local order: { string } = {}
+	for key in pairs(cells) do
+		table.insert(order, key)
+	end
+	table.sort(order, function(a, b)
+		local ca, cb = cells[a], cells[b]
+		if ca.cx ~= cb.cx then
+			return ca.cx < cb.cx
+		end
+		return ca.cz < cb.cz
+	end)
+	local dropped: { number } = {}
+	for _, key in ipairs(order) do
+		local cell = cells[key]
+		if cell.total > TreeSpread.Target and #cell.movable > 0 then
+			table.sort(cell.movable, function(a, b)
+				local ra, rb =
+					hashString("T356 thin " .. tostring(a.index)), hashString("T356 thin " .. tostring(b.index))
+				if ra ~= rb then
+					return ra < rb
+				end
+				return (a.index :: number) < (b.index :: number)
+			end)
+			local drop = math.min(#cell.movable, cell.total - TreeSpread.Target)
+			for i = 1, drop do
+				table.insert(dropped, cell.movable[i].index :: number)
+			end
+		end
+	end
+	table.sort(dropped)
+	return dropped
+end
+
+local skipSet: { [string]: boolean }? = nil
+
+local function posKey(x: number, z: number): string
+	return string.format("%.2f,%.2f", x, z)
+end
+
+-- Whether the tree at (x, z) of WorldPlan.Trees() is thinned (not planted).
+function TreeSpread.Skipped(x: number, z: number): boolean
+	local set: { [string]: boolean } = skipSet or {}
+	if skipSet == nil then
+		for _, entry in ipairs(TreeSpreadData.Skipped) do
+			set[posKey(entry.x, entry.z)] = true
+		end
+		skipSet = set
+	end
+	return set[posKey(x, z)] == true
+end
+
+function TreeSpread.SkipCount(): number
+	return #TreeSpreadData.Skipped
 end
 
 return TreeSpread
