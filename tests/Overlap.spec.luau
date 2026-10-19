@@ -1,31 +1,20 @@
 --!nocheck
 -- The one overlap pass (WORLD-SPREAD): nothing on the map shares space with
--- anything else, bar the named hits below. Every one of them involves a FIXED
--- tree (a supply, region, added, strip or first tree: they are never moved or
--- thinned), and rocks and scenery never move either, so they wait for a
--- decision. Every movable tree that overlapped a rock, a scenery piece or a
--- fixed tree is dropped by the thinning rule (TreeSpreadData). A new hit
--- fails this spec with both ids and the coordinates.
+-- anything else. Every movable tree that overlapped a rock, a scenery piece or a
+-- fixed tree is dropped by the thinning rule (TreeSpreadData); the 13 hits that
+-- involved fixed trees were fixed by T372's small moves (post-plan override tables in
+-- WorldPlan and two StripClumps). Any exemption must be named in FIXED below. A new
+-- hit fails this spec with both ids and the coordinates.
 return function(t)
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 	local OverlapCheck = t.load("ReplicatedStorage/Shared/World/OverlapCheck")
+	local TreeSpread = t.load("ReplicatedStorage/Shared/World/TreeSpread")
 
-	-- "<tree id> | <other id>" -> why it stays.
-	local FIXED = {
-		["added#78 emberwood | boulder#22"] = "added tree (Cherry/Willow/region rows are pinned)",
-		["region#2 bogcypress | boulder#55"] = "Bayou supply tree",
-		["region#43 bogcypress | boulder#7"] = "Bayou supply tree",
-		["trees#698 emberwood | boulder#67"] = "Volcano supply tree",
-		["reach#5 phantomwood | scenery#60 Outcrop"] = "Petrified Reach tree",
-		["strip#2 maple | scenery#71 RuinedCabin"] = "north strip tree",
-		["strip#25 birch | scenery#71 RuinedCabin"] = "north strip tree",
-		["strip#14 maple | strip#33 birch"] = "north strip pair",
-		["strip#15 maple | strip#32 birch"] = "north strip pair",
-		["strip#17 maple | strip#40 birch"] = "north strip pair",
-		["strip#18 maple | strip#39 birch"] = "north strip pair",
-		["trees#238 oak | region#69 ironwood"] = "first tree against a Mesa supply tree",
-		["trees#255 oak | region#49 ironwood"] = "first tree against a Mesa supply tree",
-	}
+	-- Named exemptions: "<tree id> | <other id>" -> why it stays. None are left: T372
+	-- moved the four boulders, the Ruined Cabin, the Reach tree, two Mesa ironwoods and
+	-- two north-strip clumps, so every hit of #220's list is gone. A hit added here must
+	-- say why, and it fails the spec when it disappears.
+	local FIXED = {}
 
 	local function pairId(hit)
 		return hit.a.id .. " | " .. hit.b.id
@@ -42,7 +31,7 @@ return function(t)
 		t.eq(#results, 10, "every pair check ran")
 	end)
 
-	t.test("no overlap in any pair except the named fixed-tree hits", function()
+	t.test("no overlap in any pair (the 13 hits of T372 are gone), bar anything named in FIXED", function()
 		local seen = {}
 		for _, result in ipairs(results) do
 			for _, hit in ipairs(result.hits) do
@@ -79,4 +68,74 @@ return function(t)
 			end
 		end
 	)
+
+	t.test("with the override tables applied, OverlapCheck reports 0 hits (old main reported 13)", function()
+		local total = 0
+		for _, result in ipairs(results) do
+			total += #result.hits
+		end
+		t.eq(total, 0)
+	end)
+
+	t.test("the moved spots keep 10 studs from every tree and 2 from every boulder", function()
+		local trees = {}
+		local function add(list, tag)
+			for i, spot in ipairs(list) do
+				-- (a thinned tree is not planted)
+				if not TreeSpread.Skipped(spot.position.X, spot.position.Z) then
+					table.insert(trees, { tag = tag .. "#" .. i, x = spot.position.X, z = spot.position.Z })
+				end
+			end
+		end
+		add(WorldPlan.Trees(), "trees")
+		add(WorldPlan.StripTrees(), "strip")
+		add(WorldPlan.FerryPalms(), "palms")
+		add(WorldPlan.RegionTrees(), "region")
+		add(WorldPlan.ReachTrees(), "reach")
+		add(WorldPlan.AddedTrees(), "added")
+		local boulders = WorldPlan.Boulders()
+		-- The moved trees: 10 studs (centre to centre) from every other tree, and a trunk
+		-- disc (about 2.5 studs) plus 2 studs from every boulder's own radius (size * 0.86).
+		for _, tag in ipairs({ "reach#5", "region#69", "region#49" }) do
+			local me
+			for _, tr in ipairs(trees) do
+				if tr.tag == tag then
+					me = tr
+				end
+			end
+			t.ok(me, tag)
+			for _, other in ipairs(trees) do
+				if other ~= me then
+					local d = math.sqrt((other.x - me.x) ^ 2 + (other.z - me.z) ^ 2)
+					t.ok(
+						d >= 10
+							or string.sub(other.tag, 1, 7) == "region#"
+								and string.sub(tag, 1, 7) == "region#"
+								and false,
+						tag .. " is " .. string.format("%.1f", d) .. " from " .. other.tag
+					)
+				end
+			end
+			for i, b in ipairs(boulders) do
+				local d = math.sqrt((b.position.X - me.x) ^ 2 + (b.position.Z - me.z) ^ 2) - b.size * 0.86 - 1.8
+				t.ok(d >= 2, tag .. " is " .. string.format("%.1f", d) .. " from boulder#" .. i)
+			end
+		end
+		-- The moved boulders: 2 studs from every tree's trunk disc and from every other boulder.
+		for _, index in ipairs({ 67, 55, 7, 22 }) do
+			local b = boulders[index]
+			for _, tr in ipairs(trees) do
+				local d = math.sqrt((tr.x - b.position.X) ^ 2 + (tr.z - b.position.Z) ^ 2) - b.size * 0.86 - 1.8
+				t.ok(d >= 2, "boulder#" .. index .. " is " .. string.format("%.1f", d) .. " from " .. tr.tag)
+			end
+			for j, other in ipairs(boulders) do
+				if j ~= index then
+					local d = math.sqrt((other.position.X - b.position.X) ^ 2 + (other.position.Z - b.position.Z) ^ 2)
+						- other.size * 0.86
+						- b.size * 0.86
+					t.ok(d >= 2, "boulder#" .. index .. " is " .. string.format("%.1f", d) .. " from boulder#" .. j)
+				end
+			end
+		end
+	end)
 end

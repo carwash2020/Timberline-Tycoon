@@ -756,8 +756,8 @@ WorldLayout.StripTreesPerClump = 5
 WorldLayout.StripClumps = {
 	{ x = 70, z = 955 },
 	{ x = -70, z = 955 },
-	{ x = 110, z = 970 },
-	{ x = -110, z = 970 },
+	{ x = 110, z = 985 }, -- (was 970: its ring met clump 7's, 15 apart; now 30)
+	{ x = -110, z = 955 }, -- (was 970: its ring met clump 8's, 15 apart; now 30)
 	{ x = 70, z = 985 },
 	{ x = -70, z = 985 },
 	{ x = 110, z = 955 },

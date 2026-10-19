@@ -4288,3 +4288,9 @@ Supply trees moved inside their own zone to thin dense cells. No wood, scale, zo
 - **Ferry Isle palms** (27 in cell (900,-100)) stay a named exemption (not part of `BiomeData.trees`; no room for a loose beach layout of 25 or fewer).
 - **Re-pinned:** `ClientFreeze` PLAN_CHECKSUM 449351915 to 614640516 and the `TreeFill` prefix hash 910269599 to 526113470, both because supply trees moved within their zone to thin dense cells, counts unchanged.
 - **Studio checks:** 1. Hills at (-500, 100) and Starter at (0, -200): the blob reads a little looser (9 fewer trees there). 2. The nine destinations (Hills near (-498, -2), (-414, -2), (-490, -30), (-398, 210), (-554, 222), (-462, -26), (-394, 18); Starter near (82, -86) and (142, -154)) show tree groups, not rows, none in rock or on a road. 3. Frame rate unchanged.
+
+## Overlap fix (T372, branch `phase-2/overlap-fix`, 19 October 2026)
+
+The 13 overlap hits of `docs/SPREAD_FOLLOWUPS.md` section 3 are fixed; `tools/overlap_report` prints 0 hits. No fixed tree in the first 331, no economy, price, StoreData, Net or ProfileSchema line moved. Boulders, the Ruined Cabin, one Reach tree and two Mesa ironwoods move by post-plan override tables (after the generation loop, so the rng streams and every other spot stay put); two north-strip clumps change in `WorldLayout.StripClumps`. The first four Reach trees, the AddedTrees and the Trees() plan are untouched: `ClientFreeze`, `WorldPlan`, `TreeFill`, `TreeSpread*` and `AddedTrees` pass without a re-pin. `tests/Overlap.spec.luau` now names no exemption.
+
+- **Studio checks:** the Ruined Cabin in the north strip sits clear of the trees; the north strip pairs near x 110 and x -110; the Volcano boulders near (472, 399) and (541, 479); the Bayou boulders near (-819, -601) and (-771, -589); the Mesa ironwoods near (650, -870) and (523, -705). Nothing overlaps or floats.
