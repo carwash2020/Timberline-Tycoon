@@ -28,7 +28,7 @@ Every `lune run tools/economy` (including `--check`) fails the process when a he
 | Steel Axe (E2) | 5–8 min inclusive (300–480 s) | 330 s |
 | First $1k (E3) | 13–20 min (780–1200 s) | 925 s |
 | Cobalt Axe (E4) | 45–75 min (2700–4500 s) | 2866 s |
-| Full plot (E4) | 28–36 h (100800–129600 s) | 112090 s |
+| Full plot (E4) | 28–36 h (100800–129600 s) | 112097 s |
 
 The first $1,000 in this model is 15.4 min (925 s). The CI range is 13–20 min (780–1200 s). The headline verdict above scores 15–20 min.
 
@@ -45,11 +45,11 @@ u³ = (1.6 studs)³. Sizes roll small / normal / large at 25 / 50 / 25%.
 | Oak | 12.5 | 19.9 | 29.8 | 20.5 | 41% | 90.3 | 26.1 | 4.5 | 2.5 |
 | Birch | 6.4 | 10.1 | 15.0 | 10.4 | 85% | 49.6 | 28.1 | 4.0 | 1.0 |
 | Pine | 26.5 | 42.0 | 62.5 | 43.2 | 98% | 206.2 | 52.6 | 4.0 | 1.0 |
-| Maple | 25.5 | 40.2 | 59.5 | 41.4 | 34% | 182.1 | 28.1 | 4.5 | 2.5 |
+| Maple | 25.5 | 40.1 | 59.4 | 41.3 | 34% | 181.8 | 28.1 | 4.5 | 2.5 |
 | Palmwood | 10.8 | 17.4 | 26.2 | 17.9 | 100% | 85.4 | 31.1 | 3.0 | 0.0 |
 | Frostwood | 16.1 | 25.1 | 37.0 | 25.8 | 98% | 123.4 | 46.1 | 4.0 | 1.0 |
 | Lanternwood | 8.2 | 13.2 | 20.0 | 13.6 | 54% | 64.8 | 24.1 | 4.0 | 2.0 |
-| Emberwood | 20.5 | 32.2 | 47.8 | 33.2 | 47% | 158.4 | 28.1 | 5.0 | 3.0 |
+| Emberwood | 20.4 | 32.2 | 47.8 | 33.2 | 48% | 158.3 | 28.1 | 5.0 | 3.0 |
 | Gloamwood | 12.2 | 19.5 | 29.2 | 20.1 | 43% | 90.7 | 26.1 | 4.5 | 2.5 |
 | Lumenwood | 29.6 | 46.2 | 67.8 | 47.4 | 67% | 224.6 | 39.1 | 4.9 | 1.9 |
 | Bog Cypress | 14.0 | 21.9 | 32.1 | 22.5 | 81% | 107.4 | 30.1 | 4.0 | 1.0 |
@@ -66,11 +66,11 @@ Mean volume × the v2 price per u³ (the figured-wood bonus left out). The plan'
 | Oak | 1.5 | 4 | $31 | $82 | $39 / $260 |
 | Birch | 2.25 | 6 | $23 | $62 | $28 / $187 |
 | Pine | 3.6 | 9 | $156 | $389 | $128 / $720 |
-| Maple | 3.2 | 10.56 | $132 | $437 | $88 / $830 |
+| Maple | 3.2 | 10.56 | $132 | $436 | $88 / $830 |
 | Palmwood | 2.9 | 12.8 | $52 | $230 | $52 / $570 |
 | Frostwood | 9 | 48 | $232 | $1,240 | $240 / $2,830 |
 | Lanternwood | 9 | 36 | $123 | $491 | none |
-| Emberwood | 11.25 | 46 | $373 | $1,526 | $79 / $635 |
+| Emberwood | 11.25 | 46 | $373 | $1,525 | $79 / $635 |
 | Gloamwood | 28.5 | 71.25 | $574 | $1,434 | $348 / $990 |
 | Lumenwood | 45 | 112.5 | $2,135 | $5,337 | $1,090 / $3,900 |
 | Bog Cypress | 6 | 24 | $135 | $540 | none |
@@ -118,9 +118,9 @@ Each step buys what pays for itself fastest (axes in ladder order). $/h is a rea
 
 | At | Buys | Price | $/h before | $/h after | Then cuts |
 |---|---|---|---|---|---|
-| 4.4 min | Rustbucket | $100 | $0 | $1,829 | Maple (Rusty Axe) |
-| 5.5 min | Steel Axe | $110 | $1,829 | $2,757 | Maple (Steel Axe) |
-| 8.3 min | Rickety Sawmill | $130 | $2,757 | $5,191 | Bog Cypress (Steel Axe) |
+| 4.4 min | Rustbucket | $100 | $0 | $1,826 | Maple (Rusty Axe) |
+| 5.5 min | Steel Axe | $110 | $1,826 | $2,754 | Maple (Steel Axe) |
+| 8.3 min | Rickety Sawmill | $130 | $2,754 | $5,191 | Bog Cypress (Steel Axe) |
 | 14.1 min | Insulated Coat | $500 | $5,191 | $10,558 | Frostwood (Steel Axe) |
 | 16.4 min | Pickup | $400 | $10,558 | $13,750 | Frostwood (Steel Axe) |
 | 18.1 min | Hardened Axe | $400 | $13,750 | $15,492 | Frostwood (Hardened Axe) |
@@ -128,16 +128,16 @@ Each step buys what pays for itself fastest (axes in ladder order). $/h is a rea
 | 28.8 min | Silver Axe | $1,100 | $17,925 | $19,545 | Frostwood (Silver Axe) |
 | 36.5 min | Hand Planer | $2,500 | $19,545 | $23,454 | Frostwood (Silver Axe) |
 | 40.6 min | Sturdy Sawmill | $1,600 | $23,454 | $25,800 | Frostwood (Silver Axe) |
-| 42.4 min | Heat Boots | $800 | $25,800 | $28,007 | Emberwood (Silver Axe) |
-| 47.8 min | Cobalt Axe | $2,500 | $28,007 | $29,702 | Emberwood (Cobalt Axe) |
-| 57.9 min | Flatbed | $5,000 | $29,702 | $33,524 | Emberwood (Cobalt Axe) |
-| 74.0 min | Bench Planer | $9,000 | $33,524 | $39,111 | Emberwood (Cobalt Axe) |
-| 1.8 h | Millmaster 200 | $22,500 | $39,111 | $48,356 | Emberwood (Cobalt Axe) |
-| 1.9 h | Ranch Trailer | $6,000 | $48,356 | $50,131 | Emberwood (Cobalt Axe) |
-| 2.5 h | Steam Planer | $30,000 | $50,131 | $59,083 | Emberwood (Cobalt Axe) |
-| 2.9 h | Logging Rig | $19,000 | $59,083 | $62,767 | Emberwood (Cobalt Axe) |
-| 3.0 h | Gold Axe | $8,500 | $62,767 | $64,348 | Emberwood (Gold Axe) |
-| 4.3 h | Millmaster 200 Long | $86,500 | $64,348 | $78,824 | Frostwood (Gold Axe) |
+| 42.4 min | Heat Boots | $800 | $25,800 | $27,996 | Emberwood (Silver Axe) |
+| 47.8 min | Cobalt Axe | $2,500 | $27,996 | $29,690 | Emberwood (Cobalt Axe) |
+| 57.9 min | Flatbed | $5,000 | $29,690 | $33,509 | Emberwood (Cobalt Axe) |
+| 74.0 min | Bench Planer | $9,000 | $33,509 | $39,093 | Emberwood (Cobalt Axe) |
+| 1.8 h | Millmaster 200 | $22,500 | $39,093 | $48,334 | Emberwood (Cobalt Axe) |
+| 1.9 h | Ranch Trailer | $6,000 | $48,334 | $50,107 | Emberwood (Cobalt Axe) |
+| 2.5 h | Steam Planer | $30,000 | $50,107 | $59,055 | Emberwood (Cobalt Axe) |
+| 2.9 h | Logging Rig | $19,000 | $59,055 | $62,735 | Emberwood (Cobalt Axe) |
+| 3.0 h | Gold Axe | $8,500 | $62,735 | $64,316 | Emberwood (Gold Axe) |
+| 4.3 h | Millmaster 200 Long | $86,500 | $64,316 | $78,824 | Frostwood (Gold Axe) |
 | 4.5 h | Heavy Hauler | $13,000 | $78,824 | $80,307 | Frostwood (Gold Axe) |
 | 5.7 h | Industrial Planer | $95,000 | $80,307 | $87,607 | Frostwood (Gold Axe) |
 | 5.9 h | Obsidian Axe | $22,000 | $87,607 | $88,948 | Frostwood (Obsidian Axe) |
@@ -151,10 +151,10 @@ Trees regrow in respawnSec + growSec (stump, then sapling to mature). A real pla
 |---|---|---|---|---|---|---|
 | Starter Forest | Oak | 70 | 4.8 min | 884 | 21 | $7,218 |
 | Starter Forest | Birch | 26 | 17.0 min | 92 | 3 | $570 |
-| The Hills | Maple | 50 | 21.0 min | 143 | 11 | $5,017 |
+| The Hills | Maple | 50 | 21.0 min | 143 | 11 | $5,005 |
 | The Hills | Pine | 80 | 11.5 min | 417 | 41 | $17,235 |
 | Snowfields | Frostwood | 70 | 9.0 min | 467 | - | $28,775 |
-| The Volcano | Emberwood | 60 | 21.0 min | 171 | - | $16,973 |
+| The Volcano | Emberwood | 60 | 21.0 min | 171 | - | $16,963 |
 | Gloam Hollow | Gloamwood | 22 | 25.0 min | 53 | - | $8,036 |
 | Bayou | Bog Cypress | 44 | 9.5 min | 278 | - | $9,944 |
 | Red Mesa | Ironwood | 38 | 19.5 min | 117 | - | $12,645 |
@@ -167,7 +167,7 @@ Each wood waits for its stage (BiomeData.needsStage; StageOf: the best axe rung 
 | Wood | Stage | Step | Kit's best wood, real $/h | This wood, ideal $/h | This wood, real $/h | Band (ideal) | In band |
 |---|---|---|---|---|---|---|---|
 | Bog Cypress | S2 | Rickety Sawmill (8.3 min) | $5,191 | $10,383 | $5,191 | $9,000 to $11,000 | yes |
-| Ironwood | S4 | Heat Boots (42.4 min) | $28,007 | $32,450 | $16,225 | $28,000 to $34,000 | yes |
+| Ironwood | S4 | Heat Boots (42.4 min) | $27,996 | $32,450 | $16,225 | $28,000 to $34,000 | yes |
 
 ## Lux Axe (Robux)
 

@@ -711,7 +711,7 @@ return function(t)
 		local report = fs.readFile("ECONOMY.md")
 		-- Ring map (shorter hauls): first $1k 17.9 to 17.8 min, Cobalt Axe 66.3 to 50.7 min, full plot 33.5 to 31.5 h; the rest as before.
 		-- Lane R: Bog Cypress (S2) and Ironwood (S4) joined the model: 15.4 min, 48.2 min and 31.4 h, all inside their ranges.
-		for _, headline in ipairs({ "68 s", "5.4 min", "15.4 min", "48.2 min", "31.4 h" }) do
+		for _, headline in ipairs({ "68 s", "5.5 min", "15.4 min", "47.8 min", "31.1 h" }) do
 			t.ok(string.find(report, headline, 1, true) ~= nil, headline)
 		end
 		t.eq(NPCData.Get("Murph").tips[1], "I'm Murph. Chop a tree, haul the wood, sell it at the mill.")

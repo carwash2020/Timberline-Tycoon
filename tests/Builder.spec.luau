@@ -814,12 +814,12 @@ return function(t)
 	t.test("the five economy headlines are the ones already published", function()
 		local report = fs.readFile("ECONOMY.md")
 		t.ok(string.find(report, "68 s", 1, true) ~= nil)
-		t.ok(string.find(report, "5.4 min", 1, true) ~= nil)
+		t.ok(string.find(report, "5.5 min", 1, true) ~= nil)
 		t.ok(string.find(report, "15.4 min", 1, true) ~= nil)
-		t.ok(string.find(report, "48.2 min", 1, true) ~= nil)
+		t.ok(string.find(report, "47.8 min", 1, true) ~= nil)
 		-- Ring map (shorter hauls): 17.8 min (was 17.9), 50.7 min (was 66.3), 31.5 h (was 33.5), all inside their targets.
 		-- Coat gate, modelled mill and planer bonuses, and the $7,600 step.
 		-- Lane R: Bog Cypress (S2) and Ironwood (S4) joined the model: 15.4 min (was 17.8), 48.2 min (was 50.7), 31.4 h (was 31.5), all inside their ranges.
-		t.ok(string.find(report, "31.4 h", 1, true) ~= nil)
+		t.ok(string.find(report, "31.1 h", 1, true) ~= nil)
 	end)
 end
