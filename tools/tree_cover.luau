@@ -27,8 +27,8 @@ for _, a in ipairs(process.args) do
 	end
 end
 
--- The refill this replaces planted 117 trees: the count stays.
-local OLD_SPREAD = 117
+-- The refill this replaces planted 132 trees: the count stays.
+local OLD_SPREAD = 132
 
 local started = os.clock()
 local items = TreeCoverWorld.BaseItems(WorldPlan)

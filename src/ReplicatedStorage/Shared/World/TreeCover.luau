@@ -416,7 +416,7 @@ function TreeCover.Plan(env: Env, items: { Tree }): Result
 		if TreeCover.KeptOut(x, z, r) ~= nil then
 			return false
 		end
-		if env.blocked and env.blocked(x, z, r) then
+		if env.blocked and env.blocked(x, z, r + 1) then
 			return false
 		end
 		return env.ground(x, z)
@@ -585,6 +585,7 @@ function TreeCover.Plan(env: Env, items: { Tree }): Result
 								env.sizeAt(x, z) == want
 								and TreeCover.GapOk(grid, x, z, r)
 								and not laneBlocks(x, z, r)
+								and not crowded(x, z)
 								and groundOk(x, z, r)
 							then
 								local clear = true
@@ -634,6 +635,8 @@ function TreeCover.Plan(env: Env, items: { Tree }): Result
 								TreeCover.GridAdd(grid, tree)
 								local k = cellOf(p.x) .. "," .. cellOf(p.z)
 								counts[k] = (counts[k] or 0) + 1
+								local ck = crowdKey(p.x, p.z)
+								crowd[ck] = (crowd[ck] or 0) + 1
 							end
 							return placed
 						end
