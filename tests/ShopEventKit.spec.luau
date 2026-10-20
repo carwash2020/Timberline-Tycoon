@@ -355,12 +355,13 @@ return function(t)
 		end
 	)
 
-	t.test("nothing collides, so a rope can never trap a player or block a doorway or an aisle", function()
+	t.test("only the corner posts collide, so a rope can never trap a player or block a doorway or an aisle", function()
 		for _, kind in ipairs(KINDS) do
 			local b = build(kind)
 			for _, p in ipairs(parts(b.model)) do
-				t.eq(p.CanCollide, false, kind .. ": " .. p.Name)
-				t.eq(p.CanQuery, false, kind .. ": " .. p.Name)
+				local post = p.Name == "EventStanchion"
+				t.eq(p.CanCollide, post, kind .. ": " .. p.Name)
+				t.eq(p.CanQuery, post, kind .. ": " .. p.Name)
 				t.eq(p.CanTouch, false, kind .. ": " .. p.Name)
 				t.eq(p.Anchored, true)
 			end

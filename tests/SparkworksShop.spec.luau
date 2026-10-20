@@ -39,11 +39,22 @@ return function(t)
 		return model
 	end
 
+	-- The street dressing out front that a body bumps into (T385): not part of the building.
+	local DRESSING = {
+		LampPost = true,
+		LampPostBase = true,
+		Planter = true,
+		PlanterBand = true,
+		BenchSeat = true,
+		BenchBack = true,
+		AwningPost = true,
+	}
+
 	-- The footprint (x0, x1, z0, z1) of a built model's colliding parts.
 	local function footprint(model)
 		local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
 		for _, d in ipairs(model:GetDescendants()) do
-			if d:IsA("BasePart") and d.CanCollide then
+			if d:IsA("BasePart") and d.CanCollide and not DRESSING[d.Name] then
 				local cf, size = d.CFrame, d.Size
 				for _, sx in ipairs({ -1, 1 }) do
 					for _, sz in ipairs({ -1, 1 }) do

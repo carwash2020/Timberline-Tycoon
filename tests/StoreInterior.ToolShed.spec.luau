@@ -549,7 +549,8 @@ return function(t)
 				t.eq(r.Transparency, 0, "the ropes are up")
 			end
 			for _, p in ipairs(parts(zone)) do
-				t.eq(p.CanCollide, false, p.Name .. " never blocks anyone")
+				-- (the four corner posts are solid since T385)
+				t.eq(p.CanCollide, p.Name == "EventStanchion", p.Name .. " never blocks anyone but the corner posts")
 			end
 			t.ok(
 				#named(zone, "EventTablePad1") + #named(zone, "EventTablePad2") + #named(zone, "EventTablePad3") >= 2,

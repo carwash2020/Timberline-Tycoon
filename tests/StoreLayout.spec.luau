@@ -206,6 +206,8 @@ return function(t)
 			RoofUnit = true,
 			RoofUnitFan = true,
 		}
+		-- What a body bumps into out front (T385); the rest of the facade is looks only.
+		local SOLID = { Planter = true, PlanterBand = true, BenchSeat = true, BenchBack = true, AwningPost = true }
 		for kind, entry in pairs(placed) do
 			local spec = BuildingArt.FacadeSpec(kind, BuildingArt.Scale[kind] or 1, Color3.fromRGB(100, 100, 100))
 			local origin = entry.spot.cframe.Position
@@ -217,7 +219,11 @@ return function(t)
 				local outside = z1 < origin.Z + spec.frontZ + 0.2
 				if FACADE[p.Name] and outside then
 					n += 1
-					t.eq(p.CanCollide, false, kind .. "'s " .. p.Name .. " is looks only")
+					t.eq(
+						p.CanCollide,
+						SOLID[p.Name] == true,
+						kind .. "'s " .. p.Name .. " collides only if it is a solid piece"
+					)
 					-- Out of the door's opening (and 0.8 each side of it) below the lintel.
 					local doorX0 = origin.X + spec.doorCx - spec.doorHalf - ShopFacadeClear
 					local doorX1 = origin.X + spec.doorCx + spec.doorHalf + ShopFacadeClear
@@ -277,11 +283,23 @@ return function(t)
 	---------------------------------------------------------------------------
 
 	-- A footprint from the colliding or building-sized parts of a model (x0, x1, z0, z1).
+	-- (The street dressing out front that a body bumps into, T385, is not part of the building.)
+	local DRESSING = {
+		LampPost = true,
+		LampPostBase = true,
+		PathLampPost = true,
+		Planter = true,
+		PlanterBand = true,
+		BenchSeat = true,
+		BenchBack = true,
+		AwningPost = true,
+	}
 	local function footprint(model, skip)
 		local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
 		for _, p in ipairs(parts(model)) do
 			if
 				(p.CanCollide or p.Size.X > 8 or p.Size.Z > 8)
+				and not DRESSING[p.Name]
 				and not (skip and skip[p.Name])
 				and p.Transparency < 0.95
 			then
