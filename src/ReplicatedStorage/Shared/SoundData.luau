@@ -75,7 +75,8 @@ SoundData.Sounds = {
 	-- wind, lava, wings, quack and the storm crackle are original sounds; the
 	-- rest use the public Pro Sound Effects pack as River (9118...) and the waterfall.
 	BirdsDay = { id = "rbxassetid://9116970949", volume = 0.28, looped = true }, -- morning forest birds
-	CricketsNight = { id = "rbxassetid://98495708270834", volume = 0.25, looped = true }, -- crickets and frogs, at night (8 s loop)
+	-- A short burst of crickets (AmbientSound plays 2 to 5 s of the 8 s clip from a spot near the trees, only at night).
+	CricketChirp = { id = "rbxassetid://98495708270834", volume = 0.05, rolloff = 60 },
 	Owl = { id = "rbxassetid://9117181540", volume = 0.2, looped = true }, -- a hoot in the woods at night
 	WindHowl = { id = "rbxassetid://135011285595785", volume = 0.35, looped = true }, -- the Snowfields, the isles, storms (8 s loop)
 	LavaRumble = { id = "rbxassetid://126238204708501", volume = 0.4, looped = true }, -- a low rumble at the Volcano (8 s loop)

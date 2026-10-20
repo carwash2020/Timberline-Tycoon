@@ -113,7 +113,7 @@ return function(t)
 			TreeCreak = { "rbxassetid://140235385729394", false },
 			LogThud = { "rbxassetid://71299239323730", false },
 			Engine = { "rbxassetid://79105838138081", true },
-			CricketsNight = { "rbxassetid://98495708270834", true },
+			CricketChirp = { "rbxassetid://98495708270834", false },
 			WindHowl = { "rbxassetid://135011285595785", true },
 			LavaRumble = { "rbxassetid://126238204708501", true },
 			Wings = { "rbxassetid://133814424706029", false },

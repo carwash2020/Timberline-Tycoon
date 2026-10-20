@@ -12060,7 +12060,7 @@
       "kind": "sound",
       "places": 1,
       "priority": 2,
-      "usedBy": "SoundData CricketsNight"
+      "usedBy": "SoundData CricketChirp"
     },
     {
       "collision": false,

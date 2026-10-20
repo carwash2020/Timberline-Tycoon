@@ -2,7 +2,10 @@
 -- AmbientSound: what the world sounds like where you stand (REDESIGN.md
 -- "an active environment"). Every bed fades; nothing ever pops.
 --   * Day and night: birdsong by day in leafy places (louder in thriving
---     groves), crickets at night, crossfading through dawn and dusk.
+--     groves). Crickets are rare: quiet 2 to 5 s bursts with long gaps, only
+--     in the dark, only outdoors in the forest and grass (never in town, at
+--     spawn or under a roof), played from a spot near the trees. The rules
+--     live in Shared/AmbientLogic. A roof overhead also ducks the birds and owl.
 --   * Biome beds: wind howling over the Snowfields and up on the Aether
 --     Isles (and in any storm or blizzard), a low rumble at the Volcano.
 --   * Water: a 3D river sound that follows the nearest stretch of the
@@ -13,9 +16,11 @@
 -- SoundData simply stay silent.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 
+local AmbientLogic = require(ReplicatedStorage.Shared.AmbientLogic)
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
@@ -30,6 +35,9 @@ local UPDATE_EVERY = 0.1
 local WATER_EVERY = 0.5
 local FADE_SECONDS = 2.5 -- ambience beds
 local MUSIC_FADE_SECONDS = 4
+local DUCK_FADE_SECONDS = 1.5 -- birds and owl going under a roof
+local CHIRP_GLIDE_SECONDS = 1 -- crickets going under a roof
+local TREE_HEARING = 150 -- studs: the nearest tree a burst can come from
 local WATER_HEARING = 110 -- studs from the water's edge you start to hear it
 
 -- A looping sound whose volume glides toward a target.
@@ -93,8 +101,29 @@ end
 
 local LEAFY: { [string]: number } =
 	{ [""] = 1, starter = 1, hills = 1, grove = 0.15, snow = 0.2, volcano = 0, sky = 0.25 }
-local CRICKETS: { [string]: number } =
-	{ [""] = 1, starter = 1, hills = 0.9, grove = 0.5, snow = 0, volcano = 0, sky = 0 }
+
+local function newRng(): AmbientLogic.Rng
+	local random = Random.new()
+	return {
+		NextNumber = function(_self: any, lo: number, hi: number): number
+			return random:NextNumber(lo, hi)
+		end,
+	}
+end
+
+-- The crickets' chirp: a scheduled burst, not a bed. Its biome table, burst
+-- timing and indoor check are AmbientLogic's.
+local chirp = {
+	sound = nil :: Sound?,
+	holder = nil :: Attachment?,
+	sched = AmbientLogic.NewScheduler(newRng()),
+	rng = newRng(),
+	base = SoundData.Sounds.CricketChirp.volume,
+	level = 0, -- 0..1 glide toward `target`
+	target = 0,
+	playing = false,
+}
+local indoor = false -- a roof is overhead (checked every AmbientLogic.IndoorEvery)
 
 local function setTargets(env: LightingController.Environment)
 	local biome = env.biomeId
@@ -112,13 +141,13 @@ local function setTargets(env: LightingController.Environment)
 	local day = env.daylight
 
 	local birds = beds.BirdsDay
-	birds.target = day * (LEAFY[biome] or 0.5) * math.clamp(0.55 + 0.3 * life, 0.5, 1.2) * (1 - wet * 0.85)
-	local crickets = beds.CricketsNight
-	crickets.target = (1 - day) * (CRICKETS[biome] or 0.5) * (1 - wet * 0.9)
+	local duck = AmbientLogic.IndoorDuck(indoor)
+	birds.target = day * (LEAFY[biome] or 0.5) * math.clamp(0.55 + 0.3 * life, 0.5, 1.2) * (1 - wet * 0.85) * duck
+	chirp.target = AmbientLogic.CricketTarget(day, biome, indoor, wet)
 	local owl = beds.Owl
 	if owl then
 		local leafy = LEAFY[biome] or 0
-		owl.target = (1 - day) * leafy * (1 - wet) * 0.85
+		owl.target = (1 - day) * leafy * (1 - wet) * 0.85 * duck
 	end
 
 	local wind = beds.WindHowl
@@ -186,13 +215,107 @@ local function updateWater()
 end
 
 ---------------------------------------------------------------------------
+-- Indoors and the crickets
+---------------------------------------------------------------------------
+
+-- Only the town's shops and the sawmill (tagged) and the plot buildings can
+-- roof you; trees and scatter never can.
+local function roofRoots(): { Instance }
+	local roots: { Instance } = {}
+	for _, shop in ipairs(CollectionService:GetTagged("ShopDoorModel")) do
+		table.insert(roots, shop)
+	end
+	for _, mill in ipairs(CollectionService:GetTagged("AmbientRoof")) do
+		table.insert(roots, mill)
+	end
+	local map = workspace:FindFirstChild("TimberlineMap")
+	local plots = if map then map:FindFirstChild("Plots") else nil
+	if plots then
+		table.insert(roots, plots)
+	end
+	return roots
+end
+
+local function updateIndoor()
+	local roots = roofRoots()
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = roots
+	indoor = AmbientLogic.Indoors(function(origin: Vector3, direction: Vector3): Instance?
+		local hit = workspace:Raycast(origin, direction, params)
+		return if hit then hit.Instance else nil
+	end, listener(), roots)
+end
+
+local function nearestTree(from: Vector3): Vector3?
+	local best: Vector3? = nil
+	local bestSq = TREE_HEARING * TREE_HEARING
+	for _, tree in ipairs(CollectionService:GetTagged("Tree")) do
+		if tree:IsA("Model") then
+			local at = tree:GetPivot().Position
+			local dx, dz = at.X - from.X, at.Z - from.Z
+			local sq = dx * dx + dz * dz
+			if sq < bestSq then
+				bestSq = sq
+				best = at
+			end
+		end
+	end
+	return best
+end
+
+local function stepChirp(dt: number)
+	local sound, holder = chirp.sound, chirp.holder
+	if not sound or not holder then
+		return
+	end
+	local target = if SoundData.SfxEnabled then chirp.target else 0
+	local step = dt / CHIRP_GLIDE_SECONDS
+	if chirp.level < target then
+		chirp.level = math.min(target, chirp.level + step)
+	else
+		chirp.level = math.max(target, chirp.level - step)
+	end
+	local envelope, started = AmbientLogic.Step(chirp.sched, dt, target > 0.01)
+	if started then
+		local ear = listener()
+		local at = AmbientLogic.BurstPosition(ear, nearestTree(ear), chirp.rng)
+		if at then
+			holder.WorldPosition = at
+			sound.TimePosition = 0
+			chirp.playing = true
+		end
+	end
+	if chirp.playing and (envelope <= 0 or chirp.level <= 0.001) then
+		chirp.playing = false
+		sound:Stop()
+	end
+	if chirp.playing then
+		sound.Volume = AmbientLogic.ChirpVolume(chirp.base, envelope, chirp.level, SoundData.SfxVolume)
+		if not sound.IsPlaying then
+			sound:Play()
+		end
+	end
+end
+
+---------------------------------------------------------------------------
 -- Start
 ---------------------------------------------------------------------------
 
 function AmbientSound.Start()
-	bed("BirdsDay", SoundService, FADE_SECONDS, false)
-	bed("CricketsNight", SoundService, FADE_SECONDS, false)
-	bed("Owl", SoundService, FADE_SECONDS, false)
+	bed("BirdsDay", SoundService, DUCK_FADE_SECONDS, false)
+	bed("Owl", SoundService, DUCK_FADE_SECONDS, false)
+	local holder = Instance.new("Attachment")
+	holder.Name = "AmbientSound_CricketChirp"
+	holder.Parent = workspace.Terrain
+	local chirpSound = SoundData.Make("CricketChirp")
+	if chirpSound then
+		chirpSound.Volume = 0
+		chirpSound.RollOffMaxDistance = 60
+		chirpSound.Parent = holder
+	end
+	chirp.sound = chirpSound
+	chirp.holder = holder
 	bed("WindHowl", SoundService, FADE_SECONDS, false)
 	bed("LavaRumble", SoundService, FADE_SECONDS, false)
 	bed("MusicDay", SoundService, MUSIC_FADE_SECONDS, true)
@@ -217,6 +340,7 @@ function AmbientSound.Start()
 		if sinceWater >= WATER_EVERY then
 			sinceWater = 0
 			updateWater()
+			updateIndoor()
 		end
 		sinceUpdate += step
 		if sinceUpdate < UPDATE_EVERY then
@@ -228,6 +352,7 @@ function AmbientSound.Start()
 		for _, b in pairs(beds) do
 			stepBed(b, elapsed)
 		end
+		stepChirp(elapsed)
 	end)
 end
 
