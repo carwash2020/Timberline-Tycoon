@@ -470,6 +470,8 @@ return function(t)
 			return if onBed and p == piece then owner else nil
 		end
 		local part = piece.model.PrimaryPart
+		-- The piece's largest section can lie anywhere along the fallen tree: stand beside it.
+		other.root.Position = part.CFrame.Position + Vector3.new(4, 3, 0)
 		local ok, why = s.swing(other, part)
 		t.eq(ok, false)
 		t.eq(why, "bed")

@@ -94,6 +94,56 @@ return function(t)
 		end
 	end)
 
+	-- The part budget: a standing tree is built from at most eight BaseParts
+	-- (sections, crown and details together; nothing hides in other objects),
+	-- for every wood, size roll, the Elder and every growth stage.
+	t.test("every standing tree is at most 8 parts: every wood, size, Elder and stage", function()
+		local most, mostWhere = 0, ""
+		local per = {}
+		local trees = 0
+		for _, def in ipairs(woods) do
+			for _, seed in ipairs({ 1, 2, 3, 7, 40, 111 }) do
+				for _, scale in ipairs({ TreeGen.SizeLo, 1, TreeGen.SizeHi, ELDER }) do
+					local model = build(def.id, seed, scale)
+					local n = #parts(model)
+					trees += 1
+					per[def.id] = math.max(per[def.id] or 0, n)
+					if n > most then
+						most, mostWhere = n, string.format("%s seed %d x%.2f", def.id, seed, scale)
+					end
+					t.ok(n <= 8, string.format("%s seed %d x%.2f: %d parts", def.id, seed, scale, n))
+					-- Nothing is hidden in the tree's other objects: every BasePart is
+					-- one of the counted ones, and no section carries extra parts.
+					local direct = 0
+					for _, c in ipairs(model:GetChildren()) do
+						if c:IsA("BasePart") then
+							direct += 1
+						end
+					end
+					t.ok(direct <= n)
+				end
+				for _, s in ipairs({ 0.25, 0.5, 0.75 }) do
+					local n = #parts(build(def.id, seed, 1, s))
+					t.ok(n <= 8, string.format("%s seed %d stage %.2f: %d parts", def.id, seed, s, n))
+				end
+			end
+		end
+		local line = {}
+		for _, def in ipairs(woods) do
+			table.insert(line, def.id .. " " .. per[def.id])
+		end
+		print(
+			string.format(
+				"    standing tree parts, most per wood over %d trees (most %d, %s): %s",
+				trees,
+				most,
+				mostWhere,
+				table.concat(line, ", ")
+			)
+		)
+		t.ok(most <= 8)
+	end)
+
 	t.test("leaf crowns are crystal-cut wedges; bark follows the wood", function()
 		for _, id in ipairs({ "oak", "birch", "pine", "maple", "frostwood", "phantomwood", "lumenwood" }) do
 			local model = build(id, 4, 1)
@@ -114,7 +164,7 @@ return function(t)
 					signed = true
 				end
 			end
-			t.ok(crown >= 4, id .. " has a crown")
+			t.ok(crown >= 2, id .. " has a crown")
 			t.ok(tilted >= 1, id .. " facets are cut, not flat cubes")
 			t.ok(signed, id .. " carries its signature (" .. tostring(TreeArt.Signatures[id]) .. ")")
 		end
@@ -168,7 +218,7 @@ return function(t)
 				t.eq(p.Material, Enum.Material.Snow)
 			end
 		end
-		t.ok(caps >= 4, "frost tips sit on the upper tiers")
+		t.ok(caps >= 1, "frost tips sit on the upper tier")
 		for _, id in ipairs({ "emberwood", "palmwood" }) do
 			local model = build(id, 1, 1)
 			local signed = false
@@ -198,7 +248,7 @@ return function(t)
 					t.eq(p.Shape, Enum.PartType.Block, "the grove oak is still cut by its sections")
 				end
 			end
-			t.ok(wedges >= 4, "grove oak " .. i .. " has a crown")
+			t.ok(wedges >= 3, "grove oak " .. i .. " has a crown")
 			t.ok(knot, "grove oak " .. i .. " has its sap knot")
 		end
 	end)
@@ -279,7 +329,7 @@ return function(t)
 					canopy += 1
 				end
 			end
-			t.ok(canopy >= 4, def.id .. ": a canopy")
+			t.ok(canopy >= 2, def.id .. ": a canopy")
 		end
 	end)
 
@@ -377,7 +427,7 @@ return function(t)
 				table.sort(tiers, function(a, b)
 					return a.y < b.y
 				end)
-				t.ok(#tiers >= 4, id .. ": its tiers")
+				t.ok(#tiers >= 2, id .. ": its tiers")
 				for i = 2, #tiers do
 					t.ok(tiers[i].w < tiers[i - 1].w, id .. ": a cone narrows going up")
 				end
@@ -404,9 +454,12 @@ return function(t)
 			end
 			return false
 		end
+		-- With eight parts a tree has few to glow with: an ember's crack and glowing
+		-- facet, a lumenwood's two glowing plates, a phantomwood's pod.
+		local glowing = { emberwood = 2, phantomwood = 1, lumenwood = 2 }
 		for _, id in ipairs({ "emberwood", "phantomwood", "lumenwood" }) do
 			local model = build(id, 1, 1)
-			t.ok(neon(model) >= 2, id .. " glows")
+			t.ok(neon(model) >= glowing[id], id .. " glows")
 			t.ok(light(model), id .. " has its light")
 		end
 		for _, id in ipairs({ "oak", "birch", "pine", "maple", "frostwood", "lanternwood" }) do
@@ -618,10 +671,10 @@ return function(t)
 				v2 / v1
 			)
 		)
-		t.ok(avg <= 48, string.format("the weighted average is %.1f parts", avg))
-		-- Bigger trees for at most a fifth more parts than today's, on the
-		-- same spots (500 spots: +2,850, x1.16, which keeps a 27,874-part
-		-- world under §16's 31k; the forest ring's 775 spots: x1.18).
-		t.ok(v2 <= v1 * 1.2, string.format("section trees cost x%.2f today's trees' parts", v2 / v1))
+		t.ok(avg <= TreeGen.MaxParts, string.format("the weighted average is %.1f parts", avg))
+		t.ok(v2 <= TreeGen.MaxParts * n, "no tree over the cap")
+		-- The v1 trees were 40 to 50 parts; a section tree is at most eight (1,052
+		-- spots: v1 36,704 parts, v2 8,384, x0.23), well under §16's 31k.
+		t.ok(v2 <= v1 * 0.3, string.format("section trees cost x%.2f today's trees' parts", v2 / v1))
 	end)
 end

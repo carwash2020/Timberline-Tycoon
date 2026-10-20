@@ -197,22 +197,16 @@ return function(t)
 	end)
 
 	t.test("budgets: sections plus dress over 200 seeds, every size and the Elder", function()
-		t.eq(TreeGen.Budgets, {
-			oak = 38,
-			birch = 32,
-			pine = 44,
-			maple = 44,
-			palmwood = 32,
-			frostwood = 60,
-			emberwood = 42,
-			phantomwood = 44,
-			lumenwood = 40,
-			lanternwood = 48,
-			bogcypress = 44, -- Lane R
-			ironwood = 44, -- Lane R
-			cherry = 38, -- WORLD-T323
-			willow = 40, -- WORLD-T323
-		})
+		-- A standing tree is at most eight parts, whatever the wood: the server
+		-- holds a few thousand wood parts in all (see TreeCover's wood parts
+		-- spec), and the sections are what get cut.
+		t.eq(TreeGen.MaxParts, 8)
+		local pinned = {}
+		for _, def in ipairs(woods) do
+			pinned[def.id] = 8
+			t.eq(TreeGen.Budgets[def.id], 8, def.id .. ": its budget")
+		end
+		t.eq(TreeGen.Budgets, pinned, "no wood outside the table")
 		local line = {}
 		for _, def in ipairs(woods) do
 			local budget = TreeGen.Budgets[def.id]
@@ -222,7 +216,7 @@ return function(t)
 				for _, scale in ipairs({ TreeGen.SizeLo, 1, TreeGen.SizeHi, ELDER }) do
 					local skel = TreeGen.Skeleton(def.id, seed, scale, { elder = scale == ELDER })
 					local parts = TreeGen.PartCount(skel)
-					if parts > budget then
+					if parts > math.min(budget, TreeGen.MaxParts) then
 						error(
 							string.format("%s seed %d x%.2f: %d parts, budget %d", def.id, seed, scale, parts, budget)
 						)
