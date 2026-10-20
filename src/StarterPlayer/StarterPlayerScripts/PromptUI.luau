@@ -19,6 +19,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local NameFade = require(ReplicatedStorage.Shared.NameFade)
 local TextAnchor = require(ReplicatedStorage.Shared.TextAnchor)
 local UITheme = require(script.Parent.UITheme)
 
@@ -37,7 +38,14 @@ local WIDTH, HEIGHT = 360, 72 -- the billboard; the card sits in its middle
 -- a low ceiling brings its tail down so the roof does not clip it
 -- (Shared/TextAnchor). Cards on a counter or a box stay on top: their anchor
 -- is the object's own middle, which the object would hide.
-type Watched = { gui: BillboardGui, head: BasePart, hidden: boolean, clear: number }
+type Watched = {
+	gui: BillboardGui,
+	head: BasePart,
+	hidden: boolean,
+	clear: number,
+	k: number, -- the card's growth (a TV)
+	covers: { [BasePart]: boolean }, -- other NPCs' heads whose nameplate is faded for this card
+}
 local watched: { [BillboardGui]: Watched } = {}
 local sinceCheck = 0
 local rayParams: RaycastParams? = nil
@@ -65,6 +73,108 @@ local function paramsNow(now: number): RaycastParams
 	return params
 end
 
+-- The nameplate and the Talk card are both pixel-sized billboards on the same
+-- head, so while a card shows its head's NameTag fades out (NameFade has the
+-- rules: a show count per head, 0.15 s each way). The fade owns the labels'
+-- TextTransparency and TextStrokeTransparency; NPCController.applyTag only
+-- sets sizes and distances, so it never brings a hidden name back.
+local fade = NameFade.new()
+local tagBase: { [TextLabel]: { text: number, stroke: number } } = {}
+
+local function tagLabels(head: Instance): { TextLabel }
+	local out: { TextLabel } = {}
+	local tag = head:FindFirstChild("NameTag")
+	if tag then
+		for _, child in ipairs(tag:GetChildren()) do
+			if child:IsA("TextLabel") then
+				table.insert(out, child)
+			end
+		end
+	end
+	return out
+end
+
+local function paintTag(head: Instance)
+	local a = NameFade.Transparency(fade, head)
+	for _, label in ipairs(tagLabels(head)) do
+		local base = tagBase[label]
+		if base == nil then
+			base = { text = label.TextTransparency, stroke = label.TextStrokeTransparency }
+			tagBase[label] = base
+		end
+		label.TextTransparency = base.text + (1 - base.text) * a
+		label.TextStrokeTransparency = base.stroke + (1 - base.stroke) * a
+	end
+end
+
+-- A card shows on `head`: its name fades out (kept out while any card shows).
+function PromptUI.HideTag(head: Instance)
+	for _, label in ipairs(tagLabels(head)) do
+		if tagBase[label] == nil then
+			tagBase[label] = { text = label.TextTransparency, stroke = label.TextStrokeTransparency }
+		end
+	end
+	NameFade.Show(fade, head)
+end
+
+-- A card on `head` went away: the name comes back once none is left.
+function PromptUI.ShowTag(head: Instance)
+	NameFade.Hide(fade, head)
+end
+
+-- Advances every fade by `dt` seconds and paints the labels that moved.
+function PromptUI.FadeStep(dt: number)
+	for _, head in ipairs(NameFade.Step(fade, dt)) do
+		paintTag(head)
+	end
+end
+
+function PromptUI.TagTransparency(head: Instance): number
+	return NameFade.Transparency(fade, head)
+end
+
+-- Other NPCs near a shown card whose nameplate would sit under it fade too.
+local function coverOthers(w: Watched, camera: Camera)
+	local viewH = camera.ViewportSize.Y
+	local head = w.head.Position
+	local spp = NameFade.StudsPerPixel((camera.CFrame.Position - head).Magnitude, viewH)
+	local right, up = camera.CFrame.RightVector, camera.CFrame.UpVector
+	local card = { x = WIDTH * w.k, y = HEIGHT * w.k }
+	local now: { [BasePart]: boolean } = {}
+	for _, model in ipairs(CollectionService:GetTagged("NPC")) do
+		local other = model:FindFirstChild("Head")
+		local tag = if other then other:FindFirstChild("NameTag") else nil
+		if other and other:IsA("BasePart") and other ~= w.head and tag and tag:IsA("BillboardGui") then
+			local v = other.Position - head
+			if
+				v.Magnitude < 12
+				and NameFade.Covered(
+					{ x = tag.Size.X.Offset, y = tag.Size.Y.Offset },
+					tag.StudsOffset.Y,
+					card,
+					w.gui.StudsOffset.Y,
+					spp,
+					v:Dot(right),
+					v:Dot(up)
+				)
+			then
+				now[other] = true
+			end
+		end
+	end
+	for other in pairs(now) do
+		if not w.covers[other] then
+			PromptUI.HideTag(other)
+		end
+	end
+	for other in pairs(w.covers) do
+		if not now[other] then
+			PromptUI.ShowTag(other)
+		end
+	end
+	w.covers = now
+end
+
 local function checkWatched()
 	local camera = workspace.CurrentCamera
 	if camera == nil then
@@ -83,12 +193,15 @@ local function checkWatched()
 		local lift = TextAnchor.Lift(0, PromptUI.HeadLift, if up then up.Distance else nil, card)
 		gui.StudsOffset = Vector3.new(0, lift, 0)
 		gui.Enabled = not w.hidden
+		coverOthers(w, camera)
 	end
 end
 
 -- How far above a Head (its centre) a Talk card's tail sits. The card
 -- grows upward from there, so it clears the scalp instead of sitting on
 -- the torso. A pixel UIOffset does not: up close it lands on the body.
+-- (NPCData.promptLift is that pixel UIOffset: unused for a head adornee, kept
+-- only for the prompt's own UIOffset on the rare part-adorned Talk.)
 PromptUI.HeadLift = 1.55
 
 -- Where a prompt's card is drawn. A model with a Head (an NPC) uses the
@@ -323,7 +436,8 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 
 	billboard.Parent = player:WaitForChild("PlayerGui")
 	if studs and adornee:IsA("BasePart") then
-		watched[billboard] = { gui = billboard, head = adornee, hidden = false, clear = 0 }
+		watched[billboard] = { gui = billboard, head = adornee, hidden = false, clear = 0, k = k, covers = {} }
+		PromptUI.HideTag(adornee)
 	end
 
 	local gone = false
@@ -332,7 +446,14 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 			return
 		end
 		gone = true
+		local w = watched[billboard]
 		watched[billboard] = nil
+		if w then
+			PromptUI.ShowTag(w.head)
+			for other in pairs(w.covers) do
+				PromptUI.ShowTag(other)
+			end
+		end
 		for _, conn in ipairs(conns) do
 			conn:Disconnect()
 		end
@@ -383,6 +504,7 @@ function PromptUI.Start()
 		PromptUI.RestyleAll(workspace:GetDescendants(), PromptUI.ScanPerFrame, task.wait)
 	end)
 	RunService.Heartbeat:Connect(function(dt: number)
+		PromptUI.FadeStep(dt)
 		if next(watched) == nil then
 			return
 		end
