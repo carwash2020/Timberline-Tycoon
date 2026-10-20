@@ -148,6 +148,8 @@ local rigs: { [Model]: Rig } = {}
 local phoneLayout: NPCDialogue.Layout = NPCDialogue.LayoutFor(false)
 local layoutAt = -1
 
+-- Sizes and distance only. The labels' TextTransparency belongs to PromptUI's
+-- fade (a Talk card hides its NPC's name), so nothing here sets it.
 local function applyTag(tag: BillboardGui?, layout: NPCDialogue.Layout)
 	if not tag then
 		return

@@ -80,7 +80,7 @@ export type NPC = {
 	idle: string?, -- an idle flourish NPCController knows: "sip", "clipboard", "glasses", "wipe", "lookAround"
 	work: ("chop" | "saw" | "sweep" | "carry")?, -- a work clip, client-side (NPCAnim)
 	workLoops: number?, -- chops in a row (a saw or a sweep is already a phrase)
-	promptLift: number?, -- Talk's UIOffset Y, so it sits above a shop or pad prompt
+	promptLift: number?, -- the Talk prompt's UIOffset Y. Unused by the custom card on a head (it uses PromptUI.HeadLift studs and fades the name); only the stock prompt style reads it
 	shop: string?, -- a counter keeper's shop id (ShopHoursLogic). Nil for everyone else.
 	tutorialQuiet: boolean?, -- QuestUI owns Murph's Talk (his tutorial line and tips open the same dialogue box)
 	persistent: boolean?, -- the tutorial depends on them (Murph, Old Hank): ModelStreamingMode Persistent, never streamed out, so the Talk prompt is always there
