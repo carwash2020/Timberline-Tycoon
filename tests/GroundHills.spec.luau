@@ -1,6 +1,6 @@
 --!nocheck
 -- T397: the parking lot fits its bays, the ground has gentle hills, and the
--- roads, plots, store pads and the lot stay level. Samples are every 4 studs;
+-- roads, plots, store pads and the lot stay level. Samples are every 6 studs;
 -- a slope is the steepest rise over 4 studs to any of the four neighbours.
 return function(t)
 	local roblox = t.roblox
@@ -356,8 +356,8 @@ return function(t)
 			)
 			local area = BiomeData.Get("hills").area
 			local hiHills, hiMeadow = 0, 0
-			for x = area.x - area.radius, area.x + area.radius, 20 do
-				for z = area.z - area.radius, area.z + area.radius, 20 do
+			for x = area.x - area.radius, area.x + area.radius, 5 do
+				for z = area.z - area.radius, area.z + area.radius, 5 do
 					if (x - area.x) ^ 2 + (z - area.z) ^ 2 < area.radius ^ 2 then
 						hiHills = math.max(hiHills, TerrainGen.HillLiftAt(x, z))
 					end
@@ -372,7 +372,9 @@ return function(t)
 			local fine = TerrainGen.MeadowFineAmp
 			-- Domes are at most 18 plus the meadow's own fine rolling.
 			t.ok(hiHills <= 18 + fine + 1e-6, "the Hills' lift is at most 18 + the meadow's fine rolling: " .. hiHills)
-			t.ok(hiHills >= 3, "the Hills do rise: " .. hiHills)
+			-- Was +5.85 with the 200 stud ramp; the road-grade ramp reaches +10.6 inside the
+			-- circle (about +11.9 in the Hills' cells just past it), the most the 15 degree rule allows.
+			t.ok(hiHills >= 10, "the Hills rise to at least +10: " .. hiHills)
 			t.ok(hiMeadow <= fine + 1e-6, "the meadow's fine rolling is at most " .. fine .. ": " .. hiMeadow)
 		end
 	)
@@ -476,5 +478,30 @@ return function(t)
 			)
 		)
 		t.eq(bad, {}, "forest ground over 15 degrees")
+	end)
+
+	t.test("the Hills' cells at a finer scan (every 6 studs): at most 15 degrees too", function()
+		local worst, worstAt, total = 0, nil, 0
+		for x = -740, -230, 6 do
+			for z = -150, 440, 6 do
+				if not builtSteep(x, z) and TerrainGen.RoadClearance(x, z) > 12 then
+					total += 1
+					local deg = slopeDeg(x, z)
+					if deg > worst then
+						worst, worstAt = deg, string.format("(%d, %d)", x, z)
+					end
+				end
+			end
+		end
+		t.ok(total > 4000, "Hills samples: " .. total)
+		print(
+			string.format(
+				"[GroundHills] Hills cells: %d samples, steepest %.2f degrees at %s",
+				total,
+				worst,
+				tostring(worstAt)
+			)
+		)
+		t.ok(worst <= 15, string.format("the Hills are %.2f degrees at %s", worst, tostring(worstAt)))
 	end)
 end

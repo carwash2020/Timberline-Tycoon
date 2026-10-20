@@ -43,10 +43,12 @@ end
 --     of fine rolling on top, both as they always were);
 --   * that fine rolling and the domes (the "hill layer", HillLiftAt) start
 --     HILL_CLEAR (8) studs past the edge of any road, plot shelf or store pad
---     and reach full size HILL_RAMP (200) studs out (HillMask). The ramp is
---     long because a hill may be at most 15 degrees: 18 studs of height in
---     under 200 studs of run, on top of the 5 to 9 degrees the roads' banks
---     already use (tests/GroundHills.spec: forest ground tops out at 13.8);
+--     (HillMask). Beside a road the ramp is the steady ROAD_GRADE (0.2, 11.3
+--     degrees) of total climb less the road's own bank (roadProfile), so bank
+--     and hill together stay inside the 15 degrees a hill may be (tests/
+--     GroundHills.spec: forest ground tops out at 14.8, 14.94 on a 4 stud
+--     scan). The roads cut the Hills into cells about 100 studs across, so a
+--     cell's middle reaches about +11, the most the 15 degrees allow there;
 --   * roads climb at most MAX_ROAD_DEG (5) degrees along their length and are
 --     level across, with a ROAD_SHOULDER (80) stud bank into the country
 --     (haulField); a plot, store pad or the lot keeps its level over a bank;
@@ -66,8 +68,20 @@ local MEADOW_SWELL_AMP = 6
 local MEADOW_FINE_AMP = 3.2
 local MEADOW_AMP = MEADOW_SWELL_AMP + MEADOW_FINE_AMP
 local HILL_CLEAR = 8
-local HILL_RAMP = 200
-local DOME_WAVE = 340
+local HILL_RAMP = 170
+local RAMP_OUT = 0.8
+local ROAD_GRADE = 0.2
+local BANK_RISE = 8
+local PAD_RAMP = 40
+local PAD_IN = 0.3
+local PAD_OUT = 0.8
+local DOME_WAVE = 420
+local DOME_FLOOR = 0.4
+local DOME_BIAS = 0.8
+local DOME_SWING = 0.5
+local DOME_SHARE = 0.95
+local HILLS_FINE_CUT = 0.8 -- the meadow's fine rolling fades out under the domes (their own slope is the budget)
+local HILLS_REACH = 60 -- studs the domes stay at full size past the Hills' edge
 local DOME_SEED = 12.4
 local HILLS_FALLOFF = 140 -- studs the domes take to fade in past the Hills' edge
 local MAX_ROAD_DEG = 5
@@ -235,18 +249,33 @@ end
 -- The live hill layer: before the mask (HillMask) that keeps it off roads,
 -- plots and pads. The meadow's fine rolling, the Hills' rounded domes (at
 -- most HILLS_AMP), the Snowfields' and the Volcano's small bumps.
+local function hillsWeight(x: number, z: number): number
+	return circleWeight(x, z, HILLS.x, HILLS.z, HILLS.radius + HILLS_REACH, HILLS_FALLOFF)
+end
+
+-- The most the hill layer can be at (x, z): the meadow's fine rolling, fading
+-- out under the domes, plus the domes' own height.
+local function hillsAmpAt(x: number, z: number): number
+	local wh = hillsWeight(x, z)
+	return MEADOW_FINE_AMP * (1 - wh * HILLS_FINE_CUT) + HILLS_AMP * wh
+end
+
 local function liveDetail(x: number, z: number): number
 	local h = MEADOW_FINE_AMP * fbm(x, z, 1 / 190, 3, 11)
 
 	local ws = circleWeight(x, z, STARTER.x, STARTER.z, STARTER.radius, 70)
 	h *= 1 - ws * 0.75
 
-	local wh = circleWeight(x, z, HILLS.x, HILLS.z, HILLS.radius, HILLS_FALLOFF)
+	local wh = hillsWeight(x, z)
 	if wh > 0 then
-		-- Rounded domes: the folded noise, eased so a crest is round, not a crease.
-		local d = math.max(0, 1 - math.abs(noise(x / DOME_WAVE, z / DOME_WAVE, DOME_SEED)) * 2)
-		d = d * d * (3 - 2 * d)
-		h += wh * HILLS_AMP * (0.9 * d + 0.1 * fbm(x, z, 1 / 110, 2, 6))
+		h *= 1 - wh * HILLS_FINE_CUT
+		-- Broad domes: a soft-topped swell of low-frequency noise (its slope is
+		-- a couple of degrees at most), so the road-distance ramp (HillMask) sets
+		-- how steep a hill is and a cell's middle reaches the full height.
+		local n = noise(x / DOME_WAVE, z / DOME_WAVE, DOME_SEED)
+		local d = DOME_FLOOR
+			+ (1 - DOME_FLOOR) * smoothstep((DOME_BIAS + DOME_SWING * n - DOME_FLOOR) / (1 - DOME_FLOOR))
+		h += wh * HILLS_AMP * (DOME_SHARE * d + (1 - DOME_SHARE) * fbm(x, z, 1 / 110, 2, 6))
 	end
 
 	local wsn = circleWeight(x, z, SNOW.x, SNOW.z, SNOW.radius, 200)
@@ -764,16 +793,52 @@ local LAKE_BASIN = 90
 
 -- How much of the hill layer shows at (x, z): 0 within HILL_CLEAR studs of
 -- a road's edge, a plot's shelf or a store pad (so a road, a pad and the 8
--- studs round them are the broad swell and nothing more), easing to 1
--- HILL_RAMP studs further out.
+-- studs round them are the broad swell and nothing more), easing to 1 further
+-- out: beside a pad over PAD_RAMP studs (hillProfile: the slope eases in over
+-- the first `rampIn` of the run, holds, and eases out over the last
+-- 1 - `rampOut` so a crest is round), beside a road by roadProfile.
+local function hillProfile(t: number, rampIn: number, rampOut: number): number
+	if t <= 0 then
+		return 0
+	elseif t >= 1 then
+		return 1
+	end
+	local peak = 1 / (1 - rampIn / 2 - (1 - rampOut) / 2)
+	if t < rampIn then
+		return peak * t * t / (2 * rampIn)
+	elseif t <= rampOut then
+		return peak * (rampIn / 2 + (t - rampIn))
+	end
+	local u = 1 - t
+	return 1 - peak * u * u / (2 * (1 - rampOut))
+end
+
+-- Beside a road the ground already climbs: the bank (ROAD_SHOULDER studs, a
+-- smoothstep) lifts it from the road's height toward the country's, BANK_RISE
+-- studs higher in the Hills. The hills climb on top at a slope that is the
+-- steady grade ROAD_GRADE minus that bank's, so the two add up to the same
+-- easy grade all the way out: the steepest ground stays within the 15 degrees
+-- the forest rule allows, and a cell's middle reaches as high as it can.
+local function roadProfile(clearance: number, amp: number): number
+	local rise = ROAD_GRADE * (clearance - HILL_CLEAR) - BANK_RISE * smoothstep(clearance / ROAD_SHOULDER)
+	local q = clamp(rise / amp, 0, 1)
+	if q > RAMP_OUT then
+		local u = (q - RAMP_OUT) / (1 - RAMP_OUT)
+		return RAMP_OUT + (1 - RAMP_OUT) * (2 * u - u * u)
+	end
+	return q
+end
+
 function TerrainGen.HillMask(x: number, z: number): number
-	local reach = HILL_CLEAR + HILL_RAMP
-	local pad = WorldLayout.PadClearance(x, z, reach)
+	local pad = WorldLayout.PadClearance(x, z, HILL_CLEAR + PAD_RAMP)
 	if pad <= HILL_CLEAR then
 		return 0
 	end
-	local d = math.min(pad, TerrainGen.RoadClearance(x, z, reach))
-	return clamp((d - HILL_CLEAR) / HILL_RAMP, 0, 1)
+	local road = TerrainGen.RoadClearance(x, z, HILL_CLEAR + HILL_RAMP)
+	if road <= HILL_CLEAR then
+		return 0
+	end
+	return math.min(hillProfile((pad - HILL_CLEAR) / PAD_RAMP, PAD_IN, PAD_OUT), roadProfile(road, hillsAmpAt(x, z)))
 end
 
 -- The live hill layer at (x, z): the fine rolling and the Hills' domes, kept
