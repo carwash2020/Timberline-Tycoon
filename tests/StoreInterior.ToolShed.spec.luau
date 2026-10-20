@@ -780,6 +780,37 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"the back-room door is on the west wall and the stock corner (barrels, small crates) stands in the keeper's lane",
+		function()
+			local shop = BuildingArt.Shop(KIND, KIND, ACCENT)
+			local doors = named(shop, "BackRoomDoor")
+			t.eq(#doors, 1, "one back-room door")
+			local dx0, dx1, dy0, dy1, dz0, dz1 = aabb(doors[1])
+			t.ok(dx0 < -frame.halfW and dx1 <= -frame.halfW + 0.3, "flat on the west wall: " .. dx0 .. ".." .. dx1)
+			t.ok(dy0 <= frame.floorTop + 0.01 and dy1 > frame.floorTop + 7, "a full-height door on the floor")
+			t.ok(dz0 > 17 and dz1 < 21, "at the back of the west wall: " .. dz0 .. ".." .. dz1)
+			local counter = shop:FindFirstChild("Counter")
+			local _, _, _, _, _, backFace = aabb(counter)
+			local sign = named(shop, "RobuxSign")[1]
+			local _, _, _, _, signZ0 = aabb(sign)
+			local stock = 0
+			for _, name in ipairs({ "Barrel", "Crate" }) do
+				for _, p in ipairs(named(shop, name)) do
+					local x0, x1, y0, _, z0, z1 = aabb(p)
+					if z0 > 0 then
+						stock += 1
+						t.ok(math.abs(y0 - frame.floorTop) < 0.01, name .. " stands on the floor")
+						t.ok(z0 >= backFace and z1 <= signZ0, name .. " is between the counter and the gold table")
+						-- clear of the keeper's mat (x within 2.1) and of the axe table's end (x -5.2) and the event room (x 5.35)
+						t.ok(x0 >= -5.2 and x1 <= 5.3 and (x1 <= -2.1 or x0 >= 2.1), name .. " is beside the keeper")
+					end
+				end
+			end
+			t.eq(stock, 4, "two barrels and two crates in the lane")
+		end
+	)
+
 	t.test("the whole shop with its boxes is still inside the store budget", function()
 		local GameConfig = t.shared("GameConfig")
 		local model = BuildingArt.Shop(KIND, KIND, ACCENT)
