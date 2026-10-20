@@ -85,6 +85,7 @@ local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local StoreBoard = require(ReplicatedStorage.Shared.StoreBoard)
 local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
+local MaterialSetup = require(script.Parent.MaterialSetup)
 local UndergroundBuilder = require(script.Parent.UndergroundBuilder)
 local SecretService = require(script.Parent.SecretService)
 local TreeService = require(script.Parent.TreeService)
@@ -222,6 +223,11 @@ print(
 -- written here (the "terrain" gate) and the rest follows in the background
 -- after the world gate, the plot pads' ground first (terrainFinish below).
 local terrainFinish: (() -> number)? = nil
+-- The ground's textures (T397): point Grass, Ground, LeafyGrass and Asphalt at
+-- their MaterialVariants before the terrain is written, and set its colours.
+step("3. Ground materials", function()
+	MaterialSetup.Apply(game:GetService("MaterialService"), workspace:FindFirstChildOfClass("Terrain"))
+end)
 step("3. Terrain", function()
 	local seconds, finish = TerrainBuilder.Build(function(done: number, total: number)
 		if done % 24 == 0 or done == total then
@@ -561,6 +567,10 @@ step("4. The town", function()
 	-- (town.parkingSizes, WorldPlan.ParkingBays, phase 12): small ones for
 	-- the small trucks, long pull-through ones for the big rigs.
 	local slots: { BasePart } = {}
+	-- The lot's paved surface and dirt shoulder (T397): looks only, under the paint.
+	step("4. The parking lot's surface", function()
+		BuildingArt.ParkingLot(WorldLayout.ParkingLot).Parent = map
+	end)
 	step("4. The parking lot", function()
 		for index, cf in ipairs(town.parkingSlots) do
 			local slot = Kit.part(

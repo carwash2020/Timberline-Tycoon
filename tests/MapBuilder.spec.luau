@@ -168,6 +168,15 @@ return function(t)
 						return true
 					end,
 				},
+				-- T397: the ground's texture overrides (spec MaterialSetup).
+				MaterialSetup = {
+					Apply = function(service, terrain)
+						s.materials = (s.materials or 0) + 1
+						s.materialsService = service
+						s.materialsTerrain = terrain
+						return 4
+					end,
+				},
 				NodeService = { Spawn = function() end },
 				UndergroundBuilder = { Build = function() end },
 				SecretService = { V1Init = function() end },
@@ -187,6 +196,7 @@ return function(t)
 			},
 			services = {
 				Players = Players,
+				MaterialService = { Name = "MaterialService" },
 				RunService = {
 					IsStudio = function()
 						return options.loop ~= nil
@@ -278,6 +288,9 @@ return function(t)
 	t.test("a clean build warns nothing, parents SellArea last and lets everyone in", function()
 		local s = build()
 		t.eq(s.warnings, {})
+		-- T397: the ground's MaterialVariants are switched on once, with the service.
+		t.eq(s.materials, 1)
+		t.eq(s.materialsService.Name, "MaterialService")
 		lastStepsRan(s)
 		t.ok(s.sellArea:FindFirstChild("SellZone"), "SellZone")
 		t.ok(s.sellArea:FindFirstChild("SellZone"):FindFirstChild("SellPoint"), "SellPoint")

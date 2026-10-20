@@ -23,6 +23,16 @@ function WorldLayout.SetLegacyLayout(on: boolean)
 	legacyLayout = on
 end
 
+-- On while TerrainGen builds the road grades the first 322 trees' ground
+-- needs (the ground as it was before T397: no store pads, the plot shelves
+-- at the broad height of their centre). Never on in the live world.
+local classicGround = false
+local PLOT_BLEND_LIVE = 3 -- (see FlatAt)
+
+function WorldLayout.SetClassicGround(on: boolean)
+	classicGround = on
+end
+
 WorldLayout.WorldHalf = 1000 -- the playable square runs from -1000 to 1000
 WorldLayout.TerrainSkirt = 200 -- generated past the edge so the camera never sees under the world
 WorldLayout.Sawmill = Vector3.new(0, 0, 110)
@@ -42,6 +52,8 @@ export type FlatZone = {
 	blend: number,
 	terrace: boolean?,
 	y: number?,
+	classicY: number?, -- the shelf's height before T397 (see SetClassicGround)
+	wide: boolean?, -- a shelf over high country eases back over FlatGround's wider blend
 	cx: number?,
 	cz: number?,
 }
@@ -592,11 +604,13 @@ do
 	end
 end
 
--- The parking lot east of the spawn (a gravel lot; MapBuilder paints the
--- slots on it). M1.5 grew it east (it ended at x 112) for one row of 12
--- slots 10 wide, 11 apart (WorldPlan.Town), its east rail at x 145. The
--- LotApron keeps that rail and the turnaround level.
-WorldLayout.ParkingLot = { x0 = 8, x1 = 146, z0 = -18, z1 = 68 }
+-- The parking lot east of the spawn (MapBuilder lays its paved surface and
+-- paints the slots on it). M1.5 grew it east (it ended at x 112) for one
+-- row of slots (WorldPlan.Town); T397 trimmed its east edge from x 146 to
+-- 138, one stud past the last bay's lane (bay 13 ends at x 137), so no
+-- slab stands empty beyond the bays. The LotApron keeps that rail and the
+-- turnaround level.
+WorldLayout.ParkingLot = { x0 = 8, x1 = 138, z0 = -18, z1 = 68 }
 
 -- Loading pads for boxed vehicles and machines (GameConfig.LoadingPadSize).
 -- Named rects only: not a flat zone, a paint, or a reserved box, so nothing
@@ -667,6 +681,35 @@ WorldLayout.TownFloors = {
 	-- A stud past the walls so grass does not grow through the floor.
 	{ name = "SkyForgeFloor", x0 = -130, x1 = -94, z0 = -36, z1 = -4, material = "Ground" },
 } :: { Paint }
+
+-- Store pads (T397): the ground under each shop and yard, the parking lot
+-- (with its 2-stud shoulder) and the two loading pads, each kept perfectly
+-- flat at y = 0 with an 8-stud apron blending back to the country. Most sit
+-- inside the Town zone already; the sky forge court and the dealership's
+-- far side reach past it. Live layout only: the first 322 trees never saw
+-- these (flatZonesNow below).
+WorldLayout.StorePadApron = 8
+local function storePadZones(): { FlatZone }
+	local zones: { FlatZone } = {}
+	local function add(r: { x0: number, x1: number, z0: number, z1: number }, grow: number)
+		table.insert(zones, {
+			name = "StorePad",
+			x0 = r.x0 - grow,
+			x1 = r.x1 + grow,
+			z0 = r.z0 - grow,
+			z1 = r.z1 + grow,
+			blend = WorldLayout.StorePadApron,
+		})
+	end
+	for _, floor in ipairs(WorldLayout.TownFloors) do
+		add(floor, 0)
+	end
+	add(WorldLayout.ParkingLot, 2)
+	add(WorldLayout.DealershipLoadingPad, 0)
+	add(WorldLayout.ToolShedLoadingPad, 0)
+	return zones
+end
+WorldLayout.StorePads = storePadZones()
 
 -- The river runs from the pool under the Aether Isles' waterfall, south
 -- past the Hills' west side, into Mirror Lake, then out to the west edge.
@@ -983,9 +1026,21 @@ end
 
 -- While the first 322 trees are placed, the ground they avoid is the old
 -- district lawn, not today's shelves.
+local liveZones: { FlatZone } = {}
 local function flatZonesNow(): { FlatZone }
-	if not legacyLayout then
+	if classicGround and not legacyLayout then
 		return WorldLayout.FlatZones
+	end
+	if not legacyLayout then
+		if #liveZones == 0 then
+			for _, zone in ipairs(WorldLayout.FlatZones) do
+				table.insert(liveZones, zone)
+			end
+			for _, zone in ipairs(WorldLayout.StorePads) do
+				table.insert(liveZones, zone)
+			end
+		end
+		return liveZones
 	end
 	local zones: { FlatZone } = {}
 	for _, zone in ipairs(WorldLayout.FlatZones) do
@@ -999,23 +1054,57 @@ end
 
 -- How flat (x, z) is (0 at a zone's blend edge, 1 deep inside) and the
 -- height that flat pulls toward. Town and the old lawn pull to 0.
-function WorldLayout.FlatAt(x: number, z: number): (number, number)
+-- The weight and target of the flat zones at (x, z). `reach` scales a
+-- homestead shelf's blend (1 = its own).
+local function flatBlend(x: number, z: number, reach: number): (number, number)
 	local weight, target = 0, 0
 	for _, zone in ipairs(flatZonesNow()) do
 		local dx = math.max(zone.x0 - x, 0, x - zone.x1)
 		local dz = math.max(zone.z0 - z, 0, z - zone.z1)
 		-- Past the blend on either axis the weight is 0: it can't win.
-		if dx < zone.blend and dz < zone.blend then
+		local blend = if zone.terrace and zone.wide then zone.blend * reach else zone.blend
+		if dx < blend and dz < blend then
 			local outside = math.sqrt(dx * dx + dz * dz)
-			local w = 1 - math.clamp(outside / zone.blend, 0, 1)
+			local w = 1 - math.clamp(outside / blend, 0, 1)
 			w = w * w * (3 - 2 * w) -- smoothstep
 			if w > weight then
 				weight = w
-				target = zone.y or 0
+				target = if classicGround then (zone.classicY or zone.y or 0) else (zone.y or 0)
 			end
 		end
 	end
 	return weight, target
+end
+
+function WorldLayout.FlatAt(x: number, z: number): (number, number)
+	return flatBlend(x, z, 1)
+end
+
+-- The same for the ground's height only (TerrainGen.groundHeight): T397's
+-- homestead shelves sit at y = 0 and ease back over three times FlatAt's
+-- blend, so a pad in the high country is a gentle shelf, not a wall. What the
+-- surface paint, the trees and the hubs read (FlatAt, FlatWeight) keeps the
+-- old blend. The classic ground and the first trees' lawn keep it too.
+function WorldLayout.FlatGround(x: number, z: number): (number, number)
+	return flatBlend(x, z, if classicGround or legacyLayout then 1 else PLOT_BLEND_LIVE)
+end
+
+-- Studs from (x, z) to the nearest flat zone's rectangle (a plot's shelf, the
+-- town, a store pad, the lot): 0 on or inside one, `reach` if none is nearer.
+-- The blends are not counted: the hills keep 8 studs past this edge.
+function WorldLayout.PadClearance(x: number, z: number, reach: number): number
+	local best = reach
+	for _, zone in ipairs(flatZonesNow()) do
+		local dx = math.max(zone.x0 - x, 0, x - zone.x1)
+		local dz = math.max(zone.z0 - z, 0, z - zone.z1)
+		if dx < best and dz < best then
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d < best then
+				best = d
+			end
+		end
+	end
+	return best
 end
 
 function WorldLayout.FlatWeight(x: number, z: number): number
@@ -1133,7 +1222,7 @@ WorldLayout.Forest = {
 	lanes = {
 		-- From the spawn to the lighthouse on the coast's headland
 		-- (WorldPlan.Lighthouse): its lamp stays in sight (Forest.spec).
-		{ name = "LighthouseVista", a = Vector2.new(0, 40), b = Vector2.new(780, -240), half = 45 },
+		{ name = "LighthouseVista", a = Vector2.new(0, 40), b = Vector2.new(794, -240), half = 45 },
 		-- A trail out of the Phantom Grove's ridge gap toward town, so the
 		-- curious still find it.
 		-- Ring map: the grove sits due south of the Starter Forest, so the

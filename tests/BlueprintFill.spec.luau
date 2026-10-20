@@ -201,10 +201,13 @@ return function(t)
 	t.test("no ruin, cabin or other world prop stands on a plot's biggest pad or its lawn", function()
 		local WorldPlan = t.shared("World/WorldPlan")
 		local TerrainGen = t.shared("World/TerrainGen")
-		local reach = PlotData.Tiers[#PlotData.Tiers].size / 2 + TerrainGen.PlotLawn
+		local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+		-- T397: the lawn is a distance from the pad, so its corners are round (a piece 75
+		-- studs off a pad's corner is not on the lawn: the old square test said it was).
 		local function onPlot(x, z, r)
 			for _, slot in ipairs(PlotData.Slots) do
-				if math.abs(x - slot.X) <= reach + r and math.abs(z - slot.Y) <= reach + r then
+				local dx, dz = math.max(math.abs(x - slot.X) - half, 0), math.max(math.abs(z - slot.Y) - half, 0)
+				if math.sqrt(dx * dx + dz * dz) <= TerrainGen.PlotLawn + r then
 					return true
 				end
 			end

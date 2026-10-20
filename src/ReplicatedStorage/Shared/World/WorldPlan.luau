@@ -18,6 +18,7 @@ local RegionLogic = require(script.Parent.Parent.RegionLogic)
 local BayouData = require(script.Parent.Parent.Regions.BayouData)
 local MesaData = require(script.Parent.Parent.Regions.MesaData)
 local TerrainGen = require(script.Parent.TerrainGen)
+local TownTreeData = require(script.Parent.Parent.TownTreeData)
 local UndergroundData = require(script.Parent.UndergroundData)
 local WoodData = require(script.Parent.Parent.WoodData)
 local WorldLayout = require(script.Parent.WorldLayout)
@@ -134,7 +135,9 @@ function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxS
 	end
 	-- The pull-through bays face south: no tree stands in the lanes ahead of
 	-- them down to z -150 (the Starter Forest now reaches up to the lot).
-	local lot = WorldLayout.ParkingLot
+	-- (The trees' own copy of the lot: T397 trimmed WorldLayout.ParkingLot's east edge,
+	-- and the pull-out strip stays where the first trees were placed against.)
+	local lot = TownTreeData.ParkingLot
 	-- And the bays' pull-out strip along the lot's south edge (the Starter Forest reaches it).
 	if z < lot.z0 and z > lot.z0 - (WorldPlan :: any).ParkingPullOut - 4 and x > lot.x0 - 4 and x < lot.x1 + 4 then
 		return false
@@ -383,7 +386,17 @@ function firstTrees(): { TreeSpot }
 		end
 		return nil
 	end
+	-- T397: they are placed on the ground as it was before the gentle hills (the
+	-- old swell, domes, shelves and road grades, no store pads), so their X and
+	-- Z never move; their height (below) is the live ground's.
+	-- (Anything the placement caches for later, the town's bays, is worked out
+	-- first, on the live ground.)
+	breathe()
+	pullThroughLanes()
+	breathe()
+	TerrainGen.SetClassicGround(true)
 	local placedOk, placedErr = pcall(build)
+	TerrainGen.SetClassicGround(false)
 	firstBuilding = false
 	TerrainGen.SetLegacyLayout(false)
 	if not placedOk then

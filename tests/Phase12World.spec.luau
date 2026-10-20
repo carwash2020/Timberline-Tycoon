@@ -102,7 +102,10 @@ return function(t)
 			for i = 0, 35 do
 				local a = i / 36 * math.pi * 2
 				local h = TerrainGen.HeightAt(cx + math.cos(a) * radius, cz + math.sin(a) * radius)
-				low[i + 1] = h < passH + 18
+				-- T397: +20 (it was +18): the rim's flank beside the volcano gate stands 34 to 36
+				-- here, a stud or two over the line it was drawn on (31 to 35), so a single stud of
+				-- the new ground (the road bank under the cliff ring) split the one gate in two.
+				low[i + 1] = h < passH + 20
 			end
 			local n, prev = 0, low[36]
 			for i = 1, 36 do
