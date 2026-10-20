@@ -50,7 +50,7 @@ return function(t)
 						table.insert(predicts, { ... })
 					end,
 				},
-				HUD = { Toast = function() end },
+				HUD = { Toast = function() end, TimedToast = function() end },
 				Quality = {
 					Tier = function()
 						return "high"
@@ -431,6 +431,7 @@ return function(t)
 				},
 				HUD = {
 					Toast = function() end,
+					TimedToast = function() end,
 					SetPointing = function() end,
 				},
 				Quality = {

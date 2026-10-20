@@ -144,7 +144,7 @@ return function(t)
 				},
 			},
 			mocks = {
-				HUD = { Toast = function() end },
+				HUD = { Toast = function() end, TimedToast = function() end },
 				SoundData = {
 					Play = function() end,
 					SwingFor = function()
