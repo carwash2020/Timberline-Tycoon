@@ -732,4 +732,36 @@ function SaveSlotLogic.Layout(viewW: number, viewH: number, picking: boolean, co
 	}
 end
 
+-- What the Saves list draws, as one string: the rows are rebuilt only when this
+-- changes (a once-a-second tick or the same payload again must not rebuild them,
+-- or the list snaps back to the top). Index, name, timestamp, plus every fact a
+-- card prints and the join-pick mode, which changes the buttons.
+function SaveSlotLogic.SummaryKey(list: { Summary }, picking: boolean): string
+	local parts: { string } = { if picking then "pick" else "saves" }
+	for _, s in ipairs(list) do
+		table.insert(
+			parts,
+			table.concat({
+				tostring(s.index),
+				s.name,
+				tostring(s.lastPlayed),
+				tostring(s.active == true),
+				tostring(s.fresh == true),
+				tostring(s.cash),
+				s.axeName,
+				tostring(s.hasPlot == true),
+				tostring(s.pieces),
+			}, "\t")
+		)
+	end
+	return table.concat(parts, "\n")
+end
+
+-- A saved scroll offset, kept inside the list as it is now (the canvas may be
+-- shorter after a rebuild or a change of rows). Never below 0.
+function SaveSlotLogic.ClampScroll(y: number, canvasHeight: number, windowHeight: number): number
+	local most = math.max(0, canvasHeight - windowHeight)
+	return math.clamp(y, 0, most)
+end
+
 return SaveSlotLogic
