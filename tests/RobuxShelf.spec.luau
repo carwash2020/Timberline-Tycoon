@@ -62,34 +62,37 @@ return function(t)
 		t.ok(RobuxShelf.Find("Pass", "DoubleCash") ~= nil, "not answered yet: shown (the prompt is still gated)")
 	end)
 
-	t.test("passes stand in front on the table, packs on the riser behind, each row even and centred", function()
-		local places = RobuxShelf.Placements()
-		t.eq(#places, #RobuxShelf.List())
-		local width = RobuxShelf.RowWidth()
-		local byKind = { Pass = {}, Product = {} }
-		for _, place in ipairs(places) do
-			local entry = RobuxShelf.Get(place.slotId)
-			table.insert(byKind[entry.kind], place)
-		end
-		for kind, row in pairs(byKind) do
-			local back = kind == "Product"
-			local sum = 0
-			for i, place in ipairs(row) do
-				t.eq(place.z, if back then RobuxShelf.BackZ else RobuxShelf.FrontZ)
-				local top = RobuxShelf.TableTop + (if back then RobuxShelf.RiserH else 0)
-				t.ok(math.abs(place.y - (top + RobuxShelf.BoxHalfHeight)) < 1e-9, kind .. " on its surface")
-				t.ok(math.abs(place.x) + 0.7 <= width / 2, "inside the table's width")
-				if i > 1 then
-					t.ok(math.abs(place.x - row[i - 1].x - RobuxShelf.Step) < 1e-9, "evenly spaced")
-				end
-				sum += place.x
+	t.test(
+		"passes stand in front on the table, packs on the riser behind, each row even and centred on the table (T387: the table stands against the event room, not on x = 0)",
+		function()
+			local places = RobuxShelf.Placements()
+			t.eq(#places, #RobuxShelf.List())
+			local width = RobuxShelf.RowWidth()
+			local byKind = { Pass = {}, Product = {} }
+			for _, place in ipairs(places) do
+				local entry = RobuxShelf.Get(place.slotId)
+				table.insert(byKind[entry.kind], place)
 			end
-			t.ok(math.abs(sum) < 1e-9, kind .. " centred on the shop's middle")
+			for kind, row in pairs(byKind) do
+				local back = kind == "Product"
+				local sum = 0
+				for i, place in ipairs(row) do
+					t.eq(place.z, if back then RobuxShelf.BackZ else RobuxShelf.FrontZ)
+					local top = RobuxShelf.TableTop + (if back then RobuxShelf.RiserH else 0)
+					t.ok(math.abs(place.y - (top + RobuxShelf.BoxHalfHeight)) < 1e-9, kind .. " on its surface")
+					t.ok(math.abs(place.x - RobuxShelf.CenterX()) + 0.7 <= width / 2, "inside the table's width")
+					if i > 1 then
+						t.ok(math.abs(place.x - row[i - 1].x - RobuxShelf.Step) < 1e-9, "evenly spaced")
+					end
+					sum += place.x
+				end
+				t.ok(math.abs(sum - RobuxShelf.CenterX() * #row) < 1e-9, kind .. " centred on the table's middle")
+			end
+			t.ok(RobuxShelf.BackZ - RobuxShelf.FrontZ >= 2.2, "the rows don't touch")
+			-- (ShelfLayout.spec checks the walls and the lanes from BuildingArt's frame.)
+			t.ok(RobuxShelf.TableZ - RobuxShelf.TableDepth / 2 >= 16.8, "behind the lanes")
 		end
-		t.ok(RobuxShelf.BackZ - RobuxShelf.FrontZ >= 2.2, "the rows don't touch")
-		-- (ShelfLayout.spec checks the walls and the lanes from BuildingArt's frame.)
-		t.ok(RobuxShelf.TableZ - RobuxShelf.TableDepth / 2 >= 16.8, "behind the lanes")
-	end)
+	)
 
 	t.test("the tag says R$ until Roblox's price is known", function()
 		t.eq(RobuxShelf.Tag(nil), "R$")

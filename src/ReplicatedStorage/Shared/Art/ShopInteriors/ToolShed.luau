@@ -25,7 +25,6 @@ local MAT = Enum.Material
 local hex = Kit.hex
 local dBox = ShopKit.dBox
 local counterDetail = ShopKit.counterDetail
-local backDoor = ShopKit.backDoor
 local plankFloor = ShopKit.plankFloor
 local floorBorder = ShopKit.floorBorder
 local runner = ShopKit.runner
@@ -203,24 +202,6 @@ ToolShed.Sections = {
 	},
 } :: { ShopKit.Section }
 
--- A stock crate or barrel in the back corner: the real mesh (Crate, Barrel),
--- with a part-built stand-in that is dropped when the mesh has loaded
--- (ShopKit.MeshProp: fallback first, swap later, never a yielding load).
-local function stockProp(model: Model, asset: string, x: number, y: number, z: number, yaw: number)
-	local fallback = Instance.new("Model")
-	fallback.Name = asset .. "Fallback"
-	local at = CF(x, y, z) * CFrame.Angles(0, yaw, 0)
-	if asset == "Crate" then
-		dBox(fallback, "Crate", V3(2, 2.4, 2), at * CF(0, 1.2, 0), TABLE_TOP)
-		dBox(fallback, "CrateBand", V3(2.06, 0.2, 2.06), at * CF(0, 1.2, 0), TIMBER)
-	else
-		dBox(fallback, "Barrel", V3(1.6, 2.2, 1.6), at * CF(0, 1.1, 0), TABLE)
-		dBox(fallback, "BarrelHoop", V3(1.7, 0.16, 1.7), at * CF(0, 1.1, 0), ShopKit.Table.iron)
-	end
-	fallback.Parent = model
-	ShopKit.MeshProp(model, asset, at, fallback)
-end
-
 -- The side walls' inner face stands this far past frame.halfW (the shell's 0.9 walls are built 0.6 apart from it).
 local WALL_IN = 0.15
 local BLUEPRINT = hex("#9CC3D8")
@@ -338,8 +319,6 @@ function ToolShed.Build(model: Model, frame: Frame)
 	if counterTop and counterTop:IsA("BasePart") then
 		counterTop.Size = V3(10.0, counterTop.Size.Y, counterTop.Size.Z)
 	end
-	-- (the back-room door moved to the west wall: the event room takes the east back corner)
-	backDoor(model, frame, -frame.halfW, 19, false, -1)
 
 	-- Floor: warm boards with darker planks, a border, and the aisle runner.
 	plankFloor(model, frame, hex("#B07F4F"), { hex("#94683F"), hex("#C69660"), hex("#85603C") }, 2.6, rng)
@@ -376,12 +355,6 @@ function ToolShed.Build(model: Model, frame: Frame)
 
 	local fy = frame.floorTop
 	ToolShed.Dressing(model, frame)
-
-	-- The stock corner by the west wall: real crate and barrel meshes.
-	stockProp(model, "Crate", -14.4, fy, 19.6, 0.1)
-	stockProp(model, "Crate", -14.4, fy, 17.4, -0.15)
-	stockProp(model, "Barrel", -11.2, fy, 20.4, 0)
-	stockProp(model, "Barrel", -12.4, fy, 18.2, 0.4)
 
 	-- The event expansion room (EVENTS.md, ShopEventKit). The tables fill both sides of the shop, so there is no 14 x 8
 	-- clear floor: the roped zone takes the back east corner (the machine table ends at z 12.5, the counter at x 5, the
