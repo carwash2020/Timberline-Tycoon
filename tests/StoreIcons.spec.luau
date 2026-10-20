@@ -47,30 +47,27 @@ return function(t)
 		end
 	end)
 
-	t.test("an image never changes what is on sale: ids and off-sale rows are as before", function()
-		t.eq(StoreData.CreatorIds.Products.DoubleWood, 0)
-		t.eq(StoreData.CreatorIds.Products.InstantDelivery, 0)
-		t.eq(StoreData.CreatorIds.Passes.TowService, 0)
-		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 0)
-		t.eq(StoreData.CreatorIds.Passes.PaintShop, 0)
-		t.eq(#StoreData.ListedPasses(), 2)
-		t.eq(#StoreData.ListedProducts(), 2)
+	t.test("an image never changes what is on sale: every row has its id and its picture", function()
+		t.eq(#StoreData.ListedPasses(), 5)
+		t.eq(#StoreData.ListedProducts(), 4)
 		for _, key in ipairs({ "DoubleWood", "InstantDelivery" }) do
 			local p = StoreData.Product(key)
 			t.ok(p.image > 0, key .. " has its picture")
-			t.eq(StoreData.IsForSale(p.id), false, key .. " has no id")
-			t.eq(StoreData.ProductById(p.id), nil, key .. " cannot be bought or granted")
-			-- Roblox saying "for sale" still cannot sell a row with no id.
-			for _, answer in ipairs({ true, false }) do
+			t.eq(StoreData.IsForSale(p.id), true, key .. " has its id")
+			t.eq(StoreData.ProductById(p.id), p, key .. " can be bought")
+			-- Roblox's answer still decides: no answer or a no is never Buy.
+			for _, answer in ipairs({ false }) do
 				local state = StoreSale.CardState(p, { robloxForSale = answer })
 				t.ok(state == "Soon" or state == "Hidden", key .. " stays a non-buyable card: " .. state)
 			end
+			t.eq(StoreSale.CardState(p, { robloxForSale = true }), "Buy")
 		end
 		for _, key in ipairs({ "TowService", "TimberClassic", "PaintShop" }) do
 			local p = StoreData.Pass(key)
-			t.eq(StoreData.PassById(p.id), nil, key .. " has no purchase path")
-			local state = StoreSale.CardState(p, { robloxForSale = true })
-			t.ok(state == "Soon" or state == "Hidden", key .. " not buyable: " .. state)
+			t.eq(StoreData.PassById(p.id), p, key .. " has its purchase path")
+			t.eq(StoreSale.CardState(p, { robloxForSale = true }), "Buy")
+			local state = StoreSale.CardState(p, { robloxForSale = false })
+			t.ok(state == "Soon" or state == "Hidden", key .. " not buyable when Roblox says no: " .. state)
 		end
 	end)
 

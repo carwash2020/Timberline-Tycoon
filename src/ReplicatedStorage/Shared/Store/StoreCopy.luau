@@ -21,6 +21,7 @@ StoreCopy.Owned = "Owned"
 StoreCopy.Soon = "Coming soon"
 StoreCopy.WalletFull = "Wallet full"
 StoreCopy.PriceUnknown = "R$" -- the pill while Roblox's price isn't back yet
+StoreCopy.PriceUnavailable = "Price unavailable" -- the pill after every retry failed: Buy is off
 StoreCopy.RobuxPrefix = "R$ "
 
 -- Card extras.
