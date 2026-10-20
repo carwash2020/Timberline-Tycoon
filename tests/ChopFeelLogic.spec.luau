@@ -109,15 +109,9 @@ return function(t)
 		end
 	)
 
-	t.test("a felled log's cut line: the sides' volumes add up, the label says about", function()
-		local lowV, highV = Logic.SplitVolumes(2, 10, 2, 4)
-		local whole = t.shared("SectionLogic").Volume(2, 10, 2)
-		t.ok(math.abs(lowV + highV - whole) < 1e-9)
-		t.ok(lowV < highV, "a cut 4 up a 10 stud log leaves the smaller bottom")
-		local text = Logic.SideText(lowV, whole, 100)
-		t.ok(string.find(text, "about", 1, true))
-		t.ok(string.find(text, "$40", 1, true), "a 4/10 share of $100")
-		t.ok(Logic.SideText(0, 0, 50) ~= nil, "no volume does not divide by zero")
+	t.test("the cut-line label is gone and stays gone", function()
+		t.ok(Logic.SideText == nil)
+		t.ok(Logic.SplitVolumes == nil)
 	end)
 
 	t.test("the canopy nudge rises and falls over SwaySeconds, then is zero", function()
