@@ -43,12 +43,16 @@ end
 --     of fine rolling on top, both as they always were);
 --   * that fine rolling and the domes (the "hill layer", HillLiftAt) start
 --     HILL_CLEAR (8) studs past the edge of any road, plot shelf or store pad
---     (HillMask). Beside a road the ramp is the steady ROAD_GRADE (0.2, 11.3
---     degrees) of total climb less the road's own bank (roadProfile), so bank
---     and hill together stay inside the 15 degrees a hill may be (tests/
---     GroundHills.spec: forest ground tops out at 14.8, 14.94 on a 4 stud
---     scan). The roads cut the Hills into cells about 100 studs across, so a
---     cell's middle reaches about +11, the most the 15 degrees allow there;
+--     (HillMask). Past the Hills the ramp is LEGACY_RAMP (200) studs long;
+--     over the Hills (where the weight of the Hills' domes is above 0) the closer
+--     hills blend in: beside a road the ramp is the steady ROAD_GRADE (0.19,
+--     10.8 degrees) of total climb less the road's own bank (roadProfile), so
+--     bank and hill stay inside the 15 degrees a hill may be (tests/GroundHills.
+--     spec: forest ground tops out at 14.7, 14.65 on a 4 stud scan of the
+--     Hills). The roads cut the Hills into cells about 100 studs across, so a
+--     cell's middle reaches about +9.4, about what that rule allows there.
+--     Everywhere else the ground is the T397 ground bit for bit (so the
+--     scenery, the stands and the tree plan stand where they did);
 --   * roads climb at most MAX_ROAD_DEG (5) degrees along their length and are
 --     level across, with a ROAD_SHOULDER (80) stud bank into the country
 --     (haulField); a plot, store pad or the lot keeps its level over a bank;
@@ -68,14 +72,16 @@ local MEADOW_SWELL_AMP = 6
 local MEADOW_FINE_AMP = 3.2
 local MEADOW_AMP = MEADOW_SWELL_AMP + MEADOW_FINE_AMP
 local HILL_CLEAR = 8
-local HILL_RAMP = 170
+local CLOSER_REACH = 170 -- studs the closer ramp is looked up out to (roadProfile is 1 well inside it)
 local RAMP_OUT = 0.8
-local ROAD_GRADE = 0.2
-local BANK_RISE = 8
+local ROAD_GRADE = 0.19
+local BANK_RISE = 8.5
 local PAD_RAMP = 40
 local PAD_IN = 0.3
 local PAD_OUT = 0.8
 local DOME_WAVE = 420
+local LEGACY_DOME_WAVE = 340
+local LEGACY_RAMP = 200
 local DOME_FLOOR = 0.4
 local DOME_BIAS = 0.8
 local DOME_SWING = 0.5
@@ -92,7 +98,7 @@ TerrainGen.MeadowAmp = MEADOW_AMP
 TerrainGen.MeadowSwellAmp = MEADOW_SWELL_AMP
 TerrainGen.MeadowFineAmp = MEADOW_FINE_AMP
 TerrainGen.HillClear = HILL_CLEAR
-TerrainGen.HillRamp = HILL_RAMP
+TerrainGen.HillRamp = LEGACY_RAMP
 TerrainGen.MaxRoadDegrees = MAX_ROAD_DEG
 TerrainGen.RoadShoulder = ROAD_SHOULDER
 
@@ -249,17 +255,58 @@ end
 -- The live hill layer: before the mask (HillMask) that keeps it off roads,
 -- plots and pads. The meadow's fine rolling, the Hills' rounded domes (at
 -- most HILLS_AMP), the Snowfields' and the Volcano's small bumps.
+-- The Hills' weight for the closer hills (HILLS_REACH studs wider than the
+-- biome's circle) and the T397 weight (the circle, easing out over
+-- HILLS_FALLOFF): the closer hills show where the T397 weight is above 0, and
+-- the ground past it is the T397 ground exactly, so nothing placed against it
+-- moves.
 local function hillsWeight(x: number, z: number): number
 	return circleWeight(x, z, HILLS.x, HILLS.z, HILLS.radius + HILLS_REACH, HILLS_FALLOFF)
 end
 
--- The most the hill layer can be at (x, z): the meadow's fine rolling, fading
--- out under the domes, plus the domes' own height.
+local function legacyHillsWeight(x: number, z: number): number
+	return circleWeight(x, z, HILLS.x, HILLS.z, HILLS.radius, HILLS_FALLOFF)
+end
+
+-- The most the closer hill layer can be at (x, z): the meadow's fine rolling,
+-- fading out under the domes, plus the domes' own height.
 local function hillsAmpAt(x: number, z: number): number
 	local wh = hillsWeight(x, z)
 	return MEADOW_FINE_AMP * (1 - wh * HILLS_FINE_CUT) + HILLS_AMP * wh
 end
 
+-- The T397 hill layer (before its mask): the meadow's fine rolling, the Hills'
+-- rounded domes (at most HILLS_AMP), the Snowfields' and the Volcano's bumps.
+local function legacyDetail(x: number, z: number): number
+	local h = MEADOW_FINE_AMP * fbm(x, z, 1 / 190, 3, 11)
+
+	local ws = circleWeight(x, z, STARTER.x, STARTER.z, STARTER.radius, 70)
+	h *= 1 - ws * 0.75
+
+	local wh = legacyHillsWeight(x, z)
+	if wh > 0 then
+		-- Rounded domes: the folded noise, eased so a crest is round, not a crease.
+		local d = math.max(0, 1 - math.abs(noise(x / LEGACY_DOME_WAVE, z / LEGACY_DOME_WAVE, DOME_SEED)) * 2)
+		d = d * d * (3 - 2 * d)
+		h += wh * HILLS_AMP * (0.9 * d + 0.1 * fbm(x, z, 1 / 110, 2, 6))
+	end
+
+	local wsn = circleWeight(x, z, SNOW.x, SNOW.z, SNOW.radius, 200)
+	if wsn > 0 then
+		h += wsn * 5 * fbm(x, z, 1 / 110, 2, 31)
+	end
+
+	local wv = circleWeight(x, z, VOLCANO.x, VOLCANO.z, VOLCANO.radius, 160)
+	if wv > 0 then
+		h += wv * 4 * fbm(x, z, 1 / 70, 2, 41)
+	end
+	return h
+end
+
+-- The closer hills' layer inside the Hills: the meadow's fine rolling fading
+-- out under broad domes (a soft-topped swell of low-frequency noise, a couple
+-- of degrees of slope at most), so the road-distance ramp (HillMask) sets how
+-- steep a hill is and a cell's middle reaches the height the slope rule allows.
 local function liveDetail(x: number, z: number): number
 	local h = MEADOW_FINE_AMP * fbm(x, z, 1 / 190, 3, 11)
 
@@ -269,9 +316,6 @@ local function liveDetail(x: number, z: number): number
 	local wh = hillsWeight(x, z)
 	if wh > 0 then
 		h *= 1 - wh * HILLS_FINE_CUT
-		-- Broad domes: a soft-topped swell of low-frequency noise (its slope is
-		-- a couple of degrees at most), so the road-distance ramp (HillMask) sets
-		-- how steep a hill is and a cell's middle reaches the full height.
 		local n = noise(x / DOME_WAVE, z / DOME_WAVE, DOME_SEED)
 		local d = DOME_FLOOR
 			+ (1 - DOME_FLOOR) * smoothstep((DOME_BIAS + DOME_SWING * n - DOME_FLOOR) / (1 - DOME_FLOOR))
@@ -829,31 +873,71 @@ local function roadProfile(clearance: number, amp: number): number
 	return q
 end
 
-function TerrainGen.HillMask(x: number, z: number): number
+-- The T397 mask: 0 within HILL_CLEAR studs of a road's edge, a plot's shelf or
+-- a store pad, easing in over LEGACY_RAMP studs.
+local function legacyMask(x: number, z: number): number
+	local reach = HILL_CLEAR + LEGACY_RAMP
+	local pad = WorldLayout.PadClearance(x, z, reach)
+	if pad <= HILL_CLEAR then
+		return 0
+	end
+	local d = math.min(pad, TerrainGen.RoadClearance(x, z, reach))
+	return clamp((d - HILL_CLEAR) / LEGACY_RAMP, 0, 1)
+end
+
+local function closerMask(x: number, z: number): number
 	local pad = WorldLayout.PadClearance(x, z, HILL_CLEAR + PAD_RAMP)
 	if pad <= HILL_CLEAR then
 		return 0
 	end
-	local road = TerrainGen.RoadClearance(x, z, HILL_CLEAR + HILL_RAMP)
+	local road = TerrainGen.RoadClearance(x, z, HILL_CLEAR + CLOSER_REACH)
 	if road <= HILL_CLEAR then
 		return 0
 	end
 	return math.min(hillProfile((pad - HILL_CLEAR) / PAD_RAMP, PAD_IN, PAD_OUT), roadProfile(road, hillsAmpAt(x, z)))
 end
 
+function TerrainGen.HillMask(x: number, z: number): number
+	local s = legacyHillsWeight(x, z)
+	if s <= 0 then
+		return legacyMask(x, z)
+	end
+	return legacyMask(x, z) * (1 - s) + closerMask(x, z) * s
+end
+
 -- The live hill layer at (x, z): the fine rolling and the Hills' domes, kept
 -- off roads, plots and pads by HillMask. (The classic ground has its own.)
+-- Where the T397 weight of the Hills is above 0 the closer hills (liveDetail
+-- under closerMask) show, blended with the T397 layer by that weight; past it
+-- this is the T397 layer exactly.
 function TerrainGen.HillLiftAt(x: number, z: number): number
-	local mask = TerrainGen.HillMask(x, z)
-	if mask <= 0 then
+	local s = legacyHillsWeight(x, z)
+	local mask = legacyMask(x, z)
+	local closer = if s > 0 then closerMask(x, z) else 0
+	if mask <= 0 and closer <= 0 then
 		return 0
 	end
 	-- Nor over the ground a shelf or pad is still easing down to its level.
-	mask *= 1 - (WorldLayout.FlatGround(x, z))
+	local level = 1 - (WorldLayout.FlatGround(x, z))
 	-- The mine mouth's doorstep stays at the ramp's top.
 	local mouth = UndergroundData.MineMouth
-	mask *= clamp((sqrt((x - mouth.x) ^ 2 + (z - mouth.z) ^ 2) - 30) / 30, 0, 1)
-	return if mask > 0 then liveDetail(x, z) * mask else 0
+	local door = clamp((sqrt((x - mouth.x) ^ 2 + (z - mouth.z) ^ 2) - 30) / 30, 0, 1)
+	local oldLift = 0
+	if mask > 0 then
+		local m = mask * level
+		m *= door
+		oldLift = if m > 0 then legacyDetail(x, z) * m else 0
+	end
+	if s <= 0 then
+		return oldLift
+	end
+	local newLift = 0
+	if closer > 0 then
+		local m = closer * level
+		m *= door
+		newLift = if m > 0 then liveDetail(x, z) * m else 0
+	end
+	return oldLift * (1 - s) + newLift * s
 end
 
 -- The hill layer groundHeight last added (0 on the classic ground): HeightAt

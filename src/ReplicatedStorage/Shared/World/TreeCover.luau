@@ -1006,141 +1006,33 @@ function TreeCover.Plan(env: Env, items: { Tree }): Result
 			end
 			return (a.tree.index :: number) < (b.tree.index :: number)
 		end)
-		-- Pass 1: a tree whose cell holds another. Pass 2 (only if that was not
-		-- enough, the ground having moved): a lone tree whose eight neighbouring
-		-- cells all hold trees, so the hole it leaves is one cell, inside every limit.
-		for pass = 1, 2 do
-			for _, entry in ipairs(scored) do
-				if extraDrops >= #made - want then
-					break
-				end
-				local tree = entry.tree
-				if extraGone[tree] then
-					continue
-				end
-				local cx, cz = cellOf(tree.x), cellOf(tree.z)
-				local key = cx .. "," .. cz
-				local ok = (counts[key] or 0) > 1
-				if not ok and pass == 2 and (counts[key] or 0) == 1 then
-					ok = true
-					for dx = -1, 1 do
-						for dz = -1, 1 do
-							if (dx ~= 0 or dz ~= 0) and (counts[(cx + dx) .. "," .. (cz + dz)] or 0) < 1 then
-								ok = false
-							end
-						end
+		for _, entry in ipairs(scored) do
+			if extraDrops >= #made - want then
+				break
+			end
+			local tree = entry.tree
+			local key = cellOf(tree.x) .. "," .. cellOf(tree.z)
+			local ok = (counts[key] or 0) > 1
+			if ok then
+				for _, s in ipairs(live) do
+					local dx, dz = s.x - tree.x, s.z - tree.z
+					if
+						dx * dx + dz * dz <= TreeCover.RoadReach * TreeCover.RoadReach
+						and not otherNear(s.x, s.z, TreeCover.RoadReach, tree)
+					then
+						ok = false
+						break
 					end
 				end
-				if ok then
-					for _, s in ipairs(live) do
-						local dx, dz = s.x - tree.x, s.z - tree.z
-						if
-							dx * dx + dz * dz <= TreeCover.RoadReach * TreeCover.RoadReach
-							and not otherNear(s.x, s.z, TreeCover.RoadReach, tree)
-						then
-							ok = false
-							break
-						end
-					end
-				end
-				if ok then
-					counts[key] -= 1
-					removed[tree] = true
-					extraGone[tree] = true
-					extraDrops += 1
-				end
+			end
+			if ok then
+				counts[key] -= 1
+				removed[tree] = true
+				extraGone[tree] = true
+				extraDrops += 1
 			end
 		end
 		log(string.format("extra drops: %d of %d wanted", extraDrops, #made - want))
-		-- Pass 3 (only if the standing trees could not pay for all of it): the plan
-		-- is a tree or two over, so the planned tree in the densest place that
-		-- nothing needs goes, under the same rules (its cell holds another or all
-		-- eight neighbouring cells do, its clump keeps 3, every road sample's 40
-		-- studs keeps a tree).
-		local madeGone: { [NewTree]: boolean } = {}
-		local madeDrops = 0
-		if extraDrops < #made - want then
-			local clumpSize: { [number]: number } = {}
-			for _, m in ipairs(made) do
-				clumpSize[m.clump] = (clumpSize[m.clump] or 0) + 1
-			end
-			local function gridTree(m: NewTree): Tree?
-				local found: Tree? = nil
-				eachNear(grid, m.x, m.z, 1, function(o: Tree): boolean?
-					if o.x == m.x and o.z == m.z then
-						found = o
-						return true
-					end
-					return nil
-				end)
-				return found
-			end
-			local crowded: { { m: NewTree, n: number, i: number } } = {}
-			for i, m in ipairs(made) do
-				local n = 0
-				eachNear(grid, m.x, m.z, 30, function(o: Tree): boolean?
-					local dx, dz = o.x - m.x, o.z - m.z
-					if (dx ~= 0 or dz ~= 0) and dx * dx + dz * dz < 900 then
-						n += 1
-					end
-					return nil
-				end)
-				table.insert(crowded, { m = m, n = n, i = i })
-			end
-			table.sort(crowded, function(a, b)
-				if a.n ~= b.n then
-					return a.n > b.n
-				end
-				return a.i > b.i
-			end)
-			for _, entry in ipairs(crowded) do
-				if extraDrops + madeDrops >= #made - want then
-					break
-				end
-				local m = entry.m
-				local g = gridTree(m)
-				local cx, cz = cellOf(m.x), cellOf(m.z)
-				local key = cx .. "," .. cz
-				local ok = g ~= nil and (clumpSize[m.clump] == 1 or clumpSize[m.clump] > 3)
-				if ok and (counts[key] or 0) <= 1 then
-					ok = (counts[key] or 0) == 1
-					for dx = -1, 1 do
-						for dz = -1, 1 do
-							if (dx ~= 0 or dz ~= 0) and (counts[(cx + dx) .. "," .. (cz + dz)] or 0) < 1 then
-								ok = false
-							end
-						end
-					end
-				end
-				if ok and g then
-					for _, sample in ipairs(live) do
-						local dx, dz = sample.x - m.x, sample.z - m.z
-						if
-							dx * dx + dz * dz <= TreeCover.RoadReach * TreeCover.RoadReach
-							and not otherNear(sample.x, sample.z, TreeCover.RoadReach, g)
-						then
-							ok = false
-							break
-						end
-					end
-				end
-				if ok and g then
-					counts[key] -= 1
-					removed[g] = true
-					madeGone[m] = true
-					clumpSize[m.clump] -= 1
-					madeDrops += 1
-				end
-			end
-			local kept: { NewTree } = {}
-			for _, m in ipairs(made) do
-				if not madeGone[m] then
-					table.insert(kept, m)
-				end
-			end
-			made = kept
-		end
-		log(string.format("planned-tree drops: %d", madeDrops))
 	end
 	local relocatedTrees: { Tree } = {}
 	for tree in pairs(gone) do

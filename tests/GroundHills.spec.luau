@@ -372,9 +372,9 @@ return function(t)
 			local fine = TerrainGen.MeadowFineAmp
 			-- Domes are at most 18 plus the meadow's own fine rolling.
 			t.ok(hiHills <= 18 + fine + 1e-6, "the Hills' lift is at most 18 + the meadow's fine rolling: " .. hiHills)
-			-- Was +5.85 with the 200 stud ramp; the road-grade ramp reaches +10.6 inside the
-			-- circle (about +11.9 in the Hills' cells just past it), the most the 15 degree rule allows.
-			t.ok(hiHills >= 10, "the Hills rise to at least +10: " .. hiHills)
+			-- Was +5.85 with the 200 stud ramp; the road-grade ramp reaches +9.4, about what
+			-- the 15 degree rule allows between the roads that cut the Hills into cells.
+			t.ok(hiHills >= 9, "the Hills rise to at least +9: " .. hiHills)
 			t.ok(hiMeadow <= fine + 1e-6, "the meadow's fine rolling is at most " .. fine .. ": " .. hiMeadow)
 		end
 	)
