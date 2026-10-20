@@ -2386,7 +2386,14 @@ end
 -- spawn to Murph) and a Logging Rig drives under SELL LOGS HERE's. The
 -- rocks at the posts' feet are looks only (SELL LOGS HERE's stand by the
 -- pad's lane, some road signs' 1.5 studs off the road).
-function BuildingArt.Signpost(text: string, lit: boolean?, solidBoard: boolean?, gateId: string?): Model
+-- `noWrap` turns the label's TextWrapped off so a long line shrinks to fit.
+function BuildingArt.Signpost(
+	text: string,
+	lit: boolean?,
+	solidBoard: boolean?,
+	gateId: string?,
+	noWrap: boolean?
+): Model
 	local model = Kit.model("Signpost")
 	local rng = Kit.rng(#text * 13 + 5)
 	for _, s in ipairs({ -1, 1 }) do
@@ -2394,6 +2401,16 @@ function BuildingArt.Signpost(text: string, lit: boolean?, solidBoard: boolean?,
 		dBox(model, "PostCap", V3(0.95, 0.3, 0.95), CF(s * 4.95, 9.9, 0), TIMBER_LIGHT)
 	end
 	local board = signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, text, PLANK[2], TIMBER, SIGN_INK, true)
+	if noWrap then
+		-- TextScaled shrinks a long line to fit once wrapping is off.
+		for _, gui in ipairs(board:GetChildren()) do
+			for _, label in ipairs(gui:GetChildren()) do
+				if label:IsA("TextLabel") then
+					label.TextWrapped = false
+				end
+			end
+		end
+	end
 	if solidBoard then
 		Kit.solid(board)
 	end

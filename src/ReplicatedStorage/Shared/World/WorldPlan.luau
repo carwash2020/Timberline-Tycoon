@@ -42,7 +42,7 @@ export type TreeSpot = {
 	zone: TreeZone?,
 }
 export type Placement = { name: string, cframe: CFrame, seed: number }
-export type Sign = { text: string, cframe: CFrame, lit: boolean?, gateId: string? } -- lit: gooseneck lamps (TWN-07)
+export type Sign = { text: string, cframe: CFrame, lit: boolean?, gateId: string?, noWrap: boolean? } -- lit: gooseneck lamps (TWN-07); noWrap: its label shrinks a long line instead of breaking it
 export type Fence = { length: number, cframe: CFrame }
 
 local function hashString(s: string): number
@@ -2186,7 +2186,12 @@ function WorldPlan.Town(): Town
 		-- Ring map: just north of the East Link (z 66 to 94; the posts reach
 		-- about five studs south), past the lot's east rail, facing town
 		-- (it stood at (148.5, 76), which the link now covers).
-		{ text = "PLOT DISTRICT\nLand Office: buy a plot\nand build on it", cframe = standing(147, 104, 0, 40) },
+		-- Three short lines, no wrap: line 3 shrinks to fit rather than breaking after "a".
+		{
+			text = "PLOT DISTRICT\nLand Office\nBuy a plot and build on it",
+			cframe = standing(147, 104, 0, 40),
+			noWrap = true,
+		},
 		-- The turn off the street's east end, just north of PlazaEastMouth,
 		-- facing back down the path to the truck lot.
 		{ text = "TRUCK LOT", cframe = standing(82, 100, 82, 70) },
