@@ -352,20 +352,22 @@ PlotData.Blueprints = {
 				color = WOOD_LIGHT,
 				material = "WoodPlanks",
 			},
+			-- T399: the walls stand ON the floor (floor top 0.4, wall 0.4 to 5.4) and the roof on the walls
+			-- (5.4 to 5.8); they used to sink 0.2 into the floor and the roof into the wall tops.
 			{
 				size = Vector3.new(10, 5, 0.4),
-				offset = Vector3.new(0, 2.7, 3.8),
+				offset = Vector3.new(0, 2.9, 3.8),
 				color = WOOD,
 				material = "WoodPlanks",
 			},
 			{
 				size = Vector3.new(0.4, 5, 8),
-				offset = Vector3.new(-4.8, 2.7, 0),
+				offset = Vector3.new(-4.8, 2.9, 0),
 				color = WOOD,
 				material = "WoodPlanks",
 			},
-			{ size = Vector3.new(0.4, 5, 8), offset = Vector3.new(4.8, 2.7, 0), color = WOOD, material = "WoodPlanks" },
-			{ size = Vector3.new(10, 0.4, 8), offset = Vector3.new(0, 5.2, 0), color = "#6B4423", material = "Wood" },
+			{ size = Vector3.new(0.4, 5, 8), offset = Vector3.new(4.8, 2.9, 0), color = WOOD, material = "WoodPlanks" },
+			{ size = Vector3.new(10, 0.4, 8), offset = Vector3.new(0, 5.6, 0), color = "#6B4423", material = "Wood" },
 		},
 		note = "Your own shed: place the plan, then fill it with planks",
 	},

@@ -274,7 +274,9 @@ return function(t)
 		local checked = 0
 		for _, thing in ipairs(things) do
 			for _, p in ipairs(parts(thing.model)) do
-				if p.CanCollide then
+				-- (A shop's awning posts stand out over its forecourt, solid since T385; at the
+				-- Dealership they are a post's width off the road paint, with the whole road to walk.)
+				if p.CanCollide and p.Name ~= "AwningPost" then
 					checked += 1
 					local c = roadClearance(p.CFrame, p.Size)
 					t.ok(
@@ -1324,6 +1326,17 @@ return function(t)
 		end
 	end)
 
+	local DRESSING = {
+		AwningPost = true,
+		Planter = true,
+		PlanterBand = true,
+		BenchSeat = true,
+		BenchBack = true,
+		LampPost = true,
+		LampPostBase = true,
+		PathLampPost = true,
+	}
+
 	t.test("no grass grows under a building: dirt or cobbles under every wall and floor (TER-02)", function()
 		local buildings = { { "Sawmill", placed(BuildingArt.Sawmill(), town.sawmill) } }
 		for _, spot in ipairs(town.shops) do
@@ -1344,7 +1357,8 @@ return function(t)
 			for _, p in ipairs(parts(model)) do
 				-- Anything solid that reaches the ground.
 				local bottom = p.CFrame.Position.Y - p.Size.Y / 2
-				if p.CanCollide and bottom < 1.5 then
+				-- (The street dressing out front, solid since T385, is not a wall or a floor.)
+				if p.CanCollide and bottom < 1.5 and not DRESSING[p.Name] then
 					local half = p.Size / 2
 					for _, sx in ipairs({ -1, 0, 1 }) do
 						for _, sz in ipairs({ -1, 0, 1 }) do

@@ -354,14 +354,36 @@ return function(t)
 			GondolaPath = true,
 			TruckLotPath = true,
 		}
+		-- The solid street dressing of a shop front (T385) sits beside its door, where the Hearth path
+		-- (13 studs west of the door) runs by: thin posts, planters and a bench, not buildings.
+		local DRESSING = {
+			PathLampPost = true,
+			LampPost = true,
+			LampPostBase = true,
+			Planter = true,
+			PlanterBand = true,
+			BenchSeat = true,
+			BenchBack = true,
+			AwningPost = true,
+		}
 		local function hits(part, area)
 			local p = part.CFrame.Position
-			local h = part.Size / 2
+			-- (the part's world half extents: a post lies along X, so Size alone would say it is 5 wide)
+			local cf, sz = part.CFrame, part.Size
+			local h = t.roblox.Vector3.new(
+				(math.abs(cf.RightVector.X) * sz.X + math.abs(cf.UpVector.X) * sz.Y + math.abs(cf.LookVector.X) * sz.Z)
+					/ 2,
+				0,
+				(math.abs(cf.RightVector.Z) * sz.X + math.abs(cf.UpVector.Z) * sz.Y + math.abs(cf.LookVector.Z) * sz.Z)
+					/ 2
+			)
 			return p.X + h.X > area.x0 and p.X - h.X < area.x1 and p.Z + h.Z > area.z0 and p.Z - h.Z < area.z1
 		end
 		for _, model in ipairs(models) do
 			for _, part in ipairs(parts(model)) do
-				if part.CanCollide then
+				-- (A path lamp and an awning post stand at the edge of their shop's path by design: thin posts,
+				-- solid since T385, 9.3 to 9.7 studs off the door while the Hearth path runs 13 studs west.)
+				if part.CanCollide and not DRESSING[part.Name] then
 					for _, area in ipairs(WorldLayout.TownPaint) do
 						if banned[area.name] then
 							t.eq(hits(part, area), false, model.Name .. " " .. part.Name .. " on " .. area.name)
