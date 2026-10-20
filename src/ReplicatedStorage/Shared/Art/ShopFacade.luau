@@ -618,8 +618,13 @@ local function sparkworksFront(model: Model, spec: Spec)
 	end
 
 	-- Out front: a lamp post each side of the path (the road paint in WorldLayout, 12 wide, runs to the doorstep).
+	-- The east one stands further out, at world (154, 104): it was at (144.4, 105.55), in front of the
+	-- PLOT DISTRICT sign's face at (147, 104) (the shop stands at (135, 132)).
 	for _, s in ipairs({ -1, 1 }) do
 		local x, pz = s * 9.4, fz - 8
+		if s == 1 then
+			x, pz = 19, -28
+		end
 		box(model, "LampPostBase", V3(1.0, 0.5, 1.0), CF(x, 0.25, pz), STONE, MAT.Cobblestone)
 		box(model, "LampPost", V3(0.35, 5.0, 0.35), CF(x, 3.0, pz), IRON, MAT.Metal)
 		local glow = Kit.lantern(model, CF(x, 5.5 + 0.77, pz), 1.1)
