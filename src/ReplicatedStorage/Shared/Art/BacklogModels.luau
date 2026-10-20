@@ -1204,6 +1204,30 @@ BacklogModels.Wired = {
 	"GateKiosk",
 	"ArrivalArch",
 	"RobuxBox",
+	"SkyForgeCourt",
+	"StarfallForge",
 } :: { string }
+
+-- Wired assets whose Collision piece is the walkable collider (a Hull
+-- MeshPart, TownMeshes option collision): MeshManifest preloads it as well.
+BacklogModels.Collided = {
+	"SkyForgeCourt",
+	"StarfallForge",
+} :: { string }
+
+function BacklogModels.CollisionIds(ids: { string }): { number }
+	local out: { number } = {}
+	for _, id in ipairs(ids) do
+		local asset = BY_ID[id]
+		if asset then
+			for _, piece in ipairs(asset.pieces) do
+				if piece.name == "Collision" and piece.meshId ~= 0 then
+					table.insert(out, piece.meshId)
+				end
+			end
+		end
+	end
+	return out
+end
 
 return BacklogModels

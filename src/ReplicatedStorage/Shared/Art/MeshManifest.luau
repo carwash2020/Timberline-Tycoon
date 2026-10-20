@@ -156,6 +156,9 @@ function MeshManifest.Groups(town: boolean?): { Group }
 		for _, id in ipairs(BacklogModels.MeshIds(BacklogModels.Wired)) do
 			table.insert(out, { id = id, hull = false })
 		end
+		for _, id in ipairs(BacklogModels.CollisionIds(BacklogModels.Collided)) do
+			table.insert(out, { id = id, hull = true })
+		end
 	end)
 	add("worn", function(out)
 		for _, id in ipairs(WornModels.MeshIds()) do

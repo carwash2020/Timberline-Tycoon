@@ -533,7 +533,9 @@ return function(t)
 			-- RobuxCoins, Parcel; 13 Oct upload). +14: the worn gear (WornModels, group "worn": coat,
 			-- sleeve, boots, cloak, hardhat, belt, ladder tiles, scroll V2; 16 Oct upload). +12:
 			-- Cherry and Willow (TreeModels: 3 sections and 3 crowns each; WORLD-T323).
-			t.eq(#MeshManifest.Flat(false), 722, "722 ids start loading in the background; none is awaited")
+			-- +10: the Sky Forge Court (5 visual pieces and its collision hull) and the Starfall
+			-- Forge (3 and its hull), dressed by BuildingArt (T381).
+			t.eq(#MeshManifest.Flat(false), 732, "732 ids start loading in the background; none is awaited")
 		end
 	)
 end
