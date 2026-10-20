@@ -50,8 +50,8 @@ ItemModel.ModelBudget = {
 	Gear = 8,
 	Cosmetic = 8,
 	Robux = 4,
-	Truck = 32,
-	Trailer = 28,
+	Truck = 27, -- 42 (BoxLogic.BoxPartCap) less the 15 shell parts; was 32 before the rim and price tag
+	Trailer = 27,
 	Generic = 6,
 } :: { [string]: number }
 
@@ -65,7 +65,8 @@ export type Display = {
 	itemId: string,
 	parts: { BasePart }, -- the display copy, in a frame centred on the extent's middle
 	extent: Vector3, -- the displayed item's bounding box (display orientation, real size)
-	shown: Vector3, -- the bounding box of the parts that are kept (never bigger than extent)
+	shown: Vector3, -- the bounding box of the parts that are kept (never bigger than built)
+	built: Vector3, -- the bounding box of every visible part of the built model, before the budget
 	total: number, -- visible parts of the built model, before the budget
 	generic: boolean, -- no model of its own: a generic icon stands in
 	slot: StoreModelSlots.Slot?, -- the item's model slot (StoreModelSlots), or the Parcel's when it has no model
@@ -219,12 +220,13 @@ local function buildRaw(kind: string, itemId: string): (Model?, CFrame, boolean)
 			return AxeArt.Build(def), AXE_TURN, false
 		end
 	elseif kind == "Sawmill" or kind == "Machine" then
-		-- The chop saw's display is cropped part by part, so it is the part build
-		-- (the Blender mesh is the whole 56 stud deck).
+		-- A display is always the part build. The chop saw's is cropped part by part
+		-- (the Blender mesh is the whole 56 stud deck), and a machine whose mesh covers
+		-- its frame would hide it and leave the budget to pick loose bars (the Switch
+		-- Belt, the Wood Detector). The meshes are the box's own contents instead
+		-- (StoreModelSlots.ForMachine, BoxArt), the part build stands in until they load.
 		local plain = itemId == "ChopSaw"
-		if plain then
-			MachineSkin.Disabled = true
-		end
+		MachineSkin.Disabled = true
 		local model = MachineArt.BuildAny(itemId)
 		MachineSkin.Disabled = false
 		if model then
@@ -392,6 +394,9 @@ local function make(kind: string, itemId: string): Display
 	-- parcel stands in) gets the Parcel's slot.
 	local slot = StoreModelSlots.ForItem(itemId, kind)
 	local fallback = false
+	if slot == nil and kind == "Machine" then
+		slot = StoreModelSlots.ForMachine(itemId)
+	end
 	if slot == nil and generic then
 		slot = StoreModelSlots.Resolve(itemId, kind)
 		fallback = true
@@ -410,6 +415,7 @@ local function make(kind: string, itemId: string): Display
 		parts = parts,
 		extent = extent,
 		shown = shown,
+		built = high - low,
 		total = total,
 		generic = generic,
 		slot = slot,
@@ -418,8 +424,30 @@ local function make(kind: string, itemId: string): Display
 end
 
 local cache: { [string]: Display } = {}
+local unsound: { [string]: number } = {}
 
--- The display copy of an item (built once, then cached).
+-- A display copy that shows too little of the item: under 3 parts, or under half of the
+-- built model's footprint on an axis (the budget kept loose bars while the frame was
+-- hidden, or a build went wrong).
+ItemModel.MinParts = 3
+ItemModel.MinShare = 0.5
+-- A bad copy is rebuilt (not cached) this many times before it is believed: an item that
+-- really is two parts, or flat, stops being rebuilt on every call.
+ItemModel.RebuildLimit = 3
+
+function ItemModel.Sound(display: Display): boolean
+	if #display.parts < math.min(ItemModel.MinParts, display.total) or #display.parts < 1 then
+		return false
+	end
+	local share = ItemModel.MinShare
+	return display.shown.X >= display.built.X * share
+		and display.shown.Y >= display.built.Y * share
+		and display.shown.Z >= display.built.Z * share
+end
+
+-- The display copy of an item (built once, then cached). A copy that is not sound is
+-- never cached for good on the first tries (see RebuildLimit), so a build that came out
+-- wrong once is not stuck in every box.
 function ItemModel.Get(kind: string, itemId: string): Display
 	local key = kind .. ":" .. itemId
 	local hit = cache[key]
@@ -427,6 +455,13 @@ function ItemModel.Get(kind: string, itemId: string): Display
 		return hit
 	end
 	local built = make(kind, itemId)
+	if not ItemModel.Sound(built) then
+		local misses = (unsound[key] or 0) + 1
+		unsound[key] = misses
+		if misses < ItemModel.RebuildLimit then
+			return built
+		end
+	end
 	cache[key] = built
 	return built
 end
