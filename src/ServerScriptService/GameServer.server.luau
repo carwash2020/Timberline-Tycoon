@@ -1092,6 +1092,8 @@ BootReport.StartStubs({
 		init = function()
 			if BoxService.Init then
 				BoxService.Init(remote.BoxOpen)
+				-- A Robux shelf box stays claimed while Roblox's prompt is open.
+				MonetizationService.OnPromptFinished = BoxService.RobuxFinished
 				-- Opening a sawmill, planer or belt box starts the one-time placement ghost.
 				BoxService.OnPlace = function(player: Player, uid: string, itemId: string)
 					remote.WorldFX:FireClient(player, "PlaceBox", { uid = uid, itemId = itemId })

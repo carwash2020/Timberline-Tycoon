@@ -68,6 +68,7 @@ function GrabService.PlayerById(userId: number): Player?
 	return Players:GetPlayerByUserId(userId)
 end
 GrabService.HitMargin = 2 -- studs: a grab may land this far off its part (the piece moved meanwhile)
+GrabService.JudgeGraceSec = 0.5 -- a new hold is not judged for speed this long
 GrabService.PutBackHoldSec = 1 -- a piece put back stays the server's this long
 GrabService.JudgeMoves = true -- false: WoodService's WoodWatch judges moves instead
 
@@ -140,6 +141,7 @@ type Hold = {
 	groups: { [BasePart]: string }, -- each part's collision group before the grab
 	lastGood: CFrame, -- the root where it was last accepted (Watch)
 	lastGoodAt: number,
+	grabbedAt: number, -- the clock at the grab: Watch does not judge speed until JudgeGraceSec later
 }
 
 -- A piece let go of but still simulated by its dropper's device (judged,
@@ -507,6 +509,7 @@ function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (bool
 		groups = joinHeld(model),
 		lastGood = root.CFrame,
 		lastGoodAt = now,
+		grabbedAt = now,
 	}
 	holds[player] = h
 	holdOf[model] = h
@@ -569,8 +572,19 @@ function GrabService.Watch(now: number)
 			continue
 		end
 		local cf = h.root.CFrame
-		local verdict: VehicleLogic.MoveVerdict = if GrabService.JudgeMoves
-			then VehicleLogic.JudgeMove(h.lastGood.Position, cf.Position, now - h.lastGoodAt, maxSpeed)
+		-- A lagging device is still pulling the piece from where it lay to the
+		-- hand in the first moments: its jump is not judged (the piece would
+		-- be put back on the shelf it was taken from). The far check below
+		-- still applies.
+		local settling = now - h.grabbedAt < GrabService.JudgeGraceSec
+		local verdict: VehicleLogic.MoveVerdict = if settling
+			then (if finiteVector(cf.Position) then "ok" else "tooFar")
+			elseif GrabService.JudgeMoves then VehicleLogic.JudgeMove(
+				h.lastGood.Position,
+				cf.Position,
+				now - h.lastGoodAt,
+				maxSpeed
+			)
 			else "ok"
 		if verdict == "tooFar" then
 			local lastGood = h.lastGood
