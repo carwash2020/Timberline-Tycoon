@@ -99,7 +99,7 @@ return function(t)
 	end)
 
 	t.test("the box part cap, the pay tap and the lid faces", function()
-		t.eq(BoxLogic.ShellPartCap, 9)
+		t.eq(BoxLogic.ShellPartCap, 15)
 		t.eq(BoxLogic.BoxPartCap, 42)
 		t.ok(BoxLogic.PayTapPx >= 44)
 		local faces = BoxLogic.LargestFaces(Vector3.new(2, 1.2, 1.6))

@@ -18,11 +18,12 @@ BoxLogic.MaxUnpaidPerPlayer = 3 -- the 4th take is refused
 BoxLogic.MaxUnpaidPerServer = 30 -- the 31st take is refused
 BoxLogic.PutBackRadius = 3.5 -- studs: an unpaid box let go this close (across) to its shelf spot goes back on it
 BoxLogic.PutBackHeight = 3 -- studs: and no higher or lower than this from it
--- The parts of a box (Art/BoxArt): ShellPartCap for the dark body, its windows and
--- its name strip, plus the display copy of the item (ItemModel.ModelBudget by
+-- The parts of a box (Art/BoxArt): ShellPartCap for the dark body, its windows, its
+-- name strip, the price tag plate and the rim (at most 6 more than the 9 of the
+-- plain shell: PriceTag, four Rim bars, the aisle pane's SideEdge), plus the display copy of the item (ItemModel.ModelBudget by
 -- kind). BoxPartCap is the most a whole box may have, so one in the hand stays
 -- light on a phone; the specs check every box against it.
-BoxLogic.ShellPartCap = 9
+BoxLogic.ShellPartCap = 15
 BoxLogic.BoxPartCap = 42
 BoxLogic.PayTapPx = 44
 BoxLogic.DespawnHz = 2
