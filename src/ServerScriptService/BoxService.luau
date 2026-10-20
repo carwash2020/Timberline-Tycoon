@@ -520,6 +520,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		color = itemColor,
 		gold = robux ~= nil,
 		robuxKey = if robux ~= nil then robux.key else nil,
+		price = if robux ~= nil then nil else price, -- the price this box sells for (the same number the sale charges)
 		side = if relX ~= nil then BoxArt.AisleSide(relX) else nil,
 		wood = rec.shop == "HearthAndHome"
 			or rec.shop == "Sparkworks"
@@ -527,8 +528,8 @@ function BoxService.Make(opts: MakeOptions): Record
 			or (rec.shop == "ToolShed" and robux == nil), -- the General Store's, the Sparkworks' and the Tool Shed's boxes stand flush on wood tables (the gold Robux boxes keep their own look), the showroom's on its wood-bordered mats
 		cardColor = if rec.shop == "Sparkworks" then BoxArt.WoodTealCard else nil,
 	})
-	-- The price shows in a tag when a player aims at the box (Shared/HoverTag),
-	-- never printed on it. A Robux box carries Roblox's R$ text instead.
+	-- The price is also printed on the box's plate (BoxArt) and shows in the tag when
+	-- a player aims at the box (Shared/HoverTag). A Robux box carries Roblox's R$ text instead.
 	HoverTag.Mark(model, {
 		key = "Box:" .. uid,
 		name = rec.displayName,

@@ -5,7 +5,7 @@
 -- price card (and a lock card for a gated axe) per box and a warm spot over each
 -- table, a header over each unit, warm beams and lanterns, CHECKOUT on the counter,
 -- the axe rack on the back wall, wall pegboards, shelves and framed pictures, a rug,
--- plants and a stock corner, and the event room (ShopEventKit): a roped zone in the
+-- plants, the back-room door and a stock corner behind the counter, and the event room (ShopEventKit): a roped zone in the
 -- back east corner and a blank banner at the aisle's west edge by the door.
 -- The recipe for the other stores is in STATUS.md (Store interiors).
 
@@ -25,6 +25,7 @@ local MAT = Enum.Material
 local hex = Kit.hex
 local dBox = ShopKit.dBox
 local counterDetail = ShopKit.counterDetail
+local backDoor = ShopKit.backDoor
 local plankFloor = ShopKit.plankFloor
 local floorBorder = ShopKit.floorBorder
 local runner = ShopKit.runner
@@ -202,6 +203,25 @@ ToolShed.Sections = {
 	},
 } :: { ShopKit.Section }
 
+-- A barrel in the stock corner: the real mesh (Barrel), with a part-built stand-in that is dropped when the mesh has
+-- loaded (ShopKit.MeshProp: fallback first, swap later, never a yielding load).
+local function stockBarrel(model: Model, x: number, y: number, z: number, yaw: number)
+	local fallback = Instance.new("Model")
+	fallback.Name = "BarrelFallback"
+	local at = CF(x, y, z) * CFrame.Angles(0, yaw, 0)
+	dBox(fallback, "Barrel", V3(1.6, 2.2, 1.6), at * CF(0, 1.1, 0), TABLE)
+	dBox(fallback, "BarrelHoop", V3(1.7, 0.16, 1.7), at * CF(0, 1.1, 0), ShopKit.Table.iron)
+	fallback.Parent = model
+	ShopKit.MeshProp(model, "Barrel", at, fallback)
+end
+
+-- A small stock crate, part-built only: the Crate mesh is 2.4 x 2.45 and does not fit the lane the stock stands in.
+local function stockCrate(model: Model, x: number, y: number, z: number, side: number, yaw: number)
+	local at = CF(x, y, z) * CFrame.Angles(0, yaw, 0)
+	dBox(model, "Crate", V3(side, side, side), at * CF(0, side / 2, 0), TABLE_TOP)
+	dBox(model, "CrateBand", V3(side + 0.06, 0.16, side + 0.06), at * CF(0, side / 2, 0), TIMBER)
+end
+
 -- The side walls' inner face stands this far past frame.halfW (the shell's 0.9 walls are built 0.6 apart from it).
 local WALL_IN = 0.15
 local BLUEPRINT = hex("#9CC3D8")
@@ -320,6 +340,10 @@ function ToolShed.Build(model: Model, frame: Frame)
 		counterTop.Size = V3(10.0, counterTop.Size.Y, counterTop.Size.Z)
 	end
 
+	-- (the back-room door stands on the west wall behind the gold table's west end, where it stood before the nine-box
+	-- table: the event room takes the east back corner)
+	backDoor(model, frame, -frame.halfW, 19, false, -1)
+
 	-- Floor: warm boards with darker planks, a border, and the aisle runner.
 	plankFloor(model, frame, hex("#B07F4F"), { hex("#94683F"), hex("#C69660"), hex("#85603C") }, 2.6, rng)
 	floorBorder(model, frame, 0.7, hex("#5A3E26"), MAT.Wood)
@@ -363,6 +387,14 @@ function ToolShed.Build(model: Model, frame: Frame)
 
 	local fy = frame.floorTop
 	ToolShed.Dressing(model, frame)
+
+	-- The stock corner stands in the keeper's lane behind the counter (the gold table took the old corner by the west
+	-- wall): z 15.0 to 16.7 is clear between the counter's back face and the gold table's sign, x 2.1 to 5.2 east and
+	-- -5.2 to -2.1 west of the keeper's mat. A barrel and a small crate each side; the player cannot walk there.
+	for _, side in ipairs({ -1, 1 }) do
+		stockBarrel(model, side * 3.0, fy, 15.85, 0)
+		stockCrate(model, side * 4.55, fy, 15.85, 1.2, 0)
+	end
 
 	-- The event expansion room (EVENTS.md, ShopEventKit). The tables fill both sides of the shop, so there is no 14 x 8
 	-- clear floor: the roped zone takes the back east corner (the machine table ends at z 12.5, the counter at x 5, the
