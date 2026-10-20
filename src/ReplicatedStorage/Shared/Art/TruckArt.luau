@@ -1684,6 +1684,22 @@ function TruckArt.Build(
 	return model
 end
 
+-- A trailer on its own, hitch end toward -Z, for a showroom bay: the same drawing, the same
+-- finish and the same meshes as the trailer a bought truck tows (Build), made for `towTruck`'s
+-- width (the lot shows every trailer behind the Pickup). At the origin, as built: the caller moves
+-- it after the meshes are on. Returns the model and its layout.
+function TruckArt.BuildTrailer(def: TrailerDef, towTruck: TruckDef): (Model, TrailerLayout)
+	local lay = TruckLayout.ForTrailer(def, TruckLayout.For(towTruck))
+	local model = Instance.new("Model")
+	model.Name = def.id
+	TruckArt.AddTrailer(model, def, lay)
+	sanitize(model)
+	parkTrailer(model)
+	organize(model)
+	VehicleMeshes.ApplyTrailer(model, def.id, towTruck.id)
+	return model, lay
+end
+
 -- Only these materials. Neon stays on light lenses; everything else that
 -- isn't glass or metal becomes SmoothPlastic. No textures, decals or meshes.
 local LIGHT_FACE = { Headlight = true, Taillight = true, Marker = true, Beacon = true }

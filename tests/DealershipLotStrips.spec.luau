@@ -1,13 +1,14 @@
 --!nocheck
--- The coloured tier strips on the dealership lot's plinths (one per plinth, the
--- colour of its T-flag) are paint, not loose slabs: thin, lying flush on the
+-- The coloured strips on the dealership lot's plinths (one per plinth, the
+-- vehicle's own paint; a vehicle has no tier flag) are paint, not loose slabs: thin, lying flush on the
 -- plinth's top, inside its footprint with its ends on the plinth's corners,
--- never colliding or casting a shadow, one tier colour per plinth. The aisle
+-- never colliding or casting a shadow, one colour per plinth. The aisle
 -- band is the same skin laid against the aisle face. Built through the real
 -- DealershipLot.Build for every plinth on the lot.
 return function(t)
 	local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
 	local StoreTier = t.shared("StoreTier")
+	local ItemCatalog = t.shared("ItemCatalog")
 
 	local EPS = 1e-3
 
@@ -139,41 +140,34 @@ return function(t)
 		end
 	)
 
-	t.test("one tier colour per plinth: stripe, band and T-flag all wear the tier's colour", function()
-		local plinths, stripes, bands = plinthsAndPaint()
-		local lot = DealershipLot.Build()
-		local flags = {}
-		for _, d in ipairs(lot:GetChildren()) do
-			if d.Name == "TierFlag" then
-				table.insert(flags, d)
+	t.test(
+		"one colour per plinth: stripe and band wear the vehicle's own paint, and no tier flag stands (T391)",
+		function()
+			local plinths, stripes, bands = plinthsAndPaint()
+			local lot = DealershipLot.Build()
+			for _, d in ipairs(lot:GetDescendants()) do
+				t.ok(
+					d.Name ~= "TierFlag" and d.Name ~= "TierPost" and d.Name ~= "TierBacking",
+					"a vehicle has no tier sign: " .. d.Name
+				)
+				t.eq(d:GetAttribute("StandTier"), nil, d.Name .. " has no StandTier")
+			end
+			t.eq(StoreTier.Of("Truck", "Rustbucket"), nil, "no tier for a truck")
+			for _, bay in ipairs(DealershipLot.Layout().bays) do
+				local def = if bay.kind == "Truck" then ItemCatalog.GetTruck(bay.id) else ItemCatalog.GetTrailer(bay.id)
+				local want = t.roblox.Color3.fromHex(def.look.color)
+				local plinth
+				for _, p in ipairs(plinths) do
+					if p:GetAttribute("ItemId") == bay.id then
+						plinth = p
+					end
+				end
+				t.ok(plinth, bay.id .. " has a plinth")
+				t.eq(belonging(stripes, plinth).Color, want, bay.id .. " stripe colour")
+				t.eq(belonging(bands, plinth).Color, want, bay.id .. " band colour")
 			end
 		end
-		t.eq(#flags, #plinths, "a flag per plinth")
-		for _, bay in ipairs(DealershipLot.Layout().bays) do
-			local tier = StoreTier.Of(bay.kind, bay.id)
-			t.ok(tier ~= nil, bay.id .. " has a tier")
-			local want = StoreTier.Color(tier)
-			local plinth
-			for _, p in ipairs(plinths) do
-				if p:GetAttribute("ItemId") == bay.id then
-					plinth = p
-				end
-			end
-			t.ok(plinth, bay.id .. " has a plinth")
-			t.eq(belonging(stripes, plinth).Color, want, bay.id .. " stripe colour")
-			t.eq(belonging(bands, plinth).Color, want, bay.id .. " band colour")
-			local flag
-			for _, f in ipairs(flags) do
-				local fx0, fx1, _, _, fz0, fz1 = aabb(f)
-				local px0, px1, _, _, pz0, pz1 = footprint(plinth)
-				if inside(fx0, fx1, px0, px1) and inside(fz0, fz1, pz0, pz1) then
-					flag = f
-				end
-			end
-			t.ok(flag, bay.id .. " has its flag")
-			t.eq(flag.Color, want, bay.id .. " flag colour")
-		end
-	end)
+	)
 
 	t.test("a skin never meets another plinth: no stripe or band reaches a neighbouring plinth's footprint", function()
 		local plinths, stripes, bands = plinthsAndPaint()

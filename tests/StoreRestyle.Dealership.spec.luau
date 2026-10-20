@@ -5,7 +5,7 @@
 --   * wooden display tables (the kit's DisplayTable), wall shelving, framed pictures, rugs and plants, all inside the
 --     walls, flush, and clear of every vehicle, plinth and the doorway aisle;
 --   * the box's mat is a flush painted inlay in a wood border, never a loose slab on the plinth;
---   * slimmer plinth signs and smaller tier flags, the flag still in its plinth's tier colour;
+--   * slimmer plinth signs (no tier flag on a vehicle: T391);
 --   * the event room (ShopEventKit): a roped zone with three tables and a blank banner, off the doorway aisle, clear of
 --     every vehicle, grounded and inside the room, hidden by default, nothing on sale;
 --   * the part caps.
@@ -342,41 +342,23 @@ return function(t)
 		end
 	end)
 
-	t.test(
-		"the plinth signs are slim and the tier flags small, and each flag keeps its plinth's tier colour",
-		function()
-			for _, sign in ipairs(named(lot, "NameSign")) do
-				t.ok(sign.Size.Z <= 0.2, "a slim board: " .. sign.Size.Z)
-				t.ok(sign.Size.Y <= 2.0, "and not tall: " .. sign.Size.Y)
-				t.ok(sign.Size.X <= 5.2, "and not wide: " .. sign.Size.X)
-				local _, _, y0 = aabb(sign)
-				t.ok(y0 <= 0.01, "it stands on the floor, against its plinth")
-			end
-			local flags = named(lot, "TierFlag")
-			t.eq(#flags, #ItemBox.Showroom, "a flag per plinth, none stray")
-			for _, flag in ipairs(flags) do
-				t.ok(flag.Size.X <= 3.0 and flag.Size.Y <= 1.7, "a small flag")
-				local tier = flag:GetAttribute("StandTier")
-				t.ok(tier ~= nil, "it has a tier")
-				t.eq(flag.Color, StoreTier.Color(tier), "its colour is its tier's")
-			end
-			-- each plinth's band and stripe are in the colour of the flag over it
-			for _, bay in ipairs(DealershipLot.Layout().bays) do
-				local tier = StoreTier.Of(bay.kind, bay.id)
-				if tier then
-					for _, name in ipairs({ "PlinthBand", "PlinthStripe" }) do
-						local found = 0
-						for _, p in ipairs(named(lot, name)) do
-							if p:GetAttribute("StandTier") == tier and p.Color == StoreTier.Color(tier) then
-								found += 1
-							end
-						end
-						t.ok(found >= 1, name .. " in the tier colour of " .. bay.id)
-					end
-				end
+	t.test("the plinth signs are slim, and no vehicle has a tier flag or a tier stripe (T391)", function()
+		for _, sign in ipairs(named(lot, "NameSign")) do
+			t.ok(sign.Size.Z <= 0.2, "a slim board: " .. sign.Size.Z)
+			t.ok(sign.Size.Y <= 2.0, "and not tall: " .. sign.Size.Y)
+			t.ok(sign.Size.X <= 5.2, "and not wide: " .. sign.Size.X)
+			local _, _, y0 = aabb(sign)
+			t.ok(y0 <= 0.01, "it stands on the floor, against its plinth")
+		end
+		for _, name in ipairs({ "TierFlag", "TierPost", "TierBacking", "LockChip" }) do
+			t.eq(#named(lot, name), 0, "no " .. name .. " on a vehicle")
+		end
+		for _, name in ipairs({ "PlinthBand", "PlinthStripe" }) do
+			for _, p in ipairs(named(lot, name)) do
+				t.eq(p:GetAttribute("StandTier"), nil, name .. " has no tier")
 			end
 		end
-	)
+	end)
 
 	t.test("CHECKOUT stands on the counter, on two posts, with no plaque and no hung board", function()
 		local signs = named(shop, "CheckoutSign")

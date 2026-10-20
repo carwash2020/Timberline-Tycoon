@@ -20,6 +20,8 @@ local ShopKit = require(script.Parent.Parent.ShopKit)
 local Kit = require(script.Parent.Parent.Kit)
 local DealershipLot = require(script.Parent.Parent.DealershipLot)
 local ShopEventKit = require(script.Parent.Parent.ShopEventKit)
+local Palette = require(script.Parent.Parent.Palette)
+local StoreEventData = require(script.Parent.Parent.Parent.StoreEventData)
 
 type Frame = ShopKit.Frame
 local V3, CF = Vector3.new, CFrame.new
@@ -225,11 +227,72 @@ local function woodTable(
 	})
 end
 
+-- The "Coming soon" card on its easel, standing on a table top in the zone's frame: a cream board
+-- (about 2 x 1.2 studs) in a brass frame, leaning back 15 degrees on a small easel, the words in
+-- FredokaOne sign ink. Looks only (no collide, query, touch or shadow), no prompt, no price. Its
+-- parts carry EventRole "card": ShopEventKit.SetTablesShown hides them while an event is on.
+Dealership.CardSize = V3(2, 1.2, 0.08)
+Dealership.CardTilt = math.rad(15)
+Dealership.CardText = "Coming soon"
+
+local function comingSoonCard(parent: Instance, name: string, x: number, topY: number, z: number)
+	local size, tilt = Dealership.CardSize, Dealership.CardTilt
+	local function add(part: Part): Part
+		Kit.decor(part, false)
+		part:SetAttribute(ShopEventKit.RoleAttribute, "card")
+		return part
+	end
+	-- the card stands on the table, tilted back about its own bottom edge
+	local pivot = CF(x, topY + 0.15, z - 0.25) * CFrame.Angles(tilt, 0, 0)
+	local up = CF(0, size.Y / 2, 0)
+	add(
+		Kit.part(
+			parent,
+			name .. "Frame",
+			V3(size.X + 0.24, size.Y + 0.24, 0.06),
+			pivot * up * CF(0, 0, 0.05),
+			Palette.Brass,
+			MAT.Metal
+		)
+	)
+	local board = add(Kit.part(parent, name .. "Board", size, pivot * up, Palette.SignCream, MAT.SmoothPlastic))
+	-- (the easel's one back leg, leaning the other way, holds the card up)
+	add(
+		Kit.part(
+			parent,
+			name .. "Leg",
+			V3(0.12, 1.4, 0.12),
+			CF(x, topY + 0.7, z + 0.2) * CFrame.Angles(math.rad(-20), 0, 0),
+			TIMBER,
+			MAT.Wood
+		)
+	)
+	Kit.signText(board, Dealership.CardText, Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+end
+
+-- What a table holds while an event is on: a parcel (the generic stand-in the store item
+-- models fall back to, StoreModelSlots' Parcel) until an approved item has a model of its own.
+-- Built hidden; ShopEventKit.SetTablesShown shows it. Parts carry EventRole "held".
+local function heldParcel(parent: Instance, name: string, x: number, topY: number, z: number, paint: Color3)
+	local model = Kit.model(name, parent)
+	local function add(part: Part)
+		Kit.decor(part, false)
+		part:SetAttribute(ShopEventKit.RoleAttribute, "held")
+		part.Transparency = 1
+		return part
+	end
+	add(Kit.part(model, name .. "Box", V3(1.3, 0.9, 1.1), CF(x, topY + 0.45, z), paint, MAT.SmoothPlastic))
+	return model
+end
+
 -- The event room's three tables, on the zone's pads (ShopEventKit's markers): the Hearth & Home's wood table kit
 -- (a plank top, a dark apron, a cream trim, four legs), built in the zone's own frame and turned with it. Looks only:
--- the roped-off room has nothing to walk into.
+-- the roped-off room has nothing to walk into. Each table carries the "Coming soon" card on an easel and, hidden, the
+-- parcel it holds once an event is on (the card and the parcel stand in the shop beside the zone's tables; ShopEventKit.SetZoneActive switches them).
 local function eventTables(model: Model, zone: Model, anchor: CFrame)
 	local tmp = Instance.new("Model")
+	local inZone = Instance.new("Model")
+	local topY = 2.3
 	for i, marker in ipairs(ShopEventKit.TableMarkers(zone)) do
 		local at = anchor:PointToObjectSpace(marker.CFrame.Position)
 		ShopKit.DisplayTable(tmp, {
@@ -238,22 +301,30 @@ local function eventTables(model: Model, zone: Model, anchor: CFrame)
 			cz = at.Z,
 			width = marker.Size.X - 0.2,
 			depth = marker.Size.Z - 0.3,
-			topY = 2.3,
+			topY = topY,
 			apronH = 0.35,
 			legs = 4,
 			floorY = 0.14,
 			solid = false,
 		})
+		comingSoonCard(inZone, "EventCard" .. i, at.X, topY, at.Z)
+		heldParcel(inZone, "EventHeld" .. i, at.X, topY, at.Z, MODEL_PAINT[1 + (i - 1) % #MODEL_PAINT])
 	end
-	for _, d in ipairs(tmp:GetDescendants()) do
-		if d:IsA("BasePart") then
-			d.CFrame = anchor * d.CFrame
+	for _, holder in ipairs({ tmp, inZone }) do
+		for _, d in ipairs(holder:GetDescendants()) do
+			if d:IsA("BasePart") then
+				d.CFrame = anchor * d.CFrame
+			end
 		end
 	end
 	for _, child in ipairs(tmp:GetChildren()) do
 		child.Parent = model
 	end
+	for _, child in ipairs(inZone:GetChildren()) do
+		child.Parent = model
+	end
 	tmp:Destroy()
+	inZone:Destroy()
 end
 
 function Dealership.Build(model: Model, frame: Frame, west: number, east: number, zf: number, zb: number, bays: { Bay })
@@ -478,6 +549,9 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 	local zoneAnchor = CF(west + 4.6, fy, zf + 21.7) * CFrame.Angles(0, -math.pi / 2, 0)
 	local zone = ShopEventKit.BuildZone(model, "Dealership", zoneAnchor, V3(16, 0, 9))
 	eventTables(model, zone, zoneAnchor)
+	-- The cards show until an event is on (StoreEventData.Events holds one for this store); the server
+	-- switches them with the room (ShopEventKit.SetZoneActive).
+	ShopEventKit.SetTablesShown(zone, ShopEventKit.HoldsEvent(StoreEventData.Events, "Dealership"))
 	ShopEventKit.BuildBanner(model, "Dealership", CF(west + 18.4, fy, zf + 3) * CFrame.Angles(0, math.pi, 0), 4.4)
 	counterDetail(model, frame)
 	backDoor(model, frame, west + 5.7, zb, true, 0)

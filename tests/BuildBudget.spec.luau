@@ -348,8 +348,15 @@ return function(t)
 		-- CreateAwait yields. Only ItemMeshes.LoadAsync (PlotService.Init spawns it
 		-- on its own thread) may call it.
 		t.eq(filesWith("CreateAwait(", true), { MESHKIT, "src/ReplicatedStorage/Shared/ItemMeshes.luau" })
-		-- The blocking join. MeshKit.PreloadAsync is the start path's call.
-		t.eq(filesWith("MeshKit.Preload(", true), { MESHKIT, "src/ReplicatedStorage/Shared/ItemMeshes.luau" })
+		-- The blocking join. MeshKit.PreloadAsync is the start path's call. DealershipLot.Preload
+		-- is the other: the lot is a deferred queue step on its own thread (MapBuilder defers it),
+		-- and it joins the vehicle meshes so a display truck is meshed before it is fitted and
+		-- prepped (T390; a late swap onto a fitted copy would float).
+		t.eq(filesWith("MeshKit.Preload(", true), {
+			"src/ReplicatedStorage/Shared/Art/DealershipLot.luau",
+			MESHKIT,
+			"src/ReplicatedStorage/Shared/ItemMeshes.luau",
+		})
 		local itemMeshes = sources["src/ReplicatedStorage/Shared/ItemMeshes.luau"]
 		t.ok(string.find(itemMeshes, "function ItemMeshes.LoadAsync", 1, true))
 		t.eq(

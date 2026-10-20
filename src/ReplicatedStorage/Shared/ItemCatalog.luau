@@ -70,6 +70,7 @@ export type TruckDef = {
 	robux: boolean?, -- a game pass, not sold for cash
 	sold: boolean?, -- false = never on the cash buying path
 	classic: boolean?, -- Timber Classic: gauge and the owner's name on the doors
+	upgradeOf: string?, -- the truck this one upgrades (StoreTier.UpgradeOf checks it); nil on every real truck
 }
 
 -- Hitched behind a truck at the Dealership; adds bed space. `look` is its
@@ -82,6 +83,7 @@ export type TrailerDef = {
 	extraCapacity: number,
 	priceCash: number,
 	look: { color: string, bedLength: number },
+	upgradeOf: string?, -- the trailer this one upgrades (StoreTier.UpgradeOf checks it); nil on every real trailer
 }
 
 export type BoatDef = {
