@@ -795,8 +795,6 @@ function CutController.GuideAt(kind: string, cf: CFrame, size: Vector3, hit: Vec
 end
 
 local guide: Part? = nil
-local guideLabel: TextLabel? = nil
-local guideGui: BillboardGui? = nil
 
 local function makeGuide(): Part
 	local p = Instance.new("Part")
@@ -808,27 +806,6 @@ local function makeGuide(): Part
 	p.CastShadow = false
 	p.Transparency = CutController.GuideTransparency
 	p.Size = Vector3.new(1, CutController.GuideThickness, 1)
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "CutGuideTag"
-	gui.Size = UDim2.fromOffset(190, 44)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, 1.2, 0)
-	gui.AlwaysOnTop = true
-	gui.LightInfluence = 0
-	gui.MaxDistance = 40
-	gui.Adornee = p
-	gui.Parent = p
-	guideGui = gui
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 16
-	label.TextColor3 = READY_COLOR
-	label.TextStrokeTransparency = 0.3
-	label.TextWrapped = true
-	label.Text = ""
-	label.Parent = gui
-	guideLabel = label
 	return p
 end
 
@@ -839,9 +816,8 @@ local function hideGuide()
 	end
 end
 
--- Shows the guide for `target` (or hides it). The label (felled logs only)
--- is hidden on a touch screen, where nothing may sit over the chop target.
-local function showGuide(target: Target?, def: WoodData.WoodDef?, touch: boolean)
+-- Shows the guide for `target` (or hides it).
+local function showGuide(target: Target?, def: WoodData.WoodDef?)
 	if not target or target.kind == "node" or not def then
 		hideGuide()
 		return
@@ -849,28 +825,13 @@ local function showGuide(target: Target?, def: WoodData.WoodDef?, touch: boolean
 	local g = guide or makeGuide()
 	guide = g
 	local part = target.part
-	local at, h = CutController.GuideAt(target.kind, part.CFrame, part.Size, target.hit)
+	local at = CutController.GuideAt(target.kind, part.CFrame, part.Size, target.hit)
 	local color, material = TreeArt.FaceLook(def)
 	local width = math.max(part.Size.X, part.Size.Z) + 0.2
 	g.Size = Vector3.new(width, CutController.GuideThickness, width)
 	g.Color = color
 	g.Material = material
 	g.CFrame = at
-	local label = guideLabel
-	if label then
-		local text = ""
-		if target.kind == "wood" and not touch then
-			local volume, value = target.model:GetAttribute("Volume"), target.model:GetAttribute("Value")
-			if type(volume) == "number" and type(value) == "number" then
-				local low, high = ChopFeelLogic.SplitVolumes(part.Size.X, part.Size.Y, part.Size.Z, h)
-				text = ChopFeelLogic.SideText(low, volume, value) .. "\n" .. ChopFeelLogic.SideText(high, volume, value)
-			end
-		end
-		label.Text = text
-		if guideGui then
-			guideGui.Enabled = text ~= ""
-		end
-	end
 	g.Parent = workspace
 end
 
@@ -898,7 +859,7 @@ local function updateOutline()
 	end
 	HUD.SetPointing(onWood, tooHard, thick)
 	local aimedWood = if aimed and type(aimed.woodId) == "string" then WoodData.Get(aimed.woodId) else nil
-	showGuide(aimed, aimedWood, pointerKind(UserInputService:GetLastInputType().Name) == "touch")
+	showGuide(aimed, aimedWood)
 	if adornee then
 		hl.Adornee = adornee
 		hl.OutlineColor = color

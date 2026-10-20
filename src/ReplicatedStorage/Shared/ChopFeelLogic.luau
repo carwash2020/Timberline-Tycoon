@@ -8,9 +8,6 @@
 --   * ThunkPitch rises about 20 percent from first to last hit.
 --   * The creak and canopy sway latch once per section per cut at CreakAt.
 --   * Landing shake caps per device; haptic strengths; the aim cone.
---   * Cut-line labels: what each side of a felled log is about worth.
-
-local SectionLogic = require(script.Parent.SectionLogic)
 
 local ChopFeelLogic = {}
 
@@ -204,24 +201,6 @@ function ChopFeelLogic.RejectLine(userId: number, counts: RejectCounts): string
 		counts.gone,
 		counts.bad
 	)
-end
-
----------------------------------------------------------------------------
--- Cut-line label
----------------------------------------------------------------------------
-
--- The volume (u³) of each side of a section sx by sy by sz studs cut `h`
--- studs up from its bottom: (low, high). Together they are the whole.
-function ChopFeelLogic.SplitVolumes(sx: number, sy: number, sz: number, h: number): (number, number)
-	local cut = math.clamp(h, 0, sy)
-	return SectionLogic.Volume(sx, cut, sz), SectionLogic.Volume(sx, sy - cut, sz)
-end
-
--- "about 1.2 u3 · $8" for the label; value is the whole piece's `Value`
--- attribute scaled by this side's share. Ignores a Lux swing's bonus.
-function ChopFeelLogic.SideText(volume: number, totalVolume: number, totalValue: number): string
-	local share = if totalVolume > 1e-9 then math.clamp(volume / totalVolume, 0, 1) else 0
-	return string.format("about %.1f u3, $%d", volume, math.floor(totalValue * share + 0.5))
 end
 
 return ChopFeelLogic

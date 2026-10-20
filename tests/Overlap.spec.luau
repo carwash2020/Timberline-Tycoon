@@ -95,7 +95,7 @@ return function(t)
 		add(WorldPlan.AddedTrees(), "added")
 		local boulders = WorldPlan.Boulders()
 		-- The moved trees: 10 studs (centre to centre) from every other tree, and a trunk
-		-- disc (about 2.5 studs) plus 2 studs from every boulder's own radius (size * 0.86).
+		-- disc (1.8 studs) plus 2 studs from every boulder's own radius (size * 0.86).
 		for _, tag in ipairs({ "reach#5", "region#69", "region#49" }) do
 			local me
 			for _, tr in ipairs(trees) do
@@ -107,13 +107,7 @@ return function(t)
 			for _, other in ipairs(trees) do
 				if other ~= me then
 					local d = math.sqrt((other.x - me.x) ^ 2 + (other.z - me.z) ^ 2)
-					t.ok(
-						d >= 10
-							or string.sub(other.tag, 1, 7) == "region#"
-								and string.sub(tag, 1, 7) == "region#"
-								and false,
-						tag .. " is " .. string.format("%.1f", d) .. " from " .. other.tag
-					)
+					t.ok(d >= 10, tag .. " is " .. string.format("%.1f", d) .. " from " .. other.tag)
 				end
 			end
 			for i, b in ipairs(boulders) do
