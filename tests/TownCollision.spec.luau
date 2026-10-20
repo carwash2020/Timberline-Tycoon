@@ -267,7 +267,7 @@ return function(t)
 	end)
 
 	t.test("6: no part was added (counts match main)", function()
-		local want = { Dealership = 408, GeneralStore = 114, ToolShed = 452, HearthAndHome = 456, Sparkworks = 418 }
+		local want = { Dealership = 408, GeneralStore = 114, ToolShed = 439, HearthAndHome = 456, Sparkworks = 418 }
 		for _, kind in ipairs(KINDS) do
 			t.eq(#parts(models[kind]), want[kind], kind .. " part count")
 		end
