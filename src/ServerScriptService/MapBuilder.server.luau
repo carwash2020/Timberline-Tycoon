@@ -464,6 +464,7 @@ step("4. The town", function()
 		if blade then
 			CollectionService:AddTag(blade, "SawBlade") -- TownFX spins it
 		end
+		CollectionService:AddTag(sawmill, "AmbientRoof") -- AmbientSound: under its roof the night sounds duck
 	end)
 
 	-- The zone is the pad's width and 52 deep round its middle (WorldPlan.
