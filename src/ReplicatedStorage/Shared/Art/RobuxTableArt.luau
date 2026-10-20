@@ -26,6 +26,7 @@ function RobuxTableArt.Build(model: Model, floorTop: number)
 		return
 	end
 	local width = RobuxShelf.RowWidth()
+	local cx = RobuxShelf.CenterX()
 	local cz = RobuxShelf.TableZ
 	local depth = RobuxShelf.TableDepth
 	local top = RobuxShelf.TableTop
@@ -35,7 +36,7 @@ function RobuxTableArt.Build(model: Model, floorTop: number)
 		model,
 		"GoldTable",
 		Vector3.new(width - 0.4, bodyH, depth - 0.4),
-		CFrame.new(0, floorTop + bodyH / 2, cz),
+		CFrame.new(cx, floorTop + bodyH / 2, cz),
 		RobuxTableArt.TimberBrown,
 		Enum.Material.Wood
 	)
@@ -44,7 +45,7 @@ function RobuxTableArt.Build(model: Model, floorTop: number)
 		model,
 		"GoldTableTop",
 		Vector3.new(width, slab, depth),
-		CFrame.new(0, top - slab / 2, cz),
+		CFrame.new(cx, top - slab / 2, cz),
 		RobuxTableArt.TopWood,
 		Enum.Material.WoodPlanks
 	)
@@ -53,7 +54,7 @@ function RobuxTableArt.Build(model: Model, floorTop: number)
 		model,
 		"GoldTableEdge",
 		Vector3.new(width + 0.06, 0.12, depth + 0.06),
-		CFrame.new(0, top - slab - 0.06, cz),
+		CFrame.new(cx, top - slab - 0.06, cz),
 		RobuxTableArt.Brass,
 		Enum.Material.Metal
 	)
@@ -63,7 +64,7 @@ function RobuxTableArt.Build(model: Model, floorTop: number)
 		model,
 		"GoldRiser",
 		Vector3.new(width - 0.2, RobuxShelf.RiserH, riserD),
-		CFrame.new(0, top + RobuxShelf.RiserH / 2, cz + depth / 2 - riserD / 2),
+		CFrame.new(cx, top + RobuxShelf.RiserH / 2, cz + depth / 2 - riserD / 2),
 		RobuxTableArt.TopWood,
 		Enum.Material.WoodPlanks
 	)
@@ -72,7 +73,7 @@ function RobuxTableArt.Build(model: Model, floorTop: number)
 		model,
 		"GoldRiserEdge",
 		Vector3.new(width - 0.14, 0.1, 0.1),
-		CFrame.new(0, top + RobuxShelf.RiserH - 0.05, cz + depth / 2 - riserD + 0.05),
+		CFrame.new(cx, top + RobuxShelf.RiserH - 0.05, cz + depth / 2 - riserD + 0.05),
 		RobuxTableArt.Brass,
 		Enum.Material.Metal
 	)
@@ -83,7 +84,7 @@ function RobuxTableArt.Build(model: Model, floorTop: number)
 		model,
 		"RobuxSign",
 		Vector3.new(math.max(8.4, width - 1), 1.1, 0.12),
-		CFrame.new(0, top - 0.95, cz - depth / 2 - 0.08),
+		CFrame.new(cx, top - 0.95, cz - depth / 2 - 0.08),
 		RobuxTableArt.PineTrim,
 		Enum.Material.WoodPlanks
 	)
@@ -93,7 +94,7 @@ function RobuxTableArt.Build(model: Model, floorTop: number)
 		model,
 		"RobuxSignTrim",
 		Vector3.new(math.max(8.4, width - 1) + 0.2, 0.12, 0.16),
-		CFrame.new(0, top - 0.95 + 0.6, cz - depth / 2 - 0.08),
+		CFrame.new(cx, top - 0.95 + 0.6, cz - depth / 2 - 0.08),
 		RobuxTableArt.Brass,
 		Enum.Material.Metal
 	)

@@ -5,7 +5,8 @@
 --     deprecated GetProductInfo on old clients). Regional pricing gives
 --     each player their own price, so a price is never read on the server
 --     and never written in the game.
---   * A failed lookup retries after 2 s, 4 s and 8 s. Opening the store
+--   * A failed lookup retries after 2 s, 4 s and 8 s (the pill says "R$"
+--     meanwhile; "Price unavailable" only once the last try failed). Opening the store
 --     refreshes anything older than 5 minutes.
 --   * Sale state comes from the server's cache (StoreOnSale_<Kind>_<Key>
 --     attributes on ReplicatedStorage.StoreState); the client's own lookup
@@ -25,7 +26,7 @@ local StorePrices = {}
 StorePrices.StaleSec = 300
 StorePrices.Tries = 4 -- the first try, then after 2 s, 4 s and 8 s
 
-type Row = { price: number?, forSale: boolean?, at: number, busy: boolean }
+type Row = { price: number?, forSale: boolean?, at: number, busy: boolean, failed: boolean? }
 
 local rows: { [string]: Row } = {}
 local listeners: { () -> () } = {}
@@ -66,8 +67,19 @@ function StorePrices.ForSale(kind: string, key: string): boolean?
 	return if row then row.forSale else nil
 end
 
--- The price pill's text: "R$ <price>", or "R$" while unknown.
+-- True once every try (the first, then 2 s, 4 s and 8 s later) failed and no
+-- price is known. While the retries run it is false and the pill says "R$".
+function StorePrices.Failed(kind: string, key: string): boolean
+	local row = rows[rowKey(kind, key)]
+	return row ~= nil and row.price == nil and row.failed == true
+end
+
+-- The price pill's text: "R$ <price>", "R$" while the retries run, and
+-- "Price unavailable" only after the last one failed.
 function StorePrices.Text(kind: string, key: string): string
+	if StorePrices.Failed(kind, key) then
+		return StoreCopy.PriceUnavailable
+	end
 	return StoreCopy.Price(StorePrices.Price(kind, key))
 end
 
@@ -96,6 +108,7 @@ local function fetch(kind: string, key: string)
 		return
 	end
 	row.busy = true
+	row.failed = false
 	task.spawn(function()
 		local m = market()
 		local info = if m
@@ -110,6 +123,11 @@ local function fetch(kind: string, key: string)
 			if answer ~= nil then
 				row.forSale = answer
 			end
+			row.at = clock()
+			fire()
+		else
+			-- The last retry failed: the pill says so and Buy stays off.
+			row.failed = true
 			row.at = clock()
 			fire()
 		end
@@ -152,6 +170,10 @@ end
 -- Tests only.
 function StorePrices._set(kind: string, key: string, price: number?, forSale: boolean?)
 	rows[rowKey(kind, key)] = { price = price, forSale = forSale, at = clock(), busy = false }
+end
+
+function StorePrices._setFailed(kind: string, key: string)
+	rows[rowKey(kind, key)] = { price = nil, forSale = nil, at = clock(), busy = false, failed = true }
 end
 
 function StorePrices._reset()

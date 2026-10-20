@@ -135,15 +135,15 @@ StoreData.CreatorIds = {
 	Passes = {
 		DoubleCash = 2005256811, -- on sale
 		LuxAxe = 2005226878,
-		TowService = 2006186967, -- 99 R$
-		TimberClassic = 2006912886, -- 349 R$
-		PaintShop = 2006456926, -- 249 R$
+		TowService = 2006186967,
+		TimberClassic = 2006912886,
+		PaintShop = 2006456926,
 	},
 	Products = {
-		Cash1k = 3716312861, -- $1,000, 49 R$
-		Cash10k = 3716312899, -- $10,000, 299 R$
-		DoubleWood = 0, -- no product yet: hidden
-		InstantDelivery = 0, -- no product yet: hidden
+		Cash1k = 3716312861, -- $1,000
+		Cash10k = 3716312899, -- $10,000
+		DoubleWood = 3717310556,
+		InstantDelivery = 3717310577,
 	},
 }
 ```
@@ -157,22 +157,22 @@ Roblox says, not numbers in the code.
 | Wallet near the $2,000,000 cap | The $10,000 pack says "Wallet full" and never prompts |
 | Buy 2x Cash, then rejoin | Sales pay double. Axes and trucks feel the same. The Store says Owned after rejoin |
 | Buy the Lux Axe | It arrives in your hotbar. Wood you cut with it pays 10% more. Starfall is still in the Tool Shed for cash |
-| Buy Tow Service, then send a Pickup home | No fee. Without the pass, the same recall costs 2% of the price ($2 minimum). The Rustbucket stays free either way |
+| Buy Tow Service, then send a Pickup home | No fee. Without the pass, the same recall costs 5% of the price ($5 minimum). The Rustbucket stays free either way |
 | Buy Timber Classic | It shows up at the Dealership as owned, same speed and bed as the Pickup. Your display name is on both doors. Sit in the driver seat: the dash shows an estimate at the Wood Dropoff. A passenger does not see it |
 | Buy Paint Shop | You can paint only your own truck, only from the palette. Stop and Play: the color is still there. A second change inside 2 seconds is refused |
 | Leave during a purchase and rejoin | Granted once, not twice |
-| Open the Store | No row for 2x Wood or Instant Delivery |
+| Open the Store | All five paid items, 2x Wood and Instant Delivery included, show a live price. None says Coming soon |
 
 What they do: 2x Cash doubles sale money forever and does not change axes,
 trucks, or chop speed. The Lux Axe sits between the Inferno Axe and the
 Starfall Axe; wood you cut with it sells for 10% more, and the Starfall
 Axe is still bought with cash. Tow Service makes every recall free
-(without it, a recall is 2% of the truck's price, $2 minimum; the
+(without it, a recall is 5% of the truck's price, $5 minimum; the
 Rustbucket stays free). Timber Classic is the Pickup's stats with your
 display name on both doors and a dash estimate of the load at the Wood
 Dropoff. Paint Shop repaints only your own trucks from a fixed palette;
 the color stays after you rejoin. The cash packs add cash only if it fits
-under the $2,000,000 cap. 2x Wood and Instant Delivery have no product yet.
+under the $2,000,000 cap.
 
 ## 5. Publish, then go public
 

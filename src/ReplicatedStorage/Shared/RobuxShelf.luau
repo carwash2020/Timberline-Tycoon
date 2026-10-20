@@ -12,7 +12,7 @@
 -- box goes back to its shelf (it is a display, there is no cash unit).
 --
 -- Positions are final studs from the shop's origin, like StoreStock: a
--- table along the back wall, centred on x = 0. Its boxes are class S.
+-- table along the back wall, its east end at x 5.3 (EastEdge) and its middle at CenterX(). Its boxes are class S.
 --
 -- Lane P: only items Roblox says are for sale get a box. The table has a
 -- slot for every item with a real id (StoreData order); the server's sale
@@ -56,6 +56,9 @@ RobuxShelf.TableTop = 3.9 -- the table top, above the model origin (the counter 
 RobuxShelf.RiserH = 1.0 -- the back row stands this much higher
 RobuxShelf.FrontZ = RobuxShelf.TableZ - 1.15
 RobuxShelf.BackZ = RobuxShelf.TableZ + 1.15
+-- The table's east end stands here (the Tool Shed's event room starts at x 5.35): the table is as wide as its
+-- longer row needs (nine items: 5 passes) and grows toward the west wall from this edge, so its middle is CenterX().
+RobuxShelf.EastEdge = 5.3
 RobuxShelf.Gap = BoxSize.Gap -- between boxes in a row (the shelves' gap)
 RobuxShelf.Step = BoxSize.Class(RobuxShelf.Class).size.X + RobuxShelf.Gap -- centre to centre along x
 RobuxShelf.BoxHalfHeight = BoxSize.Class(RobuxShelf.Class).size.Y / 2
@@ -129,7 +132,7 @@ function RobuxShelf.Placements(): { Placement }
 		for i, entry in ipairs(row) do
 			table.insert(out, {
 				slotId = entry.slotId,
-				x = (i - (#row + 1) / 2) * RobuxShelf.Step,
+				x = RobuxShelf.CenterX() + (i - (#row + 1) / 2) * RobuxShelf.Step,
 				y = RobuxShelf.TableTop + (if back then RobuxShelf.RiserH else 0) + RobuxShelf.BoxHalfHeight,
 				z = if back then RobuxShelf.BackZ else RobuxShelf.FrontZ,
 			})
@@ -148,7 +151,12 @@ function RobuxShelf.RowWidth(): number
 			products += 1
 		end
 	end
-	return math.max(1, passes, products) * RobuxShelf.Step + 1.0
+	return math.max(1, passes, products) * RobuxShelf.Step + 0.7
+end
+
+-- Where the table's middle is: RowWidth() back from the east edge.
+function RobuxShelf.CenterX(): number
+	return RobuxShelf.EastEdge - RobuxShelf.RowWidth() / 2
 end
 
 -- The tag over a box. Roblox owns the price, read by this player's client;
