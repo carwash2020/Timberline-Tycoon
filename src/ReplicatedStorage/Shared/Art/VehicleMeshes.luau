@@ -28,11 +28,44 @@
 -- The hull rule above dropped a Body 0.7 stud below its arches (tyres through the
 -- body, tests/VehicleWheelClearance.spec). Place stays as the rule for a piece with
 -- no `at`.
+--
+-- 20 October 2026 (T390, the dealership trucks): the lot's display copy and the bought truck
+-- take this one path (TruckArt.Build, and BuildTrailer for a trailer shown alone), and the
+-- lot fits, preps and moves the copy only AFTER the meshes are on. A copy the lot has fitted
+-- ("Fitted") is refused here: its parts were scaled and moved, so a mesh placed from `at`
+-- would float or sink. A mesh that cannot be had keeps the whole part-built vehicle and says
+-- so once, naming the vehicle and the part.
 
 local MeshKit = require(script.Parent.MeshKit)
 local VehicleModels = require(script.Parent.VehicleModels)
 
 local VehicleMeshes = {}
+
+-- One warning per vehicle and part (a spec swaps this for a recorder).
+VehicleMeshes.Warn = function(message: string)
+	warn(message)
+end
+local warned: { [string]: boolean } = {}
+
+function VehicleMeshes.ResetWarnings()
+	table.clear(warned)
+end
+
+-- The part-built vehicle stays. Said once per vehicle. Never while a mesh is only
+-- still loading (the swap runs again then) and never in a run with no engine (Lune
+-- has no AssetService, so every mesh "fails" there and the part-built art is the point).
+local function keepPartBuilt(vehicle: string, part: string, why: string)
+	if MeshKit.WasPending() or MeshKit.NoEngine() then
+		return
+	end
+	if warned[vehicle] then
+		return
+	end
+	warned[vehicle] = true
+	VehicleMeshes.Warn(
+		string.format("[VehicleMeshes] %s stays part-built: %s (%s). No mesh pieces were placed.", vehicle, part, why)
+	)
+end
 
 -- Flatbed and Logging Rig keep more hull (stakes, tandem), so their mesh
 -- build may use up to 80 parts. Every other truck is 30.
@@ -325,6 +358,9 @@ local function destroyMade(made: { Made })
 	end
 end
 
+-- The role addRole could not make last (for the warning).
+local missing = ""
+
 local function addRole(
 	made: { Made },
 	spec: { [string]: VehicleModels.Piece },
@@ -334,6 +370,7 @@ local function addRole(
 ): boolean
 	local piece = spec[role]
 	if not piece or piece.meshId == 0 then
+		missing = role
 		return false
 	end
 	local name = if role == "Wheel" then "Wheel" else "Mesh" .. role
@@ -341,11 +378,14 @@ local function addRole(
 	local collision = if role == "Wheel" then Enum.CollisionFidelity.Hull else Enum.CollisionFidelity.Box
 	local part = MeshKit.Create(piece.meshId, name, piece.size, collision)
 	if not part then
+		missing = role
 		return false
 	end
 	fidelity(part, role)
 	if role ~= "Wheel" then
 		MeshKit.Visual(part, piece.meshId)
+		-- Anchored like every other part TruckArt.Build makes (Rig frees and welds them).
+		part.Anchored = true
 	end
 	-- A wheel on the truck's -X side shows its back (the mesh's rim face is on +X): turn it
 	-- about Y so the rim faces out. Judged in the chassis frame, so it holds wherever the
@@ -388,37 +428,51 @@ local function swapWheel(mesh: MeshPart, wheel: BasePart, mirror: boolean)
 end
 
 -- True when meshes replaced the decorative body. False leaves `model` as built.
-local function applyNow(model: Model, truckId: string, trailerId: string?): boolean
-	local truck = VehicleModels.Truck(truckId)
-	if not truck then
+-- `truckId` is nil for a trailer shown alone (the lot's trailer bays); `variantOf` is the
+-- truck whose trailer variant (VehicleModels.Trailer) is drawn then.
+local function applyNow(model: Model, truckId: string?, trailerId: string?, variantOf: string?): boolean
+	local name = truckId or trailerId or model.Name
+	if model:GetAttribute("Fitted") == true then
+		-- The lot scaled and moved this copy (DealershipLot fitUnderCeiling): the authored
+		-- offsets no longer fit its parts.
+		keepPartBuilt(name, "all", "the copy was already fitted")
+		return false
+	end
+	local truck = if truckId then VehicleModels.Truck(truckId) else nil
+	if truckId and not truck then
 		return false
 	end
 	local made: { Made } = {}
 	local function fail(): boolean
 		destroyMade(made)
+		keepPartBuilt(name, missing, "no mesh for it")
 		return false
 	end
 
-	for _, role in ipairs(TRUCK_ROLES) do
-		if truck[role] == nil then
-			continue
+	if truck then
+		for _, role in ipairs(TRUCK_ROLES) do
+			if truck[role] == nil then
+				continue
+			end
+			if not addRole(made, truck, role, false, nil) then
+				return fail()
+			end
 		end
-		if not addRole(made, truck, role, false, nil) then
+		if not truck.Wheel then
+			missing = "Wheel"
 			return fail()
 		end
-	end
-	if not truck.Wheel then
-		return fail()
-	end
-	for _, wheel in ipairs(wheelsOf(model, false)) do
-		if not addRole(made, truck, "Wheel", false, wheel) then
-			return fail()
+		for _, wheel in ipairs(wheelsOf(model, false)) do
+			if not addRole(made, truck, "Wheel", false, wheel) then
+				return fail()
+			end
 		end
 	end
 
-	local trailerSpec = if trailerId then VehicleModels.Trailer(trailerId, truckId) else nil
+	local trailerSpec = if trailerId then VehicleModels.Trailer(trailerId, truckId or variantOf) else nil
 	if trailerId then
 		if not trailerSpec then
+			missing = "trailer"
 			return fail()
 		end
 		for _, role in ipairs(TRAILER_ROLES) do
@@ -430,6 +484,7 @@ local function applyNow(model: Model, truckId: string, trailerId: string?): bool
 			end
 		end
 		if not trailerSpec.Wheel then
+			missing = "Wheel"
 			return fail()
 		end
 		for _, wheel in ipairs(wheelsOf(model, true)) do
@@ -490,7 +545,15 @@ end
 -- part-built and is dressed when they land (MeshKit.Attempt).
 function VehicleMeshes.Apply(model: Model, truckId: string, trailerId: string?): boolean
 	return MeshKit.Attempt(model, function()
-		return applyNow(model, truckId, trailerId)
+		return applyNow(model, truckId, trailerId, nil)
+	end, true)
+end
+
+-- A trailer on its own (the dealership's trailer bays): its pieces only, the variant
+-- made for `variantOf`'s width.
+function VehicleMeshes.ApplyTrailer(model: Model, trailerId: string, variantOf: string): boolean
+	return MeshKit.Attempt(model, function()
+		return applyNow(model, nil, trailerId, variantOf)
 	end, true)
 end
 

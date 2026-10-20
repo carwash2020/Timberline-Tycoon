@@ -261,6 +261,49 @@ function ShopEventKit.SetZoneActive(zone: Instance, active: boolean)
 			d.Enabled = active
 		end
 	end
+	ShopEventKit.SetTablesShown(zone, active)
+end
+
+-- What stands on a store's event tables. A store's builder tags the parts it puts on the tables
+-- with EventRole: "card" (the "Coming soon" card on its easel: shown while the room is closed)
+-- and "held" (what the table holds once an event is on). They stand in the zone's parent (the
+-- shop model), so the zone keeps its own part budget. A shop with neither is untouched.
+ShopEventKit.RoleAttribute = "EventRole"
+
+-- True when `events` (StoreEventData.Events) holds an event that is on for `kind`: the tables are
+-- then filled and the cards are gone. An event switched off (`enabled = false`) does not count.
+function ShopEventKit.HoldsEvent(events: { unknown }, kind: string): boolean
+	for _, event in ipairs(events) do
+		if type(event) == "table" then
+			local entry = event :: { [string]: unknown }
+			if entry.store == kind and entry.enabled ~= false then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Shows what the tables hold (`held` true: the cards hidden) or the cards (`held` false: the
+-- held parts hidden). Parts are hidden by transparency and their text by the gui, never removed.
+function ShopEventKit.SetTablesShown(zone: Instance, held: boolean)
+	-- (the store's builder stands them beside the zone, in the same shop model)
+	local root = zone.Parent or zone
+	for _, d in ipairs(root:GetDescendants()) do
+		local role = d:GetAttribute(ShopEventKit.RoleAttribute)
+		if role ~= "card" and role ~= "held" then
+			continue
+		end
+		local shown = if role == "held" then held else not held
+		if d:IsA("BasePart") then
+			d.Transparency = if shown then 0 else 1
+			for _, child in ipairs(d:GetChildren()) do
+				if child:IsA("SurfaceGui") then
+					child.Enabled = shown
+				end
+			end
+		end
+	end
 end
 
 -- The three table marker parts of a zone, in order (EventTable1..3).

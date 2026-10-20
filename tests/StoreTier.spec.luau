@@ -64,25 +64,17 @@ return function(t)
 		t.eq(StoreTier.Of("Gear", "HeatBoots"), 4)
 		t.eq(StoreTier.Of("Gear", "Flashlight"), nil)
 		t.eq(StoreTier.Of("Blueprint", "Wall"), nil, "a tier-1 plan has no badge")
-		-- vehicles: the price order within the kind, 1 up, no gaps
-		local seen = {}
+		-- vehicles have no tier (T391): none of the real ones, and none is an upgrade
 		for _, v in ipairs(t.shared("ItemBox").Showroom) do
-			local tier = StoreTier.Of(v.kind, v.id)
-			t.ok(tier ~= nil and tier >= 1, v.id .. " has a tier")
-			seen[v.kind] = seen[v.kind] or {}
-			t.eq(seen[v.kind][tier], nil, v.id .. " shares a tier")
-			seen[v.kind][tier] = true
+			t.eq(StoreTier.Of(v.kind, v.id), nil, v.id .. " has no tier")
+			t.eq(StoreTier.UpgradeOf(v.kind, v.id), nil, v.id .. " is not an upgrade")
 		end
-		for kind, tiers in pairs(seen) do
-			local n = 0
-			for _ in pairs(tiers) do
-				n += 1
-			end
-			for i = 1, n do
-				t.ok(tiers[i], kind .. " tiers have no gap at " .. i)
-			end
+		for _, def in pairs(ItemCatalog.Trucks) do
+			t.eq(def.upgradeOf, nil, def.id .. " has no upgradeOf")
 		end
-		t.ok(StoreTier.Of("Truck", "Rustbucket") < StoreTier.Of("Truck", "LoggingRig"), "dearer trucks rank higher")
+		for _, def in pairs(ItemCatalog.Trailers) do
+			t.eq(def.upgradeOf, nil, def.id .. " has no upgradeOf")
+		end
 		-- every tier a shop item has is on the ramp
 		for _, shop in ipairs({ "ToolShed", "HearthAndHome", "Sparkworks" }) do
 			for _, slot in ipairs(StoreStock.ForShop(shop)) do

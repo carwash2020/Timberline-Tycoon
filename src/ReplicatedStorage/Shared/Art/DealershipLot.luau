@@ -24,11 +24,13 @@ local ItemBox = require(script.Parent.Parent.ItemBox)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local Kit = require(script.Parent.Kit)
+local MeshKit = require(script.Parent.MeshKit)
+local Palette = require(script.Parent.Palette)
 local ShowroomLight = require(script.Parent.Parent.ShowroomLight)
 local StoreTier = require(script.Parent.Parent.StoreTier)
 local TruckArt = require(script.Parent.TruckArt)
-local TruckLayout = require(script.Parent.Parent.TruckLayout)
 local VehicleLogic = require(script.Parent.Parent.VehicleLogic)
+local VehicleModels = require(script.Parent.VehicleModels)
 
 local DealershipLot = {}
 
@@ -66,20 +68,18 @@ DealershipLot.BlockMargin = 0.12 -- the mat is this much bigger than the box all
 DealershipLot.FrameMargin = 0.13 -- and the wood border this much bigger again
 DealershipLot.FrameHeight = 0.05
 
--- The tier stand each plinth wears (store polish; display only, the catalog has no
--- vehicle tier: StoreTier ranks a vehicle by price within its kind). The plinth's
--- front band and aisle-edge stripe are in the tier colour, and a T-flag on a brass
--- post stands beside the box (the same parts as ShopKit.TierStand makes for a
--- shelf: TierPost, TierBacking, TierFlag, and a LockChip when StoreTier.LockOf
--- names a lock, none for a vehicle today).
+-- A vehicle has no tier stand (T391): the plinth's front band and aisle-edge stripe are the
+-- vehicle's own paint, and a name sign stands at the plinth. Only a vehicle that is an upgraded
+-- version of another (ItemCatalog `upgradeOf`, checked by StoreTier.UpgradeOf) gets a small
+-- cream-and-brass plaque on its name sign (the words are StoreTier.UpgradeMark and UpgradeLine). No tier colour,
+-- no flag, no post.
 DealershipLot.NameSignSize = Vector3.new(5.0, 1.9, 0.16) -- the plinth's name sign: the name, and under it what it hauls
-DealershipLot.FlagSize = Vector3.new(2.8, 1.6, 0.16)
-DealershipLot.ChipSize = Vector3.new(5.0, 1.0, 0.16)
-DealershipLot.FlagYaw = math.rad(12) -- the flag is turned this far, so it never stands edge-on to the aisle
-DealershipLot.FlagHeight = 4.6 -- the flag's middle, above the plinth's top
+DealershipLot.PlaqueSize = Vector3.new(3.0, 1.0, 0.14) -- the upgrade plaque's brass frame (its board is inset 0.12 all round)
+DealershipLot.PlaqueInset = 0.12
+DealershipLot.PlaqueMinText = 14 -- UITextSizeConstraint.MinTextSize on both lines
 DealershipLot.BandHeight = 0.55
 DealershipLot.StripeWidth = 0.3 -- the aisle-edge stripe: at the very edge, clear of the box's block
--- The tier stripe and band are paint, not slabs: thin skins (decal-style parts, never
+-- The stripe and band are paint, not slabs: thin skins (decal-style parts, never
 -- collide, never cast a shadow) the full width of their plinth, edge to edge, so the
 -- stripe's ends sit exactly on the plinth's corners and the band's top edge exactly on
 -- the plinth's top edge. The stripe lies ON the top (its underside the slab's top, 0.05
@@ -88,7 +88,9 @@ DealershipLot.StripeWidth = 0.3 -- the aisle-edge stripe: at the very edge, clea
 -- face is the bay's edge, its top face continues the slab's top, the stripe's edge
 -- meets it). Nothing is coplanar with another face and nothing leaves the bay.
 DealershipLot.PaintThickness = 0.05
-local BRASS = Color3.fromRGB(201, 162, 74)
+local BRASS = Palette.Get("Brass")
+local SIGN_CREAM = Palette.Get("SignCream")
+local SIGN_INK = Palette.Get("SignInk")
 -- A display vehicle's Neon lenses are never near-white (ShopKit.NearWhite, luma 0.86): the live
 -- trucks' pale headlamp lens (#FFE9B0) blows out in a lit hall, so the display copy wears warm amber.
 DealershipLot.MaxNeonLuma = 0.86
@@ -301,6 +303,10 @@ local function prep(model: Model, category: string, id: string)
 			then
 				d.Color = DealershipLot.DisplayLens
 			end
+			-- A mesh piece is decoration like the rest: it casts no shadow (MeshKit.Visual leaves it on).
+			if d:GetAttribute("VisualMesh") == true then
+				d.CastShadow = false
+			end
 		end
 	end
 end
@@ -328,30 +334,27 @@ local function nameOf(kind: string, id: string): string
 	return if item then item.displayName else id
 end
 
+-- The two builders are the ones the live vehicles use (TruckArt.Build for a truck, the trailer
+-- TruckArt.AddTrailer draws and VehicleMeshes dresses): meshes go on inside them, so what is
+-- fitted, prepped and moved afterwards is already the meshed vehicle.
 local function placeTruck(id: string): Model?
 	local def = ItemCatalog.GetTruck(id)
 	if not def then
 		return nil
 	end
-	local model = TruckArt.Build(def)
-	prep(model, "Truck", id)
-	return model
+	return TruckArt.Build(def)
 end
 
-local function placeTrailer(id: string): Model?
+-- A trailer on its own, hitch toward -Z, and where to put its middle (nose, centred on the pivot,
+-- same as a truck) once everything else is done.
+local function placeTrailer(id: string): (Model?, CFrame?)
 	local def = ItemCatalog.GetTrailer(id)
 	local truck = ItemCatalog.GetTruck("Pickup")
 	if not def or not truck then
-		return nil
+		return nil, nil
 	end
-	local lay = TruckLayout.ForTrailer(def, TruckLayout.For(truck))
-	local model = Instance.new("Model")
-	model.Name = id
-	TruckArt.AddTrailer(model, def, lay)
-	-- Nose (the hitch) toward -Z, centred on the pivot, same as a truck.
-	model:PivotTo(CFrame.new(0, 0, -(lay.hitchZ + lay.length / 2)))
-	prep(model, "Trailer", id)
-	return model
+	local model, lay = TruckArt.BuildTrailer(def, truck)
+	return model, CFrame.new(0, 0, -(lay.hitchZ + lay.length / 2))
 end
 
 local function paintOf(kind: string, id: string): Color3
@@ -383,6 +386,8 @@ local function fitUnderCeiling(model: Model)
 		end
 	end
 	local height = hi - lo
+	-- Whatever the height, this copy is now fitted: no mesh may be placed on it later.
+	model:SetAttribute("Fitted", true)
 	if height > DealershipLot.MaxVehicleHeight then
 		-- Like TruckArt's grow: each part's size and position (its turn kept)
 		-- and each attachment's offset (set by CFrame, which Lune reads).
@@ -400,21 +405,38 @@ local function fitUnderCeiling(model: Model)
 	end
 end
 
+-- One display vehicle, in this order and no other: build it (the meshes go on inside the build),
+-- fit it under the ceiling, prep it (anchored, decoration, no scripts), then move it. A mesh
+-- placed after the fit would land at the unscaled offsets, so a fitted copy refuses late
+-- meshes (VehicleMeshes, the `Fitted` attribute).
 local function modelOf(kind: string, id: string, fitted: boolean?): Model?
-	local model = if kind == "Truck" then placeTruck(id) else placeTrailer(id)
-	if model and fitted == true then
+	local model: Model?
+	local move: CFrame? = nil
+	if kind == "Truck" then
+		model = placeTruck(id)
+	else
+		model, move = placeTrailer(id)
+	end
+	if model == nil then
+		return nil
+	end
+	if fitted == true then
 		fitUnderCeiling(model)
+	end
+	prep(model, kind, id)
+	if move then
+		model:PivotTo(move)
 	end
 	return model
 end
 
-measureVehicle = function(kind: string, id: string, fitted: boolean?): Measured
-	measuring = true
-	local model = modelOf(kind, id, fitted)
-	measuring = false
-	if model == nil then
-		return { length = 20, span = 10, cx = 0, cz = 0, feet = 2 }
-	end
+-- The one display copy of a vehicle, as the lot stands it before it is put on a plinth (a spec
+-- compares it with the bought vehicle).
+function DealershipLot.Vehicle(kind: string, id: string): Model?
+	return modelOf(kind, id, true)
+end
+
+local function measureModel(model: Model): Measured
 	local pivot = model:GetPivot()
 	local lo, hi = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
 	for _, d in ipairs(model:GetDescendants()) do
@@ -430,13 +452,85 @@ measureVehicle = function(kind: string, id: string, fitted: boolean?): Measured
 			end
 		end
 	end
-	model:Destroy()
 	return { length = hi.Z - lo.Z, span = hi.X - lo.X, cx = (hi.X + lo.X) / 2, cz = (hi.Z + lo.Z) / 2, feet = -lo.Y }
+end
+
+measureVehicle = function(kind: string, id: string, fitted: boolean?): Measured
+	measuring = true
+	local model = modelOf(kind, id, fitted)
+	measuring = false
+	if model == nil then
+		return { length = 20, span = 10, cx = 0, cz = 0, feet = 2 }
+	end
+	local m = measureModel(model)
+	model:Destroy()
+	return m
+end
+
+-- Loads every vehicle mesh before the lot is built (the deferred build step may wait: it is its
+-- own thread, and the start-up preload has most of them already). A mesh that is still missing
+-- afterwards keeps its whole part-built vehicle (VehicleMeshes says so once).
+function DealershipLot.Preload(): MeshKit.PreloadResult
+	local entries: { MeshKit.Entry } = {}
+	for _, piece in ipairs(VehicleModels.AllPieces()) do
+		table.insert(entries, { id = piece.meshId, hull = piece.wheel })
+	end
+	return MeshKit.Preload(entries)
+end
+
+-- The upgrade plaque: a brass frame round a cream board, about 3 x 1 studs, the mark (FredokaOne)
+-- over the "upgrade of <base name>" line (Gotham), in sign ink, on both faces. Looks only. `at` is its
+-- middle, facing the way the name sign does. Returns the board (named "UpgradePlaque").
+function DealershipLot.Plaque(parent: Instance, at: CFrame, baseName: string): Part
+	local size, inset = DealershipLot.PlaqueSize, DealershipLot.PlaqueInset
+	Kit.decor(Kit.part(parent, "UpgradePlaqueFrame", size, at, BRASS, Enum.Material.Metal), false)
+	local board = Kit.part(
+		parent,
+		"UpgradePlaque",
+		Vector3.new(size.X - 2 * inset, size.Y - 2 * inset, size.Z + 0.02),
+		at,
+		SIGN_CREAM,
+		Enum.Material.SmoothPlastic
+	)
+	Kit.decor(board, false)
+	local lines: { { text: string, font: Enum.Font, share: number } } = {
+		{ text = StoreTier.UpgradeMark, font = Enum.Font.FredokaOne, share = 0.55 },
+		{ text = StoreTier.UpgradeLine(baseName), font = Enum.Font.Gotham, share = 0.45 },
+	}
+	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "PlaqueText"
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 80
+		gui.LightInfluence = Kit.SIGN_LIGHT_INFLUENCE
+		gui.Parent = board
+		local top = 0
+		for _, line in ipairs(lines) do
+			local label = Instance.new("TextLabel")
+			label.Name = "PlaqueLine"
+			label.BackgroundTransparency = 1
+			label.Position = UDim2.fromScale(0, top)
+			label.Size = UDim2.fromScale(1, line.share)
+			label.Font = line.font
+			label.TextScaled = true
+			label.TextColor3 = SIGN_INK
+			label.Text = line.text
+			label.Parent = gui
+			local limit = Instance.new("UITextSizeConstraint")
+			limit.MinTextSize = DealershipLot.PlaqueMinText
+			limit.MaxTextSize = 60
+			limit.Parent = label
+			top += line.share
+		end
+	end
+	return board
 end
 
 -- The lot around the origin, front (-Z) toward the path. Place it with
 -- Kit.placeAt. Returns the model; each vehicle is a child model.
 function DealershipLot.Build(): Model
+	DealershipLot.Preload()
 	local layout = DealershipLot.Layout()
 	local depth = layout.depth
 	local lot = Instance.new("Model")
@@ -446,12 +540,10 @@ function DealershipLot.Build(): Model
 	for _, bay in ipairs(layout.bays) do
 		local cx, cz = bay.x, oz + bay.z
 		local paint = paintOf(bay.kind, bay.id)
-		local tier = StoreTier.Of(bay.kind, bay.id)
-		local lock = StoreTier.LockOf(bay.kind, bay.id)
-		-- The stand's colour: its tier's, else the vehicle's own paint.
-		local color = if tier then StoreTier.Color(tier) else paint
+		-- The stripe and band are the vehicle's own paint: a vehicle has no tier colour.
+		local color = paint
 
-		-- The plinth: a slab you can walk up onto, a stripe of the stand's tier colour
+		-- The plinth: a slab you can walk up onto, a stripe of the vehicle's paint
 		-- along its front edge, a lamp post at the back corner.
 		-- The slab stops one paint thickness short of the aisle edge; the band's skin fills
 		-- that last bit (its outer face is the bay's edge), so no face is coplanar with
@@ -476,7 +568,7 @@ function DealershipLot.Build(): Model
 			Enum.Material.SmoothPlastic
 		)
 		Kit.decor(stripe, false)
-		-- The tier band on the plinth's aisle face, from the top edge down, so the stand's
+		-- The band on the plinth's aisle face, from the top edge down, so the vehicle's
 		-- colour reads from across the hall.
 		local band = Kit.part(
 			lot,
@@ -487,23 +579,6 @@ function DealershipLot.Build(): Model
 			Enum.Material.SmoothPlastic
 		)
 		Kit.decor(band, false)
-		local function standPart(p: BasePart, role: string)
-			p:SetAttribute("StandRole", role)
-			p:SetAttribute("StandKind", bay.kind)
-			p:SetAttribute("StandItem", bay.id)
-			p:SetAttribute("StandOpen", color)
-			pcall(function()
-				CollectionService:AddTag(p, "StoreStand")
-			end)
-		end
-		if tier then
-			stripe:SetAttribute("StandTier", tier)
-			band:SetAttribute("StandTier", tier)
-		end
-		if lock then
-			standPart(stripe, "base")
-			standPart(band, "base")
-		end
 		local postX, postZ = cx - bay.width / 2 + 0.7, cz - aisleSide * (bay.depth / 2 - 0.7)
 		Kit.decor(
 			Kit.part(
@@ -529,7 +604,7 @@ function DealershipLot.Build(): Model
 			model.Parent = lot
 			-- Side-on, nose toward the approach (west), on the plinth: its
 			-- measured middle over the plinth's middle, its feet on the top.
-			local m = measureVehicle(bay.kind, bay.id, true)
+			local m = measureModel(model)
 			model:PivotTo(
 				CFrame.new(cx, top + m.feet, oz + bay.vz)
 					* CFrame.Angles(0, math.pi / 2, 0)
@@ -555,6 +630,18 @@ function DealershipLot.Build(): Model
 				Color3.fromRGB(245, 235, 215),
 				{ Enum.NormalId.Front, Enum.NormalId.Back }
 			)
+			local upgraded = StoreTier.UpgradeOf(bay.kind, bay.id)
+			if upgraded then
+				DealershipLot.Plaque(
+					model,
+					CFrame.new(
+						sign.CFrame.Position.X,
+						DealershipLot.NameSignSize.Y + DealershipLot.PlaqueSize.Y / 2 + 0.05,
+						sign.CFrame.Position.Z
+					),
+					nameOf(bay.kind, upgraded)
+				)
+			end
 		end
 
 		-- The box: what you pick up and carry to the counter. On the plinth at
@@ -612,55 +699,6 @@ function DealershipLot.Build(): Model
 		}
 		HoverTag.Mark(slab, hover)
 		HoverTag.Mark(spot, hover)
-		-- The T-flag on its post, beside the box (west of it, inside the plinth), turned
-		-- to the west and the aisle; the lock chip over it when a lock names one.
-		if tier then
-			local yaw = CFrame.Angles(0, -aisleSide * DealershipLot.FlagYaw, 0)
-			local fx = cx - bay.box.X / 2 - 2.2
-			local fz = cz + aisleSide * (bay.depth / 2 - 1.3)
-			local flagY = top + DealershipLot.FlagHeight
-			local size = DealershipLot.FlagSize
-			local postTop = flagY - size.Y / 2
-			local post = Kit.part(
-				lot,
-				"TierPost",
-				Vector3.new(0.2, postTop - top, 0.2),
-				CFrame.new(fx, (top + postTop) / 2, fz),
-				BRASS,
-				Enum.Material.Metal
-			)
-			Kit.decor(post, false)
-			local at = CFrame.new(fx, flagY, fz) * yaw
-			Kit.decor(
-				Kit.part(lot, "TierBacking", size + Vector3.new(0.24, 0.24, -0.08), at, BRASS, Enum.Material.Metal),
-				false
-			)
-			local flag = Kit.part(lot, "TierFlag", size, at, color, Enum.Material.SmoothPlastic)
-			Kit.decor(flag, false)
-			Kit.signText(flag, StoreTier.Label(tier), StoreTier.InkOn(color), nil, Enum.Font.FredokaOne, 0.2)
-			flag:SetAttribute("StandTier", tier)
-			local tagSpec: HoverTag.Spec = table.clone(hover)
-			tagSpec.anchor = true
-			HoverTag.Mark(flag, tagSpec)
-			local postSpec: HoverTag.Spec = table.clone(hover)
-			postSpec.anchor = false
-			HoverTag.Mark(post, postSpec)
-			if lock then
-				standPart(flag, "flag")
-				local chip = Kit.part(
-					lot,
-					"LockChip",
-					DealershipLot.ChipSize,
-					CFrame.new(fx, flagY + size.Y / 2 + 0.6, fz) * yaw,
-					StoreTier.LockedColor,
-					Enum.Material.SmoothPlastic
-				)
-				Kit.decor(chip, false)
-				Kit.signText(chip, lock.text, StoreTier.LockedInk, nil, Enum.Font.FredokaOne, 0.2)
-				chip:SetAttribute("LockText", lock.text)
-				standPart(chip, "chip")
-			end
-		end
 		if model then
 			hover.anchor = true
 			HoverTag.Mark(model, hover)

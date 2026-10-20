@@ -14,6 +14,11 @@
 --   t.eq(actual, expected)  equal (deep for tables)
 --   t.ok(value, message?)   truthy
 --   t.fails(fn, pattern?)   fn must error (optionally matching pattern)
+--   t.expectedFail(name, fn, why)
+--                           a test for a rule that is known to fail until something outside the
+--                           repo changes (a re-upload, say). It passes while fn errors, and FAILS
+--                           the moment fn passes ("now passes: make it a t.test"), so the day the
+--                           blocker is gone CI says so. `why` names the blocker; it is printed.
 --   t.loader(options?)      a fresh module Loader (see tools/loader.luau)
 --   t.shared(name), t.server(name)  load a module with a shared Loader
 --   t.load(path)            any module by its path under src/ (e.g. "ReplicatedStorage/Shared/World/TerrainGen")
@@ -190,6 +195,27 @@ for _, file in ipairs(specs) do
 	end
 	function t.test(name: string, fn: () -> ())
 		table.insert(tests, { name = name, fn = fn })
+	end
+	function t.expectedFail(name: string, fn: () -> (), why: string)
+		assert(type(why) == "string" and why ~= "", "t.expectedFail needs the reason it fails today")
+		table.insert(tests, {
+			name = name,
+			why = why,
+			fn = function()
+				local ok, err = pcall(fn)
+				if ok then
+					error("EXPECTED FAIL now passes (" .. why .. "): change this t.expectedFail to t.test", 0)
+				end
+				print(
+					string.format(
+						"  expected fail: %s (%s)\n    it fails with: %s",
+						name,
+						why,
+						(string.gsub(tostring(err), "\n.*", ""))
+					)
+				)
+			end,
+		})
 	end
 	function t.eq(actual: any, expected: any, message: string?)
 		if not deepEqual(actual, expected) then
