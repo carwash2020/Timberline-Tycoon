@@ -1,10 +1,9 @@
 --!nocheck
 -- The whole world as MapBuilder builds it (Shared/World/WorldPlan + the art
 -- modules): terrain, every tree, the town, boulders, the Skyroot and isles,
--- and the backdrop beyond the walls; with `opts.forest`, the forest ring's
--- filler trees too, which every client builds round its camera (FOR-02:
--- World.forest, every one of them here). Other client-side decoration
--- (flowers, critters) isn't part of it.
+-- and the backdrop beyond the walls. Every tree is a real one (the trees
+-- the server plants, the spread trees included); no client-side stand-ins.
+-- Other client-side decoration (flowers, critters) isn't part of it.
 -- A helper (files starting with _ aren't scenes): world.luau and
 -- world-eye.luau are this build (with the forest) with their own cameras.
 -- World.build(ctx, opts?) returns everything a scene returns but the
@@ -82,93 +81,14 @@ function World.landmarks(ctx, root, inside)
 	end
 end
 
--- One ForestFiller tree (FOR-02) into `root`, built the way the client
--- builds it: PropArt.FillerTree's look, scaled about its foot, turned and
--- stood on its spot.
-local fillerLooks = {}
-function World.fillerTree(ctx, root, tree)
-	local CF = ctx.roblox.CFrame
-	local PropArt = ctx.art("PropArt")
-	local key = tree.kind .. "/" .. tree.variant
-	local look = fillerLooks[key]
-	if not look then
-		look = {}
-		for _, p in ipairs(PropArt.FillerTree(tree.kind, tree.variant):GetDescendants()) do
-			if p:IsA("BasePart") then
-				table.insert(look, p)
-			end
-		end
-		fillerLooks[key] = look
-	end
-	local s = tree.scale
-	local base = CF.new(tree.x, tree.y, tree.z) * CF.Angles(0, tree.yaw, 0)
-	for _, template in ipairs(look) do
-		local p = template:Clone()
-		local cf = template.CFrame
-		p.Size = template.Size * s
-		p.CFrame = base * CF.new(cf.Position * s) * (cf - cf.Position)
-		p.Parent = root
-	end
-end
-
--- The forest's filler into `root`: with `eye` (a Vector3) and a tier's
--- budget, exactly what ForestFiller loads round a camera there (trees
--- within FillerNear, stand-in blocks out to FillerFar); without, every
--- filler tree on the map (how the forest looks with all of it near).
-function World.forest(ctx, root, eye, budget)
-	local Kit = ctx.art("Kit")
-	local PropArt = ctx.art("PropArt")
-	local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
-	local WorldLayout = ctx.load("ReplicatedStorage/Shared/World/WorldLayout")
-	local Enum = ctx.roblox.Enum
-	for _, step in ipairs(WorldPlan.FillerSteps) do
-		step()
-	end
-	local count = 0
-	if eye then
-		for key, mode in pairs(WorldPlan.FillerPlanAround(eye.X, eye.Y, eye.Z, budget.FillerNear, budget.FillerFar)) do
-			local cx, cz = WorldPlan.FillerCellOf(key)
-			if mode == "near" then
-				for _, tree in ipairs(WorldPlan.FillerCellTrees(cx, cz)) do
-					World.fillerTree(ctx, root, tree)
-					count += 1
-				end
-			else
-				for _, b in ipairs(WorldPlan.FillerFarCell(cx, cz)) do
-					local p = Kit.part(
-						root,
-						"FillerFar",
-						b.size,
-						b.cframe,
-						PropArt.FillerFarColor(b.kind),
-						Enum.Material.SmoothPlastic
-					)
-					Kit.decor(p, false)
-				end
-			end
-		end
-	else
-		local half = WorldLayout.WorldHalf // WorldPlan.FillerCellSize
-		for cx = -half, half - 1 do
-			for cz = -half, half - 1 do
-				for _, tree in ipairs(WorldPlan.FillerCellTrees(cx, cz)) do
-					World.fillerTree(ctx, root, tree)
-					count += 1
-				end
-			end
-		end
-	end
-	return count
-end
-
--- The grass tufts (FOR-04) ForestFiller builds round each of `eyes`
+-- The grass tufts (FOR-04) GrassTufts builds round each of `eyes`
 -- (Vector3s) within `near` studs, as it builds them: one of eight
 -- PropArt.GrassTuft looks per grass tint, turned and stood on its spot.
 function World.tufts(ctx, root, eyes, near)
 	local CF = ctx.roblox.CFrame
 	local PropArt = ctx.art("PropArt")
 	local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
-	for _, step in ipairs(WorldPlan.FillerSteps) do
+	for _, step in ipairs(WorldPlan.TuftSteps) do
 		step()
 	end
 	local done, looks = {}, {}
@@ -176,7 +96,7 @@ function World.tufts(ctx, root, eyes, near)
 		for key in pairs(WorldPlan.TuftPlanAround(eye.X, eye.Y, eye.Z, near)) do
 			if not done[key] then
 				done[key] = true
-				local cx, cz = WorldPlan.FillerCellOf(key)
+				local cx, cz = WorldPlan.TuftCellOf(key)
 				for _, tuft in ipairs(WorldPlan.TuftCell(cx, cz)) do
 					local variant = tuft.seed % 8 + 1
 					local id = tuft.biome .. "/" .. variant
@@ -248,6 +168,33 @@ function World.build(ctx, opts)
 		local size = TreeLogic.SizeFor(Kit.rng(seed + 101):next())
 		local tree = TreeArt.Build(def, seed, size.scale)
 		place(tree, CF.new(p) * CF.Angles(0, Kit.rng(seed + 202):range(0, math.pi * 2), 0))
+	end
+	-- The lists planted after the forest (the strip, the regions, the added
+	-- trees, the spawn grove and the spread), minus the thinned ones.
+	local TreeSpread = ctx.load("ReplicatedStorage/Shared/World/TreeSpread")
+	for _, list in ipairs({
+		WorldPlan.StripTrees(),
+		WorldPlan.RegionTrees(),
+		WorldPlan.AddedTrees(),
+		WorldPlan.NearGrove(),
+		WorldPlan.SpreadTrees(),
+	}) do
+		for _, spot in ipairs(list) do
+			local p = spot.position
+			if TreeSpread.Skipped(p.X, p.Z) or not WoodData.Get(spot.woodId) then
+				continue
+			end
+			if opts and opts.v2 then
+				sectionTree(spot.woodId, p)
+				continue
+			end
+			local seed = Kit.seedAt(p.X, p.Z)
+			local size = TreeLogic.SizeFor(Kit.rng(seed + 101):next())
+			place(
+				TreeArt.Build(WoodData.Get(spot.woodId), seed, size.scale),
+				CF.new(p) * CF.Angles(0, Kit.rng(seed + 202):range(0, math.pi * 2), 0)
+			)
+		end
 	end
 	-- Coloured and turned as MapBuilder does them.
 	local C3 = roblox.Color3
@@ -399,11 +346,6 @@ function World.build(ctx, opts)
 
 	-- The landscape's landmarks (STY-*), as MapBuilder's "5. The landmarks" builds them.
 	World.landmarks(ctx, root)
-
-	-- The forest ring's filler (FOR-02), when asked for: every tree of it.
-	if opts and opts.forest then
-		World.forest(ctx, root)
-	end
 
 	-- The Skyroot and the isles.
 	local sky = WorldPlan.Sky()

@@ -295,7 +295,7 @@ local shelterComplete = false
 
 -- The zones that keep rain off: scatter and underground rooms, and the plan's
 -- (NatureData.FromWorldPlan). The plan's cave points of interest are placed
--- against every tree, so until WorldPlan's trees are worked out (ForestFiller
+-- against every tree, so until WorldPlan's trees are worked out (GrassTufts
 -- does that, a slice a frame, after the player is in) the zones are the rest,
 -- and the caves join the moment they are ready. This never asks WorldPlan for
 -- the trees itself: that is seconds of work and froze the client (and Start).

@@ -14,8 +14,6 @@ return function(t)
 		"SwayTrees",
 		"SwayRange",
 		"WeatherRate",
-		"FillerNear",
-		"FillerFar",
 		"TuftNear",
 		"ChipCount",
 		"LeafPool",
