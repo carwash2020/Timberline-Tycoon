@@ -1029,56 +1029,55 @@ function WorldPlan.NearGrove(): { TreeSpot }
 	return out
 end
 
--- WORLD-SPREAD (T356): the refill (TreeSpread.Rows): clumps of 3 in every
--- treeable 200 stud cell with no tree, then in the sparsest cells until the
--- trees thinning dropped are replaced with a net gain. Appended after every
--- other tree list; nothing existing moves. Cached in fields (no new local).
--- Returns the spots; `WorldPlan._spreadUnfilled` holds the cells with no legal
--- ground. `pause` is the planner's time slice.
-function WorldPlan.SpreadTrees(pause: (() -> ())?): { TreeSpot }
+-- WORLD-SPREAD (T356), T400: the trees TreeCover spreads over the map in
+-- clumps of 3 to 5, so the gaps between the groves hold real, choppable trees
+-- (the client's stand-in forest is gone). The plan is data (TreeSpreadData.Cover,
+-- written by tools/tree_cover, checked by tests/TreeCover.spec); this reads it.
+-- Appended after every other tree list; nothing existing moves. Each clump is
+-- its own zone `spread:<n>` (cap = its trees). Cached in a field (no new
+-- local). `pause` is accepted for the callers' sake: there is nothing to plan.
+function WorldPlan.SpreadTrees(_pause: (() -> ())?): { TreeSpot }
 	local self: any = WorldPlan
 	if self._spread then
 		return self._spread
 	end
-	local TreeFill = require(script.Parent.TreeFill)
-	local TreeSpread = require(script.Parent.TreeSpread)
-	local positions: { Vector3 } = {}
-	local function add(list: { TreeSpot })
-		for _, spot in ipairs(list) do
-			if not TreeSpread.Skipped(spot.position.X, spot.position.Z) then
-				table.insert(positions, spot.position)
-			end
+	local data = require(script.Parent.TreeSpreadData)
+	local clumps: { [number]: { { x: number, z: number, wood: string } } } = {}
+	local order: { number } = {}
+	for _, tree in ipairs(data.Cover) do
+		local list = clumps[tree.clump]
+		if not list then
+			list = {}
+			clumps[tree.clump] = list
+			table.insert(order, tree.clump)
+		end
+		table.insert(list, tree)
+	end
+	local out: { TreeSpot } = {}
+	for _, id in ipairs(order) do
+		local list = clumps[id]
+		local mx, mz = 0, 0
+		for _, tree in ipairs(list) do
+			mx += tree.x
+			mz += tree.z
+		end
+		mx /= #list
+		mz /= #list
+		local radius = 0
+		for _, tree in ipairs(list) do
+			radius = math.max(radius, math.sqrt((tree.x - mx) ^ 2 + (tree.z - mz) ^ 2))
+		end
+		local zone: TreeZone = { id = "spread:" .. id, cx = mx, cz = mz, radius = radius + 6, cap = #list }
+		for _, tree in ipairs(list) do
+			table.insert(out, {
+				woodId = tree.wood,
+				position = Vector3.new(tree.x, TerrainGen.HeightAt(tree.x, tree.z) - 0.3, tree.z),
+				biome = "wild",
+				zone = zone,
+			})
 		end
 	end
-	add(WorldPlan.Trees(pause))
-	add(WorldPlan.StripTrees())
-	add(WorldPlan.FerryPalms())
-	add(WorldPlan.Lanternwood())
-	add(WorldPlan.RegionTrees())
-	add(WorldPlan.ReachTrees())
-	add(WorldPlan.AddedTrees(pause))
-	add(WorldPlan.NearGrove())
-	for _, spot in ipairs(require(script.Parent.Parent.TutorialGrove).Trees) do
-		table.insert(positions, Vector3.new(spot.x, 0, spot.z))
-	end
-	local sea = WorldLayout.SeaLevel
-	local out, unfilled = TreeSpread.Rows({
-		trees = positions,
-		dropped = TreeSpread.SkipCount(),
-		isLand = function(x: number, z: number): boolean
-			return TerrainGen.HeightAt(x, z) > sea + 1
-		end,
-		groundFor = function(x: number, z: number): boolean
-			return TreeFill.Ground(x, z) and TreeFill.Clear(x, z)
-		end,
-		takenNear = TreeFill.TakenNear,
-		height = TerrainGen.HeightAt,
-		pause = pause,
-	}, function(seed: number): any
-		return Kit.rng(seed)
-	end)
 	self._spread = out
-	self._spreadUnfilled = unfilled
 	return out
 end
 
