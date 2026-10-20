@@ -389,7 +389,10 @@ return function(t)
 		end
 		t.eq(found, true)
 		local ghostPart = model:FindFirstChild("Part1")
-		t.ok(math.abs(ghostPart.Transparency - BuilderBar.GhostTransparency) < 1e-3, "ghost stays see-through")
+		t.ok(
+			math.abs(ghostPart.Transparency - BlueprintModels.HoloTransparency) < 1e-3,
+			"ghost stays a see-through hologram"
+		)
 
 		local door = BlueprintModels.Build(bp("Door"), false)
 		local leaf = nil

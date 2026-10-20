@@ -9,6 +9,7 @@ return function(t)
 	t.test("the bindings are valid: no right trigger, no key doing two jobs, everything reachable", function()
 		t.eq({ Controls.Validate() }, { true, nil })
 		t.eq(table.find(Controls.AllKeys(), "ButtonR2"), nil, "ButtonR2 is never bound")
+		t.eq(table.find(Controls.AllKeys(), "ButtonA"), nil, "A only jumps")
 		for _, device in ipairs({ "desktop", "console", "phone" }) do
 			t.eq(Controls.Unreachable(device), {}, device .. " reaches every action")
 		end
@@ -21,7 +22,8 @@ return function(t)
 		t.eq(Controls.KeysFor("desktop", "lower"), { "PageDown", "C" })
 		t.eq(Controls.KeysFor("desktop", "place"), {}, "a PC places with the left mouse button")
 		t.eq(Controls.PlaceMouse, "MouseButton1")
-		t.eq(Controls.KeysFor("console", "place"), { "ButtonA" }, "A places, not the right trigger")
+		t.eq(Controls.KeysFor("console", "place"), {}, "RT places through the hammer; A only jumps")
+		t.eq(Controls.HammerPlaces, true)
 		t.eq(Controls.KeysFor("console", "rotate"), { "DPadRight" })
 		t.eq(Controls.KeysFor("console", "raise"), { "DPadUp" })
 		t.eq(Controls.KeysFor("console", "lower"), { "DPadDown" })
@@ -107,10 +109,79 @@ return function(t)
 	t.test("an Xbox bar has no buttons: the pad has every action, the hint line says how", function()
 		local layout = Controls.Layout("console", { x = 1920, y = 1080 }, 70)
 		t.eq(next(layout.buttons), nil)
-		t.ok(Controls.Hints.console:find("A place") ~= nil and Controls.Hints.console:find("B stop") ~= nil)
+		t.eq(
+			Controls.Hints.console,
+			"RT place · D-pad right turn · D-pad up/down raise · LT lock · B stop",
+			"RT places now, and the hint says so"
+		)
 		t.ok(Controls.Hints.phone:find("PLACE") ~= nil)
-		t.ok(Controls.Hints.desktop:find("R to turn") ~= nil)
-		t.eq(Controls.Hints.console:find("RT"), nil, "no mention of the right trigger")
+		t.ok(Controls.Hints.desktop:find("R rotate") ~= nil)
+		t.eq(Controls.Hints.console:find("A place"), nil, "A no longer places")
+	end)
+
+	t.test("each device's hint names every action bound for that device, and no other", function()
+		for _, device in ipairs({ "desktop", "console", "phone" }) do
+			local bound = {}
+			for _, action in ipairs(Controls.BoundActions(device)) do
+				bound[action] = true
+			end
+			local named = {}
+			for _, part in ipairs(Controls.HintParts[device]) do
+				t.ok(Controls.Hints[device]:find(part.text, 1, true) ~= nil, device .. " hint holds " .. part.text)
+				for _, action in ipairs(part.actions) do
+					t.ok(bound[action], device .. " hint names " .. action .. ", which it cannot do")
+					named[action] = true
+				end
+			end
+			for action in pairs(bound) do
+				t.ok(named[action], device .. " hint leaves out " .. action)
+			end
+		end
+		-- No device's hint borrows another's controls.
+		t.eq(Controls.Hints.desktop:find("RT"), nil)
+		t.eq(Controls.Hints.desktop:find("D-pad"), nil)
+		t.eq(Controls.Hints.phone:find("Click"), nil)
+		t.eq(Controls.Hints.phone:find("D-pad"), nil)
+		t.eq(Controls.Hints.console:find("Click"), nil)
+		t.eq(Controls.Hints.console:find("PgUp"), nil)
+		-- The pad's lock is the one extra action, and only the pad has it.
+		t.eq(table.find(Controls.BoundActions("console"), "lock") ~= nil, true)
+		t.eq(table.find(Controls.BoundActions("desktop"), "lock"), nil)
+	end)
+
+	t.test("the hint pill: Scale only, inside the 5 percent safe area, above the bar on a phone", function()
+		local fs = require("@lune/fs")
+		local sizes = {
+			{ "console", 1920, 1080, 1.25 },
+			{ "console", 1280, 720, 1 },
+			{ "desktop", 1920, 1080, 1.25 },
+			{ "desktop", 1280, 720, 1 },
+			{ "phone", 667, 375, 0.78 },
+			{ "phone", 812, 375, 0.78 },
+		}
+		t.eq(Controls.PillMin, { w = 260, h = 40 })
+		t.eq(Controls.PillMax, { w = 520, h = 64 })
+		for _, row in ipairs(sizes) do
+			local device, w, h, scale = row[1], row[2], row[3], row[4]
+			local at = string.format("%s %dx%d", device, w, h)
+			local bottom = (if device == "console" then 36 else 12) + (if device == "phone" then 58 else 70)
+			local pill = Controls.Pill(device, { x = w, y = h }, bottom * scale, scale)
+			t.eq(pill.x, 0.5, at)
+			t.ok(pill.w > 0 and pill.w <= 1 and pill.h > 0 and pill.h <= 1, at .. ": scale sizes")
+			local r = pill.rect
+			t.ok(r.x >= w * 0.05 - 1e-6 and r.x + r.w <= w * 0.95 + 1e-6, at .. ": inside the side safe area")
+			t.ok(r.y >= h * 0.05 - 1e-6 and r.y + r.h <= h * 0.95 + 1e-6, at .. ": inside the top and bottom safe area")
+			t.ok(r.w >= 260 * scale - 1e-6 or r.w >= w * 0.9, at .. ": at least the minimum width")
+			-- Clear of the build bar and the hotbar.
+			local bar = Controls.Layout(device, { x = w, y = h }, bottom * scale, scale).bar
+			t.ok(r.y + r.h <= bar.y - Controls.PillGap + 1e-6, at .. ": above the build bar")
+			t.ok(r.y + r.h <= h - bottom * scale - Controls.PillAboveHotbar + 1e-6, at .. ": 24 px above the hotbar")
+		end
+		-- The label is Scale only in the HUD: no offset size or position for the pill.
+		local hud = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HUD.luau")
+		t.ok(hud:find("hint.Position = UDim2.fromScale(pill.x, pill.y)", 1, true), "Scale-only Position")
+		t.ok(hud:find("hint.Size = UDim2.fromScale(pill.w, pill.h)", 1, true), "Scale-only Size")
+		t.ok(hud:find("PlaceControlsLogic.PillMin.w", 1, true) and hud:find("PlaceControlsLogic.PillMax.h", 1, true))
 	end)
 
 	t.test("a drag starts only on or next to the ghost; elsewhere a touch is the camera's", function()

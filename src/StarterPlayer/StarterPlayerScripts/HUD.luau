@@ -84,6 +84,7 @@ local LoadStages = require(ReplicatedStorage.Shared.LoadStages)
 local Net = require(ReplicatedStorage.Shared.Net)
 local GamepadNavLogic = require(ReplicatedStorage.Shared.GamepadNavLogic)
 local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
+local PlaceControlsLogic = require(ReplicatedStorage.Shared.PlaceControlsLogic)
 local PhoneHud = require(ReplicatedStorage.Shared.PhoneHud)
 local QuickMenuLogic = require(ReplicatedStorage.Shared.QuickMenuLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
@@ -182,6 +183,7 @@ local hintGrabs = 0 -- grabs this session (HUD.NoteGrab)
 local dragHintSince: number? = nil -- when the idle drag line first showed this session
 local syncHint: (() -> ())? = nil -- refreshModal, once it exists
 local hintLimit: UISizeConstraint? = nil -- the hint's widest right now (placeRow)
+local pillOn = false -- the hint is the placing pill (stylePill): out of the bottom row, Scale-sized
 local bottomRow: Frame? = nil -- the load chip and the hint, side by side
 local rowQueued = false
 local chip: Chip? = nil
@@ -758,6 +760,60 @@ local function hintStateV2(): HintLogic.StateV2
 	}
 end
 
+-- While a blueprint is being placed the one hint line becomes a small pill:
+-- bottom-centre, Ink panel, 8 px corners, Cream text, Scale-only Size and
+-- Position (PlaceControlsLogic.Pill) with a UISizeConstraint of 260 x 40 to
+-- 520 x 64, above the build bar and inside the 5 percent safe area. It is the
+-- same label as ever: it leaves the bottom row for the screen while placing and
+-- goes back when placing stops.
+local function stylePill(on: boolean)
+	local hint, row, gui, limit = hintLabel, bottomRow, hudGui, hintLimit
+	if not hint or not row or not gui or not limit then
+		return
+	end
+	local corner = hint:FindFirstChildOfClass("UICorner")
+	if on then
+		local camera = workspace.CurrentCamera
+		local viewport = if camera then camera.ViewportSize else Vector2.new(1920, 1080)
+		local scale = UITheme.Scale()
+		local pill = PlaceControlsLogic.Pill(
+			UITheme.Device(),
+			{ x = viewport.X, y = viewport.Y },
+			UITheme.Bottom() * scale,
+			scale
+		)
+		pillOn = true
+		hint.Parent = gui
+		hint.AnchorPoint = Vector2.new(0.5, 1)
+		hint.AutomaticSize = Enum.AutomaticSize.None
+		hint.Position = UDim2.fromScale(pill.x, pill.y)
+		hint.Size = UDim2.fromScale(pill.w, pill.h)
+		hint.TextWrapped = true
+		hint.TextTruncate = Enum.TextTruncate.None
+		hint.TextColor3 = C.Cream
+		hint.BackgroundColor3 = C.Ink
+		limit.MinSize = Vector2.new(PlaceControlsLogic.PillMin.w, PlaceControlsLogic.PillMin.h)
+		limit.MaxSize = Vector2.new(PlaceControlsLogic.PillMax.w, PlaceControlsLogic.PillMax.h)
+		if corner then
+			corner.CornerRadius = UDim.new(0, UITheme.Radius)
+		end
+	elseif pillOn then
+		pillOn = false
+		hint.Parent = row
+		hint.AnchorPoint = Vector2.zero
+		hint.AutomaticSize = Enum.AutomaticSize.X
+		hint.Position = UDim2.new()
+		hint.Size = UDim2.fromOffset(0, ROW_HEIGHT)
+		hint.TextWrapped = false
+		hint.TextTruncate = Enum.TextTruncate.AtEnd
+		limit.MinSize = Vector2.zero
+		limit.MaxSize = Vector2.new(HINT_MAX, ROW_HEIGHT)
+		if corner then
+			corner.CornerRadius = UDim.new(0, ROW_HEIGHT / 2)
+		end
+	end
+end
+
 -- The hint for this device and what you're doing.
 local function refreshHint()
 	local hint = hintLabel
@@ -784,6 +840,13 @@ local function refreshHint()
 		end
 	else
 		text = HintLogic.Pick(UITheme.Device(), hintForced or HintLogic.ContextFor(hintState))
+	end
+	if hintForced == "build" then
+		-- Placing: the placer's own words for this device (one source), as the pill.
+		text = PlaceControlsLogic.Hints[UITheme.Device()] or text
+		stylePill(true)
+	else
+		stylePill(false)
 	end
 	if hint.Text ~= text then
 		hint.Text = text
@@ -1020,9 +1083,9 @@ local function placeRow()
 	end
 	local c = chip
 	local chipW = if c and c.frame.Visible then c.frame.AbsoluteSize.X / scale else 0
-	local hintW = if hint.Visible then hint.AbsoluteSize.X / scale else 0
+	local hintW = if hint.Visible and not pillOn then hint.AbsoluteSize.X / scale else 0
 	local hintMax, centre = HudLayout.BottomRow(screenW, chipW, hintW, ROW_GAP, side, high, HINT_MAX)
-	if limit.MaxSize.X ~= hintMax then
+	if not pillOn and limit.MaxSize.X ~= hintMax then
 		limit.MaxSize = Vector2.new(hintMax, ROW_HEIGHT)
 	end
 	row.Position = UDim2.new(0, centre, 1, -UITheme.Bottom()) -- above the tool hotbar
