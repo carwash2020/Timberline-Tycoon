@@ -52,6 +52,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local BandLogic = require(ReplicatedStorage.Shared.BandLogic)
 local ChopFeelLogic = require(ReplicatedStorage.Shared.ChopFeelLogic)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
@@ -779,8 +780,8 @@ end
 -- tree or log is outlined or tinted.
 ---------------------------------------------------------------------------
 
-CutController.GuideThickness = 0.15 -- studs
-CutController.GuideTransparency = 0.4
+CutController.GuideThickness = 0.12 -- studs
+CutController.GuideTransparency = 0.15
 
 -- Where the guide sits for `kind` on a section with `cf` and `size` (its long
 -- axis is local Y): a standing trunk ("tree") at the seam under the pointer
@@ -800,11 +801,12 @@ local guide: Part? = nil
 local bandPart: BasePart? = nil -- the section the band rings
 local bandH = 0 -- the cut height up that section, fixed at aim time
 local bandHard = false
+local bandBark: Color3? = nil -- the bark the band colour was chosen for
 local bandCF: CFrame? = nil
 local bandSize: Vector3? = nil
 
 CutController.GuideMove = 0.05 -- studs the band must move before its CFrame is rewritten
-CutController.GuideGrow = 0.08 -- studs wider than the section, so the band clears its surface
+CutController.GuideGrow = 0.08 -- studs wider than the section (radius + 0.04), so the band clears its surface and stays within radius + 0.1
 
 -- The band for a section `cf`/`size` cut `h` up from its bottom: a thin ring
 -- just wider than the section, centred on the cut line. The only highlight.
@@ -838,7 +840,7 @@ end
 
 -- Hides the band and the one Highlight that rings it.
 local function hideGuide()
-	bandPart, bandCF, bandSize = nil, nil, nil
+	bandPart, bandBark, bandCF, bandSize = nil, nil, nil, nil
 	local g = guide
 	if g and g.Parent ~= nil then
 		g.Parent = nil
@@ -851,7 +853,7 @@ local function hideGuide()
 end
 
 -- Puts the band on `part` at height `h`, writing only what changed.
-local function placeBand(part: BasePart, h: number, hard: boolean)
+local function placeBand(part: BasePart, h: number, hard: boolean, bark: Color3?)
 	local g = guide or makeGuide()
 	guide = g
 	local cf, size = CutController.BandFor(part.CFrame, part.Size, h)
@@ -863,10 +865,12 @@ local function placeBand(part: BasePart, h: number, hard: boolean)
 		g.Size = size
 		bandSize = size
 	end
-	if bandPart ~= part or bandHard ~= hard or g.Parent == nil then
-		g.Color = if hard then HARD_COLOR else READY_COLOR
-		bandPart, bandHard = part, hard
+	if bandPart ~= part or bandBark ~= bark or g.Parent == nil then
+		-- Ink, or cream on a dark bark. Too hard shows on the Highlight outline.
+		g.Color = BandLogic.ColorFor(bark)
+		bandPart, bandBark = part, bark
 	end
+	bandHard = hard
 	bandH = h
 	if g.Parent ~= workspace then
 		g.Parent = workspace
@@ -898,7 +902,7 @@ local function followBand()
 		hideGuide()
 		return
 	end
-	placeBand(part, bandH, bandHard)
+	placeBand(part, bandH, bandHard, bandBark)
 end
 
 -- Rings the cut for `seen` (the target, or what the pointer found but the axe
@@ -909,7 +913,8 @@ local function showGuide(seen: Target?, hard: boolean)
 		return
 	end
 	local _, h = CutController.GuideAt(seen.kind, seen.part.CFrame, seen.part.Size, seen.hit)
-	placeBand(seen.part, h, hard)
+	local def = if seen.woodId then WoodData.Get(seen.woodId) else nil
+	placeBand(seen.part, h, hard, if def then def.trunkColor else nil)
 end
 
 -- Shows only where this swing would cut (see the header).

@@ -945,17 +945,55 @@ return function(t)
 		t.ok(w.section.Size.Y >= made(w, "CutGuide").Size.Y, "never longer than the log")
 	end)
 
-	t.test("the band is 0.15 thick and just wider than the section", function()
-		local w = swingWorld({ tag = "Wood" })
-		w.beat(0.05)
-		local band = made(w, "CutGuide")
-		t.ok(math.abs(band.Size.Y - 0.15) < 1e-6)
-		t.ok(math.abs(band.Size.X - 2.08) < 1e-6 and math.abs(band.Size.Z - 2.08) < 1e-6)
-		t.eq(band.Material, roblox.Enum.Material.SmoothPlastic)
-		t.eq(band.Transparency, 0.4)
+	t.test("the band is 0.12 thick, SignInk smooth plastic, and hugs the trunk (radius + 0.1 at most)", function()
+		for _, tag in ipairs({ "Tree", "Wood" }) do
+			local w = swingWorld({ tag = tag })
+			w.beat(0.05)
+			local band = made(w, "CutGuide")
+			t.ok(math.abs(band.Size.Y - 0.12) < 1e-6 and band.Size.Y <= 0.2, tag .. ": thin")
+			local Material = roblox.Enum.Material
+			t.ok(band.Material ~= Material.Wood and band.Material ~= Material.Neon, tag .. ": not Wood or Neon")
+			t.eq(band.Material, Material.SmoothPlastic)
+			t.eq(band.Transparency, 0.15)
+			t.eq(rgb(band.Color), { 0x2A, 0x24, 0x20 })
+			local s = w.section.Size
+			t.ok(band.Size.X <= s.X + 0.2 + 1e-6, tag .. ": X within radius + 0.1")
+			t.ok(band.Size.Z <= s.Z + 0.2 + 1e-6, tag .. ": Z within radius + 0.1")
+			t.ok(band.Size.X > s.X and band.Size.Z > s.Z, tag .. ": still clears the surface")
+		end
 	end)
 
-	t.test("a too-hard target shows the same band in orange; the Adornee is still the band", function()
+	t.test("a dark bark gets the SignCream band, a light one the SignInk band", function()
+		for _, tag in ipairs({ "Tree", "Wood" }) do
+			for _, id in ipairs({ "emberwood", "phantomwood", "ironwood" }) do
+				local w = swingWorld({ tag = tag, wood = id })
+				w.beat(0.05)
+				t.eq(rgb(made(w, "CutGuide").Color), { 0xF3, 0xE7, 0xC9 }, tag .. " " .. id)
+			end
+			for _, id in ipairs({ "oak", "birch" }) do
+				local w = swingWorld({ tag = tag, wood = id })
+				w.beat(0.05)
+				t.eq(rgb(made(w, "CutGuide").Color), { 0x2A, 0x24, 0x20 }, tag .. " " .. id)
+			end
+		end
+	end)
+
+	t.test("while previewing, nothing adorns the trunk or the log: no SelectionBox, no Highlight on it", function()
+		for _, tag in ipairs({ "Tree", "Wood" }) do
+			local w = swingWorld({ tag = tag })
+			w.beat(0.05)
+			local band = made(w, "CutGuide")
+			for _, inst in ipairs(w.created) do
+				t.ok(inst.ClassName ~= "SelectionBox", tag .. ": no SelectionBox at all")
+				if inst.Adornee ~= nil then
+					t.ok(inst.Adornee == band, tag .. ": an adornment rings only the band")
+					t.ok(inst.Adornee ~= w.section and inst.Adornee ~= w.model, tag .. ": never the trunk")
+				end
+			end
+		end
+	end)
+
+	t.test("a too-hard target keeps the ink band and shows orange on the outline; the Adornee is the band", function()
 		-- No shipped axe is refused outright, so give the Rusty Axe a zero-damage row for one wood.
 		for _, tag in ipairs({ "Tree", "Wood" }) do
 			local w = swingWorld({ tag = tag, wood = "frostwood" })
@@ -964,14 +1002,14 @@ return function(t)
 			w.beat(0.05)
 			rusty.v2.vs = nil
 			local hl, band = made(w, "CutTarget"), made(w, "CutGuide")
-			t.eq(rgb(band.Color), { 255, 170, 70 }, tag)
+			t.eq(rgb(band.Color), { 0x2A, 0x24, 0x20 }, tag)
 			t.eq(rgb(hl.OutlineColor), { 255, 170, 70 }, tag)
 			t.ok(hl.Adornee == band, tag)
 			t.eq(hl.Enabled, true)
 		end
 		local ready = swingWorld({ tag = "Wood" })
 		ready.beat(0.05)
-		t.eq(rgb(made(ready, "CutGuide").Color), { 255, 244, 214 })
+		t.eq(rgb(made(ready, "CutGuide").Color), { 0x2A, 0x24, 0x20 })
 	end)
 
 	t.test("300 updates make no new Instance, and the same aim writes nothing", function()
