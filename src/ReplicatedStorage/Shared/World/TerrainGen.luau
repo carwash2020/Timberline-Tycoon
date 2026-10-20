@@ -48,7 +48,7 @@ end
 --     hills blend in: beside a road the ramp is the steady ROAD_GRADE (0.19,
 --     10.8 degrees) of total climb less the road's own bank (roadProfile), so
 --     bank and hill stay inside the 15 degrees a hill may be (tests/GroundHills.
---     spec: forest ground tops out at 14.7, 14.65 on a 4 stud scan of the
+--     spec: forest ground tops out at 14.0, 14.65 on a 4 stud scan of the
 --     Hills). The roads cut the Hills into cells about 100 studs across, so a
 --     cell's middle reaches about +9.4, about what that rule allows there.
 --     Everywhere else the ground is the T397 ground bit for bit (so the
