@@ -104,7 +104,9 @@ UndergroundData.Caves = {
 	cave("hills-cave", "Hills cave", 2, -400, 80, -40, 24, 40, 40, 3),
 	cave("peak-cave", "Peak cave", 3, 90, 840, -36, 24, 40, 40, 3),
 	cave("lava-cave", "Lava cave", 3, 540, 680, -36, 24, 40, 40, 3),
-	cave("grotto", "Lanternwood grotto", 1, -240, -420, -20, 36, 48, 56, 4),
+	-- T397: 8 studs north of where it was (z -420): its rock roof stood 2 studs
+	-- into the Ring Road's south-west lane, a wall across the road's edge.
+	cave("grotto", "Lanternwood grotto", 1, -240, -412, -20, 36, 48, 56, 4),
 	cave("waterfall", "Waterfall hollow", 1, 250, 260, -28, 16, 24, 24, 2),
 	cave("camp", "Old logging camp", 1, -360, -90, -24, 20, 36, 28, 2),
 	cave("ice", "Ice cave", 1, 190, 880, -32, 20, 32, 32, 2),

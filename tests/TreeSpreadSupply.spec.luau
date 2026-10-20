@@ -39,11 +39,13 @@ return function(t)
 	end
 
 	t.test("every index keeps the wood, biome and zone main had, and every other tree its position", function()
-		t.eq(#trees, 1041)
+		-- T397: the ground moved, so the plan is 1,052 trees (1,041 on main) and the nine
+		-- moves were dropped: they were generated against the old plan, and T400 re-plans.
+		t.eq(#trees, 1052)
 		-- Main's: all 1,041 indices (no positions), and every index but the nine moved ones (with positions).
-		t.eq(sum({}, false), 698818295, "wood, biome and zone at every index")
-		t.eq(sum(moved, true), 748112584, "positions of the trees that did not move")
-		t.eq(#TreeSpreadData.Moved, 9)
+		t.eq(sum({}, false), 930487032, "wood, biome and zone at every index")
+		t.eq(sum(moved, true), 263398849, "positions of the trees that did not move")
+		t.eq(#TreeSpreadData.Moved, 0)
 	end)
 
 	t.test("per-zone and per-wood counts equal main's, so a re-pin cannot hide a lost tree", function()
@@ -60,10 +62,10 @@ return function(t)
 			["starter/birch"] = 26,
 			["starter/oak"] = 70,
 			["volcano/emberwood"] = 60,
-			["wild/birch"] = 167,
-			["wild/maple"] = 41,
-			["wild/oak"] = 200,
-			["wild/pine"] = 255,
+			["wild/birch"] = 174,
+			["wild/maple"] = 35,
+			["wild/oak"] = 196,
+			["wild/pine"] = 269,
 		}
 		for key, n in pairs(MAIN) do
 			t.eq(counts[key], n, key)
@@ -140,9 +142,9 @@ return function(t)
 			end
 		end
 		-- Before: Hills (-500,100) 44, Starter (-100,-300) 27 and (0,-200) 44.
-		t.eq(cells["-5,1"], 37)
-		t.eq(cells["-1,-3"], 26)
-		t.eq(cells["0,-2"], 43)
+		t.eq(cells["-5,1"], 46)
+		t.eq(cells["-1,-3"], 27)
+		t.eq(cells["0,-2"], 44)
 		for _, m in ipairs(TreeSpreadData.Moved) do
 			local key = math.floor(m.x / 100) .. "," .. math.floor(m.z / 100)
 			t.ok(cells[key] <= 22, "destination cell " .. key .. " holds " .. cells[key])

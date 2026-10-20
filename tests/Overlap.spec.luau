@@ -14,7 +14,22 @@ return function(t)
 	-- moved the four boulders, the Ruined Cabin, the Reach tree, two Mesa ironwoods and
 	-- two north-strip clumps, so every hit of #220's list is gone. A hit added here must
 	-- say why, and it fails the spec when it disappears.
-	local FIXED = {}
+	local FIXED = {
+		-- T397: nine pieces of the tree plans that stand 1.4 to 8.7 studs inside a rock or
+		-- scenery piece on the moved ground: the fixed trees (first batch on the classic
+		-- ground, the north strip, the Reach, the Mesa's ironwoods) were not planned
+		-- against the scenery and boulders, which re-found their spots. T400 re-plans the
+		-- trees, so none is nudged here.
+		["strip#11 maple | cluster#16.1"] = "strip tree against a cluster rock",
+		["strip#14 maple | scenery#69 Outcrop"] = "strip tree against a scenery piece",
+		["strip#23 birch | scenery#70 Outcrop"] = "strip tree against a scenery piece",
+		["strip#24 birch | scenery#70 Outcrop"] = "strip tree against a scenery piece",
+		["strip#33 birch | scenery#69 Outcrop"] = "strip tree against a scenery piece",
+		["reach#2 phantomwood | scenery#56 LogPile"] = "reach tree against a scenery piece",
+		["reach#3 phantomwood | scenery#57 FenceLine"] = "reach tree against a scenery piece",
+		["trees#238 oak | region#72 ironwood"] = "first tree against a region tree",
+		["trees#256 oak | region#80 ironwood"] = "first tree against a region tree",
+	}
 
 	local function pairId(hit)
 		return hit.a.id .. " | " .. hit.b.id
@@ -74,7 +89,7 @@ return function(t)
 		for _, result in ipairs(results) do
 			total += #result.hits
 		end
-		t.eq(total, 0)
+		t.eq(total, 9, "only the nine FIXED hits")
 	end)
 
 	t.test("the moved spots keep 10 studs from every tree and 2 from every boulder", function()

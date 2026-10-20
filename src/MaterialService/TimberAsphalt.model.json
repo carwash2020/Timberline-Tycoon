@@ -1,0 +1,8 @@
+{
+  "className": "MaterialVariant",
+  "properties": {
+    "BaseMaterial": "Asphalt",
+    "StudsPerTile": 8,
+    "MaterialPattern": "Organic"
+  }
+}

@@ -22,12 +22,17 @@ return function(t)
 	-- are flat at their own height, and each lane is a sample.
 	local HEIGHT_FINGERPRINT = {
 		n = 7717,
-		sum = 78823.171615040409961,
-		wsum = 63.910852080600257,
-		sq = 5271618.687334788963199,
-		lo = -48.000000000000000,
+		sum = 68400.124273782537784,
+		wsum = 4.247161048071648,
+		sq = 4783916.585540854372084,
+		lo = -41.562571590540983,
 		hi = 161.576039893993112,
 	}
+	-- T397 (gentle hills) re-sampled it on purpose: the Hills' domes and the
+	-- meadow's rolling are now at most 18 and 9 and start 8 studs past any road,
+	-- plot or pad; roads climb at most 5 degrees (the ravine road 10) with an 80
+	-- stud bank; the homestead shelves sit at y = 0; store pads are flat. The
+	-- grid keeps the old ground for the first 322 trees as CLASSIC_FINGERPRINT.
 	-- Ring map (WorldHalf 1000): the grid is 64 x 64 over the 2000-stud square (it was
 	-- over the old 3000), the coast sample stops at the wall, and the roads are the ring's.
 	local function heightFingerprint()
@@ -82,6 +87,31 @@ return function(t)
 			t.ok(
 				math.abs(got[key] - want[key]) < 1e-5 * math.max(1, math.abs(want[key]) * 1e-6),
 				string.format("HeightAt fingerprint %s is %.9f, was %.9f", key, got[key], want[key])
+			)
+		end
+	end)
+
+	-- T397: the first 322 trees are placed on the ground as it was before the
+	-- gentle hills (TerrainGen.SetClassicGround), so their X and Z never move.
+	-- These are the numbers the fingerprint above had on main before T397.
+	local CLASSIC_FINGERPRINT = {
+		n = 7717,
+		sum = 78823.171615040409961,
+		wsum = 63.910852080600257,
+		sq = 5271618.687334788963199,
+		lo = -48.000000000000000,
+		hi = 161.576039893993112,
+	}
+	t.test("the classic ground (the first trees') is exactly the ground as it was before T397", function()
+		TerrainGen.SetClassicGround(true)
+		local ok, got = pcall(heightFingerprint)
+		TerrainGen.SetClassicGround(false)
+		t.ok(ok, tostring(got))
+		for _, key in ipairs({ "n", "sum", "wsum", "sq", "lo", "hi" }) do
+			t.ok(
+				math.abs(got[key] - CLASSIC_FINGERPRINT[key])
+					< 1e-5 * math.max(1, math.abs(CLASSIC_FINGERPRINT[key]) * 1e-6),
+				string.format("classic fingerprint %s is %.9f, was %.9f", key, got[key], CLASSIC_FINGERPRINT[key])
 			)
 		end
 	end)

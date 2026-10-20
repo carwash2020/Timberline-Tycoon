@@ -2485,9 +2485,11 @@ end
 -- that glows after dark (LightingController), with a second, invisible
 -- LanternGlow 3 studs over it holding the dim PointLight (built switched
 -- off), so the light falls on the ground instead of grazing along it.
+-- LinePaint (T397): not in the V1 pack, so the cream the bays were always painted in, #E6DEC8.
 local BAY_PAINT = Color3.fromRGB(230, 222, 200)
 local BAY_LAMP_DAY = Color3.fromRGB(247, 217, 165) -- LightingController's daytime LanternGlow
-local BAY_LINE = 0.35
+local BAY_LINE = 0.3
+local CURB_HEIGHT = 0.45
 function BuildingArt.ParkingBay(slot: BasePart, index: number)
 	slot.Transparency = 1
 	local cf, size = slot.CFrame, slot.Size
@@ -2502,6 +2504,9 @@ function BuildingArt.ParkingBay(slot: BasePart, index: number)
 	local number = paint("BayNumber", V3(2.4, size.Y, 2), CF(0, 0, -hz + 3.6), BAY_PAINT)
 	number.Transparency = 1 -- only its painted digits show
 	Kit.signText(number, tostring(index), BAY_PAINT, { Enum.NormalId.Top })
+	-- One curb block per stall, across the tail (+Z end) where the stall
+	-- meets its neighbour or the lot's edge. Looks only: nothing to snag on.
+	paint("Curb", V3(4, CURB_HEIGHT, 0.8), CF(0, (CURB_HEIGHT - size.Y) / 2, hz - 0.6), Palette.StoneBase)
 	paint("LanternGlow", V3(2.6, size.Y + 0.02, 0.7), CF(0, 0.01, -hz + 1.2), BAY_LAMP_DAY)
 	local holder = paint("LanternGlow", V3(0.2, 0.2, 0.2), CF(0, 3, -hz + 1.2), BAY_LAMP_DAY)
 	holder.Transparency = 1
@@ -2513,6 +2518,29 @@ function BuildingArt.ParkingBay(slot: BasePart, index: number)
 	l.Enabled = false -- LightingController switches it on at dusk
 	l.Parent = holder
 	TownMeshes.Adorn(slot, "ParkingBay", cf)
+end
+
+-- The lot's own ground (T397): a PavedRoad slab of Asphalt (so the Asphalt
+-- MaterialVariant's texture shows), a 2-stud TrailDirt shoulder of Ground
+-- round it, both flat and looks only (the terrain under them is what trucks
+-- drive on). 0.3 thick, centred on the ground: its top is 0.15 up, under the
+-- bays' 0.2 paint, and nothing lies coplanar with the terrain or the paint.
+BuildingArt.LotShoulder = 2
+BuildingArt.LotSlabThickness = 0.3
+function BuildingArt.ParkingLot(lot: { x0: number, x1: number, z0: number, z1: number }): Model
+	local model = Kit.model("ParkingLotSurface")
+	local thick = BuildingArt.LotSlabThickness
+	local s = BuildingArt.LotShoulder
+	local function flat(name: string, x0: number, x1: number, z0: number, z1: number, color: Color3, mat: Enum.Material)
+		local p = Kit.part(model, name, V3(x1 - x0, thick, z1 - z0), CF((x0 + x1) / 2, 0, (z0 + z1) / 2), color, mat)
+		Kit.decor(p, false)
+	end
+	flat("LotSurface", lot.x0, lot.x1, lot.z0, lot.z1, Palette.PavedRoad, MAT.Asphalt)
+	flat("LotShoulder", lot.x0 - s, lot.x1 + s, lot.z0 - s, lot.z0, Palette.TrailDirt, MAT.Ground)
+	flat("LotShoulder", lot.x0 - s, lot.x1 + s, lot.z1, lot.z1 + s, Palette.TrailDirt, MAT.Ground)
+	flat("LotShoulder", lot.x0 - s, lot.x0, lot.z0, lot.z1, Palette.TrailDirt, MAT.Ground)
+	flat("LotShoulder", lot.x1, lot.x1 + s, lot.z0, lot.z1, Palette.TrailDirt, MAT.Ground)
+	return model
 end
 
 -- A street lamp: a stone footing, a timber post, an iron arm reaching out

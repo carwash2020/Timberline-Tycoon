@@ -543,7 +543,9 @@ return function(t)
 			-- under each rock; the shelves moved a few clusters.
 			-- Lane R: the Bayou's and Red Mesa's ground is Limestone and Sandstone, so the
 			-- clusters that stood in those two discs are gone (834672020 before).
-			t.eq(h, 932858296, "a cluster or landmark moved")
+			-- T397: re-sampled on purpose, the ground moved (the lighthouse stands at x 794 now,
+			-- the clusters and scenery re-found their spots). 932858296 before.
+			t.eq(h, 304251655, "a cluster or landmark moved")
 		end
 	)
 
@@ -573,34 +575,45 @@ return function(t)
 		end
 	)
 
-	t.test("FOR-04: Timber ground MaterialVariants are in MaterialService, off until checked in Studio", function()
-		local serde = require("@lune/serde")
-		local want = { TimberGrass = "Grass", TimberLeafy = "LeafyGrass", TimberGround = "Ground" }
-		for name, base in pairs(want) do
-			local file = "src/MaterialService/" .. name .. ".model.json"
-			local def = serde.decode("json", fs.readFile(file))
-			t.eq(def.className, "MaterialVariant", file)
-			local props = def.properties
-			t.eq(props.BaseMaterial, base, name .. "'s base material")
-			for _, map in ipairs({ "ColorMap", "NormalMap", "RoughnessMap" }) do
-				t.ok(string.match(props[map], "^rbxassetid://%d+$"), name .. "'s " .. map)
+	t.test(
+		"FOR-04: Timber ground MaterialVariants are in MaterialService (MaterialSetup points the bases at them, T397)",
+		function()
+			local serde = require("@lune/serde")
+			local want = {
+				TimberGrass = { "Grass", 10 },
+				TimberLeafy = { "LeafyGrass", 8 },
+				TimberGround = { "Ground", 12 },
+				TimberAsphalt = { "Asphalt", 8 },
+			}
+			for name, entry in pairs(want) do
+				local file = "src/MaterialService/" .. name .. ".model.json"
+				local def = serde.decode("json", fs.readFile(file))
+				t.eq(def.className, "MaterialVariant", file)
+				local props = def.properties
+				t.eq(props.BaseMaterial, entry[1], name .. "'s base material")
+				-- TimberAsphalt has no uploaded maps yet (no invented asset ids): it
+				-- tiles the engine's own Asphalt until Connor adds some.
+				for _, map in ipairs({ "ColorMap", "NormalMap", "RoughnessMap" }) do
+					if name ~= "TimberAsphalt" then
+						t.ok(string.match(props[map], "^rbxassetid://%d+$"), name .. "'s " .. map)
+					end
+				end
+				t.eq(props.StudsPerTile, entry[2], name .. "'s tiling")
+				t.eq(props.MaterialPattern, "Organic", name .. " tiles organically")
 			end
-			t.ok(props.StudsPerTile >= 16 and props.StudsPerTile <= 24, name .. "'s tiling")
-			t.eq(props.MaterialPattern, "Organic", name .. " tiles organically")
+			local tree = serde.decode("json", fs.readFile("default.project.json")).tree
+			local service = tree.MaterialService
+			t.eq(service["$className"], "MaterialService")
+			t.eq(service["$path"], "src/MaterialService")
+			t.eq(service["$ignoreUnknownInstances"], true, "never deletes a variant made in Studio")
+			-- The switch-over is MaterialSetup's SetBaseMaterialOverride at server
+			-- start (spec MaterialSetup), not properties in the project file.
+			local props = service["$properties"] or {}
+			for _, key in ipairs({ "GrassName", "LeafyGrassName", "GroundName", "AsphaltName" }) do
+				t.eq(props[key], nil, key .. " is set by MaterialSetup, not the project file")
+			end
 		end
-		local tree = serde.decode("json", fs.readFile("default.project.json")).tree
-		local service = tree.MaterialService
-		t.eq(service["$className"], "MaterialService")
-		t.eq(service["$path"], "src/MaterialService")
-		t.eq(service["$ignoreUnknownInstances"], true, "never deletes a variant made in Studio")
-		-- The textures can't be checked from here (Roblox's asset servers are
-		-- out of reach): no base material is switched over to them until
-		-- Connor has seen them in Studio (GrassName and friends stay default).
-		local props = service["$properties"] or {}
-		for _, key in ipairs({ "GrassName", "LeafyGrassName", "GroundName" }) do
-			t.eq(props[key], nil, key .. " is left to Studio for now")
-		end
-	end)
+	)
 
 	t.test("FOR-04: a grass tuft is 5-7 thin fanned blades with two lighter tips, shadowless decoration", function()
 		local grass = PropArt.Tints("starter").grass

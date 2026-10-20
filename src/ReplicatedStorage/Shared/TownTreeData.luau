@@ -119,7 +119,7 @@ TownTreeData.Lanes = {
 	-- The lighthouse's lamp stays in view from the spawn pad (WorldPlan.Lighthouse,
 	-- tests/WorldPlan.spec): no trunk within 10 studs of the line from the pad's
 	-- eye to the lamp. 11 here; the spec compares the lamp's place.
-	{ name = "LighthouseSight", ax = 0, az = 40, bx = 780, bz = -240, half = 11 },
+	{ name = "LighthouseSight", ax = 0, az = 40, bx = 794, bz = -240, half = 11 },
 } :: { Lane }
 TownTreeData.GondolaStation = { x = -40, z = 150 } -- WorldPlan.TownGondolaSpot (the spec compares)
 TownTreeData.GondolaLaneLength = 280
@@ -163,7 +163,7 @@ TownTreeData.Sites = {
 	cluster(
 		"strip1",
 		192,
-		44,
+		42, -- T397: 2 studs south (was 44): the flatter ground there no longer fits four trunks 12 apart at 44
 		16,
 		4,
 		"low",
@@ -183,7 +183,15 @@ TownTreeData.Sites = {
 	cluster("east1", 389, 125, 16, 3, "low", "east of the showroom hall"),
 	cluster("roadS", 246, -76, 16, 3, "low", "south of the plot road, east of the lot"),
 	-- medium: a roomier device.
-	cluster("west3", -210, 141, 16, 3, "medium", "the town's west edge, further out"),
+	cluster(
+		"west3",
+		-234, -- T397: was (-210, 141): a scenery piece stands there on the new ground
+		117,
+		16,
+		3,
+		"medium",
+		"the town's west edge, further out"
+	),
 	cluster("north3", -140, 245, 16, 3, "medium", "north-west of the General Store"),
 	cluster("snowE2", 66, 209, 16, 2, "medium", "east of the Snow Road, north of the Mill Road"),
 	cluster("back3", 226, 216, 16, 3, "medium", "behind the showroom hall, west end"),
