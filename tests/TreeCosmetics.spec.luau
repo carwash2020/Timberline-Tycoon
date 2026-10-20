@@ -139,8 +139,9 @@ return function(t)
 		t.eq(TreeCosmetics.Tracked(), 40)
 		table.clear(tagged) -- they streamed out: nothing else refers to them
 		-- Lune does not allow collectgarbage("collect"): make garbage until the
-		-- collector has run its cycle.
-		for _ = 1, 300 do
+		-- collector has run its cycle. The bound is generous: after a big spec run
+		-- the heap is large and one cycle takes many allocations.
+		for _ = 1, 5000 do
 			if TreeCosmetics.Tracked() == 0 then
 				break
 			end
