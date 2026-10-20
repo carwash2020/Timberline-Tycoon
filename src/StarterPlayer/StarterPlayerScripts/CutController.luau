@@ -634,18 +634,18 @@ local function toastRefuse(fromClick: boolean, refused: Target?, now: number)
 		-- short note, at most every WhiffToastEvery seconds.
 		lastWhiffToast = now
 		SoundData.Play(SoundData.SwingFor(nil))
-		HUD.Toast("Nothing in range to chop.")
+		HUD.TimedToast("none", "Nothing in range to chop.")
 		-- And the arm swings through the air (local only: nothing is sent).
 		swingSerial += 1
 		pcall(SwingPose.BeginLocal, swingSerial, CutController.WhiffSwingSeconds)
 	end
 	if refused and refused.problem == "far" then
-		HUD.Toast(SectionLogic.Message("far") :: string)
+		HUD.TimedToast("far", SectionLogic.Message("far") :: string)
 	elseif refused and refused.problem == "hard" then
 		SoundData.Play("ChopTooHard")
 		if now - lastHardToast > CutController.HardToastEvery then
 			lastHardToast = now
-			HUD.Toast(SectionLogic.Message("tooHard") :: string)
+			HUD.TimedToast("tooHard", SectionLogic.Message("tooHard") :: string)
 		end
 	end
 end
@@ -696,7 +696,7 @@ local function deliver(id: number)
 		if wood and HintLogic.Underpowered(listedDamage(axe, wood.biome), wood.hardness) then
 			if now - lastHardToast > CutController.HardToastEvery then
 				lastHardToast = now
-				HUD.Toast(SectionLogic.Message("tooHard") :: string)
+				HUD.TimedToast("tooHard", SectionLogic.Message("tooHard") :: string)
 			end
 		end
 	else

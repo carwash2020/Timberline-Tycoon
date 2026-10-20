@@ -268,12 +268,15 @@ local function refuse(fromClick: boolean, problem: string?, axe: ItemCatalog.Axe
 		return
 	end
 	if problem == "far" then
-		HUD.Toast("Too far away. Walk closer to chop.")
+		HUD.TimedToast("far", "Too far away. Walk closer to chop.")
 	elseif problem == "hard" then
 		SoundData.Play("ChopTooHard")
 		if now - lastHardToast > 3 then
 			lastHardToast = now
-			HUD.Toast(string.format("This wood is too hard for your %s. You need a stronger axe.", axe.displayName))
+			HUD.TimedToast(
+				"tooHard",
+				string.format("This wood is too hard for your %s. You need a stronger axe.", axe.displayName)
+			)
 		end
 	end
 end
