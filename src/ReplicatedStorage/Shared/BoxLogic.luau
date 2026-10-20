@@ -6,6 +6,7 @@
 -- goes back to its shelf. Paying grants the item; opening only unpacks it.
 
 local GameConfig = require(script.Parent.GameConfig)
+local Palette = require(script.Parent.Art.Palette)
 
 local BoxLogic = {}
 
@@ -28,6 +29,13 @@ BoxLogic.ShellPartCap = 15
 BoxLogic.BoxPartCap = 42
 BoxLogic.PayTapPx = 44
 BoxLogic.DespawnHz = 2
+
+-- The ink of the price printed on a box for the viewer: CoinGold when `cash` covers
+-- `price` (FREE always does), StopRed when not. A missing cash counts as 0.
+function BoxLogic.PriceColor(price: number, cash: number?): Color3
+	local have = if type(cash) == "number" then cash else 0
+	return if have >= price then Palette.CoinGold else Palette.StopRed
+end
 
 export type GrabFacts = {
 	userId: number,

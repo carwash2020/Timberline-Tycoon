@@ -361,22 +361,68 @@ return function(t)
 		t.ok(#unknown:FindFirstChild("Contents"):GetChildren() >= 1, "a generic icon")
 	end)
 
-	t.test("a box carries no price text and no billboard, on the strip, the foot or anywhere", function()
+	t.test("every sold item's box prints its real store price on the PriceTag, and nothing floats", function()
+		local Util = t.shared("Util")
+		local GameConfig = t.shared("GameConfig")
+		local count = 0
 		for _, slot in ipairs(StoreStock.All()) do
-			local model = dressed(
-				slot.itemKind,
-				slot.itemId,
-				{ name = slot.displayName, tier = StoreStock.TierLabel(slot.itemKind, slot.itemId) }
-			)
+			local price = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, GameConfig.CoreLoop)
+			t.ok(price ~= nil, slot.slotId .. " has a store price")
+			local model = dressed(slot.itemKind, slot.itemId, {
+				name = slot.displayName,
+				tier = StoreStock.TierLabel(slot.itemKind, slot.itemId),
+				price = price,
+			})
+			local plate = model:FindFirstChild("PriceTag")
+			local gui = plate:FindFirstChild("PriceMark")
+			local label = gui:FindFirstChild("Price")
+			local want = if price > 0 then Util.formatCash(price) else "FREE"
+			t.eq(label.Text, want, slot.slotId .. " prints its store price")
+			if price > 0 then
+				t.ok(
+					string.find(label.Text, "^[$]%d[%d,]*$") ~= nil,
+					slot.slotId .. " in the $1,234 format: " .. label.Text
+				)
+			end
+			t.eq(plate:GetAttribute("Price"), price, slot.slotId .. " carries the price for the client")
+			t.eq(gui.Face, Enum.NormalId.Front, "on the plate's front face")
+			t.eq(label.TextScaled, true)
+			t.eq(label.Font, Enum.Font.FredokaOne)
+			t.eq(label.TextColor3, Color3.fromHex("#F2C14E"), "CoinGold until the client says otherwise")
+			t.ok(label:FindFirstChildWhichIsA("UITextSizeConstraint").MinTextSize >= 8, "a legible minimum")
+			t.eq(plate.CastShadow, false)
+			t.eq(plate.CanCollide, false, "the plate stays a decoration")
+			t.eq(plate.CanQuery, false)
+			t.eq(plate.CanTouch, false)
+			local prices = 0
 			for _, d in ipairs(model:GetDescendants()) do
 				t.ok(not d:IsA("BillboardGui"), slot.slotId .. " floats nothing")
 				if d:IsA("TextLabel") then
-					t.ok(not string.find(d.Text, "[$]"), slot.slotId .. " prints no dollar amount: " .. d.Text)
 					t.ok(not string.find(d.Text, "R[$]", 1), slot.slotId .. " prints no R$ price")
-					t.ok(d.Name ~= "Price", slot.slotId)
+					if d.Name == "Price" then
+						prices += 1
+					elseif string.find(d.Text, "[$]") then
+						t.ok(false, slot.slotId .. " prints a stray dollar amount: " .. d.Text)
+					end
 				end
 			end
+			t.eq(prices, 1, slot.slotId .. " prints exactly one price")
+			count += 1
 		end
+		t.ok(count > 0, "the store sells something")
+	end)
+
+	t.test("a box with no price given prints none", function()
+		local model = dressed("Axe", "SteelAxe")
+		t.eq(model:FindFirstChild("PriceTag"):FindFirstChildWhichIsA("SurfaceGui"), nil)
+	end)
+
+	t.test("the printed price is gold when you can pay and red when you cannot", function()
+		t.eq(BoxLogic.PriceColor(32, 100), Color3.fromHex("#F2C14E"), "CoinGold")
+		t.eq(BoxLogic.PriceColor(32, 32), Color3.fromHex("#F2C14E"), "exactly enough is enough")
+		t.eq(BoxLogic.PriceColor(32, 31), Color3.fromHex("#D9534F"), "StopRed")
+		t.eq(BoxLogic.PriceColor(32, nil), Color3.fromHex("#D9534F"), "no cash yet is not enough")
+		t.eq(BoxLogic.PriceColor(0, 0), Color3.fromHex("#F2C14E"), "FREE is always affordable")
 	end)
 
 	t.test(
@@ -444,14 +490,20 @@ return function(t)
 				for _, d in ipairs(rec.model:GetDescendants()) do
 					if d.Name == "Price" and d:IsA("TextLabel") then
 						prices += 1
+						t.eq(
+							d.Text,
+							t.shared("Util")
+								.formatCash(StoreStock.UnitPrice(rec.itemKind, rec.itemId, rec.limited == true, 2)),
+							"the printed price is the store price"
+						)
 					elseif d:IsA("BillboardGui") then
 						billboards += 1
 					elseif d:IsA("TextLabel") and string.find(d.Text, "$", 1, true) then
 						texts += 1
 					end
 				end
-				t.eq(prices, 0, "no price on the box")
-				t.eq(texts, 0, "no dollar amount anywhere on it")
+				t.eq(prices, 1, "the real price on the box, once")
+				t.eq(texts, 0, "no other dollar amount on it")
 				t.eq(billboards, 0, "and nothing floating over it")
 			end
 			t.ok(small.model:FindFirstChild("SideWindow") ~= nil, "a west-side box shows a window to the aisle")

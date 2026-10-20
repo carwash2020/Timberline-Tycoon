@@ -79,40 +79,51 @@ return function(t)
 		return out
 	end
 
-	t.test("no shelf box prints a price or floats a tag; the hover tag has the item's real one", function()
-		local seen = 0
-		for _, shop in ipairs({ "ToolShed", "HearthAndHome" }) do
-			for _, entry in ipairs(boxesOf(shop)) do
-				seen += 1
-				local slot, rec = entry.slot, entry.rec
-				for _, label in ipairs(labelsOf(rec.model)) do
-					t.ok(label.Name ~= "Price", slot.slotId .. " has a price line")
-					t.ok(not printsPrice(label.Text), slot.slotId .. " prints a price: " .. label.Text)
-				end
-				for _, d in ipairs(rec.model:GetDescendants()) do
-					t.ok(not d:IsA("BillboardGui"), slot.slotId .. " has no floating tag")
-				end
-				-- The name is still on the label.
-				local named = false
-				for _, label in ipairs(labelsOf(rec.model)) do
-					if label.Name == "Name" and string.find(label.Text, slot.displayName, 1, true) then
-						named = true
+	t.test(
+		"every shelf box prints the item's real price on its plate and floats no tag; the hover tag agrees",
+		function()
+			local seen = 0
+			for _, shop in ipairs({ "ToolShed", "HearthAndHome" }) do
+				for _, entry in ipairs(boxesOf(shop)) do
+					seen += 1
+					local slot, rec = entry.slot, entry.rec
+					local shown = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, 2)
+					local printed = 0
+					for _, label in ipairs(labelsOf(rec.model)) do
+						if label.Name == "Price" then
+							printed += 1
+							t.eq(label.Text, Util.formatCash(shown), slot.slotId .. " prints its store price")
+							t.eq(label.Parent.Parent.Name, "PriceTag", slot.slotId .. " on the PriceTag plate")
+						else
+							t.ok(not printsPrice(label.Text), slot.slotId .. " prints a stray price: " .. label.Text)
+						end
 					end
+					t.eq(printed, 1, slot.slotId .. " prints one price")
+					for _, d in ipairs(rec.model:GetDescendants()) do
+						t.ok(not d:IsA("BillboardGui"), slot.slotId .. " has no floating tag")
+					end
+					-- The name is still on the label.
+					local named = false
+					for _, label in ipairs(labelsOf(rec.model)) do
+						if label.Name == "Name" and string.find(label.Text, slot.displayName, 1, true) then
+							named = true
+						end
+					end
+					t.ok(named, slot.slotId .. " keeps its name on the label")
+					-- The tag: the real price, from the same function the counter charges with.
+					local expected = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, 2)
+					t.ok(expected ~= nil and expected > 0, slot.slotId .. " has a price")
+					local spec = HoverTag.SpecOf(rec.model)
+					t.ok(spec ~= nil, slot.slotId .. " can be aimed at")
+					local name, line = HoverTag.Lines(spec, { hour = spec.shop == "ToolShed" and 12 or 12, loop = 2 })
+					t.eq(name, slot.displayName)
+					t.eq(line, Util.formatCash(expected), slot.slotId .. " tag shows its real price")
+					t.eq(rec.price, expected, slot.slotId .. " charges what the tag shows")
 				end
-				t.ok(named, slot.slotId .. " keeps its name on the label")
-				-- The tag: the real price, from the same function the counter charges with.
-				local expected = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, 2)
-				t.ok(expected ~= nil and expected > 0, slot.slotId .. " has a price")
-				local spec = HoverTag.SpecOf(rec.model)
-				t.ok(spec ~= nil, slot.slotId .. " can be aimed at")
-				local name, line = HoverTag.Lines(spec, { hour = spec.shop == "ToolShed" and 12 or 12, loop = 2 })
-				t.eq(name, slot.displayName)
-				t.eq(line, Util.formatCash(expected), slot.slotId .. " tag shows its real price")
-				t.eq(rec.price, expected, slot.slotId .. " charges what the tag shows")
 			end
+			t.ok(seen >= 35, "checked every box on both shops' shelves: " .. seen)
 		end
-		t.ok(seen >= 35, "checked every box on both shops' shelves: " .. seen)
-	end)
+	)
 
 	t.test("no two labels of different boxes overlap on a shelf", function()
 		for _, shop in ipairs({ "ToolShed", "HearthAndHome" }) do
@@ -245,10 +256,17 @@ return function(t)
 			counter = counter,
 			onShelf = true,
 		})
+		local truckPrice = StoreStock.UnitPrice("Truck", "Rustbucket", false, 2)
+		local printed = 0
 		for _, label in ipairs(labelsOf(rec.model)) do
-			t.ok(label.Name ~= "Price", "no price line on a vehicle box")
-			t.ok(not printsPrice(label.Text), "no price text on a vehicle box")
+			if label.Name == "Price" then
+				printed += 1
+				t.eq(label.Text, Util.formatCash(truckPrice), "a vehicle box prints its real price")
+			else
+				t.ok(not printsPrice(label.Text), "no other price text on a vehicle box")
+			end
 		end
+		t.eq(printed, 1, "one price on a vehicle box")
 		local spec = HoverTag.SpecOf(rec.model)
 		t.eq(spec.shop, "Dealership")
 		t.eq(HoverTag.Price(spec, 2), StoreStock.UnitPrice("Truck", "Rustbucket", false, 2))
