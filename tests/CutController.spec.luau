@@ -293,7 +293,9 @@ return function(t)
 		}
 	end
 
-	local function swingWorld()
+	-- opts.tag: "Tree" (default) or "Wood" (a felled log); opts.wood: the WoodId.
+	local function swingWorld(opts)
+		opts = opts or {}
 		local Vector2, Vector3, CFrame = roblox.Vector2, roblox.Vector3, roblox.CFrame
 		local fires, rays, delayed = {}, {}, {}
 		local inputName = "Touch"
@@ -315,11 +317,12 @@ return function(t)
 			end,
 		}
 		local carried = 0
+		local toolOut = true
 		local guiService = {}
 
 		local model = Instance.new("Model")
-		model:AddTag("Tree")
-		model:SetAttribute("WoodId", "oak")
+		model:AddTag(opts.tag or "Tree")
+		model:SetAttribute("WoodId", opts.wood or "oak")
 		local section = Instance.new("Part")
 		section.Name = "Section"
 		section:SetAttribute("Section", 1)
@@ -355,7 +358,7 @@ return function(t)
 			end,
 			FindFirstChildOfClass = function(_, class)
 				if class == "Tool" then
-					return tool
+					return if toolOut then tool else nil
 				elseif class == "Humanoid" then
 					return humanoid
 				end
@@ -383,15 +386,21 @@ return function(t)
 				return { Origin = Vector3.new(0, 8, 8), Direction = Vector3.new(0, -1, -1).Unit }
 			end,
 		}
+		local created, writes = {}, {} -- Instances the controller made; `Name.Key` write counts
 		local function fakeInstance(className)
 			local fields = { ClassName = className }
-			return setmetatable({}, {
+			local inst = setmetatable({}, {
 				__index = fields,
 				__newindex = function(_, key, value)
 					fields[key] = value
+					local at = (fields.Name or className) .. "." .. key
+					writes[at] = (writes[at] or 0) + 1
 				end,
 			})
+			table.insert(created, inst)
+			return inst
 		end
+		local hitPos = Vector3.new(1, 3, 0)
 		local loader = t.loader({
 			services = {
 				Debris = { AddItem = function() end },
@@ -463,7 +472,7 @@ return function(t)
 						if params and params.CollisionGroup == "Wood" and hitInstance.Name == "Leaves" then
 							return nil
 						end
-						return { Instance = hitInstance, Position = Vector3.new(1, 3, 0), Normal = Vector3.xAxis }
+						return { Instance = hitInstance, Position = hitPos, Normal = Vector3.xAxis }
 					end,
 					GetPartBoundsInRadius = function()
 						return radiusParts
@@ -510,6 +519,15 @@ return function(t)
 		return {
 			attrs = playerAttrs,
 			controller = controller,
+			created = created,
+			loader = loader,
+			putAway = function()
+				toolOut = false
+			end,
+			writes = writes,
+			hitAt = function(pos)
+				hitPos = pos
+			end,
 			fires = fires,
 			rays = rays,
 			section = section,
@@ -879,5 +897,136 @@ return function(t)
 		already.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
 		already.land()
 		t.eq(#already.fires, 0, "already sitting never starts")
+	end)
+
+	-- The cut band (T374): the only highlight, a thin ring at the cut height.
+	local function made(w, name)
+		for _, inst in ipairs(w.created) do
+			if inst.Name == name then
+				return inst
+			end
+		end
+		return nil
+	end
+
+	local function rgb(c)
+		return { math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5) }
+	end
+
+	t.test("the one Highlight rings the CutGuide band, never the tree or the log", function()
+		for _, tag in ipairs({ "Tree", "Wood" }) do
+			local w = swingWorld({ tag = tag })
+			w.beat(0.05)
+			local hl, band = made(w, "CutTarget"), made(w, "CutGuide")
+			t.ok(hl and band, tag .. ": both exist")
+			t.ok(hl.Adornee == band, tag .. ": the Adornee is the band")
+			t.ok(hl.Adornee ~= w.section, tag .. ": never the section")
+			t.eq(hl.Enabled, true)
+			t.eq(rgb(hl.OutlineColor), { 255, 244, 214 })
+			t.eq(hl.FillTransparency, 1)
+			t.eq(hl.OutlineTransparency, 0.25)
+			t.eq(#w.created, 2, "only the Highlight and the band")
+		end
+	end)
+
+	t.test("the band sits at the clamped cut height, the same h the server cuts at", function()
+		-- A felled log lies on its side: its long axis is local Y, pointing along world X.
+		local w = swingWorld({ tag = "Wood" })
+		w.section.Size = roblox.Vector3.new(1.6, 6, 1.6)
+		w.section.CFrame = roblox.CFrame.new(0, 0.8, 0) * roblox.CFrame.Angles(0, 0, math.rad(90))
+		for _, x in ipairs({ -1, 0.5, 2.2, 2.95 }) do
+			w.hitAt(roblox.Vector3.new(x, 1.2, 0))
+			w.beat(0.05)
+			local band = made(w, "CutGuide")
+			local h = SectionLogic.ClampHeight(w.section.CFrame:PointToObjectSpace(roblox.Vector3.new(x, 1.2, 0)).Y, 6)
+			local want = w.section.CFrame * roblox.CFrame.new(0, h - 3, 0)
+			t.ok((band.CFrame.Position - want.Position).Magnitude < 1e-3, "aimed at x " .. x)
+		end
+		t.ok(w.section.Size.Y >= made(w, "CutGuide").Size.Y, "never longer than the log")
+	end)
+
+	t.test("the band is 0.15 thick and just wider than the section", function()
+		local w = swingWorld({ tag = "Wood" })
+		w.beat(0.05)
+		local band = made(w, "CutGuide")
+		t.ok(math.abs(band.Size.Y - 0.15) < 1e-6)
+		t.ok(math.abs(band.Size.X - 2.08) < 1e-6 and math.abs(band.Size.Z - 2.08) < 1e-6)
+		t.eq(band.Material, roblox.Enum.Material.SmoothPlastic)
+		t.eq(band.Transparency, 0.4)
+	end)
+
+	t.test("a too-hard target shows the same band in orange; the Adornee is still the band", function()
+		-- No shipped axe is refused outright, so give the Rusty Axe a zero-damage row for one wood.
+		for _, tag in ipairs({ "Tree", "Wood" }) do
+			local w = swingWorld({ tag = tag, wood = "frostwood" })
+			local rusty = w.loader:load("ReplicatedStorage/Shared/ItemCatalog").GetAxe("RustyAxe")
+			rusty.v2.vs = { frostwood = { damage = 0 } }
+			w.beat(0.05)
+			rusty.v2.vs = nil
+			local hl, band = made(w, "CutTarget"), made(w, "CutGuide")
+			t.eq(rgb(band.Color), { 255, 170, 70 }, tag)
+			t.eq(rgb(hl.OutlineColor), { 255, 170, 70 }, tag)
+			t.ok(hl.Adornee == band, tag)
+			t.eq(hl.Enabled, true)
+		end
+		local ready = swingWorld({ tag = "Wood" })
+		ready.beat(0.05)
+		t.eq(rgb(made(ready, "CutGuide").Color), { 255, 244, 214 })
+	end)
+
+	t.test("300 updates make no new Instance, and the same aim writes nothing", function()
+		local w = swingWorld({ tag = "Wood" })
+		w.beat(0.05)
+		local count = #w.created
+		local before = {}
+		for k, v in pairs(w.writes) do
+			before[k] = v
+		end
+		for _ = 1, 300 do
+			w.beat(0.05)
+		end
+		t.eq(#w.created, count, "no new Instances")
+		t.eq(w.writes, before, "no property written again")
+		w.beat(0.001)
+		t.eq(w.writes, before, "nor on a between-hover frame")
+		w.hitAt(roblox.Vector3.new(1, 3.5, 0))
+		w.beat(0.05)
+		t.ok(w.writes["CutGuide.CFrame"] > before["CutGuide.CFrame"], "a new aim moves it")
+	end)
+
+	t.test("the band follows a moved log between hover ticks, and goes when the log or the axe does", function()
+		local w = swingWorld({ tag = "Wood" })
+		w.beat(0.05)
+		local band = made(w, "CutGuide")
+		local x0 = band.CFrame.Position.X
+		w.section.CFrame = w.section.CFrame + roblox.Vector3.new(2, 0, 0)
+		w.beat(0.001)
+		t.ok(math.abs(band.CFrame.Position.X - (x0 + 2)) < 1e-3, "it moved with the log")
+		w.section.CFrame = w.section.CFrame + roblox.Vector3.new(0.02, 0, 0)
+		local writes = w.writes["CutGuide.CFrame"]
+		w.beat(0.001)
+		t.eq(w.writes["CutGuide.CFrame"], writes, "under 0.05 studs: no write")
+		w.section.Parent = nil
+		w.beat(0.001)
+		t.eq(band.Parent, nil, "the log is gone")
+		t.eq(made(w, "CutTarget").Enabled, false)
+		local away = swingWorld({ tag = "Wood" })
+		away.beat(0.05)
+		t.ok(made(away, "CutGuide").Parent ~= nil)
+		away.putAway()
+		away.beat(0.001)
+		t.eq(made(away, "CutGuide").Parent, nil, "the axe is put away")
+		t.eq(made(away, "CutTarget").Enabled, false)
+	end)
+
+	t.test("CutGuide is untouchable and casts nothing", function()
+		local w = swingWorld({ tag = "Tree" })
+		w.beat(0.05)
+		local band = made(w, "CutGuide")
+		t.eq(band.Anchored, true)
+		t.eq(band.CanCollide, false)
+		t.eq(band.CanQuery, false)
+		t.eq(band.CanTouch, false)
+		t.eq(band.CastShadow, false)
 	end)
 end

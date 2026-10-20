@@ -40,8 +40,9 @@
 --   * Turns you to face the cut (FaceTarget) and starts the two-handed
 --     swing (SwingPose). Chop is sent on the impact frame, not the press;
 --     the cooldown starts on the press. The ray is picked again then.
--- While an axe is out, the section you'd cut is outlined (cream in reach,
--- amber too far or too hard), checked 30 times a second (15 on low).
+-- While an axe is out, a thin band rings the cut line on the trunk or log you'd
+-- cut (cream in reach, amber too hard) and nothing else is outlined; the aim is
+-- checked 30 times a second (15 on low) and the band follows its log every frame.
 
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
@@ -64,7 +65,6 @@ local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local SwingLogic = require(ReplicatedStorage.Shared.SwingLogic)
 local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
-local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local FaceTarget = require(script.Parent.FaceTarget)
 local HUD = require(script.Parent.HUD)
 local Quality = require(script.Parent.Quality)
@@ -774,12 +774,13 @@ local function clickSwing()
 end
 
 ---------------------------------------------------------------------------
--- The cut guide: one reused, client-only ring part showing where this swing
--- would cut, and (on a felled log) about what each side is worth
+-- The cut guide: one reused, client-only band around the trunk or log at the
+-- height this swing would cut. It is the only highlight: nothing else on the
+-- tree or log is outlined or tinted.
 ---------------------------------------------------------------------------
 
 CutController.GuideThickness = 0.15 -- studs
-CutController.GuideTransparency = 0.6
+CutController.GuideTransparency = 0.4
 
 -- Where the guide sits for `kind` on a section with `cf` and `size` (its long
 -- axis is local Y): a standing trunk ("tree") at the seam under the pointer
@@ -795,6 +796,31 @@ function CutController.GuideAt(kind: string, cf: CFrame, size: Vector3, hit: Vec
 end
 
 local guide: Part? = nil
+-- What the band last showed, so a steady aim writes nothing.
+local bandPart: BasePart? = nil -- the section the band rings
+local bandH = 0 -- the cut height up that section, fixed at aim time
+local bandHard = false
+local bandCF: CFrame? = nil
+local bandSize: Vector3? = nil
+
+CutController.GuideMove = 0.05 -- studs the band must move before its CFrame is rewritten
+CutController.GuideGrow = 0.08 -- studs wider than the section, so the band clears its surface
+
+-- The band for a section `cf`/`size` cut `h` up from its bottom: a thin ring
+-- just wider than the section, centred on the cut line. The only highlight.
+function CutController.BandFor(cf: CFrame, size: Vector3, h: number): (CFrame, Vector3)
+	return cf * CFrame.new(0, h - size.Y / 2, 0),
+		Vector3.new(size.X + CutController.GuideGrow, CutController.GuideThickness, size.Z + CutController.GuideGrow)
+end
+
+-- Whether the band must be rewritten: nothing shown yet, or it moved or turned.
+function CutController.BandMoved(old: CFrame?, new: CFrame): boolean
+	if old == nil then
+		return true
+	end
+	return (new.Position - old.Position).Magnitude > CutController.GuideMove
+		or (new.UpVector - old.UpVector).Magnitude > 0.01
+end
 
 local function makeGuide(): Part
 	local p = Instance.new("Part")
@@ -804,38 +830,89 @@ local function makeGuide(): Part
 	p.CanQuery = false
 	p.CanTouch = false
 	p.CastShadow = false
+	p.Material = Enum.Material.SmoothPlastic
 	p.Transparency = CutController.GuideTransparency
 	p.Size = Vector3.new(1, CutController.GuideThickness, 1)
 	return p
 end
 
+-- Hides the band and the one Highlight that rings it.
 local function hideGuide()
+	bandPart, bandCF, bandSize = nil, nil, nil
 	local g = guide
 	if g and g.Parent ~= nil then
 		g.Parent = nil
 	end
+	local hl = highlight
+	if hl and hl.Enabled then
+		hl.Enabled = false
+		hl.Adornee = nil
+	end
 end
 
--- Shows the guide for `target` (or hides it).
-local function showGuide(target: Target?, def: WoodData.WoodDef?)
-	if not target or target.kind == "node" or not def then
+-- Puts the band on `part` at height `h`, writing only what changed.
+local function placeBand(part: BasePart, h: number, hard: boolean)
+	local g = guide or makeGuide()
+	guide = g
+	local cf, size = CutController.BandFor(part.CFrame, part.Size, h)
+	if CutController.BandMoved(bandCF, cf) then
+		g.CFrame = cf
+		bandCF = cf
+	end
+	if bandSize == nil or (size - bandSize).Magnitude > 0.001 then
+		g.Size = size
+		bandSize = size
+	end
+	if bandPart ~= part or bandHard ~= hard or g.Parent == nil then
+		g.Color = if hard then HARD_COLOR else READY_COLOR
+		bandPart, bandHard = part, hard
+	end
+	bandH = h
+	if g.Parent ~= workspace then
+		g.Parent = workspace
+	end
+	local hl = highlight
+	if hl then
+		if hl.Adornee ~= g then
+			hl.Adornee = g
+		end
+		local outline = if hard then HARD_COLOR else READY_COLOR
+		if hl.OutlineColor ~= outline then
+			hl.OutlineColor = outline
+		end
+		if not hl.Enabled then
+			hl.Enabled = true
+		end
+	end
+end
+
+-- Every frame: a log that is dragged or falls takes its band with it, and a
+-- section that is gone, or an axe put away, takes the band away.
+local function followBand()
+	local part = bandPart
+	if part == nil then
+		return
+	end
+	local _tool, axe = equipped()
+	if axe == nil or part.Parent == nil then
 		hideGuide()
 		return
 	end
-	local g = guide or makeGuide()
-	guide = g
-	local part = target.part
-	local at = CutController.GuideAt(target.kind, part.CFrame, part.Size, target.hit)
-	local color, material = TreeArt.FaceLook(def)
-	local width = math.max(part.Size.X, part.Size.Z) + 0.2
-	g.Size = Vector3.new(width, CutController.GuideThickness, width)
-	g.Color = color
-	g.Material = material
-	g.CFrame = at
-	g.Parent = workspace
+	placeBand(part, bandH, bandHard)
 end
 
--- Outlines what you'd cut (see the header).
+-- Rings the cut for `seen` (the target, or what the pointer found but the axe
+-- can't cut), or hides the band.
+local function showGuide(seen: Target?, hard: boolean)
+	if not seen or seen.kind == "node" then
+		hideGuide()
+		return
+	end
+	local _, h = CutController.GuideAt(seen.kind, seen.part.CFrame, seen.part.Size, seen.hit)
+	placeBand(seen.part, h, hard)
+end
+
+-- Shows only where this swing would cut (see the header).
 local function updateOutline()
 	local hl = highlight
 	if not hl then
@@ -843,31 +920,20 @@ local function updateOutline()
 		return
 	end
 	local _tool, axe, hrp = equipped()
-	local adornee: Instance? = nil
-	local color = READY_COLOR
 	local onWood, tooHard, thick = false, false, false
-	local aimed: Target? = nil
+	local shown: Target? = nil
+	local hard = false
 	if axe and hrp then
 		local target, refused = pickTarget(hrp, axe)
-		aimed = target
 		if target then
-			adornee = target.part
+			shown = target
 		elseif refused and refused.problem == "hard" then
-			adornee, color = refused.part, HARD_COLOR
+			shown, hard = refused, true
 		end
 		onWood, tooHard, thick = CutController.PointingFacts(target or refused, axe)
 	end
 	HUD.SetPointing(onWood, tooHard, thick)
-	local aimedWood = if aimed and type(aimed.woodId) == "string" then WoodData.Get(aimed.woodId) else nil
-	showGuide(aimed, aimedWood)
-	if adornee then
-		hl.Adornee = adornee
-		hl.OutlineColor = color
-		hl.Enabled = true
-	else
-		hl.Enabled = false
-		hl.Adornee = nil
-	end
+	showGuide(shown, hard)
 end
 
 -- One throttled [Chop] line when the engine fires Tool.Activated, for the
@@ -1051,6 +1117,8 @@ local function startLoop()
 		if sinceAim >= 1 / hz then
 			sinceAim = 0
 			updateOutline()
+		else
+			followBand()
 		end
 	end)
 	player.CharacterAdded:Connect(watchCharacter)
