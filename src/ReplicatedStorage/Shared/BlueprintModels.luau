@@ -431,6 +431,20 @@ function BlueprintModels.ApplyPaint(model: Model, paintId: string?)
 	end
 end
 
+-- The one look-after-placing sequence of a kit piece: its wood, then its
+-- paint, then SetFaded when `faded` is given (nil leaves the fade alone).
+-- PlotService runs it when a piece is built and on every fill, so a rebuilt
+-- or reloaded piece and a freshly filled one are dressed the same way. It
+-- sets looks and collision only: no part moves. FillUnits must already be on
+-- the model (SetFaded reads it).
+function BlueprintModels.Refresh(model: Model, woodId: string?, paintId: string?, faded: boolean?)
+	BlueprintModels.ApplyWood(model, woodId)
+	BlueprintModels.ApplyPaint(model, paintId)
+	if faded ~= nil then
+		BlueprintModels.SetFaded(model, faded)
+	end
+end
+
 -- Stretches a wall, beam or floor along its length. Height and thickness stay
 -- put. A fence or railing is N copies, each len/N long, over one full-length
 -- collider. The collider's Size is set to that box. It is not scaled from
