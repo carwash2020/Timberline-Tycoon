@@ -31,8 +31,10 @@
 -- The model is named "EventExpansion", tagged "EventExpansion", and carries
 -- the attributes Store = <kind> and Active = false. About 26 parts.
 --
--- Everything in it is looks only (Kit.decor): nothing collides, so a rope can
--- never trap a player or block an aisle. The rope is a visual "closed" sign.
+-- Everything in it is looks only (Kit.decor) except the four corner posts
+-- (EventStanchion, Kit.solid): you walk into a post, not through it. The
+-- rope, the mat and the banner never collide, so a rope can never trap a
+-- player or block an aisle. The rope is a visual "closed" sign.
 -- The one light stays under the family's caps (ShopKit.Light, never over
 -- ShopKit.MaxLightBrightness / MaxLightRange, a warm colour) and is OFF
 -- until the zone is active.
@@ -170,7 +172,7 @@ function ShopEventKit.BuildZone(
 			local lamp = cx == 1 and cz == 1
 			local h = if lamp then POST_H + 1.0 else POST_H
 			box(model, "EventStanchionBase", V3(0.8, 0.15, 0.8), at(x, MAT_H + 0.075, z), IRON, MAT.Metal)
-			box(model, "EventStanchion", V3(0.2, h, 0.2), at(x, MAT_H + 0.15 + h / 2, z), IRON, MAT.Metal)
+			Kit.solid(box(model, "EventStanchion", V3(0.2, h, 0.2), at(x, MAT_H + 0.15 + h / 2, z), IRON, MAT.Metal))
 			if lamp then
 				local head = box(
 					model,

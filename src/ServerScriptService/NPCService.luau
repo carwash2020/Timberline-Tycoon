@@ -141,6 +141,18 @@ local function findNpc(map: Instance, id: string): Model?
 	return nil
 end
 
+-- Solid street dressing out front (T385): bumped into, but not the front face.
+local FACADE_SOLID: { [string]: boolean } = {
+	LampPost = true,
+	LampPostBase = true,
+	PathLampPost = true,
+	Planter = true,
+	PlanterBand = true,
+	BenchSeat = true,
+	BenchBack = true,
+	AwningPost = true,
+}
+
 local function frontAlong(model: Instance, counter: BasePart): number
 	local look = counter.CFrame.LookVector
 	local origin = counter.CFrame.Position
@@ -148,7 +160,7 @@ local function frontAlong(model: Instance, counter: BasePart): number
 	local function consider(part: BasePart)
 		-- Looks-only dressing out front (awnings, planters, signs, the doormat)
 		-- is not the front face; the door's own block still counts.
-		if not part.CanCollide and part.Name ~= "DoorBlock" and part ~= counter then
+		if FACADE_SOLID[part.Name] or (not part.CanCollide and part.Name ~= "DoorBlock" and part ~= counter) then
 			return
 		end
 		local along = (part.CFrame.Position - origin):Dot(look)

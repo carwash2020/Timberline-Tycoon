@@ -19,6 +19,7 @@
 -- close the SAVES panel (never the join pick).
 
 local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -59,6 +60,13 @@ local baseButton: UITheme.Button? = nil
 local saveButton: UITheme.Button? = nil
 local savedLabel: TextLabel? = nil
 local screenGui: ScreenGui? = nil
+-- The rows on screen: the key they were built from (SaveSlotLogic.SummaryKey),
+-- each row's PLAY / LOAD button (its enabled state is repainted in place every
+-- second), and the same buttons by slot index (to put a gamepad selection back).
+local builtKey: string? = nil
+type RowControl = { face: TextButton, kind: string, active: boolean }
+local controls: { RowControl } = {}
+local cardFaces: { [number]: TextButton } = {}
 
 local function send(action: string, index: number, extra: boolean | string)
 	Net.Remote("SlotAction"):FireServer(action, index, extra)
@@ -189,21 +197,28 @@ local function applyLayout()
 	end
 end
 
-local function fill()
-	applyLayout()
-	refreshBase()
-	refreshSave()
-	local holder = list
-	if not holder then
-		return
-	end
-	for _, child in ipairs(holder:GetChildren()) do
-		if child:IsA("Frame") then
-			child:Destroy()
+-- The only place the list's scroll position is written: 0 when the panel is
+-- opened, the saved (clamped) offset when the rows are rebuilt while it is open.
+local function placeCanvas(holder: ScrollingFrame, y: number)
+	holder.CanvasPosition = Vector2.new(0, y)
+end
+
+-- The slot a selected gamepad object belongs to (its card is named "Slot<n>").
+local function slotOf(obj: Instance?): number?
+	local at = obj
+	while at do
+		local n = string.match(at.Name, "^Slot(%d+)$")
+		if n then
+			return tonumber(n)
 		end
+		at = at.Parent
 	end
-	firstPick = nil
-	local now = os.time()
+	return nil
+end
+
+-- The cooldown line and each row's enabled state, repainted in place (the
+-- once-a-second tick). Nothing is created or destroyed here.
+local function paintCooldown()
 	local untilAt = player:GetAttribute("SlotCooldownUntil")
 	local cooling = type(untilAt) == "number" and os.time() < untilAt
 	local label = cooldownLabel
@@ -221,6 +236,45 @@ local function fill()
 				else "Loading a save puts this one away. Cash, wood, plot and visitor rules stay with each save."
 		end
 	end
+	for _, c in ipairs(controls) do
+		-- The last-played save is always playable; another one obeys the cooldown.
+		local on = if c.kind == "play" then not (cooling and not c.active) else not cooling
+		c.face.Active = on
+		c.face.AutoButtonColor = on
+	end
+end
+
+-- Rebuilds the rows only when `open` (the panel was just opened: back to the
+-- top) or what they show changed. Otherwise it is the in-place tick. A rebuild
+-- while open keeps the scroll offset and the selected slot, put back once the
+-- canvas has been measured again.
+local function fill(open: boolean?)
+	local holder = list
+	local key = SaveSlotLogic.SummaryKey(summaries, picking)
+	if holder and not open and key == builtKey then
+		refreshBase()
+		refreshSave()
+		paintCooldown()
+		return
+	end
+	applyLayout()
+	refreshBase()
+	refreshSave()
+	if not holder then
+		return
+	end
+	local savedY = holder.CanvasPosition.Y
+	local savedSlot = slotOf(GuiService.SelectedObject)
+	for _, child in ipairs(holder:GetChildren()) do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+	firstPick = nil
+	controls = {}
+	cardFaces = {}
+	builtKey = key
+	local now = os.time()
 	for _, slot in ipairs(summaries) do
 		local P = SaveSlotLogic.Panel
 		local card = Instance.new("Frame")
@@ -303,10 +357,8 @@ local function fill()
 			local play = rowButton(card, playLabel, "buy", 1, function()
 				send("play", slot.index, true)
 			end)
-			-- The last-played save is always playable; another one obeys the cooldown.
-			local blocked = cooling and not slot.active
-			play.face.Active = not blocked
-			play.face.AutoButtonColor = not blocked
+			table.insert(controls, { face = play.face, kind = "play", active = slot.active :: boolean } :: RowControl)
+			cardFaces[slot.index] = play.face
 		elseif playLabel ~= nil then
 			local load = rowButton(card, playLabel, "buy", 1, function()
 				local what = if slot.fresh then "Start a new game on" else "Load"
@@ -320,10 +372,26 @@ local function fill()
 					)
 				)
 			end)
-			load.face.Active = not cooling
-			load.face.AutoButtonColor = not cooling
+			table.insert(controls, { face = load.face, kind = "load", active = slot.active :: boolean } :: RowControl)
+			cardFaces[slot.index] = load.face
 		end
 	end
+	paintCooldown()
+	task.defer(function()
+		local h = list
+		if not h then
+			return
+		end
+		if open then
+			placeCanvas(h, 0) -- opening starts at the top
+			return
+		end
+		placeCanvas(h, SaveSlotLogic.ClampScroll(savedY, h.AbsoluteCanvasSize.Y, h.AbsoluteWindowSize.Y))
+		local face = if savedSlot then cardFaces[savedSlot] else nil
+		if face and UITheme.Device() == "console" then
+			GamepadNav.Focus(face, panel) -- a redraw of an open panel: only moves the selection
+		end
+	end)
 end
 
 setOpen = function(on: boolean)
@@ -345,7 +413,7 @@ setOpen = function(on: boolean)
 		ContextActionService:UnbindAction(SAVES_CLOSE)
 		GamepadNav.Restore(p) -- back to the HUD button that opened it, or to walking
 	else
-		fill()
+		fill(true)
 		ContextActionService:BindActionAtPriority(
 			SAVES_CLOSE,
 			function(_name, state)
@@ -625,8 +693,8 @@ function SaveSlotUI.Start()
 		while panel do
 			task.wait(1)
 			local p = panel
-			if p and p.Visible and confirm and not confirm.Visible then
-				fill()
+			if p and p.Visible then
+				fill() -- the in-place tick: the countdown and each row's enabled state
 			end
 		end
 	end)

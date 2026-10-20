@@ -2227,6 +2227,16 @@ function PropArt.Scene(kind: string): Model
 			Kit.solid(d)
 		end
 	end
+	if kind == "bench" then
+		-- Only the seat and the lower back stop a body; the arms, top rail,
+		-- legs and stretcher stay looks.
+		for _, d in ipairs(model:GetDescendants()) do
+			local lowerBack = d.Name == "Back" and d:IsA("BasePart") and d.Size.Y > 0.5
+			if d:IsA("BasePart") and d.Name ~= "Seat" and not lowerBack then
+				Kit.decor(d, false)
+			end
+		end
+	end
 	return model
 end
 

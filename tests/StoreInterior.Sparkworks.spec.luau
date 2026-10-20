@@ -577,7 +577,8 @@ return function(t)
 			t.eq(zone:GetAttribute("Active"), false, "off until an event runs")
 			local ropes, markers = 0, 0
 			for _, p in ipairs(parts(zone)) do
-				t.eq(p.CanCollide, false, p.Name .. " never blocks anyone")
+				-- (the four corner posts are solid since T385; the rope, mat and rugs never block)
+				t.eq(p.CanCollide, p.Name == "EventStanchion", p.Name .. " never blocks anyone but the corner posts")
 				if p.Name == "EventRope" then
 					ropes += 1
 					t.eq(p.Transparency, 0, "the rope is up (the area is closed)")

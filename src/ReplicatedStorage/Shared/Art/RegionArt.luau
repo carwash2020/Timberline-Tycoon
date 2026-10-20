@@ -203,9 +203,11 @@ function RegionArt.Lanterns(parent: Instance, ground: Ground, deckTop: number): 
 		local px, pz =
 			b.x + math.cos(a) * (b.radius - b.width / 2 + 0.6), b.z + math.sin(a) * (b.radius - b.width / 2 + 0.6)
 		local gy = ground(px, pz)
-		Kit.decor(
-			Kit.post(root, "LampPost", V3(px, gy - 0.5, pz), deckTop - gy + 6, 0.5, stilt, Enum.Material.Wood),
-			false
+		Kit.solid(
+			Kit.decor(
+				Kit.post(root, "LampPost", V3(px, gy - 0.5, pz), deckTop - gy + 6, 0.5, stilt, Enum.Material.Wood),
+				false
+			)
 		)
 		local glow = Kit.lantern(root, CF(px, deckTop + 5.8, pz), 1)
 		glow.Name = "LanternGlow"
@@ -482,9 +484,11 @@ function RegionArt.MesaLanterns(parent: Instance, ground: Ground): Model
 	for i, side in ipairs({ -1, 1 }) do
 		local x, z = lot.x + side * (lot.sx / 2 + 1.5), lot.z - lot.sz / 2 + 1
 		local gy = ground(x, z)
-		Kit.decor(
-			Kit.post(root, "LampPost", V3(x, gy, z), 6, 0.5, hex(MesaData.Palette.plank), Enum.Material.Wood),
-			false
+		Kit.solid(
+			Kit.decor(
+				Kit.post(root, "LampPost", V3(x, gy, z), 6, 0.5, hex(MesaData.Palette.plank), Enum.Material.Wood),
+				false
+			)
 		)
 		local glow = Kit.lantern(root, CF(x, gy + 6.4, z), 1)
 		glow.Name = "LanternGlow"

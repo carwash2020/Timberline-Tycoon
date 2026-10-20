@@ -992,4 +992,29 @@ return function(t)
 		end
 		t.eq(grey, 1, "one primer-grey door")
 	end)
+
+	-- T392: the Logging Rig has no crane arm or hook; the bulkhead and its
+	-- headache rack stay. Its meshed Bed, Hitch and Wheel stay as authored
+	-- (the Body mesh still has the crane baked in until it is re-exported).
+	t.test("the Logging Rig has no crane or grapple; bulkhead and rack stay", function()
+		local model = build({ def = ItemCatalog.GetTruck("LoggingRig") })
+		t.eq(#named(model, "Crane"), 0, "no Crane part")
+		t.eq(#named(model, "Grapple"), 0, "no Grapple part")
+		t.eq(#named(model, "Bulkhead"), 1, "Bulkhead stays")
+		t.eq(#named(model, "HeadacheRack"), 1, "HeadacheRack stays")
+	end)
+
+	t.test("VehicleModels LoggingRig Bed, Hitch and Wheel are unchanged", function()
+		local VehicleModels = t.load("ReplicatedStorage/Shared/Art/VehicleModels")
+		local rig = VehicleModels.Truck("LoggingRig")
+		local function same(piece, meshId, size, at)
+			t.eq(piece.meshId, meshId)
+			t.eq(piece.size, size)
+			t.eq(piece.at, at)
+		end
+		same(rig.Bed, 94574370000217, Vector3.new(10.67, 7.325, 33.8), Vector3.new(0, 8.112, 5.785))
+		same(rig.Hitch, 79514319620242, Vector3.new(0.7, 1.06, 1.68), Vector3.new(0, 2.005, 23.275))
+		same(rig.Wheel, 88377082453341, Vector3.new(1.546, 4.56, 4.55), nil)
+		t.eq(rig.Wheel.mirrorLeft, true)
+	end)
 end
