@@ -101,6 +101,7 @@ return function(t)
 		Counter = true,
 		CounterTop = true,
 		CounterKick = true,
+		CounterFront = true,
 		CounterBell = true,
 		Till = true,
 		Register = true,
@@ -316,6 +317,8 @@ return function(t)
 		"DoorBlock",
 		"DoorSensor",
 		"BackRoomKnob",
+		-- the counter's two hidden end blockers (invisible, nothing to see)
+		"CounterBack",
 	}) do
 		LOOKS_ONLY[name] = true
 	end

@@ -2670,12 +2670,13 @@ local function buildLandOffice(parent: Instance)
 	local wood = Color3.fromRGB(101, 67, 33)
 	local dark = Color3.fromRGB(70, 45, 22)
 	local counter =
-		part("Counter", Vector3.new(7, 3.4, 2.6), facing * CFrame.new(0, 1.7, 0), wood, Enum.Material.Wood, model)
+		part("Counter", Vector3.new(7, 2.6, 3.6), facing * CFrame.new(0, 1.3, 0), wood, Enum.Material.Wood, model) -- the shop counter: 2.6 high, 3.6 deep (T395)
+	counter.CanCollide = true
 	model.PrimaryPart = counter
 	for _, x in ipairs({ -3.2, 3.2 }) do
-		part("Post", Vector3.new(0.6, 8, 0.6), facing * CFrame.new(x, 4, 1.4), dark, Enum.Material.Wood, model)
+		part("Post", Vector3.new(0.6, 8, 0.6), facing * CFrame.new(x, 4, 2.3), dark, Enum.Material.Wood, model)
 	end
-	part("Roof", Vector3.new(8.4, 0.5, 4.2), facing * CFrame.new(0, 8.2, 0.6), dark, Enum.Material.Wood, model)
+	part("Roof", Vector3.new(8.4, 0.5, 5.4), facing * CFrame.new(0, 8.2, 1.2), dark, Enum.Material.Wood, model)
 	local board =
 		part("Sign", Vector3.new(7.4, 2, 0.3), facing * CFrame.new(0, 6.6, -1.5), wood, Enum.Material.Wood, model)
 	board.CanCollide = false

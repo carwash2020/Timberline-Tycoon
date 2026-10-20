@@ -90,7 +90,25 @@ local function build(npc: NPCData.NPC, find: (string, string) -> (CFrame?, Vecto
 	if lifted ~= p.Y then
 		feet += Vector3.new(0, lifted - p.Y, 0)
 	end
+	-- A short keeper behind a counter stands on a riser (NPCData.KeeperStep),
+	-- added once the figure is placed so the riser keeps its world place.
+	local stepSize, stepAt = NPCData.KeeperStep(npc, feet)
+	if stepSize then
+		feet += Vector3.new(0, stepSize.Y, 0)
+	end
 	Kit.placeAt(model, feet)
+	if stepSize and stepAt then
+		local step = Instance.new("Part")
+		step.Name = "KeeperStep"
+		step.Size = stepSize
+		step.CFrame = stepAt
+		step.Color = Color3.fromRGB(122, 90, 60)
+		step.Material = Enum.Material.Wood
+		step.Anchored = true
+		step.CanCollide = true
+		step.CastShadow = false
+		step.Parent = model
+	end
 	local root = model.PrimaryPart
 	if npc.route and root then
 		model:SetAttribute("Route", NPCData.EncodeRoute(npc.route))

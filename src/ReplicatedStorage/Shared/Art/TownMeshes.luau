@@ -441,6 +441,33 @@ local function groundSnap(made: { MeshPart }, floorY: number?): boolean
 	return true
 end
 
+-- The part counter and every part standing on it (the register, the bell: a
+-- middle over the counter's top and within 2 studs of it), when the asset's
+-- Counter mesh is marked `reupload`. Empty otherwise.
+local function keepPartCounter(model: Model, asset: TownModels.Asset, host: BasePart?): { [BasePart]: boolean }
+	local out: { [BasePart]: boolean } = {}
+	local piece = TownModels.Piece(asset, "Counter")
+	if host == nil or piece == nil or piece.reupload ~= true then
+		return out
+	end
+	local cf, size = host.CFrame, host.Size
+	out[host] = true
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d ~= host then
+			local p = cf:PointToObjectSpace(d.CFrame.Position)
+			if
+				math.abs(p.X) <= size.X / 2
+				and math.abs(p.Z) <= size.Z / 2
+				and p.Y >= size.Y / 2 - 0.1
+				and p.Y <= size.Y / 2 + 2
+			then
+				out[d] = true
+			end
+		end
+	end
+	return out
+end
+
 local function retire(model: Model, fresh: { [BasePart]: boolean })
 	local snapshot = model:GetDescendants()
 	for _, d in ipairs(snapshot) do
@@ -551,6 +578,20 @@ local function dressNow(model: Model, assetId: string, options: Options?): boole
 	end
 	local hosts = hostsOf(model)
 	local fresh: { [BasePart]: boolean } = {}
+	-- A counter whose mesh waits for its upload (TownModels `reupload`) stays
+	-- as built: the part, and what stands on it, keep their place and look.
+	local keptCounter = keepPartCounter(model, asset, hosts.Counter)
+	for part in pairs(keptCounter) do
+		fresh[part] = true
+	end
+	-- The hidden blockers at a counter's ends (BuildingArt.placeCounter) are never dressed over.
+	local blockers: { BasePart } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d.Name == "CounterBack" then
+			fresh[d] = true
+			table.insert(blockers, d)
+		end
+	end
 	for i, part in ipairs(made) do
 		place(part, root)
 		part.Parent = model
@@ -592,6 +633,14 @@ local function dressNow(model: Model, assetId: string, options: Options?): boole
 				d.CanCollide = false
 			end
 		end
+	end
+	for part in pairs(keptCounter) do
+		if part.Name == "Counter" then
+			part.CanCollide = true -- the collider above switched it off: the counter is still the one solid counter
+		end
+	end
+	for _, part in ipairs(blockers) do
+		part.CanCollide = true
 	end
 	retire(model, fresh)
 	model:SetAttribute("TownMesh", assetId)

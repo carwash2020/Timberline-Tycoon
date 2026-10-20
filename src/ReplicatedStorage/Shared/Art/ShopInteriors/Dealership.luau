@@ -57,7 +57,7 @@ export type Bay = { x: number, z: number, row: number, aisleZ: number }
 -- The signs hang this far under the ceiling line (frame.ceilY - 0.9 is the
 -- underside of the beams).
 Dealership.HeaderY = 11.3 -- a header's middle
-Dealership.CheckoutY = 7.7 -- the CHECKOUT board's middle, on its posts over the counter (the top is 3.85)
+Dealership.CheckoutY = 9.9 -- the CHECKOUT board's middle, flat on the back wall over the keeper (ShopKit.CheckoutY)
 Dealership.HeaderWidth = 10.4
 Dealership.HeaderYaw = math.rad(90) -- a header faces the door end (west), so it reads from the lobby and down the aisle
 Dealership.WallTuck = 0.5 -- a beam or rafter runs this far past the interior frame, into the wall (the wall's face is 0.4 out)
@@ -456,13 +456,12 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 			})
 		end
 	end
-	-- CHECKOUT stands on two posts on the counter's front edge, over the register and the bell, so it reads
-	-- from the door over the counter and nothing hangs in front of it (no chains across another sign). The
-	-- kit also lays the keeper's mat; no plaque.
+	-- CHECKOUT hangs flat on the back wall over the keeper, so it reads from the door over the counter and
+	-- nothing hangs in front of it (no chains across another sign). The kit also lays the keeper's mat; no plaque.
 	ShopKit.CheckoutSign(
 		model,
 		frame,
-		{ plaque = false, onCounter = true, cy = Dealership.CheckoutY, w = 5.4, h = 1.5 }
+		{ plaque = false, onCounter = true, cy = Dealership.CheckoutY, w = 5.4, h = 1.5, z = frame.halfD + 0.1 } -- (against the hall's back wall, whose face is 0.4 out)
 	)
 
 	-- Lanterns: six down the aisle and three in the lobby (each plinth has its own lamp post); every one is the family's warm capped lamp, and none hangs where a

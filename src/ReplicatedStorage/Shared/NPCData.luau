@@ -939,14 +939,33 @@ NPCData.TalkGamepad = Enum.KeyCode.ButtonX
 -- Spots
 ---------------------------------------------------------------------------
 
--- How far behind a counter's back face a keeper's centre stands.
-NPCData.CounterGap = 1.25
+-- How far behind a counter's back face a keeper's centre stands. The counter
+-- is 3.6 deep (BuildingArt.CounterSize), so 1.0 leaves the keeper's back well
+-- inside the shop and his belly a stud from the counter's edge.
+NPCData.CounterGap = 1.0
+
+-- A keeper shorter than this scale (a kid, 0.78) would sink behind the 2.6
+-- counter, so he stands on a KeeperStep: a riser 0.4 tall and 3 x 2 on the
+-- floor, solid, under his feet.
+NPCData.KeeperStepScale = 0.9
+NPCData.KeeperStepSize = Vector3.new(3, 0.4, 2)
 
 -- Standing behind a shop counter: on the counter's floor (its bottom), on
 -- its back (+Z) side, facing the customers (its -Z side, where MapBuilder
 -- puts the ShopPoint).
 function NPCData.BehindCounter(counter: CFrame, size: Vector3): CFrame
 	return counter * CFrame.new(0, -size.Y / 2, size.Z / 2 + NPCData.CounterGap)
+end
+
+-- The riser a short counter keeper stands on: its size and its middle (under
+-- `standing`, the keeper's feet before the lift), or nil for a keeper tall
+-- enough. The keeper is lifted by the riser's height.
+function NPCData.KeeperStep(npc: NPC, standing: CFrame): (Vector3?, CFrame?)
+	if npc.spot.kind ~= "counter" or (npc.look.scale or 1) >= NPCData.KeeperStepScale then
+		return nil, nil
+	end
+	local size = NPCData.KeeperStepSize
+	return size, standing * CFrame.new(0, size.Y / 2, 0)
 end
 
 -- Lying behind the counter, on the same spot as BehindCounter, low enough

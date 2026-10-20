@@ -1005,14 +1005,19 @@ end
 -- `hang` a bigger brass board also hangs over the aisle in front of it (for a
 -- store whose back wall is clear). The mat is where NPCData.BehindCounter
 -- stands the keeper.
+-- The back-wall CHECKOUT board's middle, and how far its underside (the green
+-- strip too) stays over the tallest keeper's head.
+ShopKit.CheckoutY = 9.9
+ShopKit.CheckoutHeadClear = 3
+
 export type CheckoutOpts = {
 	plaque: boolean?, -- the brass plaque on the counter's front face (default true)
-	cy: number?, -- the hung board's middle y (default 10.4 or just under the ceiling)
+	cy: number?, -- the board's middle y (default 10.4 or just under the ceiling; ShopKit.CheckoutY on the back wall)
 	z: number?, -- and its z (default 3.4 in front of the counter)
 	w: number?, -- and its width
 	h: number?, -- and its height
 	ceilY: number?, -- where its chains end (default under the ceiling beams)
-	onCounter: boolean?, -- instead of hanging: a board on two posts standing on the counter's top at its front edge, `cy` over the floor
+	onCounter: boolean?, -- instead of hanging: a board flat on the back wall over the keeper, `cy` over the floor (ShopKit.CheckoutY)
 }
 
 function ShopKit.CheckoutSign(model: Model, frame: Frame, hang: (boolean | CheckoutOpts)?)
@@ -1046,13 +1051,13 @@ function ShopKit.CheckoutSign(model: Model, frame: Frame, hang: (boolean | Check
 		)
 	end
 	if type(hang) == "table" and opts.onCounter == true then
-		-- A board on two posts standing on the counter's front edge: always over the counter, nothing in front of it
-		-- (no chains to cross another sign on screen), clear of the register, till and bell at the counter's middle.
+		-- The board hangs flat on the back wall over the keeper, at the counter's middle: nothing stands on the
+		-- counter's top, and the board clears the keeper's head by CheckoutHeadClear (the specs measure it).
+		-- A shop whose back wall is busy (`z`) hangs it in front of it from the beams (`ceilY`) instead.
 		local w = opts.w or 7
 		local h = opts.h or 1.5
-		local cy = opts.cy or (cf.Position.Y + size.Y / 2 + 3.4)
-		local z = cf.Position.Z - size.Z / 2 + 0.2
-		local topY = cf.Position.Y + size.Y / 2
+		local cy = opts.cy or ShopKit.CheckoutY
+		local z = opts.z or (frame.halfD - 0.2)
 		local board = dBox(model, "CheckoutSign", V3(w, h, 0.3), CF(cf.Position.X, cy, z), BRASS, MAT.Metal)
 		Kit.signText(board, "CHECKOUT", INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
 		board:SetAttribute("SignText", "CHECKOUT")
@@ -1064,10 +1069,19 @@ function ShopKit.CheckoutSign(model: Model, frame: Frame, hang: (boolean | Check
 			hex("#4CC36A"),
 			MAT.SmoothPlastic
 		)
-		for _, s in ipairs({ -1, 1 }) do
-			local px = cf.Position.X + s * (w / 2 - 0.4)
-			local top = cy - h / 2 - 0.2
-			dBox(model, "CheckoutPost", V3(0.3, top - topY, 0.3), CF(px, (top + topY) / 2, z), TIMBER)
+		if opts.ceilY then
+			local top = cy + h / 2
+			for _, s in ipairs({ -1, 1 }) do
+				local len = math.max(opts.ceilY - top, 0.2)
+				dBox(
+					model,
+					"CheckoutChain",
+					V3(0.12, len, 0.12),
+					CF(cf.Position.X + s * (w / 2 - 0.5), top + len / 2, z),
+					IRON,
+					MAT.Metal
+				)
+			end
 		end
 	elseif wantHung then
 		ShopKit.HeaderSign(model, {

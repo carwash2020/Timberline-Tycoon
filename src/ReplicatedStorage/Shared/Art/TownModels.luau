@@ -463,7 +463,7 @@ local ALL: { Asset } = {
 			{ name = "BarnDoorR", meshId = 128974784954519, size = V(6.6, 11.775, 0.787) },
 			{ name = "Body", meshId = 111225616877210, size = V(31.68, 32.107, 27.769) },
 			{ name = "Collision", meshId = 86986832102076, size = V(31.1, 22.107, 27.6) },
-			{ name = "Counter", meshId = 100192126544226, size = V(9.6, 4.55, 2.6) },
+			{ name = "Counter", meshId = 100192126544226, size = V(9.6, 2.6, 3.6), reupload = true },
 			{ name = "Glow", meshId = 107147198667062, size = V(27.9, 25.448, 24.12) },
 			{ name = "Roof", meshId = 122254759522234, size = V(31.213, 10.695, 24) },
 			{ name = "Sign", meshId = 138480592524964, size = V(25.5, 5.7, 0.75) },
@@ -477,7 +477,7 @@ local ALL: { Asset } = {
 		pieces = {
 			{ name = "Body", meshId = 82514834771582, size = V(32.43, 30.665, 25.159) },
 			{ name = "Collision", meshId = 77525517309414, size = V(29.898, 21.75, 25.8) },
-			{ name = "Counter", meshId = 139469055377248, size = V(7.6, 4.55, 2.4) },
+			{ name = "Counter", meshId = 139469055377248, size = V(7.6, 2.6, 3.6), reupload = true },
 			{ name = "Glow", meshId = 128731335060332, size = V(27.075, 24.923, 15.57) },
 			{ name = "OfficeDoor", meshId = 73211772830716, size = V(3.225, 9, 0.6) },
 			{ name = "OfficeSign", meshId = 97474817544364, size = V(7.8, 1.125, 0.3) },
@@ -495,7 +495,7 @@ local ALL: { Asset } = {
 			{ name = "Body", meshId = 126615154910404, size = V(51.06, 30.525, 40.524) },
 			{ name = "Chimney", meshId = 126429254955747, size = V(2.4, 0.75, 2.4) },
 			{ name = "Collision", meshId = 116430701440570, size = V(51.6, 30, 41.106) },
-			{ name = "Counter", meshId = 106358396545112, size = V(8.6, 4.55, 2.4) },
+			{ name = "Counter", meshId = 106358396545112, size = V(8.6, 2.6, 3.6), reupload = true },
 			{ name = "Glow", meshId = 76572574544186, size = V(49.35, 17.798, 37.091) },
 			{ name = "PriceTags", meshId = 124570295416522, size = V(37.35, 3.45, 0.24) },
 			{ name = "Roof", meshId = 97929711741619, size = V(51.75, 13.001, 47) },
@@ -933,10 +933,13 @@ function TownModels.Ids(category: Category): { string }
 	return out
 end
 
+-- (A piece marked `reupload` has its new size here but the mesh on the id was
+-- drawn for the old size: it is not drawn, and the part-built piece stays
+-- until the mesh is uploaded again, see assets/UPLOAD_LIST.md.)
 function TownModels.Visual(asset: Asset): { Piece }
 	local out = {}
 	for _, piece in ipairs(asset.pieces) do
-		if piece.name ~= "Collision" then
+		if piece.name ~= "Collision" and piece.reupload ~= true then
 			table.insert(out, piece)
 		end
 	end

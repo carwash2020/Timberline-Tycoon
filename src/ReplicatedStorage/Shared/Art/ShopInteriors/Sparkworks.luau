@@ -287,9 +287,9 @@ function Sparkworks.Build(model: Model, frame: Frame)
 		tieTop = ceil,
 		subShift = 0,
 	})
-	-- CHECKOUT stands on two posts on the counter's front edge, above the register and the bell, so it reads from the
-	-- door over the counter (no plaque on the counter's face).
-	ShopKit.CheckoutSign(model, frame, { plaque = false, onCounter = true, cy = 7.7, w = 5.4, h = 1.5 })
+	-- CHECKOUT hangs flat on the back wall over the keeper, 3 studs over his head, so it reads from the door over the
+	-- counter and nothing stands on the counter's top (no plaque on the counter's face).
+	ShopKit.CheckoutSign(model, frame, { plaque = false, onCounter = true, w = 5.4, h = 1.5 })
 	ShopKit.HeaderSign(model, {
 		cx = 0,
 		cy = Sparkworks.StoreSignY,

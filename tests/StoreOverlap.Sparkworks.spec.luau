@@ -131,6 +131,8 @@ return function(t)
 		Counter = "counter",
 		CounterTop = "counter",
 		CounterKick = "counter",
+		CounterFront = "counter",
+		CounterBack = "counter",
 		CounterBell = "counter",
 		Register = "counter",
 		RegisterTag = "counter",

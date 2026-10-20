@@ -285,9 +285,10 @@ return function(t)
 				local world = counter.CFrame:PointToWorldSpace(point.Position)
 				local along = world - front
 				t.ok((along - counter.CFrame.LookVector * 0.5).Magnitude < 1e-3, kind .. " ShopPoint is 0.5 in front")
-				local mesh = visualNamed(shop, "Counter")
-				t.ok(mesh, kind .. " counter mesh")
-				t.ok((mesh.CFrame.Position - counter.CFrame.Position).Magnitude <= 0.1, kind .. " counter centre")
+				-- (T395: the counter mesh was drawn for the old size; until it is uploaded again the
+				-- part-built counter stays, drawn and solid, where the mesh would stand)
+				t.eq(visualNamed(shop, "Counter"), nil, kind .. " counter mesh waits for its re-upload")
+				t.ok(counter.CanCollide and counter.Transparency == 0, kind .. " part counter stays, solid and drawn")
 			end
 			local board = StoreBoard.Build()
 			local prompt = board:FindFirstChild("StorePrompt", true)
@@ -483,8 +484,8 @@ return function(t)
 				t.ok(body and (body.Size - want).Magnitude < 1e-3, kind .. " is scaled once, by its stretch")
 				if kind ~= "Sawmill" then
 					local counter = model:FindFirstChild("Counter")
-					local mesh = visualNamed(model, "Counter")
-					t.ok((mesh.CFrame.Position - counter.CFrame.Position).Magnitude <= 0.1, kind .. " counter")
+					t.eq(visualNamed(model, "Counter"), nil, kind .. " counter mesh waits for its re-upload (T395)")
+					t.ok(counter and counter.CanCollide, kind .. " part counter stays")
 				end
 				local sign = model:FindFirstChild("Sign")
 				local signMesh = visualNamed(model, "Sign")

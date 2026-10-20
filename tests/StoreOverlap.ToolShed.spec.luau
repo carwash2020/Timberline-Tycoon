@@ -30,6 +30,7 @@ return function(t)
 		HeaderSignChain = "headersign",
 		CheckoutSign = "checkout",
 		CheckoutSignAccent = "checkout",
+		CheckoutChain = "checkout",
 		CheckoutPost = "counter",
 		AxePlate = "rackplate",
 		RobuxSign = "robuxsign",
@@ -122,6 +123,8 @@ return function(t)
 		Counter = "counter",
 		CounterTop = "counter",
 		CounterKick = "counter",
+		CounterFront = "counter",
+		CounterBack = "counter",
 		CounterBell = "counter",
 		Register = "counter",
 		RegisterTag = "counter",
@@ -396,7 +399,8 @@ return function(t)
 		end
 		-- and every family or shell name is used (a stale entry would hide a rename)
 		-- (only the door's blocker, sensor and closed sign and the tables' colliders are invisible besides the event room)
-		local invisible = { DoorBlock = true, DoorSensor = true, DoorClosedSign = true, DisplayTable = true }
+		local invisible =
+			{ DoorBlock = true, DoorSensor = true, DoorClosedSign = true, DisplayTable = true, CounterBack = true }
 		for _, d in ipairs(shopModel:GetDescendants()) do
 			if d:IsA("BasePart") and d.Transparency >= 1 and not invisible[d.Name] then
 				t.ok(string.sub(d.Name, 1, 5) == "Event", "an invisible part that is not the event room's: " .. d.Name)
