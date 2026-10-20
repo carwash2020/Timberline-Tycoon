@@ -726,9 +726,16 @@ end
 
 -- A chop tip as a toast (nothing in range, too far, too hard): 3 s, a 0.4 s
 -- fade, and the same `key` not again for 60 s (TipTimer).
-local toastTips = TipTimer.New()
+-- (the state of every timed tip lives in `tips`, below the toasts)
+local tips = {
+	toasts = TipTimer.New(),
+	hints = TipTimer.New(),
+	thickTimed = false,
+	fade = nil :: Tween?,
+	refresh = function() end :: () -> (),
+}
 function HUD.TimedToast(key: string, message: string)
-	if TipTimer.Allow(toastTips, key, os.clock()) then
+	if TipTimer.Allow(tips.toasts, key, os.clock()) then
 		HUD.Toast(message, TipTimer.VisibleSeconds)
 	end
 end
@@ -757,25 +764,21 @@ end
 -- over 0.4 s, then the control hint again, and not back for 60 s. Returns
 -- whether the line may show now; the first time it does, it schedules its own
 -- fade and the refresh that puts the control hint back.
-local hintTips = TipTimer.New()
-local thickTimed = false
-local hintFade: Tween? = nil
-local refreshHintLater: () -> () = function() end
-local function thickTipShows(): boolean
+function tips.thickShows(): boolean
 	local label = hintLabel
-	local visible = TipTimer.Show(hintTips, "thick", os.clock())
-	if visible and not thickTimed then
-		thickTimed = true
+	local visible = TipTimer.Show(tips.hints, "thick", os.clock())
+	if visible and not tips.thickTimed then
+		tips.thickTimed = true
 		task.delay(TipTimer.VisibleSeconds, function()
 			if label and hintForced == nil and pointingThick then
 				local tween = TweenService:Create(label, TweenInfo.new(TipTimer.FadeSeconds), { TextTransparency = 1 })
-				hintFade = tween
+				tips.fade = tween
 				tween:Play()
 			end
 		end)
 		task.delay(TipTimer.VisibleSeconds + TipTimer.FadeSeconds + 0.05, function()
-			thickTimed = false
-			refreshHintLater()
+			tips.thickTimed = false
+			tips.refresh()
 		end)
 	end
 	return visible
@@ -791,7 +794,7 @@ local function hintStateV2(): HintLogic.StateV2
 		holding = heldPiece ~= nil,
 		onWood = pointingWood,
 		tooHard = pointingHard,
-		thick = pointingThick and thickTipShows(),
+		thick = pointingThick and tips.thickShows(),
 		tooLong = HintLogic.TooLong(heldLength(), player:GetAttribute("BedLength")),
 		bedVolume = attrAmount("BedVolume"),
 		nearPad = nearPad,
@@ -889,14 +892,14 @@ local function refreshHint()
 	if hint.Text ~= text then
 		hint.Text = text
 		-- A new line is shown whole (the thick tip's fade is over or cancelled).
-		if hintFade then
-			hintFade:Cancel()
-			hintFade = nil
+		if tips.fade then
+			tips.fade:Cancel()
+			tips.fade = nil
 		end
 		hint.TextTransparency = 0
 	end
 end
-refreshHintLater = refreshHint
+tips.refresh = refreshHint
 
 -- What the axe is pointing at (CutController, a few times a second): a
 -- loose piece, and wood too hard for it. Refreshes the hint on a change.
