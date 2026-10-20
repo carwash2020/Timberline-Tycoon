@@ -204,3 +204,8 @@ Every other registry row is uploaded and Approved. Status `repo`: the GLB is in
 
 Kept part-built on purpose (not on this list): shop boxes (the LT2-style dark box with a
 window, BoxArt), every gameplay part (hitboxes, prompts, sell zones, signs with text).
+
+Blender follow-up (T392): re-export `vehicles/LoggingRig` Body without the crane arm and
+grapple (they are baked into the Body mesh, 14.281 studs tall; the cab roof is the top). After
+Connor re-uploads it, update the LoggingRig Body `meshId`, `size` and `at` in VehicleModels.
+The part-built rig already has no crane.
