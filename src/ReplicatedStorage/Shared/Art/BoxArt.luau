@@ -18,8 +18,12 @@
 --   SideWindow  a third window on the side that faces the aisle, in place of
 --               that side's wall, when the box stands on a shelf
 --   Strip       the name band across the top of the front, in the accent
---               colour. No price is printed: the price shows in a tag when
---               you aim at the box (Shared/HoverTag)
+--               colour
+--   PriceTag    the cream plate under the strip, opposite the brass plate,
+--               printing the item's real price (Spec.price, the one the shop
+--               charges) in a SurfaceGui. The server builds the text; the
+--               client recolours it per player (CoinGold or StopRed, the
+--               client's BoxPriceState). The hover tag still shows it too.
 --   Contents    a Model of the item itself, scaled to fit with a margin
 --               (ItemModel: low-detail copy, at most ModelBudget parts)
 -- Everything but the body is welded to it, never more massive than the box
@@ -36,6 +40,7 @@ local ItemModel = require(script.Parent.ItemModel)
 local ModelSlots = require(script.Parent.ModelSlots)
 local Kit = require(script.Parent.Kit)
 local Palette = require(script.Parent.Palette)
+local Util = require(script.Parent.Parent.Util)
 local RobuxBoxArt = require(script.Parent.RobuxBoxArt)
 local StoreModelArt = require(script.Parent.StoreModelArt)
 local StoreModelSlots = require(script.Parent.Parent.StoreModelSlots)
@@ -50,6 +55,7 @@ export type Spec = {
 	color: Color3?, -- the item's own colour (only a fallback accent)
 	gold: boolean?, -- a Robux box: RobuxBoxArt's open crate of coins (Lane P)
 	robuxKey: string?, -- the Robux item's key (its coin pile)
+	price: number?, -- the cash price the shop charges (StoreStock.UnitPrice): printed on the PriceTag plate; nil prints nothing
 	side: string?, -- "Left" | "Right": the side facing the aisle gets a window too
 	cardColor: Color3?, -- with `wood`: the name card's colour instead of the walnut (the Sparkworks' dark teal)
 	wood: boolean?, -- the General Store's look (Hearth & Home, and the Sparkworks with a teal card): a wood base board flush under the box and a slim walnut name card, instead of the accent floor and band. Same box size, hover tag and focus.
@@ -83,6 +89,7 @@ BoxArt.Layout = {
 	rim = 0.1, -- the charcoal bars round the top edge, and the aisle pane's upright
 	tag = Vector3.new(1.2, 0.6, 0.05), -- the price tag plate, under the strip, opposite the brass plate
 	tagInset = 0.15, -- from the right edge of the box
+	tagMinText = 8, -- the price's smallest text size, in pixels, so it stays legible
 	pixelsPerStud = 60,
 }
 
@@ -153,6 +160,55 @@ local function write(part: BasePart, face: Enum.NormalId, text: string, ink: Col
 	pad.PaddingTop = UDim.new(0.08, 0)
 	pad.PaddingBottom = UDim.new(0.08, 0)
 	pad.Parent = label
+end
+
+-- The CollectionService tag on a PriceTag plate: the client finds the plates by it
+-- and recolours the price per player.
+BoxArt.PriceTagTag = "BoxPriceTag"
+BoxArt.PriceLabelName = "Price"
+
+-- The text printed on a box for a cash price: "$32", "$1,250", FREE at 0 (as the hover tag).
+function BoxArt.PriceText(price: number): string
+	if price > 0 then
+		return Util.formatCash(price)
+	end
+	return "FREE"
+end
+
+-- Prints `price` on the front of the plate, CoinGold until the client says otherwise.
+local function printPrice(tag: Part, price: number)
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "PriceMark"
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = BoxArt.Layout.pixelsPerStud
+	gui.LightInfluence = 0.4
+	gui.Parent = tag
+	local label = Instance.new("TextLabel")
+	label.Name = BoxArt.PriceLabelName
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.FredokaOne
+	label.Text = BoxArt.PriceText(price)
+	label.TextScaled = true
+	label.TextWrapped = false
+	label.TextColor3 = Palette.CoinGold
+	label.TextStrokeColor3 = Color3.fromRGB(40, 28, 16)
+	label.TextStrokeTransparency = 0.4
+	label.Parent = gui
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MinTextSize = BoxArt.Layout.tagMinText
+	limit.Parent = label
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0.06, 0)
+	pad.PaddingRight = UDim.new(0.06, 0)
+	pad.PaddingTop = UDim.new(0.08, 0)
+	pad.PaddingBottom = UDim.new(0.08, 0)
+	pad.Parent = label
+	tag:SetAttribute("Price", price)
+	pcall(function()
+		game:GetService("CollectionService"):AddTag(tag, BoxArt.PriceTagTag)
+	end)
 end
 
 -- Dresses `body` (a Part whose size is the box) as a dark window box. Returns
@@ -321,11 +377,11 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 		Enum.Material.Metal
 	))
 
-	-- The price tag, opposite the brass plate: a cream plate that carries no printed
-	-- price (Connor, 7 October 2026: prices show in the hover tag when you aim at the box,
-	-- and a shared box cannot know what the viewer can afford). It is the tag's place.
+	-- The price tag, opposite the brass plate: a cream plate printing the item's real price
+	-- (the caller passes the price the shop charges). Boxes are shared, so the server
+	-- builds the text and the client colours it for the viewer (BoxArt.PriceTagTag).
 	local tagSize = L.tag
-	add(
+	local priceTag = add(
 		plate(
 			parent,
 			body,
@@ -340,6 +396,9 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 			Enum.Material.SmoothPlastic
 		)
 	)
+	if spec.price ~= nil then
+		printPrice(priceTag, spec.price)
+	end
 
 	-- The rim: four 0.1 charcoal bars round the top edge, each standing on a wall, so the
 	-- glass top reads as a closed lid from above (the bare glass read as a gap).

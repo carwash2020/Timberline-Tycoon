@@ -587,19 +587,12 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	end
 	placeModel(slot, model, item)
 	if bp.kit then
-		local apply = (BlueprintModels :: any).ApplyWood
-		local fade = (BlueprintModels :: any).SetFaded
-		if type(apply) == "function" then
-			apply(model, item.wood)
-		end
 		if item.paint ~= nil then
 			model:SetAttribute("Paint", item.paint)
-			if type(BlueprintModels.ApplyPaint) == "function" then
-				BlueprintModels.ApplyPaint(model, item.paint)
-			end
 		end
-		if type(fade) == "function" and not PlotLogic.IsBuilt(bp, item) then
-			fade(model, true)
+		local refresh = (BlueprintModels :: any).Refresh
+		if type(refresh) == "function" then
+			refresh(model, item.wood, item.paint, if PlotLogic.IsBuilt(bp, item) then nil else true)
 		end
 	end
 	if bp.opens and PlotLogic.IsBuilt(bp, item) and type(model.GetDescendants) == "function" then
@@ -3055,12 +3048,15 @@ function PlotService.FillStep()
 							}, piece.ownerId, api)
 							if changed then
 								local model = slot.items:FindFirstChild(item.uid)
-								if model and model:IsA("Model") and type(BlueprintModels.ApplyWood) == "function" then
+								if model and model:IsA("Model") and type(BlueprintModels.Refresh) == "function" then
 									-- FillUnits first: SetFaded keeps the blue hologram only while it is 0.
 									model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
-									BlueprintModels.ApplyWood(model, item.wood)
-									BlueprintModels.ApplyPaint(model, item.paint)
-									BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
+									BlueprintModels.Refresh(
+										model,
+										item.wood,
+										item.paint,
+										not PlotLogic.IsBuilt(bp, item)
+									)
 									model:SetAttribute("Needs", BuildCost.MissingText(BuildCost.Missing(bp, item)))
 								end
 							elseif type(why) == "string" and type(piece.uid) == "string" then
