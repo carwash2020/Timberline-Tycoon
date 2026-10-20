@@ -156,7 +156,7 @@ BuildingArt.SignRise = 3
 BuildingArt.DealerLobbyCounterX = 13
 BuildingArt.DealerCounterBack = 4.8
 BuildingArt.ToolShedHalfDepth = 15.0
-BuildingArt.ToolShedCounterZ = 13.6 -- the counter's middle, final studs from the shop's middle
+BuildingArt.ToolShedCounterZ = 13.2 -- the counter's middle, final studs from the shop's middle (was 13.6 for the 2.5 deep counter: the 3.6 one keeps its keeper clear of the gold table at z 16.85)
 BuildingArt.ToolShedHalfWidth = 11.9 -- was 9.7 (29.1 wide, 35.7 now): each table is 12.1 wide, so two boxes stand side by side with room between (Connor: space the boxes out)
 local TOOL_SHED_OLD_HALF_DEPTH = 7
 
@@ -808,48 +808,62 @@ local function rackAxe(parent: Instance, cf: CFrame, len: number, color: Color3,
 	end
 end
 
--- A brass cash register; `cf` = the middle of its base on a counter.
-local function register(parent: Instance, cf: CFrame)
-	dBox(parent, "Register", V3(1.6, 0.85, 1.2), cf * CF(0, 0.42, 0), BRASS, MAT.Metal)
+-- A brass cash register, `k` times its full size; `cf` = the middle of its base
+-- on a counter.
+local function register(parent: Instance, cf: CFrame, k: number)
+	dBox(parent, "Register", V3(1.6, 0.85, 1.2) * k, cf * CF(0, 0.42 * k, 0), BRASS, MAT.Metal)
 	dBox(
 		parent,
 		"Register",
-		V3(1.4, 0.55, 0.6),
-		cf * CF(0, 1.0, 0.25) * ANG(-0.45, 0, 0),
+		V3(1.4, 0.55, 0.6) * k,
+		cf * CF(0, 1.0 * k, 0.25 * k) * ANG(-0.45, 0, 0),
 		Kit.shade(BRASS, -0.15),
 		MAT.Metal
 	)
-	dBox(parent, "RegisterTag", V3(0.8, 0.4, 0.08), cf * CF(0, 1.5, 0.42), PAPER, MAT.SmoothPlastic)
+	dBox(parent, "RegisterTag", V3(0.8, 0.4, 0.08) * k, cf * CF(0, 1.5 * k, 0.42 * k), PAPER, MAT.SmoothPlastic)
 end
 
--- An open ledger book; `cf` = its middle on a counter.
-local function ledger(parent: Instance, cf: CFrame)
-	dBox(parent, "LedgerCover", V3(2.0, 0.08, 1.35), cf * CF(0, 0.04, 0), hex("#3F5E3A"))
-	for _, s in ipairs({ -1, 1 }) do
-		dBox(
-			parent,
-			"LedgerPage",
-			V3(0.92, 0.1, 1.2),
-			cf * CF(s * 0.47, 0.12, 0) * ANG(0, 0, -s * 0.07),
-			PAPER,
-			MAT.SmoothPlastic
-		)
-	end
-end
-
--- The shared shop counter. Body bottom is y = 0 so Kit.scaleModel's rigid
--- shift (anchor * (s - 1), anchor at the bottom) leaves the top at 3.9
--- at every scale. PlankHoney body, TimberBrown top, IronBlack kick.
-local COUNTER_TOP = 3.9
+-- The shared shop counter (T395): 2.6 high, 3.6 deep, 10 wide, its body bottom
+-- at y = 0 so Kit.scaleModel's rigid shift (anchor at the bottom) leaves the
+-- top at 2.6 at every scale. It is waist high on the keeper, who shows from the
+-- waist up behind it, and its top is clear: the 6 x 3 in the middle holds the
+-- boxes being paid for. The only clutter is a register and a bell in the outer
+-- 1.2 studs at the clerk's left (the keeper faces -Z, so his left is -X).
+-- PlankHoney front and body, TimberBrown top.
+BuildingArt.CounterSize = V3(10, 2.6, 3.6)
+BuildingArt.CounterClutterWidth = 1.2
+local COUNTER_TOP = BuildingArt.CounterSize.Y
 local function placeCounter(model: Model, x: number, z: number)
-	local h = COUNTER_TOP
-	Kit.part(model, "Counter", V3(10, h, 2.5), CF(x, h / 2, z), Palette.PlankHoney, MAT.WoodPlanks)
-	dBox(model, "CounterTop", V3(10.4, 0.25, 2.9), CF(x, COUNTER_TOP + 0.125, z), Palette.TimberBrown, MAT.Wood)
-	dBox(model, "CounterKick", V3(10, 0.3, 2.3), CF(x, 0.15, z), Palette.IronBlack, MAT.Metal)
-	dBox(model, "Till", V3(1.2, 0.8, 1), CF(x + 3.2, COUNTER_TOP + 0.65, z + 0.3), Palette.TimberBrown, MAT.Wood)
-	dBall(model, "CounterBell", 0.4, CF(x - 3.2, COUNTER_TOP + 0.45, z - 0.4), Palette.Brass, MAT.Metal)
-	register(model, CF(x + 1.2, COUNTER_TOP + 0.25, z + 0.15))
-	ledger(model, CF(x - 1.2, COUNTER_TOP + 0.25, z - 0.1))
+	local size = BuildingArt.CounterSize
+	Kit.part(model, "Counter", size, CF(x, size.Y / 2, z), Palette.TimberBrown, MAT.Wood)
+	-- The front: honey planks on the customer's face, a hair proud of the top's wood.
+	dBox(
+		model,
+		"CounterFront",
+		V3(size.X - 0.4, size.Y - 0.5, 0.1),
+		CF(x, (size.Y - 0.5) / 2, z - size.Z / 2 - 0.04),
+		Palette.PlankHoney,
+		MAT.WoodPlanks
+	)
+	-- A hidden blocker past each end, as deep as the counter, 3 wide and 5 tall: nobody walks round the end of
+	-- the counter or climbs over the end to the keeper's side.
+	for _, side in ipairs({ -1, 1 }) do
+		local block = Kit.part(
+			model,
+			"CounterBack",
+			V3(3, 5, size.Z),
+			CF(x + side * (size.X / 2 + 1.5), 2.5, z),
+			Palette.TimberBrown,
+			MAT.Wood
+		)
+		block.Transparency = 1
+		block.CastShadow = false
+		block.CanQuery = false
+		block.CanTouch = false
+	end
+	local left = x - size.X / 2 + BuildingArt.CounterClutterWidth / 2
+	register(model, CF(left, COUNTER_TOP, z - 0.7), 0.7)
+	dBall(model, "CounterBell", 0.4, CF(left, COUNTER_TOP + 0.2, z + 0.9), Palette.Brass, MAT.Metal)
 end
 
 -- A grindstone: a stone wheel turning in a trough on splayed legs. The
@@ -1608,7 +1622,7 @@ end
 -- prices (StoreStock), never typed here.
 BuildingArt.HearthHalfWidth = 16.5
 BuildingArt.HearthHalfDepth = 14.5
-BuildingArt.HearthCounterZ = 15.3 -- the counter's middle, final studs from the shop's middle
+BuildingArt.HearthCounterZ = 14.9 -- the counter's middle, final studs from the shop's middle (was 15.3 for the 2.5 deep counter: the 3.6 one keeps its keeper clear of the back ledge at z 18.45)
 
 local function hearthAndHome(model: Model, title: string, accent: Color3)
 	local plaster = Palette.PlankHoney
@@ -1812,16 +1826,23 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 	placeCounter(model, 0, BuildingArt.SparkworksCounterZ / BuildingArt.Scale.Sparkworks)
 
 	-- The back wall behind the keeper: a row of spark lamps, each over its
-	-- switch, and a copper run joining them. Looks only.
+	-- switch, and a copper run joining them. Looks only. The middle of the row
+	-- is left bare: the CHECKOUT board hangs there (ShopKit.CheckoutSign), 3
+	-- studs over the keeper's head, and the run stops short of it either side.
 	local backZ = HZ - 0.3
 	for i = 1, 5 do
+		if i == 3 then
+			continue
+		end
 		local x = (i - 3) * 3.4
 		local lampBit =
 			dBox(model, "SparkLamp", V3(0.9, 0.9, 0.3), CF(x, 7.4, backZ - 0.15), Palette.SparkTeal, MAT.Neon)
 		lampBit.CastShadow = false
 		dBox(model, "WallSwitch", V3(0.5, 0.8, 0.2), CF(x, 5.9, backZ - 0.1), Palette.IronBlack, MAT.Metal)
 	end
-	dBox(model, "CopperRun", V3(14.4, 0.2, 0.2), CF(0, 6.65, backZ - 0.08), Palette.Brass, MAT.Metal)
+	for _, side in ipairs({ -1, 1 }) do
+		dBox(model, "CopperRun", V3(5.2, 0.2, 0.2), CF(side * 4.6, 6.65, backZ - 0.08), Palette.Brass, MAT.Metal)
+	end
 end
 
 -- Shelf slots are attachments on the counter (they are not parts, so the
@@ -2224,10 +2245,13 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 				local p = ccf:PointToObjectSpace(d.CFrame.Position)
 				local y = d.CFrame.Position.Y
 				if
-					math.abs(p.X) <= size.X / 2 + 0.5
-					and math.abs(p.Z) <= size.Z / 2 + 0.5
-					and y >= bottom
-					and y <= bottom + size.Y + 2
+					(
+						math.abs(p.X) <= size.X / 2 + 0.5
+						and math.abs(p.Z) <= size.Z / 2 + 0.5
+						and y >= bottom
+						and y <= bottom + size.Y + 2
+					)
+					or d.Name == "CounterBack" -- (the hidden end blockers keep their size and place at the counter's ends)
 				then
 					rigid[d] = anchor
 				end
@@ -3677,7 +3701,7 @@ function BuildingArt.Sparkworks(): Model
 	Kit.part(model, "Wall", V3(6, 9, 0.4), CF(-4, 5, -5.8), Palette.WeatheredPlank, MAT.WoodPlanks)
 	Kit.part(model, "Wall", V3(6, 9, 0.4), CF(4, 5, -5.8), Palette.WeatheredPlank, MAT.WoodPlanks)
 	Kit.part(model, "Roof", V3(15, 0.25, 13), CF(0, 9.8, 0), Palette.RoofSlate, MAT.Metal)
-	Kit.part(model, "Counter", V3(8, 3.2, 2.2), CF(-2, 1.8, 3.2), Palette.TimberBrown, MAT.Wood)
+	Kit.part(model, "Counter", V3(8, 2.6, 3.6), CF(-2, 1.3, 3.2), Palette.TimberBrown, MAT.Wood)
 	for i = 1, 4 do
 		local lampBit = dBox(model, "Lamp", V3(0.5, 0.7, 0.3), CF(5.4, 3 + i * 1.1, 2), Palette.LumenGlow, MAT.Neon)
 		dBox(model, "Switch", V3(0.35, 0.45, 0.15), CF(5.4, 3 + i * 1.1, 0.4), Palette.IronBlack, MAT.Metal)

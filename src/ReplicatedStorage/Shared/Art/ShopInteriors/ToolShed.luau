@@ -298,10 +298,10 @@ function ToolShed.Dressing(model: Model, frame: Frame)
 		pegboard(model, frame, side * 12.4, 9.4)
 	end
 	-- a rug before the counter and plants at its sides
-	dBox(model, "ShedRug", V3(7.6, 0.06, 3.0), CF(0, fy + ShopKit.Layer[2], 10.7), hex("#3E5F7A"), MAT.Fabric)
-	dBox(model, "ShedRugEdge", V3(6.6, 0.07, 2.0), CF(0, fy + ShopKit.Layer[3], 10.7), hex("#D9C28A"), MAT.Fabric)
-	ShopKit.plant(model, -4.1, fy, 10.7, 0.8)
-	ShopKit.plant(model, 4.1, fy, 10.7, 0.8)
+	dBox(model, "ShedRug", V3(7.6, 0.06, 3.0), CF(0, fy + ShopKit.Layer[2], 9.6), hex("#3E5F7A"), MAT.Fabric)
+	dBox(model, "ShedRugEdge", V3(6.6, 0.07, 2.0), CF(0, fy + ShopKit.Layer[3], 9.6), hex("#D9C28A"), MAT.Fabric)
+	ShopKit.plant(model, -4.1, fy, 9.6, 0.8)
+	ShopKit.plant(model, 4.1, fy, 9.6, 0.8)
 	ShopKit.plant(model, 3.9, fy, -19.6, 0.9)
 end
 
@@ -333,7 +333,7 @@ function ToolShed.Build(model: Model, frame: Frame)
 	ShopKit.Rafter(model, frame, 0)
 	ToolShed.SpotLamps(model, frame)
 	-- (staggered either side of the middle so, from the door, they do not stack in one line on the screen)
-	for _, at in ipairs({ { 0, -13.6 }, { -2.6, 2.4 }, { 2.6, 8.8 } }) do
+	for _, at in ipairs({ { 1.8, -13.6 }, { -2.6, 2.4 }, { 3.9, 8.8 } }) do
 		ShopKit.WarmLamp(model, at[1], ceil - 3.4, at[2], ceil - 0.9)
 	end
 
@@ -351,7 +351,15 @@ function ToolShed.Build(model: Model, frame: Frame)
 		tieY = ToolShed.TieY,
 		noTie = true,
 	})
-	ShopKit.CheckoutSign(model, frame, { plaque = false, onCounter = true, cy = 7.0, w = 5.4, h = 1.5 })
+	-- (the back wall is the axe rack, so the board hangs from the last beam, at the counter's back edge, over the keeper)
+	ShopKit.CheckoutSign(model, frame, {
+		plaque = false,
+		onCounter = true,
+		w = 5.4,
+		h = 1.5,
+		z = ToolShed.BeamZs[#ToolShed.BeamZs] + 0.3,
+		ceilY = ceil - 0.9,
+	})
 
 	local fy = frame.floorTop
 	ToolShed.Dressing(model, frame)

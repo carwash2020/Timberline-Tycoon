@@ -41,6 +41,7 @@ export type Piece = {
 	name: string,
 	meshId: number,
 	size: Vector3,
+	reupload: boolean?, -- the size is the new design's; the mesh on the id was drawn for the old one, so it is not drawn until Connor uploads it again
 }
 
 export type Asset = {
@@ -79,7 +80,7 @@ local ALL: { Asset } = {
 			{ name = "Roof", meshId = 89253491911561, size = V(15.3, 4.598, 16.008) },
 			{ name = "Glow", meshId = 136237303966536, size = V(15.228, 10.415, 9.655) },
 			{ name = "Sign", meshId = 98827174864022, size = V(10, 9.9, 12.06) },
-			{ name = "Counter", meshId = 127001968071509, size = V(7.7, 3.34, 2.2) },
+			{ name = "Counter", meshId = 127001968071509, size = V(7.7, 2.6, 3.6), reupload = true },
 			{ name = "Collision", meshId = 100145003690911, size = V(14.5, 9.2, 12.5) },
 		},
 	},
@@ -93,7 +94,7 @@ local ALL: { Asset } = {
 			{ name = "Roof", meshId = 103817737726820, size = V(19.3, 5.035, 18.201) },
 			{ name = "Glow", meshId = 86262296118558, size = V(18.1, 2.4, 9.348) },
 			{ name = "Sign", meshId = 126773804852360, size = V(8.5, 1.8, 0.35) },
-			{ name = "Counter", meshId = 113385781102272, size = V(8.2, 3.63, 2.4) },
+			{ name = "Counter", meshId = 113385781102272, size = V(8.2, 2.6, 3.6), reupload = true },
 			{ name = "Collision", meshId = 84553375315370, size = V(18.05, 8.5, 14.025) },
 			{ name = "Door", meshId = 139948273690577, size = V(5.55, 6.5, 0.4) },
 		},

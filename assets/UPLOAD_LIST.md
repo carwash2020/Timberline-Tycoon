@@ -334,3 +334,30 @@ Blender follow-up (T392): re-export `vehicles/LoggingRig` Body without the crane
 grapple (they are baked into the Body mesh, 14.281 studs tall; the cab roof is the top). After
 Connor re-uploads it, update the LoggingRig Body `meshId`, `size` and `at` in VehicleModels.
 The part-built rig already has no crane.
+
+## Re-upload: the three shop counters (T395, new size)
+
+Every shop counter is now 2.6 high and 3.6 deep (it was 4.55 high and 2.4 to 2.6 deep in the
+meshes), so the keeper shows from the waist up. The three uploaded counter meshes below were drawn for the
+old size. `TownModels` already holds the new size on each `Counter` piece and marks it `reupload`:
+until you upload again the game does not draw the old mesh and the part-built counter (same size, same
+place, register and bell on it) stays. The Sparkworks and Land Office rows in `BacklogModels` carry the
+same new size and flag, for the day those shops are dressed with a counter mesh.
+
+| Piece | Used by | Size to author (studs, X x Y x Z) | Collision | Old mesh id (replace) |
+|---|---|---|---|---|
+| `Counter` | `buildings/ToolShed` | 9.6 x 2.6 x 3.6 | Box | 100192126544226 |
+| `Counter` | `buildings/Dealership` | 7.6 x 2.6 x 3.6 | Box | 139469055377248 |
+| `Counter` | `buildings/GeneralStore` | 8.6 x 2.6 x 3.6 | Box | 106358396545112 |
+
+Connor's steps:
+
+1. In Blender, open each building's GLB under `assets/glb`, resize its `Counter` piece to the size above
+   (the origin stays at the middle of the piece, the top is the surface boxes sit on), and export it
+   again as a MeshPart.
+2. Upload each in Studio (Asset Manager, Bulk Import) as a Model/MeshPart with Box collision, and wait for
+   Approved.
+3. Send the three new MeshPart ids. They replace the ids in the table in `TownModels` (`Counter` rows of
+   `ToolShed`, `Dealership`, `GeneralStore`), the `reupload = true` flag comes off the same rows, and the
+   `tools/blender/registry.py` row is regenerated, in a separate PR.
+4. Until then nothing is missing in game: the part-built counter is the counter.

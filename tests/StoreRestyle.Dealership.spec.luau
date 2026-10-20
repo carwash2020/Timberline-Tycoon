@@ -360,19 +360,22 @@ return function(t)
 		end
 	end)
 
-	t.test("CHECKOUT stands on the counter, on two posts, with no plaque and no hung board", function()
-		local signs = named(shop, "CheckoutSign")
-		t.eq(#signs, 1)
-		t.eq(#named(shop, "CheckoutPost"), 2)
-		t.eq(#named(shop, "CheckoutPlaque"), 0)
-		local counter = named(shop, "Counter")[1]
-		local cx0, cx1, _, cy1, cz0, cz1 = aabb(counter)
-		local sx0, sx1, sy0, _, sz0, sz1 = aabb(signs[1])
-		t.ok(sx0 >= cx0 and sx1 <= cx1, "over the counter in x")
-		t.ok(sz0 >= cz0 - 0.3 and sz1 <= cz1, "over the counter in z")
-		t.ok(sy0 > cy1, "above its top")
-		t.eq(#named(shop, "HeaderSignChain") % 2, 0)
-	end)
+	t.test(
+		"CHECKOUT hangs flat on the back wall over the keeper, with no posts, no plaque and no hung board",
+		function()
+			local signs = named(shop, "CheckoutSign")
+			t.eq(#signs, 1)
+			t.eq(#named(shop, "CheckoutPost"), 0)
+			t.eq(#named(shop, "CheckoutPlaque"), 0)
+			local counter = named(shop, "Counter")[1]
+			local cx0, cx1, _, _, _, cz1 = aabb(counter)
+			local sx0, sx1, sy0, _, sz0 = aabb(signs[1])
+			t.ok(sx0 >= cx0 and sx1 <= cx1, "over the counter in x")
+			t.ok(sz0 > cz1, "behind the counter, on the back wall")
+			t.ok(sy0 >= 5.85 + 3 - 0.01, "3 studs over the tallest keeper's head")
+			t.eq(#named(shop, "HeaderSignChain") % 2, 0)
+		end
+	)
 
 	---------------------------------------------------------------------------
 	-- The event room

@@ -448,6 +448,26 @@ return function(t)
 		t.ok(s.remotes.UpgradePlot.OnServerEvent.fn ~= nil)
 	end)
 
+	-- T395: the Land Office counter is a shop counter like the others: 2.6 high, 3.6 deep, Old Hank's
+	-- Talk spot a stud behind it, his posts and roof behind the counter's back face.
+	t.test("the Land Office counter is 2.6 high and 3.6 deep, solid, with Hank's spot a stud behind it", function()
+		local s = setup()
+		local counter = s.counter
+		t.ok(math.abs(counter.Size.Y - 2.6) < 1e-3 and math.abs(counter.Size.Z - 3.6) < 1e-3, "2.6 x 3.6")
+		t.ok(counter.Size.X >= 6, "at least 6 wide")
+		t.ok(counter.CanCollide)
+		local NPCData = t.shared("NPCData")
+		local stand = NPCData.BehindCounter(counter.CFrame, counter.Size)
+		local back = counter.CFrame:PointToObjectSpace(stand.Position).Z - counter.Size.Z / 2
+		t.ok(back >= 1 - 1e-3, "the keeper stands at least a stud behind the back face")
+		for _, d in ipairs(counter.Parent:GetChildren()) do
+			if d.Name == "Post" then
+				local at = counter.CFrame:PointToObjectSpace(d.CFrame.Position)
+				t.ok(at.Z - d.Size.Z / 2 >= counter.Size.Z / 2 - 1e-3, "a post stands behind the counter, not in it")
+			end
+		end
+	end)
+
 	t.test("claiming a plot makes it yours, once", function()
 		local s = setup()
 		local ann, profile = s.newPlayer(1, "Ann")
