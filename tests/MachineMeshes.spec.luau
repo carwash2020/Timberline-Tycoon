@@ -863,6 +863,14 @@ return function(t)
 		withMeshes(function()
 			for _, id in ipairs({ "SawmillRickety", "PlanerHand", "ChopSaw", "ConveyorStraight", "Lever", "GateAnd" }) do
 				local model = BUILD[id](true)
+				if id == "Lever" or id == "GateAnd" then
+					-- BlueprintModels' ghost never uses meshes (T380): the boxes, as a hologram.
+					t.eq(#meshParts(model), 0, id .. " ghost has no mesh")
+					for _, p in ipairs(parts(model)) do
+						t.eq(p.CanCollide, false, id .. " " .. p.Name)
+					end
+					continue
+				end
 				local worn = meshParts(model)
 				t.ok(#worn >= 2, id)
 				for _, p in ipairs(worn) do

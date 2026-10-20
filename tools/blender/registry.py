@@ -13,6 +13,8 @@ Rows:
            module named in wiredBy; the registry meshId stays 0 (no override).
   backlog  uploaded in the Blender backlog (2026-10-08) and wired by job 17
            (BacklogModels). meshId is its main piece's uploaded id.
+  wired    a backlog row its builder dresses itself (BUILDER_WIRED below);
+           same id as backlog, but wiredBy names the builder module.
   planned  on Lane H's list with no model yet. Nothing is uploaded and the
            part-built model stays. Listed in UPLOAD_LIST.md.
 """
@@ -51,6 +53,9 @@ BACKLOG = {
         "IsleCrystal", "BerryBush", "Cattails", "LilyPad", "GrassTuft", "Bush",
     ],
 }
+
+# Backlog rows a builder dresses itself (TownMeshes.Dress in BuildingArt).
+BUILDER_WIRED = {"shops/SkyForgeCourt": "BuildingArt"}
 
 # On Lane H's list, no model anywhere yet. (name, group, collision, why)
 PLANNED = [
@@ -178,8 +183,8 @@ def backlog_rows(backlog_json: Path, pack_models: Path) -> list[dict]:
                     "size": s["size"],
                     "collision": collision_for(category, s["size"]),
                     "meshId": mesh_id,
-                    "status": "backlog",
-                    "wiredBy": "BacklogModels",
+                    "status": "wired" if f"{category}/{name}" in BUILDER_WIRED else "backlog",
+                    "wiredBy": BUILDER_WIRED.get(f"{category}/{name}", "BacklogModels"),
                 }
             )
     return rows
@@ -215,6 +220,9 @@ HEADER = """--!strict
 --            here is 0: the registry never overrides those modules.
 --   backlog  uploaded with the Blender backlog (8 Oct 2026, Approved) and
 --            wired by BacklogModels (job 17). meshId is its main piece.
+--   wired    uploaded with the backlog and dressed by its own builder
+--            (BuildingArt calls TownMeshes.Dress; BacklogModels.Wired lists
+--            it for the preload). meshId is its main piece; MeshIds() skips it.
 --   store    a store item model (one mesh, one baked colour texture in
 --            textures.Color), uploaded 13 Oct 2026. meshId is the live id.
 --   planned  on Lane H's list with no model yet (assets/UPLOAD_LIST.md).
@@ -233,7 +241,7 @@ HEADER = """--!strict
 local BlenderAssets = {}
 
 export type Collision = "Box" | "Hull" | "Parts"
-export type Status = "repo" | "backlog" | "store" | "planned"
+export type Status = "repo" | "backlog" | "wired" | "store" | "planned"
 
 export type Entry = {
 \tname: string,
@@ -286,7 +294,7 @@ function BlenderAssets.MeshIds(): { number }
 \tlocal out: { number } = {}
 \tlocal seen: { [number]: boolean } = {}
 \tfor _, entry in ipairs(ROWS) do
-\t\tif entry.status ~= "backlog" and entry.status ~= "store" and entry.meshId ~= 0 and not seen[entry.meshId] then
+\t\tif entry.status ~= "backlog" and entry.status ~= "wired" and entry.status ~= "store" and entry.meshId ~= 0 and not seen[entry.meshId] then
 \t\t\tseen[entry.meshId] = true
 \t\t\ttable.insert(out, entry.meshId)
 \t\tend

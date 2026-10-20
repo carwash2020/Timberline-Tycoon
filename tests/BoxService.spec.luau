@@ -469,6 +469,7 @@ return function(t)
 		rec.part.Anchored = false
 		-- Let go 1 stud off its spot, a little above it.
 		rec.part.CFrame = CFrame.new(home + Vector3.new(1, 0.8, 0))
+		rec.grabbedAt = os.clock() - 1 -- held a real second (a put-back needs 0.75 s: BoxSnap.spec)
 		Box.NoteRelease(player, { model = rec.model }, "released")
 		t.eq(rec.onShelf, true, "back on its shelf")
 		t.eq(rec.heldBy, 0)
@@ -780,7 +781,8 @@ return function(t)
 		t.eq(#said, 4, "missing once, then robuxAsk three times")
 		t.eq(said[2].line, "robuxAsk")
 		t.eq(said[2].robux, { kind = "Pass", key = "DoubleCash" })
-		t.eq(rec.onShelf, true, "the box went back to its shelf")
+		t.eq(rec.onShelf, false, "the box stays where it is while Roblox's prompt is open (BoxSnap.spec)")
+		t.eq(rec.claimUserId, 7, "claimed by the asker")
 		t.ok((rec.part.CFrame.Position - rec.home.Position).Magnitude < 1e-3)
 	end)
 

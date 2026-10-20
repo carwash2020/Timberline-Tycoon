@@ -1479,7 +1479,15 @@ do
 		end)
 		defer("6. The Starfall Forge", 3, sky.root, function(_slice)
 			local forge = BuildingArt.StarfallForge()
-			local anvil = forge:FindFirstChild("StarfallForge")
+			-- The anvil's top, not the uploaded anvil mesh of the same name
+			-- (TownMeshes dresses the forge as the model is built).
+			local anvil: Instance? = nil
+			for _, child in ipairs(forge:GetChildren()) do
+				if child.Name == "StarfallForge" and child:GetAttribute("VisualMesh") ~= true then
+					anvil = child
+					break
+				end
+			end
 			place(atomic(forge), sky.forge)
 			if anvil then
 				CollectionService:AddTag(anvil, "StarfallForge")

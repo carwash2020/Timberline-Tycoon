@@ -34,6 +34,7 @@ export type Settings = {
 	showTips: boolean,
 	reduceFlashing: boolean, -- softens full-screen flashes (lightning); also in force while cameraShake is off (SettingsLogic.ReduceFlashing)
 	showOnBoard: boolean, -- opt-in: submit lifetime earnings to the leaderboard (off until the player says so)
+	uiScaleMigratedV1: boolean, -- the one-time move of every profile to the Small UI scale (Sanitize); true once done
 }
 
 export type Key =
@@ -59,10 +60,11 @@ SettingsLogic.Defaults = {
 	quality = "unset" :: Quality,
 	cameraShake = true,
 	cameraSensitivity = 1,
-	uiScale = "normal" :: UIScale,
+	uiScale = "small" :: UIScale,
 	showTips = true,
 	reduceFlashing = false,
 	showOnBoard = false,
+	uiScaleMigratedV1 = false,
 } :: Settings
 
 -- The attribute for the Lower / Higher quality choice on its own (QualityProfile).
@@ -146,6 +148,15 @@ function SettingsLogic.Sanitize(raw: any): Settings
 	if type(quality) ~= "string" or not QUALITIES[quality] then
 		quality = d.quality
 	end
+	-- One-time migration: Small became the default, so a profile that has not
+	-- been moved yet goes to Small whatever it had. The flag is then set, so a
+	-- later choice (Normal or Large) sticks. A new profile arrives here with
+	-- no flag and gets Small and the flag the same way.
+	local migrated = s.uiScaleMigratedV1 == true
+	if not migrated then
+		ui = "small"
+		migrated = true
+	end
 	return {
 		music = if s.music == nil then d.music else s.music == true,
 		sfx = if s.sfx == nil then d.sfx else s.sfx == true,
@@ -161,6 +172,7 @@ function SettingsLogic.Sanitize(raw: any): Settings
 		reduceFlashing = s.reduceFlashing == true,
 		-- Only a real `true` opts in; a missing or odd value is off.
 		showOnBoard = s.showOnBoard == true,
+		uiScaleMigratedV1 = migrated,
 	}
 end
 
@@ -286,6 +298,21 @@ function SettingsLogic.ScaleMultiplier(uiScale: string): number
 		return 1.15
 	end
 	return 1
+end
+
+-- Text and touch floors for every UI scale. A scaled size is clamped UP to
+-- its floor and never shrunk below it; a touch button is at least TouchMin on
+-- both sides, TouchGap from the next one and SafeEdge from the safe edge.
+SettingsLogic.TextFloorBody = 14
+SettingsLogic.TextFloorTitle = 20
+SettingsLogic.TouchMin = 44
+SettingsLogic.TouchGap = 8
+SettingsLogic.SafeEdge = 12
+
+-- `size` times `multiplier` (a ScaleMultiplier, 1 when omitted), but never
+-- under `floor`. ClampText(16, 14, 0.85) is 14; ClampText(24, 20, 0.85) is 20.4.
+function SettingsLogic.ClampText(size: number, floor: number, multiplier: number?): number
+	return math.max(size * (multiplier or 1), floor)
 end
 
 -- RESTART SAVE (Settings, Game tab). It wipes the save you are playing back

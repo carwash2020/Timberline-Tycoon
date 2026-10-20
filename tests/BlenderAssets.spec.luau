@@ -18,6 +18,7 @@ return function(t)
 			t.ok(
 				entry.status == "repo"
 					or entry.status == "backlog"
+					or entry.status == "wired"
 					or entry.status == "store"
 					or entry.status == "planned",
 				entry.name .. " status"
@@ -67,6 +68,9 @@ return function(t)
 			if entry.status == "backlog" then
 				t.ok(entry.meshId > 0, entry.name .. " backlog id")
 				t.eq(entry.wiredBy, "BacklogModels")
+			elseif entry.status == "wired" then
+				t.ok(entry.meshId > 0, entry.name .. " wired id")
+				t.eq(entry.wiredBy, "BuildingArt")
 			elseif entry.status == "store" then
 				t.ok(entry.meshId > 0, entry.name .. " store id")
 				t.ok((entry.textures.Color or 0) > 0, entry.name .. " baked colour texture")

@@ -3412,6 +3412,11 @@ function BuildingArt.StarfallForge(): Model
 			MAT.Neon
 		)
 	end
+	-- The uploaded StarfallForge meshes (backlog): the part build shows only
+	-- until every mesh has loaded. The anvil top (tagged "StarfallForge" by
+	-- MapBuilder, with its light and sparkles), the coals' fire and light and
+	-- the hearth parts the hopper zone is measured from stay as hidden hosts.
+	TownMeshes.Dress(model, "StarfallForge", { collision = true })
 	return model
 end
 
@@ -3786,6 +3791,12 @@ function BuildingArt.SkyForgeCourt(): Model
 	local nameBoard = dBox(model, "Sign", V3(6, 1.4, 0.3), CF(0, 6.4, 11.05), Palette.Brass, MAT.Wood)
 	Kit.signText(nameBoard, "SKY FORGE", Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
 	spot(floor, "KeeperSpot", CF(0, 1, -6))
+	-- The uploaded SkyForgeCourt meshes (backlog): Body, Glow, Sign, Smokestack
+	-- and the anvil piece, walked on through the Collision piece. The part
+	-- build shows only until every mesh has loaded. The anvil (its spot), the
+	-- four Socket_* gems, OrderBoard (its face GUI), Floor (KeeperSpot),
+	-- FurnaceMouth (its light) and Sign (its text) stay as hidden hosts.
+	TownMeshes.Dress(model, "SkyForgeCourt", { collision = true })
 	return model
 end
 

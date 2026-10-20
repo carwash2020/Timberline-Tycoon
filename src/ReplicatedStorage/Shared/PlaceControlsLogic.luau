@@ -1,7 +1,7 @@
 --!strict
 -- PlaceControlsLogic: how a player places a blueprint on PC, phone and Xbox
 -- (Lane F, the brief's Step 8). Pure, so a spec can check every rule: which
--- keys do what, that no key is the right trigger (RT is the Tool's own), that the on-screen buttons
+-- keys do what, that no key is the right trigger or A (RT is the Tool's own), that the on-screen buttons
 -- are at least 44 px with 8 px between, and that on a phone nothing sits in
 -- the thumbstick or jump zones. PlaceControls (client) binds and draws from
 -- this.
@@ -9,13 +9,14 @@
 --   Device   Place          Rotate        Raise / lower      Cancel
 --   PC       left click     R             PageUp / PageDown  Q
 --   Phone    PLACE button   ROTATE        UP / DOWN buttons  CANCEL
---   Xbox     A              D-pad right   D-pad up / down    B
+--   Xbox     RT (hammer)    D-pad right   D-pad up / down    B
 --   Aim      mouse          tap or drag the ghost            crosshair; LT lock
 --                                                            + left stick flick;
 --                                                            RB / LB slide
 -- Bound only while the placer is open and unbound on close. The right trigger
 -- is never bound: the hammer's Tool.Activated already carries click, tap and
--- RT, and binding it broke axe swinging on Xbox.
+-- RT, and binding it broke axe swinging on Xbox. HammerController sends RT to
+-- BlueprintPlacer.Place while the placer is out. A only jumps.
 
 local PlaceControlsLogic = {}
 
@@ -35,7 +36,8 @@ PlaceControlsLogic.Labels = {
 } :: { [string]: string }
 
 -- Enum.KeyCode names. `place` on a PC is the left mouse button (an input
--- type, not a key), so it has no entry there. A phone has buttons only.
+-- type, not a key) and on an Xbox the hammer's RT, so neither has an entry.
+-- A phone has buttons only.
 PlaceControlsLogic.Keys = {
 	desktop = {
 		rotate = { "R" },
@@ -48,7 +50,7 @@ PlaceControlsLogic.Keys = {
 		rotate = { "DPadRight" },
 		raise = { "DPadUp" },
 		lower = { "DPadDown" },
-		place = { "ButtonA" },
+		place = {}, -- RT, through the hammer's Tool.Activated (HammerController)
 		cancel = { "ButtonB" },
 	},
 	phone = {
@@ -71,6 +73,9 @@ PlaceControlsLogic.GamepadExtras = {
 
 -- The mouse button that places on a PC.
 PlaceControlsLogic.PlaceMouse = "MouseButton1"
+
+-- On a pad the hammer's Tool.Activated (RT) places while the placer is out.
+PlaceControlsLogic.HammerPlaces = true
 
 -- Every key name the placer binds on any device, once each.
 function PlaceControlsLogic.AllKeys(): { string }
@@ -111,6 +116,7 @@ function PlaceControlsLogic.Unreachable(device: Device): { Action }
 	for _, action in ipairs(ACTIONS) do
 		local reachable = #PlaceControlsLogic.KeysFor(device, action :: Action) > 0
 			or (device == "desktop" and action == "place")
+			or (device == "console" and action == "place" and PlaceControlsLogic.HammerPlaces)
 			or device == "phone"
 		if not reachable then
 			table.insert(missing, action)
@@ -227,11 +233,110 @@ end
 -- Hints and the phone's drag
 ---------------------------------------------------------------------------
 
+-- Each device's hint is these parts joined with " · ". Every part names the
+-- actions it covers, so a spec can check a hint names all the actions bound on
+-- that device and none that is not. "lock" is the pad's LT.
+export type HintPart = { text: string, actions: { string } }
+
+PlaceControlsLogic.HintParts = {
+	console = {
+		{ text = "RT place", actions = { "place" } },
+		{ text = "D-pad right turn", actions = { "rotate" } },
+		{ text = "D-pad up/down raise", actions = { "raise", "lower" } },
+		{ text = "LT lock", actions = { "lock" } },
+		{ text = "B stop", actions = { "cancel" } },
+	},
+	desktop = {
+		{ text = "Click place", actions = { "place" } },
+		{ text = "R rotate", actions = { "rotate" } },
+		{ text = "PgUp/PgDn raise", actions = { "raise", "lower" } },
+		{ text = "Q cancel", actions = { "cancel" } },
+	},
+	phone = {
+		{ text = "PLACE", actions = { "place" } },
+		{ text = "ROTATE", actions = { "rotate" } },
+		{ text = "UP / DOWN", actions = { "raise", "lower" } },
+		{ text = "CANCEL", actions = { "cancel" } },
+	},
+} :: { [string]: { HintPart } }
+
+local function joinHint(parts: { HintPart }): string
+	local words: { string } = {}
+	for _, part in ipairs(parts) do
+		table.insert(words, part.text)
+	end
+	return table.concat(words, " · ")
+end
+
 PlaceControlsLogic.Hints = {
-	desktop = "Click to place · R to turn · PgUp / PgDn raise and lower · Q to stop",
-	phone = "Tap or drag where it goes, then PLACE",
-	console = "A place · D-pad right turn · D-pad up/down raise · LT lock · B stop",
+	desktop = joinHint(PlaceControlsLogic.HintParts.desktop),
+	phone = joinHint(PlaceControlsLogic.HintParts.phone),
+	console = joinHint(PlaceControlsLogic.HintParts.console),
 } :: { [string]: string }
+
+-- Every action a player can do on `device` while placing (the hint names these).
+function PlaceControlsLogic.BoundActions(device: Device): { string }
+	local out: { string } = {}
+	for _, action in ipairs(ACTIONS) do
+		local bound = #PlaceControlsLogic.KeysFor(device, action :: Action) > 0
+			or (device == "desktop" and action == "place")
+			or (device == "console" and action == "place" and PlaceControlsLogic.HammerPlaces)
+			or device == "phone"
+		if bound then
+			table.insert(out, action)
+		end
+	end
+	if device == "console" then
+		table.insert(out, "lock")
+	end
+	return out
+end
+
+---------------------------------------------------------------------------
+-- The hint pill (HUD's hint line while placing)
+---------------------------------------------------------------------------
+
+PlaceControlsLogic.PillMin = { w = 260, h = 40 } -- UISizeConstraint, UI units
+PlaceControlsLogic.PillMax = { w = 520, h = 64 }
+PlaceControlsLogic.PillScale = { w = 0.42, h = 0.06 } -- Size, Scale only
+PlaceControlsLogic.PillAboveHotbar = 24 -- px between the hotbar and the pill
+PlaceControlsLogic.PillGap = 8 -- px above the build bar
+PlaceControlsLogic.SafeArea = 0.05 -- Xbox title-safe: 5 percent each side
+
+export type Pill = {
+	x: number, -- Position X scale (the pill is anchored bottom-centre)
+	y: number, -- Position Y scale
+	w: number, -- Size X scale
+	h: number, -- Size Y scale
+	rect: Rect, -- the pill's likeliest screen rectangle in px (width clamped to the max)
+}
+
+-- Where the pill goes, Scale only. Its foot sits PillAboveHotbar px above the
+-- hotbar (`bottom` px up from the screen's foot), or PillGap px above the build
+-- bar when the bar reaches higher (the phone's grid, a PC's button row), and
+-- never lower than the 5 percent safe area.
+function PlaceControlsLogic.Pill(
+	device: Device,
+	viewport: { x: number, y: number },
+	bottom: number,
+	scale: number?
+): Pill
+	local k = if type(scale) == "number" and scale > 0 then scale else 1
+	local bar = PlaceControlsLogic.Layout(device, viewport, bottom, k).bar
+	local foot = math.max(bottom + PlaceControlsLogic.PillAboveHotbar, viewport.y - bar.y + PlaceControlsLogic.PillGap)
+	foot = math.max(foot, viewport.y * PlaceControlsLogic.SafeArea)
+	local sizeW, sizeH = PlaceControlsLogic.PillScale.w, PlaceControlsLogic.PillScale.h
+	local w = math.min(sizeW * viewport.x, PlaceControlsLogic.PillMax.w * k)
+	w = math.max(w, PlaceControlsLogic.PillMin.w * k)
+	local h = math.min(math.max(sizeH * viewport.y, PlaceControlsLogic.PillMin.h * k), PlaceControlsLogic.PillMax.h * k)
+	return {
+		x = 0.5,
+		y = 1 - foot / viewport.y,
+		w = sizeW,
+		h = sizeH,
+		rect = { x = (viewport.x - w) / 2, y = viewport.y - foot - h, w = w, h = h },
+	}
+end
 
 -- A touch that starts this close (screen px) to the ghost's middle drags the
 -- ghost; anywhere else it turns the camera as always.

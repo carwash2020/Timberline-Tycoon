@@ -6,7 +6,7 @@
 -- The Tool Shed's gold Robux shelf uses the same boxes: at the counter,
 -- Yes sends the client the item (the same BuyRobuxItem intent the Store
 -- screen sends; MonetizationService checks it and shows Roblox's prompt)
--- and the box goes back to its shelf. No cash moves here.
+-- and the box stays claimed in the buyer's hands until Roblox's prompt ends. No cash moves here.
 --
 -- One connection on BoxOpen. The handler budgets the call, then opens.
 
@@ -68,6 +68,8 @@ export type Record = {
 	axeUid: string?,
 	pendingGrant: boolean?, -- paid, but the item is still in the box (BoxUnpack)
 	robux: { kind: string, key: string }?,
+	robuxUntil: number?, -- a Robux prompt is open: the box stays claimed until this clock time (or the purchase finishes)
+	grabbedAt: number?, -- the clock when the box was last lifted
 	home: CFrame,
 	zoneCf: CFrame?,
 	zoneSize: Vector3?,
@@ -144,6 +146,26 @@ local bound = false
 local chained = false
 local leftHook = false
 local acc = 0
+
+-- The last time a box was sent (or snapped) back to its shelf, and why:
+-- "outside" (Judge: left the shop volume), "release" (a player let go at
+-- its shelf spot), "refused" (a grab the server could not hand physics
+-- for), "robuxEnd" (a Robux prompt ended without a purchase), "leave" (its
+-- claimant left). Also on the box model as the ReturnReason attribute, for
+-- Explorer in Studio.
+BoxService.LastReturn = nil :: { uid: string, reason: string }?
+
+-- How long a Robux box stays claimed while Roblox's prompt is open.
+BoxService.RobuxPromptSec = 30
+-- The shop volume is judged this many studs bigger on every side.
+BoxService.ZoneGrow = 4
+
+local function noteReturn(rec: Record, reason: string)
+	BoxService.LastReturn = { uid = rec.uid, reason = reason }
+	if rec.model ~= nil then
+		rec.model:SetAttribute("ReturnReason", reason)
+	end
+end
 
 BoxService.Speaker = function(_player: Player, _line: string, _rec: Record?) end
 BoxService.OnToast = function(_player: Player, _message: string) end
@@ -593,7 +615,8 @@ function BoxService.DestroyRecord(uid: string)
 	records[uid] = nil
 end
 
-function BoxService.ReturnHome(rec: Record)
+function BoxService.ReturnHome(rec: Record, reason: string?)
+	noteReturn(rec, reason or "home")
 	local model = rec.model
 	if model then
 		pcall(function()
@@ -604,6 +627,7 @@ function BoxService.ReturnHome(rec: Record)
 	rec.heldBy = 0
 	rec.claimUserId = 0
 	rec.claimUntil = 0
+	rec.robuxUntil = nil
 	rec.outsideStreak = 0
 	rec.noted = false
 	local part = rec.part
@@ -624,19 +648,33 @@ function BoxService.ReturnHome(rec: Record)
 	BoxService.RefreshPrompts()
 end
 
-function BoxService.Judge(_now: number)
+function BoxService.Judge(now: number)
 	for _, rec in pairs(records) do
 		if rec.paid or rec.onShelf or rec.part == nil then
+			continue
+		end
+		local robuxUntil = rec.robuxUntil
+		if robuxUntil ~= nil then
+			-- Roblox's prompt is open on this box: it stays where it is until
+			-- the purchase finishes or the prompt's time runs out.
+			if now >= robuxUntil then
+				BoxService.ReturnHome(rec, "robuxEnd")
+			end
 			continue
 		end
 		if rec.zoneCf == nil or rec.zoneSize == nil then
 			rec.outsideStreak = 0
 			continue
 		end
-		local inside = BoxLogic.InsideVolume(rec.part.CFrame.Position, rec.zoneCf, rec.zoneSize)
+		local pos = rec.part.CFrame.Position
+		-- The shop volume is judged a little bigger than it is, and the
+		-- counter's own zone is always inside: a box set down at the edge of
+		-- the shop or on the far side of the counter is not "outside".
+		local grown = rec.zoneSize + Vector3.new(1, 1, 1) * (BoxService.ZoneGrow * 2)
+		local inside = BoxLogic.InsideVolume(pos, rec.zoneCf, grown) or BoxService.InCounter(rec)
 		rec.outsideStreak = BoxLogic.OutsideStreak(inside, rec.outsideStreak)
 		if BoxLogic.ShouldReturn(rec.outsideStreak) then
-			BoxService.ReturnHome(rec)
+			BoxService.ReturnHome(rec, "outside")
 		end
 	end
 	BoxService.RefreshPrompts()
@@ -934,8 +972,13 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 			speak(player, "locked", rec)
 			return false, "locked"
 		end
+		-- The box stays where it is, claimed by the asker, while Roblox's
+		-- prompt is open (RobuxFinished, or RobuxPromptSec). Sending it home
+		-- here snapped it out of the player's hand under the prompt.
+		rec.claimUserId = player.UserId
+		rec.claimUntil = os.clock() + BoxService.RobuxPromptSec
+		rec.robuxUntil = rec.claimUntil
 		speak(player, "robuxAsk", rec)
-		BoxService.ReturnHome(rec)
 		return true, "robuxAsk"
 	end
 	if BoxUnpack.OneAtATime(rec.itemKind, rec.itemId) then
@@ -979,6 +1022,61 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 	end
 	speak(player, line, rec)
 	return ok, line
+end
+
+-- Roblox's prompt for a Robux box's item finished (MonetizationService
+-- calls this when the prompt's purchase-finished event fires). Bought: the box is marked paid where it is (MonetizationService
+-- grants the item itself, so nothing is owed from the box), and a fresh
+-- display copy goes back on the shelf. Not bought: it goes back at once.
+function BoxService.RobuxFinished(userId: number, kind: string, key: string, purchased: boolean)
+	for _, rec in pairs(records) do
+		local robux = rec.robux
+		if
+			robux ~= nil
+			and rec.robuxUntil ~= nil
+			and not rec.paid
+			and rec.claimUserId == userId
+			and robux.kind == kind
+			and robux.key == key
+		then
+			if not purchased then
+				BoxService.ReturnHome(rec, "robuxEnd")
+				return
+			end
+			rec.robuxUntil = nil
+			rec.claimUserId = 0
+			rec.claimUntil = 0
+			rec.paid = true
+			rec.opened = true -- a display copy: nothing to unpack, nothing to store
+			rec.pendingGrant = false
+			rec.buyerId = userId
+			rec.onShelf = false
+			BoxService.RefreshPrompts()
+			-- The shelf keeps its box: a separate copy, never the one in hand.
+			local model = rec.model
+			if model ~= nil then
+				BoxService.Make({
+					slotId = rec.slotId,
+					shop = rec.shop,
+					displayName = rec.displayName,
+					robux = robux,
+					cf = rec.home,
+					parent = model.Parent,
+					counter = rec.counter,
+					zoneCf = rec.zoneCf,
+					zoneSize = rec.zoneSize,
+					onShelf = true,
+				})
+			end
+			local uid = rec.uid
+			pcall(function()
+				task.delay(BoxUnpack.PoofSeconds, function()
+					BoxService.DestroyRecord(uid)
+				end)
+			end)
+			return
+		end
+	end
 end
 
 local function dropStorage(player: Player, uid: string)
@@ -1373,7 +1471,7 @@ function BoxService.Commit(player: Player)
 	BoxService.ConvertPickups(player.UserId, nil, player)
 	for uid, rec in pairs(records) do
 		if not rec.paid and rec.claimUserId == player.UserId then
-			BoxService.ReturnHome(rec)
+			BoxService.ReturnHome(rec, "leave")
 		elseif rec.paid and not rec.opened and rec.buyerId == player.UserId then
 			if profile ~= nil and type(profile.storage) == "table" and not hasStored(profile.storage, uid) then
 				if #profile.storage < ProfileSchema.StorageCap then
@@ -1491,6 +1589,7 @@ function BoxService.NoteGrab(player: Player, piece: { model: Model })
 	end
 	rec.onShelf = false
 	rec.heldBy = player.UserId
+	rec.grabbedAt = os.clock()
 	if not rec.paid then
 		rec.claimUserId = player.UserId
 		rec.claimUntil = BoxLogic.ClaimUntil(os.clock())
@@ -1500,7 +1599,11 @@ end
 -- A box was let go. It is no longer in anyone's hand (so it stops counting
 -- toward the holder's carry cap), and an unpaid one let go back at its shelf
 -- spot goes onto the shelf again.
-function BoxService.NoteRelease(player: Player, piece: { model: Model }, _reason: string?)
+-- Only a player's own release (GrabService's "released") puts a box back,
+-- and only after it was held BoxLogic.PutBackAfterSec: a forced release
+-- (died, seated, too far, a lag verdict, a switch) never does, and neither
+-- does a grab let go at once.
+function BoxService.NoteRelease(player: Player, piece: { model: Model }, reason: string?)
 	local rec = recordByModel(piece.model)
 	if rec == nil then
 		return
@@ -1510,8 +1613,9 @@ function BoxService.NoteRelease(player: Player, piece: { model: Model }, _reason
 	end
 	local part = rec.part
 	if not rec.paid and not rec.onShelf and not rec.opened and part ~= nil and rec.robux == nil then
-		if BoxLogic.PutBack(part.CFrame.Position, rec.home.Position) then
-			BoxService.ReturnHome(rec)
+		local held = os.clock() - (rec.grabbedAt or 0)
+		if BoxLogic.PutBackAllowed(reason, held) and BoxLogic.PutBack(part.CFrame.Position, rec.home.Position) then
+			BoxService.ReturnHome(rec, "release")
 		end
 	end
 end
@@ -1525,6 +1629,7 @@ function BoxService.NoteRefused(_player: Player, piece: { model: Model }, _reaso
 		return
 	end
 	if rec.onShelf then
+		noteReturn(rec, "refused")
 		local part = rec.part
 		if part then
 			part.Anchored = true
@@ -1618,6 +1723,24 @@ local function wire()
 					for _, d in ipairs(piece.model:GetDescendants()) do
 						if d:IsA("BasePart") then
 							d.Anchored = false
+						end
+					end
+					-- And the box's whole assembly: a box welded to a
+					-- still-anchored part cannot change hands, and the
+					-- refused grab would put it back on its shelf.
+					local rec = recordByModel(piece.model)
+					local part = if rec then rec.part else nil
+					if part ~= nil then
+						part.Anchored = false
+						local okAssembly, connected = pcall(function(): { BasePart }
+							return (part :: any):GetConnectedParts(true)
+						end)
+						if okAssembly and type(connected) == "table" then
+							for _, other in ipairs(connected) do
+								if other:IsA("BasePart") then
+									other.Anchored = false
+								end
+							end
 						end
 					end
 				end

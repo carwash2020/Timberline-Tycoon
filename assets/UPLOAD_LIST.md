@@ -172,7 +172,7 @@ Every other registry row is uploaded and Approved. Status `repo`: the GLB is in
 | `shops/ArrivalArch` | backlog | BacklogModels | 832 | 13.2 x 13.5 x 2.83 | Parts |
 | `shops/GateKiosk` | backlog | BacklogModels | 1,664 | 8.789 x 9.8 x 8.834 | Parts |
 | `shops/OddsAndEnds` | backlog | BacklogModels | 3,320 | 20 x 11.4 x 16 | Parts |
-| `shops/SkyForgeCourt` | backlog | BacklogModels | 1,676 | 30.6 x 18.9 x 24.15 | Parts |
+| `shops/SkyForgeCourt` | wired | BuildingArt | 1,676 | 30.6 x 18.9 x 24.15 | Parts |
 | `shops/Sparkworks` | backlog | BacklogModels | 4,304 | 20 x 13.85 x 16.008 | Parts |
 | `store/Barrel` | store | StoreModelSlots | 2,240 | 2.19 x 3.26 x 2.19 | Box |
 | `store/Crate` | store | StoreModelSlots | 2,284 | 2.6 x 2.5 x 2.6 | Box |

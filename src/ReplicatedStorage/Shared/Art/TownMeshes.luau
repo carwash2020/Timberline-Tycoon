@@ -52,7 +52,15 @@ end
 export type Options = {
 	scale: Vector3?,
 	pivot: CFrame?,
+	-- Walk on the asset's own Collision piece (a Hull MeshPart, invisible)
+	-- and silence the part build's collision. Needs that piece to load too:
+	-- a miss keeps the part build exactly as it was.
+	collision: boolean?,
 }
+
+-- The fidelity of that collider. Hull is a convex shape: a hollow shell
+-- becomes a solid block. Default is the mesh as drawn.
+TownMeshes.ColliderFidelity = Enum.CollisionFidelity.Hull
 
 local GLOW = {
 	Glow = true,
@@ -496,6 +504,11 @@ local function dressNow(model: Model, assetId: string, options: Options?): boole
 	end
 	local made: { MeshPart } = {}
 	local ids: { number } = {}
+	local wantsCollider = options ~= nil and options.collision == true
+	local colliderPiece = if wantsCollider then TownModels.Piece(asset, "Collision") else nil
+	if wantsCollider and colliderPiece == nil then
+		return false
+	end
 	for _, piece in ipairs(TownModels.Visual(asset)) do
 		-- A counter keeps its size whatever the building does (BuildingArt
 		-- keeps the part counter's size too): people still lean on it.
@@ -514,6 +527,22 @@ local function dressNow(model: Model, assetId: string, options: Options?): boole
 	if #made == 0 then
 		return false
 	end
+	local collider: MeshPart? = nil
+	if colliderPiece then
+		collider = MeshKit.Create(
+			colliderPiece.meshId,
+			"Collision",
+			scaled(colliderPiece.size, scale),
+			TownMeshes.ColliderFidelity
+		)
+		if not collider then
+			for _, old in ipairs(made) do
+				old:Destroy()
+			end
+			noteFallback(model, assetId)
+			return false
+		end
+	end
 	local lifted = withoutNestedMeshes(model)
 	local floorY = partBuiltFloor(model)
 	local locked = model:GetPivot()
@@ -528,8 +557,25 @@ local function dressNow(model: Model, assetId: string, options: Options?): boole
 		fresh[part] = true
 		finishPiece(part, asset, hosts, root, ids[i])
 	end
-	if not groundSnap(made, floorY) then
-		for _, part in ipairs(made) do
+	local everything: { MeshPart } = table.clone(made)
+	if collider then
+		-- Not a looks piece: it keeps CanQuery, is invisible, and is never
+		-- flagged VisualMesh, so the swap and the budgets still count it.
+		place(collider, root)
+		collider.Anchored = true
+		collider.Massless = true
+		collider.CanCollide = true
+		collider.CanQuery = true
+		collider.CanTouch = false
+		collider.CastShadow = false
+		collider.Transparency = 1
+		collider:SetAttribute("MeshCollider", true)
+		collider.Parent = model
+		fresh[collider] = true
+		table.insert(everything, collider)
+	end
+	if not groundSnap(everything, floorY) then
+		for _, part in ipairs(everything) do
 			part:Destroy()
 		end
 		warn(string.format("[TownMeshes] %s is too far off its part-built twin; keeping the parts", assetId))
@@ -538,6 +584,15 @@ local function dressNow(model: Model, assetId: string, options: Options?): boole
 	pcall(function()
 		model.WorldPivot = locked
 	end)
+	if collider then
+		-- The collider is the only thing walked on now. What the retire step
+		-- keeps (hosts for prompts, lights, text) stops colliding too.
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and not fresh[d] and not nestedMesh(d, model) then
+				d.CanCollide = false
+			end
+		end
+	end
 	retire(model, fresh)
 	model:SetAttribute("TownMesh", assetId)
 	model:SetAttribute("MeshFallback", nil)

@@ -43,7 +43,7 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Paid. Open the box when you want the tool.",
 		locked = "That one isn't for sale from this counter.",
 		robuxOffer = "That gold box is %s, a Robux item. Roblox shows the price. Go ahead?",
-		robuxAsk = "Roblox will ask you now. I'll put the box back on the shelf.",
+		robuxAsk = "Roblox will ask you now. Keep hold of the box until it's done.",
 	},
 	HearthAndHome = {
 		greet = "If it's sitting on the counter, I can sell it.",

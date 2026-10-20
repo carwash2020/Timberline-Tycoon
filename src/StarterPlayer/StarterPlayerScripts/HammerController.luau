@@ -510,6 +510,23 @@ function HammerController.Use()
 	end
 end
 
+-- RT places while a ghost is out. The hammer's Tool.Activated carries RT (a
+-- ContextActionService bind on the trigger once broke axe swings on Xbox), so
+-- this is where the pad places: it calls BlueprintPlacer.Place, which sends one
+-- PlaceBlueprint, and skips the hammer's own use (no list, no sheet). RT does
+-- nothing while the ghost is red. A click places through the placer's own
+-- InputBegan and a tap only aims (PLACE confirms), so only a pad lands here.
+-- Returns true when the placer is out and took the use.
+function HammerController.TriggerPlaces(): boolean
+	if not BlueprintPlacer.Active() then
+		return false
+	end
+	if string.find(UserInputService:GetLastInputType().Name, "Gamepad") and BlueprintPlacer.CanPlace() then
+		BlueprintPlacer.Place()
+	end
+	return true
+end
+
 ---------------------------------------------------------------------------
 -- Tools
 ---------------------------------------------------------------------------
@@ -521,6 +538,9 @@ local function bindTool(tool: Tool)
 	if isHammer(tool) then
 		bound[tool] = true
 		tool.Activated:Connect(function()
+			if HammerController.TriggerPlaces() then
+				return
+			end
 			-- A tap's position is recorded by TouchTapInWorld; let it land first.
 			task.defer(HammerController.Use)
 		end)
