@@ -83,8 +83,9 @@ return function(t)
 		t.eq(prompt.GamepadKeyCode.Name, "ButtonX")
 		t.ok(prompt.GamepadKeyCode.Name ~= "ButtonR2")
 		t.eq(prompt.RequiresLineOfSight, false)
-		-- Five items are still at id 0 (off sale), so they sit on the strip.
-		t.ok(model:FindFirstChild("ComingSoon", true), "the unsold items are on the strip")
+		-- All nine items have ids (T387) and Roblox has not said no, so nothing sits on the strip.
+		t.eq(model:FindFirstChild("ComingSoon", true), nil, "no unsold items: no strip")
+		t.eq(#onSaleItems(), 9)
 		t.eq(#cards(model), #onSaleItems(), "one card per item with an id")
 		for _, entry in ipairs(onSaleItems()) do
 			t.ok(model:FindFirstChild(entry.item.name, true), entry.item.name)
@@ -112,7 +113,11 @@ return function(t)
 		local list = model:FindFirstChild("List", true)
 		StoreBoard.FillPosters(list, nil)
 		t.eq(#cards(model), #onSaleItems())
-		t.ok(model:FindFirstChild("ComingSoon", true), "the five id-0 items stay on the strip")
+		t.eq(
+			model:FindFirstChild("ComingSoon", true),
+			nil,
+			"refilled with no answer: every item has its card, no strip"
+		)
 	end)
 
 	t.test("a card is a title, one short line, a pin, an art disc and an R$ pill with no number", function()

@@ -215,16 +215,16 @@ return function(t)
 	end)
 
 	t.test(
-		"the five off-sale ids are still 0 and every badge id is 0 or a pasted live id (Connor pastes them, never code)",
+		"the five newer store ids are pasted (T387) and every badge id is 0 or a pasted live id (Connor pastes them, never code)",
 		function()
 			local StoreData = t.shared("StoreData")
 			local BadgeData = t.shared("BadgeData")
 			local ids = StoreData.CreatorIds
 			for _, key in ipairs({ "TowService", "TimberClassic", "PaintShop" }) do
-				t.eq(ids.Passes[key], 0, key)
+				t.ok(ids.Passes[key] > 0, key)
 			end
 			for _, key in ipairs({ "DoubleWood", "InstantDelivery" }) do
-				t.eq(ids.Products[key], 0, key)
+				t.ok(ids.Products[key] > 0, key)
 			end
 			-- Badge ids are pasted by Connor from the Creator Hub (the first five on 16 October 2026): each is
 			-- still 0 or a real whole id, never a made-up number (BadgeData.spec pins exactly which are set).

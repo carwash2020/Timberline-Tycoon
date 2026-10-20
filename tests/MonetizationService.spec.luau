@@ -166,6 +166,55 @@ return function(t)
 		t.eq(s.profile.cash, 2000, "a new purchase does")
 	end)
 
+	t.test("T387: a replayed receipt grants each of the five newer products once", function()
+		local s = setup()
+		t.eq(s.receipt("DoubleWood", "w-same"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(s.profile.doubleWoodUntil, NOW + 48 * 3600)
+		t.eq(s.receipt("DoubleWood", "w-same"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(s.profile.doubleWoodUntil, NOW + 48 * 3600, "the same PurchaseId does not extend the boost again")
+		t.eq(s.receipt("InstantDelivery", "d-same"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(s.receipt("InstantDelivery", "d-same"), Enum.ProductPurchaseDecision.PurchaseGranted)
+		t.eq(s.profile.instantDeliveries, 1, "the same PurchaseId adds one use")
+		s.receipt("InstantDelivery", "d-other")
+		t.eq(s.profile.instantDeliveries, 2, "a new purchase adds another")
+	end)
+
+	t.test("T387: Timber Classic granted twice adds the truck once", function()
+		local s = setup()
+		local hooks = 0
+		s.M.SetPassListener(function(_, key)
+			if key == "TimberClassic" then
+				hooks += 1
+			end
+		end)
+		s.passFinished("TimberClassic", true)
+		s.passFinished("TimberClassic", true)
+		t.eq(hooks, 2, "the listener is told on each finished prompt")
+		t.eq(s.player.attrs.Pass_TimberClassic, true)
+		-- The listener's grant (ShopService.GrantPassTruck) is idempotent: one truck, one box.
+		local SaveSlotLogic = t.shared("SaveSlotLogic")
+		local Schema = t.server("ProfileSchema")
+		local data = t.shared("Util").deepCopy(Schema.Template)
+		t.eq(SaveSlotLogic.GrantPassTruck(data), true)
+		Schema.MintTruckBoxes(data)
+		t.eq(SaveSlotLogic.GrantPassTruck(data), false, "the second grant adds nothing")
+		data.trucksBoxed = false
+		Schema.MintTruckBoxes(data)
+		local trucks, boxes = 0, 0
+		for _, id in ipairs(data.ownedTrucks) do
+			if id == "TimberClassic" then
+				trucks += 1
+			end
+		end
+		for _, box in ipairs(data.storage) do
+			if box.itemId == "TimberClassic" then
+				boxes += 1
+			end
+		end
+		t.eq(trucks, 1)
+		t.eq(boxes, 1)
+	end)
+
 	t.test("unknown products and absent players wait", function()
 		local s = setup()
 		t.eq(

@@ -55,6 +55,60 @@ return function(t)
 		t.eq(ProductInfo.Fetch(late, 1, "Pass", 4, function() end).PriceInRobux, 5)
 	end)
 
+	t.test("the pill says R$ while the retries run and Price unavailable only after the last one failed", function()
+		local StoreCopy = t.shared("Store/StoreCopy")
+		local waits, mid = {}, {}
+		local prices
+		local loader = t.loader({
+			services = {
+				MarketplaceService = {
+					GetProductInfo = function()
+						error("HTTP 503")
+					end,
+				},
+			},
+			globals = {
+				task = {
+					spawn = function(fn, ...)
+						fn(...)
+					end,
+					wait = function(s)
+						table.insert(waits, s)
+						if #waits <= 3 then -- the first item's three retries
+							table.insert(
+								mid,
+								prices.Text("Pass", "DoubleCash")
+									.. "|"
+									.. tostring(prices.Failed("Pass", "DoubleCash"))
+							)
+						end
+					end,
+					defer = function() end,
+					delay = function() end,
+				},
+			},
+		})
+		prices = loader:load("StarterPlayer/StarterPlayerScripts/StorePrices")
+		t.eq(prices.Text("Pass", "TowService"), "R$", "before any answer")
+		t.eq(prices.Failed("Pass", "TowService"), false)
+		prices.Load()
+		t.eq(prices.Text("Pass", "TowService"), StoreCopy.PriceUnavailable)
+		t.eq(prices.Text("Pass", "TowService"), "Price unavailable")
+		t.eq(prices.Failed("Pass", "TowService"), true)
+		t.eq(prices.Text("Product", "DoubleWood"), "Price unavailable", "every card, not just one")
+		for _, m in ipairs(mid) do
+			t.eq(m, "R$|false", "while a retry is still to come")
+		end
+		for _, s in ipairs(waits) do
+			t.ok(s == 2 or s == 4 or s == 8, "retry after " .. tostring(s))
+		end
+		t.eq(#waits, 9 * 3, "three retries for each of the nine items")
+		-- A price that did arrive is never replaced by the failure text.
+		prices._set("Pass", "PaintShop", 149, true)
+		t.eq(prices.Failed("Pass", "PaintShop"), false)
+		t.eq(prices.Text("Pass", "PaintShop"), "R$ 149")
+	end)
+
 	t.test("no server code reads a price, and StorePrices is the client's only lookup", function()
 		for _, path in ipairs({
 			"src/ServerScriptService/BoxService.luau",

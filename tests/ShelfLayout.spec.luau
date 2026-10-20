@@ -253,6 +253,17 @@ return function(t)
 			"the gold row fits between the walls (more than six passes need a second row)"
 		)
 		t.ok(RobuxShelf.TableZ + RobuxShelf.TableDepth / 2 <= frame.halfD, "the gold table is inside the back wall")
+		-- T387: nine items make a five-wide row. The table ends at the event room (x 5.35) and runs toward the west wall.
+		local east = RobuxShelf.CenterX() + RobuxShelf.RowWidth() / 2
+		local west = RobuxShelf.CenterX() - RobuxShelf.RowWidth() / 2
+		t.ok(east <= 5.35, "the gold table stops before the event room: " .. east)
+		t.ok(west >= -frame.halfW, "the gold table is inside the west wall: " .. west)
+		for _, place in ipairs(RobuxShelf.Placements()) do
+			t.ok(
+				math.abs(place.x - RobuxShelf.CenterX()) + width / 2 <= RobuxShelf.RowWidth() / 2,
+				place.slotId .. " is on the table"
+			)
+		end
 		-- It stands behind the lanes' ends.
 		for _, l in ipairs(StoreStock.Lanes("ToolShed")) do
 			t.ok(RobuxShelf.TableZ - RobuxShelf.TableDepth / 2 >= l.z1 - 1e-6, l.name .. " ends before the gold table")

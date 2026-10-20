@@ -2,6 +2,32 @@
 return function(t)
 	local StoreData = t.shared("StoreData")
 
+	t.test("all nine CreatorIds are nonzero, unique and match STORE_SETUP.md", function()
+		local fs = require("@lune/fs")
+		local setup = {}
+		for kind, key, id in string.gmatch(fs.readFile("STORE_SETUP.md"), "|%s*(%a+)%s*|%s*(%w+)%s*|%s*(%d+)%s*|") do
+			if kind == "Pass" or kind == "Product" then
+				setup[key] = tonumber(id)
+			end
+		end
+		local seen, count = {}, 0
+		for _, entry in ipairs(StoreData.Ordered()) do
+			local id = entry.item.id
+			t.ok(type(id) == "number" and id > 0, entry.key .. " has a real id")
+			t.ok(not seen[id], entry.key .. " id is used once")
+			seen[id] = true
+			t.eq(id, setup[entry.key], entry.key .. " matches STORE_SETUP.md")
+			count += 1
+		end
+		t.eq(count, 9)
+		for _, id in pairs(StoreData.CreatorIds.Passes) do
+			t.ok(id > 0)
+		end
+		for _, id in pairs(StoreData.CreatorIds.Products) do
+			t.ok(id > 0)
+		end
+	end)
+
 	t.test("keys are unique and look up both ways", function()
 		local seen = {}
 		for _, item in ipairs(StoreData.Passes) do
@@ -26,13 +52,12 @@ return function(t)
 		t.eq(StoreData.CreatorIds.Passes.LuxAxe, 2005226878)
 		t.eq(StoreData.CreatorIds.Products.Cash1k, 3716312861)
 		t.eq(StoreData.CreatorIds.Products.Cash10k, 3716312899)
-		-- Lane P: these five stay at 0 (off sale, "Coming soon") until Connor
-		-- says to paste their ids (kept in the comments in StoreData).
-		t.eq(StoreData.CreatorIds.Passes.TowService, 0)
-		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 0)
-		t.eq(StoreData.CreatorIds.Passes.PaintShop, 0)
-		t.eq(StoreData.CreatorIds.Products.DoubleWood, 0)
-		t.eq(StoreData.CreatorIds.Products.InstantDelivery, 0)
+		-- T387: the other five went on sale with their ids pasted.
+		t.eq(StoreData.CreatorIds.Passes.TowService, 2006186967)
+		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 2006912886)
+		t.eq(StoreData.CreatorIds.Passes.PaintShop, 2006456926)
+		t.eq(StoreData.CreatorIds.Products.DoubleWood, 3717310556)
+		t.eq(StoreData.CreatorIds.Products.InstantDelivery, 3717310577)
 		local forSale = 0
 		local seen = {}
 		for _, pass in ipairs(StoreData.Passes) do
@@ -51,12 +76,12 @@ return function(t)
 				seen[product.id] = true
 			end
 		end
-		-- Four ids are pasted (2x Cash, Lux Axe, both cash packs); whether
-		-- each is on sale is still Roblox's answer (StoreSale).
-		t.eq(forSale, 4)
+		-- All nine ids are pasted; whether each is on sale is still Roblox's
+		-- answer (StoreSale).
+		t.eq(forSale, 9)
 		t.eq(StoreData.AnyForSale(), true)
-		t.eq(#StoreData.ListedPasses(), 2)
-		t.eq(#StoreData.ListedProducts(), 2)
+		t.eq(#StoreData.ListedPasses(), 5)
+		t.eq(#StoreData.ListedProducts(), 4)
 		t.eq(#StoreData.Ordered(), 9)
 		t.eq(StoreData.ProductById(0), nil, "id 0 never lists a product")
 		t.eq(StoreData.Pass("DoubleCash").key, "DoubleCash")
