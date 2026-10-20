@@ -202,6 +202,7 @@ classicBuild = false
 for _, zone in ipairs(WorldLayout.FlatZones) do
 	if zone.terrace and zone.cx and zone.cz then
 		zone.y = 0
+		zone.wide = true
 	end
 end
 
@@ -784,6 +785,9 @@ function TerrainGen.HillLiftAt(x: number, z: number): number
 	end
 	-- Nor over the ground a shelf or pad is still easing down to its level.
 	mask *= 1 - (WorldLayout.FlatGround(x, z))
+	-- The mine mouth's doorstep stays at the ramp's top.
+	local mouth = UndergroundData.MineMouth
+	mask *= clamp((sqrt((x - mouth.x) ^ 2 + (z - mouth.z) ^ 2) - 30) / 30, 0, 1)
 	return if mask > 0 then liveDetail(x, z) * mask else 0
 end
 
@@ -1445,7 +1449,19 @@ function TerrainGen.HeightAt(x: number, z: number): number
 			if WorldLayout.InReservedRegion(x, z) then
 				pull = 0
 			end
+			-- Nor the mine mouth's doorstep: its ground is the ramp's top (1.5).
+			local mouth = UndergroundData.MineMouth
+			local md = sqrt((x - mouth.x) ^ 2 + (z - mouth.z) ^ 2)
+			pull *= clamp((md - 24) / 24, 0, 1)
 			h = h * (1 - pull) + shoulderH * pull + lift * pull
+		end
+	end
+	if not isClassic and not graded then
+		-- The mine mouth's doorstep is level at the ramp's top (1.5), as it was.
+		local mouth = UndergroundData.MineMouth
+		local w = 1 - clamp((sqrt((x - mouth.x) ^ 2 + (z - mouth.z) ^ 2) - 20) / 20, 0, 1)
+		if w > 0 then
+			h = h * (1 - w) + UndergroundData.Ramp.top * w
 		end
 	end
 	if graded then

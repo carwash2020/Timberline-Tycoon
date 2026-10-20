@@ -39,7 +39,7 @@ return function(t)
 	-- dense cells, counts unchanged (TreeSpreadData.Moved, 9 trees). 449351915 before.
 	-- T397: re-pinned on purpose: the ground moved (hills, roads, plots, store pads), so the plan is 1,052 trees.
 	local PLAN_COUNT = 1052
-	local PLAN_CHECKSUM = 267624254
+	local PLAN_CHECKSUM = 623119780
 	local function checksum(trees)
 		local h = 0
 		for i, s in ipairs(trees) do

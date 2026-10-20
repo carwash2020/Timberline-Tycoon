@@ -32,9 +32,10 @@ return function(t)
 	t.test("the first layer places exactly what it did before the cover layer", function()
 		local want = {
 			-- Ring map: re-sampled for the 2000-stud square and its roads, pads and hills.
-			[20] = { 1166, 79772042, 62325975 },
-			[60] = { 1477, 81395303, 903926765 },
-			[85] = { 1832, 103508628, 974201479 },
+			-- T397: re-sampled again on purpose, the ground (hills, banks, plots at y 0) moved.
+			[20] = { 1172, 75595493, 335756024 },
+			[60] = { 1486, 77837932, 217359867 },
+			[85] = { 1839, 98493672, 655951318 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0

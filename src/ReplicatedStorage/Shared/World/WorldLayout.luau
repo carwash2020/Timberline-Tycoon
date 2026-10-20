@@ -53,6 +53,7 @@ export type FlatZone = {
 	terrace: boolean?,
 	y: number?,
 	classicY: number?, -- the shelf's height before T397 (see SetClassicGround)
+	wide: boolean?, -- a shelf over high country eases back over FlatGround's wider blend
 	cx: number?,
 	cz: number?,
 }
@@ -1061,7 +1062,7 @@ local function flatBlend(x: number, z: number, reach: number): (number, number)
 		local dx = math.max(zone.x0 - x, 0, x - zone.x1)
 		local dz = math.max(zone.z0 - z, 0, z - zone.z1)
 		-- Past the blend on either axis the weight is 0: it can't win.
-		local blend = if zone.terrace then zone.blend * reach else zone.blend
+		local blend = if zone.terrace and zone.wide then zone.blend * reach else zone.blend
 		if dx < blend and dz < blend then
 			local outside = math.sqrt(dx * dx + dz * dz)
 			local w = 1 - math.clamp(outside / blend, 0, 1)
