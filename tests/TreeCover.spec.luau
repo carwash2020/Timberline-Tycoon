@@ -17,6 +17,8 @@ return function(t)
 	local WoodData = t.shared("WoodData")
 	local GrowLogic = t.shared("GrowLogic")
 	local GameConfig = t.shared("GameConfig")
+	local TreeGen = t.shared("TreeGen")
+	local ForestData = t.shared("ForestData")
 
 	-- The trees WorldPlan's lists plant, as before this job (main: 1430 and Murph's three oaks).
 	local PLANTED = 1430
@@ -541,43 +543,63 @@ return function(t)
 	-- Wood parts ----------------------------------------------------------
 
 	t.test("wood parts: the 20 largest trees fully chopped stay under MaxWoodPartsServer", function()
-		-- A felled section is one piece; a section takes MaxCutsPerSection cuts, so at most
-		-- that many plus one pieces, one part each.
-		local perSection = GameConfig.MaxCutsPerSection + 1
+		-- A tree chopped to nothing: every section takes MaxCutsPerSection cuts, so
+		-- it ends as that many plus one pieces, one part each; the dress that
+		-- SplitPart keeps (the crown, bark marks and the rest; the leaves really
+		-- drop when the tree falls, but they are counted anyway) stays as parts;
+		-- and each cut leaves two cut-face plates. All of it is counted, so the
+		-- figure is the most the tree can ever hold.
+		local cuts = GameConfig.MaxCutsPerSection
+		local function chopped(skel)
+			local sections = #skel.sections
+			local dress = TreeGen.PartCount(skel) - sections
+			return sections * (cuts + 1) + dress + sections * cuts * 2, sections, dress
+		end
 		local sizes = {}
 		for _, spot in ipairs(WorldPlan.Trees()) do
 			if not TreeSpread.Skipped(spot.position.X, spot.position.Z) then
 				local def = WoodData.Get(spot.woodId)
 				if def then
-					local boot = GrowLogic.BootTree(def, spot.position)
-					table.insert(sizes, #boot.skel.sections)
+					table.insert(sizes, (chopped(GrowLogic.BootTree(def, spot.position).skel)))
 				end
 			end
 		end
 		for _, spot in ipairs(cover) do
-			local boot = GrowLogic.BootTree(WoodData.Get(spot.woodId), spot.position)
-			table.insert(sizes, #boot.skel.sections)
+			table.insert(sizes, (chopped(GrowLogic.BootTree(WoodData.Get(spot.woodId), spot.position).skel)))
 		end
-		table.sort(sizes, function(a, b)
-			return a > b
-		end)
-		local parts = 0
-		for i = 1, 20 do
-			parts += sizes[i] * perSection
-		end
-		print(string.format(
-			"[TreeCover] the 20 largest trees: %d sections, %d parts chopped (cap %d)",
-			(function()
-				local s = 0
-				for i = 1, 20 do
-					s += sizes[i]
+		-- The worst a tree can be: every wood at every size, and an Elder, over
+		-- many seeds, the 20 largest of all of them (a bound for any forest).
+		local every = {}
+		for _, def in ipairs(WoodData.All()) do
+			for seed = 1, 60 do
+				for _, scale in ipairs({ TreeGen.SizeLo, 1, TreeGen.SizeHi }) do
+					table.insert(every, (chopped(TreeGen.Skeleton(def.id, seed, scale))))
 				end
-				return s
-			end)(),
-			parts,
-			GameConfig.MaxWoodPartsServer
-		))
-		t.ok(parts < GameConfig.MaxWoodPartsServer, parts .. " parts")
+				table.insert(every, (chopped(TreeGen.Skeleton(def.id, seed, ForestData.Elder.scale, { elder = true }))))
+			end
+		end
+		local function top20(list)
+			table.sort(list, function(a, b)
+				return a > b
+			end)
+			local sum = 0
+			for i = 1, math.min(20, #list) do
+				sum += list[i]
+			end
+			return sum
+		end
+		local world, worst = top20(sizes), top20(every)
+		print(
+			string.format(
+				"[TreeCover] the 20 largest trees fully chopped: %d parts on the map, %d parts for the 20 worst trees of any wood (cap %d)",
+				world,
+				worst,
+				GameConfig.MaxWoodPartsServer
+			)
+		)
+		t.ok(#sizes >= 20 and #every >= 20)
+		t.ok(world < GameConfig.MaxWoodPartsServer, world .. " parts")
+		t.ok(worst < GameConfig.MaxWoodPartsServer, worst .. " parts")
 	end)
 
 	t.test("run again after a save loads: a fresh load plans the same trees", function()

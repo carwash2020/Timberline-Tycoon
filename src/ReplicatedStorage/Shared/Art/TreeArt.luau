@@ -1257,6 +1257,12 @@ crystalCluster = function(
 	local half = d.size / 2
 	local n = math.max(1, d.parts)
 	local cut = cutFor(woodId, d.flat)
+	-- A crown of one or two parts has to carry the whole mass: bigger, blockier
+	-- wedges that fill the box instead of a few shards inside it.
+	local few = n <= 2
+	if few then
+		cut = { pitch = cut.pitch * 0.5, wide = 0.95, tall = math.max(cut.tall, 0.75), deep = 0.8, jag = cut.jag }
+	end
 	local light, dark = lightDark(colors)
 	local side = (d.size.X + d.size.Z) / 2
 	local spin = rng:range(0, math.pi * 2)
@@ -1266,7 +1272,10 @@ crystalCluster = function(
 		local dir = facetDir(woodId, i, n, ang)
 		-- Slope faces outward: the low edge of the wedge points out of the crown.
 		local rot = CFrame.Angles(0, ang, 0) * CFrame.Angles(-cut.pitch, 0, 0)
-		local frac = if i == 1 then math.clamp(0.64 - 0.02 * n, 0.48, 0.64) else rng:range(0.4, 0.52)
+		local frac = if few
+			then (if i == 1 then 0.95 else 0.8)
+			elseif i == 1 then math.clamp(0.64 - 0.02 * n, 0.48, 0.64)
+			else rng:range(0.4, 0.52)
 		local jag = 1 + rng:range(-cut.jag, cut.jag)
 		local c = math.min(side * frac, d.grain or math.huge) * jag
 		local dims = Vector3.new(c * cut.wide, math.min(c * cut.tall, d.size.Y * 0.92), c * cut.deep)
@@ -1401,12 +1410,16 @@ local function buildDress(model: Model, def: WoodDef, paint: Paint, d: Dress): {
 	local kind = d.kind
 	local glow = paint.glow or paint.accent
 	if kind == "leaves" then
-		local knot = if def.id == "oak" then TreeArt.HeartColor(def) else nil
+		local knot = if def.id == "oak" and d.parts >= 2 then TreeArt.HeartColor(def) else nil
 		local parts = leafCluster(model, "Leaves", d, paint.leaves, nil, def.id, knot)
-		if d.glow and parts[1] then
-			-- One facet glows through the cuts (never a whole crown).
+		if d.glow and (parts[2] or d.flat) and parts[1] then
+			-- One facet glows through the cuts (never a whole crown: a mass of
+			-- one part stays dull); a tiered crown's glowing disc is one part.
 			parts[1].Material = Enum.Material.Neon
 			parts[1].Color = glow
+			if d.flat and def.id == "lumenwood" then
+				parts[1]:SetAttribute("Signature", TreeArt.Signatures.lumenwood)
+			end
 		elseif def.id == WoodData.LanternId then
 			-- Day colour stays. The client swaps these to neon at night.
 			for _, leaf in ipairs(parts) do
@@ -1450,19 +1463,9 @@ local function buildDress(model: Model, def: WoodDef, paint: Paint, d: Dress): {
 		return { asDress(Kit.part(model, "PalmRing", d.size, d.cf, paint.accent, Enum.Material.Wood), d.section) }
 	elseif kind == "pod" then
 		local ball = d.size.X
-		local stemTop = d.cf.Position + Vector3.new(0, d.size.Y - ball / 2, 0)
 		local pod = Kit.ball(model, "Pod", ball, d.cf, glow, Enum.Material.Neon)
 		pod:SetAttribute("Signature", TreeArt.Signatures.phantomwood)
-		local stem = Kit.rod(
-			model,
-			"PodStem",
-			stemTop,
-			d.cf.Position + Vector3.new(0, ball * 0.4, 0),
-			0.1,
-			paint.bark,
-			Enum.Material.Wood
-		)
-		return { asDress(pod, d.section), asDress(stem, d.section) }
+		return { asDress(pod, d.section) }
 	elseif kind == "flare" then
 		local rng = Kit.rng(d.seed)
 		local p = Kit.wedge(
@@ -1560,6 +1563,10 @@ function TreeArt.FromSkeleton(def: WoodDef, skel: Skeleton, opts: SkeletonOption
 			local parts = buildDress(model, def, paint, d)
 			if d.glow and parts[2] then
 				table.insert(lit, parts[2])
+			elseif (d.kind == "crack" or d.glow and d.flat) and parts[1] then
+				-- A crown of single parts has no glowing facet: the glowing
+				-- bark strip (or glowing disc) carries the light.
+				table.insert(lit, parts[1])
 			end
 		end
 	end
