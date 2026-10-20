@@ -85,6 +85,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local GamepadNavLogic = require(ReplicatedStorage.Shared.GamepadNavLogic)
 local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
 local PlaceControlsLogic = require(ReplicatedStorage.Shared.PlaceControlsLogic)
+local TipTimer = require(ReplicatedStorage.Shared.TipTimer)
 local PhoneHud = require(ReplicatedStorage.Shared.PhoneHud)
 local QuickMenuLogic = require(ReplicatedStorage.Shared.QuickMenuLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
@@ -108,7 +109,7 @@ local MAX_TOASTS = 3 -- until the lane is placed (HudLayout.ToastLane says how m
 local TOAST_WIDTH = 280 -- a toast's widest
 local TOAST_TEXT_INSET = 28 -- its padding either side of the text
 local TOAST_LANE_MIN = 240 -- a band narrower than this between the left column and the corner: toasts go under the column
-local TOAST_FADE = 0.25
+local TOAST_FADE = TipTimer.FadeSeconds
 local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
 local HINT_POLL = 0.25 -- seconds between sell-zone checks for the hint
 local SIDE_GAP = 8 -- between side buttons, and under the corner
@@ -723,6 +724,22 @@ function HUD.Toast(
 	end
 end
 
+-- A chop tip as a toast (nothing in range, too far, too hard): 3 s, a 0.4 s
+-- fade, and the same `key` not again for 60 s (TipTimer).
+-- (the state of every timed tip lives in `tips`, below the toasts)
+local tips = {
+	toasts = TipTimer.New(),
+	hints = TipTimer.New(),
+	thickTimed = false,
+	fade = nil :: Tween?,
+	refresh = function() end :: () -> (),
+}
+function HUD.TimedToast(key: string, message: string)
+	if TipTimer.Allow(tips.toasts, key, os.clock()) then
+		HUD.Toast(message, TipTimer.VisibleSeconds)
+	end
+end
+
 ---------------------------------------------------------------------------
 -- Hint and side buttons, by device
 ---------------------------------------------------------------------------
@@ -743,6 +760,30 @@ local function heldLength(): number?
 	return math.max(size.X, size.Y, size.Z)
 end
 
+-- The "thicker cuts take longer" line is timed (TipTimer): up for 3 s, faded
+-- over 0.4 s, then the control hint again, and not back for 60 s. Returns
+-- whether the line may show now; the first time it does, it schedules its own
+-- fade and the refresh that puts the control hint back.
+function tips.thickShows(): boolean
+	local label = hintLabel
+	local visible = TipTimer.Show(tips.hints, "thick", os.clock())
+	if visible and not tips.thickTimed then
+		tips.thickTimed = true
+		task.delay(TipTimer.VisibleSeconds, function()
+			if label and hintForced == nil and pointingThick then
+				local tween = TweenService:Create(label, TweenInfo.new(TipTimer.FadeSeconds), { TextTransparency = 1 })
+				tips.fade = tween
+				tween:Play()
+			end
+		end)
+		task.delay(TipTimer.VisibleSeconds + TipTimer.FadeSeconds + 0.05, function()
+			tips.thickTimed = false
+			tips.refresh()
+		end)
+	end
+	return visible
+end
+
 -- What the v2 hint knows (HintLogic.StateV2): what the axe points at
 -- (CutController, through SetPointing), and whether the piece you hold is
 -- longer than your truck's bed (TruckLoad's BedLength).
@@ -753,7 +794,7 @@ local function hintStateV2(): HintLogic.StateV2
 		holding = heldPiece ~= nil,
 		onWood = pointingWood,
 		tooHard = pointingHard,
-		thick = pointingThick,
+		thick = pointingThick and tips.thickShows(),
 		tooLong = HintLogic.TooLong(heldLength(), player:GetAttribute("BedLength")),
 		bedVolume = attrAmount("BedVolume"),
 		nearPad = nearPad,
@@ -850,8 +891,15 @@ local function refreshHint()
 	end
 	if hint.Text ~= text then
 		hint.Text = text
+		-- A new line is shown whole (the thick tip's fade is over or cancelled).
+		if tips.fade then
+			tips.fade:Cancel()
+			tips.fade = nil
+		end
+		hint.TextTransparency = 0
 	end
 end
+tips.refresh = refreshHint
 
 -- What the axe is pointing at (CutController, a few times a second): a
 -- loose piece, and wood too hard for it. Refreshes the hint on a change.
