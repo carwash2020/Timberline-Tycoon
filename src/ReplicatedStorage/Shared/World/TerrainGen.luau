@@ -37,6 +37,66 @@ function TerrainGen.SetLegacyLayout(on: boolean)
 	WorldLayout.SetLegacyLayout(on)
 end
 
+-- T397, gentle hills (the live ground; HeightAt is documented for T400, trees):
+--   * the Hills' domes rise at most HILLS_AMP (18) and the meadow's rolling at
+--     most MEADOW_AMP (9.2 nominal, "9": the swell of 6 the roads follow and 3.2
+--     of fine rolling on top, both as they always were);
+--   * that fine rolling and the domes (the "hill layer", HillLiftAt) start
+--     HILL_CLEAR (8) studs past the edge of any road, plot shelf or store pad
+--     and reach full size HILL_RAMP (200) studs out (HillMask). The ramp is
+--     long because a hill may be at most 15 degrees: 18 studs of height in
+--     under 200 studs of run, on top of the 5 to 9 degrees the roads' banks
+--     already use (tests/GroundHills.spec: forest ground tops out at 13.8);
+--   * roads climb at most MAX_ROAD_DEG (5) degrees along their length and are
+--     level across, with a ROAD_SHOULDER (80) stud bank into the country
+--     (haulField); a plot, store pad or the lot keeps its level over a bank;
+--   * the homestead shelves sit at y = 0 like the town, easing back over three
+--     times their old blend (WorldLayout.FlatGround, the height only);
+--   * store pads (WorldLayout.StorePads) are flat at 0 with an 8 stud apron.
+-- The ground the first 322 trees were placed on (the legacy layout) and the
+-- road grades built for it are "classic": the old amplitudes (Hills domes 34,
+-- a meadow of 6 + 3.2), detail faded by the road weight, roads graded to 18%,
+-- no store pads. Nothing in that path changed, so their X and Z never move.
+local HILLS_AMP = 18
+-- The meadow was already 6 (the swell the roads follow) + 3.2 (the fine rolling)
+-- = 9.2 at the very most, 9 as the noise really peaks; T397 keeps both, so the
+-- coast, the lakes and everything that was placed against them stand where
+-- they did. Only where the fine rolling shows has changed (HillMask).
+local MEADOW_SWELL_AMP = 6
+local MEADOW_FINE_AMP = 3.2
+local MEADOW_AMP = MEADOW_SWELL_AMP + MEADOW_FINE_AMP
+local HILL_CLEAR = 8
+local HILL_RAMP = 200
+local DOME_WAVE = 340
+local DOME_SEED = 12.4
+local HILLS_FALLOFF = 140 -- studs the domes take to fade in past the Hills' edge
+local MAX_ROAD_DEG = 5
+local ROAD_SHOULDER = 80
+local SNOW_APPROACH = 450 -- the Snowfields' ramp up (was 330): the swell under the Snow Road stays near 5 degrees
+TerrainGen.HillsAmp = HILLS_AMP
+TerrainGen.MeadowAmp = MEADOW_AMP
+TerrainGen.MeadowSwellAmp = MEADOW_SWELL_AMP
+TerrainGen.MeadowFineAmp = MEADOW_FINE_AMP
+TerrainGen.HillClear = HILL_CLEAR
+TerrainGen.HillRamp = HILL_RAMP
+TerrainGen.MaxRoadDegrees = MAX_ROAD_DEG
+TerrainGen.RoadShoulder = ROAD_SHOULDER
+
+-- True while the legacy layout is on or the classic road grades are built.
+local classicBuild = false
+local function classic(): boolean
+	return legacyLayout or classicBuild
+end
+
+-- The ground as it was before T397, on today's layout (roads, rims, pools):
+-- the old swell and domes, the shelves at their broad height, no store pads,
+-- the roads graded to 18%. The first 322 trees are placed on it, so their X
+-- and Z never move. Only WorldPlan's first batch turns it on.
+function TerrainGen.SetClassicGround(on: boolean)
+	classicBuild = on
+	WorldLayout.SetClassicGround(on)
+end
+
 local noise = math.noise
 local clamp = math.clamp
 local sqrt = math.sqrt
@@ -103,7 +163,7 @@ end
 
 -- The broad, gentle shape of the land: what roads follow.
 local function lowHeight(x: number, z: number): number
-	local h = 6 * fbm(x, z, 1 / 720, 2, 23)
+	local h = MEADOW_SWELL_AMP * fbm(x, z, 1 / 720, 2, 23)
 
 	-- Starter Forest: almost flat, a hair above the meadow.
 	local ws = circleWeight(x, z, STARTER.x, STARTER.z, STARTER.radius, 70)
@@ -114,7 +174,7 @@ local function lowHeight(x: number, z: number): number
 	h += wh * 10
 
 	-- Snowfields: a plateau, ramping up over a long, drivable approach.
-	local wsn = circleWeight(x, z, SNOW.x, SNOW.z, SNOW.radius + 40, 330)
+	local wsn = circleWeight(x, z, SNOW.x, SNOW.z, SNOW.radius + 40, if classic() then 330 else SNOW_APPROACH)
 	h += wsn * 26
 
 	-- Volcano: a basalt shelf.
@@ -129,9 +189,19 @@ local function lowHeight(x: number, z: number): number
 end
 
 -- Homestead shelves sit on the broad shape, not in a hole at y = 0.
+-- T397: they now sit at y = 0 like the town (the pad is level and so is the
+-- ground a plot's builds stand on); classicY is the old shelf height, kept
+-- for the first trees' road grades (WorldLayout.SetClassicGround).
+classicBuild = true
 for _, zone in ipairs(WorldLayout.FlatZones) do
 	if zone.terrace and zone.cx and zone.cz then
-		zone.y = lowHeight(zone.cx, zone.cz)
+		zone.classicY = lowHeight(zone.cx, zone.cz)
+	end
+end
+classicBuild = false
+for _, zone in ipairs(WorldLayout.FlatZones) do
+	if zone.terrace and zone.cx and zone.cz then
+		zone.y = 0
 	end
 end
 
@@ -147,6 +217,35 @@ local function detailHeight(x: number, z: number): number
 		-- Rounded hills: the absolute value of noise folds it into domes.
 		local domes = 1 - math.abs(noise(x / 150, z / 150, 5.5)) * 2
 		h += wh * (34 * math.max(0, domes) + 8 * fbm(x, z, 1 / 60, 2, 6))
+	end
+
+	local wsn = circleWeight(x, z, SNOW.x, SNOW.z, SNOW.radius, 200)
+	if wsn > 0 then
+		h += wsn * 5 * fbm(x, z, 1 / 110, 2, 31)
+	end
+
+	local wv = circleWeight(x, z, VOLCANO.x, VOLCANO.z, VOLCANO.radius, 160)
+	if wv > 0 then
+		h += wv * 4 * fbm(x, z, 1 / 70, 2, 41)
+	end
+	return h
+end
+
+-- The live hill layer: before the mask (HillMask) that keeps it off roads,
+-- plots and pads. The meadow's fine rolling, the Hills' rounded domes (at
+-- most HILLS_AMP), the Snowfields' and the Volcano's small bumps.
+local function liveDetail(x: number, z: number): number
+	local h = MEADOW_FINE_AMP * fbm(x, z, 1 / 190, 3, 11)
+
+	local ws = circleWeight(x, z, STARTER.x, STARTER.z, STARTER.radius, 70)
+	h *= 1 - ws * 0.75
+
+	local wh = circleWeight(x, z, HILLS.x, HILLS.z, HILLS.radius, HILLS_FALLOFF)
+	if wh > 0 then
+		-- Rounded domes: the folded noise, eased so a crest is round, not a crease.
+		local d = math.max(0, 1 - math.abs(noise(x / DOME_WAVE, z / DOME_WAVE, DOME_SEED)) * 2)
+		d = d * d * (3 - 2 * d)
+		h += wh * HILLS_AMP * (0.9 * d + 0.1 * fbm(x, z, 1 / 110, 2, 6))
 	end
 
 	local wsn = circleWeight(x, z, SNOW.x, SNOW.z, SNOW.radius, 200)
@@ -249,9 +348,13 @@ local function outsideRoad(region: WorldLayout.ReservedRegion): (number, number)
 	return a.X + (b.X - a.X) * hi, a.Y + (b.Y - a.Y) * hi
 end
 
+-- (Their floors stay where the classic swell put them: T397 changed the swell,
+-- not the Bayou's and the Mesa's depth.)
+classicBuild = true
 local bayouApproachX, bayouApproachZ = outsideRoad(BAYOU_REGION)
 local bayouFloor = lowHeight(bayouApproachX, bayouApproachZ) - BAYOU_REGION.sink
 local mesaFloor = lowHeight(MESA_REGION.x, MESA_REGION.z) - MESA_REGION.sink
+classicBuild = false
 
 local function applyReserve(
 	x: number,
@@ -361,6 +464,7 @@ local function ravineCut(x: number, z: number, h: number): number
 	return h
 end
 
+local GROTTO_MOVED = 8
 -- Rock over a covered cave. Mouths and the grotto skylight stay open.
 local function caveRoof(x: number, z: number, h: number): number
 	-- The mine's hill: rock over the walk-in decline, so its bore is roofed
@@ -380,8 +484,11 @@ local function caveRoof(x: number, z: number, h: number): number
 	end
 	local grotto = UndergroundData.Cave("grotto")
 	for _, c in ipairs(UndergroundData.Caves) do
-		local covered = math.abs(x - c.x) <= c.sx / 2 and math.abs(z - c.z) <= c.sz / 2
-		local skylight = grotto ~= nil and c.id == grotto.id and (x - c.x) ^ 2 + (z - c.z) ^ 2 < 14 * 14
+		-- (T397 moved the grotto 8 studs north, off the Ring Road's lane; the
+		-- first trees' ground keeps it where it stood.)
+		local cz = if c.id == "grotto" and classic() then c.z - GROTTO_MOVED else c.z
+		local covered = math.abs(x - c.x) <= c.sx / 2 and math.abs(z - cz) <= c.sz / 2
+		local skylight = grotto ~= nil and c.id == grotto.id and (x - c.x) ^ 2 + (z - cz) ^ 2 < 14 * 14
 		if covered and not skylight then
 			h = math.max(h, c.floorY + c.height + UndergroundData.CeilingRock)
 		end
@@ -617,10 +724,11 @@ end
 TerrainGen.GravelMaterial = WorldLayout.RoadMaterial
 
 -- How far (x, z) is from the edge of the nearest road (negative = on it).
-function TerrainGen.RoadClearance(x: number, z: number): number
+function TerrainGen.RoadClearance(x: number, z: number, reach: number?): number
 	local best = math.huge
+	local far = reach or 60 -- (past this, any distance is reported as `far`)
 	for _, road in ipairs(roadsNow()) do
-		local d = WorldLayout.FastDistance(road.line, x, z, road.half + 60) - road.half
+		local d = WorldLayout.FastDistance(road.line, x, z, road.half + far) - road.half
 		if d < best then
 			best = d
 		end
@@ -653,11 +761,48 @@ end
 -- truck still climbs at the ramp's slope.
 local LAKE_BASIN = 90
 
+-- How much of the hill layer shows at (x, z): 0 within HILL_CLEAR studs of
+-- a road's edge, a plot's shelf or a store pad (so a road, a pad and the 8
+-- studs round them are the broad swell and nothing more), easing to 1
+-- HILL_RAMP studs further out.
+function TerrainGen.HillMask(x: number, z: number): number
+	local reach = HILL_CLEAR + HILL_RAMP
+	local pad = WorldLayout.PadClearance(x, z, reach)
+	if pad <= HILL_CLEAR then
+		return 0
+	end
+	local d = math.min(pad, TerrainGen.RoadClearance(x, z, reach))
+	return clamp((d - HILL_CLEAR) / HILL_RAMP, 0, 1)
+end
+
+-- The live hill layer at (x, z): the fine rolling and the Hills' domes, kept
+-- off roads, plots and pads by HillMask. (The classic ground has its own.)
+function TerrainGen.HillLiftAt(x: number, z: number): number
+	local mask = TerrainGen.HillMask(x, z)
+	if mask <= 0 then
+		return 0
+	end
+	-- Nor over the ground a shelf or pad is still easing down to its level.
+	mask *= 1 - (WorldLayout.FlatGround(x, z))
+	return if mask > 0 then liveDetail(x, z) * mask else 0
+end
+
+-- The hill layer groundHeight last added (0 on the classic ground): HeightAt
+-- puts it back after a road's shoulder has pulled the ground toward the road,
+-- so the lift is not eased in twice over the same studs.
+local lastLift = 0
+
 local function groundHeight(x: number, z: number): (number, number?)
 	local low = lowHeight(x, z)
-	local detail = detailHeight(x, z)
-	local rw = roadWeight(x, z)
-	local h = low + detail * (1 - rw)
+	local h: number
+	if classic() then
+		local rw = roadWeight(x, z)
+		h = low + detailHeight(x, z) * (1 - rw)
+		lastLift = 0
+	else
+		lastLift = TerrainGen.HillLiftAt(x, z)
+		h = low + lastLift
+	end
 	h = landmarks(x, z, h)
 
 	-- Mirror Lake sits in a gentle bowl on the Hills' west slope (ring
@@ -682,11 +827,12 @@ local function groundHeight(x: number, z: number): (number, number?)
 
 	-- Building zones are perfectly flat. Town pulls to 0; a homestead
 	-- pulls to its shelf. A shelf's blend must not fill a pond or a river.
-	local flat, target = WorldLayout.FlatAt(x, z)
+	local flat, target = WorldLayout.FlatGround(x, z)
 	local coneDx, coneDz = x - CONE.x, z - CONE.z
 	local inCone = coneDx * coneDx + coneDz * coneDz < CONE.radius * CONE.radius
 	-- A yard's blend must not tip the lava pool or pave the cone.
-	if flat > 0 and not (bed and surface) and not inCone then
+	-- (Nor over the Bayou's and the Mesa's reserved floors, which a shelf's wide blend now reaches.)
+	if flat > 0 and not (bed and surface) and not inCone and (classic() or not WorldLayout.InReservedRegion(x, z)) then
 		h = h * (1 - flat) + target * flat
 	end
 	return h, bed
@@ -708,6 +854,10 @@ type SpurGrade = {
 	maxZ: number,
 }
 local SPUR_GRADE: { SpurGrade } = {}
+-- (Surveyed on the classic ground, as before T397: the lanes' ends are where
+-- the first trees' ground was cut.)
+classicBuild = true
+WorldLayout.SetClassicGround(true)
 for _, road in ipairs(WorldLayout.Roads) do
 	if road.name == "PlotSpur" and #road.points >= 2 then
 		local total = 0
@@ -740,7 +890,17 @@ for _, road in ipairs(WorldLayout.Roads) do
 	end
 end
 
+WorldLayout.SetClassicGround(false)
+classicBuild = false
+
+-- True while the strip's own heights are surveyed from the open ground (HeightAt
+-- with the lanes and the toll spur left out: they are cut from these heights).
+local surveying = false
+
 local function spurChord(x: number, z: number): number?
+	if surveying then
+		return nil
+	end
 	local bestH: number? = nil
 	local bestD = math.huge
 	for _, spur in ipairs(SPUR_GRADE) do
@@ -776,14 +936,27 @@ end
 
 -- The strip copies the height of the last surveyed column so the entrance
 -- at z = 1500 doesn't grow a cliff, and nothing at z <= 1500 moves.
+-- The strip copies the height of the last surveyed column so the entrance
+-- at z = 1500 doesn't grow a cliff, and nothing at z <= 1500 moves. One value
+-- for the live ground and one for the classic, so neither depends on which
+-- was asked first.
 local STRIP_SHELF: number? = nil
+local STRIP_SHELF_CLASSIC: number? = nil
 local function stripShelf(): number
-	local known = STRIP_SHELF
+	local isClassic = classic()
+	local known = if isClassic then STRIP_SHELF_CLASSIC else STRIP_SHELF
 	if known then
 		return known
 	end
-	local shelf = groundHeight(0, WorldLayout.ShelfProbeZ)
-	STRIP_SHELF = shelf
+	-- (The ground there as HeightAt draws it, banks and all: the probe is clear of the strip.)
+	surveying = true
+	local shelf = TerrainGen.HeightAt(0, WorldLayout.ShelfProbeZ)
+	surveying = false
+	if isClassic then
+		STRIP_SHELF_CLASSIC = shelf
+	else
+		STRIP_SHELF = shelf
+	end
 	return shelf
 end
 
@@ -795,15 +968,23 @@ end
 -- gradeFrom is the existing ground, untouched, which keeps the height
 -- fingerprint.
 local SPUR_H0: number? = nil
+local SPUR_H0_CLASSIC: number? = nil
 local function spurStartHeight(): number
-	local known = SPUR_H0
+	local isClassic = classic()
+	local known = if isClassic then SPUR_H0_CLASSIC else SPUR_H0
 	if known then
 		return known
 	end
 	local spur = WorldLayout.TollSpur
 	local p = spur.points[spur.gradeFrom]
-	local h = groundHeight(p.X, p.Y)
-	SPUR_H0 = h
+	surveying = true
+	local h = if WorldLayout.InNorthStrip(p.X, p.Y) then groundHeight(p.X, p.Y) else TerrainGen.HeightAt(p.X, p.Y)
+	surveying = false
+	if isClassic then
+		SPUR_H0_CLASSIC = h
+	else
+		SPUR_H0 = h
+	end
 	return h
 end
 
@@ -873,6 +1054,9 @@ local function tollFlat(): { number }
 end
 
 local function tollChord(x: number, z: number): number?
+	if surveying then
+		return nil
+	end
 	local spur = WorldLayout.TollSpur
 	local half = spur.width / 2
 	local south = WorldLayout.BridgeCenterZ - WorldLayout.BridgeLength / 2
@@ -912,6 +1096,11 @@ end
 -- held to a grade under 20%. Sampled from the shaped ground, then relaxed
 -- so a cliff the road crosses becomes a cut instead of a wall.
 local GRADE_CAP = 0.18
+-- T397: the live roads climb at most MAX_ROAD_DEG degrees (a hair under, so a
+-- 4-stud sample never reads over it).
+local GRADE_CAP_LIVE = math.tan(math.rad(MAX_ROAD_DEG)) * 0.995
+local CLOSE_REACH = 80 -- roads closer than this (edge to edge) keep to each other's height
+local CLOSE_GRADE = 0.17 -- ... to within this much of the gap between them
 type GradedRoad = {
 	xs: { number },
 	zs: { number },
@@ -923,16 +1112,24 @@ type GradedRoad = {
 	minZ: number,
 	maxZ: number,
 }
-local HAUL_GRADE: { GradedRoad } = {}
-local haulHeight: (number, number) -> number?
+local HAUL_CLASSIC: { GradedRoad } = {}
+local HAUL_LIVE: { GradedRoad } = {}
+local haulHeight: ({ GradedRoad }, number, number, number) -> (number?, number)
 
-local function buildHaulGrades()
-	for _, road in ipairs(WorldLayout.Roads) do
+local function buildHaulGrades(grades: { GradedRoad }, cap: number, pinJoins: boolean)
+	for roadIndex, road in ipairs(WorldLayout.Roads) do
+		-- The ravine road is the one road graded steeper than 5 degrees: it
+		-- descends 54 studs into the Gloam ravine (cut to -48) in 316, as it
+		-- always did (10 degrees, the classic grade). At 5 degrees it would
+		-- end 27 studs over the ravine's floor.
+		local roadCap = if road.name == "RavineRoad" then GRADE_CAP else cap
 		local pts = road.points
 		local xs: { number } = {}
 		local zs: { number } = {}
 		local hs: { number } = {}
 		local pinned: { [number]: boolean } = {}
+		local lows: { number } = {}
+		local highs: { number } = {}
 		local function push(x: number, z: number)
 			local n = #xs
 			if n > 0 and math.abs(xs[n] - x) < 1e-3 and math.abs(zs[n] - z) < 1e-3 then
@@ -942,7 +1139,16 @@ local function buildHaulGrades()
 			table.insert(zs, z)
 			-- A lane that ends on a haul road takes that road's height, and
 			-- the pin keeps the join from stepping off it.
-			local onHaul = if road.name == "PlotSpur" then haulHeight(x, z) else nil
+			-- T397: any node of a road within its own half width of an earlier
+			-- road takes that road's height, so roads that meet, cross or run
+			-- side by side never step against each other across their width.
+			local onHaul: number? = nil
+			if road.name == "PlotSpur" and not pinJoins then
+				onHaul = (haulHeight(grades, x, z, 0))
+			elseif pinJoins and roadIndex > 1 then
+				-- (the earlier road may only touch this one's edge)
+				onHaul = (haulHeight(grades, x, z, road.width / 2))
+			end
 			local height = if onHaul then onHaul else groundHeight(x, z)
 			local bore = WorldLayout.TunnelWidth / 2
 			local td = WorldLayout.FastDistance(TUNNEL_LINE, x, z, bore + 20)
@@ -960,7 +1166,21 @@ local function buildHaulGrades()
 					end
 				end
 			end
+			-- Two roads whose surfaces stand close but not touching (the Hills'
+			-- three roads run 40 studs apart) may differ by at most CLOSE_GRADE
+			-- of the gap between them, or the ground between climbs a wall.
+			local loBound, hiBound = -math.huge, math.huge
+			if pinJoins and roadIndex > 1 and not pin then
+				local near, edge = haulHeight(grades, x, z, CLOSE_REACH)
+				if near then
+					local allow = CLOSE_GRADE * math.max(edge - road.width / 2, 0)
+					loBound, hiBound = near - allow, near + allow
+					height = clamp(height, loBound, hiBound)
+				end
+			end
 			table.insert(hs, height)
+			table.insert(lows, loBound)
+			table.insert(highs, hiBound)
 			if pin then
 				pinned[#hs] = true
 			end
@@ -983,29 +1203,37 @@ local function buildHaulGrades()
 		local function relax()
 			for i = 1, #hs - 1 do
 				if not pinned[i + 1] then
-					local cap = GRADE_CAP * segLen(i)
+					local limit = roadCap * segLen(i)
 					local delta = hs[i + 1] - hs[i]
-					if delta > cap then
-						hs[i + 1] = hs[i] + cap
-					elseif delta < -cap then
-						hs[i + 1] = hs[i] - cap
+					if delta > limit then
+						hs[i + 1] = hs[i] + limit
+					elseif delta < -limit then
+						hs[i + 1] = hs[i] - limit
 					end
 				end
 			end
 			for i = #hs - 1, 1, -1 do
 				if not pinned[i] then
-					local cap = GRADE_CAP * segLen(i)
+					local limit = roadCap * segLen(i)
 					local delta = hs[i] - hs[i + 1]
-					if delta > cap then
-						hs[i] = hs[i + 1] + cap
-					elseif delta < -cap then
-						hs[i] = hs[i + 1] - cap
+					if delta > limit then
+						hs[i] = hs[i + 1] + limit
+					elseif delta < -limit then
+						hs[i] = hs[i + 1] - limit
 					end
+				end
+			end
+		end
+		local function bound()
+			for i = 1, #hs do
+				if not pinned[i] then
+					hs[i] = clamp(hs[i], lows[i], highs[i])
 				end
 			end
 		end
 		for _ = 1, 6 do
 			relax()
+			bound()
 			if closed and hs[1] ~= nil and hs[#hs] ~= nil then
 				local mid = (hs[1] + hs[#hs]) * 0.5
 				hs[1] = mid
@@ -1024,7 +1252,7 @@ local function buildHaulGrades()
 				along[i] = acc
 			end
 		end
-		table.insert(HAUL_GRADE, {
+		table.insert(grades, {
 			xs = xs,
 			zs = zs,
 			hs = hs,
@@ -1038,12 +1266,17 @@ local function buildHaulGrades()
 	end
 end
 
-haulHeight = function(x: number, z: number): number?
+-- The graded road height at (x, z) and how far it is from that road's edge
+-- (negative on the road). Only roads within `shoulder` studs of an edge are
+-- considered, the nearest to (x, z) first; nil past them all.
+haulHeight = function(grades: { GradedRoad }, x: number, z: number, shoulder: number): (number?, number)
 	local bestH: number? = nil
+	local bestEdge = math.huge
 	local bestD = math.huge
-	for _, g in ipairs(HAUL_GRADE) do
+	for _, g in ipairs(grades) do
 		local half = g.half
-		if x < g.minX - half or x > g.maxX + half or z < g.minZ - half or z > g.maxZ + half then
+		local reach = half + shoulder
+		if x < g.minX - reach or x > g.maxX + reach or z < g.minZ - reach or z > g.maxZ + reach then
 			continue
 		end
 		local dist = math.huge
@@ -1062,8 +1295,65 @@ haulHeight = function(x: number, z: number): number?
 				alongAt = g.along[i] + len * t
 			end
 		end
-		if dist < half * half and dist < bestD then
-			bestD = dist
+		if dist < reach * reach then
+			-- On a road the nearest centreline wins (as it always did); on a
+			-- shoulder, the nearest edge.
+			local edge = math.sqrt(dist) - half
+			local better = if shoulder == 0 or edge <= 0 and bestEdge <= 0 then dist < bestD else edge < bestEdge
+			if better then
+				bestD = dist
+				bestEdge = edge
+				local hs, along = g.hs, g.along
+				local hAt = hs[#hs]
+				for i = 1, #along - 1 do
+					if alongAt <= along[i + 1] then
+						local span = along[i + 1] - along[i]
+						local u = if span > 1e-6 then (alongAt - along[i]) / span else 0
+						hAt = hs[i] + (hs[i + 1] - hs[i]) * u
+						break
+					end
+				end
+				bestH = hAt
+			end
+		end
+	end
+	return bestH, bestEdge
+end
+
+-- The live ground beside the roads, in one pass over them: the height of the
+-- road whose surface (x, z) is on (nil if none), and for a point on no road
+-- the shoulder: the height the nearby roads pull it toward (each road's
+-- weight falls off with the square of its distance, so the nearer one rules)
+-- and how hard they pull (0 far off, 1 at a road's edge). With two roads
+-- close together the ground between them runs from one height to the other
+-- instead of stepping at the line where "nearest" changes hands.
+local function haulField(x: number, z: number): (number?, number?, number)
+	local onH: number? = nil
+	local onD = math.huge
+	local sumW, sumWH, keep = 0, 0, 1
+	for _, g in ipairs(HAUL_LIVE) do
+		local half = g.half
+		local reach = half + ROAD_SHOULDER
+		if x < g.minX - reach or x > g.maxX + reach or z < g.minZ - reach or z > g.maxZ + reach then
+			continue
+		end
+		local dist = math.huge
+		local alongAt = 0
+		local xs, zs = g.xs, g.zs
+		for i = 1, #xs - 1 do
+			local ax, az, bx, bz = xs[i], zs[i], xs[i + 1], zs[i + 1]
+			local abx, abz = bx - ax, bz - az
+			local len2 = abx * abx + abz * abz
+			local len = math.sqrt(len2)
+			local t = if len2 > 1e-6 then math.clamp(((x - ax) * abx + (z - az) * abz) / len2, 0, 1) else 0
+			local dx, dz = x - (ax + abx * t), z - (az + abz * t)
+			local d2 = dx * dx + dz * dz
+			if d2 < dist then
+				dist = d2
+				alongAt = g.along[i] + len * t
+			end
+		end
+		if dist < reach * reach then
 			local hs, along = g.hs, g.along
 			local hAt = hs[#hs]
 			for i = 1, #along - 1 do
@@ -1074,13 +1364,46 @@ haulHeight = function(x: number, z: number): number?
 					break
 				end
 			end
-			bestH = hAt
+			local edge = math.sqrt(dist) - half
+			if edge <= 0 then
+				if dist < onD then
+					onD = dist
+					onH = hAt
+				end
+			else
+				local pull = 1 - smoothstep(edge / ROAD_SHOULDER)
+				local w = pull / ((edge + 1) * (edge + 1))
+				sumW += w
+				sumWH += w * hAt
+				keep *= 1 - pull
+			end
 		end
 	end
-	return bestH
+	if onH then
+		return onH, nil, 1
+	end
+	if sumW > 0 then
+		return nil, sumWH / sumW, 1 - keep
+	end
+	return nil, nil, 0
 end
 
-buildHaulGrades()
+-- The graded height of the road whose surface (x, z) is on, or nil off the
+-- roads: what HeightAt returns there (bar a cave's roof or the tunnel's
+-- bore). Roads climb at most MAX_ROAD_DEG degrees along their length.
+function TerrainGen.RoadHeightAt(x: number, z: number): number?
+	local onRoad = haulField(x, z)
+	return onRoad
+end
+
+-- The classic grades (18%) are built on the classic ground, as they always
+-- were; the live ones (5 degrees) on today's.
+classicBuild = true
+WorldLayout.SetClassicGround(true)
+buildHaulGrades(HAUL_CLASSIC, GRADE_CAP, false)
+WorldLayout.SetClassicGround(false)
+classicBuild = false
+buildHaulGrades(HAUL_LIVE, GRADE_CAP_LIVE, true)
 
 -- Ground height at (x, z), in studs.
 function TerrainGen.HeightAt(x: number, z: number): number
@@ -1089,7 +1412,7 @@ function TerrainGen.HeightAt(x: number, z: number): number
 	-- graded suffix is the one exception, and it misses those samples.
 	if WorldLayout.InNorthStrip(x, z) then
 		local shelf = stripShelf()
-		local graded = haulHeight(x, z)
+		local graded = haulHeight(if classic() then HAUL_CLASSIC else HAUL_LIVE, x, z, 0)
 		if graded then
 			return cover(x, z, graded)
 		end
@@ -1103,7 +1426,28 @@ function TerrainGen.HeightAt(x: number, z: number): number
 		return cover(x, z, shelf)
 	end
 	local h, bed = groundHeight(x, z) -- (its channel bed: water(x, z)'s first value)
-	local graded = haulHeight(x, z)
+	local lift = lastLift
+	local isClassic = classic()
+	local graded: number? = nil
+	if isClassic then
+		graded = haulHeight(HAUL_CLASSIC, x, z, 0)
+	else
+		local shoulderH, pull
+		graded, shoulderH, pull = haulField(x, z)
+		if shoulderH and not bed then
+			-- The shoulder: the country eases from the roads' height out to its
+			-- own over ROAD_SHOULDER studs, so a cut or a fill is a bank, not a wall.
+			-- A pad's level beats it: a road's bank never tilts a plot, a store pad or the lot.
+			pull *= 1 - (WorldLayout.FlatGround(x, z))
+			-- Nor does it cut a cliff ring (the gate is the only way through) or
+			-- the Bayou's and the Mesa's reserved floors.
+			pull *= 1 - clamp(rimLift(x, z) / 6, 0, 1)
+			if WorldLayout.InReservedRegion(x, z) then
+				pull = 0
+			end
+			h = h * (1 - pull) + shoulderH * pull + lift * pull
+		end
+	end
 	if graded then
 		h = graded
 		-- A graded road that clips the bore can land a hair under the roof.
