@@ -174,6 +174,9 @@ return function(t)
 			got[entry.id] = true
 			t.ok(hasTemplate(entry.id), entry.id .. " has a template")
 		end
+		for _, id in ipairs(BacklogModels.CollisionIds(BacklogModels.Collided)) do
+			want[id] = true -- a collision piece the builder walks on is preloaded too
+		end
 		for id in pairs(want) do
 			t.ok(got[id], tostring(id) .. " is preloaded")
 		end

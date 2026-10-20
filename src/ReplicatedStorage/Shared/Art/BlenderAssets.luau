@@ -9,6 +9,9 @@
 --            here is 0: the registry never overrides those modules.
 --   backlog  uploaded with the Blender backlog (8 Oct 2026, Approved) and
 --            wired by BacklogModels (job 17). meshId is its main piece.
+--   wired    uploaded with the backlog and dressed by its own builder
+--            (BuildingArt calls TownMeshes.Dress; BacklogModels.Wired lists
+--            it for the preload). meshId is its main piece; MeshIds() skips it.
 --   store    a store item model (one mesh, one baked colour texture in
 --            textures.Color), uploaded 13 Oct 2026. meshId is the live id.
 --   planned  on Lane H's list with no model yet (assets/UPLOAD_LIST.md).
@@ -27,7 +30,7 @@
 local BlenderAssets = {}
 
 export type Collision = "Box" | "Hull" | "Parts"
-export type Status = "repo" | "backlog" | "store" | "planned"
+export type Status = "repo" | "backlog" | "wired" | "store" | "planned"
 
 export type Entry = {
 	name: string,
@@ -1870,8 +1873,8 @@ local ROWS: { Entry } = {
 		collision = "Parts",
 		meshId = 108675903715340,
 		textures = {},
-		status = "backlog",
-		wiredBy = "BacklogModels",
+		status = "wired",
+		wiredBy = "BuildingArt",
 	},
 	{
 		name = "shops/Sparkworks",
@@ -2238,7 +2241,13 @@ function BlenderAssets.MeshIds(): { number }
 	local out: { number } = {}
 	local seen: { [number]: boolean } = {}
 	for _, entry in ipairs(ROWS) do
-		if entry.status ~= "backlog" and entry.status ~= "store" and entry.meshId ~= 0 and not seen[entry.meshId] then
+		if
+			entry.status ~= "backlog"
+			and entry.status ~= "wired"
+			and entry.status ~= "store"
+			and entry.meshId ~= 0
+			and not seen[entry.meshId]
+		then
 			seen[entry.meshId] = true
 			table.insert(out, entry.meshId)
 		end
