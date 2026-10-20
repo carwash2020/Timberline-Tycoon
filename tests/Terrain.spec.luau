@@ -22,12 +22,16 @@ return function(t)
 	-- are flat at their own height, and each lane is a sample.
 	local HEIGHT_FINGERPRINT = {
 		n = 7717,
-		sum = 68400.124273782537784,
-		wsum = 4.247161048071648,
-		sq = 4783916.585540854372084,
+		sum = 68582.533304951954051,
+		wsum = 1.800485241712979,
+		sq = 4783396.555362608283758,
 		lo = -41.562571590540983,
 		hi = 161.576039893993112,
 	}
+	-- Hills closer to +18 (the road-grade ramp, broad domes) re-sampled it on purpose:
+	-- the meadow's fine rolling now reaches full size about 60 studs off a road (it was
+	-- 200), so the samples beside the roads rise a little (sum +182); lo and hi are
+	-- the same ground. Was sum 68400.124273783, wsum 4.247161049, sq 4783916.585540854.
 	-- T397 (gentle hills) re-sampled it on purpose: the Hills' domes and the
 	-- meadow's rolling are now at most 18 and 9 and start 8 studs past any road,
 	-- plot or pad; roads climb at most 5 degrees (the ravine road 10) with an 80
