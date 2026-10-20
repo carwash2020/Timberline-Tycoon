@@ -9,7 +9,7 @@
 --   4. each planter collides with its top 1.4 to 1.8; each awning post covers
 --      its centre from Y 0.5 to 4 and stands 1.5 studs clear of the door;
 --   5. a character-sized box at each door centre touches no solid part;
---   6. the part counts are unchanged (the change builds no part).
+--   6. the part counts are unchanged (the change builds no part; the Dealership is 408 plus the 12 of its event-table cards, T390).
 return function(t)
 	local roblox = t.roblox
 	local Color3, Instance = roblox.Color3, roblox.Instance
@@ -267,7 +267,7 @@ return function(t)
 	end)
 
 	t.test("6: no part was added (counts match main)", function()
-		local want = { Dealership = 408, GeneralStore = 114, ToolShed = 439, HearthAndHome = 456, Sparkworks = 418 }
+		local want = { Dealership = 420, GeneralStore = 114, ToolShed = 439, HearthAndHome = 456, Sparkworks = 418 }
 		for _, kind in ipairs(KINDS) do
 			t.eq(#parts(models[kind]), want[kind], kind .. " part count")
 		end

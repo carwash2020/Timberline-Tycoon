@@ -257,6 +257,9 @@ return function(t)
 			HoursBoard = true,
 			DoorClosedSign = true,
 			EventBanner = true, -- the event room's blank board by the entrance (hidden until an event runs)
+			EventCard1Board = true, -- the "Coming soon" cards on the three event tables (hidden once an event runs)
+			EventCard2Board = true,
+			EventCard3Board = true,
 		}
 		local total = 0
 		for _, p in ipairs(parts(model)) do
@@ -265,7 +268,7 @@ return function(t)
 				total += 1
 			end
 		end
-		t.ok(total <= 12, "signs on the whole building: " .. total)
+		t.ok(total <= 15, "signs on the whole building: " .. total)
 		t.eq(#named(model, "OfficeSign"), 0, "no second TRUCKS & TRAILERS board over the windows")
 		t.eq(#named(model, "SandwichBoard"), 0, "no sandwich board: the hours board says it")
 		t.eq(#named(model, "SwatchBoard"), 0, "no swatch board behind the counter")
@@ -297,12 +300,12 @@ return function(t)
 		end
 	end)
 
-	t.test("one tier stand per vehicle: tier colour, T-flag, hover tag, no lock for a vehicle today", function()
+	t.test("no tier stand on a vehicle (T391): no flag, post, lock chip or tier colour; the hover tag stays", function()
 		local lot = DealershipLot.Build()
 		local layout = DealershipLot.Layout()
-		local flags = named(lot, "TierFlag")
-		t.eq(#flags, #layout.bays, "a T-flag per vehicle")
-		t.eq(#named(lot, "LockChip"), 0, "no vehicle has a lock, so no lock chip")
+		for _, name in ipairs({ "TierFlag", "TierPost", "TierBacking", "LockChip" }) do
+			t.eq(#named(lot, name), 0, "no " .. name)
+		end
 		local plinths = {}
 		for _, d in ipairs(lot:GetChildren()) do
 			if d.Name == "Plinth" then
@@ -310,56 +313,10 @@ return function(t)
 			end
 		end
 		for _, bay in ipairs(layout.bays) do
-			local tier = StoreTier.Of(bay.kind, bay.id)
-			t.ok(tier ~= nil, bay.id .. " has a tier")
-			local flag
-			for _, f in ipairs(flags) do
-				local spec = HoverTag.SpecOf(f)
-				if spec and spec.itemId == bay.id then
-					flag = f
-				end
-			end
-			t.ok(flag, bay.id .. " has its flag")
-			t.eq(flag.Color, StoreTier.Color(tier), bay.id .. " flag colour")
-			t.eq(textOf(flag), StoreTier.Label(tier), bay.id .. " flag text")
-			t.eq(HoverTag.SpecOf(flag).shop, "Dealership")
-			-- inside its plinth, above its top, at the aisle edge but never past it
-			local px0, px1, py0, py1, pz0, pz1 = aabb(plinths[bay.id])
-			local fx0, fx1, fy0, fy1, fz0, fz1 = aabb(flag)
-			t.ok(fx0 >= px0 and fx1 <= px1, bay.id .. " flag is over its plinth in x")
-			t.ok(fz0 >= pz0 and fz1 <= pz1, bay.id .. " flag is over its plinth in z")
-			t.ok(fy0 >= py1, bay.id .. " flag is above the plinth")
-			local stripe, band
-			for _, d in ipairs(lot:GetChildren()) do
-				if not d:IsA("BasePart") then
-					continue
-				end
-				local x0, x1, _, _, z0, z1 = aabb(d)
-				if
-					d.Name == "PlinthStripe"
-					and x0 >= px0 - 1e-3
-					and x1 <= px1 + 1e-3
-					and z0 >= pz0 - 1e-3
-					and z1 <= pz1 + 1e-3
-				then
-					stripe = d
-				elseif d.Name == "PlinthBand" and x0 >= px0 - 0.01 and x1 <= px1 + 0.01 then
-					local _, _, _, _, bz0, bz1 = aabb(d)
-					if bz1 >= pz0 - 0.2 and bz0 <= pz1 + 0.2 then
-						band = d
-					end
-				end
-			end
-			t.ok(stripe and band, bay.id .. " has its stripe and band")
-			t.eq(stripe.Color, StoreTier.Color(tier), bay.id .. " stripe is the tier colour")
-			t.eq(band.Color, StoreTier.Color(tier), bay.id .. " band is the tier colour")
-		end
-		-- vehicles: the tiers are the price order within each kind, and distinct within a kind
-		local seen = {}
-		for _, bay in ipairs(layout.bays) do
-			local key = bay.kind .. StoreTier.Of(bay.kind, bay.id)
-			t.eq(seen[key], nil, bay.id .. " shares a tier within its kind")
-			seen[key] = true
+			t.eq(StoreTier.Of(bay.kind, bay.id), nil, bay.id .. " has no tier")
+			local spec = HoverTag.SpecOf(plinths[bay.id])
+			t.ok(spec and spec.itemId == bay.id, bay.id .. " plinth still shows its price tag")
+			t.eq(spec.shop, "Dealership")
 		end
 	end)
 

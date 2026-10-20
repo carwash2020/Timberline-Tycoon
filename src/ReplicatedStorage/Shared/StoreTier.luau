@@ -16,8 +16,8 @@
 --   * Gear: the stage it is for (StageOf.GearStage), when it has one.
 --   * Plan (blueprint): the plot tier it asks for (PlotData tier), when that
 --     is more than 1 (tier 1 is every plan's start).
---   * Truck / trailer: its place in the price order of its own kind (display
---     only: the catalog has no tier for vehicles).
+--   * Truck / trailer: none, unless it is an upgraded version of another one
+--     (`upgradeOf`, see StoreTier.UpgradeOf): then a "Mk II" plaque, no tier colour.
 --   * Anything else (belts, the Sky Bin, the chop saw, logic pieces, the lamp
 --     post): no tier, so no badge; its stand keeps its category colour.
 -- Locks (display only, from rules that already exist):
@@ -109,46 +109,44 @@ end
 -- Which tier an item has
 ---------------------------------------------------------------------------
 
--- Vehicles: the place in the price order of their own kind, cheapest first
--- (the catalog's v2 price, so it never depends on the loop). Cached.
-local vehicleTiers: { [string]: number }? = nil
+-- Vehicles have no tier. A truck or trailer carries a sign only when it is an upgraded version
+-- of another one (ItemCatalog's `upgradeOf`): UpgradeOf names the base, Of says it is a second
+-- mark. Nothing else about a vehicle is ranked or labelled.
+local UPGRADE_TIER = 2
 
-local function vehiclePrice(def: any): number
-	return if def.v2 and type(def.v2.price) == "number" then def.v2.price else def.priceCash
+-- The plaque's two lines (the only tier-like words a vehicle ever shows).
+StoreTier.UpgradeMark = "Mk II"
+function StoreTier.UpgradeLine(baseName: string): string
+	return "Upgrade of " .. baseName
 end
 
-local function vehicleRanks(): { [string]: number }
-	if vehicleTiers ~= nil then
-		return vehicleTiers
+local function vehicleDef(kind: string, id: string): any
+	return if kind == "Truck" then ItemCatalog.GetTruck(id) else ItemCatalog.GetTrailer(id)
+end
+
+local function capacityOf(kind: string, def: any): number
+	return if kind == "Truck" then def.bedCapacity else def.extraCapacity
+end
+
+-- The vehicle this one upgrades, or nil. A set `upgradeOf` counts only when it is valid: the
+-- id exists (and is not this vehicle), it beats the base on bed capacity (a trailer: extra
+-- capacity) and it costs more (priceCash). Anything else is no upgrade, never an error.
+function StoreTier.UpgradeOf(kind: string, itemId: string): string?
+	if kind ~= "Truck" and kind ~= "Trailer" then
+		return nil
 	end
-	local out: { [string]: number } = {}
-	local function rank(kind: string, ids: { string }, get: (string) -> any)
-		local sorted = table.clone(ids)
-		table.sort(sorted, function(a, b)
-			local pa, pb = vehiclePrice(get(a)), vehiclePrice(get(b))
-			if pa ~= pb then
-				return pa < pb
-			end
-			return a < b
-		end)
-		for i, id in ipairs(sorted) do
-			out[kind .. ":" .. id] = i
-		end
+	local def = vehicleDef(kind, itemId)
+	if not def or type(def.upgradeOf) ~= "string" or def.upgradeOf == itemId then
+		return nil
 	end
-	local trucks: { string } = {}
-	local trailers: { string } = {}
-	for _, def in pairs(ItemCatalog.Trucks) do
-		if def.robux ~= true and def.sold ~= false and def.priceCash > 0 then
-			table.insert(trucks, def.id)
-		end
+	local base = vehicleDef(kind, def.upgradeOf)
+	if not base then
+		return nil
 	end
-	for _, def in pairs(ItemCatalog.Trailers) do
-		table.insert(trailers, def.id)
+	if capacityOf(kind, def) <= capacityOf(kind, base) or def.priceCash <= base.priceCash then
+		return nil
 	end
-	rank("Truck", trucks, ItemCatalog.GetTruck)
-	rank("Trailer", trailers, ItemCatalog.GetTrailer)
-	vehicleTiers = out
-	return out
+	return def.upgradeOf
 end
 
 -- The tier of an item, or nil when it has none (no badge).
@@ -175,7 +173,7 @@ function StoreTier.Of(kind: string, itemId: string): number?
 		end
 		return nil
 	elseif kind == "Truck" or kind == "Trailer" then
-		return vehicleRanks()[kind .. ":" .. itemId]
+		return if StoreTier.UpgradeOf(kind, itemId) ~= nil then UPGRADE_TIER else nil
 	end
 	return nil
 end

@@ -618,7 +618,10 @@ step("4. The town", function()
 		end)
 		defer("4. Town signs", 1, around(0, 60), function(slice)
 			for _, sign in ipairs(town.signs) do
-				standOnGround(place(atomic(BuildingArt.Signpost(sign.text, sign.lit)), sign.cframe), true)
+				standOnGround(
+					place(atomic(BuildingArt.Signpost(sign.text, sign.lit, nil, nil, sign.noWrap)), sign.cframe),
+					true
+				)
 				slice()
 			end
 		end)

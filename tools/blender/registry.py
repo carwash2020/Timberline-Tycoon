@@ -327,6 +327,78 @@ def luau(rows: list[dict]) -> str:
     return HEADER + "".join(body) + FOOTER
 
 
+VEHICLE_ORDER = ["Rustbucket", "Pickup", "ScoutATV", "Flatbed", "LoggingRig", "PonyTrailer", "RanchTrailer", "HeavyHauler"]
+
+
+def vehicle_reupload_section() -> list[str]:
+    """T390: the walk-through for the vehicle meshes whose Roblox upload is stale (Rustbucket first).
+
+    The old ids come from the re-upload table in ASSETS.md (written by `lune run tools/assets` from
+    VehicleModels.luau), so this section never holds a second copy that could drift.
+    """
+    import re
+
+    rows: dict[str, list[tuple[str, str]]] = {}
+    assets = Path("ASSETS.md")
+    if assets.exists():
+        for line in assets.read_text().splitlines():
+            m = re.match(r"^\| (\d+) \| `[^`]+` \| (\w+) \| (\w+) \| new GLB in repo, needs re-upload \|$", line)
+            if m:
+                rows.setdefault(m.group(3), []).append((m.group(2), m.group(1)))
+    total = sum(len(v) for v in rows.values())
+    lines = [
+        "## Vehicle meshes: re-upload (T390, Rustbucket first)",
+        "",
+        f"{total} of the vehicle mesh ids in `VehicleModels.luau` point at Roblox uploads older than the GLBs in",
+        "`assets/meshes/vehicles` (`Glass` is unchanged in every GLB: keep its id). Until they are replaced the",
+        "display trucks and the bought trucks both dress in the old meshes. The game is not broken meanwhile:",
+        "`tests/VehicleMeshes.spec.luau` keeps two expected-fail specs that go green when this is done.",
+        "",
+        "Do them in this order, one vehicle at a time, and look at each in Studio before starting the next:",
+        "",
+        "1. Open Roblox Studio and the Timberline place. View tab, Asset Manager, Meshes tab, **Bulk Import**.",
+        "2. Pick the vehicle's `.glb` from the table below. The 3D Importer lists its pieces by name",
+        "   (`Body`, `Glass`, `Lights`, `Bed`, `Wheel`, `Hitch`). Leave the settings, click **Import**.",
+        "3. Each piece becomes a MeshPart with its own mesh. For every piece in the vehicle's table (skip `Glass`):",
+        "   click it, copy the number out of **MeshId** (`rbxassetid://123456789`, keep only the number). Never use",
+        "   the id of the whole Model.",
+        "4. In `src/ReplicatedStorage/Shared/Art/VehicleModels.luau` find the old id (Ctrl+F) and replace only that",
+        "   number. Leave `size` and `at` alone: they already match the new file. A mesh id used by more than one",
+        "   truck variant (the trailers) is one search and one replace: Replace All.",
+        "5. Allow the asset in the experience (Creator Hub, Creations, Assets, the asset, Permissions) if it is not",
+        "   already yours to use, or the mesh will not load in game.",
+        "6. After the last vehicle: run `lune run tools/assets` and commit `ASSETS.md` and `tools/asset-ids.json`,",
+        "   then `scripts/check-assets.ps1` (Windows) and tell the build agent the result so the rows can be marked",
+        "   checked. That flips the two expected-fail specs in `tests/VehicleMeshes.spec.luau` to passing; change them",
+        "   to `t.test` then.",
+        "7. Studio check, a NEW Play session (not a Run in the same session): walk every pad in the Dealership, each",
+        "   truck matches its render; Output (View > Output) shows no `[MeshKit]` or `[VehicleMeshes]` warnings; buy the",
+        "   Rust Bucket and one other truck, spawn, compare to the display; stop, Play again, still correct.",
+        "",
+    ]
+    order = [v for v in VEHICLE_ORDER if v in rows] + sorted(v for v in rows if v not in VEHICLE_ORDER)
+    for n, who in enumerate(order, 1):
+        glb = f"assets/meshes/vehicles/{who}/{who}.glb"
+        lines += [
+            f"### {n}. {who}" + ("  (start here)" if n == 1 else ""),
+            "",
+            f"File: `{glb}`",
+            "",
+            "| Piece (node) | Old id to replace |",
+            "|---|---|",
+        ]
+        order_nodes = {"Body": 0, "Lights": 1, "Bed": 2, "Wheel": 3, "Hitch": 4}
+        for node, old in sorted(rows[who], key=lambda r: order_nodes.get(r[0], 9)):
+            lines.append(f"| {node} | `{old}` |")
+        lines.append("")
+    lines += [
+        "The trailers' `by_truck` variants (`assets/meshes/vehicles/<Trailer>/by_truck/<Truck>/...`) have no ids of",
+        "their own yet: each variant draws its trailer's mesh above, stretched to the truck's width. Leave them.",
+        "",
+    ]
+    return lines
+
+
 def upload_list(rows: list[dict]) -> str:
     lines = [
         "# Blender upload list (Lane H)",
@@ -336,6 +408,7 @@ def upload_list(rows: list[dict]) -> str:
         "Connor uploads, only after he says yes to the renders; the ids then go into the",
         "registry (or the module in the Wired by column) in a separate PR.",
         "",
+    ] + vehicle_reupload_section() + [
         "## Still to model and upload (status planned)",
         "",
         "No model exists yet. The part-built model stays in game until one is made, approved and uploaded.",
