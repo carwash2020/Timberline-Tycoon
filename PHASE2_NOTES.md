@@ -4300,3 +4300,10 @@ The 13 overlap hits of `docs/SPREAD_FOLLOWUPS.md` section 3 are fixed; `tools/ov
 The two-line "about 1.3 u3, $8" label that floated over a felled log when you aimed an axe at it (PC) is gone. The coloured cut-line slab (`CutGuide`) is unchanged. No chop logic, price, StoreData, Net or ProfileSchema change.
 
 - **Studio check:** equip an axe on PC and aim at a felled log. The coloured cut line still shows, but no text floats over it.
+
+## Cut line only (T374, branch `phase-2/cut-line-only`, 20 October 2026)
+
+The axe now highlights only where the cut will happen: a thin band (0.15 studs, section width + 0.08, SmoothPlastic, transparency 0.4) at the cut height `h` (the same clamped h the server cuts at), on a standing tree and on a felled log. The one `CutTarget` Highlight rings that band (outline only), never the tree or log. Cream #FFF4D6 when ready, orange #FFAA46 for a refused-too-hard target. Per frame: no new Instances; CFrame and Size are written only when the band moves more than 0.05 studs (or turns); the band follows a moved log every frame and hides when the aim leaves, the axe is put away or the log is gone. Only `CutController` and its spec changed.
+
+- **Studio checks:** aim your axe at a tree, then at a log. Only a thin cream ring shows where the cut will go, and it moves as you aim. Nothing else lights up. A too-hard target shows the same ring in orange. Screenshots (PC, phone, Xbox) need Studio.
+
