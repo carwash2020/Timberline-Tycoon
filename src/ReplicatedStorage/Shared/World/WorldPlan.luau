@@ -70,6 +70,17 @@ local function breathe()
 	end
 end
 
+-- `breathe` on every 8th call: for the loops that run thousands of times a
+-- second (a ground height each), so a stretch stays well under a time slice
+-- without the pause being asked for at every step.
+local breatheCalls = 0
+local function breatheSome()
+	breatheCalls += 1
+	if breatheCalls % 8 == 0 then
+		breathe()
+	end
+end
+
 -- Runs `fn` with `pause` called from the planners' loops.
 function WorldPlan.WithPause(pause: (() -> ())?, fn: () -> any): any
 	local prevThread, prevStep = pauseThread, pauseStep
@@ -397,17 +408,24 @@ function firstTrees(): { TreeSpot }
 	TerrainGen.SetClassicGround(true)
 	local placedOk, placedErr = pcall(build)
 	TerrainGen.SetClassicGround(false)
-	firstBuilding = false
 	TerrainGen.SetLegacyLayout(false)
 	if not placedOk then
+		firstBuilding = false
 		error(placedErr)
 	end
-	for _, spot in ipairs(out) do
+	-- The live heights: 322 ground heights, a stretch of tens of milliseconds
+	-- unless it gives the frame back too (firstBuilding still holds a second
+	-- asker off until the plan is whole).
+	for i, spot in ipairs(out) do
+		if i % 16 == 0 then
+			breathe()
+		end
 		local p = spot.position
 		spot.position = Vector3.new(p.X, TerrainGen.HeightAt(p.X, p.Z) - 0.3, p.Z)
 	end
 	table.move(discs, 1, #discs, #groveDiscs + 1, groveDiscs)
 	cachedFirst = out
+	firstBuilding = false
 	return out
 end
 
@@ -1627,6 +1645,7 @@ local function sightOfLamp(): (Vector3, Vector3)
 		breathe()
 		local coast = WorldLayout.Coast
 		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt do
+			breatheSome()
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
 				table.insert(tips, { x = x, z = z })
 				break
@@ -1764,6 +1783,7 @@ function WorldPlan.Scenery(): { ScenerySpot }
 		end
 		local lo, hi = math.huge, -math.huge
 		for _, sample in ipairs(WorldPlan.SceneryFootprint(x, z, r)) do
+			breatheSome()
 			local sx, sz = sample.X, sample.Y
 			if TerrainGen.WaterLevelAt(sx, sz) ~= nil or WorldLayout.FlatWeight(sx, sz) > 0 then
 				return nil
@@ -2473,6 +2493,7 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 	-- `flat` (at y = 0) set down on the lower post's ground, and whether the
 	-- ground under its posts and middle is level within a stud.
 	local function setDown(flat: CFrame): (CFrame, boolean)
+		breathe()
 		local a, b, m = flat * Vector3.new(-SIGN_POST, 0, 0), flat * Vector3.new(SIGN_POST, 0, 0), flat.Position
 		local ha, hb, hm = TerrainGen.HeightAt(a.X, a.Z), TerrainGen.HeightAt(b.X, b.Z), TerrainGen.HeightAt(m.X, m.Z)
 		local level = math.max(ha, hb, hm) - math.min(ha, hb, hm) < 1
@@ -3896,7 +3917,10 @@ local function clutter(): Clutter
 			end
 		end
 	end
-	for _, tree in ipairs(baseTrees()) do -- (not the forest's: they keep off all this)
+	for i, tree in ipairs(baseTrees()) do -- (not the forest's: they keep off all this)
+		if i % 64 == 0 then
+			breathe()
+		end
 		add(tree.position.X, tree.position.Z, 0)
 	end
 	for _, b in ipairs(WorldPlan.Boulders()) do
@@ -4057,6 +4081,7 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 			return nil
 		end
 		for k = 0, 7 do -- the water, a little beyond its side
+			breatheSome()
 			local a = k * math.pi / 4
 			local d = reach + WorldPlan.ClusterWater
 			local sx, sz = x + math.cos(a) * d, z + math.sin(a) * d
@@ -4074,6 +4099,7 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 		local lowest = h
 		breathe()
 		for _, p in ipairs(WorldPlan.ClusterFootprint(x, z, size)) do
+			breatheSome()
 			lowest = math.min(lowest, TerrainGen.HeightAt(p.X, p.Y))
 		end
 		if h - lowest > WorldPlan.ClusterDrop(size) then
@@ -4326,6 +4352,7 @@ local function bridgeAcross(p: Vector2, n: Vector2): Footbridge?
 	-- ground there, and out over the river its underside clears the ground
 	-- and its top the water, right across.
 	for k = 0, 40 do
+		breatheSome()
 		local t = k / 40
 		local d = span * t
 		local top = ha + LandmarkArt.DeckTop(t, drop, rise)
@@ -4450,6 +4477,7 @@ local function dockAt(kind: string, land: Vector2, out: Vector2, length: number,
 	-- Its first studs rest on the bank (the deck's top clears it), then its
 	-- planks and stringers clear the ground under the water.
 	for k = 0, math.floor(length) do
+		breatheSome()
 		for _, off in ipairs({ -width / 2, 0, width / 2 }) do
 			local q = land + out * k + side * off
 			local ground = TerrainGen.HeightAt(q.X, q.Y)
@@ -4523,6 +4551,7 @@ function WorldPlan.Docks(): { Dock }
 		local turn = math.rad(5) * math.ceil(k / 2) * (if k % 2 == 0 then 1 else -1)
 		local away = Vector2.new(math.cos(turn), math.sin(turn))
 		for r = lake.radius * 0.7, lake.radius * 1.4, 0.5 do
+			breatheSome()
 			local q = centre + away * r
 			if TerrainGen.WaterLevelAt(q.X, q.Y) == nil then
 				found = dockAt("lake", q + away * 2.5, -away, 20, WorldLayout.LakeLevel)
@@ -4544,6 +4573,7 @@ function WorldPlan.Docks(): { Dock }
 		local z = isle.z + 10 * math.ceil(k / 2) * (if k % 2 == 0 then 1 else -1)
 		-- From the back of the beach out to the skirt: the first water.
 		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt, 1 do
+			breatheSome()
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
 				found = dockAt("coast", Vector2.new(x - 4, z), Vector2.new(1, 0), 26, WorldLayout.SeaLevel)
 				break
@@ -4682,6 +4712,7 @@ function WorldPlan.Lighthouse(): Lighthouse?
 	for z = LIGHTHOUSE_Z[1], LIGHTHOUSE_Z[2], 4 do
 		local coast = WorldLayout.Coast
 		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt, 1 do
+			breatheSome()
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
 				table.insert(tips, { x = x, z = z })
 				break
