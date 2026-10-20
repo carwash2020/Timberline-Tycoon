@@ -858,6 +858,15 @@ function WorldPlan.ReachTrees(): { TreeSpot }
 			})
 		end
 	end
+	-- WORLD-SPREAD (T372): one Reach tree stood on an outcrop; moved after the plan,
+	-- so the sequence and the first four (hash-pinned) trees do not change.
+	local moveReach: { [number]: { number } } = { [5] = { 263.3, -746.9 } }
+	for index, to in pairs(moveReach) do
+		local spot = out[index]
+		if spot then
+			spot.position = Vector3.new(to[1], TerrainGen.HeightAt(to[1], to[2]) - 0.3, to[2])
+		end
+	end
 	cachedReach = out
 	return out
 end
@@ -920,6 +929,15 @@ function WorldPlan.RegionTrees(): { TreeSpot }
 					end
 				end
 			end
+		end
+	end
+	-- WORLD-SPREAD (T372): two Mesa ironwoods stood in first-331 oaks; moved after the
+	-- plan (the oaks are hash-pinned, so they stay), the sequence is unchanged.
+	local moveRegion: { [number]: { number } } = { [69] = { 650.0, -869.8 }, [49] = { 523.4, -705.3 } }
+	for index, to in pairs(moveRegion) do
+		local spot = out[index]
+		if spot then
+			spot.position = Vector3.new(to[1], TerrainGen.HeightAt(to[1], to[2]) - 0.3, to[2])
 		end
 	end
 	cachedRegionTrees = out
@@ -1252,6 +1270,20 @@ function WorldPlan.Boulders(): { Boulder }
 				snowy = id == "snow",
 				dark = id == "volcano" or id == "grove",
 			})
+		end
+	end
+	-- WORLD-SPREAD (T372): four boulders stood in trees; moved after the generation
+	-- loop, so the rng stream and every other boulder stay put.
+	local moveBoulder: { [number]: { number } } = {
+		[67] = { 472.0, 399.4 },
+		[55] = { -818.9, -600.6 },
+		[7] = { -771.0, -588.6 },
+		[22] = { 540.8, 479.1 },
+	}
+	for index, to in pairs(moveBoulder) do
+		local boulder = out[index]
+		if boulder then
+			boulder.position = Vector3.new(to[1], TerrainGen.HeightAt(to[1], to[2]) - 0.6, to[2])
 		end
 	end
 	cachedBoulders = out
@@ -1852,6 +1884,32 @@ function WorldPlan.Scenery(): { ScenerySpot }
 						break
 					end
 				end
+			end
+		end
+	end
+	-- WORLD-SPREAD (T372): the Ruined Cabin in the north strip stood in two strip
+	-- trees; it shifts 5 studs east with all its items, after the generation loop.
+	local moveScenery: { [number]: number } = { [71] = 5 }
+	for index, dx in pairs(moveScenery) do
+		local spot = out[index]
+		if spot and spot.kind == "RuinedCabin" then
+			spot.center = spot.center + Vector3.new(dx, 0, 0)
+			for i, item in ipairs(spot.items) do
+				local at = item.cframe.Position + Vector3.new(dx, 0, 0)
+				spot.items[i] = {
+					builder = item.builder,
+					cframe = CFrame.new(
+						at.X,
+						TerrainGen.HeightAt(at.X, at.Z)
+							+ (
+								item.cframe.Position.Y
+								- TerrainGen.HeightAt(item.cframe.Position.X, item.cframe.Position.Z)
+							),
+						at.Z
+					) * (item.cframe - item.cframe.Position),
+					seed = item.seed,
+					size = item.size,
+				}
 			end
 		end
 	end

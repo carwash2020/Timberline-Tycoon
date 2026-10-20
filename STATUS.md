@@ -31,6 +31,9 @@ never bound; `NoButtonR2.spec`), no Robux price in code.
 #201 What's New fixes, grey box backing, held-tool teleport; #202 console safe area and text sizes; #203 axe head placement, gear meshes, Xbox chop diagnostics; #204 remaining gear meshes, pending-mesh swap, real layout specs; #205 event and cave prop mesh ids; #206 worn gear meshes, rope ladder tiles, scroll V2; #207 first badge ids; #208 build menu; #209 chop feel; #210 wood effects on buildings; #211 Cherry, Willow, Amber, Garnet, added trees and teasers. Open draft: #213 (custom sound ids).
 Sound ids: #213 wires the custom ids for TreeCreak, Engine, CricketsNight, WindHowl, LavaRumble, Wings, Quack, StormCrackle and LogThud. Chop, ChopFinal, TreeFall and LogLoad keep their stand-ins until Connor confirms the uploads are Approved.
 
+## Overlap fix (branch `phase-2/overlap-fix`, 19 October 2026, draft)
+The 13 overlap hits are fixed by small post-plan moves (four boulders, the Ruined Cabin, one Reach tree, two Mesa ironwoods, two north-strip clumps); `tools/overlap_report` prints 0 hits and `Overlap.spec` names no exemption. Details: PHASE2_NOTES.md "Overlap fix".
+
 ## Spread supply (branch `phase-2/spread-supply`, 18 October 2026, draft)
 Nine supply trees moved inside their own zone (`TreeSpreadData.Moved`, `tools/spread_supply`); the zones are nearly full, so 40 could not be placed. `ClientFreeze` and `TreeFill` pins re-pinned with the reason. Details: PHASE2_NOTES.md "Spread supply".
 
