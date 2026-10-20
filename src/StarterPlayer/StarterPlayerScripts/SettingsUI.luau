@@ -622,7 +622,7 @@ function SettingsUI.Start()
 		Quality.Refresh()
 		local shake = player:GetAttribute("SettingCameraShake")
 		CameraShake.SetEnabled(shake ~= false)
-		local scaleName = (player:GetAttribute("SettingUIScale") :: string?) or "normal"
+		local scaleName = (player:GetAttribute("SettingUIScale") :: string?) or SettingsLogic.Defaults.uiScale
 		UITheme.SetUserScale(SettingsLogic.ScaleMultiplier(scaleName))
 		local tips = player:GetAttribute("SettingShowTips")
 		HUD.SetTips(tips ~= false)
@@ -717,8 +717,8 @@ function SettingsUI.Start()
 		save("reduceFlashing", on)
 		applyAll()
 	end)
-	scaleFace = row("scale", "UI scale  NORMAL", function()
-		local current = (player:GetAttribute("SettingUIScale") :: string?) or "normal"
+	scaleFace = row("scale", "UI scale  SMALL", function()
+		local current = (player:GetAttribute("SettingUIScale") :: string?) or SettingsLogic.Defaults.uiScale
 		local nextName = cycle(SCALES, current)
 		UITheme.SetUserScale(SettingsLogic.ScaleMultiplier(nextName))
 		save("uiScale", nextName)
