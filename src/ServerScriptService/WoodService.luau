@@ -1256,6 +1256,10 @@ local function copySection(s: BasePart): Part
 	return p
 end
 
+-- Dress an axe hit leaves on a section: the notch and any chip or
+-- highlight part. A split removes them, so no end keeps a step or a block.
+local HIT_DRESSING: { [string]: boolean } = { Notch = true, Chip = true, HitMark = true, HitHighlight = true }
+
 -- Cuts section part `s` (anchored, or with its welds gone) `h` studs up
 -- from its bottom: `s` keeps the bottom h, resized in place, and a new
 -- part (id `newId`, beside it in the same parent) takes the rest. Dress
@@ -1276,7 +1280,7 @@ function WoodService.SplitPart(s: BasePart, h: number, newId: number): BasePart
 	if parent and sid then
 		for _, item in ipairs(parent:GetChildren()) do
 			if item ~= s and not isSection(item) and sectionOf(item) == sid then
-				if item.Name == "Notch" then
+				if HIT_DRESSING[item.Name] then
 					item:Destroy()
 				else
 					local at = positionOf(item)
@@ -1285,6 +1289,11 @@ function WoodService.SplitPart(s: BasePart, h: number, newId: number): BasePart
 					end
 				end
 			end
+		end
+	end
+	for _, d in ipairs(s:GetChildren()) do
+		if d:IsA("Highlight") then
+			d:Destroy()
 		end
 	end
 	high.Parent = parent

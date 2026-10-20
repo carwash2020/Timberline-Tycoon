@@ -113,7 +113,7 @@ local GameConfig = {
 	-- seconds (SectionLogic.ClaimBlocks). Elders are everyone's.
 	TreeClaimSec = 60,
 	CutWindow = 0.6, -- studs: a hit this near an existing cut adds to it
-	CutEdge = 0.3, -- studs: cuts keep this far from a section's ends
+	CutEdge = 0.5, -- studs: cuts keep this far from a section's ends (no piece shorter)
 	MaxCutsPerSection = 2,
 	MinPieceVolume = 0.05, -- u³: smaller offcuts vanish
 	FallNoCollideSec = 2.5, -- a falling piece passes through players this long

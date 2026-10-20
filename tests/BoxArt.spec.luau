@@ -50,6 +50,13 @@ return function(t)
 		WindowTop = true,
 		SideWindow = true,
 		Strip = true,
+		Logo = true,
+		PriceTag = true,
+		RimFront = true,
+		RimBack = true,
+		RimLeft = true,
+		RimRight = true,
+		SideEdge = true,
 	}
 
 	local function luma(c)
