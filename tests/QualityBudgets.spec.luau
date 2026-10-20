@@ -25,9 +25,7 @@ return function(t)
 		"DepthOfField",
 		"Bloom",
 		"TownFxNear",
-		"FillerNear",
-		"FillerFar",
-		"FillerBuildMs",
+		"TuftBuildMs",
 		"TuftNear",
 		"ChipCount",
 		"LeafPool",
@@ -53,11 +51,8 @@ return function(t)
 			DepthOfField = 1,
 			Bloom = 1,
 			TownFxNear = 260, -- TownFX NEAR
-			-- ForestFiller (FOR-02): trees to 480 studs, stand-ins to 600
-			-- (inside StreamingTargetRadius 640), 2 ms of building a frame.
-			FillerNear = 480,
-			FillerFar = 600,
-			FillerBuildMs = 2,
+			-- GrassTufts (FOR-04): 2 ms of building a frame.
+			TuftBuildMs = 2,
 			TuftNear = 150, -- grass tufts (FOR-04, new)
 			-- WoodFX (the v2 loop, V2_PLAN.md §16, new): pooled chips and leaves.
 			ChipCount = 48,
@@ -87,9 +82,7 @@ return function(t)
 			DepthOfField = 0,
 			Bloom = 0.5,
 			TownFxNear = 120,
-			FillerNear = 340, -- the forest's edges round the spawn stay trees
-			FillerFar = 520,
-			FillerBuildMs = 1.2,
+			TuftBuildMs = 1.2,
 			TuftNear = 90,
 			-- WoodFX (V2_PLAN.md §16): half the chips and leaves, no leaf shadows.
 			ChipCount = 24,
@@ -469,7 +462,7 @@ return function(t)
 			WeatherController = { "WeatherRate" },
 			LightingController = { "SunRays", "DepthOfField", "Bloom" },
 			TownFX = { "TownFxNear" },
-			ForestFiller = { "FillerNear", "FillerFar", "FillerBuildMs", "TuftNear" },
+			GrassTufts = { "TuftBuildMs", "TuftNear" },
 			WoodFX = { "ChipCount", "LeafPool", "LeafShadows" }, -- the v2 loop (M1.3)
 			QualityDressing = { "BoxContents", "LightScale" }, -- the shop boxes' windows and the shop lights (the Lower and Higher choice)
 			NPCController = { "NpcAnimateRange" },

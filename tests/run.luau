@@ -64,7 +64,6 @@ local SLOW_SPECS: { [string]: number } = {
 	["DecorCover.spec.luau"] = 13,
 	["DriveMath.spec.luau"] = 24,
 	["Forest.spec.luau"] = 25,
-	["ForestFiller.spec.luau"] = 47,
 	["ForestService.spec.luau"] = 12,
 	["ForestServiceV2.spec.luau"] = 3,
 	["LandscapeStyle.spec.luau"] = 17,

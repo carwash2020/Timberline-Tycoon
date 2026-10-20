@@ -13,7 +13,7 @@
 --     LightScale shortens their reach and switches their shadows off below 1.
 -- Both follow a change of choice at once (Quality.OnChange). The ground decor,
 -- grass tufts, filler trees and motion budgets are the existing QualityBudgets
--- readers (AmbientLife, ForestFiller, WindSway ...).
+-- readers (AmbientLife, GrassTufts, WindSway ...).
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

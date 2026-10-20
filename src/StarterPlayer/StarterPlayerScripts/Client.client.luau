@@ -51,11 +51,11 @@ local MODULES = {
 	"FaceTarget",
 	"FerryController",
 	"FieldGuideUI",
-	"ForestFiller",
 	"ForestUI",
 	"ForgeUI",
 	"GamepadNav",
 	"GondolaController",
+	"GrassTufts",
 	"HUD",
 	"HammerController",
 	"HoverTagUI",
@@ -159,7 +159,7 @@ local DEFERRED: { [string]: number } = {
 	AmbientSound = 24,
 	CanopyFade = 25,
 	StoreStandState = 26,
-	ForestFiller = 30, -- last: it plans the filler forest on its own, after the player is in
+	GrassTufts = 30, -- last: it plans the grass on its own, after the player is in
 }
 -- Frames the queue waits after the player can play (the loading card's fade).
 local RELEASE_SETTLE_FRAMES = 30
@@ -455,9 +455,9 @@ local controllers: { { name: string, get: () -> any } } = {
 		end,
 	},
 	{
-		name = "ForestFiller",
+		name = "GrassTufts",
 		get = function()
-			return require(script.Parent.ForestFiller)
+			return require(script.Parent.GrassTufts)
 		end,
 	},
 	{

@@ -94,9 +94,6 @@ local CELL = EnvironmentData.DecorCell
 -- most Quality.Budget().MaxDecor live decoration models (560, 148 on low),
 -- all cells together. Shared/QualityBudgets.
 local TREE_CLEARANCE = 4
--- Nor inside a ForestFiller tree's trunk (FOR-02: WorldPlan's plan, once
--- ForestFiller has worked it out; the cells loaded before then re-scatter).
-local FILLER_CLEARANCE = 2.5
 local CELLS_PER_FRAME = 2
 local SCAN_EVERY = 0.4
 local POOL_SPARE = 24 -- unused models kept per look
@@ -231,7 +228,7 @@ end
 
 -- The nature zones: scatter and underground rooms and the plan's. The plan's
 -- cave points of interest are placed against every tree, so while WorldPlan's
--- trees are not worked out (ForestFiller does that, a slice a frame) the zones
+-- trees are not worked out (GrassTufts does that, a slice a frame) the zones
 -- are the rest, and the caves join when they are ready. Called for every cell
 -- of every scan: a lookup after the first, never a rebuild, and it never asks
 -- WorldPlan for the trees itself (seconds of work, which froze the client).
@@ -540,7 +537,7 @@ local function loadCell(cx: number, cz: number, key: string)
 			end
 		else
 			local spot = job.decor :: DecorSpot
-			if not nearTree(spot.x, spot.z) and not WorldPlan.FillerTrunkNear(spot.x, spot.z, FILLER_CLEARANCE) then
+			if not nearTree(spot.x, spot.z) then
 				d = acquireDecor(spot)
 				at = CFrame.new(spot.x, spot.y, spot.z) * CFrame.Angles(0, spot.yaw, 0)
 			end
@@ -1854,7 +1851,6 @@ function AmbientLife.Start()
 
 	local sinceScan = math.huge
 	local sincePlan = 0
-	local fillerSeen = false
 	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
 		sinceCosmetic += dt
@@ -1868,12 +1864,6 @@ function AmbientLife.Start()
 		sinceScan += step
 		if sinceScan >= SCAN_EVERY then
 			sinceScan = 0
-			if not fillerSeen and WorldPlan.FillerReady() then
-				fillerSeen = true -- re-scatter what loaded before the filler's plan
-				for key in pairs(cells) do
-					dirty[key] = true
-				end
-			end
 			zones() -- picks up the caves the moment WorldPlan's trees are ready
 			if zonesUpgraded then
 				zonesUpgraded = false -- and re-scatter what loaded before them

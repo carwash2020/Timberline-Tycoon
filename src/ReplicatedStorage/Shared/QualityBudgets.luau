@@ -20,9 +20,8 @@
 --     The same budgets answer: low shows no item copies in shop box windows
 --     (BoxContents), lights in shops reach 60% as far (LightScale) and
 --     townsfolk animate only within NpcAnimateRange.
---   * Both: the forest ring's filler trees (ForestFiller, FOR-02), real
---     trees out to FillerNear and stand-in blocks out to FillerFar, built
---     FillerBuildMs a frame at most (closer and cheaper on low).
+--   * Both: the grass tufts (GrassTufts, FOR-04) out to TuftNear, built
+--     TuftBuildMs a frame at most (closer and cheaper on low).
 -- Pure: no services, so tests and both sides can read it.
 
 local QualityBudgets = {}
@@ -48,10 +47,8 @@ export type Budget = {
 	Bloom: number, -- Bloom intensity
 	-- TownFX
 	TownFxNear: number, -- studs: the saw blade spins and flames flicker within this
-	-- ForestFiller (FOR-02): the forest ring's client-built trees
-	FillerNear: number, -- studs: real filler trees in the cells within this of the camera
-	FillerFar: number, -- studs: and dark stand-in blocks for the forest out to this
-	FillerBuildMs: number, -- milliseconds a frame it may spend building cells
+	-- GrassTufts (FOR-04): the client-built grass
+	TuftBuildMs: number, -- milliseconds a frame it may spend building cells
 	TuftNear: number, -- studs: grass tufts at the forest's fringe, verges, rocks and fences (FOR-04)
 	-- WoodFX (the v2 loop, V2_PLAN.md §16): pooled chips and falling leaves
 	ChipCount: number, -- wood chips in the air or on the ground at once
@@ -81,15 +78,7 @@ QualityBudgets.High = table.freeze({
 	DepthOfField = 1,
 	Bloom = 1,
 	TownFxNear = 260,
-	-- The forest (FOR-02): trees out to 480 studs, stand-ins to 600. That
-	-- stays inside StreamingTargetRadius (640) so stand-ins never sit on
-	-- terrain that hasn't streamed. 1024 used to stream most of the map
-	-- onto every phone; the shorter radius is the launch default, and the
-	-- haze is meant to hide the pop-in around 600. tests/Forest.spec.luau
-	-- counts the parts this loads.
-	FillerNear = 480,
-	FillerFar = 600,
-	FillerBuildMs = 2,
+	TuftBuildMs = 2,
 	TuftNear = 150,
 	ChipCount = 48,
 	LeafPool = 64,
@@ -131,9 +120,7 @@ QualityBudgets.Low = table.freeze({
 	DepthOfField = 0,
 	Bloom = 0.5,
 	TownFxNear = 120,
-	FillerNear = 340, -- the forest edges round the spawn (300-340 studs off) are real trees
-	FillerFar = 520, -- inside the 640 stream radius, and short of high's 600
-	FillerBuildMs = 1.2,
+	TuftBuildMs = 1.2,
 	TuftNear = 90,
 	ChipCount = 24,
 	LeafPool = 32,
@@ -159,9 +146,7 @@ QualityBudgets.Medium = table.freeze({
 	DepthOfField = 1,
 	Bloom = 0.75,
 	TownFxNear = 180,
-	FillerNear = 480,
-	FillerFar = 600,
-	FillerBuildMs = 1.6,
+	TuftBuildMs = 1.6,
 	TuftNear = 150,
 	ChipCount = 36,
 	LeafPool = 48,

@@ -68,17 +68,13 @@ return function(t)
 		local low = QualityBudgets.For("low")
 		t.eq(low.BoxContents, false, "a flat window and the name strip instead of the item mesh")
 		t.eq(low.LeafShadows, false, "no shadow from every leaf part")
-		t.ok(low.FillerNear <= 340, "real filler trees only within " .. low.FillerNear)
-		t.ok(low.FillerFar <= 520, "stand-in blocks only out to " .. low.FillerFar)
-		t.ok(low.FillerBuildMs <= 1.2, "building filler cells costs a phone 1.2 ms a frame at most")
+		t.ok(low.TuftNear <= 90, "grass tufts only within " .. low.TuftNear)
+		t.ok(low.TuftBuildMs <= 1.2, "building tuft cells costs a phone 1.2 ms a frame at most")
 		t.ok(low.DecorLoadRadius <= 110 and low.DecorUnloadRadius <= 130, "decoration cells load close")
 		t.ok(low.NpcAnimateRange <= 70, "townsfolk animate only near")
 		local project = serde.decode("json", fs.readFile("default.project.json"))
 		local radius = project.tree.Workspace["$properties"].StreamingTargetRadius
-		t.ok(
-			low.FillerFar < radius,
-			"the stand-ins stay inside the stream radius, or they would sit on streamed-out ground"
-		)
+		t.ok(low.TuftNear < radius, "the tufts stay inside the stream radius, or they would sit on streamed-out ground")
 		t.ok(low.DecorLoadRadius < radius and low.DecorUnloadRadius < radius)
 	end)
 
@@ -107,8 +103,7 @@ return function(t)
 			"SwayTrees",
 			"ChipCount",
 			"LeafPool",
-			"FillerNear",
-			"FillerFar",
+			"TuftNear",
 		}) do
 			local low, medium, high =
 				QualityBudgets.For("low")[field], QualityBudgets.For("medium")[field], QualityBudgets.For("high")[field]

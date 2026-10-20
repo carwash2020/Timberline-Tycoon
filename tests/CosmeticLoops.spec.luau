@@ -22,7 +22,7 @@ return function(t)
 		"TownFX",
 		"WeatherController",
 		"LightingController",
-		"ForestFiller",
+		"GrassTufts",
 		"VehicleFX",
 		"AmbientSound",
 		"CameraShake",
