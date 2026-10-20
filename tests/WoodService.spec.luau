@@ -317,12 +317,12 @@ return function(t)
 
 	t.test("an offcut under MinPieceVolume becomes chips", function()
 		local s = setup()
-		local p = s.log(1, 6, 0.4, nil)
+		local p = s.log(1, 6, 0.3, nil)
 		local cutter = s.player(1)
 		local part = p.parts[1]
 		local result
 		repeat
-			-- Right by the end: the edge clamp keeps it CutEdge (0.3) in.
+			-- Right by the end: the edge clamp keeps it CutEdge (0.5) in.
 			result = s.Wood.CutPiece(cutter, p, part, part.CFrame * Vector3.new(0, 2.95, 0), part.CFrame.XVector, 5)
 		until #result.pieces > 0
 		t.eq(#result.pieces, 1, "the tiny end is chips")
