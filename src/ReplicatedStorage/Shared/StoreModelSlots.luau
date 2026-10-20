@@ -28,6 +28,7 @@
 
 local BacklogModels = require(script.Parent.Art.BacklogModels)
 local ItemMeshData = require(script.Parent.ItemMeshData)
+local MachineMeshes = require(script.Parent.Art.MachineMeshes)
 
 local StoreModelSlots = {}
 
@@ -299,6 +300,59 @@ function StoreModelSlots.ForItem(itemId: string?, kind: string?): Slot?
 		return BY_KIND[kind]
 	end
 	return nil
+end
+
+-- The pieces of a machine's shop display. A line piece and a belt of the kit are
+-- the Blender meshes of MachineMeshes (Body, Belt, ArrowDecal, Rollers; the Wood
+-- Detector's Lamp); the part that swings in play (the Switch Belt's Gate) stays out
+-- of a display. The planers and the chop saw keep their part-built display.
+local MACHINE_FAMILIES: { [string]: boolean } = { line = true, belt = true }
+local MACHINE_MOVING: { [string]: boolean } = { Gate = true }
+
+-- A display slot for a Machine item, read from MachineMeshes (so the ids are written
+-- once), or nil when the machine has no mesh set to show. Not one of ALL: BY_ITEM
+-- also feeds the placed-item paths (StoreModelArt.DressPlaced), and a placed machine
+-- is dressed by MachineSkin already. A piece with no id (a spec's ForcedZero) makes
+-- HasMesh false, so the part-built look stays.
+function StoreModelSlots.ForMachine(itemId: string): Slot?
+	local asset = MachineMeshes.Get(itemId)
+	if asset == nil or not MACHINE_FAMILIES[asset.family] then
+		return nil
+	end
+	local pieces: { Piece } = {}
+	local lo: Vector3? = nil
+	local hi: Vector3? = nil
+	for _, piece in ipairs(asset.pieces) do
+		if not MACHINE_MOVING[piece.name] then
+			local a, b = piece.offset - piece.size / 2, piece.offset + piece.size / 2
+			lo = if lo then lo:Min(a) else a
+			hi = if hi then hi:Max(b) else b
+			table.insert(
+				pieces,
+				{
+					name = piece.name,
+					meshId = MachineMeshes.MeshId(itemId, piece.name),
+					textureId = 0,
+					size = piece.size,
+					centre = piece.offset,
+				} :: Piece
+			)
+		end
+	end
+	if lo == nil or hi == nil then
+		return nil
+	end
+	return {
+		id = itemId,
+		items = { itemId },
+		kinds = {},
+		glb = "",
+		source = "machines",
+		fit = hi - lo, -- the mesh at its own size: the display shrinks it into the box (BoxArt's limit)
+		yaw = 0,
+		fallback = false,
+		pieces = pieces,
+	}
 end
 
 function StoreModelSlots.Parcel(): Slot

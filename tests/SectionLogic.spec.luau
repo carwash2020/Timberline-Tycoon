@@ -175,11 +175,11 @@ return function(t)
 	end)
 
 	t.test("cut heights stay CutEdge from a section's ends", function()
-		t.eq(GameConfig.CutEdge, 0.3)
+		t.eq(GameConfig.CutEdge, 0.5)
 		t.eq(SectionLogic.ClampHeight(0, 6), 3, "the middle")
-		t.eq(SectionLogic.ClampHeight(-3, 6), 0.3, "at the bottom")
-		t.eq(SectionLogic.ClampHeight(-9, 6), 0.3, "past the bottom")
-		t.eq(SectionLogic.ClampHeight(2.95, 6), 5.7, "at the top")
+		t.eq(SectionLogic.ClampHeight(-3, 6), 0.5, "at the bottom")
+		t.eq(SectionLogic.ClampHeight(-9, 6), 0.5, "past the bottom")
+		t.eq(SectionLogic.ClampHeight(2.95, 6), 5.5, "at the top")
 		t.eq(SectionLogic.ClampHeight(1, 6), 4)
 		t.eq(SectionLogic.ClampHeight(0.2, 0.5), 0.25, "too short: its middle")
 	end)
@@ -326,8 +326,8 @@ return function(t)
 
 	-- M1.3: where a swing lands (CutController aims, SectionTrees checks).
 	t.test("a swing at a standing trunk goes in between knee and chest, on the side facing you", function()
-		local trunk = CFrame.new(0, 2.25, 0) -- a 2 x 4.5 x 2 section, its bottom on the ground
-		local size = Vector3.new(2, 4.5, 2)
+		local trunk = CFrame.new(0, 3, 0) -- a 2 x 6 x 2 section, its bottom on the ground
+		local size = Vector3.new(2, 6, 2)
 		local root = Vector3.new(5, 3, 0) -- the root part 3 studs above the feet
 		local hit, normal = SectionLogic.AimAt(trunk, size, root, nil, nil)
 		t.ok(math.abs(hit.Y - 3) < 1e-5, "no pointer: the root part's height")
@@ -344,7 +344,7 @@ return function(t)
 		t.ok(math.abs(a.Y - b.Y) > 1.2, "a different height each swing")
 		-- Standing on a slope above the trunk: kept CutEdge inside its ends.
 		local edge = SectionLogic.AimAt(trunk, size, Vector3.new(5, 12, 0), nil, nil)
-		t.ok(math.abs(edge.Y - (4.5 - 0.3)) < 1e-5, "never past the end")
+		t.ok(math.abs(edge.Y - (6 - 0.5)) < 1e-5, "never past the end")
 		-- The pointer's side face wins over the side toward you.
 		local _, side = SectionLogic.AimAt(trunk, size, root, Vector3.new(0, 3, -1), Vector3.new(0, 0, -1))
 		t.ok((side - Vector3.new(0, 0, -1)).Magnitude < 1e-5)

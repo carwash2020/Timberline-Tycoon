@@ -14,7 +14,7 @@
 --   Flatbed      boxy work truck: roof beacon, headache rack, wooden stake
 --                sides, tandem rear axle.
 --   Logging Rig  long-nose big rig: chrome grille, bumper, tanks and twin
---                stacks, roof marker lights, log stanchions, a stub crane.
+--                stacks, roof marker lights, log stanchions.
 --   Trailers     Pony (wooden farm trailer), Ranch (stake sides), Heavy
 --                Hauler (steel stanchions, tandem axle).
 --
@@ -173,15 +173,6 @@ local function alongX(a: Vector3, b: Vector3): CFrame
 	return CFrame.fromMatrix((a + b) / 2, x, y, z)
 end
 
--- The same with Z along a -> b (boxes: planks, beams), X kept level.
-local function alongZ(a: Vector3, b: Vector3): CFrame
-	local z = (b - a).Unit
-	local ref = if math.abs(z.Y) > 0.99 then Vector3.xAxis else Vector3.yAxis
-	local x = ref:Cross(z).Unit
-	local y = z:Cross(x).Unit
-	return CFrame.fromMatrix((a + b) / 2, x, y, z)
-end
-
 -- A cylinder from a to b (pipes, ropes, tubes).
 local function decoRod(
 	parent: Instance,
@@ -228,22 +219,6 @@ local function gloss(model: Model, paint: Color3, shine: number)
 			d.Reflectance = shine
 		end
 	end
-end
-
--- A box from a to b (`width` across, `thick` thick): booms, beams.
-local function plank(
-	parent: Instance,
-	name: string,
-	a: Vector3,
-	b: Vector3,
-	width: number,
-	thick: number,
-	color: Color3,
-	material: Enum.Material?
-): Part
-	local p = Kit.part(parent, name, V3(width, thick, (b - a).Magnitude), alongZ(a, b), color, material)
-	Kit.decor(p, shadowFor(p.Size))
-	return p
 end
 
 -- A chunky fender over a wheel (or a run of wheels from z0 to z1) at x:
@@ -1128,7 +1103,6 @@ builders.rig = function(c: Ctx)
 	local seatTop, seatZ = SEAT_TOP.rig, f + 7.9
 	local steel = hex("#3D4045")
 	local post = hex("#A2A8AE")
-	local crane = hex("#E3A72F")
 
 	deco(m, "Frame", V3(W - 2.6, 1.0, L - 1.2), CF(0, 1.95, 0), BLACK, M.Metal)
 	deco(m, "DeckBeam", V3(W - 1.8, 0.6, lay.bedLength), CF(0, lay.bedFloorY - 0.55, lay.bedCenterZ), steel, M.Metal)
@@ -1207,20 +1181,12 @@ builders.rig = function(c: Ctx)
 	driverSeat(m, V3(2.6, 0.5, 1.4), CF(0, seatTop - 0.25, seatZ), hex("#3B2F2A"), M.Leather)
 	steeringWheel(m, V3(0, seatTop + 1.05, seatZ - 0.75), 1.05)
 
-	-- Bulkhead, as tall as the cab, with a stub knuckle crane parked on top
-	-- (its turret clear of the cab's glass): turret, mast, a boom reaching
-	-- back over the load and a grapple hanging off its end.
+	-- Bulkhead, as tall as the cab.
 	local bulkTop = roofY
 	local cz = bedStart + 0.2
 	local bulkH = bulkTop - deckTop
 	deco(m, "Bulkhead", V3(W, bulkH, 0.4), CF(0, deckTop + bulkH / 2, cz), hex("#5C6166"), M.Metal)
 	deco(m, "HeadacheRack", V3(W - 0.3, 0.35, 0.4), CF(0, deckTop + bulkH + 0.15, cz), steel, M.Metal)
-	Kit.decor(Kit.post(m, "Crane", V3(1.2, bulkTop, cz), 0.65, 1.5, crane, M.Metal), false)
-	Kit.decor(Kit.post(m, "Crane", V3(1.2, bulkTop + 0.65, cz), 1.95, 0.65, crane, M.Metal), false)
-	local tip = V3(1.2, bulkTop + 3.1, cz + 6.0)
-	plank(m, "Crane", V3(1.2, bulkTop + 2.35, cz - 0.4), tip, 0.65, 0.65, crane, M.Metal)
-	plank(m, "Crane", tip, tip - V3(0, 1.7, 0), 0.42, 0.42, Kit.shade(crane, -0.15), M.Metal)
-	deco(m, "Grapple", V3(1.0, 0.6, 0.8), CF(tip - V3(0, 1.95, 0)), BLACK, M.Metal)
 
 	-- Deck with steel bunk stakes, a pair at each third and at the back.
 	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#5E4636"))

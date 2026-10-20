@@ -457,9 +457,9 @@ return function(t)
 				local local_ = s.CFrame:PointToObjectSpace(face.CFrame.Position)
 				local edge = s.Size.Y / 2
 				if top then
-					t.ok(local_.Y > edge - 0.01 and local_.Y < edge + 0.06, "on the top end")
+					t.ok(math.abs(local_.Y + 0.03 - 0.005 - edge) < 1e-4, "outer face 0.005 proud of the top end ")
 				else
-					t.ok(local_.Y < -edge + 0.01 and local_.Y > -edge - 0.06, "on the bottom end")
+					t.ok(math.abs(-local_.Y + 0.03 - 0.005 - edge) < 1e-4, "outer face 0.005 proud of the bottom end")
 				end
 			end
 		end

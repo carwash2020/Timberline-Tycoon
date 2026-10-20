@@ -139,7 +139,9 @@ return function(t)
 			local x0, x1, y0, y1, z0, z1 = aabb(p)
 			if NEW[p.Name] and z0 < facade.frontZ + 0.2 then
 				seen += 1
-				t.eq(p.CanCollide, false, p.Name .. " is looks only")
+				-- (the lamp post and its base are solid since T385: you walk into a lamp post)
+				local lamp = p.Name == "LampPostBase" or p.Name == "LampPost"
+				t.eq(p.CanCollide, lamp, p.Name .. " is looks only, but the lamp post")
 			end
 			if WALKED[p.Name] then
 				seen += 1

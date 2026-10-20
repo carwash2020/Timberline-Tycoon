@@ -5,8 +5,9 @@
 -- barrels and crates, a sandwich board with the hours, a chimney or roof
 -- vent. Pure art code (Kit, Instance.new, datatypes); everything is built in
 -- FINAL studs from the shop's origin (ground y = 0, the door on -Z), after the
--- shop is scaled, and is looks only (Kit.decor), except a bench, which is
--- left non-colliding too so nothing narrows the walk to the door.
+-- shop is scaled, and is looks only (Kit.decor), except what a body should
+-- bump into: the planters, the bench seat and back, the awning posts and the
+-- lamp posts (Kit.solid). Each sits clear of the door walk below.
 --
 -- Every piece stays at least DoorClear studs off the door's opening
 -- (x -doorHalf to doorHalf) and out of the way of a 2-stud-wide walk from
@@ -79,8 +80,8 @@ local function window(parent: Instance, spec: Spec, cx: number, cy: number, w: n
 end
 
 local function planter(parent: Instance, x: number, y: number, z: number)
-	box(parent, "Planter", V3(2.2, 1.6, 2.2), CF(x, y + 0.8, z), WOOD)
-	box(parent, "PlanterBand", V3(2.3, 0.25, 2.3), CF(x, y + 1.3, z), TIMBER)
+	Kit.solid(box(parent, "Planter", V3(2.2, 1.6, 2.2), CF(x, y + 0.8, z), WOOD))
+	Kit.solid(box(parent, "PlanterBand", V3(2.3, 0.25, 2.3), CF(x, y + 1.3, z), TIMBER))
 	Kit.decor(Kit.ball(parent, "PlanterLeaves", 2.2, CF(x, y + 2.2, z), LEAF, MAT.Grass), false)
 end
 
@@ -97,8 +98,8 @@ local function crate(parent: Instance, x: number, y: number, z: number, s: numbe
 end
 
 local function bench(parent: Instance, x: number, y: number, z: number)
-	box(parent, "BenchSeat", V3(4.4, 0.3, 1.4), CF(x, y + 1.5, z), WOOD)
-	box(parent, "BenchBack", V3(4.4, 1.1, 0.25), CF(x, y + 2.3, z + 0.65), WOOD)
+	Kit.solid(box(parent, "BenchSeat", V3(4.4, 0.3, 1.4), CF(x, y + 1.5, z), WOOD))
+	Kit.solid(box(parent, "BenchBack", V3(4.4, 1.1, 0.25), CF(x, y + 2.3, z + 0.65), WOOD))
 	for _, s in ipairs({ -1, 1 }) do
 		box(parent, "BenchLeg", V3(0.3, 1.5, 1.2), CF(x + s * 1.9, y + 0.75, z), TIMBER)
 	end
@@ -257,12 +258,14 @@ function ShopFacade.StripedAwning(parent: Instance, spec: Spec, o: AwningOpts)
 	for _, s in ipairs({ -1, 1 }) do
 		local x = c + s * (w / 2 - 0.2)
 		local postTop = railY + 0.05
-		box(
-			parent,
-			"AwningPost",
-			V3(0.3, postTop - spec.groundY, 0.3),
-			CF(x, spec.groundY + (postTop - spec.groundY) / 2, frontZ + 0.2),
-			TIMBER
+		Kit.solid(
+			box(
+				parent,
+				"AwningPost",
+				V3(0.3, postTop - spec.groundY, 0.3),
+				CF(x, spec.groundY + (postTop - spec.groundY) / 2, frontZ + 0.2),
+				TIMBER
+			)
 		)
 		-- a bracket from the post's head back to the wall under the slab
 		local from = Vector3.new(x, railY - 0.15, frontZ + 0.2)
@@ -375,7 +378,7 @@ local function hearthDressing(model: Model, spec: Spec)
 	end
 	for _, s in ipairs({ -1, 1 }) do
 		local x, z = spec.doorCx + s * (d + 2.2), fz - 7
-		Kit.decor(Kit.post(model, "PathLampPost", V3(x, gy, z), 5.2, 0.35, IRON, MAT.Metal), false)
+		Kit.solid(Kit.decor(Kit.post(model, "PathLampPost", V3(x, gy, z), 5.2, 0.35, IRON, MAT.Metal), false))
 		local glow = Kit.lantern(model, CF(x, gy + 5.8, z), 0.9)
 		for _, l in ipairs(glow:GetChildren()) do
 			if l:IsA("PointLight") then
@@ -625,8 +628,11 @@ local function sparkworksFront(model: Model, spec: Spec)
 		if s == 1 then
 			x, pz = 19, -28
 		end
-		box(model, "LampPostBase", V3(1.0, 0.5, 1.0), CF(x, 0.25, pz), STONE, MAT.Cobblestone)
-		box(model, "LampPost", V3(0.35, 5.0, 0.35), CF(x, 3.0, pz), IRON, MAT.Metal)
+		-- built solid, thin pieces cast no shadow (the building pack's rule)
+		local base = Kit.part(model, "LampPostBase", V3(1.0, 0.5, 1.0), CF(x, 0.25, pz), STONE, MAT.Cobblestone)
+		local pole = Kit.part(model, "LampPost", V3(0.35, 5.0, 0.35), CF(x, 3.0, pz), IRON, MAT.Metal)
+		Kit.solid(Kit.decor(base, false))
+		Kit.solid(Kit.decor(pole, false))
 		local glow = Kit.lantern(model, CF(x, 5.5 + 0.77, pz), 1.1)
 		for _, c in ipairs(glow:GetChildren()) do
 			if c:IsA("PointLight") then

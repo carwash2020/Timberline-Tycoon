@@ -1068,6 +1068,7 @@ TreeArt.WoodGroup = "Wood"
 TreeArt.LeavesGroup = "Leaves"
 TreeArt.CutFaceThickness = 0.06
 TreeArt.CutFaceInset = 0.86 -- of the section's width
+TreeArt.CutFaceProud = 0.005 -- studs the plate's outer face stands off the end
 TreeArt.NotchHeight = 0.35
 TreeArt.NotchMaxDepth = 0.95 -- of the section's width
 TreeArt.NotchShade = -0.25
@@ -1614,13 +1615,26 @@ function TreeArt.FaceLook(def: WoodDef): (Color3, Enum.Material)
 end
 
 -- The fresh face on one end of a cut section (`top` = its +Y end): a thin
--- plate of the wood's core, 0.86 of the section's width, just proud of the
--- end. Parented beside the section; never collides, can't be queried.
+-- plate of the wood's core, 0.86 of the section's width, sunk into the end
+-- so its outer face is CutFaceProud (0.005 stud) proud of it and the bark
+-- shows as an even ring round it. One plate per end: an old plate on the
+-- same end is replaced. Parented beside the section; never collides,
+-- can't be queried.
 function TreeArt.CutFace(def: WoodDef, section: BasePart, top: boolean): Part
 	local color, material = TreeArt.FaceLook(def)
 	local t = widthOf(section) * TreeArt.CutFaceInset
 	local th = TreeArt.CutFaceThickness
-	local y = (section.Size.Y / 2 + th / 2 - 0.01) * (if top then 1 else -1)
+	local y = (section.Size.Y / 2 + TreeArt.CutFaceProud - th / 2) * (if top then 1 else -1)
+	local end_ = if top then "Top" else "Bottom"
+	local home = section.Parent
+	local id = section:GetAttribute("Section")
+	if home and id ~= nil then
+		for _, d in ipairs(home:GetChildren()) do
+			if d.Name == "CutFace" and d:GetAttribute("Section") == id and d:GetAttribute("End") == end_ then
+				d:Destroy()
+			end
+		end
+	end
 	local p = Kit.part(
 		section.Parent or section,
 		"CutFace",
@@ -1634,6 +1648,8 @@ function TreeArt.CutFace(def: WoodDef, section: BasePart, top: boolean): Part
 	p.CanTouch = false
 	p.CastShadow = false
 	p:SetAttribute("Section", section:GetAttribute("Section"))
+	p:SetAttribute("End", end_)
+	p.Massless = true
 	ride(p, section)
 	return p
 end

@@ -35,6 +35,7 @@ local ItemBox = require(script.Parent.Parent.ItemBox)
 local ItemModel = require(script.Parent.ItemModel)
 local ModelSlots = require(script.Parent.ModelSlots)
 local Kit = require(script.Parent.Kit)
+local Palette = require(script.Parent.Palette)
 local RobuxBoxArt = require(script.Parent.RobuxBoxArt)
 local StoreModelArt = require(script.Parent.StoreModelArt)
 local StoreModelSlots = require(script.Parent.Parent.StoreModelSlots)
@@ -79,6 +80,9 @@ BoxArt.Layout = {
 	tierH = 0.3, -- height of the tier line on the base's front
 	glassTransparency = 0.5,
 	glassColor = Color3.fromRGB(150, 192, 212),
+	rim = 0.1, -- the charcoal bars round the top edge, and the aisle pane's upright
+	tag = Vector3.new(1.2, 0.6, 0.05), -- the price tag plate, under the strip, opposite the brass plate
+	tagInset = 0.15, -- from the right edge of the box
 	pixelsPerStud = 60,
 }
 
@@ -250,8 +254,9 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	)
 	glassify(front)
 
-	-- The top window: over the whole opening, from the front edge to the back wall.
-	local topW = if windowSide == nil then openW else W - t
+	-- The top window: over the whole opening, from the front edge to the back wall. On the
+	-- aisle side it stops at the rim bar that stands on that edge.
+	local topW = if windowSide == nil then openW else W - t - L.rim
 	local top = add(
 		plate(
 			parent,
@@ -259,7 +264,7 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 			"WindowTop",
 			Vector3.new(topW, L.pane, D - t),
 			Vector3.new(
-				if windowSide == "Left" then -t / 2 elseif windowSide == "Right" then t / 2 else 0,
+				if windowSide == "Left" then -(t - L.rim) / 2 elseif windowSide == "Right" then (t - L.rim) / 2 else 0,
 				H / 2 + L.proud + L.pane / 2,
 				-t / 2
 			),
@@ -300,10 +305,7 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	write(strip, Enum.NormalId.Front, spec.name, if wood then BoxArt.Wood.ink else ink, Enum.Font.FredokaOne)
 
 	-- A brass plate under the name band, on the left. It used to sit on
-	-- the band and covered the name. This is the one spare shell part
-	-- (BoxLogic.ShellPartCap is 9, and the body plus the walls, windows
-	-- and strip already use 8). Four 0.1 corner bevels would need that
-	-- cap raised, so they are not separate parts.
+	-- the band and covered the name.
 	local logoT = 0.05
 	local logoH = 0.3
 	local gap = 0.06
@@ -318,6 +320,62 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 		Color3.fromHex("#C9A24A"), -- Brass
 		Enum.Material.Metal
 	))
+
+	-- The price tag, opposite the brass plate: a cream plate that carries no printed
+	-- price (Connor, 7 October 2026: prices show in the hover tag when you aim at the box,
+	-- and a shared box cannot know what the viewer can afford). It is the tag's place.
+	local tagSize = L.tag
+	add(
+		plate(
+			parent,
+			body,
+			"PriceTag",
+			tagSize,
+			Vector3.new(
+				W / 2 - L.tagInset - tagSize.X / 2,
+				stripBottom - gap - tagSize.Y / 2,
+				stripFront - 0.02 - tagSize.Z / 2
+			),
+			Palette.SignCream,
+			Enum.Material.SmoothPlastic
+		)
+	)
+
+	-- The rim: four 0.1 charcoal bars round the top edge, each standing on a wall, so the
+	-- glass top reads as a closed lid from above (the bare glass read as a gap).
+	local r = L.rim
+	local bars: { { name: string, size: Vector3, at: Vector3 } } = {
+		{ name = "RimFront", size = Vector3.new(W, r, r), at = Vector3.new(0, H / 2 + r / 2, -(D / 2 + r / 2)) },
+		{ name = "RimBack", size = Vector3.new(W, r, r), at = Vector3.new(0, H / 2 + r / 2, D / 2 - r / 2) },
+		{
+			name = "RimLeft",
+			size = Vector3.new(r, r, D - 2 * r),
+			at = Vector3.new(-(W / 2 - r / 2), H / 2 + r / 2, 0),
+		},
+		{
+			name = "RimRight",
+			size = Vector3.new(r, r, D - 2 * r),
+			at = Vector3.new(W / 2 - r / 2, H / 2 + r / 2, 0),
+		},
+	}
+	for _, bar in ipairs(bars) do
+		add(plate(parent, body, bar.name, bar.size, bar.at, wallColor, Enum.Material.SmoothPlastic))
+	end
+	-- And one upright bar on the front corner of the aisle pane, the pane's only edge.
+	if windowSide == "Left" or windowSide == "Right" then
+		local sign = if windowSide == "Right" then 1 else -1
+		add(
+			plate(
+				parent,
+				body,
+				"SideEdge",
+				Vector3.new(r, frontH, r),
+				Vector3.new(sign * (W / 2 + r / 2), frontY, -(D / 2 + r / 2)),
+				wallColor,
+				Enum.Material.SmoothPlastic
+			)
+		)
+	end
 
 	-- The item itself, scaled to fit with the margin, standing on the floor.
 	local contents = Instance.new("Model")
