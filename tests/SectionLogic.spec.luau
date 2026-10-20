@@ -283,10 +283,10 @@ return function(t)
 		-- Fell it: cut section 1 at 1.2.
 		local stub, felled = SectionLogic.SplitGraph(graph, 1, 1.2, 100)
 		t.ok(stub[1] and not stub[2], "the stub is just the low half")
-		-- Buck the felled piece at its third section.
-		local a, b = SectionLogic.SplitGraph(felled, 3, 2, 101)
-		t.ok(a[100] and a[2] and a[3], "the butt end")
-		t.ok(b[101] and b[4], "the top end")
+		-- Buck the felled piece at its second section (a pine is three).
+		local a, b = SectionLogic.SplitGraph(felled, 2, 2, 101)
+		t.ok(a[100] and a[2], "the butt end")
+		t.ok(b[101] and b[3], "the top end")
 		t.eq(SectionLogic.Largest(a) ~= nil, true)
 	end)
 

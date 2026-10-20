@@ -117,14 +117,18 @@ return function(t)
 		)
 		t.eq(marks, 0, "no flat marks: the look is the window")
 		t.ok(rec.model:FindFirstChild("Window") ~= nil and rec.model:FindFirstChild("Contents") ~= nil)
-		-- No price is printed on the box and nothing floats over it: the price shows
-		-- in a hover tag when a player aims at it (Shared/HoverTag), read from the
-		-- box's own attributes.
+		-- The price is printed on the box's PriceTag plate (BoxArt), the number the sale
+		-- charges, and nothing floats over it; the hover tag (Shared/HoverTag) shows it too.
 		t.eq(rec.part:FindFirstChild("PriceTag"), nil, "no floating price tag")
+		local printed = 0
 		for _, d in ipairs(rec.model:GetDescendants()) do
 			t.ok(not d:IsA("BillboardGui"), "no billboard on a shelf box")
-			t.ok(not (d:IsA("TextLabel") and d.Name == "Price"), "no price line on the label")
+			if d:IsA("TextLabel") and d.Name == "Price" then
+				printed += 1
+				t.eq(d.Text, t.shared("Util").formatCash(rec.price), "the plate prints the price the box sells for")
+			end
 		end
+		t.eq(printed, 1, "one printed price")
 		local spec = HoverTag.SpecOf(rec.model)
 		t.ok(spec ~= nil, "the box is aimable")
 		t.eq(spec.key, "Box:" .. rec.uid)

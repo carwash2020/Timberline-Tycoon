@@ -29,6 +29,17 @@ BoxLogic.BoxPartCap = 42
 BoxLogic.PayTapPx = 44
 BoxLogic.DespawnHz = 2
 
+-- (Art/Palette's CoinGold and StopRed; not required from here, Palette's own requires reach this module in some loaders. BoxArt.spec pins that they match.)
+BoxLogic.PriceGold = Color3.fromHex("#F2C14E")
+BoxLogic.PriceRed = Color3.fromHex("#D9534F")
+
+-- The ink of the price printed on a box for the viewer: CoinGold when `cash` covers
+-- `price` (FREE always does), StopRed when not. A missing cash counts as 0.
+function BoxLogic.PriceColor(price: number, cash: number?): Color3
+	local have = if type(cash) == "number" then cash else 0
+	return if have >= price then BoxLogic.PriceGold else BoxLogic.PriceRed
+end
+
 export type GrabFacts = {
 	userId: number,
 	now: number,

@@ -9,7 +9,8 @@
 --     tiers, fronds, root flares, bark marks. Every dress entry names the
 --     section it rides on and how many parts it becomes, so a tree's part
 --     count (PartCount) is known before a single part exists, and the
---     generator keeps it inside the wood's budget (TreeGen.Budgets).
+--     generator keeps it inside the wood's budget (TreeGen.Budgets): at most
+--     TreeGen.MaxParts (8) for every tree, an Elder and a young one too.
 --   * Skeleton(woodId, seed, scale, opts?): a mature tree. `scale` is the
 --     size roll (SizeLo 0.85 / 1 / SizeHi 1.15; an Elder passes
 --     { elder = true } and ForestData.Elder.scale). The height always lands
@@ -83,27 +84,32 @@ export type Skeleton = {
 export type Options = { elder: boolean? }
 
 -- Parts per tree, sections and dress together, for every seed and size, an
--- Elder included. V2_PLAN §3c's maxima (oak 46, birch 40, pine 56, maple 52,
--- palm 32, frost 66, ember 46, gloam 48, lumen 44) would put the world at
--- about 34.8k parts with today's 512 tree spots (161 of them pines); these
--- keep it under §16's 31k (the TreeArtSections spec checks the estimate).
+-- Elder included: at most TreeGen.MaxParts for every wood. A standing tree
+-- is a handful of BaseParts (the sections that get cut, a few crown parts
+-- and at most one signature detail), because the server holds a few
+-- thousand wood parts in all (GameConfig.MaxWoodPartsServer) and the 20
+-- largest trees, every section felled into its pieces, must fit under it
+-- (the TreeCover spec adds it up). The look of each wood is then what
+-- those few parts can carry: WoodData's shapes and LOOKS below are tuned
+-- to it. V2_PLAN §3c's old maxima (oak 46 ... frost 66) are history.
+TreeGen.MaxParts = 8
 TreeGen.Budgets = {
-	oak = 38,
-	birch = 32,
-	pine = 44,
-	maple = 44,
-	palmwood = 32,
-	frostwood = 60,
-	emberwood = 42,
-	phantomwood = 44,
-	lumenwood = 40,
-	lanternwood = 48, -- tightened after a part-count pass
-	bogcypress = 44, -- Lane R
-	ironwood = 44, -- Lane R
-	cherry = 38, -- WORLD-T323
-	willow = 40, -- WORLD-T323
+	oak = 8,
+	birch = 8,
+	pine = 8,
+	maple = 8,
+	palmwood = 8,
+	frostwood = 8,
+	emberwood = 8,
+	phantomwood = 8,
+	lumenwood = 8,
+	lanternwood = 8,
+	bogcypress = 8,
+	ironwood = 8,
+	cherry = 8,
+	willow = 8,
 } :: { [string]: number }
-TreeGen.DefaultBudget = 48
+TreeGen.DefaultBudget = TreeGen.MaxParts
 
 TreeGen.HardCap = 40 -- sections, whatever maxSections says
 TreeGen.FirstBranchMin = 8 -- studs: no limb lower than a truck's roof
@@ -142,6 +148,8 @@ TreeGen.CoreBandOver = 1.08 -- diameter over the trunk, so the collar shows.
 --              least this many cluster sizes from every other mass
 --   rise       side branches bend this far toward the sky (0-1)
 --   out        ... and this far away from the trunk
+--   pair       one mass always gets two parts (the oak's sap knot and the
+--              ember's glowing facet need a part to spare)
 type Look = {
 	leafShare: number,
 	size: number,
@@ -156,32 +164,34 @@ type Look = {
 	fill: number,
 	rise: number,
 	out: number,
+	pair: boolean?,
 }
 
 local LOOKS: { [string]: Look } = {
 	oak = {
-		leafShare = 0.64,
-		size = 1.2,
+		leafShare = 0.375,
+		size = 1.5,
 		clusterY = 0.78,
 		lift = 0.2,
 		merge = 0.8,
-		massParts = 6,
-		maxParts = 8,
-		maxGrow = 1.9,
+		massParts = 1,
+		maxParts = 2,
+		maxGrow = 2.2,
 		flatten = 0.3,
 		layers = 0,
 		fill = 0.75,
 		rise = 0.24,
 		out = 0.06,
+		pair = true,
 	},
 	birch = {
-		leafShare = 0.66,
+		leafShare = 0.4,
 		size = 1.15,
 		clusterY = 1.05,
 		lift = 0.1,
 		merge = 0.6,
-		massParts = 4,
-		maxParts = 6,
+		massParts = 1,
+		maxParts = 2,
 		maxGrow = 1.5,
 		flatten = 0,
 		layers = 0,
@@ -190,34 +200,35 @@ local LOOKS: { [string]: Look } = {
 		out = 0,
 	},
 	maple = {
-		leafShare = 0.66,
-		size = 1.2,
+		leafShare = 0.375,
+		size = 1.5,
 		clusterY = 0.72,
 		lift = 0.12,
 		merge = 0.95,
-		massParts = 6,
-		maxParts = 8,
-		maxGrow = 1.8,
+		massParts = 1,
+		maxParts = 2,
+		maxGrow = 2.4,
 		flatten = 0.75,
 		layers = 0,
 		fill = 0.75,
 		rise = 0.3,
-		out = 0.14,
+		out = 0.3,
 	},
 	emberwood = {
-		leafShare = 0.62,
+		leafShare = 0.25,
 		size = 1.15,
 		clusterY = 0.8,
 		lift = 0.2,
 		merge = 0.7,
-		massParts = 6,
-		maxParts = 8,
+		massParts = 1,
+		maxParts = 2,
 		maxGrow = 1.8,
 		flatten = 0.2,
 		layers = 0,
 		fill = 0.8,
 		rise = 0.22,
 		out = 0.08,
+		pair = true,
 	},
 	phantomwood = {
 		leafShare = 0,
@@ -225,8 +236,8 @@ local LOOKS: { [string]: Look } = {
 		clusterY = 0.8,
 		lift = 0,
 		merge = 0,
-		massParts = 2,
-		maxParts = 2,
+		massParts = 1,
+		maxParts = 1,
 		maxGrow = 1,
 		flatten = 0,
 		layers = 0,
@@ -236,13 +247,13 @@ local LOOKS: { [string]: Look } = {
 	},
 	-- Compact broadleaf.
 	lanternwood = {
-		leafShare = 0.6,
+		leafShare = 0.4,
 		size = 1.1,
 		clusterY = 0.8,
 		lift = 0.16,
 		merge = 0.75,
-		massParts = 4,
-		maxParts = 6,
+		massParts = 1,
+		maxParts = 2,
 		maxGrow = 1.6,
 		flatten = 0.2,
 		layers = 0,
@@ -251,13 +262,13 @@ local LOOKS: { [string]: Look } = {
 		out = 0.08,
 	},
 	lumenwood = {
-		leafShare = 0.62,
+		leafShare = 0.375,
 		size = 1.3,
 		clusterY = 0.24,
 		lift = 0.1,
 		merge = 0.7,
-		massParts = 5,
-		maxParts = 8,
+		massParts = 1,
+		maxParts = 2,
 		maxGrow = 2.6,
 		flatten = 0,
 		layers = 3,
@@ -265,6 +276,38 @@ local LOOKS: { [string]: Look } = {
 		rise = 0.02,
 		out = 0.4,
 	},
+}
+-- The woods without a look of their own wear the oak's, a few masses each;
+-- the two below spread theirs thinner, so the few masses stay apart.
+LOOKS.ironwood = {
+	leafShare = 0.375,
+	size = 1.25,
+	clusterY = 0.6,
+	lift = 0.15,
+	merge = 0.45,
+	massParts = 1,
+	maxParts = 2,
+	maxGrow = 2.2,
+	flatten = 0.5,
+	layers = 0,
+	fill = 0.6,
+	rise = 0.2,
+	out = 0.2,
+}
+LOOKS.willow = {
+	leafShare = 0.5,
+	size = 1.2,
+	clusterY = 0.8,
+	lift = 0.15,
+	merge = 0.45,
+	massParts = 1,
+	maxParts = 2,
+	maxGrow = 2,
+	flatten = 0.2,
+	layers = 0,
+	fill = 0.6,
+	rise = 0.2,
+	out = 0.1,
 }
 local DEFAULT_LOOK: Look = LOOKS.oak
 
@@ -367,9 +410,9 @@ local function detailParts(shape: Shape): number
 		+ (shape.veins or 0)
 		+ (shape.coreBands or 0)
 	if shape.canopy == "fronds" then
-		n += (shape.fronds or 0) * 2 + (shape.coconuts or 0) + (shape.rings or 0)
+		n += (shape.fronds or 0) + (shape.coconuts or 0) + (shape.rings or 0)
 	elseif shape.canopy == "wisps" then
-		n += (shape.wisps or 0) * 2 + (shape.pods or 0) * 2
+		n += (shape.wisps or 0) + (shape.pods or 0)
 	end
 	return n
 end
@@ -807,13 +850,14 @@ local function clusterFor(
 		parts = parts,
 		seed = seed,
 		tips = table.clone(g.tips),
-		grain = size * 0.62,
+		grain = if parts > 2 then size * 0.62 else nil,
 	}
 end
 
 -- A conifer's cone tiers (and a frostwood's snow caps) up the trunk from
--- firstTierAt to just over the spire's top. Side counts drop on the top
--- tiers (never under 3) until the tree fits its budget.
+-- firstTierAt to just over the trunk's (or spire's) top. A tier is a ring of
+-- wedges, one a side; side counts drop on the top tiers (never under 1)
+-- until the tree fits its room.
 local function coniferDress(sections: { Section }, shape: Shape, scale: number, room: number, rng: Rng): { Dress }
 	local out: { Dress } = {}
 	local spire = sections[#sections]
@@ -831,22 +875,30 @@ local function coniferDress(sections: { Section }, shape: Shape, scale: number, 
 	local function total(): number
 		local sum = 0
 		for i = 1, n do
-			sum += sides[i] * 2 * (if i > n - capsOn then 2 else 1)
+			sum += sides[i] * (if i > n - capsOn then 2 else 1)
 		end
 		return sum
 	end
-	local i = n
-	while total() > room and i >= 1 do
-		if sides[i] > 3 then
-			sides[i] -= 1
-		end
-		i -= 1
-		if i < 1 then
-			i = n
-			if sides[n] <= 3 and sides[1] <= 3 then
-				break
+	-- One wedge a side: fewer sides on the tiers with the most (the top one
+	-- first on a tie) until the stack fits its room, never under one; then
+	-- any room left goes back to the bottom tier, up to tierSides.
+	while total() > room do
+		local widest = 0
+		for i = n, 1, -1 do
+			if sides[i] > (sides[widest] or 0) then
+				widest = i
 			end
 		end
+		if widest == 0 or sides[widest] <= 1 then
+			break
+		end
+		sides[widest] -= 1
+	end
+	while total() < room and sides[1] < (shape.tierSides or 5) do
+		sides[1] += 1
+	end
+	if total() > room and sides[1] > 1 then
+		sides[1] -= 1 -- a cap on the bottom tier overshot by one
 	end
 	-- Each tier overlaps the one under it by TierOverlap of its height, and
 	-- the stack fills the trunk from firstTierAt to the apex: the cones are
@@ -893,7 +945,7 @@ local function coniferDress(sections: { Section }, shape: Shape, scale: number, 
 			section = on,
 			cf = cf,
 			size = Vector3.new(r * 2, heights[k], r * 2),
-			parts = sides[k] * 2,
+			parts = sides[k],
 			sides = sides[k],
 			seed = tierSeed,
 		})
@@ -910,7 +962,7 @@ local function coniferDress(sections: { Section }, shape: Shape, scale: number, 
 				section = on,
 				cf = cf * CFrame.new(0, capFrom, 0),
 				size = Vector3.new(capR * 2, h - capFrom + 0.15 * scale, capR * 2),
-				parts = sides[k] * 2,
+				parts = sides[k],
 				sides = sides[k],
 				seed = tierSeed,
 			})
@@ -932,16 +984,15 @@ local function palmDress(sections: { Section }, shape: Shape, scale: number, rng
 		local a = start + (i - 1) / n * math.pi * 2 + rng:range(-0.18, 0.18)
 		local flat = Vector3.new(math.cos(a), 0, math.sin(a))
 		local droop = rng:range(0.28, 0.45)
-		local bend = top + flat * len * 0.42 + UP * len * rng:range(0.12, 0.2)
-		local tipAt = top + flat * len * 0.88 - UP * len * droop
+		local tipAt = top + flat * len * 0.88 - UP * len * droop * 0.5
 		table.insert(out, {
 			kind = "frond",
 			section = crown.id,
 			cf = CFrame.new(top),
 			size = Vector3.new(1.7 * scale, 0.16, len),
-			parts = 2,
+			parts = 1,
 			seed = rng:int(1, 1e6),
-			points = { top, bend, tipAt },
+			points = { top, tipAt },
 		})
 	end
 	for i = 1, shape.coconuts or 0 do
@@ -1038,6 +1089,9 @@ local function layerDress(
 				best, bestD = s.id, d
 			end
 		end
+		-- A tree of a few limbs has few tops to sit on: the disc leans toward
+		-- the one it hangs on, so it always sits on its section.
+		centre = centre:Lerp(TreeGen.TopOf(sections[best]), 0.6)
 		local dseed = seed * 31 + l
 		table.insert(out, {
 			kind = "leaves",
@@ -1072,7 +1126,7 @@ local function wispDress(sections: { Section }, shape: Shape, scale: number, rng
 			section = s.id,
 			cf = CFrame.new(top + UP * size * 0.15) * CFrame.Angles(0, rng:range(0, math.pi * 2), 0),
 			size = Vector3.new(size, size * 0.8, size),
-			parts = 2,
+			parts = 1,
 			seed = rng:int(1, 1e6),
 			tips = { s.id },
 		})
@@ -1094,7 +1148,7 @@ local function wispDress(sections: { Section }, shape: Shape, scale: number, rng
 				section = s.id,
 				cf = CFrame.new(top - UP * (stem + d / 2)),
 				size = Vector3.new(d, d + stem, d),
-				parts = 2,
+				parts = 1,
 				seed = rng:int(1, 1e6),
 			})
 		end
@@ -1291,7 +1345,9 @@ local function planLeaves(plan: Plan)
 	local tips = tipsOf(sections)
 	local leafBudget = plan.budget - #sections - detailParts(shape)
 	local size = (shape.leafSize or 6) * plan.scale * look.size
-	local groups = groupTips(sections, tips, size * look.merge, look.massParts, leafBudget)
+	-- A pair look keeps one part back so one mass can have two.
+	local spare = if look.pair then 1 else 0
+	local groups = groupTips(sections, tips, size * look.merge, look.massParts, leafBudget - spare)
 	-- Joints from the top down: the trunk's top and every branch that forks.
 	local fills: { Group } = {}
 	for _, s in ipairs(sections) do
@@ -1321,7 +1377,7 @@ local function planLeaves(plan: Plan)
 		return a.at.Y > b.at.Y
 	end)
 	for _, f in ipairs(fills) do
-		if (#groups + 1) * look.massParts > leafBudget then
+		if (#groups + 1) * look.massParts > leafBudget - spare then
 			break
 		end
 		local near = math.huge
@@ -1696,7 +1752,7 @@ function TreeGen.AtStage(skel: Skeleton, s: number): Skeleton
 	-- A leafy tree's every tip that shows gets leaves, even one whose
 	-- clusters hung on a neighbour's branch.
 	if leafy then
-		local minParts = (shape.clusterParts or { 3, 4 })[1]
+		local minParts = 1
 		for _, sec in ipairs(out) do
 			if #sec.children == 0 and sec.depth > 0 and not gathered[sec.id] then
 				gathered[sec.id] = {
@@ -1745,7 +1801,7 @@ function TreeGen.AtStage(skel: Skeleton, s: number): Skeleton
 		local most: Dress? = nil
 		for _, at in ipairs(order) do
 			local d = gathered[at]
-			if d.parts > 2 and (most == nil or d.parts > most.parts) then
+			if d.parts > 1 and (most == nil or d.parts > most.parts) then
 				most = d
 			end
 		end
@@ -1754,6 +1810,59 @@ function TreeGen.AtStage(skel: Skeleton, s: number): Skeleton
 		end
 		most.parts -= 1
 		over -= 1
+	end
+	-- Still over with every cluster at one part: the clusters on joints (not
+	-- tips) go, the lowest-numbered section's first, so every tip keeps leaves.
+	while over > 0 do
+		local dropAt: number? = nil
+		for _, at in ipairs(order) do
+			local d = gathered[at]
+			if #out[at].children > 0 and d.kind == "leaves" then
+				dropAt = at
+				break
+			end
+		end
+		if not dropAt then
+			break
+		end
+		local dress = out[dropAt].dress
+		for i = #dress, 1, -1 do
+			if dress[i] == gathered[dropAt] then
+				table.remove(dress, i)
+				over -= gathered[dropAt].parts
+			end
+		end
+		gathered[dropAt] = nil
+		local at = table.find(order, dropAt)
+		if at then
+			table.remove(order, at)
+		end
+	end
+	-- Still over (a tip each): the two nearest clusters share one, until it fits.
+	while over > 0 and #order >= 2 do
+		local ai, bi, bd = 1, 2, math.huge
+		for i = 1, #order do
+			for j = i + 1, #order do
+				local d = (gathered[order[i]].cf.Position - gathered[order[j]].cf.Position).Magnitude
+				if d < bd then
+					ai, bi, bd = i, j, d
+				end
+			end
+		end
+		local keep, lose = gathered[order[ai]], gathered[order[bi]]
+		for _, id in ipairs(lose.tips or {}) do
+			table.insert(keep.tips :: { number }, id)
+		end
+		keep.cf = CFrame.new((keep.cf.Position + lose.cf.Position) / 2) * keep.cf.Rotation
+		keep.size = Vector3.new(keep.size.X + bd * 0.5, keep.size.Y, keep.size.Z + bd * 0.5)
+		local dress = out[lose.section].dress
+		local idx = table.find(dress, lose)
+		if idx then
+			table.remove(dress, idx)
+		end
+		over -= lose.parts
+		gathered[order[bi]] = nil
+		table.remove(order, bi)
 	end
 	local height, width = measure(out)
 	staged.height = height

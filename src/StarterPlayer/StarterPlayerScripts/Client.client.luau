@@ -33,6 +33,7 @@ local MODULES = {
 	"BadgeUI",
 	"BlueprintPlacer",
 	"BoxPoof",
+	"BoxPriceState",
 	"BuildMenuUI",
 	"BuilderTools",
 	"CameraShake",
@@ -356,6 +357,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "HoverTagUI",
 		get = function()
 			return require(script.Parent.HoverTagUI)
+		end,
+	},
+	{
+		name = "BoxPriceState", -- CoinGold or StopRed on each shop box's printed price, by your cash
+		get = function()
+			return require(script.Parent.BoxPriceState)
 		end,
 	},
 	{
