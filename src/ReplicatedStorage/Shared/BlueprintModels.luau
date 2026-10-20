@@ -6,6 +6,12 @@
 -- A kit piece with a loaded mesh hides the boxes that the mesh replaces.
 -- DoorWall8 keeps two jambs. FenceGate4 keeps two posts. A door or gate
 -- leaf is the only swinging collider. No mesh keeps the boxes as the look.
+--
+-- The GHOST (ghost = true: the placer's preview) is never dressed. It is the
+-- blueprint's own boxes, every one visible, no mesh, no extra part, then
+-- Hologram(). A PLACED blueprint is Build(bp, false): the same boxes plus the
+-- meshes; while it holds no material (FillUnits 0) SetFaded turns it into the
+-- same hologram, and the first material puts the real wood back.
 
 local CollectionService = game:GetService("CollectionService")
 
@@ -22,6 +28,14 @@ local TreeArt = require(script.Parent.Art.TreeArt)
 local WoodData = require(script.Parent.WoodData)
 
 local BlueprintModels = {}
+
+-- The hologram look (UITheme.Colors carries the same three hex values; a spec
+-- keeps them equal). Shared code cannot read UITheme, so they live here too.
+BlueprintModels.HoloColor = Color3.fromHex("#4FA8FF") -- BlueprintBlue
+BlueprintModels.HoloEdge = Color3.fromHex("#CFE8FF") -- BlueprintEdge
+BlueprintModels.HoloBad = Color3.fromHex("#FF5A4F") -- BlueprintBad
+BlueprintModels.HoloTransparency = 0.6
+BlueprintModels.HoloFill = 0.75
 
 local function materialOf(name: string): Enum.Material
 	local named = (Enum.Material :: any)[name]
@@ -80,6 +94,9 @@ end
 function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 	local model = Instance.new("Model")
 	model.Name = bp.id
+	if ghost then
+		model:SetAttribute("Ghost", true)
+	end
 	local root = Instance.new("Part")
 	root.Name = "Root"
 	root.Size = Vector3.new(bp.footprint.X, 0.2, bp.footprint.Y)
@@ -138,10 +155,17 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 		p.Parent = model
 	end
 	model.PrimaryPart = root
+	if ghost then
+		-- The ghost is the boxes and nothing else (no KitMeshes, ItemMeshes,
+		-- model slot, shop model or logic dressing), so it always shows the
+		-- whole blueprint.
+		BlueprintModels.Hologram(model)
+		return model
+	end
 	if bp.kit then
-		KitMeshes.Dress(model, bp.id, ghost)
+		KitMeshes.Dress(model, bp.id, false)
 	else
-		ItemMeshes.Attach(model, root, bp.id, ghost)
+		ItemMeshes.Attach(model, root, bp.id, false)
 	end
 	-- The Wood Sign has a model slot (Art/ModelSlots): with a real model set it stands here, the boxes
 	-- stay as the (invisible) collider; meshId 0 keeps the part-built look. (The Shed's model is the
@@ -153,7 +177,7 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 			onDressed = function(mesh: MeshPart)
 				mesh:SetAttribute("ItemVisual", true)
 				mesh:SetAttribute("Role", "Prop")
-				mesh.Transparency = if ghost then 0.45 else 0
+				mesh.Transparency = 0
 				for _, child in ipairs(model:GetChildren()) do
 					if child:IsA("BasePart") and string.sub(child.Name, 1, 4) == "Part" then
 						child:SetAttribute("Role", nil)
@@ -168,11 +192,11 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 	-- The item's one model slot (StoreModelSlots): the same model the shop box shows.
 	-- No mesh id yet, or a mesh still loading, keeps the boxes above as the look.
 	if not bp.kit then
-		StoreModelArt.DressPlaced(model, root, bp.id, ghost)
+		StoreModelArt.DressPlaced(model, root, bp.id, false)
 	end
 	local applyMeshes = (LogicItems :: any).ApplyMeshes
 	if type(applyMeshes) == "function" then
-		applyMeshes(model, bp.id, ghost)
+		applyMeshes(model, bp.id, false)
 	end
 	local dress = (LogicItems :: any).Dress
 	if type(dress) == "function" then
@@ -181,9 +205,117 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 	return model
 end
 
+-- The blue hologram: every visible part becomes BlueprintBlue SmoothPlastic at
+-- Transparency 0.6 with no shadow, plus one Highlight (Fill blue 0.75, Outline
+-- the pale edge, Occluded). Used by the ghost and by a placed blueprint that
+-- holds no material yet. It changes looks only: a ghost (attribute Ghost) is
+-- also made non-colliding; a placed model's collision is never touched here.
+-- The look each part had is kept in Holo* attributes so SetFaded can put it
+-- back when the first material goes in (a part ApplyWood or ApplyPaint
+-- repaints while it is a hologram updates those, not the blue).
+local HOLO_NAME = "Hologram"
+
+local function holoSkips(part: BasePart): boolean
+	return part.Name == "Root" or part.Transparency >= 1
+end
+
+function BlueprintModels.Hologram(model: Model)
+	local ghost = model:GetAttribute("Ghost") == true
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and not holoSkips(d) then
+			if d:GetAttribute("Holo") ~= true then
+				d:SetAttribute("Holo", true)
+				d:SetAttribute("HoloColor", d.Color)
+				d:SetAttribute("HoloMaterial", d.Material.Name)
+				d:SetAttribute("HoloCast", d.CastShadow)
+			end
+			d.Color = BlueprintModels.HoloColor
+			d.Material = Enum.Material.SmoothPlastic
+			d.Transparency = BlueprintModels.HoloTransparency
+			d.CastShadow = false
+			if ghost then
+				d.CanCollide = false
+				d.CanTouch = false
+				d.CanQuery = false
+			end
+		end
+	end
+	local found = model:FindFirstChild(HOLO_NAME)
+	local hl: Highlight
+	if found and found:IsA("Highlight") then
+		hl = found
+	else
+		hl = Instance.new("Highlight")
+		hl.Name = HOLO_NAME
+		hl.Parent = model
+	end
+	hl.FillColor = BlueprintModels.HoloColor
+	hl.FillTransparency = BlueprintModels.HoloFill
+	hl.OutlineColor = BlueprintModels.HoloEdge
+	hl.OutlineTransparency = 0
+	hl.DepthMode = Enum.HighlightDepthMode.Occluded
+end
+
+-- The ghost's verdict: blue where it can go, BlueprintBad where it cannot
+-- (parts and Highlight). Never green.
+function BlueprintModels.HologramTint(model: Model, valid: boolean)
+	local color = if valid then BlueprintModels.HoloColor else BlueprintModels.HoloBad
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d:GetAttribute("Holo") == true then
+			d.Color = color
+		end
+	end
+	local light = model:FindFirstChild(HOLO_NAME)
+	if light and light:IsA("Highlight") then
+		light.FillColor = color
+		light.OutlineColor = if valid then BlueprintModels.HoloEdge else BlueprintModels.HoloBad
+	end
+end
+
+-- Puts back what Hologram changed (Color, Material, shadow). Transparency is
+-- SetFaded's own.
+local function release(model: Model)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d:GetAttribute("Holo") == true then
+			local color = d:GetAttribute("HoloColor")
+			if typeof(color) == "Color3" then
+				d.Color = color
+			end
+			d.Material = materialOf(tostring(d:GetAttribute("HoloMaterial")))
+			d.CastShadow = d:GetAttribute("HoloCast") ~= false
+			d:SetAttribute("Holo", nil)
+			d:SetAttribute("HoloColor", nil)
+			d:SetAttribute("HoloMaterial", nil)
+			d:SetAttribute("HoloCast", nil)
+		end
+	end
+	local light = model:FindFirstChild(HOLO_NAME)
+	if light and light:IsA("Highlight") then
+		light:Destroy()
+	end
+end
+
+-- Repaints a part; while it is a hologram the blue stays and the new look is
+-- kept for when the hologram goes.
+local function setLook(part: BasePart, color: Color3, material: Enum.Material)
+	if part:GetAttribute("Holo") == true then
+		part:SetAttribute("HoloColor", color)
+		part:SetAttribute("HoloMaterial", material.Name)
+	else
+		part.Color = color
+		part.Material = material
+	end
+end
+
 -- An unfilled kit piece is a ghost: half see-through, no collision.
--- CanTouch stays on so a plank can still land on it.
+-- CanTouch stays on so a plank can still land on it. While it holds nothing
+-- (FillUnits 0 or not set) it is the blue hologram; with any material in, it
+-- is faded real wood, and with the last unit in it is solid.
 function BlueprintModels.SetFaded(model: Model, faded: boolean)
+	local holo = faded and ((model:GetAttribute("FillUnits") :: number?) or 0) == 0
+	if not holo then
+		release(model)
+	end
 	for _, child in ipairs(model:GetChildren()) do
 		if child:IsA("BasePart") and child.Name ~= "Root" then
 			-- The full-length fence collider stays invisible. The mesh it was
@@ -219,6 +351,9 @@ function BlueprintModels.SetFaded(model: Model, faded: boolean)
 				child.CanQuery = true
 			end
 		end
+	end
+	if holo then
+		BlueprintModels.Hologram(model)
 	end
 end
 
@@ -259,14 +394,14 @@ function BlueprintModels.ApplyWood(model: Model, woodId: string?)
 		if child:IsA("BasePart") then
 			local role = child:GetAttribute("Role")
 			if role == "Wood" or role == "Door" then
-				child.Color = color
-				child.Material = material
+				local paint = color
+				if effect and role == "Door" and not lantern and accent then
+					paint = accent
+				end
+				setLook(child, paint, material)
 				if lantern then
 					child:SetAttribute("NightGlow", true)
 				elseif effect and role == "Door" then
-					if accent then
-						child.Color = accent
-					end
 					if effect.neon then
 						child:SetAttribute("NightGlow", true)
 					end
@@ -289,8 +424,7 @@ function BlueprintModels.ApplyPaint(model: Model, paintId: string?)
 	local material = materialOf(KitPaint.Material)
 	for _, child in ipairs(model:GetDescendants()) do
 		if child:IsA("BasePart") and KitPaint.TakesPaint(child:GetAttribute("Role")) then
-			child.Color = color
-			child.Material = material
+			setLook(child, color, material)
 			child:SetAttribute("NightGlow", nil) -- paint covers a Lanternwood glow
 			child:SetAttribute("Painted", true)
 		end
@@ -339,7 +473,7 @@ function BlueprintModels.ApplySize(model: Model, bp: PlotData.Blueprint, len: nu
 				-- One copy, drawn at the new length. Height and thickness stay.
 				if visual and not collider then
 					child.Size = Vector3.new(fullX, child.Size.Y, child.Size.Z)
-					child.CFrame = CFrame.new(box.offset.X, child.Position.Y, box.offset.Z)
+					child.CFrame = CFrame.new(box.offset.X, child.CFrame.Y, box.offset.Z)
 				else
 					child.Size = Vector3.new(fullX, box.size.Y, box.size.Z)
 					child.CFrame = CFrame.new(box.offset)
@@ -364,7 +498,7 @@ function BlueprintModels.ApplySize(model: Model, bp: PlotData.Blueprint, len: nu
 				if visual and not collider then
 					local thick = if bp.id == "Floor" or bp.id == "Floor4" then shaped.footprint.Y else child.Size.Z
 					child.Size = Vector3.new(fullX, child.Size.Y, thick)
-					local pos = child.Position
+					local pos = child.CFrame.Position
 					child.CFrame = CFrame.new(box.offset.X, pos.Y, box.offset.Z)
 				else
 					local match = box

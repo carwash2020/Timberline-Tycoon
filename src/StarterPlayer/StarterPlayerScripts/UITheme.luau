@@ -87,6 +87,10 @@ UITheme.Colors = {
 	Locked = Color3.fromHex("#5A4A3E"),
 	LockedEdge = Color3.fromHex("#3E342C"),
 	Money = Color3.fromHex("#2F8A48"),
+	-- The blueprint hologram (Shared/BlueprintModels carries the same three).
+	BlueprintBlue = Color3.fromHex("#4FA8FF"),
+	BlueprintEdge = Color3.fromHex("#CFE8FF"),
+	BlueprintBad = Color3.fromHex("#FF5A4F"),
 }
 local C = UITheme.Colors
 

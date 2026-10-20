@@ -209,10 +209,11 @@ return function(t)
 					local mesh = slotted(solid, slot, "placed")
 					t.eq(#mesh, 1, id .. " placed model")
 					t.eq(mesh[1].Transparency, 0)
+					-- The ghost never wears the slot model (T380): its boxes, as a hologram.
 					local ghost = BlueprintModels.Build(bp, true)
 					local seen = slotted(ghost, slot, "placed")
-					t.eq(#seen, 1, id .. " ghost model")
-					t.ok(seen[1].Transparency > 0.3, "a ghost is see-through")
+					t.eq(#seen, 0, id .. " ghost has no model")
+					t.ok(ghost:FindFirstChild("Part1").Transparency > 0.3, "a ghost is see-through")
 					for _, child in ipairs(solid:GetChildren()) do
 						if child:IsA("BasePart") and string.sub(child.Name, 1, 4) == "Part" then
 							t.eq(child.Transparency, 1, "the box is only the collider")

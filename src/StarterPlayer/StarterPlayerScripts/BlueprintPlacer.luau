@@ -50,8 +50,6 @@ local BlueprintPlacer = {}
 local player = Players.LocalPlayer
 
 local CREAM = UITheme.Colors.Cream
-local VALID = UITheme.Colors.Green
-local INVALID = Color3.fromRGB(255, 80, 80)
 
 local LEAVE_REACH = 40 -- studs past the plot's edge before placing stops (PlotService's BUILD_REACH)
 local PUSH_MIN, PUSH_MAX = -25, 40 -- studs the gamepad can slide the ghost nearer or further than the crosshair
@@ -67,7 +65,7 @@ type State = {
 	bp: PlotData.Blueprint,
 	options: Options,
 	ghost: Model,
-	highlight: Highlight,
+	tinted: boolean?, -- the hologram's last tint (true blue, false red)
 	rot: number,
 	x: number,
 	y: number,
@@ -96,6 +94,12 @@ local overBar = false
 
 function BlueprintPlacer.Active(): boolean
 	return state ~= nil
+end
+
+-- The ghost is where it can go (blue, not red). RT does nothing while it is red.
+function BlueprintPlacer.CanPlace(): boolean
+	local s = state
+	return s ~= nil and s.valid
 end
 
 -- `fn(worldPos)` runs each time a place or a move is sent (the hammer swings).
@@ -331,8 +335,11 @@ local function update(s: State)
 		end
 	end
 	s.valid, s.reason = ok, why
-	s.highlight.FillColor = if ok then VALID else INVALID
-	s.highlight.OutlineColor = s.highlight.FillColor
+	if s.tinted ~= ok then
+		-- Blue while it can go here, BlueprintBad while it cannot. Never green.
+		s.tinted = ok
+		BlueprintModels.HologramTint(s.ghost, ok)
+	end
 	local verb = if s.options.moveUid then "Move" else "Place"
 	local priceText = if s.options.moveUid
 		then ""
@@ -504,13 +511,19 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	ClientBoot.Ensure("BlueprintPlacer") -- its Start is deferred until after the player can play (first use starts it now)
 	BlueprintPlacer.Stop()
 	local opts: Options = options or {}
-	local ghost = MachineArt.BuildAny(bp.id, true) or BlueprintModels.Build(bp, true)
+	-- BlueprintModels.Build's ghost is already the hologram (boxes only, no
+	-- meshes). A machine's own ghost is dressed by MachineArt, so it is turned
+	-- into the same hologram here.
+	local machine = MachineArt.BuildAny(bp.id, true)
+	local ghost: Model
+	if machine then
+		ghost = machine
+		ghost:SetAttribute("Ghost", true)
+		BlueprintModels.Hologram(ghost)
+	else
+		ghost = BlueprintModels.Build(bp, true)
+	end
 	ghost.Name = "BlueprintGhost"
-	local highlight = Instance.new("Highlight")
-	highlight.FillTransparency = 0.55
-	highlight.OutlineTransparency = 0.2
-	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
-	highlight.Parent = ghost
 	ghost.Parent = workspace
 
 	local hidden: { BasePart } = {}
@@ -535,7 +548,6 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		bp = bp,
 		options = opts,
 		ghost = ghost,
-		highlight = highlight,
 		rot = rot,
 		x = x,
 		y = y,

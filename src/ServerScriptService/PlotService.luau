@@ -3055,10 +3055,11 @@ function PlotService.FillStep()
 							if changed then
 								local model = slot.items:FindFirstChild(item.uid)
 								if model and model:IsA("Model") and type(BlueprintModels.ApplyWood) == "function" then
+									-- FillUnits first: SetFaded keeps the blue hologram only while it is 0.
+									model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
 									BlueprintModels.ApplyWood(model, item.wood)
 									BlueprintModels.ApplyPaint(model, item.paint)
 									BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
-									model:SetAttribute("FillUnits", BuildCost.TakenOf(bp, item))
 									model:SetAttribute("Needs", BuildCost.MissingText(BuildCost.Missing(bp, item)))
 								end
 							elseif type(why) == "string" and type(piece.uid) == "string" then

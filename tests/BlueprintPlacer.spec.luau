@@ -62,4 +62,18 @@ return function(t)
 		local settings = fs.readFile("src/StarterPlayer/StarterPlayerScripts/SettingsUI.luau")
 		t.ok(string.find(settings, "BlueprintPlacer.Active()", 1, true))
 	end)
+
+	t.test("B cancels for free: no remote, no cash, no item, no cooldown", function()
+		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/BlueprintPlacer.luau")
+		local stop = string.match(src, "function BlueprintPlacer%.Stop%(%)(.-)\nend\n")
+		t.ok(stop, "Stop is there")
+		for _, word in ipairs({ "FireServer", "Net.Remote", "Cash", "AddCash", "cooldown", "Cooldown", "os.clock" }) do
+			t.eq(string.find(stop, word, 1, true), nil, "Stop never touches " .. word)
+		end
+		t.ok(string.find(src, "cancel = BlueprintPlacer.Stop", 1, true), "the cancel key and button are Stop")
+		local keys = fs.readFile("src/ReplicatedStorage/Shared/PlaceControlsLogic.luau")
+		t.ok(string.find(keys, 'cancel = { "ButtonB" }', 1, true))
+		t.eq(Placer.Active(), false)
+		Placer.Stop() -- nothing out: a no-op, not an error
+	end)
 end

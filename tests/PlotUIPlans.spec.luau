@@ -287,7 +287,6 @@ return function(t)
 		for _, needle in ipairs({
 			'"R"',
 			"DPadRight",
-			"ButtonA", -- Place on Xbox (the right trigger is the hammer's own Tool.Activated, never bound)
 			"ButtonL2",
 			"Thumbstick1", -- LT + the LEFT stick flicks the ghost; the right stick is the camera's
 			"ButtonR1",

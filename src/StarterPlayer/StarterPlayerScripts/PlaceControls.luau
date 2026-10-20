@@ -8,10 +8,11 @@
 --          DOWN, CANCEL are buttons, 44 x 44 or more and 8 apart, in a narrow
 --          grid between the thumbstick and the jump button, so neither
 --          Builder's thumbstick nor the jump zone is covered.
---   Xbox   A places, D-pad right turns, D-pad up / down raise and lower, B
---          cancels; the crosshair aims; LT hangs the ghost so the left stick
---          flicks it; RB / LB slide it. The right trigger is never bound (the
---          hammer's Tool.Activated already carries RT).
+--   Xbox   RT places (the hammer's Tool.Activated: HammerController calls
+--          BlueprintPlacer.Place), D-pad right turns, D-pad up / down raise
+--          and lower, B cancels; the crosshair aims; LT hangs the ghost so
+--          the left stick flicks it; RB / LB slide it. A only jumps. The
+--          right trigger and A are never bound here.
 --
 -- Everything binds when the placer opens (Bind) and unbinds when it closes
 -- (Unbind): there are no permanent binds. BlueprintPlacer owns what each

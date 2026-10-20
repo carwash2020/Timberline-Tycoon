@@ -341,7 +341,7 @@ return function(t)
 			local ghost = BlueprintModels.Build(piece, true)
 			for _, p in ipairs(partsOf(ghost)) do
 				if p:GetAttribute("Role") == "Glass" then
-					t.ok(math.abs(p.Transparency - 0.45) < 1e-3)
+					t.ok(math.abs(p.Transparency - BlueprintModels.HoloTransparency) < 1e-3)
 					t.eq(p.CanCollide, false, id .. " a ghost does not collide")
 				end
 			end

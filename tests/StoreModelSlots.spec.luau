@@ -335,9 +335,10 @@ return function(t)
 			t.ok(hi.X - lo.X <= bp.footprint.X + EPS and hi.Z - lo.Z <= bp.footprint.Y + EPS, id .. " in its footprint")
 			local layout = W.Slots.Layout(slot)
 			t.ok(layout.size.X <= slot.fit.X + EPS and layout.size.Y <= slot.fit.Y + EPS, id .. " fits")
-			-- The ghost is see-through.
+			-- The ghost never wears the model (T380): the boxes, as a hologram.
 			local ghost = W.BlueprintModels.Build(bp, true)
-			t.ok(math.abs(meshParts(ghost)[1].Transparency - 0.45) < 0.001, id .. " ghost")
+			t.eq(#meshParts(ghost), 0, id .. " ghost has no mesh")
+			t.ok(math.abs(ghost:FindFirstChild("Part1").Transparency - 0.6) < 0.001, id .. " ghost")
 		end
 	end)
 

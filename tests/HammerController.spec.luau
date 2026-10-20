@@ -56,7 +56,13 @@ return function(t)
 	local function setup(options)
 		options = options or {}
 		local fires, toasts, opened, begun, selected, knocks = {}, {}, {}, {}, {}, {}
-		local state = { placing = false, shopOpen = false, aimed = nil, last = Enum.UserInputType.MouseMovement }
+		local state = {
+			placing = false,
+			valid = true,
+			shopOpen = false,
+			aimed = nil,
+			last = Enum.UserInputType.MouseMovement,
+		}
 		local placed = options.placed or {}
 		local character = { kids = {}, ChildAdded = signal(), ChildRemoved = signal() }
 		function character:GetChildren()
@@ -156,6 +162,13 @@ return function(t)
 						return state.placing
 					end,
 					OnPlaced = function() end,
+					CanPlace = function()
+						return state.placing and state.valid
+					end,
+					-- The real Place sends one PlaceBlueprint (and swings the hammer).
+					Place = function()
+						table.insert(fires, { "PlaceBlueprint", "Wall", 0, 0, 0, 0 })
+					end,
 					MyPlaced = function()
 						return placed
 					end,
@@ -354,6 +367,36 @@ return function(t)
 		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HammerController.luau")
 		t.eq(string.find(src, "BindAction", 1, true), nil, "no ContextActionService bind")
 		t.eq(string.find(src, "KeyCode", 1, true), nil, "no key")
+	end)
+
+	t.test("RT with the placer out places once and does not open the hammer's list; otherwise no place", function()
+		local s = setup()
+		local hammer = tool({ Hammer = true })
+		table.insert(s.backpack.kids, hammer)
+		s.Controller.Start()
+		-- Placer out, on a pad: RT is Place and the hammer's own use is skipped.
+		s.state.placing = true
+		s.state.last = Enum.UserInputType.Gamepad1
+		hammer.Activated:fire()
+		t.eq(s.fires, { { "PlaceBlueprint", "Wall", 0, 0, 0, 0 } }, "one PlaceBlueprint")
+		t.eq(s.opened, {}, "no list, no sheet")
+		t.eq(#s.knocks, 0, "no knock from the hammer itself")
+		-- Ghost red: RT does nothing at all.
+		s.state.valid = false
+		hammer.Activated:fire()
+		t.eq(#s.fires, 1, "a red ghost is not placed")
+		t.eq(s.opened, {})
+		-- A click places through the placer's own InputBegan, so the tool does not place twice.
+		s.state.valid = true
+		s.state.last = Enum.UserInputType.MouseButton1
+		hammer.Activated:fire()
+		t.eq(#s.fires, 1, "a click is not RT")
+		-- Placer not out: no place, the hammer does its own thing.
+		s.state.placing = false
+		s.state.last = Enum.UserInputType.Gamepad1
+		hammer.Activated:fire()
+		t.eq(#s.fires, 1, "no place without a ghost")
+		t.eq(s.opened, { "plans" })
 	end)
 
 	t.test("the hammer coming into the hand is announced, and leaving it too", function()
