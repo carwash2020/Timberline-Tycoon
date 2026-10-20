@@ -391,7 +391,9 @@ function firstTrees(): { TreeSpot }
 	-- Z never move; their height (below) is the live ground's.
 	-- (Anything the placement caches for later, the town's bays, is worked out
 	-- first, on the live ground.)
+	breathe()
 	pullThroughLanes()
+	breathe()
 	TerrainGen.SetClassicGround(true)
 	local placedOk, placedErr = pcall(build)
 	TerrainGen.SetClassicGround(false)
