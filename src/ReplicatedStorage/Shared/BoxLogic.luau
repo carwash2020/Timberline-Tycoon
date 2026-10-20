@@ -17,6 +17,7 @@ BoxLogic.OpenRange = 12 -- studs, buyer to the box
 BoxLogic.MaxUnpaidPerPlayer = 3 -- the 4th take is refused
 BoxLogic.MaxUnpaidPerServer = 30 -- the 31st take is refused
 BoxLogic.PutBackRadius = 3.5 -- studs: an unpaid box let go this close (across) to its shelf spot goes back on it
+BoxLogic.PutBackAfterSec = 0.75 -- a put-back needs the box to have been held this long
 BoxLogic.PutBackHeight = 3 -- studs: and no higher or lower than this from it
 -- The parts of a box (Art/BoxArt): ShellPartCap for the dark body, its windows and
 -- its name strip, plus the display copy of the item (ItemModel.ModelBudget by
@@ -120,6 +121,13 @@ end
 function BoxLogic.PutBack(at: Vector3, home: Vector3): boolean
 	local across = Vector3.new(at.X - home.X, 0, at.Z - home.Z).Magnitude
 	return across <= BoxLogic.PutBackRadius and math.abs(at.Y - home.Y) <= BoxLogic.PutBackHeight
+end
+
+-- Whether a release counts as a put-back at all: a player's own release
+-- ("released", what GrabService reports for the Release remote), of a box
+-- they held at least PutBackAfterSec. Forced releases never put back.
+function BoxLogic.PutBackAllowed(reason: string?, heldSec: number): boolean
+	return reason == "released" and heldSec >= BoxLogic.PutBackAfterSec
 end
 
 function BoxLogic.CapMessage(byPlayer: number, onServer: number): string?

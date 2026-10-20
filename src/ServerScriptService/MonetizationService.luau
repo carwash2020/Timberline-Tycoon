@@ -568,6 +568,15 @@ function MonetizationService.PlayerRemoving(player: Player)
 	owned[player] = nil
 end
 
+-- A Robux shelf box waits claimed while Roblox's prompt is open; this tells
+-- it the prompt ended (bought or not). A hook GameServer sets (BoxService
+-- requires this module's neighbours, so no require here).
+MonetizationService.OnPromptFinished = function(_userId: number, _kind: string, _key: string, _purchased: boolean) end
+
+local function boxFinished(userId: number, kind: string, key: string, purchased: boolean)
+	pcall(MonetizationService.OnPromptFinished, userId, kind, key, purchased)
+end
+
 -- `buyRemote` is BuyRobuxItem; `notifyFn` shows a toast. `clockFn` is for tests.
 function MonetizationService.Init(buyRemote: RemoteEvent, notifyFn: (Player, string) -> (), clockFn: (() -> number)?)
 	notify = notifyFn
@@ -577,14 +586,29 @@ function MonetizationService.Init(buyRemote: RemoteEvent, notifyFn: (Player, str
 	StoreSaleService.Init(MarketplaceService)
 	buyRemote.OnServerEvent:Connect(onBuy)
 	MarketplaceService.ProcessReceipt = processReceipt
+	pcall(function()
+		MarketplaceService.PromptProductPurchaseFinished:Connect(
+			function(userId: number, productId: number, purchased: boolean)
+				local product = StoreData.ProductById(productId)
+				if product then
+					boxFinished(userId, "Product", product.key, purchased)
+				end
+			end
+		)
+	end)
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
 		function(player: Player, passId: number, purchased: boolean)
 			if not purchased then
+				local declined = StoreData.PassById(passId)
+				if declined then
+					boxFinished(player.UserId, "Pass", declined.key, false)
+				end
 				return
 			end
 			-- id 0 is not a pass: never grant because a prompt finished with 0.
 			local pass = StoreData.PassById(passId)
 			if pass then
+				boxFinished(player.UserId, "Pass", pass.key, true)
 				setPass(player, pass.key)
 				GameAnalytics.Store(player, "PurchaseCompleted", pass.key)
 				tell(player, string.format(StoreCopy.ThanksPass, pass.name))
