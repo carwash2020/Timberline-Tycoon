@@ -4307,3 +4307,38 @@ The axe now highlights only where the cut will happen: a thin band (0.15 studs, 
 
 - **Studio checks:** aim your axe at a tree, then at a log. Only a thin cream ring shows where the cut will go, and it moves as you aim. Nothing else lights up. A too-hard target shows the same ring in orange. Screenshots (PC, phone, Xbox) need Studio.
 
+## MEGA batch T380 to T401 (20 October 2026, all on main)
+
+Twenty-two jobs from one work order, one PR each (#226 to #243, plus #222 to #225 before it). No Studio was available, so **no screenshots exist for any of them**; every Studio check below is still to do. Full suite is the CI run on each PR.
+
+| Job | PR | What Connor checks in Studio |
+|---|---|---|
+| T380 blueprint placement | #226 | Controller: Hammer, wall blueprint. Full blue ghost, A only jumps, RT places, D-pad right turns, B cancels, small hint pill. PC and phone too. |
+| T381 Sky Forge | #225 | Walk to the Sky Forge: dressed building, forge one item (prompts work). **If the hull collision blocks the court, set `TownMeshes.ColliderFidelity` to `Default`.** The glow altar band was not added. |
+| T382 items snap back | #227 | Buy an item, grab it, carry it out, hold 10 s: stays. Robux shelf item stays where it is until the purchase ends. |
+| T383 store boxes | #235 | Walk every store: boxes closed, real item inside, Switch Belt box shows the real mesh. The price tag plate has no printed price (hover-only rule): decision needed. |
+| T384 crickets | #230 | Noon at spawn silent; midnight in town silent; quiet bursts under forest trees; stores fade them out. |
+| T385 town collision | #229 | Lamp posts, benches, planters, awning posts are solid; stand on a bench. |
+| T386 UI scale | #228 | Existing save loads at Small; Large sticks after a rejoin. |
+| T387 store ids | #238 | Five new cards with live prices (test purchases). The Tool Shed gold table now runs west from the event room (the west back-room door and stock corner were removed). |
+| T388 NPC names | #231 | Name fades while the Talk card shows; walk up to Old Hank on Xbox. |
+| T389 clean cuts | #234 | Cut ends are flat circles. `GameConfig.CutEdge` is now 0.5 (was 0.3). |
+| T390 and T391 dealership | #240 | Trucks match their displays (needs Connor's re-upload list in `assets/UPLOAD_LIST.md`, Rustbucket first); no tier signs on vehicles; the three event tables show Coming soon cards. |
+| T392 crane | #233 | Part-built Logging Rig has no crane or grapple; the meshed rig needs a Blender re-export. |
+| T393 saves menu | #237 | Scroll halfway, wait, it stays. |
+| T395 counters | #241 | Clerk shows from the waist up; pay for an item; three meshed counters need re-upload. |
+| T396 PLOT DISTRICT sign | #239 | Sign reads cleanly, no lamp in front (the east Sparkworks lamp moved to (154, 104)). |
+| T397 ground | #242 | Drive the biggest truck into a stall; hills are gentler than asked (about +6 in the Hills, see below); textures on Xbox and phone; Shift+F5. |
+| T398 thin cut band | #224 | Thin dark band at the cut; light on dark barks. |
+| T399 shed | #232 | The jumbled shed was not reproduced; the Shed's walls and roof no longer sink into the floor. The screenshot matches the Ruined Cabin (not on any plot): send its location. |
+| T400 real trees | #243 | Only real trees in the spawn grove; walking into one stops you; biggest truck through the Hills forest; Shift+F5 in the densest grove (the 640 stud peak rose from 635 to 729). |
+| T401 timed tips | #236 | Thick-cut tip shows 3 s, fades, does not return for 60 s. |
+
+**Decisions and deviations Connor should rule on**
+- T397: the Hills reach only about +6 (not +18), because roads cut them into small cells; the lot slab trim is x 138 (not 130) so no bay is cut; TimberAsphalt StudsPerTile 8 is a guess and has no texture maps yet (no ids invented).
+- T383: price text on the box tag, corner wedges and plinth were skipped (hover-only price rule, part limit).
+- T400: real trunks keep `CanTouch` off (a spec pins it); trees have 5 to 22 sections, not 8 parts; coverage gaps and old fixed-tree violations are ratcheted in the specs with measured numbers (see PR #243).
+- T390: ASSETS.md "needs re-upload" is a fixed generator rule, not proof about Roblox; the expected-fail specs flip when the re-upload lands.
+- T389: `CutEdge` 0.3 to 0.5 changes where a cut may land (it keeps pieces at least 0.5 long).
+- T401: every toast now fades over 0.4 s (was 0.25).
+

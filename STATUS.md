@@ -23,9 +23,13 @@ block the build; #157 client audit; #158 world first look; #159 store interiors:
 still also comes from the best axe and gear. S8 (Master Timber) is set only by its key: deriving it from a full plot is awaiting
 Connor (it would raise cash packs about 25%).
 
-**Rules that did not change:** the five formerly off-sale products keep id 0 (Coming soon), badge ids stay 0 until Connor
+**Rules that did not change:** the five formerly off-sale products now have their ids (T387, 20 Oct 2026; no Robux price in code), badge ids stay 0 until Connor
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.
+
+## MEGA batch T380 to T401 (20 October 2026)
+
+All 22 jobs are on main (#222 to #243; #244 fixes a ClientFreeze stretch that T397 introduced). Their Studio checks and the decisions they need are in the last section of PHASE2_NOTES.md ("MEGA batch T380 to T401"). No screenshots were possible, so everything there is untested in Studio.
 
 ## #201 to #213 and open work
 #201 What's New fixes, grey box backing, held-tool teleport; #202 console safe area and text sizes; #203 axe head placement, gear meshes, Xbox chop diagnostics; #204 remaining gear meshes, pending-mesh swap, real layout specs; #205 event and cave prop mesh ids; #206 worn gear meshes, rope ladder tiles, scroll V2; #207 first badge ids; #208 build menu; #209 chop feel; #210 wood effects on buildings; #211 Cherry, Willow, Amber, Garnet, added trees and teasers. Open draft: #213 (custom sound ids).
