@@ -62,7 +62,8 @@ return function(t)
 		-- 123854960 before.
 		-- Re-pinned (WORLD-SPREAD T366): supply trees moved within their zone to thin
 		-- dense cells, counts unchanged (TreeSpreadData.Moved). 910269599 before.
-		t.eq(hashOf(trees, PREFIX), 526113470, "existing trunks moved")
+		-- T397: re-pinned on purpose, the ground moved (the plan is 1,052 trees). 526113470 before.
+		t.eq(hashOf(trees, PREFIX), 867099533, "existing trunks moved")
 		t.eq(#reach, 6, "the Reach is 1.5x of 4, rounded down")
 		t.eq(hashOf(reach, 4), 419646000, "the first 4 Reach trees moved")
 	end)
