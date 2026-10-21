@@ -383,7 +383,11 @@ return function(t)
 			for _, part in ipairs(parts(model)) do
 				-- (A path lamp and an awning post stand at the edge of their shop's path by design: thin posts,
 				-- solid since T385, 9.3 to 9.7 studs off the door while the Hearth path runs 13 studs west.)
-				if part.CanCollide and not DRESSING[part.Name] then
+				-- (T404: the main roof's eave stands 1 stud past every wall, so it now hangs over the path's last stud at the
+				-- hall's front. The slab's underside is 15 studs up: nobody can touch it from the path, so it is not a
+				-- building on the path. Nothing else is exempted.)
+				local overhead = part.Name == "Roof" and part.CFrame.Position.Y - part.Size.Y / 2 >= 10
+				if part.CanCollide and not DRESSING[part.Name] and not overhead then
 					for _, area in ipairs(WorldLayout.TownPaint) do
 						if banned[area.name] then
 							t.eq(hits(part, area), false, model.Name .. " " .. part.Name .. " on " .. area.name)
