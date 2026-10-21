@@ -1053,11 +1053,15 @@ function BuildingArt.Sawmill(scale: number?): Model
 	smoke.Size = 4
 	smoke.Parent = stack
 
-	-- The lean-to over the log slip and the log deck (east).
-	for _, z in ipairs({ -10.2, -0.6, 10.2 }) do
+	-- The lean-to over the log slip and the log deck (east). No middle post:
+	-- it stood in front of the slip log. A tie beam from the shed's corner
+	-- post and a knee brace carry the plate there instead (as the mesh does).
+	for _, z in ipairs({ -10.2, 10.2 }) do
 		Kit.part(model, "Post", V3(1, 7, 1), CF(19.6, 3.5, z), TIMBER, MAT.Wood)
 	end
 	dBox(model, "Plate", V3(1.1, 0.8, 21.4), CF(19.6, 7.2, 0), TIMBER)
+	dBox(model, "TieBeam", V3(7.4, 0.55, 0.65), CF(15.37, 7.07, 0.73), TIMBER)
+	dBeam(model, "KneeBrace", V3(11.7, 4.35, 0.73), V3(13.95, 6.8, 0.73), 0.35, 0.4, TIMBER)
 	local hi, lo = V3(11.5, 10.6, 0), V3(20.9, 7.25, 0)
 	roofPlane(model, hi, Vector3.zAxis, (lo - hi).Unit, 22, (lo - hi).Magnitude, rng, roofStyle)
 	dBox(model, "Fascia", V3(0.35, 0.8, 22.3), CF(21.05, 6.9, 0), TIMBER)
