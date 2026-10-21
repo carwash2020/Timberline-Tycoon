@@ -682,8 +682,8 @@ Not wired by these slots (another lane wires them; no slot here):
 | 102697546003435 | TownModels.luau Dock Deck | 1 | template, format ok, not checked yet |
 | 79575927974739 | TownModels.luau Dock LanternGlow | 1 | template, format ok, not checked yet |
 | 125093131488068 | TownModels.luau Rowboat Body | 1 | template, format ok, not checked yet |
-| 86215100835246 | TownModels.luau Sawmill Body | 1 | template, format ok, not checked yet |
-| 112566568598574 | TownModels.luau Sawmill Collision | 1 | collision piece (not loaded), no template, format ok, not checked yet |
+| 136642384683617 | TownModels.luau Sawmill Body | 1 | template, format ok, not checked yet |
+| 133234482270698 | TownModels.luau Sawmill Collision | 1 | collision piece (not loaded), no template, format ok, not checked yet |
 | 103111550635504 | TownModels.luau Sawmill Door | 1 | template, format ok, not checked yet |
 | 130480099384678 | TownModels.luau Sawmill Glow | 1 | template, format ok, not checked yet |
 | 106500111589450 | TownModels.luau Sawmill Roof | 1 | template, format ok, not checked yet |
