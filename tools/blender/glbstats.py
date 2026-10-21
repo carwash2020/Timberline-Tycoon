@@ -107,6 +107,33 @@ def png_size(raw: bytes) -> tuple[int, int] | None:
     return None
 
 
+def vertices(path: Path) -> dict[str, list[tuple[float, float, float]]]:
+    """Every vertex of each named mesh node, in world space (after node transforms), by node name."""
+    doc, blob = load(path)
+    meshes = doc.get("meshes") or []
+    nodes = doc.get("nodes") or []
+    out: dict[str, list[tuple[float, float, float]]] = {}
+
+    def visit(index: int, parent: list[float]):
+        node = nodes[index]
+        world = mat_mul(parent, node_matrix(node))
+        mesh_index = node.get("mesh")
+        if isinstance(mesh_index, int):
+            name = node.get("name") or meshes[mesh_index].get("name") or f"mesh{mesh_index}"
+            for prim in meshes[mesh_index].get("primitives", []):
+                position = prim.get("attributes", {}).get("POSITION")
+                if position is not None:
+                    out.setdefault(name, []).extend(apply(world, p) for p in read_accessor(doc, blob, position))
+        for child in node.get("children", []):
+            visit(child, world)
+
+    identity = [1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0]
+    scenes = doc.get("scenes") or [{"nodes": list(range(len(nodes)))}]
+    for root in scenes[doc.get("scene", 0)].get("nodes", []):
+        visit(root, identity)
+    return out
+
+
 def stats(path: Path) -> dict:
     doc, blob = load(path)
     meshes = doc.get("meshes") or []

@@ -4372,3 +4372,41 @@ Connor's Studio playtest: the town ground looked flat and patchy (grey smears on
 5. Colours: grass #6E9F45 vs the forest's #5A8A3C (no more than two greens beside each other), asphalt dark, footpaths dirt brown (not grey), plaza grey cobbles. Nothing at a stock colour.
 6. Worst frame while the world loads (Output: `[Perf] terrain step` lines, the `stage terrain background` line) and the background terrain time: tell us the numbers.
 7. Textures on: grass, dirt and leafy tiles are not stretched; if a texture shows blurry stock, a ColorMap failed to load (Output: `ColorMap did not load`).
+
+
+## T404 roof clearance (21 October 2026, branch `phase-2/t404-roof-clearance`)
+
+Connor's Studio playtest: second porch roofs clip inside building fronts (the Sawmill, the barn / Tool Shed, Hearth & Home, others). No Studio here, so none of this has been seen in the game; the preview renders are flat-coloured (no textures, no lighting from Studio) and are under `preview/t404/`.
+
+**Causes**
+1. `ShopFacade.Add` runs after `TownMeshes.Dress` (`BuildingArt.Shop`), so when the meshes are cached the facade's `DoorFrame` (DoorPost, DoorPostBase, DoorThreshold) and `StripedAwning` stayed visible on top of meshes that already have their own porch roof.
+2. (Connor's correction) `Sawmill.glb` is fine and has no baked porch. The Sawmill's clipping came from its code-built parts, which show while the meshes load or fail: its shed roof overhung the walls by 2.61 (sides), 1.35 (front) and 1.26 (back) studs at the Sawmill's 1.5 Scale, and the lean-to's back edge was 0.01 from the east wall.
+
+**What changed**
+- **Tool Shed and Hearth & Home with `TownMesh` set** skip the striped awning and the door frame (and the Hearth's posts); with the parts fallback they keep both. The Tool Shed's two door lanterns hung on those posts: with the mesh they hang on a longer arm from the wall (arm 1.35 instead of 0.8, the lantern where it was).
+- **Awning pitch is `ShopFacade.Pitch` = 15 degrees** (was 7.4 degrees at the Tool Shed, 6.9 at the Hearth and the Sparkworks). The Dealership canopy stays as it was (`DealerAwning`: backY 12.15, reach 4.8, 16 degrees).
+- **No awning part is behind the wall face.** The tilted slab's back-bottom corner used to poke thick/2 x sin(tilt) (0.012 to 0.025) into the wall; `StripedAwning` now stands 0.005 beyond that. This covers the Dealership canopy and the Sparkworks awning too (the Sparkworks top, 12.6, was already under its eave at 15 minus 0.2).
+- **Hearth and Sparkworks awnings are shallower** so the open door leaves (top 11.0) still clear the front valance under the steeper pitch: reach 4.0 to 3.5, valance 0.7 to 0.45 (short pieces 0.43 to 0.28), back unchanged at 12.6 under the hours board. The Tool Shed (sliding leaves) keeps reach 4.2, valance 0.7 and back 12.4; its front edge is now 0.54 lower (11.31).
+- **Sparkworks planters** moved from x +-10.3 to +-10.9 (the awning posts now stand 0.5 nearer the wall and overlapped them; `StoreOverlap.Sparkworks`).
+- **Main eave overhang is `BuildingArt.EaveOverhang` = 1.05 studs past each outside wall face, at every Scale.** The builders take the Scale (`toolShed`, `hearthAndHome`, `sparkworks`, `dealership`) and size the roof from it; at Scale 1.5 the Tool Shed, Hearth and Sparkworks roofs are exactly as they were (1.0 to 1.05). The Dealership roof was 0.5 past the end walls and 0.1 past the long walls: now 1.05 all round (the slab is 158.04 x 64.94 where it was 156.94 x 63.04).
+- **Sawmill (code-built)**: the mill shed's eave is now 1.05 past the side walls (x +-11.33), the front gable face (z -11.8) and the back wall (13.33) at any Scale (`BuildingArt.Sawmill` takes the Scale for it): at 1.5 the east and west overhang goes from 2.61 to 1.01, front 1.35 to 1.05, back 1.26 to 1.01. The lean-to over the log slip (the Sawmill's shed roof, 19.8 degrees, back edge outside the east wall, top 10.6 under the 13 eave) moved its back edge from x 11.5 to 11.6 so it clears the wall face. The Sawmill has no awning or porch parts; its cabin door's `DoorFrame` parts are hidden by the mesh dressing (spec). All four spec checks run on it at 1.5 and 2.25.
+- **`FacadeSpec` is Scale-correct**: the front wall's outer face is `(half depth + 0.3) x Scale` (it was `half depth x Scale + 0.45`, right only at 1.5), and `spec.fit` = Scale / 1.5 scales the awning's back, reach and valance, so a bigger store gets a bigger awning.
+- **`tests/RoofClearance.spec.luau`** (36 tests; 18 fail on old main): (a) with the mesh dressing no visible Awning*, Porch*, DoorFrame*, DoorPost* or DoorThreshold part remains; (b) every awning or porch roof part is at or in front of the wall face, under wallTop - 0.2, at 15 to 25 degrees; (c) a ray straight up from a 2-stud floor grid (a ray against each part's box, no workspace raycast) hits no porch roof, and no roof-class part under the main roof; (d) the main eave is 1 +- 0.1 past all four walls. Runs at 1.5 and 2.25 (the Dealership only at 1: its hall and facade are in absolute studs). `PorchPost` is the Hearth's timber post inside its front wall, a post and not a roof, so (b) skips names ending in Post.
+- **`tools/blender/check.py`** (run by hand, CI has no Python step): a building GLB (under `assets/meshes/buildings`) whose Roof node has a vertex above y 8 within 0.1 of the Collision node's front face fails. All repo GLBs pass, the Sawmill included, so there is **no allow-list**. The ticket's wording ("between the front wall plane and the wall thickness") cannot tell a wall from a porch roof by vertices alone (the wall stands in that band), so this is a narrow rule: Roof node only, the face band only. Say so if you want a stronger one.
+
+**Existing spec changed on purpose**
+- `DealershipLot.spec` ("the hall and the lot stay off the street, plaza and paths"): the Dealership's new 1.05 eave hangs over the last stud of `DealershipPath` at the hall's front. The roof slab's underside is 15 studs up, so a part named Roof whose underside is 10 or more studs up is exempt from that one check; nothing else is.
+
+**Not done**
+- The Sawmill mesh/GLB is untouched (and needs no change).
+- Dealership and Sparkworks have no uploaded shop mesh, so there are no mesh renders of them.
+- `SkyMarket`'s two part awnings (`ANG(-0.25)`, 14.3 degrees) are a stand-alone stall, not a building front, and were left alone.
+
+**Studio checks for Connor** (meshes on, then off: set the workspace attribute `TownMeshes` false and rejoin)
+1. Inside each shop (Tool Shed, Hearth & Home, Sparkworks, Dealership, and the Sawmill's mill shed), look straight up at the ceiling along the front wall and at the door: one ceiling, no second roof sheet hanging under it, no awning slab showing through the wall.
+2. From outside, at the door of each: Tool Shed and Hearth with the mesh on show only the mesh's porch roof and posts (no striped awning, no cream door posts on top); with the meshes off they show the striped awning and door frame. The Sparkworks awning (teal) and the Dealership canopy (blue) meet the wall cleanly, no slab through the wall.
+3. Open and close the Hearth and Sparkworks doors: the leaves swing out under the awning's front without touching the valance. Walk under each awning: head clear.
+4. Tool Shed with the mesh on: the two lanterns by the door hang from the wall on an arm and are not inside the mesh's porch posts.
+5. Eaves: stand under each shop's roof edge: about 1 stud of overhang on all four sides, the Dealership too (the hall's roof now reaches 1 stud past its front wall, over its path).
+6. Sparkworks yard: the two planters beside the awning posts do not touch them.
+7. Sawmill with meshes off: the mill shed's roof edge 1 stud past the walls on all four sides, the lean-to on the east clear of the wall; with meshes on, no stray door frame from the office cabin shows through.

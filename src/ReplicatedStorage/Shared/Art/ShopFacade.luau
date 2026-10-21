@@ -31,9 +31,11 @@ export type Spec = {
 	matY: number?, -- where the doormat lies, when that is not the floor's top (the Dealership's walk is at street level)
 	accent: Color3,
 	yardY: number?, -- where the yard's props stand (the real ground) when the floor is a step up from it; default groundY
+	fit: number?, -- the awning's backY, reach and valance (written in final studs for the 1.5x shops) are multiplied by this: scale / 1.5 (default 1)
 }
 
 ShopFacade.DoorClear = 0.8
+ShopFacade.Pitch = math.rad(15) -- a porch or awning roof slopes this much (T404: 15 to 25 degrees; the Dealership's canopy is 16)
 ShopFacade.AwningGap = 0.7 -- the Dealership canopy's near end stands this far off the wall, clear of the hours board on it
 ShopFacade.AwningReach = 5 -- how far the Dealership's canopy reaches out from the front wall (its porch lantern's old reference)
 -- The Dealership's striped canopy (StripedAwning): its back's top at the wall, the reach out and the tilt.
@@ -207,7 +209,7 @@ export type AwningOpts = {
 	colorB: Color3,
 	stripes: number?, -- stripes across (default 6)
 	width: number?, -- default the door + 4
-	tilt: number?, -- radians the front drops below the back (default 0.13)
+	tilt: number?, -- radians the front drops below the back (default ShopFacade.Pitch, 15 degrees)
 	valance: number?, -- the front valance's height (default 0.7; every other piece is a third shorter: a stepped edge)
 }
 
@@ -222,10 +224,14 @@ function ShopFacade.StripedAwning(parent: Instance, spec: Spec, o: AwningOpts)
 	local w = o.width or (spec.doorHalf * 2 + 4)
 	local c = spec.doorCx
 	local stripe = w / n
-	local tilt = o.tilt or 0.13
+	local tilt = o.tilt or ShopFacade.Pitch
 	local thick = 0.18
 	local reach = o.reach
-	local z0 = spec.frontZ -- the wall's outside face
+	-- The wall's outside face. The tilted slab's back-bottom corner swings thick / 2 * sin(tilt) behind the plane the
+	-- back-top edge is set on, so the whole canopy stands that much (and 0.005 more) out from the wall: no part of it
+	-- is inside the wall (T404, RoofClearance spec).
+	local wallZ = spec.frontZ
+	local z0 = wallZ - (thick / 2 * math.sin(tilt) + 0.005)
 	local val = o.valance or 0.7
 	-- the slab's middle: its back edge top is at backY on the wall, the front end drops by reach * sin(tilt)
 	local midY = o.backY - (reach / 2) * math.sin(tilt) - (thick / 2) * math.cos(tilt)
@@ -269,7 +275,7 @@ function ShopFacade.StripedAwning(parent: Instance, spec: Spec, o: AwningOpts)
 		)
 		-- a bracket from the post's head back to the wall under the slab
 		local from = Vector3.new(x, railY - 0.15, frontZ + 0.2)
-		local to = Vector3.new(x, railY - 0.15 - (reach - 0.3) * 0.18, z0 - 0.1)
+		local to = Vector3.new(x, railY - 0.15 - (reach - 0.3) * 0.18, wallZ - 0.1)
 		local len = (to - from).Magnitude
 		box(parent, "AwningBracket", V3(0.2, 0.2, len), CFrame.lookAt((from + to) / 2, to), TIMBER)
 	end
@@ -397,31 +403,39 @@ end
 -- the posts when open (ShopDoor `openShift`). All looks only; the doorway and the 2-stud walk to it stay empty.
 local function toolShedDressing(model: Model, spec: Spec)
 	local hw, fz = spec.halfW, spec.frontZ
+	local fit = spec.fit or 1
 	local postX = spec.doorHalf + ShopFacade.FrameGap + 0.45
 	-- The barn's floor is 0.75 above the lawn (a ramp climbs to the door), and everything out front stands on the LAWN:
 	-- the door posts and the awning posts go down to y 0, not to the floor's level where they would hover.
 	local lawn = table.clone(spec)
 	lawn.groundY = 0
-	ShopFacade.DoorFrame(model, lawn, { postTop = spec.doorTop + 0.75 })
-	local threshold = model:FindFirstChild("DoorThreshold")
-	if threshold and threshold:IsA("BasePart") then
-		threshold.CFrame = threshold.CFrame + V3(0, spec.groundY, 0) -- (the threshold is in the doorway, at the floor's level)
+	-- The uploaded barn has its own porch roof and door frame: with it on (TownMesh) the facade adds neither (T404),
+	-- or a second roof and a second pair of posts would stand through the mesh's. The parts-only barn keeps both.
+	local meshed = model:GetAttribute("TownMesh") ~= nil
+	if not meshed then
+		ShopFacade.DoorFrame(model, lawn, { postTop = spec.doorTop + 0.75 })
+		local threshold = model:FindFirstChild("DoorThreshold")
+		if threshold and threshold:IsA("BasePart") then
+			threshold.CFrame = threshold.CFrame + V3(0, spec.groundY, 0) -- (the threshold is in the doorway, at the floor's level)
+		end
+		ShopFacade.StripedAwning(model, lawn, {
+			backY = 12.4 * fit,
+			reach = 4.2 * fit,
+			colorA = hex("#963E2C"),
+			colorB = hex("#F2E7CF"),
+			stripes = 6,
+			tilt = ShopFacade.Pitch,
+			valance = 0.7 * fit,
+		})
 	end
-	ShopFacade.StripedAwning(model, lawn, {
-		backY = 12.4,
-		reach = 4.2,
-		colorA = hex("#963E2C"),
-		colorB = hex("#F2E7CF"),
-		stripes = 6,
-		tilt = 0.13,
-		valance = 0.7,
-	})
-	-- a lantern on each door post: an iron arm out from the post's face and the lantern at its end
+	-- a lantern on each door post: an iron arm out from the post's face and the lantern at its end (with the mesh on
+	-- there is no post: the arm starts at the wall instead, the lantern stays where it hung)
 	for _, s in ipairs({ -1, 1 }) do
 		local x = spec.doorCx + s * postX
-		local faceZ = fz - 0.55 - 0.03
-		box(model, "LampArm", V3(0.2, 0.2, 0.8), CF(x, 8.6, faceZ - 0.4), IRON, MAT.Metal)
-		local glow = Kit.lantern(model, CF(x, 7.8, faceZ - 0.8), 0.8)
+		local faceZ = if meshed then fz - 0.03 else fz - 0.55 - 0.03
+		local arm = if meshed then 1.35 else 0.8
+		box(model, "LampArm", V3(0.2, 0.2, arm), CF(x, 8.6, faceZ - arm / 2), IRON, MAT.Metal)
+		local glow = Kit.lantern(model, CF(x, 7.8, faceZ - arm), 0.8)
 		for _, d in ipairs(glow:GetChildren()) do
 			if d:IsA("PointLight") then
 				d.Brightness = 0.9
@@ -508,22 +522,27 @@ local function sparkworksFront(model: Model, spec: Spec)
 	local yard = table.clone(spec)
 	yard.groundY = gy
 	ShopFacade.DoorFrame(model, spec, { proud = 0.3 }) -- (slim posts: their footings stand within the plinth)
+	local fit = spec.fit or 1
+	-- (15 degrees: the canopy is shallower and its valance shorter than the General Store's old 4.0 and 0.7, so the
+	-- front edge stays above the open door leaves' tops under the steeper pitch, T404)
 	ShopFacade.StripedAwning(model, yard, {
-		backY = 12.6,
-		reach = 4.0,
+		backY = 12.6 * fit,
+		reach = 3.5 * fit,
 		colorA = spec.accent,
 		colorB = hex("#F2E7CF"),
 		stripes = 6,
-		tilt = 0.12,
-		valance = 0.7,
+		tilt = ShopFacade.Pitch,
+		valance = 0.45 * fit,
 	})
 
 	-- Yard: two windows, a planter each side, the sandwich board, a barrel and a crate.
 	for _, x in ipairs({ -15.2, 15.2 }) do -- (clear of the corner pilasters)
 		window(model, spec, x, 6.8, 3.6, 4.4, false)
 	end
-	planter(model, -10.3, gy, fz - 2.4)
-	planter(model, 10.3, gy, fz - 2.4)
+	-- (the planters stand 0.6 further out than they did, clear of the awning posts, which stand 0.5 nearer the wall
+	-- under the shallower 15 degree canopy)
+	planter(model, -10.9, gy, fz - 2.4)
+	planter(model, 10.9, gy, fz - 2.4)
 	sandwichBoard(model, -15.5, gy, fz - 2.6, "Sparkworks") -- (west, clear of the barrel and crate)
 	barrel(model, spec.halfW - 2.2, gy, fz - 2.3)
 	crate(model, spec.halfW - 4.4, gy, fz - 2.1, 1.7)
@@ -653,18 +672,23 @@ local function shopSpecific(model: Model, spec: Spec)
 			window(model, spec, x, 7.3, 3.6, 4.4, true)
 		end
 		hearthDressing(model, spec)
-		ShopFacade.DoorFrame(model, spec, { proud = 0.3 }) -- (slim posts: their footings stand within the plinth)
-		-- (the canopy is high and shallow so the door leaves swing out under its valance, and its top stays under
-		-- the hours board over the door)
-		ShopFacade.StripedAwning(model, spec, {
-			backY = 12.6,
-			reach = 4.0,
-			colorA = hex("#3E6A3A"),
-			colorB = hex("#F2E7CF"),
-			stripes = 6,
-			tilt = 0.12,
-			valance = 0.7,
-		})
+		-- The uploaded General Store has its own porch roof and door frame: with it on (TownMesh) the facade adds
+		-- neither (T404); the parts-only store keeps both.
+		if model:GetAttribute("TownMesh") == nil then
+			local fit = spec.fit or 1
+			ShopFacade.DoorFrame(model, spec, { proud = 0.3 }) -- (slim posts: their footings stand within the plinth)
+			-- (the canopy is high and shallow so the door leaves swing out under its valance, and its top stays under
+			-- the hours board over the door: 15 degrees, 3.5 deep, a 0.45 valance, where it was 4.0, 0.7 at 7 degrees)
+			ShopFacade.StripedAwning(model, spec, {
+				backY = 12.6 * fit,
+				reach = 3.5 * fit,
+				colorA = hex("#3E6A3A"),
+				colorB = hex("#F2E7CF"),
+				stripes = 6,
+				tilt = ShopFacade.Pitch,
+				valance = 0.45 * fit,
+			})
+		end
 		planter(model, -10.3, gy, fz - 1.8)
 		planter(model, 10.3, gy, fz - 1.8)
 		bench(model, -20.5, gy, fz - 1.4)
