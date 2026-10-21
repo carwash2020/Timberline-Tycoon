@@ -144,6 +144,12 @@ BuildingArt.Scale = {
 	Sparkworks = 1.5,
 } :: { [string]: number }
 
+-- How far the main roof's eave stands past each outside wall face, in final studs (T404: 1 stud, give or take 0.1).
+-- The builders take it in design studs (EaveOverhang / scale) so it holds at any store Scale.
+BuildingArt.EaveOverhang = 1.05
+-- The thickness of a wall's outer course at design size: the outside face stands this far past the wall's half width.
+local WALL_OUT = 0.3
+
 -- The Tool Shed's half depth at design size. It was 7; the aisles and the
 -- Robux table need more floor, so the barn grew backward (the front stays
 -- put). Its uploaded meshes stretch by the same factor along Z only (the
@@ -1008,7 +1014,20 @@ function BuildingArt.Sawmill(scale: number?): Model
 	dCyl(model, "Medallion", 0.36, 2.9, slice, HEART)
 	dCyl(model, "Medallion", 0.42, 1.7, slice, Kit.shade(HEART, -0.1))
 	dCyl(model, "Medallion", 0.48, 0.6, slice, Kit.shade(HEART, -0.25))
-	gableRoof(model, CF(0, TOP, zMid) * ANG(0, PI / 2, 0), depth + 2.4, 23.4, RISE, 1.4, rng, roofStyle)
+	-- The shed's eave stands BuildingArt.EaveOverhang past the walls' outside faces (T404): the side walls at x +-11.33,
+	-- the gables' front face at z -11.8 and the back wall's at 13.33, at any Scale.
+	local eave = BuildingArt.EaveOverhang / (scale or BuildingArt.Scale.Sawmill)
+	local roofFront, roofBack = Z0 - 0.3 - eave, Z1 + 0.33 + eave
+	gableRoof(
+		model,
+		CF(0, TOP, (roofFront + roofBack) / 2) * ANG(0, PI / 2, 0),
+		roofBack - roofFront,
+		2 * (11.33 + eave - 1.4), -- (the roof runs 1.4 past this span)
+		RISE,
+		1.4,
+		rng,
+		roofStyle
+	)
 
 	-- The crest sign above the ridge (phase 12: bigger and bolder, still
 	-- cream on dark brown, now in a honey frame), its frame clear of the
@@ -1073,7 +1092,7 @@ function BuildingArt.Sawmill(scale: number?): Model
 	dBox(model, "Plate", V3(1.1, 0.8, 21.4), CF(19.6, 7.2, 0), TIMBER)
 	dBox(model, "TieBeam", V3(7.4, 0.55, 0.65), CF(15.37, 7.07, 0.73), TIMBER)
 	dBeam(model, "KneeBrace", V3(11.7, 4.35, 0.73), V3(13.95, 6.8, 0.73), 0.35, 0.4, TIMBER)
-	local hi, lo = V3(11.5, 10.6, 0), V3(20.9, 7.25, 0)
+	local hi, lo = V3(11.6, 10.6, 0), V3(20.9, 7.25, 0) -- (its back edge stands clear of the east wall's face: T404)
 	roofPlane(model, hi, Vector3.zAxis, (lo - hi).Unit, 22, (lo - hi).Magnitude, rng, roofStyle)
 	dBox(model, "Fascia", V3(0.35, 0.8, 22.3), CF(21.05, 6.9, 0), TIMBER)
 	-- The log slip: logs ride up it onto the carriage.
@@ -1240,7 +1259,7 @@ end
 -- slid open on the counter, the axe ladder on the back wall (every axe the
 -- shop sells, from ItemCatalog), a grindstone and a chopping block out
 -- front, logs stacked by the west wall (the east side faces the sell station keep-out).
-local function toolShed(model: Model, title: string, accent: Color3)
+local function toolShed(model: Model, title: string, accent: Color3, scale: number)
 	local rng = Kit.rng(311)
 	local boards = {
 		Palette.PlankHoney,
@@ -1290,7 +1309,10 @@ local function toolShed(model: Model, title: string, accent: Color3)
 
 	-- The gambrel roof: steep lower slopes, shallow upper ones.
 	local KX, KY, RY = HX - 4.1, 13, 14.8 -- (the knee keeps the lower slope's 4.1 run as the barn grew wider)
-	local length = 2 * HZ + 2
+	-- (the eaves stand BuildingArt.EaveOverhang out from the walls' outside faces: 1.05 at the ends, and 1.0 along the
+	-- slope's foot, whatever the Scale. The lower slope runs on 0.9 past the wall line at 1.5x.)
+	local length = 2 * (HZ + WALL_OUT) + 2 * BuildingArt.EaveOverhang / scale
+	local slopeExtra = 0.9 * 1.5 / scale
 	local ridge = V3(0, RY, 0)
 	for _, s in ipairs({ -1, 1 }) do
 		local knee = V3(s * KX, KY, 0)
@@ -1301,7 +1323,7 @@ local function toolShed(model: Model, title: string, accent: Color3)
 			Vector3.zAxis,
 			(eave - knee).Unit,
 			length,
-			(eave - knee).Magnitude + 0.9,
+			(eave - knee).Magnitude + slopeExtra,
 			rng,
 			roofStyle,
 			0
@@ -1397,7 +1419,7 @@ end
 BuildingArt.EndSignWidth = 36 -- the board across the door end's wall (TRUCKS & TRAILERS: its words fit at full height)
 BuildingArt.ForecourtDepth = 5 -- the Dealership's paved apron, from the front wall out (the footprint spec allows 6)
 
-local function dealership(model: Model, title: string, accent: Color3)
+local function dealership(model: Model, title: string, accent: Color3, scale: number)
 	local hall = DealershipLot.Hall()
 	local hx, hz = hall.innerW / 2, hall.innerD / 2
 	local cream = Palette.PlankHoney
@@ -1495,8 +1517,10 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- Roof: a flat slab. No skylight: the hall stands north of the spawn's line
 	-- to the lighthouse (z 96 at its front, the line is south of that along its
 	-- whole length), so the roof can be solid.
-	local roofW = 2 * hx + 2 * T + 1
-	Kit.part(model, "Roof", V3(roofW, 0.8, 2 * hz + 2 * T + 0.2), CF(0, H + 0.4, 0), Palette.RoofSlate, MAT.Metal)
+	-- (its eave stands BuildingArt.EaveOverhang out from every wall, T404: it was 0.5 at the ends and 0.1 at the sides)
+	local eave = BuildingArt.EaveOverhang / scale
+	local roofW = 2 * (hx + T + eave)
+	Kit.part(model, "Roof", V3(roofW, 0.8, 2 * (hz + T + eave)), CF(0, H + 0.4, 0), Palette.RoofSlate, MAT.Metal)
 	-- The name sign over the lobby door, lit by two goosenecks, and a second
 	-- board for the trade over the windows.
 	local signW, signH = 24, 4.2
@@ -1640,7 +1664,7 @@ BuildingArt.HearthHalfWidth = 16.5
 BuildingArt.HearthHalfDepth = 14.5
 BuildingArt.HearthCounterZ = 14.9 -- the counter's middle, final studs from the shop's middle (was 15.3 for the 2.5 deep counter: the 3.6 one keeps its keeper clear of the back ledge at z 18.45)
 
-local function hearthAndHome(model: Model, title: string, accent: Color3)
+local function hearthAndHome(model: Model, title: string, accent: Color3, scale: number)
 	local plaster = Palette.PlankHoney
 	local wood = Kit.shade(accent, -0.32)
 	local HX, HZ, FLOOR, TOP = BuildingArt.HearthHalfWidth, BuildingArt.HearthHalfDepth, 0.4, 10
@@ -1673,7 +1697,16 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 			TRIM
 		)
 	end
-	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), Palette.PineTrim, MAT.WoodPlanks)
+	-- (the eave stands BuildingArt.EaveOverhang out from each wall's outside face, whatever the Scale: T404)
+	local eave = WALL_OUT + BuildingArt.EaveOverhang / scale
+	Kit.part(
+		model,
+		"Roof",
+		V3(2 * (HX + eave), 0.5, 2 * (HZ + eave)),
+		CF(0, TOP + 0.4, 0),
+		Palette.PineTrim,
+		MAT.WoodPlanks
+	)
 
 	-- Above the roof, and no further south than the roof's overhang, so the
 	-- board doesn't hang past the front or sit inside the roof.
@@ -1784,7 +1817,7 @@ BuildingArt.SparkworksHalfWidth = 12
 BuildingArt.SparkworksHalfDepth = 12
 BuildingArt.SparkworksCounterZ = 11.5 -- the counter's middle, final studs from the shop's middle
 
-local function sparkworks(model: Model, title: string, accent: Color3)
+local function sparkworks(model: Model, title: string, accent: Color3, scale: number)
 	local plaster = Palette.PlankHoney
 	local wood = Kit.shade(accent, -0.32)
 	local HX, HZ, FLOOR, TOP = BuildingArt.SparkworksHalfWidth, BuildingArt.SparkworksHalfDepth, 0.4, 10
@@ -1817,7 +1850,15 @@ local function sparkworks(model: Model, title: string, accent: Color3)
 		)
 	end
 	-- (the roof's underside is the walls' top, TOP, so it rests on the walls; its top is TOP + 0.65)
-	Kit.part(model, "Roof", V3(2 * HX + 2, 0.65, 2 * HZ + 2), CF(0, TOP + 0.325, 0), Palette.RoofSlate, MAT.Slate)
+	local eave = WALL_OUT + BuildingArt.EaveOverhang / scale -- (1.05 past each outside face at any Scale: T404)
+	Kit.part(
+		model,
+		"Roof",
+		V3(2 * (HX + eave), 0.65, 2 * (HZ + eave)),
+		CF(0, TOP + 0.325, 0),
+		Palette.RoofSlate,
+		MAT.Slate
+	)
 
 	-- The name board stands over the roof on two posts, like the General Store's.
 	local signW, signH = 20, 3
@@ -2085,7 +2126,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 		return {
 			kind = kind,
 			halfW = BuildingArt.ToolShedHalfWidth * s,
-			frontZ = -(BuildingArt.ToolShedHalfDepth * s + 0.45),
+			frontZ = -(BuildingArt.ToolShedHalfDepth + WALL_OUT) * s,
 			doorCx = 0,
 			doorHalf = 5 * s,
 			doorTop = 7.1 * s,
@@ -2094,6 +2135,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			groundY = 0.5 * s,
 			matY = 0, -- the lawn: the barn's floor is 0.75 above it (a ramp climbs to the door), so the mat lies on the grass past the ramp
 			accent = accent,
+			fit = s / 1.5, -- (the awning's numbers are written for the 1.5x shops)
 		}
 	elseif kind == "Dealership" then
 		local hall = DealershipLot.Hall()
@@ -2115,7 +2157,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 		return {
 			kind = kind,
 			halfW = BuildingArt.SparkworksHalfWidth * s,
-			frontZ = -(BuildingArt.SparkworksHalfDepth * s + 0.45),
+			frontZ = -(BuildingArt.SparkworksHalfDepth + WALL_OUT) * s,
 			doorCx = 0,
 			doorHalf = 5 * s,
 			doorTop = 7.5 * s,
@@ -2124,12 +2166,13 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			groundY = 0.4 * s,
 			yardY = 0, -- the floor is a step up from the ground; the yard's props stand on the ground
 			accent = accent,
+			fit = s / 1.5, -- (the awning's numbers are written for the 1.5x shops)
 		}
 	end
 	return {
 		kind = kind,
 		halfW = BuildingArt.HearthHalfWidth * s,
-		frontZ = -(BuildingArt.HearthHalfDepth * s + 0.45),
+		frontZ = -(BuildingArt.HearthHalfDepth + WALL_OUT) * s,
 		doorCx = 0,
 		doorHalf = 5 * s,
 		doorTop = 7.5 * s,
@@ -2137,6 +2180,7 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 		roofTop = 10.65 * s,
 		groundY = 0.4 * s,
 		accent = accent,
+		fit = s / 1.5, -- (the awning's numbers are written for the 1.5x shops)
 	}
 end
 
@@ -2238,16 +2282,16 @@ end
 
 function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: number?): Model
 	local model = Kit.model(kind)
-	if kind == "ToolShed" then
-		toolShed(model, title, accent)
-	elseif kind == "Dealership" then
-		dealership(model, title, accent)
-	elseif kind == "Sparkworks" then
-		sparkworks(model, title, accent)
-	else
-		hearthAndHome(model, title, accent)
-	end
 	local s = scale or BuildingArt.Scale[kind] or 1
+	if kind == "ToolShed" then
+		toolShed(model, title, accent, s)
+	elseif kind == "Dealership" then
+		dealership(model, title, accent, s)
+	elseif kind == "Sparkworks" then
+		sparkworks(model, title, accent, s)
+	else
+		hearthAndHome(model, title, accent, s)
+	end
 	local counter = model:FindFirstChild("Counter")
 	local rigid: { [BasePart]: Vector3 } = {}
 	if counter and counter:IsA("BasePart") then

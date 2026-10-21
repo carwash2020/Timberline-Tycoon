@@ -12,6 +12,8 @@ and what was exported next to each uploaded FBX). Fails (exit 1) on:
   - UVs outside 0 to 1 (0.001 slack)
   - an embedded texture over 1024 px
   - a file over 5 MB
+  - a building (a GLB under assets/meshes/buildings with Roof and Collision nodes) whose Roof node has a vertex
+    above y PORCH_FLOOR_Y inside the front wall's face band (see below; T404)
 Bounds against the part-built model are not checked here: the part-built
 sizes live in Luau and Studio. The registry spec (tests/BlenderAssets.spec)
 checks the recorded sizes instead.
@@ -23,12 +25,21 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from glbstats import stats  # noqa: E402
+from glbstats import stats, vertices  # noqa: E402
 
 MAX_TRIS = 20000
 MAX_TEXTURE = 1024
 MAX_BYTES = 5 * 1024 * 1024
 UV_SLACK = 0.001
+
+# T404: a building's porch roof stands IN FRONT of its front wall. A Roof vertex above a door's height (PORCH_FLOOR_Y)
+# that sits within FACE_BAND of the front wall's outside plane (the front, min Z, face of the Collision node) pokes
+# through the wall face or z-fights it from inside. Measured on the repo's building GLBs none does (Sawmill included:
+# its mesh is fine, the clipping it showed came from the code-built parts). This is a narrow rule: the wording of the
+# ticket ("between the front wall plane and the wall thickness") cannot tell a wall from a porch roof by vertices
+# alone, since the wall itself stands there, so only the Roof node is scanned and the band is the face itself.
+PORCH_FLOOR_Y = 8.0
+FACE_BAND = 0.1
 
 
 def problems(path: Path) -> list[str]:
@@ -53,6 +64,23 @@ def problems(path: Path) -> list[str]:
     return out
 
 
+def porch_problems(path: Path) -> list[str]:
+    """Roof vertices above PORCH_FLOOR_Y inside FACE_BAND of a building's front wall plane."""
+    if "buildings" not in path.parts:
+        return []
+    verts = vertices(path)
+    if "Roof" not in verts or "Collision" not in verts:
+        return []
+    front = min(v[2] for v in verts["Collision"])
+    bad = [v for v in verts["Roof"] if v[1] > PORCH_FLOOR_Y and front <= v[2] <= front + FACE_BAND]
+    if not bad:
+        return []
+    return [
+        f"Roof: {len(bad)} vertices above y {PORCH_FLOOR_Y:g} within {FACE_BAND:g} of the front wall plane "
+        f"(z {front:.2f}): a porch roof through the front wall"
+    ]
+
+
 def main(argv: list[str]) -> int:
     targets = [Path(a) for a in argv] or [Path("assets/meshes")]
     files: list[Path] = []
@@ -61,6 +89,7 @@ def main(argv: list[str]) -> int:
     bad = 0
     for f in files:
         found = problems(f)
+        found += porch_problems(f)
         if found:
             bad += 1
             for line in found:
