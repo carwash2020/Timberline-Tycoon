@@ -441,7 +441,7 @@ local ALL: { Asset } = {
 		id = "Sawmill",
 		category = "building",
 		modelId = 122113550398654,
-		tris = 9940,
+		tris = 9732,
 		pieces = {
 			{ name = "Body", meshId = 86215100835246, size = V(63.785, 42.3, 42.938) },
 			{ name = "Collision", meshId = 112566568598574, size = V(61.65, 42, 40.95) },
