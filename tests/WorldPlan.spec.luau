@@ -2543,9 +2543,10 @@ return function(t)
 			end
 		end
 		-- T397: re-sampled on purpose, the ground moved. 651551197 before.
+		-- (Hills closer to +18: X and Z are the same stands; tree 323's height below moved 0.04 with the Hills' ground.)
 		t.eq(h, 2600458, "the country stands moved, changed wood or changed order")
 		t.eq(trees[FIRST + 1].woodId, "oak")
-		t.ok((trees[FIRST + 1].position - Vector3.new(-280.44458, 0.8724530, -2.88238)).Magnitude < 0.01, "tree 323")
+		t.ok((trees[FIRST + 1].position - Vector3.new(-280.44458, 0.9184996, -2.88238)).Magnitude < 0.01, "tree 323")
 		t.ok(
 			(trees[lastStand].position - Vector3.new(-846.01990, 3.4498632, 529.29968)).Magnitude < 0.01,
 			"the last stand"
