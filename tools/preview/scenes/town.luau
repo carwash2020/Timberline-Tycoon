@@ -55,6 +55,14 @@ return {
 		place(DealershipLot.Build(), town.displayLot)
 		place(BuildingArt.GondolaStation(), town.gondola)
 		place(BuildingArt.Campsite(), town.campsite)
+		-- The ground parts (T402: roads, curbs, footpaths, the lot's pavement and edge).
+		-- Before T402 the lot's slab and 2-stud dirt shoulder stood here instead.
+		local okGround, TownGroundArt = pcall(ctx.art, "TownGroundArt")
+		if okGround then
+			TownGroundArt.Build().Parent = root
+		elseif BuildingArt.ParkingLot then
+			BuildingArt.ParkingLot(ctx.load("ReplicatedStorage/Shared/World/WorldLayout").ParkingLot).Parent = root
+		end
 		for index, cf in ipairs(town.parkingSlots) do
 			local slot = Kit.part(
 				root,
@@ -62,7 +70,7 @@ return {
 				town.parkingSizes[index] or WorldPlan.ParkingSlotSize,
 				cf,
 				C3.fromRGB(186, 168, 140),
-				Enum.Material.Slate
+				Enum.Material.Asphalt
 			)
 			slot.CanCollide = false
 			slot.CastShadow = false
@@ -145,6 +153,16 @@ return {
 				-- The Robux store board: from the spawn, and close.
 				{ pos = { 2, 6.5, 32 }, target = { -20.5, 7, 58.3 }, fov = 60, label = "store board from the spawn" },
 				{ pos = { -8, 5, 58.3 }, target = { -20.5, 5, 58.3 }, fov = 60, label = "store board close" },
+				-- T402: 10 studs from the ground's edges. Main Street's south curb; the lot's west edge;
+				-- the lot's east entrance (the loop's last leg comes in at z 50).
+				{
+					pos = { -80, 3.5, 52.5 },
+					target = { -80, 0.2, 62.5 },
+					fov = 50,
+					label = "road edge and curb, 10 studs",
+				},
+				{ pos = { -2, 3.5, 45 }, target = { 8, 0.2, 45 }, fov = 50, label = "lot edge, 10 studs" },
+				{ pos = { 152, 5, 36 }, target = { 138, 0.2, 50 }, fov = 50, label = "lot entrance, east" },
 			},
 		}
 	end,

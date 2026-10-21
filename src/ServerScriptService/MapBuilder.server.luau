@@ -59,6 +59,7 @@ local RunService = game:GetService("RunService")
 Players.CharacterAutoLoads = false
 
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
+local ColorMapGuard = require(ReplicatedStorage.Shared.ColorMapGuard)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
@@ -85,6 +86,7 @@ local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local StoreBoard = require(ReplicatedStorage.Shared.StoreBoard)
 local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
+local TownGroundArt = require(ReplicatedStorage.Shared.Art.TownGroundArt)
 local MaterialSetup = require(script.Parent.MaterialSetup)
 local UndergroundBuilder = require(script.Parent.UndergroundBuilder)
 local SecretService = require(script.Parent.SecretService)
@@ -226,7 +228,10 @@ local terrainFinish: (() -> number)? = nil
 -- The ground's textures (T397): point Grass, Ground, LeafyGrass and Asphalt at
 -- their MaterialVariants before the terrain is written, and set its colours.
 step("3. Ground materials", function()
-	MaterialSetup.Apply(game:GetService("MaterialService"), workspace:FindFirstChildOfClass("Terrain"))
+	local materialService = game:GetService("MaterialService")
+	MaterialSetup.Apply(materialService, workspace:FindFirstChildOfClass("Terrain"))
+	-- A ColorMap that fails to load keeps the flat colour (checked on its own thread; nothing waits).
+	task.spawn(ColorMapGuard.Run, materialService)
 end)
 step("3. Terrain", function()
 	local seconds, finish = TerrainBuilder.Build(function(done: number, total: number)
@@ -439,6 +444,14 @@ sellArea.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
 local townStation: Model? = nil -- the town's gondola cable starts here (section 6)
 
+-- The town's roads, curbs, footpaths, lot pavement and edge, and the plots'
+-- lawn edges, as parts (T402; Shared/World/TownGround). The terrain under
+-- them is plain Grass. Before the town's buildings and the lot's bays, which
+-- stand on and over them.
+step("4. The town's ground parts", function()
+	TownGroundArt.Build().Parent = map
+end)
+
 step("4. The town", function()
 	local town = WorldPlan.Town()
 
@@ -567,10 +580,6 @@ step("4. The town", function()
 	-- (town.parkingSizes, WorldPlan.ParkingBays, phase 12): small ones for
 	-- the small trucks, long pull-through ones for the big rigs.
 	local slots: { BasePart } = {}
-	-- The lot's paved surface and dirt shoulder (T397): looks only, under the paint.
-	step("4. The parking lot's surface", function()
-		BuildingArt.ParkingLot(WorldLayout.ParkingLot).Parent = map
-	end)
 	step("4. The parking lot", function()
 		for index, cf in ipairs(town.parkingSlots) do
 			local slot = Kit.part(
@@ -579,7 +588,7 @@ step("4. The town", function()
 				town.parkingSizes[index] or WorldPlan.ParkingSlotSize,
 				cf,
 				Color3.fromRGB(186, 168, 140),
-				Enum.Material.Slate
+				Enum.Material.Asphalt -- (Slate was a grey on the lot's ground; the slot is invisible once painted)
 			)
 			slot.CanCollide = false
 			slot.CastShadow = false

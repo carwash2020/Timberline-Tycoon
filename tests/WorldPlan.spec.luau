@@ -14,6 +14,7 @@ return function(t)
 	local Vector2, Vector3, CFrame = roblox.Vector2, roblox.Vector3, roblox.CFrame
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 	local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
+	local TownGround = t.load("ReplicatedStorage/Shared/World/TownGround")
 	local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
 	local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
 	local IsleArt = t.load("ReplicatedStorage/Shared/Art/IsleArt")
@@ -1364,7 +1365,12 @@ return function(t)
 						for _, sz in ipairs({ -1, 0, 1 }) do
 							local q = p.CFrame * Vector3.new(half.X * sx, 0, half.Z * sz)
 							local _, m = TerrainGen.Sample(q.X, q.Z)
-							if m == "Grass" or m == "LeafyGrass" then
+							-- (T402: the sawmill's apron, the sell yard and the shop paths are parts now (Asphalt or dirt), over plain Grass
+							-- terrain; a part is the floor there, and Terrain.Decoration is off, so no blade grows.)
+							if
+								(m == "Grass" or m == "LeafyGrass")
+								and not TownGround.Covers(q.X, q.Z, { Road = true, Yard = true, Path = true }, 0.5)
+							then
 								table.insert(bad, string.format("%s at (%.1f, %.1f)", p.Name, q.X, q.Z))
 							end
 						end

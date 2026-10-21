@@ -7,8 +7,8 @@
 --     ground up to its highest ground or water. Below that nobody looks.
 --   * Fractional occupancy on the surface voxel (TerrainGen.Voxel) gives
 --     smooth hills (under water the bed rounds to whole voxels, so water
---     always meets it); the top two voxels take the surface material,
---     deeper ones what lies beneath (TerrainGen.SubMaterial).
+--     always meets it); the top three voxels (SurfaceBand) take the surface
+--     material, deeper ones what lies beneath (UnderMaterial).
 --   * Yields between chunks, so the server keeps ticking.
 --   * The engine draws the ground where it likes (the live game drew the
 --     flat town 2 studs above the y = 0 we wrote), so the chunks under the
@@ -33,6 +33,11 @@ local VOXEL = 4
 local CHUNK = 64 -- voxel columns per chunk side
 local CRUST = 8 -- 32 studs of solid ground under the surface
 TerrainBuilder.Crust = CRUST
+-- How many voxels at the top of a column take the surface material (T402:
+-- 3, was 2; a thicker top layer keeps the grass colour where the ground
+-- slopes and the under-layer would otherwise blend up through it).
+local SURFACE_BAND = 3
+TerrainBuilder.SurfaceBand = SURFACE_BAND
 local NO_WATER = -1e9
 
 local materialCache: { [string]: Enum.Material } = {}
@@ -49,10 +54,19 @@ local function material(name: string): Enum.Material
 	return mat
 end
 
-local function setLook(terrain: Terrain)
-	for name, color in pairs(TerrainGen.MaterialColors) do
-		terrain:SetMaterialColor(material(name), color)
+-- What lies under a surface material (the voxels below the top band). Grass
+-- and LeafyGrass always sit on Ground, never Rock or Slate: those blend up
+-- through the grass on a slope as grey smears (T402).
+function TerrainBuilder.UnderMaterial(surface: string): string
+	local under = TerrainGen.SubMaterial(surface)
+	if (surface == "Grass" or surface == "LeafyGrass") and (under == "Rock" or under == "Slate") then
+		return "Ground"
 	end
+	return under
+end
+
+local function setLook(terrain: Terrain)
+	-- The material colours are MaterialSetup's alone (T402).
 	terrain.WaterColor = Color3.fromRGB(62, 140, 150)
 	terrain.WaterTransparency = 0.55
 	terrain.WaterReflectance = 0.45
@@ -125,13 +139,15 @@ local function writeChunk(terrain: Terrain, x0: number, z0: number, nx: number, 
 			local w = waters[i][k]
 			local surfaceName = surfaces[i][k]
 			local top = material(surfaceName)
-			local under = material(TerrainGen.SubMaterial(surfaceName))
-			local surfaceVoxel = math.floor(h / VOXEL) - yMin + 1 -- index of the voxel holding the ground's surface
+			local under = material(TerrainBuilder.UnderMaterial(surfaceName))
+			-- Index of the topmost solid voxel: the one the ground's surface cuts, or (when
+			-- the ground is exactly on a voxel edge, as the flat town's y = 0 is) the one just under it.
+			local topSolid = math.ceil(h / VOXEL) - yMin
 			for j = 1, ny do
 				local bottom = (yMin + j - 1) * VOXEL
 				local kind, occ = TerrainGen.Voxel(h, if w > NO_WATER then w else nil, bottom)
 				if kind == "solid" then
-					mx[j][k] = if j >= surfaceVoxel - 1 then top else under
+					mx[j][k] = if j > topSolid - SURFACE_BAND then top else under
 					ox[j][k] = occ
 				elseif kind == "water" then
 					mx[j][k] = water
@@ -315,12 +331,14 @@ end
 -- town probes (TerrainFit.NextShift picks the next shift). Ends on the
 -- best try. Returns the shift, the town's ground at it (nil if no ray
 -- ever hit), the tries, and the chunks it wrote. `cast` and `wait` can be
--- swapped for tests.
+-- swapped for tests; `pace` (a TimeSlice's step) is called after each
+-- block so the settle yields every few milliseconds like the rest.
 function TerrainBuilder.SettleTown(
 	terrain: Terrain,
 	jobs: { Job },
 	cast: Cast?,
-	wait: (() -> ())?
+	wait: (() -> ())?,
+	pace: (() -> boolean)?
 ): (number, number?, { TerrainFit.Try }, { [Job]: boolean })
 	local waitFn = wait or function()
 		task.wait()
@@ -339,8 +357,11 @@ function TerrainBuilder.SettleTown(
 			terrain:FillBlock(r.CFrame, r.Size, Enum.Material.Air)
 		end
 		table.clear(regions)
-		for _, job in ipairs(town) do
-			table.insert(regions, writeChunk(terrain, job.x0, job.z0, job.nx, job.nz, shift))
+		for _, block in ipairs(TerrainBuilder.Split(town, TerrainBuilder.SubColumns)) do
+			table.insert(regions, writeChunk(terrain, block.x0, block.z0, block.nx, block.nz, shift))
+			if pace then
+				pace() -- a few ms of blocks, then the frame back (no 64-column stall)
+			end
 		end
 	end
 	local function measure(): number?
@@ -382,8 +403,11 @@ function TerrainBuilder.SettleTown(
 	return best.shift, best.error, tries, done
 end
 
--- How long Build writes chunks before it yields a frame.
-TerrainBuilder.SliceSeconds = 0.03
+-- How long Build writes before it yields a frame (T402: 4 ms, was 30 ms near
+-- the town and 12 ms in the background; a 64-column chunk is now written as
+-- 16-column blocks, so one stretch of work is a block or two).
+TerrainBuilder.YieldSeconds = 0.004
+TerrainBuilder.SliceSeconds = TerrainBuilder.YieldSeconds
 
 -- Staged build (server audit, 11 October 2026). Writing all 100 chunks took
 -- 30 to 55 s, and the first player waited for every one of them (the
@@ -396,7 +420,7 @@ TerrainBuilder.SliceSeconds = 0.03
 -- caves last.
 TerrainBuilder.NearRadius = 230
 TerrainBuilder.SubColumns = 16 -- voxel columns a side per background block (64 studs): about 1/16 of a chunk, so no frame stalls
-TerrainBuilder.BackgroundSliceSeconds = 0.012 -- the same share of a frame the forest planter and the deferred queue take
+TerrainBuilder.BackgroundSliceSeconds = TerrainBuilder.YieldSeconds -- the same 4 ms ceiling for the background blocks
 TerrainBuilder.SpotReach = 150 -- studs: blocks this close to a `firstSpots` point (a plot pad) go first
 
 export type Options = {
@@ -405,6 +429,8 @@ export type Options = {
 	sliceSeconds: (() -> number)?, -- the background slice, asked before each frame (default BackgroundSliceSeconds)
 	frame: TimeSlice.FrameBudgetLike?, -- a frame budget shared with the forest and the deferred queue: then it, not sliceSeconds, paces the writes
 	focus: (() -> { NearFirst.Point })?, -- where the players are: the later blocks nearest them go first, asked again as they move
+	clock: (() -> number)?, -- os.clock; specs inject one
+	wait: (() -> ())?, -- task.wait; specs inject one
 }
 
 TerrainBuilder.ResortDistance = 48 -- studs a player may move before the remaining blocks are put in order again
@@ -445,7 +471,17 @@ function TerrainBuilder.Split(jobs: { Job }, columns: number): { Job }
 	return out
 end
 
--- Puts blocks in the order they are written: those within SpotReach of a
+-- Whether a block touches the town zone (WorldLayout.TownZone): its roads,
+-- curbs and lot sit on this ground, so it is written first (T402).
+function TerrainBuilder.InTown(block: Job): boolean
+	local zone = WorldLayout.TownZone
+	return block.x0 < zone.x1
+		and block.x0 + block.nx * VOXEL > zone.x0
+		and block.z0 < zone.z1
+		and block.z0 + block.nz * VOXEL > zone.z0
+end
+
+-- Puts blocks in the order they are written: the town zone's first, then those within SpotReach of a
 -- `spots` point first, then the rest, each nearest the players first (the
 -- nearest of `focus`; the sawmill when there is none). Same order as ever
 -- when `focus` is nil.
@@ -457,6 +493,9 @@ function TerrainBuilder.Order(blocks: { Job }, spots: { Vector2 }?, focus: { Nea
 		if hasFocus then
 			local mx, mz = block.x0 + block.nx * VOXEL / 2, block.z0 + block.nz * VOXEL / 2
 			k = math.sqrt(NearFirst.Distance2(mx, mz, focus, { x = 0, z = 0 }))
+		end
+		if TerrainBuilder.InTown(block) then
+			k -= 2e6 -- the town zone's ground goes before everything else
 		end
 		for _, spot in ipairs(spots or {}) do
 			local dx = math.max(block.x0 - spot.X, 0, spot.X - (block.x0 + block.nx * VOXEL))
@@ -485,8 +524,30 @@ end
 -- each chunk. Returns how many seconds it took and, when `options.nearRadius`
 -- left chunks for later, `finish`: call it (it yields) to write them and
 -- carve the caves; it returns its own seconds.
+-- T402: every write is a 16-column block, and after each one the build
+-- yields (task.wait) once about YieldSeconds (4 ms) of os.clock() has passed,
+-- or sooner when the shared frame budget is spent. Each step's time is
+-- printed ("[Perf] terrain step ...") and kept in TerrainBuilder.StepTimes.
+export type StepTime = { name: string, seconds: number, longest: number, blocks: number }
+TerrainBuilder.StepTimes = {} :: { StepTime }
+
+local function recordStep(name: string, seconds: number, longest: number, blocks: number)
+	table.insert(TerrainBuilder.StepTimes, { name = name, seconds = seconds, longest = longest, blocks = blocks })
+	print(
+		string.format(
+			"[Perf] terrain step %s: %.0f ms, longest stretch %.0f ms (%d blocks)",
+			name,
+			seconds * 1000,
+			longest * 1000,
+			blocks
+		)
+	)
+end
+
 function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Options?): (number, (() -> number)?)
-	local started = os.clock()
+	local clock = (options and options.clock) or os.clock
+	local started = clock()
+	table.clear(TerrainBuilder.StepTimes)
 	local terrain = workspace.Terrain
 	setLook(terrain)
 	if terrain:GetAttribute("Prebuilt") == true then
@@ -495,15 +556,33 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 	end
 	terrain:Clear()
 	local jobs = TerrainBuilder.Jobs()
+	local frame = options and options.frame
+	-- A slice for the settle and one for the near ring (each also follows the frame budget, when given, not only the 4 ms).
+	local function newSlice(): TimeSlice.Slice
+		return TimeSlice.new({
+			frame = frame,
+			budget = TerrainBuilder.YieldSeconds,
+			clock = options and options.clock,
+			wait = options and options.wait,
+		})
+	end
+	local settleSlice = newSlice() -- the near ring shares it: no yield-free gap where one stage ends and the next begins
 	local shift, tries, done = 0, {} :: { TerrainFit.Try }, {} :: { [Job]: boolean }
+	local settleStart = clock()
 	local okSettle, settleErr = pcall(function()
-		local s, _, t, d = TerrainBuilder.SettleTown(terrain, jobs)
+		local s, _, t, d = TerrainBuilder.SettleTown(terrain, jobs, nil, nil, settleSlice.step)
 		shift, tries, done = s, t, d
 	end)
 	if not okSettle then
 		warn("[TerrainBuilder] Settling the town's ground failed: " .. tostring(settleErr))
 		shift, done = 0, {}
 	end
+	local settleCount = 0
+	for _ in pairs(done) do
+		settleCount += 1
+	end
+	settleSlice.finish()
+	recordStep("settle town", clock() - settleStart, settleSlice.longest(), settleCount)
 	local steps: { string } = {}
 	for _, t in ipairs(tries) do
 		table.insert(steps, string.format("%+.2f -> %.2f", t.shift, t.error))
@@ -534,28 +613,21 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 	for _ in pairs(done) do
 		finished += 1
 	end
-	local sliceStart = os.clock()
-	local nearFrame = options and options.frame
-	local nearSlice = TimeSlice.new({ frame = nearFrame, budget = if nearFrame then nil else math.huge })
-	local nearLongest, stretchStart = 0, os.clock()
+	local nearStart = clock()
+	local nearSlice = settleSlice
+	local nearBlocks = 0
 	for _, job in ipairs(near) do
-		local ok, err = pcall(function(): any
-			writeChunk(terrain, job.x0, job.z0, job.nx, job.nz, shift)
-			return nil
-		end)
-		if not ok then
-			warn(string.format("[TerrainBuilder] chunk at (%d, %d) failed: %s", job.x0, job.z0, tostring(err)))
-		end
-		-- A frame's worth of chunks, then a yield (the server stays alive),
-		-- not a frame per chunk: a chunk takes less than a frame to write
-		-- on a fast machine, and the idle frames were pure waiting (LOAD-01).
-		if nearFrame then
+		for _, block in ipairs(TerrainBuilder.Split({ job }, TerrainBuilder.SubColumns)) do
+			local ok, err = pcall(function(): any
+				writeChunk(terrain, block.x0, block.z0, block.nx, block.nz, shift)
+				return nil
+			end)
+			if not ok then
+				warn(string.format("[TerrainBuilder] block at (%d, %d) failed: %s", block.x0, block.z0, tostring(err)))
+			end
+			nearBlocks += 1
+			-- A few ms of blocks, then a yield: the server stays alive (LOAD-01).
 			nearSlice.step()
-		elseif os.clock() - sliceStart >= TerrainBuilder.SliceSeconds then
-			nearLongest = math.max(nearLongest, os.clock() - stretchStart)
-			task.wait()
-			sliceStart = os.clock()
-			stretchStart = sliceStart
 		end
 		finished += 1
 		if onProgress then
@@ -563,11 +635,12 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 		end
 	end
 	nearSlice.finish()
-	nearLongest = math.max(nearLongest, nearSlice.longest(), os.clock() - stretchStart)
+	local nearLongest = nearSlice.longest()
+	recordStep("near ring", clock() - nearStart, nearLongest, nearBlocks)
 	print(
 		string.format(
 			"[Perf] stage terrain near ring: total %.2fs, longest step %.0f ms (%d chunks)",
-			os.clock() - started,
+			clock() - started,
 			nearLongest * 1000,
 			#near
 		)
@@ -575,22 +648,27 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 	if #later == 0 then
 		TerrainBuilder.Carve(terrain, shift)
 		reportTown(terrain)
-		return os.clock() - started, nil
+		return clock() - started, nil
 	end
 	reportTown(terrain)
-	local nearSeconds = os.clock() - started
+	local nearSeconds = clock() - started
 	local function finish(): number
-		local finishStarted = os.clock()
+		local finishStarted = clock()
 		local spots = options and options.firstSpots
 		local focusFn = options and options.focus
-		local frame = options and options.frame
 		local focus: { NearFirst.Point } = if focusFn then focusFn() else {}
 		local blocks = TerrainBuilder.Order(TerrainBuilder.Split(later, TerrainBuilder.SubColumns), spots, focus)
 		local resortedFor = focus
 		local nextBlock = 1
-		local slice = TimeSlice.new({ frame = frame, budget = if frame then nil else math.huge })
-		local frameStart = os.clock()
-		local longest, backStart, written = 0, os.clock(), 0
+		-- The block's own ceiling: the supplier asked each frame (specs, tuning), else YieldSeconds.
+		local sliceBudget = if options and options.sliceSeconds then options.sliceSeconds else nil
+		local slice = TimeSlice.new({
+			frame = frame,
+			budget = if sliceBudget then sliceBudget() else TerrainBuilder.BackgroundSliceSeconds,
+			clock = options and options.clock,
+			wait = options and options.wait,
+		})
+		local written = 0
 		while nextBlock <= #blocks do
 			-- Players who have moved pull the blocks round them forward.
 			if focusFn and nextBlock > 1 then
@@ -611,35 +689,29 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 				warn(string.format("[TerrainBuilder] block at (%d, %d) failed: %s", block.x0, block.z0, tostring(err)))
 			end
 			written += 1
-			if frame then
-				slice.step()
-			else
-				local limit = if options and options.sliceSeconds
-					then options.sliceSeconds()
-					else TerrainBuilder.BackgroundSliceSeconds
-				if os.clock() - frameStart >= limit then
-					longest = math.max(longest, os.clock() - backStart)
-					task.wait()
-					frameStart = os.clock()
-					backStart = frameStart
-				end
+			if sliceBudget then
+				slice.setBudget(sliceBudget())
 			end
+			slice.step()
 		end
-		TerrainBuilder.Carve(terrain, shift, if frame then slice.step else nil)
+		local carveStart = clock()
+		TerrainBuilder.Carve(terrain, shift, slice.step)
 		if onProgress then
 			onProgress(total, total)
 		end
 		slice.finish()
-		longest = math.max(longest, slice.longest(), os.clock() - backStart)
+		local longest = slice.longest()
+		recordStep("background blocks", carveStart - finishStarted, longest, written)
+		recordStep("caves", clock() - carveStart, longest, 0)
 		print(
 			string.format(
 				"[Perf] stage terrain background: total %.2fs, longest step %.0f ms (%d blocks)",
-				os.clock() - finishStarted,
+				clock() - finishStarted,
 				longest * 1000,
 				written
 			)
 		)
-		return os.clock() - finishStarted
+		return clock() - finishStarted
 	end
 	return nearSeconds, finish
 end

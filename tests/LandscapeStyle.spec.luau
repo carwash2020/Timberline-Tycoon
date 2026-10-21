@@ -34,7 +34,7 @@ return function(t)
 			Glacier = { 169, 211, 230 },
 			Sand = { 216, 198, 154 },
 			Basalt = { 58, 52, 51 },
-			Slate = { 91, 86, 80 },
+			Slate = { 124, 122, 106 }, -- T402: #7C7A6A (was #5B5650)
 			CrackedLava = { 255, 106, 30 },
 			Mud = { 90, 74, 62 },
 			Cobblestone = { 156, 149, 138 },
@@ -64,9 +64,12 @@ return function(t)
 			local name, now, was = set[1], set[2], set[3]
 			t.ok(lum(now) >= lum(was) * 1.2, name .. " is brighter than phase 12's dark green")
 			t.ok(sat(now) >= 0.55, string.format("%s is saturated (%.2f)", name, sat(now)))
-			t.ok(val(now) >= 0.6, string.format("%s is bright (%.2f)", name, val(now)))
+			-- (T402: Connor's #5A8A3C forest floor is value 0.54; the floor was 0.6.)
+			t.ok(val(now) >= 0.5, string.format("%s is bright (%.2f)", name, val(now)))
 			t.ok(hue(now) >= 0.22 and hue(now) <= 0.34, string.format("%s is a true green (hue %.2f)", name, hue(now)))
-			t.ok(now.G > now.R * 1.4 and now.G > now.B * 2.5, name .. " is green")
+			-- T402 (Connor's #6E9F45 and #5A8A3C): a softer green than October's, so blue may be up to
+			-- 1 / 2.0 of green (it was 1 / 2.5).
+			t.ok(now.G > now.R * 1.4 and now.G > now.B * 2.0, name .. " is green")
 		end
 		-- The darker patches stay readable but gentle: LeafyGrass a small step down.
 		t.ok(lum(leafy) < lum(grass) * 0.95, "LeafyGrass is a step darker than Grass")
@@ -143,7 +146,7 @@ return function(t)
 		return bestRoad, best
 	end
 
-	t.test("STY-02: the road is a real terrain material of its own, a light, neutral grey (speckled gravel)", function()
+	t.test("STY-02: the road is a real terrain material of its own, a dark, neutral grey (asphalt)", function()
 		t.eq(GRAVEL, WorldLayout.RoadMaterial, "TownPaint and the country roads share one material")
 		t.ok(t.roblox.Enum.Material[GRAVEL] ~= nil, GRAVEL .. " is an Enum.Material")
 		for _, used in ipairs({ "Grass", "LeafyGrass", "Ground", "Mud", "Sand", "Rock", "Snow", "Glacier" }) do
@@ -153,14 +156,15 @@ return function(t)
 			t.ok(used ~= GRAVEL, "the road isn't " .. used)
 		end
 		local c = colors[GRAVEL]
-		t.ok(c ~= nil, "the road has a colour in MaterialColors (TerrainBuilder's setLook applies it)")
+		t.ok(c ~= nil, "the road has a colour in MaterialColors (MaterialSetup applies it)")
 		local _, s, v = c:ToHSV()
-		t.eq({ rgb(c) }, { 168, 164, 156 }, "Asphalt #A8A49C")
+		-- T402: asphalt #55585A, the colour of the town's road parts too (it was the light #A8A49C gravel).
+		t.eq({ rgb(c) }, { 85, 88, 90 }, "Asphalt #55585A")
 		t.ok(s < 0.09, "grey: hardly any colour in it")
-		t.ok(v > 0.6, "light")
-		t.ok(lum(c) > lum(colors.Ground), "paler than dirt")
+		t.ok(v < 0.4, "dark")
+		t.ok(lum(c) < lum(colors.Ground), "darker than dirt")
 		local r, g, b = rgb(c)
-		t.ok(r - b >= 0 and r - b <= 14, string.format("a warm grey (%d, %d, %d)", r, g, b))
+		t.ok(b - r >= 0 and b - r <= 14, string.format("a cool grey (%d, %d, %d)", r, g, b))
 		t.ok(math.abs(r - g) <= 6, string.format("neither pink nor green (%d, %d, %d)", r, g, b))
 		for name, other in pairs(colors) do
 			if name ~= GRAVEL then
@@ -280,7 +284,7 @@ return function(t)
 	)
 
 	t.test(
-		"STY-02: the town's street, paths, yards and lots are gravel; its plaza stays cobbles, shop floors stay earth",
+		"STY-02: the town's street, paths, yards and lots are asphalt paint outside the town zone and parts inside it; its plaza stays cobbles, shop floors stay earth",
 		function()
 			for _, paint in ipairs(WorldLayout.TownPaint) do
 				local cx, cz = (paint.x0 + paint.x1) / 2, (paint.z0 + paint.z1) / 2
@@ -293,11 +297,16 @@ return function(t)
 					end
 				end
 				if first == paint then
-					t.eq(materialAt(cx, cz), paint.material, paint.name)
+					-- T402: inside the town zone the roads are parts (TownGround) and the ground under them is Grass.
+					local want = paint.material
+					if want == GRAVEL and WorldLayout.InTownZone(cx, cz) then
+						want = "Grass"
+					end
+					t.eq(materialAt(cx, cz), want, paint.name)
 				end
 				t.ok(
 					paint.material == GRAVEL or paint.name == "Plaza",
-					paint.name .. " is gravel (only the plaza is cobbles)"
+					paint.name .. " is road paint (only the plaza is cobbles)"
 				)
 			end
 			local earth = 0
@@ -309,9 +318,15 @@ return function(t)
 			end
 			t.ok(earth >= 4, "the shop floors stay as they were")
 			t.eq(materialAt(0, 80), "Cobblestone", "the plaza's centre")
-			t.eq(materialAt(-60, 72), GRAVEL, "the main street")
+			t.eq(materialAt(-60, 72), "Grass", "the main street: a road part now, grass under it")
 			local lot = WorldLayout.ParkingLot
-			t.eq(materialAt((lot.x0 + lot.x1) / 2, (lot.z0 + lot.z1) / 2), GRAVEL, "the parking lot")
+			t.eq(
+				materialAt((lot.x0 + lot.x1) / 2, (lot.z0 + lot.z1) / 2),
+				"Grass",
+				"the parking lot: a part, grass under it"
+			)
+			-- The dealership strip is outside the zone: its painted roads are as they were.
+			t.eq(materialAt(250, 67), GRAVEL, "the dealership forecourt road")
 		end
 	)
 

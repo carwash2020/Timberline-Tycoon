@@ -31,6 +31,10 @@ never bound; `NoButtonR2.spec`), no Robux price in code.
 
 All 22 jobs are on main (#222 to #243; #244 fixes a ClientFreeze stretch that T397 introduced). Their Studio checks and the decisions they need are in the last section of PHASE2_NOTES.md ("MEGA batch T380 to T401"). No screenshots were possible, so everything there is untested in Studio.
 
+## T402 good-looking ground (21 October 2026, branch `phase-2/t402-ground`)
+
+The town's roads, curbs, footpaths, the lot's pavement and edge, and every plot pad's lawn edge are now parts (`Shared/World/TownGround`, built by `Art/TownGroundArt`, 145 parts: 73 in the town zone, 72 plot edges, budget 150). Country roads stay terrain. Terrain inside `WorldLayout.TownZone` never writes Asphalt, Rock, Slate or LeafyGrass (all read Grass); under Grass the voxels are Ground; the surface band is 3 voxels. `MaterialSetup` is the only `SetMaterialColor` writer (full table in its header, Mud and Rock kept as they were, no Pavement row). The terrain build writes 16-column blocks and yields every 4 ms; the town zone's blocks go first; each step's time is logged (`[Perf] terrain step ...`). Studio checks and the numbers: PHASE2_NOTES.md "T402 good-looking ground". Nothing has been seen in Studio.
+
 ## #201 to #213 and open work
 #201 What's New fixes, grey box backing, held-tool teleport; #202 console safe area and text sizes; #203 axe head placement, gear meshes, Xbox chop diagnostics; #204 remaining gear meshes, pending-mesh swap, real layout specs; #205 event and cave prop mesh ids; #206 worn gear meshes, rope ladder tiles, scroll V2; #207 first badge ids; #208 build menu; #209 chop feel; #210 wood effects on buildings; #211 Cherry, Willow, Amber, Garnet, added trees and teasers. Open draft: #213 (custom sound ids).
 Sound ids: #213 wires the custom ids for TreeCreak, Engine, CricketsNight, WindHowl, LavaRumble, Wings, Quack, StormCrackle and LogThud. Chop, ChopFinal, TreeFall and LogLoad keep their stand-ins until Connor confirms the uploads are Approved.
