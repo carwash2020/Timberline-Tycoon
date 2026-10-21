@@ -142,7 +142,16 @@ return function(t)
 			count += 1
 		end
 		t.ok(count >= 1 and count <= 4, count .. " town chunks")
-		t.eq(#terrain.live, count, "the first try's writes were cleared")
+		-- (each town chunk is written as 16-column blocks since T402)
+		local townJobs = {}
+		for job in pairs(done) do
+			table.insert(townJobs, job)
+		end
+		t.eq(
+			#terrain.live,
+			#TerrainBuilder.Split(townJobs, TerrainBuilder.SubColumns),
+			"the first try's writes were cleared"
+		)
 		for _, p in ipairs(TerrainBuilder.TownProbes) do
 			near(cast(p.X, p.Y), 0, 1e-5, "probe")
 		end

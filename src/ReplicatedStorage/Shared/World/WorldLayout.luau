@@ -604,13 +604,30 @@ do
 	end
 end
 
--- The parking lot east of the spawn (MapBuilder lays its paved surface and
--- paints the slots on it). M1.5 grew it east (it ended at x 112) for one
+-- The parking lot east of the spawn (TownGround lays its pavement and edge
+-- curb as parts; MapBuilder paints the slots on it). M1.5 grew it east (it ended at x 112) for one
 -- row of slots (WorldPlan.Town); T397 trimmed its east edge from x 146 to
 -- 138, one stud past the last bay's lane (bay 13 ends at x 137), so no
 -- slab stands empty beyond the bays. The LotApron keeps that rail and the
 -- turnaround level.
 WorldLayout.ParkingLot = { x0 = 8, x1 = 138, z0 = -18, z1 = 68 }
+
+-- The town zone (T402): the square, the parking lot, the sell yard and the
+-- roads between them, out to the lot loop. Inside it the roads are parts
+-- (Shared/World/TownGround), so the terrain under them is plain Grass: no
+-- Asphalt is painted and no Rock or Slate is written on the top layers (a
+-- grey smear on the grass). Its edges sit where the country roads begin:
+-- the Hills Road at x -125, the Snow Road at z 205, the East Link at x 180
+-- (the lot loop's east edge; the dealership strip beyond keeps its paint)
+-- and the South Link past the loop at z -75.
+-- Not a flat zone: nothing about the ground's height reads it.
+export type TownZoneRect = { x0: number, x1: number, z0: number, z1: number }
+WorldLayout.TownZone = { x0 = -125, x1 = 180, z0 = -75, z1 = 205 } :: TownZoneRect
+
+function WorldLayout.InTownZone(x: number, z: number): boolean
+	local zone = WorldLayout.TownZone
+	return x >= zone.x0 and x <= zone.x1 and z >= zone.z0 and z <= zone.z1
+end
 
 -- Loading pads for boxed vehicles and machines (GameConfig.LoadingPadSize).
 -- Named rects only: not a flat zone, a paint, or a reserved box, so nothing

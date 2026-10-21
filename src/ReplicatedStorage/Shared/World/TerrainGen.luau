@@ -1676,6 +1676,8 @@ end
 -- Studs of plain Grass past a homestead's pad (see SurfaceMaterial).
 local PLOT_LAWN = 40
 TerrainGen.PlotLawn = PLOT_LAWN
+local PLOT_EDGE = 8
+TerrainGen.PlotEdge = PLOT_EDGE
 
 -- Surface materials. This runs once per 4-stud column of the whole map
 -- (about 560,000 times a build), so it stays cheap: a few math.noise calls,
@@ -1760,8 +1762,8 @@ local function meadow(x: number, z: number, flat: number, bank: number): string
 end
 
 -- The surface material (an Enum.Material name) for a column of height h
--- and slope (rise over run).
-function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: number): string
+-- and slope (rise over run), before the town zone's rules (below).
+local function surfaceMaterial(x: number, z: number, h: number, slope: number): string
 	local _, surface, bank = water(x, z)
 	if surface and h < surface then
 		return if bank > 0.5 then "Sand" else "Mud"
@@ -1836,6 +1838,11 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 	end
 	-- The lawn round every homestead: plain Grass for PlotLawn studs past
 	-- the pad (its edge dithered), whatever the biome. Not on a cliff.
+	-- The first PLOT_EDGE studs past a pad are Grass whatever the slope or the
+	-- biome (T402): no dirt band, rock or scree against the pad's lawn edge.
+	if WorldLayout.NearPlotPad(x, z, PLOT_EDGE) then
+		return "Grass"
+	end
 	if slope <= 0.6 and WorldLayout.NearPlotPad(x, z, PLOT_LAWN + dither(x, z) * 6) then
 		return "Grass"
 	end
@@ -1923,6 +1930,23 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 	return meadow(x, z, flat, bank)
 end
 
+-- The surface material for a column of height h and slope (rise over run).
+-- Inside the town zone (WorldLayout.TownZone) the roads are parts, not paint,
+-- and the top layers are never grey: Asphalt, Rock and Slate there read as
+-- Grass, and so does the forest floor's LeafyGrass (T402).
+function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: number): string
+	local m = surfaceMaterial(x, z, h, slope)
+	-- (LeafyGrass too: the town's lawn is one green, so a road part never stands on the forest floor's second one.)
+	if
+		not legacyLayout
+		and (m == "Asphalt" or m == "Rock" or m == "Slate" or m == "LeafyGrass")
+		and WorldLayout.InTownZone(x, z)
+	then
+		return "Grass"
+	end
+	return m
+end
+
 -- Height, surface material and water surface (if any) at (x, z).
 function TerrainGen.Sample(x: number, z: number): (number, string, number?)
 	local h = TerrainGen.HeightAt(x, z)
@@ -1955,8 +1979,9 @@ function TerrainGen.Voxel(h: number, surface: number?, bottom: number): (string,
 	return "air", 0
 end
 
--- Colours for each terrain material. TerrainBuilder applies them with
--- Terrain:SetMaterialColor; the preview tool paints with them.
+-- Colours for each terrain material. MaterialSetup applies them with
+-- Terrain:SetMaterialColor (its own table: a spec keeps the two equal); the
+-- preview tool paints with these.
 -- 7 October 2026 (Connor, from Lumber Tycoon 2 screenshots): the ground
 -- reads as LT2's. A flat, vivid, almost cartoon-bright mid-green meadow
 -- (phase 12's dark, muted green is gone: Grass was 84,125,55 and LeafyGrass
@@ -1967,8 +1992,8 @@ end
 -- brighter than the green they should look. Snow, the volcano, the sand and
 -- the Gloam Hollow keep their own colours.
 TerrainGen.MaterialColors = {
-	Grass = Color3.fromRGB(100, 184, 56),
-	LeafyGrass = Color3.fromRGB(82, 158, 48),
+	Grass = Color3.fromRGB(110, 159, 69), -- #6E9F45
+	LeafyGrass = Color3.fromRGB(90, 138, 60), -- #5A8A3C
 	Ground = Color3.fromRGB(142, 108, 74), -- #8E6C4A
 	Mud = Color3.fromRGB(90, 74, 62), -- #5A4A3E
 	Sand = Color3.fromRGB(216, 198, 154), -- #D8C69A
@@ -1976,15 +2001,15 @@ TerrainGen.MaterialColors = {
 	Snow = Color3.fromRGB(238, 243, 247), -- #EEF3F7
 	Glacier = Color3.fromRGB(169, 211, 230), -- #A9D3E6
 	Basalt = Color3.fromRGB(58, 52, 51), -- #3A3433
-	Slate = Color3.fromRGB(91, 86, 80), -- #5B5650
+	Slate = Color3.fromRGB(124, 122, 106), -- #7C7A6A
 	CrackedLava = Color3.fromRGB(255, 106, 30), -- #FF6A1E
 	Cobblestone = Color3.fromRGB(156, 149, 138), -- #9C958A
 	-- The Bayou's floor, mud discs and channel beds (Builder amendment 1, the
 	-- Art Director's value) and Red Mesa's red sandstone (nothing else uses it).
 	Limestone = Color3.fromRGB(78, 74, 54), -- #4E4A36
-	Sandstone = Color3.fromRGB(200, 100, 60), -- #C8643C
-	-- Every road, path and street (GravelMaterial).
-	Asphalt = Color3.fromRGB(168, 164, 156), -- #A8A49C
+	Sandstone = Color3.fromRGB(200, 105, 62), -- #C8693E
+	-- The country roads, still terrain (GravelMaterial); the town's are parts.
+	Asphalt = Color3.fromRGB(85, 88, 90), -- #55585A
 } :: { [string]: Color3 }
 
 -- What lies under a surface material (cliff faces, the voxels below).

@@ -29,6 +29,7 @@ export type Options = {
 export type Slice = {
 	step: () -> boolean, -- yields when the slice is spent; true if it did
 	reset: () -> (), -- start a fresh slice now (after a yield of your own)
+	setBudget: (seconds: number) -> (), -- change the slice's own budget (the next step uses it)
 	yields: () -> number, -- how many times step() has yielded
 	longest: () -> number, -- the longest stretch of work between two yields, seconds
 	finish: () -> (), -- counts the stretch since the last yield (call when the job ends)
@@ -67,6 +68,9 @@ function TimeSlice.new(options: Options?): Slice
 				return true
 			end
 			return false
+		end,
+		setBudget = function(seconds: number)
+			budget = seconds
 		end,
 		reset = function()
 			sliceStart = clock()

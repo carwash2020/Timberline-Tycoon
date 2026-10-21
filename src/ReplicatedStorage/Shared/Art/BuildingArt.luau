@@ -2485,8 +2485,8 @@ end
 -- that glows after dark (LightingController), with a second, invisible
 -- LanternGlow 3 studs over it holding the dim PointLight (built switched
 -- off), so the light falls on the ground instead of grazing along it.
--- LinePaint (T397): not in the V1 pack, so the cream the bays were always painted in, #E6DEC8.
-local BAY_PAINT = Color3.fromRGB(230, 222, 200)
+-- LinePaint (T402): #E8E2D0, the same cream the town's road lines use (TownGround.LineColor).
+local BAY_PAINT = Color3.fromRGB(232, 226, 208)
 local BAY_LAMP_DAY = Color3.fromRGB(247, 217, 165) -- LightingController's daytime LanternGlow
 local BAY_LINE = 0.3
 local CURB_HEIGHT = 0.45
@@ -2520,28 +2520,8 @@ function BuildingArt.ParkingBay(slot: BasePart, index: number)
 	TownMeshes.Adorn(slot, "ParkingBay", cf)
 end
 
--- The lot's own ground (T397): a PavedRoad slab of Asphalt (so the Asphalt
--- MaterialVariant's texture shows), a 2-stud TrailDirt shoulder of Ground
--- round it, both flat and looks only (the terrain under them is what trucks
--- drive on). 0.3 thick, centred on the ground: its top is 0.15 up, under the
--- bays' 0.2 paint, and nothing lies coplanar with the terrain or the paint.
-BuildingArt.LotShoulder = 2
-BuildingArt.LotSlabThickness = 0.3
-function BuildingArt.ParkingLot(lot: { x0: number, x1: number, z0: number, z1: number }): Model
-	local model = Kit.model("ParkingLotSurface")
-	local thick = BuildingArt.LotSlabThickness
-	local s = BuildingArt.LotShoulder
-	local function flat(name: string, x0: number, x1: number, z0: number, z1: number, color: Color3, mat: Enum.Material)
-		local p = Kit.part(model, name, V3(x1 - x0, thick, z1 - z0), CF((x0 + x1) / 2, 0, (z0 + z1) / 2), color, mat)
-		Kit.decor(p, false)
-	end
-	flat("LotSurface", lot.x0, lot.x1, lot.z0, lot.z1, Palette.PavedRoad, MAT.Asphalt)
-	flat("LotShoulder", lot.x0 - s, lot.x1 + s, lot.z0 - s, lot.z0, Palette.TrailDirt, MAT.Ground)
-	flat("LotShoulder", lot.x0 - s, lot.x1 + s, lot.z1, lot.z1 + s, Palette.TrailDirt, MAT.Ground)
-	flat("LotShoulder", lot.x0 - s, lot.x0, lot.z0, lot.z1, Palette.TrailDirt, MAT.Ground)
-	flat("LotShoulder", lot.x1, lot.x1 + s, lot.z0, lot.z1, Palette.TrailDirt, MAT.Ground)
-	return model
-end
+-- (The parking lot's own pavement and edge curb are TownGround's parts since
+-- T402; the 2-stud dirt shoulder T397 laid round the slab is gone.)
 
 -- A street lamp: a stone footing, a timber post, an iron arm reaching out
 -- toward -Z with a lantern hanging from it (lit; clients may switch the

@@ -296,6 +296,10 @@ return function(t)
 					want = p.material
 				end
 			end
+			-- T402: the town's roads are parts, so their paint (Asphalt) reads Grass under them.
+			if want == WorldLayout.RoadMaterial and WorldLayout.InTownZone(x, z) then
+				want = "Grass"
+			end
 			t.eq(materialAt(x, z), want)
 		end
 	end)

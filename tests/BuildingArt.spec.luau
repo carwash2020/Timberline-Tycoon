@@ -598,7 +598,7 @@ return function(t)
 		for _, d in ipairs(slot:GetChildren()) do
 			if d.Name == "BayLine" then
 				t.ok(math.abs(d.Size.X - 0.3) < 1e-4, "bay lines are 0.3 wide (LinePaint)")
-				t.eq(d.Color:ToHex(), C3.fromRGB(230, 222, 200):ToHex())
+				t.eq(d.Color:ToHex(), C3.fromRGB(232, 226, 208):ToHex(), "LinePaint #E8E2D0")
 				t.eq(d.Material, Enum.Material.SmoothPlastic)
 			elseif d.Name == "StopBar" then
 				t.ok(
@@ -620,37 +620,11 @@ return function(t)
 	end)
 
 	t.test(
-		"the parking lot's ground (T397): a PavedRoad Asphalt slab and a 2-stud TrailDirt shoulder, looks only",
+		"the parking lot's slab and dirt shoulder are gone (T402): TownGround builds the pavement and the curb",
 		function()
-			local Palette = loader:load("ReplicatedStorage/Shared/Art/Palette")
-			local lot = { x0 = 8, x1 = 138, z0 = -18, z1 = 68 }
-			local model = BuildingArt.ParkingLot(lot)
-			local surface, shoulders = nil, {}
-			for _, p in ipairs(model:GetChildren()) do
-				t.ok(
-					not p.CanCollide and not p.CanQuery and not p.CanTouch and not p.CastShadow,
-					p.Name .. " is looks-only"
-				)
-				t.ok(p.CFrame.Position.Y + p.Size.Y / 2 <= 0.16, p.Name .. " is under the bays' paint")
-				if p.Name == "LotSurface" then
-					surface = p
-				else
-					table.insert(shoulders, p)
-				end
-			end
-			t.ok(surface, "LotSurface")
-			t.eq(surface.Color:ToHex(), Palette.PavedRoad:ToHex())
-			t.eq(surface.Material, roblox.Enum.Material.Asphalt)
-			t.ok(
-				math.abs(surface.Size.X - (lot.x1 - lot.x0)) < 1e-4
-					and math.abs(surface.Size.Z - (lot.z1 - lot.z0)) < 1e-4
-			)
-			t.eq(#shoulders, 4)
-			for _, p in ipairs(shoulders) do
-				t.eq(p.Color:ToHex(), Palette.TrailDirt:ToHex())
-				t.eq(p.Material, roblox.Enum.Material.Ground)
-				t.ok(math.min(p.Size.X, p.Size.Z) == 2, "the shoulder is 2 studs wide")
-			end
+			t.eq(BuildingArt.ParkingLot, nil, "no ParkingLot slab")
+			t.eq(BuildingArt.LotShoulder, nil, "no 2-stud dirt shoulder")
+			t.eq(BuildingArt.LotSlabThickness, nil)
 		end
 	)
 

@@ -34,11 +34,11 @@ return function(t)
 	-- real os.clock a fast CI runner finished 100 flat chunks inside the slices
 	-- and 'yields as it goes' failed once on #159.)
 	local STEP = 0.004
-	local function loadBuilder(terrain, yields)
+	local function loadBuilder(terrain, yields, step)
 		local now = 0
 		local fakeOs = setmetatable({
 			clock = function()
-				now += STEP
+				now += step or STEP
 				return now
 			end,
 		}, { __index = os })
@@ -116,14 +116,26 @@ return function(t)
 			local dz = math.max(b.z0 - far.Y, 0, far.Y - (b.z0 + b.nz * 4))
 			return dx <= TerrainBuilder.SpotReach and dz <= TerrainBuilder.SpotReach
 		end
-		local firstOther
+		-- T402: the town zone's blocks lead (their roads and lot stand on them), then the pads.
+		local townEnd = 0
 		for i, b in ipairs(blocks) do
-			if not nearSpot(b) then
+			if not TerrainBuilder.InTown(b) then
+				townEnd = i - 1
+				break
+			end
+		end
+		t.ok(townEnd > 20, "the town zone's blocks lead: " .. townEnd)
+		for i = townEnd + 1, #blocks do
+			t.ok(not TerrainBuilder.InTown(blocks[i]), "no town block after the first other block")
+		end
+		local firstOther
+		for i = townEnd + 1, #blocks do
+			if not nearSpot(blocks[i]) then
 				firstOther = i
 				break
 			end
 		end
-		t.ok(firstOther and firstOther > 1, "some blocks are pad blocks and they lead")
+		t.ok(firstOther and firstOther > townEnd + 1, "some blocks are pad blocks and they follow the town")
 		for i = firstOther, #blocks do
 			t.ok(not nearSpot(blocks[i]), "no pad block after the first other block")
 		end
@@ -152,13 +164,23 @@ return function(t)
 			"the first stage is a small part of the world: " .. nearWrites .. " of " .. #fullLog
 		)
 		local at = WorldLayout.Sawmill
+		-- (Writes are 16-column blocks now: each lies inside a chunk that touches the disc.)
+		local jobs = staged.Jobs()
 		for _, w in ipairs(stagedLog) do
 			if type(w) == "table" then
-				local cx, cz = math.clamp(at.X, w.x0, w.x1), math.clamp(at.Z, w.z0, w.z1)
-				t.ok(
-					(cx - at.X) ^ 2 + (cz - at.Z) ^ 2 <= (staged.NearRadius + 1) ^ 2,
-					"a first-stage write is far from the town"
-				)
+				local inside = false
+				for _, job in ipairs(jobs) do
+					if
+						w.x0 >= job.x0
+						and w.z0 >= job.z0
+						and w.x1 <= job.x0 + job.nx * 4
+						and w.z1 <= job.z0 + job.nz * 4
+					then
+						inside = staged.Touches(job, staged.NearRadius)
+						break
+					end
+				end
+				t.ok(inside, "a first-stage write is far from the town")
 			end
 		end
 		rest()
@@ -239,14 +261,22 @@ return function(t)
 			local mx, mz = b.x0 + b.nx * 2 - player.x, b.z0 + b.nz * 2 - player.z
 			return math.sqrt(mx * mx + mz * mz)
 		end
-		local firstOther
+		local townEnd = 0
 		for i, b in ipairs(blocks) do
-			if not nearSpot(b) then
+			if not TerrainBuilder.InTown(b) then
+				townEnd = i - 1
+				break
+			end
+		end
+		t.ok(townEnd > 0, "the town zone leads (T402)")
+		local firstOther
+		for i = townEnd + 1, #blocks do
+			if not nearSpot(blocks[i]) then
 				firstOther = i
 				break
 			end
 		end
-		t.ok(firstOther and firstOther > 1, "the pads still lead")
+		t.ok(firstOther and firstOther > townEnd + 1, "the pads follow the town")
 		for i = firstOther + 1, #blocks do
 			t.ok(away(blocks[i - 1]) <= away(blocks[i]) + 1e-9, "outward from the player, not the sawmill")
 		end
@@ -280,8 +310,19 @@ return function(t)
 		rest()
 		local writes = {}
 		for i = base + 1, #log do
-			if type(log[i]) == "table" then
-				table.insert(writes, log[i])
+			local w = log[i]
+			-- (the town zone's blocks go first whoever is where: left out here)
+			if
+				type(w) == "table"
+				and not builder.InTown({
+					x0 = w.x0,
+					z0 = w.z0,
+					nx = (w.x1 - w.x0) / 4,
+					nz = (w.z1 - w.z0) / 4,
+					dist = 0,
+				})
+			then
+				table.insert(writes, w)
 			end
 		end
 		t.ok(#writes > 500, #writes .. " blocks written in the second stage")
@@ -305,7 +346,8 @@ return function(t)
 
 	t.test("with a shared frame budget it yields when the frame is spent, not on a timer of its own", function()
 		local log, yields = {}, { n = 0 }
-		local builder = loadBuilder(fakeTerrain(log), yields)
+		-- (the clock barely moves: the 4 ms ceiling never fires, only the frame budget does)
+		local builder = loadBuilder(fakeTerrain(log), yields, 1e-7)
 		local overAfter = math.huge
 		local asked = 0
 		local frame = {
@@ -328,7 +370,7 @@ return function(t)
 		t.ok(asked >= blocks - 5, "the budget is asked after every block")
 		-- And an always-open budget never yields.
 		local log2, yields2 = {}, { n = 0 }
-		local builder2 = loadBuilder(fakeTerrain(log2), yields2)
+		local builder2 = loadBuilder(fakeTerrain(log2), yields2, 1e-7)
 		local _, rest2 = builder2.Build(nil, {
 			nearRadius = builder2.NearRadius,
 			frame = {
