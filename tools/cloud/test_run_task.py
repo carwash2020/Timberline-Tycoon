@@ -160,6 +160,32 @@ class Flow(unittest.TestCase):
             self.assertEqual(headers["x-api-key"], KEY)
         self.assertNotIn(KEY, text, "the key is never printed")
 
+    def test_a_publish_500_is_retried_and_a_400_is_not(self):
+        class Flaky(Fake):
+            def __init__(self, codes, **kw):
+                super().__init__(**kw)
+                self.codes = list(codes)
+
+            def http(self, method, url, headers, body):
+                if "/universes/v1/" in url and self.codes:
+                    self.calls.append((method, url, dict(headers), body))
+                    code = self.codes.pop(0)
+                    if code != 200:
+                        return code, b'{"title":"boom"}'
+                    return 200, b'{"versionNumber": 7}'
+                return super().http(method, url, headers, body)
+
+        f = Flaky([500, 200])
+        out = []
+        self.assertEqual(rt.run(cfg(), http=f.http, sleep=lambda s: None, clock=lambda: 0.0, out=out.append), 0)
+        self.assertEqual(sum(1 for c in f.calls if "/universes/v1/" in c[1]), 2)
+        f = Flaky([500, 500, 500])
+        self.assertEqual(rt.run(cfg(), http=f.http, sleep=lambda s: None, clock=lambda: 0.0, out=out.append), 1)
+        self.assertEqual(sum(1 for c in f.calls if "/universes/v1/" in c[1]), 3)
+        f = Flaky([400])
+        self.assertEqual(rt.run(cfg(), http=f.http, sleep=lambda s: None, clock=lambda: 0.0, out=out.append), 1)
+        self.assertEqual(sum(1 for c in f.calls if "/universes/v1/" in c[1]), 1)
+
     def test_the_task_timeout_is_inside_the_api_limit(self):
         fake = Fake()
         run(cfg(), fake)

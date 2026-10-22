@@ -152,7 +152,16 @@ class Client:
         cfg = self.cfg
         data = cfg.rbxl.read_bytes()
         url = f"{API}/universes/v1/{cfg.universe}/places/{cfg.place}/versions?versionType=Saved"
-        out = self.call("POST", url, data, "application/octet-stream")
+        # A 5xx from the publish endpoint is Roblox's, not ours (one was seen on a CI run). Saving the same
+        # file again as another Saved version is harmless, so try up to 3 times, 5 s then 15 s apart.
+        for attempt, wait in enumerate((5, 15, None)):
+            try:
+                out = self.call("POST", url, data, "application/octet-stream")
+                break
+            except Failed as e:
+                if wait is None or not str(e).startswith("HTTP 5"):
+                    raise
+                self.sleep(wait)
         version = out.get("versionNumber")
         if not isinstance(version, int):
             raise Failed(f"publishing the place returned no versionNumber: {json.dumps(out)[:300]}")
