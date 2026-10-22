@@ -977,6 +977,30 @@ ItemCatalog.Machines = {
 	},
 } :: { [string]: MachineDef }
 
+-- Wire (T420): single-use wiring, bought by the amount needed and used up as a
+-- wire is stretched between two pieces. One unit is one stud of wire. There was
+-- no per-unit wire price before this (the Glow Wire is a placed light, not a
+-- length), so `unitPrice` is NEW DATA, flagged for Connor: no other price moved.
+-- The longest single wire is WireLogic.Span (the server's reach between pieces)
+-- and is not repeated here.
+export type WireDef = {
+	id: string,
+	displayName: string,
+	unitPrice: number, -- cash per unit (one stud)
+	note: string,
+}
+
+ItemCatalog.Wire = {
+	id = "Wire",
+	displayName = "Wire",
+	unitPrice = 2,
+	note = "One unit is one stud of wire. A wire is used up when you stretch it between two pieces.",
+} :: WireDef
+
+function ItemCatalog.GetWire(): WireDef
+	return ItemCatalog.Wire
+end
+
 function ItemCatalog.GetMachine(machineId: string): MachineDef?
 	local machine = ItemCatalog.Machines[machineId]
 	if type(machine) == "table" then

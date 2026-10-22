@@ -1,0 +1,488 @@
+{
+  "sizes": [
+    {
+      "after": {
+        "card": {
+          "artH": 44,
+          "blurbH": 54,
+          "blurbLines": 3,
+          "blurbText": 14,
+          "costH": 34,
+          "costLines": 2,
+          "costText": 14,
+          "gap": 4,
+          "h": 188,
+          "nameH": 40,
+          "nameText": 16,
+          "pad": 8
+        },
+        "cols": 2,
+        "tileH": 188,
+        "tileW": 227.5
+      },
+      "before": {
+        "cols": 3,
+        "tileH": 120,
+        "tileW": 149
+      },
+      "h": 375,
+      "label": "667x375 phone",
+      "panelW": 643,
+      "phone": true,
+      "rail": 132,
+      "scale": 1,
+      "w": 667
+    },
+    {
+      "after": {
+        "card": {
+          "artH": 56,
+          "blurbH": 57,
+          "blurbLines": 3,
+          "blurbText": 15,
+          "costH": 36,
+          "costLines": 2,
+          "costText": 15,
+          "gap": 4,
+          "h": 209,
+          "nameH": 44,
+          "nameText": 18,
+          "pad": 8
+        },
+        "cols": 3,
+        "tileH": 209,
+        "tileW": 232
+      },
+      "before": {
+        "cols": 4,
+        "tileH": 140,
+        "tileW": 172
+      },
+      "h": 1080,
+      "label": "1920x1080 computer",
+      "panelW": 960,
+      "phone": false,
+      "rail": 200,
+      "scale": 1.25,
+      "w": 1920
+    }
+  ],
+  "tabs": [
+    {
+      "cards": [
+        {
+          "blurb": "A sandstone wall, 4 studs. Carry slabs to it to finish it.",
+          "cost": "2 sandstone slabs · fee $8",
+          "name": "Sandstone Wall",
+          "size": "4 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A low wall, 3 studs high. Fences off a yard or a counter.",
+          "cost": "4 u³ of planks, one wood · fee $16",
+          "name": "Half Wall",
+          "size": "8 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A short wall, 4 studs. Fills a gap or finishes a corner.",
+          "cost": "4 u³ of planks, one wood · fee $16",
+          "name": "Short Wall",
+          "size": "4 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A glass wall with a doorway. Hang a Door in it.",
+          "cost": "5 u³ of planks, one wood · fee $20",
+          "name": "Glass Door Wall",
+          "size": "8 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A mostly glass wall. You see through it, not walk through.",
+          "cost": "5 u³ of planks, one wood · fee $20",
+          "name": "Picture Window Wall",
+          "size": "8 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A wall with a doorway in it. Hang a Door in the gap.",
+          "cost": "6 u³ of planks, one wood · fee $24",
+          "name": "Door Wall",
+          "size": "8 × 1 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 15,
+      "label": "Walls"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "A sandstone floor, 4 by 4. Carry slabs to it to finish it.",
+          "cost": "2 sandstone slabs · fee $8",
+          "name": "Sandstone Floor",
+          "size": "4 × 4 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A small floor, 4 by 4 studs. Patches a gap or floors a closet.",
+          "cost": "3 u³ of planks, one wood · fee $12",
+          "name": "Small Floor",
+          "size": "4 × 4 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A balcony, 8 by 4, railed at the front and sides.",
+          "cost": "10 u³ of planks, one wood · fee $40",
+          "name": "Balcony",
+          "size": "8 × 4 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A square of floor. Lay a few side by side for a room.",
+          "cost": "12 u³ of planks, one wood · fee $48",
+          "name": "Floor",
+          "size": "8 × 8 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A raised base, 8 by 8 and 2 tall. Lifts a building off the ground.",
+          "cost": "20 u³ of planks, one wood · fee $80",
+          "name": "Foundation",
+          "size": "8 × 8 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 5,
+      "label": "Floors"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "A door that swings open. Hang it in a door wall.",
+          "cost": "4 u³ of planks, one wood · fee $16",
+          "name": "Door",
+          "size": "4 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A sandstone arch with a 4 by 6 opening, for a gate.",
+          "cost": "4 sandstone slabs · fee $16",
+          "name": "Sandstone Arch",
+          "size": "8 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A pane of glass for a window wall. It stays clear.",
+          "cost": "6 u³ of planks, one wood · fee $24",
+          "name": "Window",
+          "size": "4 × 1 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 3,
+      "label": "Doors"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "A trim band for a roof edge. Resize it, face it toward the roof.",
+          "cost": "2 u³ of planks, one wood · fee $8",
+          "name": "Roof Edge",
+          "size": "8 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A striped canopy for a shop front. High at the wall.",
+          "cost": "3 u³ of planks, one wood · fee $12",
+          "name": "Awning",
+          "size": "8 × 3 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A hip corner, 4 by 4, rising 3. Turns a roof round a corner.",
+          "cost": "5 u³ of planks, one wood · fee $20",
+          "name": "Roof Corner",
+          "size": "4 × 4 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "The cap where two slopes meet. Sit it on the roof base.",
+          "cost": "6 u³ of planks, one wood · fee $24",
+          "name": "Roof Ridge",
+          "size": "8 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A sloped roof, 8 along the eave and 4 deep, rising 3.",
+          "cost": "10 u³ of planks, one wood · fee $40",
+          "name": "Sloped Roof",
+          "size": "8 × 4 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A flat roof, 8 by 8, with a short overhang.",
+          "cost": "12 u³ of planks, one wood · fee $48",
+          "name": "Flat Roof",
+          "size": "8 × 8 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 9,
+      "label": "Roofs"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "An 8-stud railing for a porch, balcony or deck edge.",
+          "cost": "3 u³ of planks, one wood · fee $12",
+          "name": "Railing",
+          "size": "8 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A run of fence, 8 studs. Keeps your plot tidy.",
+          "cost": "3 u³ of planks, one wood · fee $12",
+          "name": "Fence",
+          "size": "8 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A gate, 4 studs, that swings open. Goes in a gap in a fence.",
+          "cost": "3 u³ of planks, one wood · fee $12",
+          "name": "Fence Gate",
+          "size": "4 × 1 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 3,
+      "label": "Fences"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "A 6-stud post. Holds up a porch roof or marks a fence corner.",
+          "cost": "1 u³ of planks, one wood · fee $4",
+          "name": "Post",
+          "size": "1 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "An 8-stud beam. Spans between posts to carry a roof or floor.",
+          "cost": "2 u³ of planks, one wood · fee $8",
+          "name": "Beam",
+          "size": "8 × 1 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 2,
+      "label": "Supports"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "A ramp rising 2 studs over 8, toward the back.",
+          "cost": "8 u³ of planks, one wood · fee $32",
+          "name": "Ramp",
+          "size": "4 × 8 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A flight of stairs, rising toward the back.",
+          "cost": "18 u³ of planks, one wood · fee $72",
+          "name": "Stairs",
+          "size": "4 × 8 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "Eight steps up one storey, 8 long. The top is at the back.",
+          "cost": "22 u³ of planks, one wood · fee $88",
+          "name": "Storey Stairs",
+          "size": "4 × 8 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 3,
+      "label": "Stairs"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "A chair. The back is at the rear.",
+          "cost": "Free to place",
+          "name": "Chair",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "Furniture for the inside of your building.",
+          "cost": "Free to place",
+          "name": "Crate",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A flat rug. Walk right over it.",
+          "cost": "Free to place",
+          "name": "Rug",
+          "size": "6 × 4 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "Furniture for the inside of your building.",
+          "cost": "Free to place",
+          "name": "Barrel",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A plain table for the cabin.",
+          "cost": "Free to place",
+          "name": "Table",
+          "size": "4 × 4 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A fire pit that glows all night.",
+          "cost": "Free to place",
+          "name": "Fire Pit",
+          "size": "4 × 4 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 7,
+      "label": "Indoor"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "A sign for your plot.",
+          "cost": "Free to place",
+          "name": "Wood Sign",
+          "size": "4 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A touch of decoration for your plot.",
+          "cost": "$60 to place",
+          "name": "Flower Bed",
+          "size": "4 × 4 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A can of barn-red paint.",
+          "cost": "Free to place",
+          "name": "Paint Can",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A touch of decoration for your plot.",
+          "cost": "$80 to place",
+          "name": "Bench",
+          "size": "4 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A mailbox by the path.",
+          "cost": "Free to place",
+          "name": "Mailbox",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A touch of decoration for your plot.",
+          "cost": "$120 to place",
+          "name": "Lamp Post",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 8,
+      "label": "Decor"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "Your own shed: place the plan, then fill it with planks.",
+          "cost": "60 u³ of planks, one wood · free to place",
+          "name": "Shed",
+          "size": "10 × 8 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A whole building. Place the plan, then fill it with planks.",
+          "cost": "$2,000 to place",
+          "name": "Cabin",
+          "size": "12 × 10 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "Will show off your axes (a later update).",
+          "cost": "$500 to place",
+          "name": "Axe Rack",
+          "size": "6 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "Will store logs and materials (a later update).",
+          "cost": "$4,000 to place",
+          "name": "Warehouse",
+          "size": "16 × 12 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 4,
+      "label": "Houses"
+    },
+    {
+      "cards": [
+        {
+          "blurb": "A copper lamp post that glows all night.",
+          "cost": "Crafted at the bench",
+          "name": "Copper Lamp Post",
+          "size": "2 × 3 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A chest with gold bands. For show.",
+          "cost": "Crafted at the bench",
+          "name": "Gold-banded Chest",
+          "size": "4 × 3 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "A copper band for a wall top or a floor edge.",
+          "cost": "1 Copper ingot · fee $4",
+          "name": "Copper Trim",
+          "size": "4 × 1 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "Flip it. Wire it to a lamp, a door or a gate.",
+          "cost": "Free to place",
+          "name": "Wall Switch",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "Lit until you wire it, then it follows the wire.",
+          "cost": "Free to place",
+          "name": "Spark Lamp",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        },
+        {
+          "blurb": "On when its input is off.",
+          "cost": "$200 to place",
+          "name": "NOT Gate",
+          "size": "2 × 2 studs",
+          "state": "ready"
+        }
+      ],
+      "count": 20,
+      "label": "More"
+    }
+  ]
+}

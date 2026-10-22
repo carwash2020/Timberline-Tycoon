@@ -2,8 +2,8 @@
 -- WireToolLogic: the rules of the wiring tool (StarterPlayerScripts/WireTool).
 -- Pure, so tests can run a whole wiring session without a client.
 --
--- In BUILD mode, WIRE starts the tool. Pick a Wall Switch, then tap a Spark
--- Lamp or a Door to wire it (the switch stays picked, so one switch can feed
+-- The Wire spool in hand starts the tool (T420; it used to be the hammer's WIRE
+-- button). Pick a Wall Switch, then tap a Spark Lamp or a Door to wire it (the switch stays picked, so one switch can feed
 -- several). Pick any wired piece and CUT clears its wires. Everything is an
 -- intent for the server's Wire remote: (fromUid, 1, toUid, 1) or
 -- ("cut", uid); LogicService checks it all again.
@@ -13,6 +13,7 @@
 -- never more than MaxLines of them.
 
 local WireLogic = require(script.Parent.WireLogic)
+local WireSupply = require(script.Parent.WireSupply)
 
 local WireToolLogic = {}
 
@@ -43,6 +44,111 @@ WireToolLogic.Lessons = { "Pick an output", "Pick an input", "Done: flip it" }
 
 -- `step` is 1..3 while teaching and 4 once the session has seen all three.
 function WireToolLogic.Lesson(step: number): string?
+	---------------------------------------------------------------------------
+	-- Stretching a wire (T420): wire is a single-use item, so the tool shows what
+	-- the wire you are stretching would use and cost before you place it.
+	---------------------------------------------------------------------------
+
+	WireToolLogic.TopUp = 10 -- what the buy button offers when nothing is missing
+
+	export type Stretch = {
+		state: string, -- "start" | "aim" | "ok" | "short" | "far"
+		length: number,
+		units: number,
+		short: number,
+		buyCost: number,
+		left: number,
+		text: string,
+	}
+
+	local function stretchText(state: string, q: WireSupply.Quote, stock: number): string
+		if state == "start" then
+			return "Pick an output to start a wire."
+		elseif state == "aim" then
+			return string.format("%d studs so far. Aim at an input.", math.ceil(q.length))
+		elseif state == "ok" then
+			return string.format("%d studs: uses %d wire, %d left.", math.ceil(q.length), q.units, q.left)
+		elseif state == "short" then
+			return string.format("%d studs needs %d wire. You have %d.", math.ceil(q.length), q.units, stock)
+		end
+		return WireSupply.Message("far")
+	end
+
+	-- What the wire from `from` stretched to `to` (or loose, `free` studs long) would
+	-- use from a box of `stock`. A wire starts at an output; an end that is the same
+	-- piece, or not an input, is still aiming.
+	function WireToolLogic.Stretch(stock: number?, from: Piece?, to: Piece?, free: number?): Stretch
+		local have = WireSupply.Clean(stock)
+		local blank = WireSupply.Quote(have, 0)
+		if from == nil or not WireLogic.IsSource(WireLogic.Role(from.blueprintId)) then
+			return {
+				state = "start",
+				length = 0,
+				units = 0,
+				short = 0,
+				buyCost = 0,
+				left = have,
+				text = stretchText("start", blank, have),
+			}
+		end
+		local length = free or 0
+		local state = "aim"
+		if to ~= nil and to.uid ~= from.uid and WireLogic.IsTarget(WireLogic.Role(to.blueprintId)) then
+			length = WireSupply.Length(from, to)
+			state = "ok"
+		end
+		local q = WireSupply.Quote(have, length)
+		if q.state == "far" then
+			state = "far"
+		elseif state == "ok" and q.state == "short" then
+			state = "short"
+		end
+		return {
+			state = state,
+			length = length,
+			units = q.units,
+			short = q.short,
+			buyCost = q.buyCost,
+			left = q.left,
+			text = stretchText(state, q, have),
+		}
+	end
+
+	-- How the stretched line is drawn: its colour follows the state.
+	function WireToolLogic.LineTone(state: string): string
+		if state == "short" then
+			return "warn"
+		elseif state == "far" then
+			return "bad"
+		end
+		return "ok"
+	end
+
+	-- The wire left in the box, in a line.
+	function WireToolLogic.BoxLine(stock: number?): string
+		local have = WireSupply.Clean(stock)
+		if have <= 0 then
+			return "Wire box: empty. Buy some."
+		end
+		return string.format("Wire box: %d", have)
+	end
+
+	export type BuyPlan = { amount: number, cost: number, text: string }
+
+	-- What the buy button does: the units the stretched wire is short of, else a
+	-- top-up of TopUp, never more than the box has room for.
+	function WireToolLogic.BuyPlan(stock: number?, stretch: Stretch): BuyPlan
+		local have = WireSupply.Clean(stock)
+		local room = WireSupply.MaxStock - have
+		if room <= 0 then
+			return { amount = 0, cost = 0, text = "Box full" }
+		end
+		local want = if stretch.short > 0 then stretch.short else WireToolLogic.TopUp
+		local amount = math.max(0, math.min(want, room, WireSupply.MaxBuy))
+		local cost = amount * WireSupply.UnitPrice()
+		return { amount = amount, cost = cost, text = string.format("BUY %d · %s", amount, WireSupply.PriceText(cost)) }
+	end
+
 	return WireToolLogic.Lessons[step]
 end
 
@@ -283,6 +389,111 @@ function WireToolLogic.NearestOnScreen(
 		end
 	end
 	return best
+end
+
+---------------------------------------------------------------------------
+-- Stretching a wire (T420): wire is a single-use item, so the tool shows what
+-- the wire you are stretching would use and cost before you place it.
+---------------------------------------------------------------------------
+
+WireToolLogic.TopUp = 10 -- what the buy button offers when nothing is missing
+
+export type Stretch = {
+	state: string, -- "start" | "aim" | "ok" | "short" | "far"
+	length: number,
+	units: number,
+	short: number,
+	buyCost: number,
+	left: number,
+	text: string,
+}
+
+local function stretchText(state: string, q: WireSupply.Quote, stock: number): string
+	if state == "start" then
+		return "Pick an output to start a wire."
+	elseif state == "aim" then
+		return string.format("%d studs so far. Aim at an input.", math.ceil(q.length))
+	elseif state == "ok" then
+		return string.format("%d studs: uses %d wire, %d left.", math.ceil(q.length), q.units, q.left)
+	elseif state == "short" then
+		return string.format("%d studs needs %d wire. You have %d.", math.ceil(q.length), q.units, stock)
+	end
+	return WireSupply.Message("far")
+end
+
+-- What the wire from `from` stretched to `to` (or loose, `free` studs long) would
+-- use from a box of `stock`. A wire starts at an output; an end that is the same
+-- piece, or not an input, is still aiming.
+function WireToolLogic.Stretch(stock: number?, from: Piece?, to: Piece?, free: number?): Stretch
+	local have = WireSupply.Clean(stock)
+	local blank = WireSupply.Quote(have, 0)
+	if from == nil or not WireLogic.IsSource(WireLogic.Role(from.blueprintId)) then
+		return {
+			state = "start",
+			length = 0,
+			units = 0,
+			short = 0,
+			buyCost = 0,
+			left = have,
+			text = stretchText("start", blank, have),
+		}
+	end
+	local length = free or 0
+	local state = "aim"
+	if to ~= nil and to.uid ~= from.uid and WireLogic.IsTarget(WireLogic.Role(to.blueprintId)) then
+		length = WireSupply.Length(from, to)
+		state = "ok"
+	end
+	local q = WireSupply.Quote(have, length)
+	if q.state == "far" then
+		state = "far"
+	elseif state == "ok" and q.state == "short" then
+		state = "short"
+	end
+	return {
+		state = state,
+		length = length,
+		units = q.units,
+		short = q.short,
+		buyCost = q.buyCost,
+		left = q.left,
+		text = stretchText(state, q, have),
+	}
+end
+
+-- How the stretched line is drawn: its colour follows the state.
+function WireToolLogic.LineTone(state: string): string
+	if state == "short" then
+		return "warn"
+	elseif state == "far" then
+		return "bad"
+	end
+	return "ok"
+end
+
+-- The wire left in the box, in a line.
+function WireToolLogic.BoxLine(stock: number?): string
+	local have = WireSupply.Clean(stock)
+	if have <= 0 then
+		return "Wire box: empty. Buy some."
+	end
+	return string.format("Wire box: %d", have)
+end
+
+export type BuyPlan = { amount: number, cost: number, text: string }
+
+-- What the buy button does: the units the stretched wire is short of, else a
+-- top-up of TopUp, never more than the box has room for.
+function WireToolLogic.BuyPlan(stock: number?, stretch: Stretch): BuyPlan
+	local have = WireSupply.Clean(stock)
+	local room = WireSupply.MaxStock - have
+	if room <= 0 then
+		return { amount = 0, cost = 0, text = "Box full" }
+	end
+	local want = if stretch.short > 0 then stretch.short else WireToolLogic.TopUp
+	local amount = math.max(0, math.min(want, room, WireSupply.MaxBuy))
+	local cost = amount * WireSupply.UnitPrice()
+	return { amount = amount, cost = cost, text = string.format("BUY %d · %s", amount, WireSupply.PriceText(cost)) }
 end
 
 return WireToolLogic

@@ -49,7 +49,7 @@ return function(t)
 		end
 		local owner = newPlayer(1)
 		local visitor = newPlayer(2)
-		local profile = { plot = { placed = {}, wires = {} }, permissions = {} }
+		local profile = { plot = { placed = {}, wires = {} }, permissions = {}, wireUnits = 500 } -- wire is single use (T420): a full box
 		local items = Instance.new("Folder")
 		local host = { cframe = CFrame.new(100, 0, 100), items = items }
 		-- Plot-local to world, so a player near plot (x, z) stands there.
@@ -565,7 +565,7 @@ return function(t)
 			local items = Instance.new("Folder")
 			items.Parent = Instance.new("Folder")
 			local host = { cframe = CFrame.new(0, 0, 0), items = items }
-			local profile = { plot = { placed = {}, wires = {} }, permissions = {} }
+			local profile = { plot = { placed = {}, wires = {} }, permissions = {}, wireUnits = 500 } -- wire is single use (T420): a full box
 			local item = { uid = uid, blueprintId = "SparkLamp", x = 0, z = 0, rot = 0 }
 			table.insert(profile.plot.placed, item)
 			local model = BlueprintModels.Build(PlotData.Blueprint("SparkLamp"), false)

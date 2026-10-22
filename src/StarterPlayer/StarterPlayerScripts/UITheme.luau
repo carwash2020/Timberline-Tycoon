@@ -46,6 +46,8 @@ local UserInputService = game:GetService("UserInputService")
 
 local UIArt = require(script.Parent.UIArt)
 local Palette = require(ReplicatedStorage.Shared.Art.Palette)
+local PickerMotion = require(ReplicatedStorage.Shared.PickerMotion)
+local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 
 local UITheme = {}
 
@@ -1491,16 +1493,24 @@ end
 -- The ring a focused card, row or button shows on a gamepad: a gold stroke
 -- (Palette.CoinGold, `stroke` px) and a 2 px Ink ring outside it, because gold
 -- alone on Cream is 1.4:1. Use it as a SelectionImageObject.
-function UITheme.FocusRing(stroke: number): Frame
+function UITheme.FocusRing(stroke: number, radius: number?): Frame
 	local ring = Instance.new("Frame")
 	ring.Name = "FocusRing"
+	-- T420: placed like the selection ring above, from the object's top-left
+	-- corner with no anchor: Position 0 and Size 1 (the object's own rectangle),
+	-- so the gold stroke (drawn outside the frame) lies exactly on the button's
+	-- edge. The corner is the button's own (`radius`), not a rounder guess, so the
+	-- ring follows the edge round the corners too.
+	ring.AnchorPoint = Vector2.zero
+	ring.Position = UDim2.new()
 	ring.Size = UDim2.fromScale(1, 1)
 	ring.BackgroundTransparency = 1
 	ring.BorderSizePixel = 0
-	UITheme.corner(ring, 10)
+	UITheme.corner(ring, radius or 10)
 	local gold = Instance.new("UIStroke")
 	gold.Color = Palette.CoinGold
 	gold.Thickness = stroke
+	gold.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	gold.Parent = ring
 	local outer = Instance.new("Frame")
 	outer.Name = "InkRing"
@@ -1509,7 +1519,7 @@ function UITheme.FocusRing(stroke: number): Frame
 	outer.Size = UDim2.new(1, stroke * 2 + 4, 1, stroke * 2 + 4)
 	outer.BackgroundTransparency = 1
 	outer.BorderSizePixel = 0
-	UITheme.corner(outer, 12)
+	UITheme.corner(outer, (radius or 10) + 2)
 	UITheme.stroke(outer, UITheme.Skin.Ink, 2)
 	outer.Parent = ring
 	return ring
@@ -1527,6 +1537,114 @@ function UITheme.HiddenSelection(): Frame
 	empty.BorderSizePixel = 0
 	empty.Size = UDim2.fromScale(1, 1)
 	return empty
+end
+
+---------------------------------------------------------------------------
+-- Motion (T420). One place makes the picker's tweens, and it gives way to the
+-- player's "calm the screen" setting (Reduce flashing, or camera shake off).
+---------------------------------------------------------------------------
+
+-- Whether UI motion should be skipped: the player asked for a calm screen.
+function UITheme.MotionReduced(): boolean
+	local ok, reduced = pcall(function()
+		return PickerMotion.Reduced(
+			player:GetAttribute(SettingsLogic.ReduceFlashingAttribute),
+			player:GetAttribute("SettingCameraShake")
+		)
+	end)
+	return ok and reduced == true
+end
+
+-- Tweens `obj` to `goal` over `seconds` and returns the tween, or, on a calm
+-- screen (or a zero time), sets the end state at once and returns nil.
+function UITheme.Tween(
+	obj: Instance,
+	seconds: number,
+	goal: { [string]: any },
+	style: Enum.EasingStyle?,
+	direction: Enum.EasingDirection?
+): Tween?
+	local function settle()
+		for property, value in pairs(goal) do
+			(obj :: any)[property] = value
+		end
+		return nil
+	end
+	if seconds <= 0 or UITheme.MotionReduced() then
+		return settle()
+	end
+	-- Looked up here, not at load: most screens never tween, and a spec that loads
+	-- the theme (no TweenService to hand) just gets the end state.
+	local ok, tween = pcall(function(): Tween
+		local made = game:GetService("TweenService"):Create(
+			obj,
+			TweenInfo.new(seconds, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out),
+			goal
+		)
+		made:Play()
+		return made
+	end)
+	if not ok then
+		return settle()
+	end
+	return tween
+end
+
+-- Hover and press answer for `button`: its `target` (default the button) grows a
+-- little under the pointer and shrinks a little when pressed, through a UIScale
+-- (PickerMotion's numbers; nothing moves on a calm screen). Returns the UIScale.
+function UITheme.Respond(button: GuiButton, target: GuiObject?): UIScale
+	local host = target or button
+	local existing = host:FindFirstChildOfClass("UIScale")
+	local grow: UIScale
+	if existing then
+		grow = existing
+	else
+		grow = Instance.new("UIScale")
+		grow.Name = "Respond"
+		grow.Parent = host
+	end
+	local hovered, pressed = false, false
+	local function settle()
+		local reduced = UITheme.MotionReduced()
+		local goal = PickerMotion.Scale(hovered, pressed, reduced)
+		local effect = if pressed then PickerMotion.Press else PickerMotion.Hover
+		UITheme.Tween(grow, PickerMotion.Seconds(effect, reduced), { Scale = goal })
+	end
+	button.InputBegan:Connect(function(input: InputObject)
+		local kind = input.UserInputType
+		if kind == Enum.UserInputType.MouseMovement then
+			hovered = true
+			settle()
+		elseif
+			kind == Enum.UserInputType.MouseButton1
+			or kind == Enum.UserInputType.Touch
+			or input.KeyCode == Enum.KeyCode.ButtonA
+		then
+			pressed = true
+			settle()
+		end
+	end)
+	button.InputEnded:Connect(function(input: InputObject)
+		local kind = input.UserInputType
+		if kind == Enum.UserInputType.MouseMovement then
+			hovered = false
+		end
+		if
+			kind == Enum.UserInputType.MouseButton1
+			or kind == Enum.UserInputType.Touch
+			or kind == Enum.UserInputType.MouseMovement
+			or input.KeyCode == Enum.KeyCode.ButtonA
+		then
+			pressed = false
+		end
+		settle()
+	end)
+	button.SelectionLost:Connect(function()
+		pressed = false
+		settle()
+	end)
+	return grow
 end
 
 function UITheme.Start()

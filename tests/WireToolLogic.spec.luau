@@ -121,6 +121,8 @@ return function(t)
 		end
 		t.eq(by.Pick.gamepad, Enum.KeyCode.ButtonR1, "RB picks: the right trigger is never bound")
 		t.eq(by.Cut.gamepad, Enum.KeyCode.ButtonX)
+		t.eq(by.Buy.gamepad, Enum.KeyCode.ButtonY, "Y buys the missing wire")
+		t.ok(by.Buy.gamepad ~= Enum.KeyCode.ButtonR2 and by.Buy.gamepad ~= Enum.KeyCode.ButtonL2, "no trigger")
 		t.eq(by.Done.gamepad, Enum.KeyCode.ButtonB)
 		t.eq(by.Done.gamepad, InputKit.Actions.Cancel.gamepad, "B is the same Cancel everywhere")
 		t.ok(InputKit.WireSafe(InputKit.WireBinds))
@@ -144,8 +146,9 @@ return function(t)
 		t.ok(string.find(tool, 'PromptSwitch.Hold("wire")', 1, true), "world prompts off while wiring")
 		t.ok(string.find(tool, 'PromptSwitch.Release("wire")', 1, true), "and back after")
 		local plot = fs.readFile("src/StarterPlayer/StarterPlayerScripts/PlotUI.luau")
-		t.ok(string.find(plot, "WireTool.SetBuilding(on)", 1, true), "build mode drives the tool")
-		t.ok(string.find(plot, 'text = "WIRE"', 1, true), "a WIRE button on the build bar")
+		t.ok(string.find(plot, "WireTool.SetBuilding(on)", 1, true), "build mode still shows the lines")
+		t.eq(string.find(plot, 'text = "WIRE"', 1, true), nil, "no WIRE button on the hammer's bar (T420)")
+		t.ok(string.find(tool, "WireSpool", 1, true), "the wire spool in hand starts the tool")
 		t.ok(string.find(tool, "LogicPanelUI.Start", 1, true), "the settings panel starts with the tool")
 	end)
 
@@ -168,5 +171,70 @@ return function(t)
 		local both = { { from = "sw", to = "gate" }, { from = "sw2", to = "gate", toPort = 2 } }
 		t.eq(Logic.NextIn(both, "gate", "GateAnd"), 1)
 		t.eq(Logic.NextIn({}, "lamp", "SparkLamp"), 1)
+	end)
+
+	local WireSupply = t.shared("WireSupply")
+
+	t.test(
+		"stretching a wire: nothing picked, then a length to the aim, then the pieces, all priced from the box",
+		function()
+			local sw, lamp, far = pieces[1], pieces[3], piece("far", "SparkLamp", 200, 0)
+			t.eq(Logic.Stretch(10, nil, nil, nil).state, "start")
+			local aiming = Logic.Stretch(10, sw, nil, 7.4)
+			t.eq(aiming.state, "aim")
+			t.eq(aiming.units, 8)
+			local ok = Logic.Stretch(10, sw, lamp, nil)
+			t.eq(ok.state, "ok")
+			t.eq(ok.length, 6)
+			t.eq(ok.units, 6)
+			t.eq(ok.left, 4, "what the box would hold after")
+			local short = Logic.Stretch(4, sw, lamp, nil)
+			t.eq(short.state, "short")
+			t.eq(short.short, 2)
+			t.eq(short.buyCost, 2 * WireSupply.UnitPrice())
+			local tooLong = Logic.Stretch(999, sw, far, nil)
+			t.eq(tooLong.state, "far")
+			t.eq(tooLong.short, 0)
+			t.eq(Logic.Stretch(10, sw, sw, nil).state, "aim", "an end on itself is not an end")
+			t.eq(Logic.Stretch(10, lamp, sw, nil).state, "start", "a wire starts at an output, not a lamp")
+			t.eq(Logic.Stretch(10, sw, nil, WireSupply.MaxLength + 5).state, "far", "aiming past the longest wire")
+		end
+	)
+
+	t.test("every stretch says its state in words, and the line colour follows the state", function()
+		local sw, lamp = pieces[1], pieces[3]
+		for _, r in ipairs({
+			Logic.Stretch(10, nil, nil, nil),
+			Logic.Stretch(10, sw, nil, 3),
+			Logic.Stretch(10, sw, lamp, nil),
+			Logic.Stretch(1, sw, lamp, nil),
+			Logic.Stretch(10, sw, piece("far", "SparkLamp", 200, 0), nil),
+		}) do
+			t.ok(type(r.text) == "string" and r.text ~= "", r.state .. " has words")
+		end
+		t.eq(Logic.LineTone("ok"), "ok")
+		t.eq(Logic.LineTone("aim"), "ok")
+		t.eq(Logic.LineTone("short"), "warn")
+		t.eq(Logic.LineTone("far"), "bad")
+	end)
+
+	t.test("the box line says how much wire is left, and when to buy", function()
+		t.ok(string.find(Logic.BoxLine(14), "14", 1, true))
+		t.ok(string.find(string.lower(Logic.BoxLine(0)), "empty", 1, true))
+	end)
+
+	t.test("the buy button asks for the shortfall, or a top-up, and never past the box", function()
+		local sw, lamp = pieces[1], pieces[3]
+		local short = Logic.BuyPlan(4, Logic.Stretch(4, sw, lamp, nil))
+		t.eq(short.amount, 2)
+		t.eq(short.cost, 2 * WireSupply.UnitPrice())
+		t.ok(string.find(short.text, "2", 1, true) and string.find(short.text, "$", 1, true), short.text)
+		local topUp = Logic.BuyPlan(30, Logic.Stretch(30, sw, lamp, nil))
+		t.eq(topUp.amount, Logic.TopUp)
+		local nearlyFull = Logic.BuyPlan(WireSupply.MaxStock - 3, Logic.Stretch(WireSupply.MaxStock - 3, sw, lamp, nil))
+		t.eq(nearlyFull.amount, 3, "only what fits")
+		local full = Logic.BuyPlan(WireSupply.MaxStock, Logic.Stretch(WireSupply.MaxStock, sw, lamp, nil))
+		t.eq(full.amount, 0)
+		t.ok(string.find(string.lower(full.text), "full", 1, true))
 	end)
 end

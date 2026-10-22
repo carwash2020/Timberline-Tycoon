@@ -46,8 +46,12 @@ return function(t)
 					Toast = function(text)
 						table.insert(toasts, text)
 					end,
+					SetBuildMode = function() end,
 				},
 				ShopUI = {
+					IsOpen = function()
+						return false
+					end,
 					Close = function()
 						table.insert(closes, true)
 					end,
@@ -57,6 +61,9 @@ return function(t)
 					Refresh = function() end,
 				},
 				BuildMenuUI = {
+					IsOpen = function()
+						return false
+					end,
 					Start = function() end,
 					Open = function(o)
 						table.insert(menuOpens, o)
@@ -265,7 +272,7 @@ return function(t)
 		t.ok(string.find(plot, 'text = "PLANS"', 1, true), "the bar's clear button for a phone")
 		t.ok(string.find(plot, 'text = "HAMMER"', 1, true), "a phone takes the hammer out from the side column")
 		t.ok(string.find(plot, 'text = "LAND"', 1, true))
-		t.ok(string.find(plot, 'text = "WIRE"', 1, true))
+		t.eq(string.find(plot, 'text = "WIRE"', 1, true), nil, "wiring is not on the hammer's bar any more (T420)")
 	end)
 
 	t.test("the tutorial hears the list opened, only on your plot", function()
@@ -378,4 +385,32 @@ return function(t)
 		t.ok(#s.toasts >= 2, "and says why")
 		t.eq(#s.menuCloses, 0, "the menu stays open on a refusal")
 	end)
+
+	t.test(
+		"equipping the hammer on your plot opens the picker; off your plot, mid-place or already open it does not",
+		function()
+			local s = setup({ Blueprints = "Bench,Wall,Shed", PlotTier = 3, Cash = 1000 })
+			s.stand(true)
+			s.PlotUI.OnHammerHeld(true)
+			t.eq(#s.menuOpens, 1, "the picker opened on equip")
+			s.PlotUI.OnHammerHeld(false)
+			t.eq(#s.menuOpens, 1, "putting it away opens nothing")
+			s.stand(false)
+			s.PlotUI.OnHammerHeld(true)
+			t.eq(#s.menuOpens, 1, "off your plot it does not open")
+		end
+	)
+
+	t.test(
+		"the hammer's own handler still goes through OnHammerHeld, and no wire button or wire call is in the picker path",
+		function()
+			local plot = fs.readFile(dir .. "PlotUI.luau")
+			t.ok(string.find(plot, "HammerController.OnHeldChanged(PlotUI.OnHammerHeld)", 1, true))
+			local at = string.find(plot, "local function openPlans()", 1, true)
+			local stop = string.find(plot, "PlotUI.OpenPlans = openPlans", 1, true)
+			local body = string.sub(plot, at, stop)
+			t.eq(string.find(body, "WireTool", 1, true), nil, "the picker never starts the wire tool")
+			t.eq(string.find(plot, "WireTool.Begin", 1, true), nil, "nor does the build bar")
+		end
+	)
 end

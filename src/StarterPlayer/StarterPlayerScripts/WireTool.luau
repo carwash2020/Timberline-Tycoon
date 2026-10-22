@@ -1,15 +1,24 @@
 --!strict
 -- WireTool: wire a Wall Switch to a Spark Lamp or a Door without prompts.
--- Rules are in Shared/WireToolLogic; the server (LogicService) decides.
---   * PlotUI's WIRE button (BUILD mode) starts it. Lines between wired
---     pieces on your own plot show for the whole of BUILD mode, at most
---     WireToolLogic.MaxLines thin Neon parts, reused.
+-- Rules are in Shared/WireToolLogic and Shared/WireSupply; the server
+-- (LogicService) decides.
+--   * The Wire spool (a Tool, LogicService.GiveSpool) starts it when you take it
+--     out and ends it when you put it away (T420: wiring is not on the hammer
+--     any more). Lines between wired pieces on your own plot show while the
+--     spool or the hammer is in hand, at most WireToolLogic.MaxLines thin Neon
+--     parts, reused.
+--   * Wire is a single-use item: pick an output, and a line stretches from it to
+--     where you aim; its length, the wire it would use and what is left in your
+--     box show as you go (WireToolLogic.Stretch). Tap an input to place it: up to
+--     WireSupply.MaxLength studs, used up from the box. BUY gets what is missing
+--     (Wire ("buy", amount)); the server sells, takes the cash and checks again.
 --   * Phone: tap a piece. PC: click it. Xbox: aim the crosshair, RB picks,
---     X cuts, B leaves (InputKit.WireBinds). Buttons CUT and DONE are 48 px
---     tall for touch and the help line is 18 px on a TV.
+--     X cuts, Y buys, B puts the spool away (InputKit.WireBinds). Buttons are
+--     48 px tall for touch and the help line is 18 px on a TV.
 --   * Pick a switch, then tap lamps and doors to wire them (each tap is
 --     Wire (fromUid, 1, toUid, 1)). Pick any wired piece and CUT sends
---     Wire ("cut", uid). World prompts are off while the tool is up.
+--     Wire ("cut", uid); cutting gives no wire back. World prompts are off while
+--     the tool is up.
 
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
@@ -22,6 +31,7 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
+local WireSupply = require(ReplicatedStorage.Shared.WireSupply)
 local WireToolLogic = require(ReplicatedStorage.Shared.WireToolLogic)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
@@ -36,7 +46,9 @@ local C = UITheme.Colors
 
 local LINE = Color3.fromRGB(255, 196, 64)
 local LINE_PICKED = Color3.fromRGB(120, 220, 255)
-local ACTIONS = { "WirePick", "WireCut", "WireDone" }
+local LINE_WARN = Color3.fromRGB(255, 170, 40) -- a stretch the box cannot pay for yet
+local LINE_BAD = Color3.fromRGB(235, 80, 70) -- a stretch past the longest wire
+local ACTIONS = { "WirePick", "WireCut", "WireBuy", "WireDone" }
 
 local active = false
 local building = false
@@ -46,13 +58,24 @@ local selection: SelectionBox? = nil
 local folder: Folder? = nil
 local pool: { Part } = {}
 local bar: UITheme.Bar? = nil
+local buyButton: UITheme.Button? = nil
 local reticle: Frame? = nil
+local spool: Tool? = nil -- the Wire tool in hand
+local stretchLine: Part? = nil -- the live line from the picked output to where you aim
+local stretch: WireToolLogic.Stretch = WireToolLogic.Stretch(0, nil, nil, nil)
+local lastTap: Vector2? = nil
+local session = 0 -- a new tool session cancels the preview loop of the last
 local onStop: (() -> ())? = nil
 -- 1..3 while the first-use hint is showing, 4 once this session has seen it.
 local lessonStep = 1
 
 function WireTool.Active(): boolean
 	return active
+end
+
+-- Wire left in your box (the WireUnits attribute the server keeps).
+local function stock(): number
+	return WireSupply.Clean(player:GetAttribute("WireUnits"))
 end
 
 -- Your pieces: their uid, blueprint and plot-local spot, the models, and
@@ -114,7 +137,7 @@ end
 
 local function drawLines()
 	local plot = BlueprintPlacer.PlotCFrame()
-	if not building or not plot then
+	if not (building or active) or not plot then
 		for _, p in ipairs(pool) do
 			p.Parent = nil
 		end
@@ -147,15 +170,28 @@ local function refreshBar()
 		return
 	end
 	local pieces = mine()
-	local text = WireToolLogic.Help(picked, pieces)
-	local lesson = WireToolLogic.Lesson(lessonStep)
-	if lesson then
-		text = lesson .. "  " .. text
+	local text: string
+	if picked ~= nil and stretch.state ~= "start" then
+		-- Stretching: the length, what it uses and what is left (WireToolLogic.Stretch).
+		text = stretch.text
+	else
+		text = WireToolLogic.Help(picked, pieces)
+		local lesson = WireToolLogic.Lesson(lessonStep)
+		if lesson then
+			text = lesson .. "  " .. text
+		end
 	end
+	text ..= "  " .. WireToolLogic.BoxLine(stock())
 	if UITheme.Device() == "console" then
-		text ..= "  RB pick · X cut · B done"
+		text ..= "  RB pick · X cut · Y buy · B done"
 	end
 	b.label.Text = text
+	local buy = buyButton
+	if buy then
+		local plan = WireToolLogic.BuyPlan(stock(), stretch)
+		buy:SetText(plan.text)
+		buy:SetStyle(if plan.amount > 0 then (if stretch.short > 0 then "buy" else "amber") else "locked")
+	end
 end
 
 local function highlight()
@@ -231,6 +267,129 @@ local function detailedWires(wires: { [string]: string }): { WireLogic.Wire }
 	return out
 end
 
+local function pieceOf(pieces: { WireToolLogic.Piece }, uid: string?): WireToolLogic.Piece?
+	if uid == nil then
+		return nil
+	end
+	for _, piece in ipairs(pieces) do
+		if piece.uid == uid then
+			return piece
+		end
+	end
+	return nil
+end
+
+local function lastInputIsGamepad(): boolean
+	return string.find(UserInputService:GetLastInputType().Name, "Gamepad") ~= nil
+end
+
+-- The screen point you are aiming at: the mouse, the last tap, or the crosshair.
+local function aimPoint(): Vector2
+	local camera = workspace.CurrentCamera
+	local centre = if camera then camera.ViewportSize / 2 else Vector2.zero
+	local last = UserInputService:GetLastInputType()
+	if last == Enum.UserInputType.Touch then
+		return lastTap or centre
+	elseif string.find(last.Name, "Gamepad") then
+		return centre
+	end
+	return UserInputService:GetMouseLocation() - GuiService:GetGuiInset()
+end
+
+local function previewPart(): Part?
+	local f = folder
+	if not f then
+		return nil
+	end
+	local part = stretchLine
+	if part and part.Parent then
+		return part
+	end
+	local p = Instance.new("Part")
+	p.Name = "WireStretch"
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanTouch = false
+	p.CanQuery = false
+	p.CastShadow = false
+	p.Material = Enum.Material.Neon
+	p.Size = Vector3.new(WireToolLogic.LineThickness, WireToolLogic.LineThickness, 1)
+	p.Parent = f
+	stretchLine = p
+	return p
+end
+
+local TONE_COLOR: { [string]: Color3 } = { ok = LINE_PICKED, warn = LINE_WARN, bad = LINE_BAD }
+
+-- The line stretching from the picked output to where you aim, and what it would
+-- use and cost. A few times a second, only while something is picked.
+local function updateStretch()
+	local plot = BlueprintPlacer.PlotCFrame()
+	local camera = workspace.CurrentCamera
+	local pieces = mine()
+	local from = pieceOf(pieces, picked)
+	local part = previewPart()
+	if
+		not (active and plot and camera and from and part) or not WireLogic.IsSource(WireLogic.Role(from.blueprintId))
+	then
+		stretch = WireToolLogic.Stretch(stock(), nil, nil, nil)
+		if part then
+			part.Parent = nil
+		end
+		refreshBar()
+		return
+	end
+	local at = aimPoint()
+	-- What the aim is on: an input within a fingertip of it, or the crosshair's piece.
+	local aimed: WireToolLogic.Piece? = nil
+	if lastInputIsGamepad() then
+		local eye = plot:PointToObjectSpace(camera.CFrame.Position)
+		local look = plot:VectorToObjectSpace(camera.CFrame.LookVector)
+		aimed = pieceOf(pieces, WireToolLogic.Aim(pieces, eye.X, eye.Y, eye.Z, look.X, look.Y, look.Z))
+	else
+		local points: { [string]: { number } } = {}
+		for _, piece in ipairs(pieces) do
+			local v, onScreen = camera:WorldToScreenPoint(worldPoint(plot, piece))
+			if onScreen then
+				points[piece.uid] = { v.X, v.Y }
+			end
+		end
+		aimed = pieceOf(pieces, WireToolLogic.NearestOnScreen(pieces, points, at.X, at.Y))
+	end
+	-- Loose, the line ends on the ground beside the output, where the aim meets its height.
+	local start = worldPoint(plot, from)
+	local ray = camera:ViewportPointToRay(at.X, at.Y)
+	local free = 0
+	local endPoint = start
+	if math.abs(ray.Direction.Y) > 1e-4 then
+		local along = (start.Y - ray.Origin.Y) / ray.Direction.Y
+		if along > 0 then
+			endPoint = ray.Origin + ray.Direction * along
+			free = Vector3.new(endPoint.X - start.X, 0, endPoint.Z - start.Z).Magnitude
+		end
+	end
+	stretch = WireToolLogic.Stretch(stock(), from, aimed, free)
+	if aimed ~= nil and stretch.state ~= "aim" and stretch.state ~= "start" then
+		endPoint = worldPoint(plot, aimed)
+	end
+	local len = (endPoint - start).Magnitude
+	part.Size = Vector3.new(WireToolLogic.LineThickness, WireToolLogic.LineThickness, math.max(len, 0.1))
+	part.CFrame = CFrame.lookAt((start + endPoint) / 2, endPoint)
+	part.Color = TONE_COLOR[WireToolLogic.LineTone(stretch.state)] or LINE_PICKED
+	part.Parent = folder
+	refreshBar()
+end
+
+-- Buys the wire the stretch is short of (or a top-up): an intent the server checks.
+local function buy()
+	local plan = WireToolLogic.BuyPlan(stock(), stretch)
+	if plan.amount <= 0 then
+		HUD.Toast(WireSupply.Message("full"))
+		return
+	end
+	Net.Remote("Wire"):FireServer("buy", plan.amount)
+end
+
 -- A piece was picked (or nothing, for the ground).
 local function pick(uid: string?)
 	local pieces, _, wires = mine()
@@ -245,8 +404,17 @@ local function pick(uid: string?)
 		else
 			local ok, why = WireLogic.Check(list, pieces :: any, action.from, action.to, WireLogic.Port, action.toPort)
 			if ok then
-				fire(action)
-				lessonStep = WireToolLogic.Advance(lessonStep, "link")
+				-- The wire's length against the longest wire and the box (the server decides again).
+				local result =
+					WireToolLogic.Stretch(stock(), pieceOf(pieces, action.from), pieceOf(pieces, action.to), nil)
+				if result.state == "far" then
+					HUD.Toast(WireSupply.Message("far"))
+				elseif result.state == "short" then
+					HUD.Toast(WireSupply.Message("short", stock(), result.units))
+				else
+					fire(action)
+					lessonStep = WireToolLogic.Advance(lessonStep, "link")
+				end
 			else
 				HUD.Toast(WireLogic.Message(why) or "")
 			end
@@ -315,8 +483,14 @@ function WireTool.Stop()
 		return
 	end
 	active = false
+	session += 1
 	lessonStep = WireToolLogic.Advance(lessonStep, "done")
 	picked = nil
+	stretch = WireToolLogic.Stretch(0, nil, nil, nil)
+	local line = stretchLine
+	if line then
+		line.Parent = nil
+	end
 	for _, conn in ipairs(conns) do
 		conn:Disconnect()
 	end
@@ -361,10 +535,13 @@ function WireTool.Begin(stopped: (() -> ())?)
 	picked = nil
 	onStop = stopped
 	PromptSwitch.Hold("wire")
+	session += 1
+	local thisSession = session
 	local char = player.Character
 	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
 	if humanoid then
-		humanoid:UnequipTools()
+		-- Dying ends it. Putting the spool away (or taking another tool, which puts it
+		-- away) ends it too: WireTool.SetSpool.
 		table.insert(
 			conns,
 			humanoid.Died:Connect(function()
@@ -372,16 +549,13 @@ function WireTool.Begin(stopped: (() -> ())?)
 			end)
 		)
 	end
-	if char then
-		table.insert(
-			conns,
-			char.ChildAdded:Connect(function(child: Instance)
-				if child:IsA("Tool") then
-					WireTool.Stop()
-				end
-			end)
-		)
-	end
+	-- The stretched wire follows your aim a few times a second, only while it runs.
+	task.spawn(function()
+		while active and session == thisSession do
+			updateStretch()
+			task.wait(0.1)
+		end
+	end)
 	-- Mouse click. Touch taps arrive as TouchTapInWorld (a drag is the camera).
 	table.insert(
 		conns,
@@ -396,12 +570,13 @@ function WireTool.Begin(stopped: (() -> ())?)
 		conns,
 		UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processed: boolean)
 			if not processed then
+				lastTap = position
 				pickAt(position.X, position.Y)
 			end
 		end)
 	)
 	local binds = InputKit.WireBinds
-	local pickBind, cutBind, doneBind = binds[1], binds[2], binds[3]
+	local pickBind, cutBind, buyBind, doneBind = binds[1], binds[2], binds[3], binds[4]
 	local top = Enum.ContextActionPriority.High.Value + 100
 	ContextActionService:BindActionAtPriority("WirePick", action(pickAimed), false, top, pickBind.gamepad)
 	ContextActionService:BindActionAtPriority(
@@ -413,8 +588,16 @@ function WireTool.Begin(stopped: (() -> ())?)
 		cutBind.keyboard :: Enum.KeyCode
 	)
 	ContextActionService:BindActionAtPriority(
+		"WireBuy",
+		action(buy),
+		false,
+		top,
+		buyBind.gamepad,
+		buyBind.keyboard :: Enum.KeyCode
+	)
+	ContextActionService:BindActionAtPriority(
 		"WireDone",
-		action(WireTool.Stop),
+		action(WireTool.PutAway),
 		false,
 		top,
 		doneBind.gamepad,
@@ -430,13 +613,53 @@ function WireTool.Begin(stopped: (() -> ())?)
 	drawLines()
 end
 
--- BUILD mode on or off. Lines show while it is on; leaving ends the tool.
+-- BUILD mode (the hammer) on or off. The lines show while it is on; putting the
+-- hammer away ends the tool unless the spool is in hand (taking the spool out
+-- puts the hammer away, and that must not end the session it just started).
 function WireTool.SetBuilding(on: boolean)
 	building = on
-	if not on then
+	if not on and spool == nil then
 		WireTool.Stop()
 	end
 	drawLines()
+end
+
+-- Puts the spool away (DONE, B, Q): ends the tool and drops the tool from your hand.
+function WireTool.PutAway()
+	WireTool.Stop()
+	local char = player.Character
+	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+	if humanoid then
+		humanoid:UnequipTools()
+	end
+end
+
+-- The Wire spool came into your hand (a Tool) or went away (nil).
+function WireTool.SetSpool(tool: Tool?)
+	spool = tool
+	if tool then
+		WireTool.Begin(nil)
+	else
+		WireTool.Stop()
+	end
+end
+
+local function watchCharacter(char: Model)
+	local function consider(child: Instance)
+		if child:IsA("Tool") and child:GetAttribute("WireSpool") == true then
+			WireTool.SetSpool(child :: Tool)
+		end
+	end
+	for _, child in ipairs(char:GetChildren()) do
+		consider(child)
+	end
+	char.ChildAdded:Connect(consider)
+	char.ChildRemoved:Connect(function(child: Instance)
+		-- Unequipped (back in the Backpack) or gone.
+		if child == spool and child.Parent ~= char then
+			WireTool.SetSpool(nil)
+		end
+	end)
 end
 
 function WireTool.Start()
@@ -449,7 +672,7 @@ function WireTool.Start()
 	local b = UITheme.Bar(screen, "WireMode")
 	local console = UITheme.Device() == "console"
 	b.label.TextSize = if console then 18 else 15
-	b.label.Size = UDim2.fromOffset(if console then 560 else 340, if console then 26 else 40)
+	b.label.Size = UDim2.fromOffset(if console then 560 else 340, if console then 52 else 58)
 	b.label.TextWrapped = true
 	b.label.TextTruncate = Enum.TextTruncate.None
 	local cutButton = UITheme.Button({
@@ -461,15 +684,25 @@ function WireTool.Start()
 	cutButton.root.LayoutOrder = 1
 	cutButton.root.Parent = b.row
 	cutButton.face.Activated:Connect(cut)
+	local buyIt = UITheme.Button({
+		text = "BUY",
+		size = Vector2.new(150, PlotLogic.LandTap),
+		style = "amber",
+		textSize = if console then 18 else nil,
+	})
+	buyIt.root.LayoutOrder = 2
+	buyIt.root.Parent = b.row
+	buyIt.face.Activated:Connect(buy)
+	buyButton = buyIt
 	local done = UITheme.Button({
 		text = "DONE",
 		size = Vector2.new(98, PlotLogic.LandTap),
 		style = "skip",
 		textSize = if console then 18 else nil,
 	})
-	done.root.LayoutOrder = 2
+	done.root.LayoutOrder = 3
 	done.root.Parent = b.row
-	done.face.Activated:Connect(WireTool.Stop)
+	done.face.Activated:Connect(WireTool.PutAway)
 	bar = b
 
 	-- A small crosshair for the gamepad's aim.
@@ -488,13 +721,24 @@ function WireTool.Start()
 
 	screen.Parent = player:WaitForChild("PlayerGui")
 	LogicPanelUI.Start()
+	-- The spool in hand starts the tool; putting it away ends it.
+	player.CharacterAdded:Connect(watchCharacter)
+	if player.Character then
+		watchCharacter(player.Character)
+	end
 	-- Keep the lines in step with the wires the server reports.
 	task.spawn(function()
 		while true do
 			task.wait(0.25)
-			if building then
+			if building or active then
 				drawLines()
 			end
+		end
+	end)
+	-- The box count changes when you buy and when a wire is placed.
+	player:GetAttributeChangedSignal("WireUnits"):Connect(function()
+		if active then
+			refreshBar()
 		end
 	end)
 end
