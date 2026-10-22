@@ -207,6 +207,17 @@ function TerrainBuilder.LiftOnto(x: number, y: number, z: number, reach: number?
 	return y
 end
 
+-- The drawn terrain's surface within `reach` studs above and below `y` at
+-- (x, z), or nil (no hit, or the ray errored: a test's fake world).
+function TerrainBuilder.SurfaceNear(x: number, y: number, z: number, reach: number?): number?
+	local r = reach or 3
+	local ok, hit = pcall(castTerrain, x, z, y + r, y - r, false)
+	if ok and type(hit) == "number" then
+		return hit
+	end
+	return nil
+end
+
 -- Spots on the town's flat ground (y = 0 by design): the spawn walk, the
 -- parking lot, the sell pad's apron, the shop paths.
 TerrainBuilder.TownProbes = {

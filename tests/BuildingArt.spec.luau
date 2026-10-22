@@ -592,7 +592,11 @@ return function(t)
 		end
 		t.eq(named.BayLine, 2)
 		t.eq(named.StopBar, 1)
-		t.eq(named.Curb, 1) -- one curb block per stall (T397)
+		t.eq(
+			named.Curb,
+			nil,
+			"no grey curb block per stall (T406: a thin grey bar on the grass; the lot edge is TownGround's)"
+		)
 		t.eq(named.BayNumber, 1)
 		t.eq(named.LanternGlow, 2) -- the glowing plate and the light's holder
 		for _, d in ipairs(slot:GetChildren()) do

@@ -126,6 +126,7 @@ return function(t)
 						onProgress(24, 24)
 						return 1.25
 					end,
+					SurfaceNear = options.surfaceNear,
 					LiftOnto = function(_, y)
 						return y
 					end,
@@ -298,6 +299,70 @@ return function(t)
 		end
 		return nil
 	end
+
+	t.test("T406: the uploaded town meshes are ON in the game (the build check says so)", function()
+		local GameConfig = t.shared("GameConfig")
+		t.eq(GameConfig.TownMeshes, true)
+		local s = build()
+		local found
+		for _, line in ipairs(s.prints) do
+			if string.find(line, "[MapBuilder] build check: uploaded town meshes ", 1, true) then
+				found = line
+			end
+		end
+		t.ok(found and string.find(found, "uploaded town meshes ON,", 1, true), tostring(found))
+		t.eq(string.find(found, "OFF", 1, true), nil)
+	end)
+
+	t.test("T406: a footpath the drawn terrain would bury is raised onto it; one that shows stays", function()
+		local function count(s)
+			local paths = s.map:FindFirstChild("TownGround"):FindFirstChild("TownPaths")
+			local n, tops = 0, {}
+			for _, p in ipairs(paths:GetChildren()) do
+				n += 1
+				table.insert(tops, p.CFrame.Position.Y + p.Size.Y / 2)
+			end
+			return n, tops
+		end
+		local ground = t.shared("Art/TownGroundArt")
+		local plain = build({ townGroundArt = ground })
+		local n, tops = count(plain)
+		t.eq(n, 8, "the eight footpaths T402 made")
+		local line
+		for _, l in ipairs(plain.prints) do
+			if string.find(l, "town footpaths", 1, true) then
+				line = l
+			end
+		end
+		t.eq(
+			line,
+			"[MapBuilder] town footpaths: 0 parts, 0 raised onto the drawn terrain",
+			"no terrain probe in this world"
+		)
+		-- The drawn terrain is 0.3 over every path's planned top.
+		local buried = build({
+			townGroundArt = ground,
+			surfaceNear = function(_x, y, _z)
+				return y + 0.3
+			end,
+		})
+		local m, raised = count(buried)
+		t.eq(m, 8)
+		for i = 1, 8 do
+			t.ok(raised[i] > tops[i] + 0.3, "path " .. i .. " is lifted over the terrain")
+		end
+		-- Terrain that sits well under the paths changes nothing.
+		local fine = build({
+			townGroundArt = ground,
+			surfaceNear = function(_x, y, _z)
+				return y - 0.1
+			end,
+		})
+		local _, same = count(fine)
+		for i = 1, 8 do
+			t.ok(math.abs(same[i] - tops[i]) < 1e-6, "path " .. i .. " stays where it was planned")
+		end
+	end)
 
 	t.test("a clean build warns nothing, parents SellArea last and lets everyone in", function()
 		local s = build()

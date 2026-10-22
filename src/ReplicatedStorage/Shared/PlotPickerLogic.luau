@@ -6,14 +6,13 @@
 -- at the Land Office in town (GameConfig.PlotPrice); the picker opens from
 -- that counter and shows the price. A player whose save already has a plot
 -- (profile.plot.claimed) picks a pad again for free when they join, as
--- before, and only that player's timeout takes the first open pad. Builds
+-- before. There is no timeout: the picker stays open until they claim a pad
+-- (T406; "give me any open plot" is the button, never a timer). Builds
 -- are saved in plot-local studs, so a rejoin picks again from whatever is
 -- still open. Two claims of one pad in the same breath: the first one in
 -- TryClaim wins, and the other is "taken".
 
 local PlotPickerLogic = {}
-
-PlotPickerLogic.TimeoutSeconds = 60
 
 -- The join panel, in pixels. PlotPickerUI uses these same numbers, and the
 -- spec checks the cluster stays off the thumbstick and the jump button.
@@ -35,7 +34,6 @@ export type OfferPlot = {
 }
 
 export type Offer = {
-	timeout: number,
 	price: number, -- what the claim costs this player (0: they already own a plot in their save)
 	plots: { OfferPlot },
 	notice: string?, -- "taken" when the claim you just sent lost
@@ -158,10 +156,6 @@ function PlotPickerLogic.FirstFree(taken: { boolean }): number?
 		end
 	end
 	return nil
-end
-
-function PlotPickerLogic.TimedOut(startedAt: number, now: number): boolean
-	return now - startedAt >= PlotPickerLogic.TimeoutSeconds
 end
 
 -- An integer slot in 1..count. Anything else is ignored (no claim).

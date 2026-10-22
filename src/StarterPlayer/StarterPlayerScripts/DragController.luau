@@ -112,6 +112,7 @@ local focusConn: RBXScriptConnection? = nil -- the window losing focus lets go o
 local stick = Vector2.zero -- the left stick, read while locked
 local tookKey: { [Enum.KeyCode]: boolean } = {} -- key presses whose Begin we used
 local lastHint = -math.huge
+local lastPushAt = -math.huge -- when the hold was last pushed further out (a throw's push, GrabLogic.ThrowVelocity)
 local balls: { [Model]: BasePart } = {}
 local watched: { [Model]: RBXScriptConnection } = {}
 local ballFolder: Folder? = nil
@@ -234,6 +235,7 @@ local function hint()
 		return
 	end
 	lastHint = now
+	HUD.NoteAxeTry() -- the hint line: 3.4 s, then gone (AxeHintTimer)
 	-- Once per session: the hint line at the bottom says it again.
 	HUD.Toast(GrabLogic.AxeHint(UITheme.Device()), nil, { key = "axeHint", once = true })
 end
@@ -397,6 +399,9 @@ local function nudge(delta: number)
 	local h = hold
 	if h then
 		h.distance = GrabLogic.StepHold(h.distance, delta, tune("HoldMin"), tune("HoldMax"))
+		if delta > 0 then
+			lastPushAt = os.clock()
+		end
 	end
 end
 
@@ -603,10 +608,26 @@ local function ghostBeds(on: boolean)
 	end
 end
 
-local function drop(tell: boolean)
+-- `throw`: a release you chose (button up, finger up) lets the piece leave with
+-- its own velocity, a push forward if you had just pushed it out, at most
+-- GameConfig.ThrowMaxSpeed. The server judges what it is sent (GrabService.Release).
+local function drop(tell: boolean, throw: boolean?)
 	local h = hold
 	if not h then
 		return
+	end
+	local velocity: Vector3? = nil
+	if tell and throw == true then
+		local camera = workspace.CurrentCamera
+		local ok, current = pcall(function(): Vector3
+			return h.part.AssemblyLinearVelocity
+		end)
+		if ok and camera then
+			velocity = GrabLogic.ThrowVelocity(current, camera.CFrame.LookVector, os.clock() - lastPushAt)
+			pcall(function()
+				h.part.AssemblyLinearVelocity = velocity :: Vector3
+			end)
+		end
 	end
 	hold = nil
 	distanceAxis = 0
@@ -621,7 +642,7 @@ local function drop(tell: boolean)
 	h.turn:Destroy()
 	h.grip:Destroy()
 	if tell then
-		Net.Remote("Release"):FireServer(h.part)
+		Net.Remote("Release"):FireServer(h.part, velocity)
 	end
 	refreshBall(h.model)
 end
@@ -971,7 +992,7 @@ local function onTouch(_name: string, state: Enum.UserInputState, input: InputOb
 	local h = hold
 	if h and h.touch == input then
 		if state ~= Enum.UserInputState.Change then
-			drop(true)
+			drop(true, true)
 		end
 		return Enum.ContextActionResult.Sink
 	end
@@ -1059,7 +1080,7 @@ local function startLoop()
 			(input.UserInputType == Enum.UserInputType.MouseButton1 and h.device == "mouse")
 			or (input.KeyCode == GrabLogic.PadGrabKey and h.device == "pad")
 		then
-			drop(true)
+			drop(true, true)
 		end
 	end)
 	ContextActionService:BindActionAtPriority("DragTouch", onTouch, false, TOUCH_PRIORITY, Enum.UserInputType.Touch)

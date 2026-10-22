@@ -85,6 +85,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local GamepadNavLogic = require(ReplicatedStorage.Shared.GamepadNavLogic)
 local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
 local PlaceControlsLogic = require(ReplicatedStorage.Shared.PlaceControlsLogic)
+local AxeHintTimer = require(ReplicatedStorage.Shared.AxeHintTimer)
 local TipTimer = require(ReplicatedStorage.Shared.TipTimer)
 local PhoneHud = require(ReplicatedStorage.Shared.PhoneHud)
 local QuickMenuLogic = require(ReplicatedStorage.Shared.QuickMenuLogic)
@@ -730,6 +731,7 @@ end
 local tips = {
 	toasts = TipTimer.New(),
 	hints = TipTimer.New(),
+	axeAway = AxeHintTimer.New(),
 	thickTimed = false,
 	fade = nil :: Tween?,
 	refresh = function() end :: () -> (),
@@ -792,7 +794,9 @@ local function hintStateV2(): HintLogic.StateV2
 		driving = hintState.driving,
 		axeOut = axeOut,
 		holding = heldPiece ~= nil,
-		onWood = pointingWood,
+		-- Over loose wood with an axe out, the "put your axe away" line shows only
+		-- briefly after a try to grab (AxeHintTimer), not for as long as you aim.
+		onWood = pointingWood and AxeHintTimer.Showing(tips.axeAway, os.clock(), axeOut, heldPiece ~= nil),
 		tooHard = pointingHard,
 		thick = pointingThick and tips.thickShows(),
 		tooLong = HintLogic.TooLong(heldLength(), player:GetAttribute("BedLength")),
@@ -1049,7 +1053,19 @@ end
 -- hints stop showing.
 function HUD.NoteGrab()
 	hintGrabs += 1
+	AxeHintTimer.Cancel(tips.axeAway)
 	refreshHint()
+end
+
+-- The player pressed to grab a piece with an axe in hand (DragController): the
+-- "put your axe away" line shows for 3.4 s, then the control hint is back.
+function HUD.NoteAxeTry()
+	if AxeHintTimer.Try(tips.axeAway, os.clock()) then
+		refreshHint()
+		task.delay(AxeHintTimer.Seconds + 0.05, function()
+			tips.refresh()
+		end)
+	end
 end
 
 -- Settings: hide the hint line without closing panels.
@@ -1228,6 +1244,9 @@ local function refreshV2State()
 	local found = if area then area:FindFirstChild("SellZone") else nil
 	local near = found ~= nil and found:IsA("BasePart") and HintLogic.NearPad(truckFrom(found))
 	if axe ~= axeOut or near ~= nearPad then
+		if not axe then
+			AxeHintTimer.Cancel(tips.axeAway) -- put away: the line goes at once
+		end
 		axeOut, nearPad = axe, near
 		refreshHint()
 	end
@@ -1239,6 +1258,7 @@ end
 local function onHeldBy(model: Model)
 	if model:GetAttribute("HeldBy") == player.UserId then
 		heldPiece = model
+		AxeHintTimer.Cancel(tips.axeAway)
 	elseif heldPiece == model then
 		heldPiece = nil
 	end
