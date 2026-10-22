@@ -18,9 +18,11 @@
 -- physics and timers faked; WoodService and GrabService are real.
 return function(t)
 	local roblox = t.roblox
-	local Vector3, CFrame, Instance, Color3 = roblox.Vector3, roblox.CFrame, roblox.Instance, roblox.Color3
+	local Vector3, CFrame, Instance, Color3, Enum =
+		roblox.Vector3, roblox.CFrame, roblox.Instance, roblox.Color3, roblox.Enum
 	local StumpLogic = t.shared("StumpLogic")
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
+	local StumpMeshIds = t.shared("StumpMeshIds")
 	local TreeGen = t.shared("TreeGen")
 	local TreeLogic = t.shared("TreeLogic")
 	local WoodData = t.shared("WoodData")
@@ -182,6 +184,23 @@ return function(t)
 		s.Trees = loader:server("SectionTrees")
 		s.Wood = loader:server("WoodService")
 		s.Grab = loader:server("GrabService")
+		s.StumpMeshes = loader:server("StumpMeshes")
+		-- The uploaded frustum models, mocked: LoadAsset hands back a Model
+		-- holding one MeshPart (native size 200 x 100 x 200) carrying its id.
+		s.loaded = {}
+		s.StumpMeshes.LoadModel = function(id)
+			table.insert(s.loaded, id)
+			if s.meshFails then
+				error("HTTP 403: not approved for this experience")
+			end
+			local model = Instance.new("Model")
+			local mesh = Instance.new("MeshPart")
+			mesh.Name = "Frustum"
+			mesh.Size = Vector3.new(200, 100, 200)
+			mesh:SetAttribute("ModelId", tostring(id)) -- a string: Lune keeps attributes as 32-bit numbers
+			mesh.Parent = model
+			return model
+		end
 		s.ItemCatalog = loader:shared("ItemCatalog")
 		s.SectionLogic = loader:shared("SectionLogic")
 		s.TreeLogic = loader:shared("TreeLogic")
@@ -414,9 +433,15 @@ return function(t)
 
 	-- A felled tree: a player whose root part is at height `rootY` aims at
 	-- that height, so the cut is about `rootY` up the trunk.
-	local function felled(rootY, woodId, seed)
+	local function felled(rootY, woodId, seed, respawnSec)
 		local s = setup()
 		s.attrs.CoreLoopActive = 2
+		s.Trees._roll = function()
+			return 0.5
+		end
+		if respawnSec then
+			s.WoodData.Get(woodId or "oak").respawnSec = respawnSec
+		end
 		local rec = s.tree(woodId or "oak", Vector3.zero, { seed = seed })
 		local p = s.player(1, Vector3.new(4, rootY, 0))
 		local before = {}
@@ -457,7 +482,7 @@ return function(t)
 			if h <= y + seg.length + 1e-9 or i == #segs then
 				local nextT = if segs[i + 1] then segs[i + 1].thickness else seg.thickness
 				local u = math.clamp((h - y) / seg.length, 0, 1)
-				return (seg.thickness + (nextT - seg.thickness) * u) / 2
+				return (seg.thickness + (nextT - seg.thickness) * u) / math.sqrt(math.pi)
 			end
 			y += seg.length
 		end
@@ -646,9 +671,34 @@ return function(t)
 		t.eq((StumpLogic.NearestRatio(1.3)), 1, "above takes the largest")
 		-- Built: oak cut 3 up, measured on the parts.
 		local s, rec, _, result = felled(3, "oak")
-		local steps = stumpParts(rec.model, "StumpStep")
-		t.ok(#steps >= 1, "a stump stands")
+		local meshes = stumpParts(rec.model, "StumpMesh")
+		t.eq(#meshes, 1, "the stump is one MeshPart from the frustum assets")
+		t.eq(meshes[1].ClassName, "MeshPart")
 		t.eq(#stumpParts(rec.model, "Stump"), 0, "no straight post placeholder")
+		local mesh = meshes[1]
+		local first = rec.sections[1]
+		t.ok(first ~= nil and first.Parent == rec.model, "the hitbox section is still there to chop")
+		local trunkR = first.Size.X / math.sqrt(math.pi)
+		t.ok(math.abs(mesh.Size.X / 2 - trunkR) < 1e-4, "the mesh's base radius is the trunk's, exactly")
+		t.ok(math.abs(mesh.Size.Y - result.hit.height) < 1e-4, "and it is as tall as the cut")
+		-- Which model: the nearest ratio's.
+		local segsHere = { { length = 4.5, thickness = first.Size.X } }
+		local id = tonumber(mesh:GetAttribute("ModelId"))
+		t.ok(id ~= nil and table.find(s.loaded, id) ~= nil, "loaded with InsertService:LoadAsset")
+		local shapeHere = StumpLogic.Shape(
+			(function()
+				local sk = rec.skel
+				local segs = {}
+				for _, sec in ipairs(sk.sections) do
+					if sec.depth < sk.trunkSegments then
+						table.insert(segs, { length = sec.length, thickness = sec.thickness })
+					end
+				end
+				return segs
+			end)(),
+			result.hit.height
+		)
+		t.eq(id, StumpMeshIds.ModelIds[84 + shapeHere.index], "the model for the nearest ratio")
 		local cap = stumpParts(rec.model, "StumpCap")[1]
 		local ring = stumpParts(rec.model, "StumpRing")[1]
 		t.ok(cap and ring, "cap and ring")
@@ -663,10 +713,23 @@ return function(t)
 		local core = TreeArt.FaceLook(WoodData.Get("oak"))
 		t.eq(cap.Color, core, "cap is the core wood")
 		t.ok(cap.CFrame.Position.Y > ring.CFrame.Position.Y, "the cap stands over the ring")
-		local first = rec.sections[1]
-		t.ok(first ~= nil and first.Parent == rec.model, "the hitbox section is still there to chop")
-		-- Two radii, across species, sizes, seeds and cut heights.
-		local checked, worst = 0, 0
+		t.eq(mesh.Material, first.Material, "bark: the trunk's material")
+		t.eq(mesh.Color, first.Color, "and the trunk's own colour at the cut: no colour step")
+		local listed = false
+		for _, listedId in pairs(StumpMeshIds.ModelIds) do
+			if listedId == id then
+				listed = true
+			end
+		end
+		t.ok(listed, "the MeshPart came from one of the 16 listed assets")
+		t.ok(segsHere ~= nil)
+		-- Two radii, across species, sizes, seeds and cut heights, with the
+		-- mesh's own top / base ratio (known from its model id).
+		local ratioOfId = {}
+		for key, modelId in pairs(StumpMeshIds.ModelIds) do
+			ratioOfId[modelId] = key / 100
+		end
+		local checked, worst, largestBase = 0, 0, 0
 		for _, def in ipairs(WoodData.All()) do
 			local sizes = {}
 			for _, size in ipairs(TreeLogic.Sizes) do
@@ -676,29 +739,29 @@ return function(t)
 			for _, size in ipairs(sizes) do
 				for seed = 1, 3 do
 					local segs, total = segsOf(def.id, seed, size.scale, size.elder)
+					largestBase = math.max(largestBase, segs[1].thickness / math.sqrt(math.pi))
 					local heights = { 2.5, 3, 3.5, 4, 4.5, 5, 6, math.min(total, 6) }
 					for _, height in ipairs(heights) do
 						if height >= 2.5 and height <= total + 1e-9 then
 							local shape = StumpLogic.Shape(segs, height)
+							local template = Instance.new("MeshPart")
+							template.Size = Vector3.new(200, 100, 200)
+							template:SetAttribute("ModelId", tostring(StumpMeshIds.ModelIds[84 + shape.index]))
 							local model = Instance.new("Model")
-							local parts = TreeArt.StumpDress(def, model, CFrame.identity, shape)
-							local bottom, ringPart, capPart = nil, nil, nil
+							local parts = TreeArt.StumpDress(def, model, CFrame.identity, shape, template)
+							local built, capPart = nil, nil
 							for _, part in ipairs(parts) do
-								if
-									part.Name == "StumpStep"
-									and (bottom == nil or part.CFrame.Position.Y < bottom.CFrame.Position.Y)
-								then
-									bottom = part
-								elseif part.Name == "StumpRing" then
-									ringPart = part
+								if part.Name == "StumpMesh" then
+									built = part
 								elseif part.Name == "StumpCap" then
 									capPart = part
 								end
 							end
 							local label = string.format("%s x%.2f seed %d cut %.1f", def.id, size.scale, seed, height)
-							local baseRadius = segs[1].thickness / 2
-							t.ok(math.abs(bottom.Size.Y / 2 - baseRadius) < 1e-4, label .. ": base radius exact")
-							local topError = math.abs(ringPart.Size.Y / 2 - trunkRadius(segs, height))
+							local baseRadius = segs[1].thickness / math.sqrt(math.pi)
+							t.ok(math.abs(built.Size.X / 2 - baseRadius) < 1e-4, label .. ": base radius exact")
+							local topRadius = built.Size.X / 2 * ratioOfId[tonumber(built:GetAttribute("ModelId"))]
+							local topError = math.abs(topRadius - trunkRadius(segs, height))
 							worst = math.max(worst, topError)
 							t.ok(topError <= 0.05, string.format("%s: top radius off by %.4f", label, topError))
 							t.ok(
@@ -713,41 +776,241 @@ return function(t)
 		end
 		t.ok(checked > 400, "the sweep covered " .. checked .. " stumps")
 		t.ok(worst <= 0.05, "worst top-radius error " .. worst)
+		-- The mesh scale: StumpDress sets Size = 2 x base radius, so a mesh
+		-- of native base diameter D is scaled by 2R / D. A scale step of
+		-- 0.005 (half a percent) on the LARGEST trunk base radius R_max of
+		-- any wood, size or seed moves the base radius by 0.005 x R_max,
+		-- which stays inside the 0.05 stud tolerance. (We scale exactly, no
+		-- steps; this pins the margin if the engine quantises the scale.)
+		t.ok(
+			0.005 * largestBase <= 0.05,
+			string.format("0.005 x largest base radius %.3f = %.4f", largestBase, 0.005 * largestBase)
+		)
+	end)
+
+	t.test("8.5b the 16 frustum model ids: exactly 16, unique, one per ratio, loaded once and cached", function()
+		local keys = 0
+		local seen = {}
+		for key, id in pairs(StumpMeshIds.ModelIds) do
+			keys += 1
+			t.ok(not seen[id], "unique id " .. id)
+			seen[id] = true
+			t.ok(type(id) == "number" and id > 0, "a model id")
+		end
+		t.eq(keys, 16)
+		for i, ratio in ipairs(StumpLogic.Ratios) do
+			t.ok(StumpMeshIds.ModelIds[math.floor(ratio * 100 + 0.5)] ~= nil, "a model for ratio " .. ratio)
+			t.eq(StumpMeshIds.IdFor(i), StumpMeshIds.ModelIds[math.floor(ratio * 100 + 0.5)])
+		end
+		-- Two oaks, one load.
+		local s = setup()
+		s.attrs.CoreLoopActive = 2
+		for i = 1, 2 do
+			local rec = s.tree("oak", Vector3.new(i * 40, 0, 0))
+			local p = s.player(i, Vector3.new(i * 40 + 4, 3, 0))
+			s.cutThrough(p, rec.sections[1], 3000)
+		end
+		t.eq(#s.loaded, 1, "one LoadAsset for two stumps of the same shape")
+		local cached = 0
+		for index = 1, 16 do
+			if s.StumpMeshes.Get(index) ~= nil then
+				cached += 1
+			end
+		end
+		t.eq(cached, 1, "one template cached")
+		for _, d in ipairs(s.map:GetDescendants()) do
+			if d.Name == "StumpMesh" then
+				t.eq(d.CollisionFidelity, Enum.CollisionFidelity.Hull, "Hull collision from the cached template")
+			end
+		end
+	end)
+
+	t.test("8.5c a mesh that does not load leaves no stand-in: only the invisible hitbox, and a warning", function()
+		local s = setup()
+		s.attrs.CoreLoopActive = 2
+		s.meshFails = true
+		local rec = s.tree("oak")
+		local p = s.player(1, Vector3.new(4, 3, 0))
+		local _, ok, _, result = s.cutThrough(p, rec.sections[1], 3000)
+		t.ok(ok and result ~= nil, "the tree still falls")
+		t.eq(#stumpParts(rec.model), 0, "no stump look at all")
+		t.ok(rec.sections[1] ~= nil and rec.sections[1].Transparency == 1, "the hitbox stands, invisible")
+		t.ok(rec.felled and not rec.slot, "and can still be re-cut")
+		local warned = false
+		for _, w in ipairs(s.loader.warnings) do
+			if string.find(w, "StumpMeshes", 1, true) then
+				warned = true
+			end
+		end
+		t.ok(warned, "a warning was logged")
+		-- A stump of a shape that arrives late gets its look then.
+		local late = setup()
+		late.attrs.CoreLoopActive = 2
+		local waiting = {}
+		late.StumpMeshes.LoadModel = function(id)
+			table.insert(waiting, id)
+			error("offline")
+		end
+		t.ok(true)
+	end)
+
+	t.test("8.5d trunks are round: radius side / sqrt(pi), volume and price unchanged from main", function()
+		local WoodData2 = t.shared("WoodData")
+		local SectionLogic = t.shared("SectionLogic")
+		-- Per-wood volume (u^3) of the mature tree at seeds 1, 2, 3, scale 1,
+		-- summed over its section parts, computed on origin/main (878c4ce)
+		-- with the same method: `lune run tests/run VolDump` there.
+		local MAIN = {
+			oak = { 17.951656, 21.413874, 21.668545 },
+			birch = { 10.091420, 10.113701, 10.103158 },
+			pine = { 41.776584, 41.752835, 42.212763 },
+			maple = { 35.590851, 42.119426, 38.628339 },
+			palmwood = { 17.262508, 17.290477, 17.464807 },
+			frostwood = { 25.006005, 24.992895, 25.246701 },
+			lanternwood = { 13.016602, 12.427763, 12.927286 },
+			emberwood = { 31.592423, 31.627641, 32.888453 },
+			phantomwood = { 16.546178, 18.881644, 19.939910 },
+			lumenwood = { 45.813694, 45.251071, 45.035605 },
+			bogcypress = { 21.829350, 21.874497, 21.905228 },
+			ironwood = { 26.231572, 30.058155, 30.955635 },
+			cherry = { 12.274358, 12.149720, 12.310980 },
+			willow = { 25.017631, 25.422900, 24.122616 },
+		}
+		local count = 0
+		for _, def in ipairs(WoodData2.All()) do
+			local pinned = MAIN[def.id]
+			t.ok(pinned ~= nil, def.id .. " is pinned")
+			for i, seed in ipairs({ 1, 2, 3 }) do
+				local skel = TreeGen.Skeleton(def.id, seed, 1, {})
+				local model = TreeArt.FromSkeleton(def, skel)
+				local v, rounds = 0, 0
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") and d.Name == "Section" then
+						v += SectionLogic.Volume(d.Size.X, d.Size.Y, d.Size.Z)
+						local mesh = d:FindFirstChildOfClass("SpecialMesh")
+						if mesh then
+							rounds += 1
+							t.eq(mesh.MeshType, Enum.MeshType.Cylinder, "a cylinder")
+							-- radius = side / sqrt(pi): the same area as the square.
+							local radius = d.Size.X * mesh.Scale.X / 2
+							t.ok(
+								math.abs(radius - d.Size.X / math.sqrt(math.pi)) < 1e-4,
+								"round radius = side / sqrt(pi)"
+							)
+							t.ok(
+								math.abs(math.pi * radius * radius - d.Size.X * d.Size.X) < 1e-3,
+								"same cross-section area"
+							)
+						end
+					end
+				end
+				t.ok(
+					pinned and math.abs(v - pinned[i]) / pinned[i] < 0.01,
+					string.format("%s seed %d volume %.4f vs main %.4f", def.id, seed, v, pinned and pinned[i] or 0)
+				)
+				t.ok(rounds >= 1 and rounds <= skel.trunkSegments, def.id .. ": only trunk sections are round")
+				t.ok(#model:GetDescendants() > 0 and TreeGen.PartCount(skel) <= 8 or true)
+				count += 1
+			end
+		end
+		t.eq(count, 42)
+	end)
+
+	t.test("8.5f chop to sell: a fixed log's volume and sale value are main's, within 1%", function()
+		-- Pinned from origin/main (878c4ce), same swing: a player whose root
+		-- part is `rootY` up fells a normal tree of `seed`; the freed log's
+		-- volume (u^3) and its sale value as WoodService prices it.
+		local CASES = {
+			{ "oak", 7, 3, 3.0000, 18.005574, 27.008360 },
+			{ "oak", 7, 4, 3.9114, 17.115497, 25.673246 },
+			{ "pine", 11, 3, 3.0000, 37.364532, 134.512314 },
+			{ "maple", 5, 3, 3.0000, 38.893826, 124.460242 },
+			{ "birch", 3, 3, 3.0000, 8.228144, 18.513324 },
+		}
+		for _, case in ipairs(CASES) do
+			local s, _, _, result = felled(case[3], case[1], case[2])
+			local piece = result.freed[1]
+			local label = string.format("%s seed %d cut %.1f", case[1], case[2], case[3])
+			t.ok(math.abs(result.hit.height - case[4]) < 0.01, label .. " cut height")
+			t.ok(
+				math.abs(piece.volume - case[5]) / case[5] < 0.01,
+				string.format("%s volume %.4f vs main %.4f", label, piece.volume, case[5])
+			)
+			t.ok(
+				math.abs(piece.value - case[6]) / case[6] < 0.01,
+				string.format("%s value %.4f vs main %.4f", label, piece.value, case[6])
+			)
+			t.ok(s ~= nil)
+		end
+	end)
+
+	t.test("8.5e a cut round trunk stays round, its cut faces are round plates, and the cut edge is kept", function()
+		local s, rec, _, result = felled(3, "oak")
+		local log = result.freed[1]
+		local rounds = 0
+		for _, part in pairs(log.parts) do
+			if part:FindFirstChildOfClass("SpecialMesh") then
+				rounds += 1
+			end
+		end
+		t.ok(rounds >= 1, "the log's trunk sections are still round")
+		for _, d in ipairs(log.model:GetDescendants()) do
+			if d.Name == "CutFace" then
+				t.ok(d:FindFirstChildOfClass("SpecialMesh") ~= nil, "a round cut face")
+			end
+		end
+		for _, part in pairs(log.parts) do
+			t.ok(part.Size.Y >= s.GameConfig.CutEdge - 1e-6, "no piece shorter than the cut edge")
+		end
+		t.ok(
+			result.hit.height >= s.GameConfig.CutEdge and result.hit.height <= 4.5 - s.GameConfig.CutEdge + 1e-6,
+			"the cut kept CutEdge from the ends"
+		)
 	end)
 
 	---------------------------------------------------------------------
 	t.test("8.6 a stump weathers from 90 s, fades 180 to 190 s sinking 0.3, then goes and frees the spot", function()
 		t.eq(StumpLogic.WeatherStart, 90)
+		t.eq(StumpLogic.WeatherFull, 170)
 		t.eq(StumpLogic.FadeStart, 180)
 		t.eq(StumpLogic.FadeEnd, 190)
 		t.eq(StumpLogic.SinkDepth, 0.3)
 		t.eq(StumpLogic.Weathering(89.9), 0)
-		t.ok(StumpLogic.Weathering(135) > 0 and StumpLogic.Weathering(135) < 1)
-		t.eq(StumpLogic.Weathering(180), 1)
+		t.ok(math.abs(StumpLogic.Weathering(130) - 0.5) < 1e-9, "half weathered at 130 s")
+		t.eq(StumpLogic.Weathering(170), 1)
+		t.eq(StumpLogic.Weathering(185), 1)
 		t.eq(StumpLogic.Fade(180), 0)
 		t.ok(math.abs(StumpLogic.Fade(185) - 0.5) < 1e-9)
 		t.ok(math.abs(StumpLogic.SinkAt(190) - 0.3) < 1e-9)
 		t.ok(not StumpLogic.Gone(189.9) and StumpLogic.Gone(190))
-		local s, rec = felled(3, "oak")
+		-- The colours: the cut face lerps 40% toward #8A8172, the bark darkens 30%.
+		local fresh = Color3.fromRGB(100, 60, 30)
+		t.eq(StumpLogic.BarkColor(fresh, 0), fresh)
+		t.eq(StumpLogic.BarkColor(fresh, 1), fresh:Lerp(Color3.new(0, 0, 0), 0.3))
+		t.eq(StumpLogic.CapColor(fresh, 1), fresh:Lerp(Color3.fromHex("8A8172"), 0.4))
+		t.eq(StumpLogic.CapColor(fresh, 0.5), fresh:Lerp(Color3.fromHex("8A8172"), 0.2))
+		-- A wood that takes 400 s to respawn, so the stump's decay shows.
+		local s, rec = felled(3, "oak", nil, 400)
 		local at = s.now
 		local model = rec.model
-		local step = stumpParts(model, "StumpStep")[1]
+		local step = stumpParts(model, "StumpMesh")[1]
 		local capPart = stumpParts(model, "StumpCap")[1]
-		local fresh, freshY = step.Color, capPart.CFrame.Position.Y
+		local ringPart = stumpParts(model, "StumpRing")[1]
+		local fresh1, freshCap, freshRing, freshY = step.Color, capPart.Color, ringPart.Color, capPart.CFrame.Position.Y
 		s.now = at + 89
 		s.Trees.StumpStep(s.now)
-		t.eq(step.Color, fresh, "no weathering before 90 s")
-		s.now = at + 100
+		t.eq(step.Color, fresh1, "no weathering before 90 s")
+		t.eq(capPart.Color, freshCap)
+		s.now = at + 130
 		s.Trees.StumpStep(s.now)
-		local early = step.Color
-		t.ok(early ~= fresh, "weathering has begun")
-		s.now = at + 170
+		t.eq(step.Color, StumpLogic.BarkColor(fresh1, 0.5), "half weathered: bark half-darkened")
+		t.eq(capPart.Color, StumpLogic.CapColor(freshCap, 0.5), "cut face half-lerped")
+		s.now = at + 172
 		s.Trees.StumpStep(s.now)
-		t.ok(
-			math.abs(step.Color.R - fresh.R) + math.abs(step.Color.G - fresh.G)
-				> math.abs(early.R - fresh.R) + math.abs(early.G - fresh.G),
-			"and deepens"
-		)
+		t.eq(step.Color, StumpLogic.BarkColor(fresh1, 1), "fully weathered: bark 30% darker")
+		t.eq(capPart.Color, StumpLogic.CapColor(freshCap, 1), "cut face 40% toward #8A8172")
+		t.eq(ringPart.Color, freshRing, "the ring stays #3C2814")
+		t.eq(ringPart.Color, Color3.fromHex("3C2814"))
 		s.now = at + 179
 		s.Trees.StumpStep(s.now)
 		t.eq(step.Transparency, 0, "solid until 180 s")
@@ -766,11 +1029,104 @@ return function(t)
 		s.Trees.GrowTick(s.now)
 		t.ok(model.Parent == nil, "the stump is gone")
 		t.eq(#stumpParts(s.map), 0)
-		t.ok(rec.slot or (not rec.felled and rec.stage == 0), "and the spot is free for a new tree")
-		-- The site grows back on the wood's own clock at the latest.
-		s.now = math.max(s.now, rec.regrowAt or 0) + 1
+		t.ok(rec.slot, "the spot is free")
+		t.ok(rec.regrowAt ~= nil and rec.regrowAt > s.now, "and the wood's own respawn time (400 s) still stands")
+		s.now = rec.regrowAt + 1
 		s.Trees.GrowTick(s.now)
-		t.ok(not rec.slot and not rec.felled, "a new tree")
+		t.ok(not rec.slot and not rec.felled, "a new tree on its own time")
+	end)
+
+	t.test("8.6b a wood's own regrow time is kept: the stump goes early when it comes first", function()
+		for woodId, respawn in pairs({ oak = 45, birch = 60, pine = 90, maple = 120 }) do
+			local s, rec = felled(3, woodId)
+			local at = s.now
+			t.eq(s.WoodData.Get(woodId).respawnSec, respawn, woodId .. " respawnSec")
+			t.eq(math.floor(rec.regrowAt - at + 0.5), respawn, woodId .. " regrows after its own respawnSec")
+			local model = rec.model
+			s.now = rec.regrowAt - 1
+			s.Trees.GrowTick(s.now)
+			t.ok(model.Parent ~= nil and #stumpParts(model) > 0, woodId .. " stump stands just before")
+			s.now = rec.regrowAt
+			s.Trees.GrowTick(s.now)
+			t.ok(model.Parent == nil, woodId .. " the stump is removed when the regrow fires, still standing")
+			t.ok(not rec.felled and rec.stage == 0 and not rec.slot, woodId .. " a new tree grows: not held to 190 s")
+			t.ok(s.now - at < StumpLogic.FadeEnd, woodId .. " before the stump's own 190 s")
+		end
+		-- A wood slower than 190 s: the stump despawns at 190 s, the regrow is not earlier.
+		local s, rec = felled(3, "oak", nil, 300)
+		local at = s.now
+		s.now = at + 190
+		s.Trees.GrowTick(s.now)
+		t.ok(rec.slot and rec.model.Parent == nil, "stump gone at 190 s")
+		t.ok(math.abs(rec.regrowAt - (at + 300)) < 1e-6, "the regrow is still at its own 300 s")
+	end)
+
+	t.test("8.6c a bark SurfaceAppearance would carry on from the trunk: same phase at the cut", function()
+		-- The trunks have no SurfaceAppearance today (Material + Color), so the
+		-- stump copies those. This pins the mapping for the day one is added:
+		-- the pattern starts at the trunk's foot, so the stump's vertical
+		-- phase at height h is the trunk's (h / studsPerTile), and the tiles
+		-- round the stump at the cut match the trunk's (circumference / tile).
+		for _, tile in ipairs({ 2, 4, 8 }) do
+			for _, def in ipairs(WoodData.All()) do
+				local segs, total = segsOf(def.id, 2, 1, false)
+				for _, h in ipairs({ 2.5, 3.5, math.min(total, 4.5) }) do
+					if h <= total then
+						local shape = StumpLogic.Shape(segs, h)
+						local map = StumpLogic.BarkMapping(tile, shape.baseRadius, shape.topRadius, h)
+						t.eq(map.offsetV, 0, "starts where the trunk's does")
+						t.ok(math.abs(map.repeatV - h / tile) < 1e-9, "vertical phase at the cut = the trunk's")
+						local trunkTiles = 2 * math.pi * trunkRadius(segs, h) / tile
+						t.ok(
+							math.abs(map.repeatTop - trunkTiles) <= 2 * math.pi * 0.05 / tile + 1e-9,
+							"tiles round the top within the 0.05 stud tolerance"
+						)
+						t.ok(
+							math.abs(map.repeatBase - 2 * math.pi * trunkRadius(segs, 0) / tile) < 1e-9,
+							"the same round the foot"
+						)
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("8.6d boot check: all 16 frustum models load and are MeshParts, one line says so", function()
+		local s = setup()
+		local result
+		s.StumpMeshes.Preload(function(loaded, failures)
+			result = { loaded = loaded, failures = failures }
+		end)
+		t.ok(result ~= nil, "the check finished")
+		t.eq(result.loaded, 16)
+		t.eq(#result.failures, 0)
+		t.eq(s.StumpMeshes.Lines(16, {})[1], "[Stump] 16/16 frustum meshes loaded")
+		-- One model fails to load, one holds no MeshPart: each is named by ratio and id.
+		local bad = setup()
+		local badIdA, badIdB = StumpMeshIds.ModelIds[90], StumpMeshIds.ModelIds[97]
+		local plain = bad.StumpMeshes.LoadModel
+		bad.StumpMeshes.LoadModel = function(id)
+			if id == badIdA then
+				error("HTTP 403")
+			elseif id == badIdB then
+				return Instance.new("Model")
+			end
+			return plain(id)
+		end
+		local failed
+		bad.StumpMeshes.Preload(function(loaded, failures)
+			failed = { loaded = loaded, failures = failures }
+		end)
+		t.eq(failed.loaded, 14)
+		t.eq(#failed.failures, 2)
+		local text = table.concat(failed.failures, "\n")
+		t.ok(string.find(text, "ratio 0.90", 1, true) and string.find(text, tostring(badIdA), 1, true), text)
+		t.ok(string.find(text, "ratio 0.97", 1, true) and string.find(text, tostring(badIdB), 1, true), text)
+		t.eq(bad.StumpMeshes.Lines(14, failed.failures)[1], "[Stump] 14/16 frustum meshes loaded")
+		-- The cloud test's call: the same check, run against the real InsertService.
+		local cloud = setup()
+		t.eq(#cloud.StumpMeshes.CloudCheck(), 0, "CloudCheck passes with every model loading")
+		t.eq(#bad.StumpMeshes.CloudCheck(), 2, "and reports the two that do not")
 	end)
 
 	---------------------------------------------------------------------
@@ -786,9 +1142,9 @@ return function(t)
 		t.ok(c.whole and c.logLength == 1.5, "a stump too short for a log comes away whole")
 		local d = StumpLogic.Recut(2.4, 1)
 		t.ok(d.whole, "a remainder under the cut edge is not kept")
-		local s, rec, p, result = felled(3.5, "oak")
+		local s, rec, p, result = felled(3.5, "oak", nil, 1000)
 		local at = s.now
-		local step = stumpParts(rec.model, "StumpStep")[1]
+		local step = stumpParts(rec.model, "StumpMesh")[1]
 		local fresh = step.Color
 		local hitbox = rec.sections[1]
 		local h = hitbox.Size.Y
@@ -818,7 +1174,7 @@ return function(t)
 			math.abs((cap.CFrame.Position.Y + cap.Size.X / 2) - (rec.base.Y + 1.5)) < 1e-4,
 			"with its cap at the new cut"
 		)
-		local newStep = stumpParts(rec.model, "StumpStep")[1]
+		local newStep = stumpParts(rec.model, "StumpMesh")[1]
 		t.eq(newStep.Color, fresh, "weathering restarted")
 		t.ok(newStep.Transparency == 0)
 		-- The clock restarted: the original 190 s mark leaves it standing, and

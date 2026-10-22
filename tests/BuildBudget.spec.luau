@@ -336,7 +336,15 @@ return function(t)
 
 	t.test("call graph: only MeshKit asks the engine for a mesh", function()
 		t.eq(filesWith(":CreateMeshPartAsync(", true), { MESHKIT }, "the one engine call")
-		t.eq(filesWith("InsertService", true), {}, "no model downloads on the build path either")
+		-- T420: the stump frustums are uploaded as Model assets and loaded by the
+		-- server at runtime, in the background, after the build (StumpMeshes
+		-- preloads them from SectionTrees.Init). That one loader is the only
+		-- allowed InsertService user; nothing on the map build path may be.
+		t.eq(
+			filesWith("InsertService", true),
+			{ "src/ServerScriptService/StumpMeshes.luau" },
+			"no model downloads on the build path (the stump loader is the one runtime exception)"
+		)
 		for path, text in pairs(codeOf) do
 			if string.find(path, "ServerScriptService", 1, true) then
 				t.ok(not string.find(text, "ContentProvider", 1, true), path .. " waits on ContentProvider")

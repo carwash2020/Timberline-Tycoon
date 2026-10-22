@@ -1553,39 +1553,30 @@ return function(t)
 		end
 	end)
 
-	t.test(
-		"a stump stands out its 190 s decay (respawnSec is the earliest regrow), then the site regrows; cutting it clears it sooner",
-		function()
-			local s = setup()
-			s.Trees._roll = function()
-				return 0.5
-			end
-			local rec = s.tree("oak")
-			local p = s.player(1)
-			s.cutThrough(p, rec.sections[1])
-			local fellAt = s.now
-			local def = s.WoodData.Get("oak")
-			t.ok(rec.felled and not rec.slot)
-			t.eq(math.floor((rec.regrowAt or 0) - s.now + 0.5), def.respawnSec)
-			s.now = (rec.regrowAt or 0) - 1
-			s.Trees.GrowTick(s.now)
-			t.ok(rec.model.Parent ~= nil and not rec.slot, "the stump stands until its time")
-			s.now += 2
-			s.Trees.GrowTick(s.now)
-			-- T420: the stump decays for StumpLogic.FadeEnd (190 s) whatever the
-			-- wood's respawn time; the site grows back when both have passed.
-			t.ok(rec.model.Parent ~= nil and rec.felled and not rec.slot, "past respawnSec the stump still stands")
-			s.now = fellAt + 190
-			s.Trees.GrowTick(s.now)
-			t.ok(not rec.slot and not rec.felled and rec.stage == 0, "regrown as a sapling once the stump is gone")
-			-- A second tree: cut the stump itself.
-			local other = s.tree("oak", Vector3.new(60, 0, 0))
-			local q = s.player(2, Vector3.new(64, 3, 0))
-			s.cutThrough(q, other.sections[1])
-			s.clearSite(q, other)
-			t.ok(other.slot, "cutting the stump away opens the site")
+	t.test("a stump times out after respawnSec, then the site regrows; cutting it clears it sooner", function()
+		local s = setup()
+		s.Trees._roll = function()
+			return 0.5
 		end
-	)
+		local rec = s.tree("oak")
+		local p = s.player(1)
+		s.cutThrough(p, rec.sections[1])
+		local def = s.WoodData.Get("oak")
+		t.ok(rec.felled and not rec.slot)
+		t.eq(math.floor((rec.regrowAt or 0) - s.now + 0.5), def.respawnSec)
+		s.now = (rec.regrowAt or 0) - 1
+		s.Trees.GrowTick(s.now)
+		t.ok(rec.model.Parent ~= nil and not rec.slot, "the stump stands until its time")
+		s.now += 2
+		s.Trees.GrowTick(s.now)
+		t.ok(not rec.slot and not rec.felled and rec.stage == 0, "regrown as a sapling")
+		-- A second tree: cut the stump itself.
+		local other = s.tree("oak", Vector3.new(60, 0, 0))
+		local q = s.player(2, Vector3.new(64, 3, 0))
+		s.cutThrough(q, other.sections[1])
+		s.clearSite(q, other)
+		t.ok(other.slot, "cutting the stump away opens the site")
+	end)
 
 	-- CHOP-T325: what the server already says about a cut, and what it counts.
 	t.test(
@@ -1687,9 +1678,9 @@ return function(t)
 		t.eq(p.root.Position, rootPos, "a fall never pushes the player")
 		-- Cutting the stump through once more is the cut, not a second fell.
 		t.eq(falls, 1, "no second fell")
-		s.now = math.max(rec.regrowAt or 0, s.now + 190) + 1
+		s.now = (rec.regrowAt or 0) + 1
 		s.Trees.GrowTick(s.now)
-		t.ok(not rec.felled and rec.stage == 0, "regrown once the stump has decayed")
+		t.ok(not rec.felled and rec.stage == 0, "regrown on the existing timer")
 	end)
 
 	t.test("two players split the damage on an Elder; the finishing piece goes to whoever did more", function()

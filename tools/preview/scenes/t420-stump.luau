@@ -1,11 +1,14 @@
 --!nocheck
--- T420: the stump a felled section tree leaves. Flat-colour preview, not
--- Studio. Back row: today's stump (a straight post, TreeArt.Stump). Front
--- row: the new one (StumpLogic shape from the real trunk, TreeArt.StumpDress),
--- cut 3 studs up; the front-most row is cut 4.2 up. Views:
---   1  before: today's stumps         2  after: the new stumps (3 studs)
---   3  before and after side by side  4  close-up of one new stump (oak)
---   5  the cut at 2.5 up against 4.2 up (taper and end-grain cap)
+-- T420: stumps next to the round trunks they were cut from. PREVIEW ONLY:
+-- this tool cannot load the 16 uploaded frustum MeshParts (InsertService),
+-- so the stump body here is a stand-in of 14 stacked discs between the real
+-- base radius and the real top radius (StumpLogic.Shape), drawn only so the
+-- taper and the colours can be judged. The cap, the ring, the radii, the
+-- heights and the weathering colours are the game's own code (TreeArt.StumpDress,
+-- StumpLogic). Lit by the viewer's sun and sky with shadows (three.js), not
+-- by Roblox: no material textures. Views:
+--   1  oak stump, cut 4.2 up              2  pine stump, cut 4.2 up
+--   3  oak trunk and its stump together   4  oak stump weathered, 150 s (next to a fresh one)
 local Common = require("./_common")
 
 return {
@@ -14,17 +17,13 @@ return {
 		local V3, CF, C3, Enum = roblox.Vector3, roblox.CFrame, roblox.Color3, roblox.Enum
 		local Kit = ctx.art("Kit")
 		local TreeArt = ctx.art("TreeArt")
-		local CharacterArt = ctx.art("CharacterArt")
 		local TreeGen = ctx.shared("TreeGen")
 		local StumpLogic = ctx.shared("StumpLogic")
 		local WoodData = ctx.shared("WoodData")
 		local root = roblox.Instance.new("Model")
-		Common.ground(ctx, root, 400, nil, V3.new(60, -0.5, 0))
+		Common.ground(ctx, root, 300, nil, V3.new(0, -0.5, 0))
 
-		local ids = { "oak", "birch", "pine", "maple", "frostwood", "emberwood" }
-		local GAP = 12
-		local function segsOf(woodId, seed)
-			local skel = TreeGen.Skeleton(woodId, seed, 1, {})
+		local function segsOf(skel)
 			local trunk = {}
 			for _, sec in ipairs(skel.sections) do
 				if sec.depth < skel.trunkSegments then
@@ -40,52 +39,75 @@ return {
 			end
 			return segs
 		end
-		local function newStump(def, seed, h, at)
-			local shape = StumpLogic.Shape(segsOf(def.id, seed), h)
+
+		-- A stump at `at`: the stand-in body, the game's cap and ring.
+		local function stump(woodId, seed, h, at, weather)
+			local def = WoodData.Get(woodId)
+			local skel = TreeGen.Skeleton(woodId, seed, 1, {})
+			local segs = segsOf(skel)
+			local shape = StumpLogic.Shape(segs, h)
+			local bark = Kit.vary(TreeArt.Palette(def).bark or def.trunkColor, Kit.rng(1), 0)
 			local model = roblox.Instance.new("Model")
-			TreeArt.StumpDress(def, model, CF.new(at), shape)
 			model.Parent = root
+			local template = roblox.Instance.new("MeshPart")
+			template.Size = V3.new(2, 2, 2)
+			local base = CF.new(at)
+			local parts = TreeArt.StumpDress(def, model, base, shape, template, bark)
+			for _, d in ipairs(parts) do
+				if d.Name == "StumpMesh" then
+					d:Destroy()
+				elseif d.Name == "StumpCap" then
+					d.Color = StumpLogic.CapColor(d.Color, weather)
+				end
+			end
+			local n = 14
+			for i = 1, n do
+				local u0, u1 = (i - 1) / n, i / n
+				local r = shape.baseRadius + (shape.topRadius - shape.baseRadius) * (u0 + u1) / 2
+				local disc = Kit.cylinder(
+					model,
+					"PreviewStandIn",
+					h / n + 0.01,
+					r * 2,
+					base * CF.new(0, h * (u0 + u1) / 2, 0) * CF.Angles(0, 0, math.pi / 2),
+					StumpLogic.BarkColor(bark, weather),
+					TreeArt.BarkMaterial(def)
+				)
+				Kit.decor(disc)
+			end
+			return shape, skel
 		end
-		for i, id in ipairs(ids) do
-			local def = WoodData.Get(id)
-			local x = (i - 1) * GAP
-			local old = TreeArt.Stump(def, i, 1)
-			Kit.placeAt(old, CF.new(x, 0, 10))
-			old.Parent = root
-			newStump(def, i, 3, V3.new(x, 0, -4))
-			newStump(def, i, 4.2, V3.new(x, 0, -16))
-			local sign = Kit.part(
-				root,
-				"Label",
-				V3.new(7, 1.6, 0.3),
-				CF.new(x, 1, -24),
-				C3.fromRGB(110, 74, 44),
-				Enum.Material.Wood
-			)
-			Kit.signText(sign, def.displayName, C3.fromRGB(250, 240, 220), { Enum.NormalId.Front })
+		local function label(text, at)
+			local sign =
+				Kit.part(root, "Label", V3.new(9, 1.6, 0.3), CF.new(at), C3.fromRGB(110, 74, 44), Enum.Material.Wood)
+			Kit.signText(sign, text, C3.fromRGB(250, 240, 220), { Enum.NormalId.Front })
 		end
-		local fig = CharacterArt.Build({
-			name = "Dummy",
-			skin = C3.fromHex("#E8B994"),
-			shirt = C3.fromHex("#B8382E"),
-			pants = C3.fromHex("#3D5A8C"),
-			hair = C3.fromHex("#5A3A22"),
-			hat = "cap",
-			hatColor = C3.fromHex("#4C7A3E"),
-			tag = false,
-		})
-		Kit.placeAt(fig, CF.new(-5, 0, -4))
-		fig.Parent = root
-		local mid = (#ids - 1) * GAP / 2
+
+		stump("oak", 7, 4.2, V3.new(0, 0, 0), 0)
+		label("oak, cut 4.2 up", V3.new(0, 0.8, 5))
+		stump("pine", 11, 4.2, V3.new(30, 0, 0), 0)
+		label("pine, cut 4.2 up", V3.new(30, 0.8, 5))
+		-- Trunk and stump together: the standing oak's trunk, and its stump beside it.
+		local def = WoodData.Get("oak")
+		local skel = TreeGen.Skeleton("oak", 7, 1, {})
+		local tree = TreeArt.FromSkeleton(def, skel)
+		Kit.placeAt(tree, CF.new(60, 0, 0))
+		tree.Parent = root
+		stump("oak", 7, 4.2, V3.new(66, 0, 0), 0)
+		label("oak: trunk | stump", V3.new(63, 0.8, 6))
+		-- Weathered at 150 s (0.75 weathered), beside a fresh one.
+		local w = StumpLogic.Weathering(150)
+		stump("oak", 7, 4.2, V3.new(90, 0, 0), 0)
+		stump("oak", 7, 4.2, V3.new(96, 0, 0), w)
+		label("fresh | 150 s", V3.new(93, 0.8, 5))
 		return {
 			root = root,
-			shadowRadius = 120,
+			shadowRadius = 140,
 			cameras = {
-				{ pos = { mid, 9, 36 }, target = { mid, 1, 10 }, label = "before: today's stumps" },
-				{ pos = { mid, 9, 12 }, target = { mid, 1, -4 }, label = "after: the new stumps, cut 3 up" },
-				{ pos = { mid, 22, 40 }, target = { mid, 0, -2 }, label = "before (back) and after (front)" },
-				{ pos = { 4, 5, 6 }, target = { 0, 1.5, -4 }, label = "oak, close up" },
-				{ pos = { 6, 6, -6 }, target = { 0, 2, -16 }, label = "oak cut 4.2 up" },
+				{ pos = { 5, 8.5, -9 }, target = { 0, 3.2, 0 }, label = "oak stump, cut 4.2 up (stand-in body)" },
+				{ pos = { 35, 8.5, -9 }, target = { 30, 3.2, 0 }, label = "pine stump, cut 4.2 up (stand-in body)" },
+				{ pos = { 63, 6, -20 }, target = { 63, 4, 0 }, label = "oak trunk and stump, same taper" },
+				{ pos = { 93, 9, -10 }, target = { 93, 3, 0 }, label = "stump at 150 s (right) beside fresh (left)" },
 			},
 		}
 	end,

@@ -1253,6 +1253,12 @@ local function copySection(s: BasePart): Part
 	p.CustomPhysicalProperties = s.CustomPhysicalProperties
 	p.Massless = s.Massless
 	CollectionService:AddTag(p, WoodService.SectionTag)
+	-- A round trunk (TreeArt.Roundify) stays round when it is cut.
+	for _, child in ipairs(s:GetChildren()) do
+		if child:IsA("SpecialMesh") then
+			child:Clone().Parent = p
+		end
+	end
 	return p
 end
 

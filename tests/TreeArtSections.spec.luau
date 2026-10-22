@@ -562,12 +562,17 @@ return function(t)
 				local along = if case.axis == "X" then n.Size.X else n.Size.Z
 				local across = if case.axis == "X" then n.Size.Z else n.Size.X
 				t.ok(math.abs(along - (depth + 0.02)) < 1e-3, "as deep as the damage")
-				t.ok(math.abs(across - (tW + 0.04)) < 1e-3, "as wide as the section")
+				-- T420: a trunk is round (radius side / sqrt(pi)): the notch is as
+				-- wide as the chord it has cut, and flush with the round surface.
+				local r = tW / math.sqrt(math.pi)
+				local into = math.min(depth, r)
+				local chord = math.max(0.15, 2 * math.sqrt(math.max(0, r * r - (r - into) ^ 2)))
+				t.ok(math.abs(across - chord) < 1e-3, "as wide as the chord it has cut")
 				-- Its outer face is flush with the section's face (a hair proud).
 				local rel = s.CFrame:PointToObjectSpace(n.CFrame.Position)
 				local c = if case.axis == "X" then rel.X else rel.Z
 				local outer = c * case.sign + along / 2
-				t.ok(math.abs(outer - (tW / 2 + 0.02)) < 1e-3, "flush with the face it was hit on")
+				t.ok(math.abs(outer - (r + 0.02)) < 1e-3, "flush with the round surface it was hit on")
 				t.ok(math.abs(rel.Y - (1.2 - s.Size.Y / 2)) < 1e-3, "at the height hit")
 				t.ok(n.Color:Lerp(Kit.shade(color, -0.25), 1) == n.Color, "core, shaded")
 				t.eq(n:GetAttribute("Section"), 1)
