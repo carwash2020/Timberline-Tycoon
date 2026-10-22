@@ -111,7 +111,7 @@ jobs:
   # Require this job ("cloud-test") in branch protection once the key exists.
   cloud-test:
     name: cloud-test
-    needs: [tests]
+    # PROOF BRANCH ONLY: no needs, so the planted overlap reaches the cloud runner even though the lune tests fail.
     runs-on: ubuntu-latest
     concurrency:
       group: cloud-test
