@@ -28,6 +28,8 @@ export type Shape = {
 	y0: number?,
 	y1: number?,
 	obb: { cf: CFrame, half: Vector3 }?,
+	-- A Clearance.Wedge only: the 6 corners, the face normals and the edge directions (world space).
+	hull: { pts: { Vector3 }, normals: { Vector3 }, dirs: { Vector3 } }?,
 }
 
 function Clearance.Disc(x: number, z: number, r: number): Shape
@@ -70,18 +72,134 @@ function Clearance.Box(cf: CFrame, size: Vector3): Shape
 	}
 end
 
+-- A Roblox WedgePart as a convex shape: a right triangle in its Y and Z (the slope rises toward +Z, the tall
+-- face is at +Z), extruded along X. Judged exactly (SAT over its 5 face normals and its edges), not as its box.
+function Clearance.Wedge(cf: CFrame, size: Vector3): Shape
+	local h = size / 2
+	local local_ = {
+		Vector3.new(-h.X, -h.Y, -h.Z),
+		Vector3.new(-h.X, -h.Y, h.Z),
+		Vector3.new(-h.X, h.Y, h.Z),
+		Vector3.new(h.X, -h.Y, -h.Z),
+		Vector3.new(h.X, -h.Y, h.Z),
+		Vector3.new(h.X, h.Y, h.Z),
+	}
+	local pts: { Vector3 } = {}
+	local x0, y0, z0, x1, y1, z1 = math.huge, math.huge, math.huge, -math.huge, -math.huge, -math.huge
+	for _, p in ipairs(local_) do
+		local w = cf * p
+		table.insert(pts, w)
+		x0, y0, z0 = math.min(x0, w.X), math.min(y0, w.Y), math.min(z0, w.Z)
+		x1, y1, z1 = math.max(x1, w.X), math.max(y1, w.Y), math.max(z1, w.Z)
+	end
+	local right, up, look = cf.RightVector, cf.UpVector, cf.ZVector -- (ZVector: the local +Z, LookVector is -Z)
+	-- slope direction in the YZ plane: from (-h.Y, -h.Z) to (+h.Y, +h.Z)
+	local slope = (up * size.Y + look * size.Z).Unit
+	local slopeNormal = (up * size.Z - look * size.Y).Unit
+	return {
+		x0 = x0,
+		z0 = z0,
+		x1 = x1,
+		z1 = z1,
+		y0 = y0,
+		y1 = y1,
+		hull = {
+			pts = pts,
+			normals = { right, up, look, slopeNormal },
+			dirs = { right, up, look, slope },
+		},
+	}
+end
+
+-- A box's hull (corners, axes), for the general test.
+local function hullOf(s: Shape): { pts: { Vector3 }, normals: { Vector3 }, dirs: { Vector3 } }?
+	if s.hull then
+		return s.hull
+	end
+	local o = s.obb
+	if not o then
+		return nil
+	end
+	local pts: { Vector3 } = {}
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sy in ipairs({ -1, 1 }) do
+			for _, sz in ipairs({ -1, 1 }) do
+				table.insert(pts, o.cf * Vector3.new(o.half.X * sx, o.half.Y * sy, o.half.Z * sz))
+			end
+		end
+	end
+	local axes = { o.cf.RightVector, o.cf.UpVector, o.cf.LookVector }
+	return { pts = pts, normals = axes, dirs = axes }
+end
+
+-- How deep two shapes overlap, in studs, when either is a wedge (convex SAT).
+local function hullDepth(a: Shape, b: Shape): number
+	local ha, hb = hullOf(a), hullOf(b)
+	if not ha or not hb then
+		return 0
+	end
+	local best = math.huge
+	local function test(axis: Vector3): boolean
+		local len = axis.Magnitude
+		if len < 1e-6 then
+			return true
+		end
+		local n = axis / len
+		local aMin, aMax, bMin, bMax = math.huge, -math.huge, math.huge, -math.huge
+		for _, p in ipairs(ha.pts) do
+			local d = p:Dot(n)
+			aMin, aMax = math.min(aMin, d), math.max(aMax, d)
+		end
+		for _, p in ipairs(hb.pts) do
+			local d = p:Dot(n)
+			bMin, bMax = math.min(bMin, d), math.max(bMax, d)
+		end
+		local overlap = math.min(aMax, bMax) - math.max(aMin, bMin)
+		if overlap <= 0 then
+			return false
+		end
+		best = math.min(best, overlap)
+		return true
+	end
+	for _, n in ipairs(ha.normals) do
+		if not test(n) then
+			return 0
+		end
+	end
+	for _, n in ipairs(hb.normals) do
+		if not test(n) then
+			return 0
+		end
+	end
+	for _, da in ipairs(ha.dirs) do
+		for _, db in ipairs(hb.dirs) do
+			if not test(da:Cross(db)) then
+				return 0
+			end
+		end
+	end
+	return if best == math.huge then 0 else best
+end
+
 -- How deep two boxes overlap, in studs: the smallest overlap along the 15 SAT axes (3 face normals
 -- of each box and the 9 edge cross products). 0 when they are apart or only touch (or when
--- either shape is not a Clearance.Box). The Y range is tested first, as a cheap exit.
+-- either shape is not a Clearance.Box or Wedge). The Y range is tested first, as a cheap exit. A wedge goes
+-- through the convex SAT in hullDepth.
 function Clearance.BoxDepth(a: Shape, b: Shape): number
-	local oa, ob = a.obb, b.obb
-	if not oa or not ob then
+	if a.y0 == nil or b.y0 == nil then
 		return 0
 	end
 	if (a.y0 :: number) >= (b.y1 :: number) or (b.y0 :: number) >= (a.y1 :: number) then
 		return 0
 	end
 	if a.x0 >= b.x1 or b.x0 >= a.x1 or a.z0 >= b.z1 or b.z0 >= a.z1 then
+		return 0
+	end
+	if a.hull or b.hull then
+		return hullDepth(a, b)
+	end
+	local oa, ob = a.obb, b.obb
+	if not oa or not ob then
 		return 0
 	end
 	local axesA = { oa.cf.RightVector, oa.cf.UpVector, oa.cf.LookVector }

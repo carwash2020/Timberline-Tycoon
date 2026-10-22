@@ -78,6 +78,7 @@ local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
+local BuiltMoves = require(ReplicatedStorage.Shared.World.BuiltMoves)
 local TreeSpread = require(ReplicatedStorage.Shared.World.TreeSpread)
 local NodeService = require(script.Parent.NodeService)
 local SectionTrees = require(script.Parent.SectionTrees)
@@ -650,8 +651,8 @@ step("4. The town", function()
 			end
 		end)
 		defer("4. Fences", 1, around(0, 60), function(slice)
-			for _, fence in ipairs(town.fences) do
-				standOnGround(place(atomic(BuildingArt.Fence(fence.length)), fence.cframe), true)
+			for _, fence in ipairs(BuiltMoves.Fences(town.fences)) do
+				standOnGround(place(atomic(BuildingArt.Fence(fence.length, fence.noEndPosts)), fence.cframe), true)
 				slice()
 			end
 		end)
@@ -1079,10 +1080,10 @@ do
 		2,
 		function(): { WorldPlan.Boulder }
 			local boulders: { WorldPlan.Boulder } = {}
-			for _, b in ipairs(WorldPlan.Boulders()) do
+			for _, b in ipairs(BuiltMoves.Boulders(WorldPlan, TerrainGen)) do
 				table.insert(boulders, b)
 			end
-			for _, b in ipairs(WorldPlan.MeadowBoulders()) do
+			for _, b in ipairs(BuiltMoves.MeadowBoulders(WorldPlan, TerrainGen)) do
 				table.insert(boulders, b)
 			end
 			return boulders
@@ -1258,7 +1259,7 @@ do
 		2,
 		function(): { { text: string, cframe: CFrame, gateId: string? } }
 			local signs: { { text: string, cframe: CFrame, gateId: string? } } = {}
-			for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+			for _, sign in ipairs(BuiltMoves.RoadSigns(WorldPlan, TerrainGen, WorldPlan.BiomeSignText)) do
 				table.insert(signs, sign)
 			end
 			for _, sign in ipairs(WorldPlan.GateSigns(WorldPlan.BiomeSignText)) do
@@ -1295,7 +1296,7 @@ do
 		2,
 		function(): { { spot: WorldPlan.ScenerySpot, index: number } }
 			local out: { { spot: WorldPlan.ScenerySpot, index: number } } = {}
-			for index, spot in ipairs(WorldPlan.Scenery()) do
+			for index, spot in ipairs(BuiltMoves.Scenery(WorldPlan, TerrainGen)) do
 				table.insert(out, { spot = spot, index = index })
 			end
 			return out

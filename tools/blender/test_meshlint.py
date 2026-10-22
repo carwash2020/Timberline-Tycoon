@@ -122,6 +122,33 @@ class MeshLint(unittest.TestCase):
         out = self.run_lint({"Body": [rail], "Collision": [((20, 0, 0), (21, 1, 1))]}, bad)
         self.assertTrue(any("has no reason" in line for line in out), out)
 
+    def run_with_notes(self, nodes, entry):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "Thing").mkdir()
+            glb(root / "Thing" / "Thing.glb", nodes)
+            notes: list[str] = []
+            fails = meshlint.lint_mesh("Thing", [entry], root / "Thing" / "Thing.glb", notes)
+            return fails, notes
+
+    def test_a_pending_box_is_reported_not_failed_and_must_keep_hitting(self):
+        post = ((4, 0, 1), (5, 4, 2))
+        entry = dict(LANE, pending=[{"min": [3, -1, 0], "max": [6, 5, 3], "why": "a post in the GLB", "edit": "move the post 2 studs"}])
+        fails, notes = self.run_with_notes({"Body": [post], "Collision": [((20, 0, 0), (21, 1, 1))]}, entry)
+        self.assertEqual(fails, [])
+        self.assertTrue(notes and notes[0].startswith("PENDING Thing/slip: ") and "move the post 2 studs" in notes[0], notes)
+        # the same box with nothing in it any more: the entry has to go
+        fails, _ = self.run_with_notes({"Body": [((20, 0, 0), (21, 1, 1))], "Collision": [((20, 0, 0), (21, 1, 1))]}, entry)
+        self.assertTrue(any("no longer hits anything" in f for f in fails), fails)
+        # something else entering the lane still fails
+        other = ((8, 0, 1), (9, 4, 2))
+        fails, _ = self.run_with_notes({"Body": [post, other], "Collision": [((20, 0, 0), (21, 1, 1))]}, entry)
+        self.assertTrue(any("(Body, lane)" in f for f in fails), fails)
+        # a pending box needs its edit written down
+        bad = dict(LANE, pending=[{"min": [3, -1, 0], "max": [6, 5, 3], "why": "a post"}])
+        fails, _ = self.run_with_notes({"Body": [post], "Collision": [((20, 0, 0), (21, 1, 1))]}, bad)
+        self.assertTrue(any("needs a reason and the edit" in f for f in fails), fails)
+
     def test_the_real_meshes_pass(self):
         proc = subprocess.run([sys.executable, str(REPO / "tools/blender/meshlint.py")], capture_output=True, text=True, cwd=REPO)
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)

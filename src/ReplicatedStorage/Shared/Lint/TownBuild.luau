@@ -11,6 +11,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
+local BuiltMoves = require(ReplicatedStorage.Shared.World.BuiltMoves)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
@@ -76,8 +77,8 @@ function TownBuild.Build(): Folder
 	for _, cf in ipairs(town.lamps) do
 		place(BuildingArt.LampPost(), cf, map)
 	end
-	for _, fence in ipairs(town.fences) do
-		place(BuildingArt.Fence(fence.length), fence.cframe, map)
+	for _, fence in ipairs(BuiltMoves.Fences(town.fences)) do
+		place(BuildingArt.Fence(fence.length, fence.noEndPosts), fence.cframe, map)
 	end
 	for _, prop in ipairs(town.props) do
 		place(BuildingArt.Prop(prop.name, prop.seed), prop.cframe, map)

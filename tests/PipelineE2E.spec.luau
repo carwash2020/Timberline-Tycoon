@@ -26,7 +26,8 @@ return function(t)
 		return out
 	end
 
-	-- Runs the story once. `options.removeIntake` takes the Intake off the mill (the control).
+	-- Runs the story once. `options.removeIntake` takes the Intake off the mill and `options.loseAxes` makes the
+	-- save forget the axes (the controls).
 	-- Returns { ok, step, err, state, ... } and never throws: a spec reads it.
 	local function story(options)
 		options = options or {}
@@ -124,25 +125,79 @@ return function(t)
 				end,
 			}
 
-			local profile = {
-				cash = 500,
-				totalEarned = 0,
-				bestAxeTier = 1,
-				ownedTrucks = {},
-				gear = {},
-				ownedTrailers = {},
-				equippedTrailer = "",
-				equippedTruck = "",
-				plot = { claimed = false, tier = 1, placed = {}, squares = {} },
-				storage = {},
-				stats = {},
+			-- A DataStore in memory behind the real ProfileService and ProfileSchema (the vendored ProfileStore is
+			-- the only fake): what a session ends with is what the next session starts from.
+			local disk = {}
+			local function copy(v)
+				if type(v) ~= "table" then
+					return v
+				end
+				local out = {}
+				for k, x in pairs(v) do
+					out[k] = copy(x)
+				end
+				return out
+			end
+			local function signal()
+				local listeners = {}
+				return {
+					Connect = function(_, fn)
+						table.insert(listeners, fn)
+						return { Disconnect = function() end }
+					end,
+					Fire = function(_, ...)
+						for _, fn in ipairs(listeners) do
+							fn(...)
+						end
+					end,
+					Wait = function()
+						return nil
+					end,
+				}
+			end
+			local template
+			local fakeStore = {
+				StartSessionAsync = function(_, key)
+					local session = {
+						Data = copy(disk[key] or {}),
+						LastSavedData = {},
+						OnSessionEnd = signal(),
+						OnLastSave = signal(),
+						OnAfterSave = signal(),
+						active = true,
+					}
+					function session:AddUserId() end
+					function session:Reconcile()
+						for k, v in pairs(template) do
+							if self.Data[k] == nil then
+								self.Data[k] = copy(v)
+							end
+						end
+					end
+					function session:IsActive()
+						return self.active
+					end
+					function session:Save()
+						disk[key] = copy(self.Data)
+						self.LastSavedData = disk[key]
+						self.OnAfterSave:Fire(self.LastSavedData)
+					end
+					function session:EndSession()
+						self.OnLastSave:Fire()
+						self:Save()
+						self.active = false
+					end
+					return session
+				end,
 			}
+			s.disk = disk
 			local player
 			local loader = t.loader({
 				services = {
 					Players = Players,
 					CollectionService = CollectionService,
 					PhysicsService = {},
+					TextChatService = {},
 				},
 				mocks = {
 					RateLimiter = {
@@ -150,22 +205,16 @@ return function(t)
 							return true
 						end,
 					},
-					ProfileService = {
-						GetProfile = function(p)
-							return if p == player then profile else nil
+					ProfileStore = {
+						New = function(_, tpl)
+							template = tpl
+							return fakeStore
 						end,
+						SetConstant = function() end,
+						IsClosing = false,
 					},
 					GameAnalytics = {
 						Economy = function() end,
-					},
-					AxeService = {
-						OwnedCounts = function()
-							return { RustyAxe = 1 }, 1
-						end,
-						Grant = function(_, axeId)
-							table.insert(s.granted, axeId)
-							return { uid = "axe-" .. #s.granted, id = axeId }, nil
-						end,
 					},
 					MilestoneService = {
 						Mark = function(_, name)
@@ -210,6 +259,7 @@ return function(t)
 				},
 			})
 
+			local ProfileService = loader:server("ProfileService")
 			local Economy = loader:server("EconomyService")
 			local Shop = loader:server("ShopService")
 			local Trees = loader:server("SectionTrees")
@@ -309,16 +359,30 @@ return function(t)
 					return if class == "Humanoid" then humanoid else nil
 				end,
 			}
-			player = {
-				UserId = 1,
-				Name = "Tester",
-				DisplayName = "Tester",
-				Character = character,
-				Parent = Players,
-				SetAttribute = function() end,
-			}
-			player.root = root
-			s.byId[1] = player
+			local function newPlayer()
+				local p = {
+					UserId = 1,
+					Name = "Tester",
+					DisplayName = "Tester",
+					Character = character,
+					Parent = Players,
+					SetAttribute = function() end,
+					-- (a Backpack-less player: AxeService keeps the axe in the save and hands the tool over later)
+					FindFirstChildOfClass = function()
+						return nil
+					end,
+					FindFirstChild = function()
+						return nil
+					end,
+				}
+				p.root = root
+				s.byId[1] = p
+				return p
+			end
+			player = newPlayer()
+			local profile = ProfileService.LoadProfile(player)
+			need(profile ~= nil, "the first join did not load a save")
+			Economy.AddCash(player, 500, "test: the starting purse", "test")
 
 			----------------------------------------------------------------------------------------
 			step("buy the starter axe at the Tool Shed", function()
@@ -383,8 +447,11 @@ return function(t)
 						tostring(s.toasts[#s.toasts])
 					)
 				)
-				need(s.granted[1] == axe.id, "the shop did not hand over the " .. axe.id)
-				equipped = s.granted[1]
+				local mine = profile.axes[#profile.axes]
+				need(mine ~= nil and mine.id == axe.id, "the shop did not put the " .. axe.id .. " in the save")
+				need(profile.bestAxeTier >= 2, "buying the axe did not raise bestAxeTier")
+				equipped = mine.id
+				result.axeUid = mine.uid
 				result.axe = axe.id
 				result.axePrice = price
 				state(string.format("bought the %s for $%d, cash $%d", axe.id, price, after))
@@ -810,6 +877,49 @@ return function(t)
 				result.logSold = gained
 				state(string.format("raw log sold for $%d, first sale marked", gained))
 			end)
+
+			----------------------------------------------------------------------------------------
+			step("save, rejoin: cash and the axe read back", function()
+				local cash = Economy.GetCash(player)
+				local earned = profile.totalEarned
+				local axes = {}
+				for _, item in ipairs(profile.axes) do
+					table.insert(axes, item.uid .. ":" .. item.id)
+				end
+				local tier = profile.bestAxeTier
+				state(string.format("leaving with $%d and %d axe(s)", cash, #axes))
+				-- The leave: the final save, the session ends. Then the same account joins again.
+				ProfileService.ReleaseProfile(player)
+				s.byId[1] = nil
+				need(s.disk.profile_1 ~= nil, "leaving wrote nothing to the DataStore")
+				if options.loseAxes then
+					s.disk.profile_1.axes = {} -- the control: a save that dropped the axes
+				end
+				need(
+					s.disk.profile_1.cash == cash,
+					string.format("the save holds $%s, the player had $%d", tostring(s.disk.profile_1.cash), cash)
+				)
+				local second = newPlayer()
+				local again, why = ProfileService.LoadProfile(second)
+				need(again ~= nil, "the rejoin did not load the save: " .. tostring(why))
+				need(again ~= profile, "the rejoin handed back the old table, not a fresh load of the save")
+				need(again.cash == cash, string.format("rejoined with $%d, left with $%d", again.cash, cash))
+				need(again.totalEarned == earned, "totalEarned did not survive the rejoin")
+				need(again.bestAxeTier == tier, "bestAxeTier did not survive the rejoin")
+				local back = {}
+				for _, item in ipairs(again.axes) do
+					table.insert(back, item.uid .. ":" .. item.id)
+				end
+				need(
+					table.concat(back, ",") == table.concat(axes, ","),
+					"the axes after the rejoin: " .. table.concat(back, ",") .. ", before: " .. table.concat(axes, ",")
+				)
+				need(
+					table.concat(back, ","):find(result.axeUid, 1, true) ~= nil,
+					"the bought axe is not in the rejoined save"
+				)
+				state(string.format("rejoined with $%d and the same axes", again.cash))
+			end)
 		end)
 
 		result.ok = ok
@@ -833,7 +943,7 @@ return function(t)
 				0
 			)
 		end
-		t.eq(r.step, 8)
+		t.eq(r.step, 9)
 		t.ok(r.planksSold > 0 and r.logSold > 0)
 	end)
 
@@ -848,4 +958,15 @@ return function(t)
 			t.ok(string.find(r.state, "log dragged to the mill's belt end", 1, true), r.state)
 		end
 	)
+
+	t.test("a save that forgets the axe fails at the rejoin step, naming what came back", function()
+		local r = story({ loseAxes = true })
+		t.eq(r.ok, false)
+		t.eq(r.step, 9)
+		t.eq(r.stepName, "save, rejoin: cash and the axe read back")
+		t.ok(
+			string.find(r.err, "the axes after the rejoin: ", 1, true) and string.find(r.err, "SteelAxe", 1, true),
+			r.err
+		)
+	end)
 end

@@ -64,7 +64,7 @@ function Lanes.Run(
 		for _, d in ipairs(root:GetDescendants()) do
 			-- (a rider belongs to the lane's own model: another piece's part named "Log" is still in the way)
 			local rider = LaneData.Riders[d.Name] and d:IsDescendantOf(model)
-			if d:IsA("BasePart") and d.CanCollide and not d:IsA("WedgePart") and not rider then
+			if d:IsA("BasePart") and d.CanCollide and not rider then
 				table.insert(parts, d)
 			end
 		end

@@ -8,8 +8,8 @@
 --   Scenery/Outcrop#5 and Crate#3 are pieces, ToolShed is one piece with all its parts).
 --   Two parts of the same piece never count (a wall and the counter it stands against, welded
 --   decks and plinths): only pairs from different pieces do.
---   A part counts when CanCollide is on. WedgeParts are skipped (a wedge is not its box); a
---   cylinder or ball counts as its inscribed box.
+--   A part counts when CanCollide is on. A WedgePart is judged as the wedge it is (Clearance.Wedge, a
+--   convex SAT, not its bounding box); a cylinder or ball counts as its inscribed box.
 --   Rule 2b: two parts of different pieces overlap by more than MinDepth (0.05 studs, the
 --   smallest overlap along the 15 SAT axes of Clearance.BoxDepth) and the pair is not in the
 --   allowlist.
@@ -66,7 +66,7 @@ function Geometry.Pieces(root: Instance): ({ string }, { [string]: Instance })
 end
 
 function Geometry.Solid(part: BasePart): boolean
-	return part.CanCollide and not part:IsA("WedgePart")
+	return part.CanCollide
 end
 
 local function collidingParts(piece: Instance): { BasePart }
@@ -85,6 +85,9 @@ end
 -- The box a part stands for. A round part is its inscribed box (a cylinder's round faces are its
 -- Y and Z, a ball is round all over), so a corner of the bounding box never makes a hit.
 function Geometry.BoxOf(part: BasePart): Clearance.Shape
+	if part:IsA("WedgePart") then
+		return Clearance.Wedge(part.CFrame, part.Size)
+	end
 	local size = part.Size
 	if part:IsA("Part") then
 		if part.Shape == Enum.PartType.Cylinder then

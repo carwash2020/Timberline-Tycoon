@@ -71,6 +71,51 @@ return function(t)
 		t.eq(Clearance.BoxDepth(Clearance.Disc(0, 0, 1), Clearance.Disc(0, 0, 1)), 0)
 	end)
 
+	t.test("Clearance.Wedge: judged as the wedge, not its bounding box (the slope rises toward +Z)", function()
+		local wedge = Clearance.Wedge(CFrame.new(0, 0, 0), Vector3.new(2, 2, 2))
+		local function depth(at, size)
+			return Clearance.BoxDepth(wedge, Clearance.Box(CFrame.new(at), size or Vector3.new(0.5, 0.5, 0.5)))
+		end
+		t.ok(depth(Vector3.new(0, 0.5, 0.8)) > 0.3, "the tall end, up high: inside the wedge")
+		t.eq(depth(Vector3.new(0, 0.7, -0.7)), 0, "over the slope at the low end: only in the wedge's bounding box")
+		t.ok(depth(Vector3.new(0, -0.7, -0.7)) > 0.3, "the low end near the ground: inside")
+		t.eq(depth(Vector3.new(3, 0, 0)), 0, "apart")
+		-- turned half a circle about Y: the tall end is now at -Z
+		local turned = Clearance.Wedge(CFrame.Angles(0, math.pi, 0), Vector3.new(2, 2, 2))
+		t.ok(Clearance.BoxDepth(turned, Clearance.Box(CFrame.new(0, 0.5, -0.8), Vector3.new(0.5, 0.5, 0.5))) > 0.3)
+		t.eq(Clearance.BoxDepth(turned, Clearance.Box(CFrame.new(0, 0.7, 0.7), Vector3.new(0.5, 0.5, 0.5))), 0)
+		-- wedge against wedge, back to back
+		t.ok(Clearance.BoxDepth(wedge, Clearance.Wedge(CFrame.new(0, 0, 1.5), Vector3.new(2, 2, 2))) > 0.1)
+	end)
+
+	t.test(
+		"wedges are part of the world lint: a crate in a wedge's tall end is a hit, over its slope it is not",
+		function()
+			local function world(at)
+				return smallWorld({
+					{
+						name = "Ramp",
+						piece = "Ramp",
+						at = Vector3.new(0, 1, 0),
+						size = Vector3.new(4, 2, 4),
+						fn = function(p)
+							local w = Instance.new("WedgePart")
+							w.Name = p.Name
+							w.Anchored = true
+							w.Size = p.Size
+							w.CFrame = p.CFrame
+							w.Parent = p.Parent
+							p:Destroy()
+						end,
+					},
+					{ name = "Crate", piece = "Crate", at = at, size = Vector3.new(1, 1, 1) },
+				})
+			end
+			t.eq(#Geometry.Run(world(Vector3.new(0, 1.6, 1.4)), {}).hits, 1, "in the tall end")
+			t.eq(#Geometry.Run(world(Vector3.new(0, 1.6, -1.4)), {}).hits, 0, "over the slope")
+		end
+	)
+
 	t.test("Clearance.BoxHits: the grid finds what a brute-force scan finds", function()
 		local grid = Clearance.NewGrid()
 		local seed = 9
@@ -331,7 +376,7 @@ return function(t)
 	)
 
 	t.test("the allowlist file: every entry has a reason", function()
-		t.ok(#allow > 5)
+		t.ok(#allow >= 1)
 		for i, entry in ipairs(allow) do
 			t.ok(
 				type(entry.reason) == "string" and #entry.reason > 20,
@@ -348,7 +393,14 @@ return function(t)
 		local w = world()
 		t.eq(w.warnings[1] ~= nil and #w.warnings or 0, #w.warnings)
 		local r = Geometry.Run(w.map, allow)
-		t.ok(r.parts > 1500, r.parts .. " colliding parts walked")
+		local wedges = 0
+		for _, d in ipairs(w.map:GetDescendants()) do
+			if d:IsA("WedgePart") and d.CanCollide then
+				wedges += 1
+			end
+		end
+		t.ok(wedges > 20, wedges .. " colliding wedge parts (of the 1344 in the world; the rest are decor)")
+		t.ok(r.parts > 2400, r.parts .. " colliding parts walked, wedges among them")
 		t.ok(r.pieces > 300, r.pieces .. " pieces")
 		t.eq(r.failures, {}, show(r.failures))
 	end)

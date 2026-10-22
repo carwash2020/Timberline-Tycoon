@@ -20,6 +20,8 @@ cross products). FAIL (exit 1) when:
   - any Body or Collision triangle enters a box, or
   - Collision blocks a box that Body leaves open (Collision is what a player
     bumps into, so a solid you cannot see is still a block).
+An entry's "pending" boxes are known hits inside the GLB that need a Blender re-export (each carries the exact edit):
+they are reported as PENDING, do not fail, and fail themselves once they stop hitting (so they must be removed).
 A lane's "riders" (rails, carriage, logs, saw blade...) are separate parts in
 the part-built model; in the GLB they are merged into Body, so an entry may
 list "allow": [ { min, max, why } ] boxes whose Body triangles are not
@@ -160,27 +162,51 @@ def box_of(tris: list[tuple]):
     return [round(v, 3) for v in lo], [round(v, 3) for v in hi]
 
 
-def lint_mesh(mesh: str, entries: list[dict], glb: Path) -> list[str]:
+def lint_mesh(mesh: str, entries: list[dict], glb: Path, notes: list[str] | None = None) -> list[str]:
     nodes = world_triangles(glb)
     body = [t for n, ts in nodes.items() if n == "Body" or n.startswith("Body.") for t in ts]
     coll = [t for n, ts in nodes.items() if n == "Collision" or n.startswith("Collision.") for t in ts]
     fails: list[str] = []
     for e in entries:
         lo, hi = e["min"], e["max"]
-        skip = [(a["min"], a["max"]) for a in e.get("allow", [])]
+        riders = [(a["min"], a["max"]) for a in e.get("allow", [])]
+        pending = e.get("pending", [])
         for a in e.get("allow", []):
             if not a.get("why"):
                 fails.append(f"{mesh}/{e['name']}: an allow box has no reason")
+        for a in pending:
+            if not a.get("why") or not a.get("edit"):
+                fails.append(f"{mesh}/{e['name']}: a pending box needs a reason and the edit that fixes it")
         label = f"{mesh}/{e['name']}"
-        b = hits(body, lo, hi, skip)
-        c = hits(coll, lo, hi, skip)
-        if b:
-            fails.append(f"{label}: {len(b)} tris, first at {first_at(b[0])} (Body, {e['kind']})")
-        if c:
-            fails.append(f"{label}: {len(c)} tris, first at {first_at(c[0])} (Collision, {e['kind']})")
-        if c and not b:
+        b = hits(body, lo, hi, riders)
+        c = hits(coll, lo, hi, riders)
+        # A pending box is a known hit in the GLB itself, which cannot be re-exported from here: the exact edit
+        # is written next to it. It is not an exemption: the box must still hit (so the entry goes the day the
+        # mesh is fixed), and anything else entering the lane fails as usual.
+        pend_boxes = [(a["min"], a["max"]) for a in pending]
+        pb = hits(body, lo, hi, riders + pend_boxes)
+        pc = hits(coll, lo, hi, riders + pend_boxes)
+        for a in pending:
+            box = [(a["min"], a["max"])]
+            seen = [t for t in hits(body, lo, hi, riders) if tri_in(t, box)] + [
+                t for t in hits(coll, lo, hi, riders) if tri_in(t, box)
+            ]
+            if not seen:
+                fails.append(f"{label}: a pending box no longer hits anything: remove it ({a['why'][:60]}...)")
+            elif notes is not None:
+                notes.append(f"PENDING {label}: {len(seen)} tris, first at {first_at(seen[0])}; GLB edit: {a.get('edit', '?')}")
+        if pb:
+            fails.append(f"{label}: {len(pb)} tris, first at {first_at(pb[0])} (Body, {e['kind']})")
+        if pc:
+            fails.append(f"{label}: {len(pc)} tris, first at {first_at(pc[0])} (Collision, {e['kind']})")
+        if pc and not pb:
             fails.append(f"{label}: Collision blocks a box that Body leaves open")
     return fails
+
+
+def tri_in(tri, boxes) -> bool:
+    cen = tuple(sum(p[k] for p in tri) / 3 for k in range(3))
+    return any(_inside(cen, lo, hi) for lo, hi in boxes)
 
 
 def main(argv: list[str]) -> int:
@@ -208,7 +234,10 @@ def main(argv: list[str]) -> int:
             print(f"FAIL {mesh}: no {mesh}.glb under {root}")
             bad += 1
             continue
-        fails = lint_mesh(mesh, entries, glb)
+        notes: list[str] = []
+        fails = lint_mesh(mesh, entries, glb, notes)
+        for line in notes:
+            print(line)
         for line in fails:
             print("FAIL " + line)
         bad += len(fails)

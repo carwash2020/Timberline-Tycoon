@@ -97,7 +97,8 @@ return function(t)
 		local stack = find(mill, "Smokestack")
 		t.ok(stack and stack:FindFirstChildOfClass("Smoke"), "Smokestack has a Smoke")
 		t.ok(stack.CFrame.Position.Y > 20, "the smoke leaves the top of the stack")
-		t.ok(#parts(mill) <= 404, "sawmill parts: " .. #parts(mill))
+		-- 408, was 404: T409 opened the office door in the wall (3 panels and a lintel instead of one: +5 boards) and took the east middle post out of the log opening (-1)
+		t.ok(#parts(mill) <= 408, "sawmill parts: " .. #parts(mill))
 		t.ok(texts(mill)["TIMBERLINE SAWMILL"], "the sign")
 		-- The blade stays non-colliding (it spins). SawGuard covers its
 		-- centre, and the rails close the way in from the deck and the east

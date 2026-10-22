@@ -19,6 +19,8 @@
 -- each other (and prop against prop also needs a height overlap).
 
 local BuildingArt = require(script.Parent.Parent.Art.BuildingArt)
+local BuiltMoves = require(script.Parent.BuiltMoves)
+local TerrainGen = require(script.Parent.TerrainGen)
 local Clearance = require(script.Parent.Clearance)
 local DealershipLot = require(script.Parent.Parent.Art.DealershipLot)
 local Kit = require(script.Parent.Parent.Art.Kit)
@@ -79,11 +81,11 @@ function OverlapCheck.Build(plan: any): (Clearance.Grid, { [string]: number })
 
 	-- Boulders, clusters, scenery.
 	local rocks = 0
-	for i, b in ipairs(WorldPlan.Boulders()) do
+	for i, b in ipairs(BuiltMoves.Boulders(WorldPlan, TerrainGen)) do
 		Clearance.Add(grid, "boulder#" .. i, "boulder", Clearance.Disc(b.position.X, b.position.Z, b.size * 0.86))
 		rocks += 1
 	end
-	for i, b in ipairs(WorldPlan.MeadowBoulders()) do
+	for i, b in ipairs(BuiltMoves.MeadowBoulders(WorldPlan, TerrainGen)) do
 		Clearance.Add(grid, "meadowBoulder#" .. i, "boulder", Clearance.Disc(b.position.X, b.position.Z, b.size * 0.86))
 		rocks += 1
 	end
@@ -100,7 +102,7 @@ function OverlapCheck.Build(plan: any): (Clearance.Grid, { [string]: number })
 		end
 	end
 	local sceneryCount = 0
-	for i, spot in ipairs(WorldPlan.Scenery()) do
+	for i, spot in ipairs(BuiltMoves.Scenery(WorldPlan, TerrainGen)) do
 		Clearance.Add(
 			grid,
 			string.format("scenery#%d %s", i, spot.kind),
