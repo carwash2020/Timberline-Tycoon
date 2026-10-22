@@ -60,45 +60,54 @@ local filter = process.args[1]
 local SLOW_SPECS: { [string]: number } = {
 	["AetherServiceV2.spec.luau"] = 6,
 	["BoxService.spec.luau"] = 5,
+	["CloudCheck.spec.luau"] = 2,
 	["DailyService.spec.luau"] = 20,
 	["DecorCover.spec.luau"] = 13,
 	["DriveMath.spec.luau"] = 24,
-	["Forest.spec.luau"] = 25,
+	["Forest.spec.luau"] = 32,
 	["ForestService.spec.luau"] = 12,
 	["ForestServiceV2.spec.luau"] = 3,
-	["GeometryLint.spec.luau"] = 8,
-	["CloudCheck.spec.luau"] = 4,
+	["GeometryLint.spec.luau"] = 2,
+	["GroundHills.spec.luau"] = 47,
 	["LandscapeStyle.spec.luau"] = 17,
 	["LogicService.spec.luau"] = 3,
 	["MachineSwap.spec.luau"] = 25,
-	["MapBuilder.spec.luau"] = 66,
+	["MapBuilder.spec.luau"] = 118,
 	["MonetizationService.spec.luau"] = 6,
-	["MustKeep.spec.luau"] = 6,
+	["MustKeep.spec.luau"] = 1,
 	["NPCService.spec.luau"] = 3,
+	["Overlap.spec.luau"] = 16,
 	["Phase12World.spec.luau"] = 7,
-	["PipelineE2E.spec.luau"] = 14,
+	["PipelineE2E.spec.luau"] = 2,
 	["PlanPause.spec.luau"] = 14,
 	["PlotLogic.spec.luau"] = 6,
 	["PlotPlatform.spec.luau"] = 5,
 	["PlotService.spec.luau"] = 32,
+	["PoiPlanSplit.spec.luau"] = 12,
 	["ProfileSchema.spec.luau"] = 7,
-	["QualityBudgets.spec.luau"] = 8,
+	["QualityBudgets.spec.luau"] = 14,
 	["QuestService.spec.luau"] = 5,
 	["RegionLogic.spec.luau"] = 6,
-	["SectionTrees.spec.luau"] = 21,
+	["SectionTrees.spec.luau"] = 46,
 	["ShopService.spec.luau"] = 10,
-	["TerrainFit.spec.luau"] = 6,
-	["TownBuild.spec.luau"] = 10,
-	["TownMesh.spec.luau"] = 16,
-	["TownTrees.spec.luau"] = 22,
+	["Terrain.spec.luau"] = 14,
+	["TerrainFit.spec.luau"] = 18,
+	["TerrainStaged.spec.luau"] = 15,
+	["TownBuild.spec.luau"] = 2,
+	["TownMesh.spec.luau"] = 27,
+	["TownTrees.spec.luau"] = 65,
 	["TreeArtSections.spec.luau"] = 16,
-	["TreeFill.spec.luau"] = 79,
+	["TreeCover.spec.luau"] = 29,
+	["TreeFill.spec.luau"] = 181,
 	["TreeGen.spec.luau"] = 38,
+	["TreeShapes.spec.luau"] = 13,
+	["TreeSpreadRows.spec.luau"] = 16,
+	["TreeSpreadThin.spec.luau"] = 13,
 	["TruckArt.spec.luau"] = 3,
 	["WorldPlan.spec.luau"] = 69,
 }
 
--- Specs that build the whole world (tests/support/WorldBuild, about 35 s on CI) share one build per
+-- Specs that build the whole world (tests/support/WorldBuild, about 20 s on CI) share one build per
 -- process, so they are dealt out together to one shard, as a single unit, and pay it once.
 local WORLD_SPECS = {
 	"CloudCheck.spec.luau",
@@ -107,7 +116,7 @@ local WORLD_SPECS = {
 	"PipelineE2E.spec.luau",
 	"TownBuild.spec.luau",
 }
-local WORLD_BUILD_SECONDS = 35
+local WORLD_BUILD_SECONDS = 20
 
 local function show(value: any): string
 	if type(value) == "string" then
