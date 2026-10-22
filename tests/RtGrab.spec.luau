@@ -210,6 +210,7 @@ return function(t)
 				HUD = {
 					Toast = noop,
 					NoteGrab = noop,
+					NoteAxeTry = noop,
 					BuildOpen = function()
 						return false
 					end,

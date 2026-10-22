@@ -101,9 +101,13 @@ local GameConfig = {
 	-- changes). In Studio, set the workspace attribute TownMeshes to
 	-- true/false to try either for one run. Every dressed model is ground-
 	-- snapped to its part-built twin (TownMeshes.Dress), so a mesh cannot sink.
-	-- OFF again (6 Oct): with the meshes on, signs and buildings sank under the
-	-- ground in Studio. Turn on only after the cause is found (STATUS.md).
-	TownMeshes = false,
+	-- ON (T406). It had been false since 6 Oct, when signs and buildings sank
+	-- under the ground with it on. Dress now snaps every mesh onto its part-built
+	-- twin (a mesh more than 0.4 low is lifted, more than 8 off drops the
+	-- dressing), and the TownMesh, ModelSlots and StoreModelSlots specs pin the
+	-- result with the meshes on. The Studio log said "uploaded town meshes OFF
+	-- (part-built town)" because of this flag alone.
+	TownMeshes = true,
 	WoodUnit = 1.6, -- studs in one timber unit "u"; prices are $/u³, hardness per u² of cut
 	StartingCash = 20, -- v2: a new player's cash
 	-- cutting
@@ -127,8 +131,22 @@ local GameConfig = {
 	BedAutoWeld = false, -- fallback if loads jitter on a moving bed
 	-- grab and drag
 	GrabRange = 26, -- studs from the character to start holding a piece
-	HoldMin = 3,
-	HoldMax = 30, -- studs: how far in front of the camera a held piece floats
+	-- How far in front of you a held piece floats (T406, LT2 style): it starts at
+	-- HoldStart; the scroll wheel, the D-pad's up/down or the phone's +/- move it
+	-- between HoldMin and HoldMax. The server lets go of a hold past
+	-- HoldMax + HoldSlack.
+	HoldStart = 12,
+	HoldMin = 6,
+	HoldMax = 22, -- studs: the furthest a held piece floats from you
+	HoldSlack = 2, -- studs the server allows past HoldMax (lag, a swinging end)
+	-- A held piece let go with a push leaves at most this fast (studs/s, clamped).
+	-- A release claiming more than ThrowRejectSpeed is refused outright (the
+	-- piece is stopped where it is), as is a throw on a piece the thrower does
+	-- not hold the network for.
+	ThrowMaxSpeed = 30,
+	ThrowRejectSpeed = 60,
+	ThrowPush = 18, -- studs/s a push at the moment of release adds, forward
+	ThrowPushWindow = 0.4, -- seconds a push counts for
 	ReleaseDistance = 40, -- a held piece further than this lets go
 	DragForcePerMass = 400,
 	DragForceCap = 4000,

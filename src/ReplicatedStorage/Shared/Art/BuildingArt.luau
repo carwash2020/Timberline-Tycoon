@@ -2495,7 +2495,6 @@ end
 local BAY_PAINT = Color3.fromRGB(232, 226, 208)
 local BAY_LAMP_DAY = Color3.fromRGB(247, 217, 165) -- LightingController's daytime LanternGlow
 local BAY_LINE = 0.3
-local CURB_HEIGHT = 0.45
 function BuildingArt.ParkingBay(slot: BasePart, index: number)
 	slot.Transparency = 1
 	local cf, size = slot.CFrame, slot.Size
@@ -2510,9 +2509,9 @@ function BuildingArt.ParkingBay(slot: BasePart, index: number)
 	local number = paint("BayNumber", V3(2.4, size.Y, 2), CF(0, 0, -hz + 3.6), BAY_PAINT)
 	number.Transparency = 1 -- only its painted digits show
 	Kit.signText(number, tostring(index), BAY_PAINT, { Enum.NormalId.Top })
-	-- One curb block per stall, across the tail (+Z end) where the stall
-	-- meets its neighbour or the lot's edge. Looks only: nothing to snag on.
-	paint("Curb", V3(4, CURB_HEIGHT, 0.8), CF(0, (CURB_HEIGHT - size.Y) / 2, hz - 0.6), Palette.StoneBase)
+	-- (T406: the grey Curb block each stall had across its tail is gone: it lay
+	-- on the grass as a thin grey bar beside the white bay lines. The lot's edge
+	-- curb is TownGround's CurbConcrete.)
 	paint("LanternGlow", V3(2.6, size.Y + 0.02, 0.7), CF(0, 0.01, -hz + 1.2), BAY_LAMP_DAY)
 	local holder = paint("LanternGlow", V3(0.2, 0.2, 0.2), CF(0, 3, -hz + 1.2), BAY_LAMP_DAY)
 	holder.Transparency = 1

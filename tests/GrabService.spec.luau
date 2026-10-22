@@ -101,6 +101,7 @@ return function(t)
 			realSetOwner = realSetOwner,
 			owners = {}, -- [part] = player, nil (the server) or "auto"
 			ownerCalls = {},
+			events = {}, -- "owner:nil", "owner:player", "push" in call order
 			autos = {},
 			toasts = {},
 			handlers = {},
@@ -109,12 +110,22 @@ return function(t)
 		}
 		GrabService.Physics.SetOwner = function(part, player)
 			table.insert(w.ownerCalls, { part = part, player = player })
+			table.insert(w.events, if player == nil then "owner:nil" else "owner:player")
 			w.owners[part] = player
 			return not options.stuck
 		end
 		GrabService.Physics.SetAuto = function(part)
 			table.insert(w.autos, part)
 			w.owners[part] = "auto"
+		end
+		w.pushes = {}
+		GrabService.Physics.Owns = function(part, player)
+			return w.owners[part] == player
+		end
+		GrabService.Physics.Push = function(part, velocity)
+			table.insert(w.pushes, { part = part, velocity = velocity })
+			table.insert(w.events, "push")
+			part.AssemblyLinearVelocity = velocity
 		end
 		local function remote(name)
 			return {
@@ -593,6 +604,100 @@ return function(t)
 		t.eq(w.GrabService.Holding(player), nil)
 		t.ok(table.find(w.autos, sectionA) and table.find(w.autos, sectionB), "both back to automatic now")
 		t.eq(w.released[#w.released].reason, "left")
+	end)
+
+	t.test(
+		"T406: a hold past HoldMax + HoldSlack (24) lets go once settled; 23.5 holds; the rule is in GameConfig",
+		function()
+			t.eq(
+				{ GameConfig.HoldStart, GameConfig.HoldMin, GameConfig.HoldMax, GameConfig.HoldSlack },
+				{ 12, 6, 22, 2 }
+			)
+			local w = setup()
+			local record, section = w.piece()
+			local player, hrp = w.player(1)
+			t.ok(w.GrabService.Grab(player, section, HIT))
+			w.wait(2) -- settled
+			hrp.Position = HIT + Vector3.new(0, 0, 23.5)
+			w.watch()
+			t.ok(w.GrabService.Holding(player) ~= nil, "23.5 studs: still held")
+			w.wait(0.5)
+			hrp.Position = HIT + Vector3.new(0, 0, 24.5)
+			w.watch()
+			t.eq(w.GrabService.Holding(player), nil, "24.5 studs: the server lets go")
+			t.eq(w.released[1].reason, "far")
+			t.eq(record.model:GetAttribute("HeldBy"), 0)
+		end
+	)
+
+	t.test("T406: a throw is taken from the device that owns the piece, clamped to 30 studs/s", function()
+		local w = setup()
+		local _, section = w.piece()
+		local player = w.player(1)
+		t.ok(w.GrabService.Grab(player, section, HIT))
+		w.wait(0.5)
+		t.eq(GameConfig.ThrowMaxSpeed, 30)
+		t.eq(w.GrabService.Release(player, section, Vector3.new(0, 0, -45)), "ok")
+		t.eq(#w.pushes, 1)
+		t.ok(math.abs(w.pushes[1].velocity.Magnitude - 30) < 1e-4, "clamped to 30, not refused")
+		t.ok(w.pushes[1].velocity.Z < 0, "same direction")
+		t.eq(w.GrabService.Holding(player), nil, "and the piece is let go")
+	end)
+
+	t.test("T406: a release claiming more than 60 studs/s is refused: the piece stops, nothing is thrown", function()
+		local w = setup()
+		local _, section = w.piece()
+		local player = w.player(1)
+		t.ok(w.GrabService.Grab(player, section, HIT))
+		w.wait(0.5)
+		t.eq(GameConfig.ThrowRejectSpeed, 60)
+		t.eq(w.GrabService.Release(player, section, Vector3.new(0, 0, -61)), "reject")
+		t.eq(w.pushes[1].velocity, Vector3.zero, "stopped, not clamped to 30")
+		t.eq(w.GrabService.Holding(player), nil, "it is still let go")
+		t.eq(w.ownerCalls[#w.ownerCalls].player, nil, "the server owns it again")
+		local ownerAt, pushAt = 0, 0
+		for i, e in ipairs(w.events) do
+			if e == "owner:nil" and ownerAt == 0 then
+				ownerAt = i
+			elseif e == "push" and pushAt == 0 then
+				pushAt = i
+			end
+		end
+		t.ok(ownerAt > 0 and pushAt > ownerAt, "SetOwner(nil) is called before the stopping Push")
+		-- Exactly 60 is allowed (and clamped).
+		local _, again = w.piece(Vector3.new(0, 1, 3))
+		t.ok(w.GrabService.Grab(player, again, HIT + Vector3.new(0, 0, 3)))
+		w.wait(0.5)
+		t.eq(w.GrabService.Release(player, again, Vector3.new(0, 0, -60)), "ok")
+		-- Junk is refused too.
+		local _, third = w.piece(Vector3.new(0, 1, 6))
+		t.ok(w.GrabService.Grab(player, third, HIT + Vector3.new(0, 0, 6)))
+		w.wait(0.5)
+		t.eq(w.GrabService.Release(player, third, Vector3.new(0 / 0, 0, 0)), "reject")
+	end)
+
+	t.test("T406: a throw on a piece the player does not own the network for is refused", function()
+		local w = setup()
+		local _, section = w.piece()
+		local player = w.player(1)
+		t.ok(w.GrabService.Grab(player, section, HIT))
+		w.wait(0.5)
+		w.owners[section] = w.player(2) -- the engine handed it elsewhere
+		t.eq(w.GrabService.Release(player, section, Vector3.new(0, 0, -10)), "reject")
+		t.eq(w.pushes[1].velocity, Vector3.zero)
+		t.eq(w.ownerCalls[#w.ownerCalls].player, nil, "the refused throw hands the network back to the server")
+		t.eq(w.events[#w.events - 1], "owner:nil", "and does so just before the stopping Push")
+		t.eq(w.events[#w.events], "push")
+	end)
+
+	t.test("T406: a plain release (no velocity) throws nothing", function()
+		local w = setup()
+		local _, section = w.piece()
+		local player = w.player(1)
+		t.ok(w.GrabService.Grab(player, section, HIT))
+		w.wait(0.5)
+		t.eq(w.GrabService.Release(player, section), "none")
+		t.eq(#w.pushes, 0)
 	end)
 
 	t.test("too far from its holder: it lets go", function()

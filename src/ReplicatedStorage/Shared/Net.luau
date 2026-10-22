@@ -50,7 +50,7 @@ Net.RemoteNames = {
 	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)
 	"TutorialSeen", -- client -> server: ("build" | "land") the player opened the hammer's blueprint list or the Land panel (QuestService)
 	"Grab", -- client -> server: (part, hitPos) take hold of a loose piece of wood (v2 loop: GrabService)
-	"Release", -- client -> server: (part) let go of it
+	"Release", -- client -> server: (part, velocity?) let go of it; a throw velocity is judged (GrabLogic.JudgeThrow)
 	"Chop", -- client -> server: (part, hitPos, normal) one swing at a section, standing or loose (v2 loop: SectionTrees)
 	"Swing", -- client -> server: (woodId | "node" | "v1", cancel?) the pose. Damage stays on Chop / ChopTree / MineNode
 	"SawmillSet", -- client -> server: (uid, "x" | "y", 1 | -1) nudge a placed mill's cut (v2 loop: SawmillService)

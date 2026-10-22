@@ -71,6 +71,7 @@ GrabService.HitMargin = 2 -- studs: a grab may land this far off its part (the p
 GrabService.JudgeGraceSec = 0.5 -- a new hold is not judged for speed this long
 GrabService.PutBackHoldSec = 1 -- a piece put back stays the server's this long
 GrabService.JudgeMoves = true -- false: WoodService's WoodWatch judges moves instead
+GrabService.HoldSettleSec = 1.5 -- a new hold may be this far (ReleaseDistance) while it is pulled in; after it, HoldMax + HoldSlack
 
 -- What GrabService needs of a piece's record (WoodService's records have
 -- all of it). Times are the server's os.clock().
@@ -128,6 +129,21 @@ GrabService.Physics = {
 	SetAuto = function(part: BasePart)
 		pcall(function(): any
 			part:SetNetworkOwnershipAuto()
+			return nil
+		end)
+	end,
+	-- Whether `player`'s device owns the piece's physics right now (a throw is
+	-- only taken from the device that simulates the piece).
+	Owns = function(part: BasePart, player: Player): boolean
+		local ok, owner = pcall(function(): any
+			return part:GetNetworkOwner()
+		end)
+		return ok and owner == player
+	end,
+	-- Sets the piece's velocity (a clamped throw, or a stop).
+	Push = function(part: BasePart, velocity: Vector3)
+		pcall(function(): any
+			part.AssemblyLinearVelocity = velocity
 			return nil
 		end)
 	end,
@@ -530,21 +546,36 @@ function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (bool
 end
 
 -- The Release remote: lets go of what `player` holds (`part`, if given,
--- must be on it; nil when it has streamed out on their device).
-function GrabService.Release(player: Player, part: unknown)
+-- must be on it; nil when it has streamed out on their device). `velocity`
+-- (optional) is a throw: GrabLogic.JudgeThrow takes it only from the device
+-- that owns the piece's network, clamps it to ThrowMaxSpeed, and refuses
+-- (and stops the piece) one faster than ThrowRejectSpeed or from a player who
+-- does not own it. Returns the throw's verdict.
+function GrabService.Release(player: Player, part: unknown, velocity: unknown?): GrabLogic.ThrowVerdict
 	if not CoreLoop.V2() or not RateLimiter.Allow(player, "Release") then
-		return
+		return "none"
 	end
 	local h = holds[player]
 	if not h then
-		return
+		return "none"
 	end
 	if part ~= nil then
 		if typeof(part) ~= "Instance" or not (part :: Instance):IsDescendantOf(h.piece.model) then
-			return
+			return "none"
 		end
 	end
-	finish(h, "released", "keep")
+	local owns = velocity ~= nil and GrabService.Physics.Owns(h.root, player)
+	local verdict: GrabLogic.ThrowVerdict, thrown: Vector3? = GrabLogic.JudgeThrow(velocity, owns)
+	-- A refused throw takes the piece back (SetOwner nil) before it is stopped:
+	-- while the thrower's device owns the network the server's Push is ignored.
+	finish(h, "released", if verdict == "reject" then "server" else "keep")
+	if verdict == "ok" and thrown then
+		GrabService.Physics.Push(h.root, thrown)
+	elseif verdict == "reject" then
+		warn(string.format("[AntiExploit] %s's throw was refused", player.Name))
+		GrabService.Physics.Push(h.root, Vector3.zero)
+	end
+	return verdict
 end
 
 ---------------------------------------------------------------------------
@@ -603,7 +634,13 @@ function GrabService.Watch(now: number)
 			h.lastGoodAt = now
 		end
 		local gripAt = cf:PointToWorldSpace(h.grip)
-		if GrabLogic.TooFar((gripAt - hrp.Position).Magnitude, releaseDistance, GameConfig.RangeTolerance) then
+		local away = (gripAt - hrp.Position).Magnitude
+		-- Pulled in from where it was grabbed, a hold has its first moments at the
+		-- old limit; then nothing floats past HoldMax + HoldSlack (T406).
+		local tooFar = if now - h.grabbedAt < GrabService.HoldSettleSec
+			then GrabLogic.TooFar(away, releaseDistance, GameConfig.RangeTolerance)
+			else GrabLogic.HoldTooFar(away, Tune.Get("HoldMax") :: number, GameConfig.HoldSlack)
+		if tooFar then
 			finish(h, "far", "keep")
 		end
 	end
@@ -707,8 +744,8 @@ function GrabService.Init(remotes: { Grab: RemoteEvent, Release: RemoteEvent }, 
 	remotes.Grab.OnServerEvent:Connect(function(player: Player, part: unknown, hitPos: unknown)
 		GrabService.Grab(player, part, hitPos)
 	end)
-	remotes.Release.OnServerEvent:Connect(function(player: Player, part: unknown)
-		GrabService.Release(player, part)
+	remotes.Release.OnServerEvent:Connect(function(player: Player, part: unknown, velocity: unknown)
+		GrabService.Release(player, part, velocity)
 	end)
 	Players.PlayerAdded:Connect(watchPlayer)
 	for _, player in ipairs(Players:GetPlayers()) do

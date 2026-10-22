@@ -139,7 +139,7 @@ export type Look = {
 PlotData.Looks = {
 	{ name = "Charcoal", top = { 86, 88, 92 }, edge = { 68, 70, 74 }, rail = { 130, 90, 50 } },
 	{ name = "Slate", top = { 92, 96, 100 }, edge = { 72, 76, 82 }, rail = { 110, 76, 44 } },
-	{ name = "Graphite", top = { 78, 80, 82 }, edge = { 60, 62, 64 }, rail = { 82, 84, 88 } },
+	{ name = "Graphite", top = { 78, 80, 82 }, edge = { 60, 62, 64 }, rail = { 96, 78, 56 } }, -- (T406: was a grey 82, 84, 88: a thin grey bar on the grass)
 	{ name = "Iron", top = { 90, 90, 94 }, edge = { 70, 70, 74 }, rail = { 70, 48, 30 } },
 	{ name = "Basalt", top = { 82, 84, 88 }, edge = { 64, 66, 70 }, rail = { 220, 214, 200 } },
 	{ name = "Ash", top = { 96, 96, 98 }, edge = { 76, 76, 78 }, rail = { 150, 60, 44 } },

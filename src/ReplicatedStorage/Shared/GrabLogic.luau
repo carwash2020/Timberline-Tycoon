@@ -299,10 +299,77 @@ function GrabLogic.ClampHold(d: number, min: number?, max: number?): number
 	return math.clamp(d, lo, hi)
 end
 
--- The hold distance a grab starts at: where it was grabbed, from `anchor`
--- (the character's head), clamped.
-function GrabLogic.StartHold(grip: Vector3, anchor: Vector3, min: number?, max: number?): number
-	return GrabLogic.ClampHold((grip - anchor).Magnitude, min, max)
+-- The hold distance a grab starts at: GameConfig.HoldStart, clamped (T406: a
+-- log always comes up to the same reach, wherever it was grabbed; the wheel,
+-- D-pad or +/- moves it from there). `grip` and `anchor` are kept for the
+-- callers' sake.
+function GrabLogic.StartHold(_grip: Vector3, _anchor: Vector3, min: number?, max: number?, start: number?): number
+	return GrabLogic.ClampHold(start or GameConfig.HoldStart, min, max)
+end
+
+-- The server's far limit for a held piece: HoldMax + HoldSlack from its
+-- holder (24 studs by default). `distance` is the grip to the character.
+function GrabLogic.HoldLimit(max: number?, slack: number?): number
+	return (max or GameConfig.HoldMax) + (slack or GameConfig.HoldSlack)
+end
+
+function GrabLogic.HoldTooFar(distance: number, max: number?, slack: number?): boolean
+	return not finite(distance) or distance > GrabLogic.HoldLimit(max, slack)
+end
+
+---------------------------------------------------------------------------
+-- Throwing a held piece on release
+---------------------------------------------------------------------------
+
+-- `v` kept to at most `cap` studs/s (ThrowMaxSpeed), direction unchanged;
+-- zero for nonsense.
+function GrabLogic.ClampThrow(v: Vector3, cap: number?): Vector3
+	local most = cap or GameConfig.ThrowMaxSpeed
+	if not (finite(v.X) and finite(v.Y) and finite(v.Z)) then
+		return Vector3.zero
+	end
+	local speed = v.Magnitude
+	if speed <= most or speed == 0 then
+		return v
+	end
+	return v * (most / speed)
+end
+
+-- What the holder's device sends with its release: the piece's own velocity,
+-- plus ThrowPush forward (along `look`, flattened) when a push was made within
+-- ThrowPushWindow seconds (`sincePush`, nil = none), clamped to ThrowMaxSpeed.
+function GrabLogic.ThrowVelocity(current: Vector3, look: Vector3, sincePush: number?): Vector3
+	local v = current
+	if sincePush ~= nil and finite(sincePush) and sincePush >= 0 and sincePush <= GameConfig.ThrowPushWindow then
+		local flat = Vector3.new(look.X, 0, look.Z)
+		if flat.Magnitude > 1e-3 then
+			v += flat.Unit * GameConfig.ThrowPush + Vector3.new(0, GameConfig.ThrowPush * 0.25, 0)
+		end
+	end
+	return GrabLogic.ClampThrow(v)
+end
+
+export type ThrowVerdict = "none" | "ok" | "reject"
+
+-- The server's verdict on the velocity a Release carried: "none" (no throw
+-- asked), "reject" (not a vector, not finite, faster than ThrowRejectSpeed,
+-- or the thrower does not own the piece's network: nothing is applied and the
+-- piece is stopped) or "ok" with the velocity clamped to ThrowMaxSpeed.
+function GrabLogic.JudgeThrow(velocity: unknown, ownsNetwork: boolean): (ThrowVerdict, Vector3?)
+	if velocity == nil then
+		return "none", nil
+	end
+	if typeof(velocity) ~= "Vector3" then
+		return "reject", nil
+	end
+	local v = velocity :: Vector3
+	if not (finite(v.X) and finite(v.Y) and finite(v.Z)) then
+		return "reject", nil
+	end
+	if v.Magnitude > GameConfig.ThrowRejectSpeed or not ownsNetwork then
+		return "reject", nil
+	end
+	return "ok", GrabLogic.ClampThrow(v)
 end
 
 -- The hold distance moved by `delta` studs, clamped.

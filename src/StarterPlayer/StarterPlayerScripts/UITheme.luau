@@ -1470,8 +1470,14 @@ function selectionRing(): Frame
 	local ring = Instance.new("Frame")
 	ring.Name = "SelectionRing"
 	ring.BackgroundTransparency = 1
-	ring.AnchorPoint = Vector2.new(0.5, 0.5)
-	ring.Position = UDim2.fromScale(0.5, 0.5)
+	-- T406: placed from the selected object's top-left corner with no AnchorPoint
+	-- and no scale in Position. The ring used to be centred with AnchorPoint
+	-- (0.5, 0.5) and Position (0.5, 0.5); the engine does not honour the
+	-- anchor for a selection image, so the box landed half the button's size
+	-- right and down (BADGES, FIELD GUIDE, STORE on a TV). The pad is outside
+	-- the object on every side.
+	ring.AnchorPoint = Vector2.zero
+	ring.Position = UDim2.fromOffset(-pad / 2, -pad / 2)
 	ring.Size = UDim2.new(1, pad, 1, pad)
 	UITheme.corner(ring, UITheme.Radius + UITheme.Ring)
 	local stroke = UITheme.stroke(ring, C.Selection, UITheme.Ring)
@@ -1507,6 +1513,11 @@ function UITheme.FocusRing(stroke: number): Frame
 	UITheme.stroke(outer, UITheme.Skin.Ink, 2)
 	outer.Parent = ring
 	return ring
+end
+
+-- A new gamepad selection ring (what every Button and the PlayerGui carry).
+function UITheme.SelectionRing(): Frame
+	return selectionRing()
 end
 
 function UITheme.HiddenSelection(): Frame

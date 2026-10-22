@@ -4,10 +4,9 @@
 return function(t)
 	local Logic = t.shared("PlotPickerLogic")
 
-	t.test("the picker stays up for about a minute, then gives up", function()
-		t.eq(Logic.TimeoutSeconds, 60)
-		t.eq(Logic.TimedOut(0, 59), false)
-		t.eq(Logic.TimedOut(0, 60), true)
+	t.test("the picker has no timeout (T406): nothing takes a pad for the player", function()
+		t.eq(Logic.TimeoutSeconds, nil)
+		t.eq(Logic.TimedOut, nil)
 	end)
 
 	t.test("a player who already has a pad does not pick again", function()
