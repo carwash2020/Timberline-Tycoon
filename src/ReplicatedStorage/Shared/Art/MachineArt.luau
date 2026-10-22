@@ -607,6 +607,7 @@ local function buildFrame(model: Model, layout: MachineMeshes.Layout, preview: b
 			intake.CanCollide = false
 			intake.CanTouch = false
 			intake.CanQuery = false
+			intake:Destroy()
 		elseif name == "Panel" then
 			frame.panelAt = row.pos
 		elseif name == "Blockage" then
