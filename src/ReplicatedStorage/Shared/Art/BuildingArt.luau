@@ -860,6 +860,7 @@ local function placeCounter(model: Model, x: number, z: number)
 		block.CastShadow = false
 		block.CanQuery = false
 		block.CanTouch = false
+		Kit.blocker(block, "keeps people from walking round or climbing over the end of the counter")
 	end
 	local left = x - size.X / 2 + BuildingArt.CounterClutterWidth / 2
 	register(model, CF(left, COUNTER_TOP, z - 0.7), 0.7)
@@ -1175,6 +1176,7 @@ function BuildingArt.Sawmill(scale: number?): Model
 	sawGuard.Transparency = 1
 	sawGuard.CastShadow = false
 	sawGuard.CanTouch = false
+	Kit.blocker(sawGuard, "the saw blade spins, so it cannot collide: this box keeps people out of its disc")
 	local frontRail = Kit.part(model, "GuardRail", V3(14, 3.4, 0.4), CF(-2, 2.75, -3.1), TIMBER, MAT.Wood)
 	frontRail.CanTouch = false
 	local eastRail = Kit.part(model, "GuardRail", V3(0.45, 5.2, 6.2), CF(9.7, 3.65, -0.5), TIMBER, MAT.Wood)
@@ -3557,6 +3559,7 @@ function BuildingArt.Bridge(a: Vector3, b: Vector3, width: number): Model
 		guard.Transparency = 1
 		guard.CastShadow = false
 		guard.CanTouch = false
+		Kit.blocker(guard, "the rope bridge's side rail: keeps people from walking off the planks")
 		-- Roblox ignores this while the part collides (raycasts still hit it),
 		-- but it says what's meant: nothing to click.
 		guard.CanQuery = false

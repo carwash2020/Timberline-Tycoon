@@ -1,0 +1,287 @@
+{
+  "machines": [
+    {
+      "machine": "SawmillRickety",
+      "part": "Intake",
+      "pos": [
+        0,
+        2.5,
+        -4.5
+      ],
+      "tol": 0.5
+    },
+    {
+      "machine": "SawmillRickety",
+      "part": "Output",
+      "pos": [
+        0,
+        1.6,
+        4.6
+      ],
+      "tol": 0.5
+    },
+    {
+      "machine": "ChopSaw",
+      "part": "Intake",
+      "pos": [
+        0,
+        1.82,
+        -2
+      ],
+      "tol": 0.5
+    },
+    {
+      "machine": "ChopSaw",
+      "part": "Output",
+      "pos": [
+        0,
+        1.9,
+        28
+      ],
+      "tol": 0.5
+    },
+    {
+      "machine": "PlanerHand",
+      "part": "Intake",
+      "pos": [
+        0,
+        2.1,
+        -2.5
+      ],
+      "tol": 0.5
+    },
+    {
+      "machine": "PlanerHand",
+      "part": "Output",
+      "pos": [
+        0,
+        1.6,
+        3
+      ],
+      "tol": 0.5
+    }
+  ],
+  "world": [
+    {
+      "note": "the Tool Shed back door (Art/ShopInteriors/ToolShed.luau, backDoor)",
+      "path": "TimberlineMap/ToolShed/BackRoomDoor",
+      "pos": [
+        -101.25,
+        4.75,
+        136.7
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Tool Shed front door",
+      "path": "TimberlineMap/ToolShed/ShopDoor/DoorBlock",
+      "pos": [
+        -84,
+        5.7,
+        94.45
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Hearth and Home front door",
+      "path": "TimberlineMap/HearthAndHome/ShopDoor/DoorBlock",
+      "pos": [
+        -100,
+        5.93,
+        165.52
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Sparkworks front door",
+      "path": "TimberlineMap/Sparkworks/ShopDoor/DoorBlock",
+      "pos": [
+        135,
+        5.93,
+        113.77
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Dealership hall entrance",
+      "path": "TimberlineMap/Dealership/ShopDoor/DoorBlock",
+      "pos": [
+        189.25,
+        6.02,
+        100.3
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Sawmill front door",
+      "path": "TimberlineMap/Sawmill/Door",
+      "pos": [
+        -21.15,
+        6,
+        105.4
+      ],
+      "tol": 0.5
+    },
+    {
+      "canCollide": false,
+      "note": "the town sawmill's sell pad (must not collide)",
+      "path": "TimberlineMap/SellArea/SellStationArt/SellPad",
+      "pos": [
+        53,
+        0.1,
+        111
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "the sell area",
+      "path": "TimberlineMap/SellArea",
+      "pos": [
+        60.3,
+        6,
+        111
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Tool Shed counter",
+      "path": "TimberlineMap/ToolShed/Counter",
+      "pos": [
+        -84,
+        1.3,
+        130.9
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Hearth and Home counter",
+      "path": "TimberlineMap/HearthAndHome/Counter",
+      "pos": [
+        -100,
+        1.3,
+        202.4
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Sparkworks counter",
+      "path": "TimberlineMap/Sparkworks/Counter",
+      "pos": [
+        135,
+        1.3,
+        143.5
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Dealership counter",
+      "path": "TimberlineMap/Dealership/Counter",
+      "pos": [
+        194,
+        1.3,
+        156.23
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Sky Forge keeper spot",
+      "path": "TimberlineMap/TownScenes/SkyForgeCourt/Floor/KeeperSpot",
+      "pos": [
+        -112,
+        1.4,
+        -14
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "Sky Forge temper spot",
+      "path": "TimberlineMap/TownScenes/SkyForgeCourt/Anvil/TemperSpot",
+      "pos": [
+        -112,
+        3.5,
+        -22
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "relic socket",
+      "path": "TimberlineMap/TownScenes/SkyForgeCourt/RelicGem#1/Socket_FrostRelic",
+      "pos": [
+        -118.8,
+        4,
+        -26
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "relic socket",
+      "path": "TimberlineMap/TownScenes/SkyForgeCourt/RelicGem#2/Socket_EmberRelic",
+      "pos": [
+        -119.6,
+        4,
+        -26
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "relic socket",
+      "path": "TimberlineMap/TownScenes/SkyForgeCourt/RelicGem#3/Socket_GloamRelic",
+      "pos": [
+        -120.4,
+        4,
+        -26
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "relic socket",
+      "path": "TimberlineMap/TownScenes/SkyForgeCourt/RelicGem#4/Socket_LumenRelic",
+      "pos": [
+        -121.2,
+        4,
+        -26
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "the spawn",
+      "path": "TimberlineMap/SpawnLocation",
+      "pos": [
+        0,
+        0.5,
+        40
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "ferry dock (FerryService hangs the boarding prompt on its deck)",
+      "path": "TimberlineMap/FerryDock#1",
+      "pos": [
+        780,
+        -0.35,
+        136
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "ferry dock, island side",
+      "path": "TimberlineMap/FerryDock#2",
+      "pos": [
+        910.54,
+        4.84,
+        -25.87
+      ],
+      "tol": 0.5
+    },
+    {
+      "note": "toll booth counter (GateService hangs the toll prompt on it)",
+      "path": "TimberlineMap/TollBooth/Counter",
+      "pos": [
+        22,
+        41.85,
+        886
+      ],
+      "tol": 0.5
+    }
+  ]
+}

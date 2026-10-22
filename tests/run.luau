@@ -66,13 +66,16 @@ local SLOW_SPECS: { [string]: number } = {
 	["Forest.spec.luau"] = 25,
 	["ForestService.spec.luau"] = 12,
 	["ForestServiceV2.spec.luau"] = 3,
+	["GeometryLint.spec.luau"] = 20,
 	["LandscapeStyle.spec.luau"] = 17,
 	["LogicService.spec.luau"] = 3,
 	["MachineSwap.spec.luau"] = 25,
 	["MapBuilder.spec.luau"] = 66,
 	["MonetizationService.spec.luau"] = 6,
+	["MustKeep.spec.luau"] = 20,
 	["NPCService.spec.luau"] = 3,
 	["Phase12World.spec.luau"] = 7,
+	["PipelineE2E.spec.luau"] = 20,
 	["PlanPause.spec.luau"] = 14,
 	["PlotLogic.spec.luau"] = 6,
 	["PlotPlatform.spec.luau"] = 5,
@@ -132,6 +135,10 @@ end
 
 local passed, failed = 0, 0
 local failures = {}
+
+-- tests/support/<name>.luau: helper modules a spec asks for with t.support(name). Each is
+-- loaded once per run, so what it caches (the built world) is shared by every spec.
+local supportModules: { [string]: any } = {}
 
 local specs = {}
 for _, file in ipairs(fs.readDir("tests")) do
@@ -254,6 +261,13 @@ for _, file in ipairs(specs) do
 	end
 	function t.load(path: string)
 		return shared:load(path)
+	end
+	function t.support(name: string)
+		if supportModules[name] == nil then
+			local file = "tests/support/" .. name .. ".luau"
+			supportModules[name] = luau.load(fs.readFile(file), { debugName = file })()()
+		end
+		return supportModules[name]
 	end
 
 	local specStart = os.clock()

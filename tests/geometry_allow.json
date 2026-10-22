@@ -1,0 +1,67 @@
+[
+ {
+  "a": "WorldEdge#*",
+  "b": "WorldEdge#*",
+  "reason": "the invisible world-edge walls are segments that overlap at their joints and corners by design (4 studs thick); nobody can reach them"
+ },
+ {
+  "a": "NorthStrip",
+  "b": "WorldEdge#*",
+  "reason": "the north strip's end caps and lips stand inside the invisible world-edge wall that closes the map beside the strip; nobody can reach the overlap, so it is harmless"
+ },
+ {
+  "a": "NorthStrip",
+  "b": "TollBooth",
+  "reason": "known on main: the strip's Lip runs 1 stud into the toll booth roof (depth 1.0, y 47.9); nothing walks there; Builder follow-up (move the lip or the roof 1 stud)"
+ },
+ {
+  "a": "BoulderClusters/BoulderCluster#17",
+  "b": "WorldEdge#*",
+  "reason": "a boulder of cluster 17 stands in the invisible world-edge wall (depth up to 1.3); nobody can reach it, so it is harmless"
+ },
+ {
+  "a": "Boulders/Rock#6",
+  "b": "Scenery/RuinedCabin#1",
+  "reason": "known on main: boulder Rock#6 sits inside the ruined cabin's footing, floor, wall logs and chimney (depth up to 2.7 at -196,1,117); Builder follow-up: move the boulder or the cabin"
+ },
+ {
+  "a": "Boulders/Rock#65",
+  "b": "SecretCave",
+  "reason": "known on main: boulder Rock#65 pokes through the secret cave's wall and floor (depth up to 2.8 at -730,1,-86); Builder follow-up: move the boulder"
+ },
+ {
+  "a": "Scenery/LogPile#13",
+  "b": "SecretCave",
+  "reason": "known on main: a log of pile 13 dips 1.1 into the secret cave floor (at -715,0.3,-113); Builder follow-up: lift the pile"
+ },
+ {
+  "a": "Boulders/Rock#25",
+  "b": "Scenery/LogPile#3",
+  "reason": "known on main: boulder Rock#25 is inside log pile 3 (depth up to 1.8 at 54,3.5,267); Builder follow-up: move the boulder or the pile"
+ },
+ {
+  "a": "Fence#1",
+  "b": "HearthAndHome",
+  "reason": "known on main: fence 1's rail runs 2.4 into the Hearth and Home wall and its posts 0.6 into the floor (at -125,2.8,192); Builder follow-up: shorten the fence"
+ },
+ {
+  "a": "Fence#2",
+  "b": "HearthAndHome",
+  "reason": "known on main: fence 2's rail runs 2.4 into the Hearth and Home wall, its posts 0.6 into the floor and 0.3 into the counter end (at -125,2.8,204); Builder follow-up: shorten the fence"
+ },
+ {
+  "a": "Fence#1",
+  "b": "Fence#3",
+  "reason": "known on main: the posts of fences 1 and 3 share a corner and overlap 0.6 (at -128,1.8,192); Builder follow-up: drop one post"
+ },
+ {
+  "a": "Fence#2",
+  "b": "Fence#3",
+  "reason": "known on main: the posts of fences 2 and 3 share a corner and overlap 0.6 (at -128,1.8,204); Builder follow-up: drop one post"
+ },
+ {
+  "a": "Signpost#12",
+  "b": "Skyroot",
+  "reason": "known on main: signpost 12 (the sky road sign) stands inside the Skyroot trunk (depth up to 2.4 at 684,6,298); Builder follow-up: move the sign off the trunk"
+ }
+]

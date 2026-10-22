@@ -1613,6 +1613,7 @@ step("7. The world's edge", function()
 		local part = Kit.part(map, "WorldEdge", size, cf, Color3.new(1, 1, 1))
 		part.Transparency = 1
 		part.CastShadow = false
+		Kit.blocker(part, "the edge of the world: nobody leaves the map")
 	end
 	-- East, west, and south. The north side is gapped for the strip.
 	for _, edge in ipairs({ { 1, 0 }, { -1, 0 }, { 0, -1 } }) do

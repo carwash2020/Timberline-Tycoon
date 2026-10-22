@@ -2,7 +2,8 @@
 # Runs every check that doesn't need Roblox Studio:
 #   formatting (StyLua), lint (Selene), strict type-checking against the
 #   real Roblox API (luau-lsp), the unit tests (Lune), and whether ECONOMY.md
-#   matches the balance tables. Run from the repo root: ./scripts/check.sh
+#   matches the balance tables, and meshlint (the GLBs have nothing solid in a
+#   log lane or a doorway: tools/blender/meshlint.py). Run from the repo root: ./scripts/check.sh
 # Tools come from rokit.toml (`rokit install`). GitHub runs this on every
 # push to main and every pull request (.github/workflows/checks.yml).
 #
@@ -62,6 +63,9 @@ if [ "$RUN_LINT" = 1 ]; then
 	lune run tools/economy1 --check
 	echo "== ASSETS.md is current"
 	lune run tools/assets --check
+	echo "== meshlint (no solid in a lane or door of a mesh)"
+	python3 tools/blender/test_meshlint.py
+	python3 tools/blender/meshlint.py
 fi
 
 echo "All checks passed."
