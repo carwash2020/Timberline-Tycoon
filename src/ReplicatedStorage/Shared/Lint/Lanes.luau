@@ -62,7 +62,9 @@ function Lanes.Run(
 		-- Everything solid in the root, not just the model's own parts: a crate or a post from another
 		-- piece standing in a log lane is as much in the way.
 		for _, d in ipairs(root:GetDescendants()) do
-			if d:IsA("BasePart") and d.CanCollide and not d:IsA("WedgePart") and not LaneData.Riders[d.Name] then
+			-- (a rider belongs to the lane's own model: another piece's part named "Log" is still in the way)
+			local rider = LaneData.Riders[d.Name] and d:IsDescendantOf(model)
+			if d:IsA("BasePart") and d.CanCollide and not d:IsA("WedgePart") and not rider then
 				table.insert(parts, d)
 			end
 		end

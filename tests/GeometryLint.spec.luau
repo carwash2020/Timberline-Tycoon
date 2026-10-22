@@ -274,6 +274,21 @@ return function(t)
 		local other = Lanes.Run(mixed, frames)
 		t.eq(#other.failures, 1, show(other.failures))
 		t.ok(string.find(other.failures[1], "Crate (Crate) x lane Sawmill.slip", 1, true), other.failures[1])
+		-- a rider is only a rider inside the lane's own model: a pile's "Log" in the lane is in the way
+		local pile = Instance.new("Model")
+		pile.Name = "LogPile"
+		pile.Parent = mixed
+		local stray = Instance.new("Part")
+		stray.Name = "Log"
+		stray.Anchored = true
+		stray.Size = Vector3.new(2, 2, 2)
+		stray.CFrame = frame * CFrame.new(26, 3, -0.9)
+		stray.Parent = pile
+		local strayRun = Lanes.Run(mixed, frames)
+		t.ok(
+			string.find(table.concat(strayRun.failures, "\n"), "Log (LogPile) x lane Sawmill.slip", 1, true),
+			show(strayRun.failures)
+		)
 		local missing = Lanes.Run(Instance.new("Folder"), frames)
 		t.eq(#missing.failures, 1, "a lane whose model is gone is a failure, not a pass")
 	end)
