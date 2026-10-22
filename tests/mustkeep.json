@@ -261,7 +261,8 @@
         -0.35,
         136
       ],
-      "tol": 0.5
+      "tol": 0.5,
+      "town": false
     },
     {
       "note": "ferry dock, island side",
@@ -271,7 +272,8 @@
         4.84,
         -25.87
       ],
-      "tol": 0.5
+      "tol": 0.5,
+      "town": false
     },
     {
       "note": "toll booth counter (GateService hangs the toll prompt on it)",
@@ -281,7 +283,8 @@
         41.85,
         886
       ],
-      "tol": 0.5
+      "tol": 0.5,
+      "town": false
     }
   ]
 }

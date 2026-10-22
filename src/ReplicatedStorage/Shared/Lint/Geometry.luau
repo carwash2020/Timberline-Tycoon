@@ -65,17 +65,17 @@ function Geometry.Pieces(root: Instance): ({ string }, { [string]: Instance })
 	return ids, byId
 end
 
-local function solid(part: BasePart): boolean
+function Geometry.Solid(part: BasePart): boolean
 	return part.CanCollide and not part:IsA("WedgePart")
 end
 
 local function collidingParts(piece: Instance): { BasePart }
 	local out: { BasePart } = {}
-	if piece:IsA("BasePart") and solid(piece) then
+	if piece:IsA("BasePart") and Geometry.Solid(piece) then
 		table.insert(out, piece)
 	end
 	for _, d in ipairs(piece:GetDescendants()) do
-		if d:IsA("BasePart") and solid(d) then
+		if d:IsA("BasePart") and Geometry.Solid(d) then
 			table.insert(out, d)
 		end
 	end
@@ -114,6 +114,16 @@ local function matches(pattern: string, id: string): boolean
 	return false
 end
 
+-- Whether the allowlist names this pair of pieces (either order).
+function Geometry.Allowed(list: { AllowEntry }, ida: string, idb: string): boolean
+	for _, entry in ipairs(list) do
+		if (matches(entry.a, ida) and matches(entry.b, idb)) or (matches(entry.a, idb) and matches(entry.b, ida)) then
+			return true
+		end
+	end
+	return false
+end
+
 function Geometry.Line(hit: Hit): string
 	return string.format(
 		"[GeometryLint] %s (%s) x %s (%s) at (%.1f, %.1f, %.1f), depth %.2f, rule %s",
@@ -130,8 +140,16 @@ function Geometry.Line(hit: Hit): string
 end
 
 -- Rule 2b over everything under `root`. `allow` is the allowlist, `minDepth` defaults to 0.05.
-function Geometry.Run(root: Instance, allow: { AllowEntry }?, minDepth: number?): Result
+-- `options.skipStale`: do not fail an allowlist entry that hits nothing (a run over part of the
+-- world, like the cloud test's town, cannot see every entry's pieces).
+function Geometry.Run(
+	root: Instance,
+	allow: { AllowEntry }?,
+	minDepth: number?,
+	options: { skipStale: boolean? }?
+): Result
 	local list = allow or {}
+	local skipStale = options ~= nil and options.skipStale == true
 	local limit = minDepth or Geometry.MinDepth
 	local failures: { string } = {}
 	local hits: { Hit } = {}
@@ -190,7 +208,7 @@ function Geometry.Run(root: Instance, allow: { AllowEntry }?, minDepth: number?)
 		end
 	end
 	for i, entry in ipairs(list) do
-		if not used[i] then
+		if not used[i] and not skipStale then
 			table.insert(
 				failures,
 				string.format(

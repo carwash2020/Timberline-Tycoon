@@ -103,6 +103,58 @@ jobs:
           TEST_SHARD: ${{ matrix.shard }}/4
         run: ./scripts/check.sh --tests-only
 
+  # The cloud test (T409): publishes a Saved version of the TEST place (never the live one) and runs the
+  # town's geometry, lane, MustKeep and mesh-load checks in a Roblox Luau Execution task. One task per run,
+  # one run at a time (the concurrency group). Without the ROBLOX_API_KEY secret (a fork's pull request, or
+  # before the secret exists) it logs "cloud-test SKIPPED: missing ROBLOX_API_KEY" and passes as skipped,
+  # never as passed; set the repository variable CLOUD_TEST_REQUIRED to 1 to make a missing key fail.
+  # Require this job ("cloud-test") in branch protection once the key exists.
+  cloud-test:
+    name: cloud-test
+    needs: [tests]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: cloud-test
+      cancel-in-progress: false
+    env:
+      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+      TEST_UNIVERSE_ID: ${{ vars.TEST_UNIVERSE_ID || '10772436908' }}
+      TEST_PLACE_ID: ${{ vars.TEST_PLACE_ID || '109062394774073' }}
+      CLOUD_TEST_REQUIRED: ${{ vars.CLOUD_TEST_REQUIRED }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the tool binaries are cached, never ~/.rokit/auth.toml (the token).
+      - name: Cache Rokit tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.rokit/bin
+            ~/.rokit/tool-storage
+          key: rokit-v2-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
+
+      - name: Install Rokit and the pinned tools
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -x "$HOME/.rokit/bin/rokit" ]; then
+            curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          fi
+          export PATH="$HOME/.rokit/bin:$PATH"
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+          rokit authenticate github --token "$GITHUB_TOKEN" --skip-verify
+          rokit install --no-trust-check
+
+      # default.project.json plus ServerStorage.CloudTests (tests/cloud and its data); the shipping project is untouched.
+      - name: Build the test place
+        run: |
+          python3 tools/cloud/make_project.py
+          rojo build build/cloud.project.json -o build/test.rbxl
+
+      - name: Publish the test place and run the cloud checks
+        run: python3 tools/cloud/run_task.py --rbxl build/test.rbxl --script tools/cloud/task.luau
+
   # Single status to look at (and to require in branch protection later).
   checks:
     name: checks

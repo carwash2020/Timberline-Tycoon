@@ -20,3 +20,4 @@ globalTypes.d.luau
 __pycache__/
 tools/blender/__pycache__/
 globalTypes.d.luau.pin
+build/
