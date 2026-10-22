@@ -566,7 +566,9 @@ function GrabService.Release(player: Player, part: unknown, velocity: unknown?):
 	end
 	local owns = velocity ~= nil and GrabService.Physics.Owns(h.root, player)
 	local verdict: GrabLogic.ThrowVerdict, thrown: Vector3? = GrabLogic.JudgeThrow(velocity, owns)
-	finish(h, "released", "keep")
+	-- A refused throw takes the piece back (SetOwner nil) before it is stopped:
+	-- while the thrower's device owns the network the server's Push is ignored.
+	finish(h, "released", if verdict == "reject" then "server" else "keep")
 	if verdict == "ok" and thrown then
 		GrabService.Physics.Push(h.root, thrown)
 	elseif verdict == "reject" then

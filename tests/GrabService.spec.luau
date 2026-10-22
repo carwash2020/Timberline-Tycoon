@@ -101,6 +101,7 @@ return function(t)
 			realSetOwner = realSetOwner,
 			owners = {}, -- [part] = player, nil (the server) or "auto"
 			ownerCalls = {},
+			events = {}, -- "owner:nil", "owner:player", "push" in call order
 			autos = {},
 			toasts = {},
 			handlers = {},
@@ -109,6 +110,7 @@ return function(t)
 		}
 		GrabService.Physics.SetOwner = function(part, player)
 			table.insert(w.ownerCalls, { part = part, player = player })
+			table.insert(w.events, if player == nil then "owner:nil" else "owner:player")
 			w.owners[part] = player
 			return not options.stuck
 		end
@@ -122,6 +124,7 @@ return function(t)
 		end
 		GrabService.Physics.Push = function(part, velocity)
 			table.insert(w.pushes, { part = part, velocity = velocity })
+			table.insert(w.events, "push")
 			part.AssemblyLinearVelocity = velocity
 		end
 		local function remote(name)
@@ -651,6 +654,16 @@ return function(t)
 		t.eq(w.GrabService.Release(player, section, Vector3.new(0, 0, -61)), "reject")
 		t.eq(w.pushes[1].velocity, Vector3.zero, "stopped, not clamped to 30")
 		t.eq(w.GrabService.Holding(player), nil, "it is still let go")
+		t.eq(w.ownerCalls[#w.ownerCalls].player, nil, "the server owns it again")
+		local ownerAt, pushAt = 0, 0
+		for i, e in ipairs(w.events) do
+			if e == "owner:nil" and ownerAt == 0 then
+				ownerAt = i
+			elseif e == "push" and pushAt == 0 then
+				pushAt = i
+			end
+		end
+		t.ok(ownerAt > 0 and pushAt > ownerAt, "SetOwner(nil) is called before the stopping Push")
 		-- Exactly 60 is allowed (and clamped).
 		local _, again = w.piece(Vector3.new(0, 1, 3))
 		t.ok(w.GrabService.Grab(player, again, HIT + Vector3.new(0, 0, 3)))
@@ -672,6 +685,9 @@ return function(t)
 		w.owners[section] = w.player(2) -- the engine handed it elsewhere
 		t.eq(w.GrabService.Release(player, section, Vector3.new(0, 0, -10)), "reject")
 		t.eq(w.pushes[1].velocity, Vector3.zero)
+		t.eq(w.ownerCalls[#w.ownerCalls].player, nil, "the refused throw hands the network back to the server")
+		t.eq(w.events[#w.events - 1], "owner:nil", "and does so just before the stopping Push")
+		t.eq(w.events[#w.events], "push")
 	end)
 
 	t.test("T406: a plain release (no velocity) throws nothing", function()
