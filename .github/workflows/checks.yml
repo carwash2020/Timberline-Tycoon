@@ -117,34 +117,23 @@ jobs:
       group: cloud-test
       cancel-in-progress: false
     env:
-      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
       TEST_UNIVERSE_ID: ${{ vars.TEST_UNIVERSE_ID || '10772436908' }}
       TEST_PLACE_ID: ${{ vars.TEST_PLACE_ID || '109062394774073' }}
       CLOUD_TEST_REQUIRED: ${{ vars.CLOUD_TEST_REQUIRED }}
     steps:
       - uses: actions/checkout@v4
 
-      # Only the tool binaries are cached, never ~/.rokit/auth.toml (the token).
-      - name: Cache Rokit tools
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.rokit/bin
-            ~/.rokit/tool-storage
-          key: rokit-v2-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
-
-      - name: Install Rokit and the pinned tools
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      # Rojo only, from its pinned release (v7.7.0, the version in rokit.toml) and checked against its
+      # SHA-256: this job holds ROBLOX_API_KEY, so nothing unpinned (no piped install script) runs in it.
+      # The key is in the environment of the last step only.
+      - name: Install Rojo 7.7.0 (pinned release, checksum checked)
         run: |
-          if [ ! -x "$HOME/.rokit/bin/rokit" ]; then
-            curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
-          fi
-          export PATH="$HOME/.rokit/bin:$PATH"
-          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
-          rokit authenticate github --token "$GITHUB_TOKEN" --skip-verify
-          rokit install --no-trust-check
+          curl -fsSL -o rojo.zip https://github.com/rojo-rbx/rojo/releases/download/v7.7.0/rojo-7.7.0-linux-x86_64.zip
+          echo "22503e5839864f9d7c2171c48b536fc229f2cc4d8774c9cc149f60941d864073  rojo.zip" | sha256sum -c -
+          mkdir -p "$HOME/bin"
+          unzip -o rojo.zip -d "$HOME/bin"
+          chmod +x "$HOME/bin/rojo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       # default.project.json plus ServerStorage.CloudTests (tests/cloud and its data); the shipping project is untouched.
       - name: Build the test place
@@ -153,17 +142,28 @@ jobs:
           rojo build build/cloud.project.json -o build/test.rbxl
 
       - name: Publish the test place and run the cloud checks
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
         run: python3 tools/cloud/run_task.py --rbxl build/test.rbxl --script tools/cloud/task.luau
 
   # Single status to look at (and to require in branch protection later).
   checks:
     name: checks
     if: always()
-    needs: [lint, tests]
+    needs: [lint, tests, cloud-test]
     runs-on: ubuntu-latest
     steps:
       - name: All jobs passed
+        env:
+          CLOUD_TEST_REQUIRED: ${{ vars.CLOUD_TEST_REQUIRED }}
         run: |
-          echo "lint: ${{ needs.lint.result }}, tests: ${{ needs.tests.result }}"
+          echo "lint: ${{ needs.lint.result }}, tests: ${{ needs.tests.result }}, cloud-test: ${{ needs.cloud-test.result }}"
           test "${{ needs.lint.result }}" = success
           test "${{ needs.tests.result }}" = success
+          # cloud-test: success (it ran, or it SKIPPED for want of the key, which it reports itself). With
+          # CLOUD_TEST_REQUIRED=1 only a success counts: a skipped or cancelled job is a failure.
+          if [ "$CLOUD_TEST_REQUIRED" = "1" ]; then
+            test "${{ needs.cloud-test.result }}" = success
+          else
+            test "${{ needs.cloud-test.result }}" = success || test "${{ needs.cloud-test.result }}" = skipped
+          fi
