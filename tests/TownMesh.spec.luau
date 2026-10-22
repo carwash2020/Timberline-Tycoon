@@ -614,7 +614,7 @@ return function(t)
 		t.eq(TownMeshes.FidelityFor("Body", 200), roblox.Enum.RenderFidelity.Performance, "a prop under 300 tris")
 		local fs = require("@lune/fs")
 		local expected = {
-			Sawmill = 9732,
+			Sawmill = 9944,
 			GeneralStore = 8232,
 			ToolShed = 5120,
 			Dealership = 3780,

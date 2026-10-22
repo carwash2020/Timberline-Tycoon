@@ -441,10 +441,10 @@ local ALL: { Asset } = {
 		id = "Sawmill",
 		category = "building",
 		modelId = 122113550398654,
-		tris = 9732,
+		tris = 9944,
 		pieces = {
-			{ name = "Body", meshId = 86215100835246, size = V(63.785, 42.3, 42.938) },
-			{ name = "Collision", meshId = 112566568598574, size = V(61.65, 42, 40.95) },
+			{ name = "Body", meshId = 136642384683617, size = V(63.785, 42.3, 42.938) },
+			{ name = "Collision", meshId = 133234482270698, size = V(61.65, 42, 40.95) },
 			{ name = "Door", meshId = 103111550635504, size = V(4.125, 9, 0.6) },
 			{ name = "Glow", meshId = 130480099384678, size = V(47.321, 37.748, 32.209) },
 			{ name = "Roof", meshId = 106500111589450, size = V(63.367, 20.52, 40.5) },
