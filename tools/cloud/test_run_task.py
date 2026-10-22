@@ -160,6 +160,14 @@ class Flow(unittest.TestCase):
             self.assertEqual(headers["x-api-key"], KEY)
         self.assertNotIn(KEY, text, "the key is never printed")
 
+    def test_the_task_timeout_is_inside_the_api_limit(self):
+        fake = Fake()
+        run(cfg(), fake)
+        body = json.loads(fake.tasks_created()[0][3])
+        seconds = int(body["timeout"].rstrip("s"))
+        self.assertTrue(1 <= seconds <= 300, body["timeout"])
+        self.assertEqual(body["script"], "return 1")
+
     def test_only_the_test_place_is_in_every_url(self):
         fake = Fake()
         run(cfg(), fake)

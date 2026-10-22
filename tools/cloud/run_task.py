@@ -41,7 +41,7 @@ TEST_UNIVERSE_ID = "10772436908"
 API = "https://apis.roblox.com"
 POLL_SECONDS = 3
 DEFAULT_TIMEOUT = 900  # whole run, seconds
-TASK_TIMEOUT = "600s"  # the task's own limit
+TASK_TIMEOUT = "300s"  # the task's own limit (the API allows 1 to 300)
 
 # (method, url, headers, body) -> (status, body bytes). Replaced in tests.
 Http = Callable[[str, str, dict, "bytes | None"], "tuple[int, bytes]"]
