@@ -35,11 +35,10 @@ return function(t)
 		t.ok(WireArt.Grip() ~= nil)
 	end)
 
-	t.test("the art is built from parts only: no asset id, no mesh", function()
+	t.test("the art holds no asset id: the mesh id is a config slot, nil for now", function()
 		local source = fs.readFile("src/ReplicatedStorage/Shared/Art/WireArt.luau")
-		t.eq(string.find(source, "rbxassetid", 1, true), nil)
-		t.eq(string.find(source, "MeshId", 1, true), nil)
-		t.eq(string.find(source, "%d%d%d%d%d%d%d%d"), nil, "no long numbers that look like ids")
+		t.eq(string.find(source, "rbxassetid://%d"), nil, "no id written in")
+		t.eq(string.find(source, "%d%d%d%d%d%d"), nil, "no long numbers that look like ids")
 	end)
 
 	local function setup(hasWallet)
@@ -120,5 +119,34 @@ return function(t)
 			string.find(tool, 'FireServer("buy"', 1, true) or string.find(tool, '"buy"', 1, true),
 			"buys through the Wire remote"
 		)
+	end)
+
+	t.test(
+		"the spool has a mesh slot (WireSpoolMeshId, nil for now) and the part-built spool is used while it is nil",
+		function()
+			t.ok(WireArt.Config ~= nil, "a named config table")
+			t.eq(WireArt.Config.WireSpoolMeshId, nil, "no id yet: Builder is making the mesh, none is invented")
+			t.ok(not WireArt.UsesMesh())
+			local model = WireArt.Build()
+			local meshParts = 0
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("MeshPart") then
+					meshParts += 1
+				end
+			end
+			t.eq(meshParts, 0, "no MeshPart while the id is nil")
+			t.ok(model:FindFirstChild("FlangeLeft") ~= nil, "the part-built spool")
+			local source = fs.readFile("src/ReplicatedStorage/Shared/Art/WireArt.luau")
+			t.ok(string.find(source, "TODO(Builder)", 1, true), "the stand-in is marked TODO")
+		end
+	)
+
+	t.test("once an id is set the mesh Handle is built instead, and the id is restored after", function()
+		WireArt.Config.WireSpoolMeshId = 1234
+		local ok, model = pcall(WireArt.Build)
+		WireArt.Config.WireSpoolMeshId = nil
+		t.ok(ok, "building with an id does not error")
+		t.ok(model.PrimaryPart ~= nil and model.PrimaryPart:IsA("MeshPart"))
+		t.eq(model:FindFirstChild("FlangeLeft"), nil, "no part-built pieces beside the mesh")
 	end)
 end

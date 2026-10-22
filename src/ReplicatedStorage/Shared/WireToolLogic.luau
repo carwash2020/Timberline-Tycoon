@@ -44,111 +44,6 @@ WireToolLogic.Lessons = { "Pick an output", "Pick an input", "Done: flip it" }
 
 -- `step` is 1..3 while teaching and 4 once the session has seen all three.
 function WireToolLogic.Lesson(step: number): string?
-	---------------------------------------------------------------------------
-	-- Stretching a wire (T420): wire is a single-use item, so the tool shows what
-	-- the wire you are stretching would use and cost before you place it.
-	---------------------------------------------------------------------------
-
-	WireToolLogic.TopUp = 10 -- what the buy button offers when nothing is missing
-
-	export type Stretch = {
-		state: string, -- "start" | "aim" | "ok" | "short" | "far"
-		length: number,
-		units: number,
-		short: number,
-		buyCost: number,
-		left: number,
-		text: string,
-	}
-
-	local function stretchText(state: string, q: WireSupply.Quote, stock: number): string
-		if state == "start" then
-			return "Pick an output to start a wire."
-		elseif state == "aim" then
-			return string.format("%d studs so far. Aim at an input.", math.ceil(q.length))
-		elseif state == "ok" then
-			return string.format("%d studs: uses %d wire, %d left.", math.ceil(q.length), q.units, q.left)
-		elseif state == "short" then
-			return string.format("%d studs needs %d wire. You have %d.", math.ceil(q.length), q.units, stock)
-		end
-		return WireSupply.Message("far")
-	end
-
-	-- What the wire from `from` stretched to `to` (or loose, `free` studs long) would
-	-- use from a box of `stock`. A wire starts at an output; an end that is the same
-	-- piece, or not an input, is still aiming.
-	function WireToolLogic.Stretch(stock: number?, from: Piece?, to: Piece?, free: number?): Stretch
-		local have = WireSupply.Clean(stock)
-		local blank = WireSupply.Quote(have, 0)
-		if from == nil or not WireLogic.IsSource(WireLogic.Role(from.blueprintId)) then
-			return {
-				state = "start",
-				length = 0,
-				units = 0,
-				short = 0,
-				buyCost = 0,
-				left = have,
-				text = stretchText("start", blank, have),
-			}
-		end
-		local length = free or 0
-		local state = "aim"
-		if to ~= nil and to.uid ~= from.uid and WireLogic.IsTarget(WireLogic.Role(to.blueprintId)) then
-			length = WireSupply.Length(from, to)
-			state = "ok"
-		end
-		local q = WireSupply.Quote(have, length)
-		if q.state == "far" then
-			state = "far"
-		elseif state == "ok" and q.state == "short" then
-			state = "short"
-		end
-		return {
-			state = state,
-			length = length,
-			units = q.units,
-			short = q.short,
-			buyCost = q.buyCost,
-			left = q.left,
-			text = stretchText(state, q, have),
-		}
-	end
-
-	-- How the stretched line is drawn: its colour follows the state.
-	function WireToolLogic.LineTone(state: string): string
-		if state == "short" then
-			return "warn"
-		elseif state == "far" then
-			return "bad"
-		end
-		return "ok"
-	end
-
-	-- The wire left in the box, in a line.
-	function WireToolLogic.BoxLine(stock: number?): string
-		local have = WireSupply.Clean(stock)
-		if have <= 0 then
-			return "Wire box: empty. Buy some."
-		end
-		return string.format("Wire box: %d", have)
-	end
-
-	export type BuyPlan = { amount: number, cost: number, text: string }
-
-	-- What the buy button does: the units the stretched wire is short of, else a
-	-- top-up of TopUp, never more than the box has room for.
-	function WireToolLogic.BuyPlan(stock: number?, stretch: Stretch): BuyPlan
-		local have = WireSupply.Clean(stock)
-		local room = WireSupply.MaxStock - have
-		if room <= 0 then
-			return { amount = 0, cost = 0, text = "Box full" }
-		end
-		local want = if stretch.short > 0 then stretch.short else WireToolLogic.TopUp
-		local amount = math.max(0, math.min(want, room, WireSupply.MaxBuy))
-		local cost = amount * WireSupply.UnitPrice()
-		return { amount = amount, cost = cost, text = string.format("BUY %d · %s", amount, WireSupply.PriceText(cost)) }
-	end
-
 	return WireToolLogic.Lessons[step]
 end
 
@@ -167,7 +62,9 @@ function WireToolLogic.Advance(step: number, event: string): number
 end
 
 export type Piece = { uid: string, blueprintId: string, x: number, y: number?, z: number }
-export type Action = { op: "link", from: string, to: string, toPort: number? } | { op: "cut", uid: string }
+export type Action =
+	{ op: "link", from: string, to: string, toPort: number?, via: { WireLogic.Point }? }
+	| { op: "cut", uid: string }
 export type Segment =
 	{ from: string, to: string, ax: number, ay: number, az: number, bx: number, by: number, bz: number }
 
@@ -214,7 +111,16 @@ end
 -- What the Wire remote is fired with for an action.
 function WireToolLogic.Args(action: Action): { any }
 	if action.op == "link" then
-		return { action.from, WireLogic.Port, action.to, action.toPort or WireLogic.Port }
+		local args: { any } = { action.from, WireLogic.Port, action.to, action.toPort or WireLogic.Port }
+		-- The corners, as the player placed them. The server measures the run itself.
+		if action.via ~= nil and #action.via > 0 then
+			local corners = {}
+			for _, p in ipairs(action.via) do
+				table.insert(corners, { x = p.x, z = p.z })
+			end
+			table.insert(args, corners)
+		end
+		return args
 	end
 	return { "cut", action.uid }
 end
@@ -254,6 +160,38 @@ function WireToolLogic.NextIn(wires: { WireLogic.Wire }, toUid: string, blueprin
 	return spec.ins[1] or WireLogic.Port
 end
 
+-- One token of a switch model's "Wires" attribute: `uid`, `uid@port`, and any
+-- bends as `~x:z` after it (the server writes them from the run it validated).
+export type Token = { uid: string, port: number?, via: { WireLogic.Point } }
+
+function WireToolLogic.ParseToken(token: string): Token?
+	local uid = string.match(token, "^[^@~]+")
+	if not uid or uid == "" then
+		return nil
+	end
+	local port = string.match(token, "^[^@~]+@(%d+)")
+	local via: { WireLogic.Point } = {}
+	for xs, zs in string.gmatch(token, "~(%-?[%d%.]+):(%-?[%d%.]+)") do
+		local x, z = tonumber(xs), tonumber(zs)
+		if x and z then
+			table.insert(via, { x = x, z = z })
+		end
+	end
+	return { uid = uid, port = if port then tonumber(port) else nil, via = via }
+end
+
+-- The attribute text for one wire (what LogicService writes).
+function WireToolLogic.Encode(wire: WireLogic.Wire): string
+	local text = wire.to
+	if wire.toPort ~= nil and wire.toPort ~= 1 then
+		text ..= "@" .. tostring(wire.toPort)
+	end
+	for _, p in ipairs(wire.via or {}) do
+		text ..= string.format("~%.2f:%.2f", p.x, p.z)
+	end
+	return text
+end
+
 -- The target uids in a switch model's "Wires" attribute.
 function WireToolLogic.Parse(text: unknown): { string }
 	local out: { string } = {}
@@ -261,9 +199,9 @@ function WireToolLogic.Parse(text: unknown): { string }
 		return out
 	end
 	for token in string.gmatch(text, "[^,]+") do
-		local uid = string.match(token, "^[^@]+")
-		if uid and uid ~= "" then
-			table.insert(out, uid)
+		local parsed = WireToolLogic.ParseToken(token)
+		if parsed then
+			table.insert(out, parsed.uid)
 		end
 	end
 	return out
@@ -286,7 +224,8 @@ function WireToolLogic.WireList(wires: { [string]: string }): { WireLogic.Wire }
 end
 
 -- The lines to draw, plot-local, at most MaxLines. `wires` maps a switch uid
--- to the text of its "Wires" attribute. Pieces that are gone are skipped.
+-- to the text of its "Wires" attribute. Pieces that are gone are skipped. A run
+-- with bends is several lines, one per leg.
 function WireToolLogic.Segments(pieces: { Piece }, wires: { [string]: string }): { Segment }
 	local by: { [string]: Piece } = {}
 	for _, piece in ipairs(pieces) do
@@ -305,24 +244,35 @@ function WireToolLogic.Segments(pieces: { Piece }, wires: { [string]: string }):
 	for _, fromUid in ipairs(uids) do
 		local a = by[fromUid]
 		if a and WireLogic.IsSource(WireLogic.Role(a.blueprintId)) then
-			for _, toUid in ipairs(WireToolLogic.Parse(wires[fromUid])) do
-				local b = by[toUid]
-				if b and WireLogic.IsTarget(WireLogic.Role(b.blueprintId)) then
-					if #out >= WireToolLogic.MaxLines then
-						return out
-					end
+			for token in string.gmatch(wires[fromUid], "[^,]+") do
+				local parsed = WireToolLogic.ParseToken(token)
+				local b = if parsed then by[parsed.uid] else nil
+				if parsed and b and WireLogic.IsTarget(WireLogic.Role(b.blueprintId)) then
 					local ax, ay, az = tie(a)
 					local bx, by2, bz = tie(b)
-					table.insert(out, {
-						from = fromUid,
-						to = toUid,
-						ax = ax,
-						ay = ay,
-						az = az,
-						bx = bx,
-						by = by2,
-						bz = bz,
-					})
+					-- The corners sit on a line from one tie height to the other.
+					local points: { { number } } = { { ax, ay, az } }
+					for i, p in ipairs(parsed.via) do
+						local f = i / (#parsed.via + 1)
+						table.insert(points, { p.x, ay + (by2 - ay) * f, p.z })
+					end
+					table.insert(points, { bx, by2, bz })
+					for i = 1, #points - 1 do
+						if #out >= WireToolLogic.MaxLines then
+							return out
+						end
+						local p, q = points[i], points[i + 1]
+						table.insert(out, {
+							from = fromUid,
+							to = parsed.uid,
+							ax = p[1],
+							ay = p[2],
+							az = p[3],
+							bx = q[1],
+							by = q[2],
+							bz = q[3],
+						})
+					end
 				end
 			end
 		end
@@ -396,36 +346,62 @@ end
 -- the wire you are stretching would use and cost before you place it.
 ---------------------------------------------------------------------------
 
-WireToolLogic.TopUp = 10 -- what the buy button offers when nothing is missing
-
 export type Stretch = {
 	state: string, -- "start" | "aim" | "ok" | "short" | "far"
-	length: number,
+	length: number, -- along the run, bends included
 	units: number,
 	short: number,
 	buyCost: number,
 	left: number,
+	bends: number,
 	text: string,
 }
 
-local function stretchText(state: string, q: WireSupply.Quote, stock: number): string
+-- A run so far: the corners tapped on the ground. A fifth is refused.
+function WireToolLogic.AddBend(bends: { WireLogic.Point }, x: number, z: number): ({ WireLogic.Point }?, string?)
+	if #bends >= WireSupply.MaxBends then
+		return nil, "bends"
+	end
+	if x ~= x or z ~= z or math.abs(x) == math.huge or math.abs(z) == math.huge then
+		return nil, "badvia"
+	end
+	local out = table.clone(bends)
+	table.insert(out, { x = x, z = z })
+	return out, nil
+end
+
+local function stretchText(state: string, q: WireSupply.Quote, stock: number, bends: number): string
+	local corners = if bends == 1 then "1 bend" else string.format("%d bends", bends)
 	if state == "start" then
 		return "Pick an output to start a wire."
 	elseif state == "aim" then
-		return string.format("%d studs so far. Aim at an input.", math.ceil(q.length))
+		return string.format(
+			"%d studs so far, %s. Tap the ground to bend, or an input to end.",
+			math.ceil(q.length),
+			corners
+		)
 	elseif state == "ok" then
-		return string.format("%d studs: uses %d wire, %d left.", math.ceil(q.length), q.units, q.left)
+		return string.format("%d studs, %s: uses %d wire, %d left.", math.ceil(q.length), corners, q.units, q.left)
 	elseif state == "short" then
 		return string.format("%d studs needs %d wire. You have %d.", math.ceil(q.length), q.units, stock)
 	end
 	return WireSupply.Message("far")
 end
 
--- What the wire from `from` stretched to `to` (or loose, `free` studs long) would
--- use from a box of `stock`. A wire starts at an output; an end that is the same
--- piece, or not an input, is still aiming.
-function WireToolLogic.Stretch(stock: number?, from: Piece?, to: Piece?, free: number?): Stretch
+-- What the run from `from` would use from a box of `stock`: along the `bends`
+-- already tapped, then to `to` (a piece) or loose for `free` more studs. A run
+-- starts at an output; an end that is the same piece, or not an input, is still
+-- aiming. The length is the server's own measure (WireSupply.Path), so what the
+-- tool quotes is what the server will charge.
+function WireToolLogic.Stretch(
+	stock: number?,
+	from: Piece?,
+	to: Piece?,
+	free: number?,
+	bends: { WireLogic.Point }?
+): Stretch
 	local have = WireSupply.Clean(stock)
+	local corners = bends or {}
 	local blank = WireSupply.Quote(have, 0)
 	if from == nil or not WireLogic.IsSource(WireLogic.Role(from.blueprintId)) then
 		return {
@@ -435,14 +411,19 @@ function WireToolLogic.Stretch(stock: number?, from: Piece?, to: Piece?, free: n
 			short = 0,
 			buyCost = 0,
 			left = have,
-			text = stretchText("start", blank, have),
+			bends = 0,
+			text = stretchText("start", blank, have, 0),
 		}
 	end
-	local length = free or 0
 	local state = "aim"
+	local length: number
+	local last = if #corners > 0 then corners[#corners] else from
 	if to ~= nil and to.uid ~= from.uid and WireLogic.IsTarget(WireLogic.Role(to.blueprintId)) then
-		length = WireSupply.Length(from, to)
+		length = WireSupply.Path(from, corners, to) or 0
 		state = "ok"
+	else
+		local upTo = WireSupply.Path(from, corners, last) or 0
+		length = upTo + (free or 0)
 	end
 	local q = WireSupply.Quote(have, length)
 	if q.state == "far" then
@@ -457,7 +438,8 @@ function WireToolLogic.Stretch(stock: number?, from: Piece?, to: Piece?, free: n
 		short = q.short,
 		buyCost = q.buyCost,
 		left = q.left,
-		text = stretchText(state, q, have),
+		bends = #corners,
+		text = stretchText(state, q, have, #corners),
 	}
 end
 
@@ -482,16 +464,17 @@ end
 
 export type BuyPlan = { amount: number, cost: number, text: string }
 
--- What the buy button does: the units the stretched wire is short of, else a
--- top-up of TopUp, never more than the box has room for.
+-- What the buy button does: the smallest pack that covers what the run is short
+-- of (or the smallest pack, as a top-up, when nothing is missing), never more
+-- than the box has room for. Wire is sold in packs only.
 function WireToolLogic.BuyPlan(stock: number?, stretch: Stretch): BuyPlan
 	local have = WireSupply.Clean(stock)
 	local room = WireSupply.MaxStock - have
-	if room <= 0 then
+	local want = if stretch.short > 0 then stretch.short else WireSupply.Packs[1]
+	local amount = WireSupply.PackFor(want, room)
+	if amount <= 0 then
 		return { amount = 0, cost = 0, text = "Box full" }
 	end
-	local want = if stretch.short > 0 then stretch.short else WireToolLogic.TopUp
-	local amount = math.max(0, math.min(want, room, WireSupply.MaxBuy))
 	local cost = amount * WireSupply.UnitPrice()
 	return { amount = amount, cost = cost, text = string.format("BUY %d · %s", amount, WireSupply.PriceText(cost)) }
 end

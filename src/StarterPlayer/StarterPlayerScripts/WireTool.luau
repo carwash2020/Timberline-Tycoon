@@ -13,7 +13,7 @@
 --     WireSupply.MaxLength studs, used up from the box. BUY gets what is missing
 --     (Wire ("buy", amount)); the server sells, takes the cash and checks again.
 --   * Phone: tap a piece. PC: click it. Xbox: aim the crosshair, RB picks,
---     X cuts, Y buys, B puts the spool away (InputKit.WireBinds). Buttons are
+--     X cuts, R3 (right stick press) buys, B puts the spool away (InputKit.WireBinds). Buttons are
 --     48 px tall for touch and the help line is 18 px on a TV.
 --   * Pick a switch, then tap lamps and doors to wire them (each tap is
 --     Wire (fromUid, 1, toUid, 1)). Pick any wired piece and CUT sends
@@ -46,8 +46,8 @@ local C = UITheme.Colors
 
 local LINE = Color3.fromRGB(255, 196, 64)
 local LINE_PICKED = Color3.fromRGB(120, 220, 255)
-local LINE_WARN = Color3.fromRGB(255, 170, 40) -- a stretch the box cannot pay for yet
-local LINE_BAD = Color3.fromRGB(235, 80, 70) -- a stretch past the longest wire
+local LINE_WARN = C.WireShort -- a stretch the box cannot pay for yet (#FFC873)
+local LINE_BAD = C.WireTooLong -- a stretch past the longest wire (#C8553D)
 local ACTIONS = { "WirePick", "WireCut", "WireBuy", "WireDone" }
 
 local active = false
@@ -61,7 +61,8 @@ local bar: UITheme.Bar? = nil
 local buyButton: UITheme.Button? = nil
 local reticle: Frame? = nil
 local spool: Tool? = nil -- the Wire tool in hand
-local stretchLine: Part? = nil -- the live line from the picked output to where you aim
+local stretchLines: { Part } = {} -- the live run: one line per leg, from the picked output through its bends to where you aim
+local bends: { WireLogic.Point } = {} -- corners tapped on the ground so far (plot-local), at most WireSupply.MaxBends
 local stretch: WireToolLogic.Stretch = WireToolLogic.Stretch(0, nil, nil, nil)
 local lastTap: Vector2? = nil
 local session = 0 -- a new tool session cancels the preview loop of the last
@@ -183,7 +184,7 @@ local function refreshBar()
 	end
 	text ..= "  " .. WireToolLogic.BoxLine(stock())
 	if UITheme.Device() == "console" then
-		text ..= "  RB pick · X cut · Y buy · B done"
+		text ..= "  RB pick · X cut · R3 buy · B done"
 	end
 	b.label.Text = text
 	local buy = buyButton
@@ -253,14 +254,9 @@ local function detailedWires(wires: { [string]: string }): { WireLogic.Wire }
 	local out: { WireLogic.Wire } = {}
 	for from, text in pairs(wires) do
 		for token in string.gmatch(text, "[^,]+") do
-			local target, portText = string.match(token, "^([^@]+)@(%d+)$")
-			if target and portText then
-				table.insert(out, { from = from, to = target, toPort = tonumber(portText) })
-			else
-				local bare = string.match(token, "^[^@]+")
-				if bare and bare ~= "" then
-					table.insert(out, { from = from, to = bare })
-				end
+			local parsed = WireToolLogic.ParseToken(token)
+			if parsed then
+				table.insert(out, { from = from, to = parsed.uid, toPort = parsed.port })
 			end
 		end
 	end
@@ -296,12 +292,12 @@ local function aimPoint(): Vector2
 	return UserInputService:GetMouseLocation() - GuiService:GetGuiInset()
 end
 
-local function previewPart(): Part?
+local function previewPart(i: number): Part?
 	local f = folder
 	if not f then
 		return nil
 	end
-	local part = stretchLine
+	local part = stretchLines[i]
 	if part and part.Parent then
 		return part
 	end
@@ -315,8 +311,31 @@ local function previewPart(): Part?
 	p.Material = Enum.Material.Neon
 	p.Size = Vector3.new(WireToolLogic.LineThickness, WireToolLogic.LineThickness, 1)
 	p.Parent = f
-	stretchLine = p
+	stretchLines[i] = p
 	return p
+end
+
+local function hideStretch()
+	for _, part in ipairs(stretchLines) do
+		part.Parent = nil
+	end
+end
+
+-- Where a screen point meets the ground at `height` (plot-local x, z), or nil.
+local function groundAt(x: number, y: number, height: number): Vector3?
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+	local ray = camera:ViewportPointToRay(x, y)
+	if math.abs(ray.Direction.Y) < 1e-4 then
+		return nil
+	end
+	local along = (height - ray.Origin.Y) / ray.Direction.Y
+	if along <= 0 then
+		return nil
+	end
+	return ray.Origin + ray.Direction * along
 end
 
 local TONE_COLOR: { [string]: Color3 } = { ok = LINE_PICKED, warn = LINE_WARN, bad = LINE_BAD }
@@ -328,14 +347,9 @@ local function updateStretch()
 	local camera = workspace.CurrentCamera
 	local pieces = mine()
 	local from = pieceOf(pieces, picked)
-	local part = previewPart()
-	if
-		not (active and plot and camera and from and part) or not WireLogic.IsSource(WireLogic.Role(from.blueprintId))
-	then
-		stretch = WireToolLogic.Stretch(stock(), nil, nil, nil)
-		if part then
-			part.Parent = nil
-		end
+	if not (active and plot and camera and from) or not WireLogic.IsSource(WireLogic.Role(from.blueprintId)) then
+		stretch = WireToolLogic.Stretch(stock(), nil, nil, nil, nil)
+		hideStretch()
 		refreshBar()
 		return
 	end
@@ -356,27 +370,43 @@ local function updateStretch()
 		end
 		aimed = pieceOf(pieces, WireToolLogic.NearestOnScreen(pieces, points, at.X, at.Y))
 	end
-	-- Loose, the line ends on the ground beside the output, where the aim meets its height.
+	-- The run so far (the tie of the output, then each bend), and where it ends.
 	local start = worldPoint(plot, from)
-	local ray = camera:ViewportPointToRay(at.X, at.Y)
+	local path: { Vector3 } = { start }
+	for _, bend in ipairs(bends) do
+		table.insert(path, plot:PointToWorldSpace(Vector3.new(bend.x, start.Y - plot.Position.Y, bend.z)))
+	end
+	local last = path[#path]
+	local endPoint = last
 	local free = 0
-	local endPoint = start
-	if math.abs(ray.Direction.Y) > 1e-4 then
-		local along = (start.Y - ray.Origin.Y) / ray.Direction.Y
-		if along > 0 then
-			endPoint = ray.Origin + ray.Direction * along
-			free = Vector3.new(endPoint.X - start.X, 0, endPoint.Z - start.Z).Magnitude
+	local onInput = aimed ~= nil and aimed.uid ~= from.uid
+	if onInput then
+		endPoint = worldPoint(plot, aimed :: WireToolLogic.Piece)
+	else
+		local ground = groundAt(at.X, at.Y, last.Y)
+		if ground then
+			endPoint = ground
+			local a, b = plot:PointToObjectSpace(last), plot:PointToObjectSpace(ground)
+			free = math.sqrt((b.X - a.X) ^ 2 + (b.Z - a.Z) ^ 2)
 		end
 	end
-	stretch = WireToolLogic.Stretch(stock(), from, aimed, free)
-	if aimed ~= nil and stretch.state ~= "aim" and stretch.state ~= "start" then
-		endPoint = worldPoint(plot, aimed)
+	stretch = WireToolLogic.Stretch(stock(), from, aimed, free, bends)
+	table.insert(path, endPoint)
+	local tone = TONE_COLOR[WireToolLogic.LineTone(stretch.state)] or LINE_PICKED
+	for i = 1, #path - 1 do
+		local part = previewPart(i)
+		if part then
+			local a, b = path[i], path[i + 1]
+			part.Size =
+				Vector3.new(WireToolLogic.LineThickness, WireToolLogic.LineThickness, math.max((b - a).Magnitude, 0.1))
+			part.CFrame = CFrame.lookAt((a + b) / 2, b)
+			part.Color = tone
+			part.Parent = folder
+		end
 	end
-	local len = (endPoint - start).Magnitude
-	part.Size = Vector3.new(WireToolLogic.LineThickness, WireToolLogic.LineThickness, math.max(len, 0.1))
-	part.CFrame = CFrame.lookAt((start + endPoint) / 2, endPoint)
-	part.Color = TONE_COLOR[WireToolLogic.LineTone(stretch.state)] or LINE_PICKED
-	part.Parent = folder
+	for i = #path, #stretchLines do
+		stretchLines[i].Parent = nil
+	end
 	refreshBar()
 end
 
@@ -402,11 +432,20 @@ local function pick(uid: string?)
 		if not (reachOk(pieces, action.from) and reachOk(pieces, action.to)) then
 			HUD.Toast(WireLogic.Message("reach") or "Stand closer to wire that.")
 		else
-			local ok, why = WireLogic.Check(list, pieces :: any, action.from, action.to, WireLogic.Port, action.toPort)
+			local ok, why = WireLogic.Check(
+				list,
+				pieces :: any,
+				action.from,
+				action.to,
+				WireLogic.Port,
+				action.toPort,
+				WireSupply.MaxLength
+			)
 			if ok then
 				-- The wire's length against the longest wire and the box (the server decides again).
 				local result =
-					WireToolLogic.Stretch(stock(), pieceOf(pieces, action.from), pieceOf(pieces, action.to), nil)
+					WireToolLogic.Stretch(stock(), pieceOf(pieces, action.from), pieceOf(pieces, action.to), nil, bends)
+				action.via = if #bends > 0 then table.clone(bends) else nil
 				if result.state == "far" then
 					HUD.Toast(WireSupply.Message("far"))
 				elseif result.state == "short" then
@@ -424,6 +463,9 @@ local function pick(uid: string?)
 		if WireLogic.IsSource(WireLogic.Role(if id then id else "")) then
 			lessonStep = WireToolLogic.Advance(lessonStep, "source")
 		end
+	end
+	if nextPick ~= previous or action ~= nil then
+		bends = {}
 	end
 	picked = nextPick
 	highlight()
@@ -444,6 +486,30 @@ local function cut()
 	fire(action)
 end
 
+-- A tap on bare ground with an output picked bends the run there (at most
+-- WireSupply.MaxBends; a fifth is refused). True when the tap was a bend.
+local function bendAt(x: number, y: number): boolean
+	local plot = BlueprintPlacer.PlotCFrame()
+	local pieces = mine()
+	local from = pieceOf(pieces, picked)
+	if not plot or not from or not WireLogic.IsSource(WireLogic.Role(from.blueprintId)) then
+		return false
+	end
+	local ground = groundAt(x, y, worldPoint(plot, from).Y)
+	if not ground then
+		return false
+	end
+	local local3 = plot:PointToObjectSpace(ground)
+	local added, why = WireToolLogic.AddBend(bends, local3.X, local3.Z)
+	if added then
+		bends = added
+		updateStretch()
+	else
+		HUD.Toast(WireSupply.Message(why or "bends"))
+	end
+	return true
+end
+
 -- A tap or click at a screen point (GUI-inset space).
 local function pickAt(x: number, y: number)
 	local camera = workspace.CurrentCamera
@@ -459,7 +525,11 @@ local function pickAt(x: number, y: number)
 			points[piece.uid] = { v.X, v.Y }
 		end
 	end
-	pick(WireToolLogic.NearestOnScreen(pieces, points, x, y))
+	local hit = WireToolLogic.NearestOnScreen(pieces, points, x, y)
+	if hit == nil and bendAt(x, y) then
+		return
+	end
+	pick(hit)
 end
 
 -- Gamepad: what the crosshair (screen centre) is on.
@@ -471,7 +541,11 @@ local function pickAimed()
 	end
 	local eye = plot:PointToObjectSpace(camera.CFrame.Position)
 	local look = plot:VectorToObjectSpace(camera.CFrame.LookVector)
-	pick(WireToolLogic.Aim(mine(), eye.X, eye.Y, eye.Z, look.X, look.Y, look.Z))
+	local hit = WireToolLogic.Aim(mine(), eye.X, eye.Y, eye.Z, look.X, look.Y, look.Z)
+	if hit == nil and bendAt(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2) then
+		return
+	end
+	pick(hit)
 end
 
 ---------------------------------------------------------------------------
@@ -486,11 +560,9 @@ function WireTool.Stop()
 	session += 1
 	lessonStep = WireToolLogic.Advance(lessonStep, "done")
 	picked = nil
-	stretch = WireToolLogic.Stretch(0, nil, nil, nil)
-	local line = stretchLine
-	if line then
-		line.Parent = nil
-	end
+	bends = {}
+	stretch = WireToolLogic.Stretch(0, nil, nil, nil, nil)
+	hideStretch()
 	for _, conn in ipairs(conns) do
 		conn:Disconnect()
 	end

@@ -40,9 +40,9 @@ local BlueprintArt = require(ReplicatedStorage.Shared.Art.BlueprintArt)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local BuildMenuArt = require(ReplicatedStorage.Shared.Art.BuildMenuArt)
 local BuildMenuLogic = require(ReplicatedStorage.Shared.BuildMenuLogic)
+local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 local HammerPicker = require(ReplicatedStorage.Shared.HammerPicker)
 local PickerMotion = require(ReplicatedStorage.Shared.PickerMotion)
-local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 local GamepadNav = require(script.Parent.GamepadNav)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
@@ -107,6 +107,13 @@ end
 
 local CARD_RADIUS = 8
 local ROW_RADIUS = 8
+
+-- The UIScale this screen really runs at: a phone's is 1 (UITheme.Screen's scale
+-- function in Start), anything else the theme's. Sizes read off the screen are
+-- divided by this to get design px.
+local function screenScale(): number
+	return math.max(if phoneNow then 1 else UITheme.Scale(), 0.01)
+end
 
 -- AbsoluteSize / AbsolutePosition, or zero where they cannot be read (before
 -- the first layout pass, and in the headless specs, which have no layout).
@@ -230,7 +237,7 @@ local function buildTile(
 	name.Font = F.Bold
 	name.Text = view.name
 	name.TextSize = cs.nameText
-	name.TextColor3 = C.Ink -- the name stays full contrast, locked or not
+	name.TextColor3 = C.PickerInk -- the name stays full contrast, locked or not
 	name.TextWrapped = true
 	name.TextTruncate = Enum.TextTruncate.None
 	name.TextScaled = false
@@ -252,7 +259,7 @@ local function buildTile(
 	blurb.Font = F.Body
 	blurb.Text = card.blurb
 	blurb.TextSize = cs.blurbText
-	blurb.TextColor3 = C.Bark
+	blurb.TextColor3 = C.PickerInk
 	blurb.TextWrapped = true
 	blurb.TextTruncate = Enum.TextTruncate.None
 	blurb.TextXAlignment = Enum.TextXAlignment.Left
@@ -270,7 +277,7 @@ local function buildTile(
 	cost.Font = F.Bold
 	cost.Text = card.costText
 	cost.TextSize = cs.costText
-	cost.TextColor3 = if card.state == "cant" then C.Danger else C.Ink
+	cost.TextColor3 = if card.state == "cant" then C.Danger else C.PickerInk
 	cost.TextWrapped = true
 	cost.TextTruncate = Enum.TextTruncate.None
 	cost.TextXAlignment = Enum.TextXAlignment.Left
@@ -335,7 +342,7 @@ local function paintSelected()
 		local edge = tile.button:FindFirstChild("Edge")
 		if edge and edge:IsA("UIStroke") then
 			UITheme.Tween(edge, seconds, {
-				Color = if on then Palette.CoinGold else UITheme.Skin.Bark,
+				Color = if on then C.AmberEdge else UITheme.Skin.Bark,
 				Thickness = if on then BuildMenuLogic.SizesFor(phoneNow).stroke else 2,
 			})
 		end
@@ -430,7 +437,7 @@ local function paintRail()
 		local edge = row:FindFirstChild("Edge")
 		if edge and edge:IsA("UIStroke") then
 			UITheme.Tween(edge, seconds, {
-				Color = if on then Palette.CoinGold else UITheme.Skin.Bark,
+				Color = if on then C.AmberEdge else UITheme.Skin.Bark,
 				Thickness = if on then 3 else 1,
 			})
 		end
@@ -455,7 +462,7 @@ local function buildGrid()
 	clearGrid()
 	local sizes = BuildMenuLogic.SizesFor(phoneNow)
 	local cs = HammerPicker.CardSizes(phoneNow)
-	local panelWidth = if panel then absSize(panel).X / math.max(UITheme.Scale(), 0.01) else 0
+	local panelWidth = if panel then absSize(panel).X / screenScale() else 0
 	local grid = HammerPicker.GridFor(
 		if panelWidth > 0 then panelWidth else BuildMenuLogic.Layout(667, phoneNow, 1).panelW,
 		phoneNow
@@ -563,7 +570,7 @@ local function buildRail()
 		bar.Name = "Bar"
 		bar.Size = UDim2.new(0, sizes.bar, 1, -8)
 		bar.Position = UDim2.fromOffset(2, 4)
-		bar.BackgroundColor3 = Palette.CoinGold
+		bar.BackgroundColor3 = C.AmberEdge
 		bar.BorderSizePixel = 0
 		bar.Visible = false
 		UITheme.corner(bar, 3)
@@ -586,9 +593,15 @@ local function buildRail()
 		label.Font = F.Bold
 		label.Text = text
 		label.TextSize = sizes.label
-		label.TextColor3 = C.Ink
+		label.TextColor3 = C.PickerInk
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.TextWrapped = false
+		-- A tab name never runs off the tab (Supports, Fences): it shrinks to fit, to the 14 px floor.
+		label.TextScaled = true
+		local labelFit = Instance.new("UITextSizeConstraint")
+		labelFit.MinTextSize = sizes.minText
+		labelFit.MaxTextSize = sizes.label
+		labelFit.Parent = label
 		label.Active = false
 		label.Parent = row
 		row.Parent = list
@@ -599,7 +612,11 @@ local function buildRail()
 		-- The tab's icon is its first piece's art (its swatch until the render is set);
 		-- an empty tab keeps a plain wood swatch.
 		local first = cat.entries[1]
-		local row = makeRow(cat.label, Color3.fromHex(if first then BuildMenuLogic.Swatch(first.bp) else "#8C6A45"), i)
+		local row = makeRow(
+			cat.label,
+			if first then Color3.fromHex(BuildMenuLogic.Swatch(first.bp)) else Palette.TimberBrown,
+			i
+		)
 		row.Activated:Connect(function()
 			selectCategory(i, false)
 		end)
@@ -626,7 +643,7 @@ local function fitPanel()
 	if not g or not a then
 		return
 	end
-	local scale = math.max(UITheme.Scale(), 0.01)
+	local scale = screenScale()
 	local screen = absSize(g) / scale
 	if screen.X <= 0 then
 		local cam = workspace.CurrentCamera
@@ -769,6 +786,17 @@ function BuildMenuUI.Open(o: Opts, wantKind: string?, wantId: string?)
 			dim.BackgroundTransparency = SCRIM_ALPHA
 		end
 	end
+	-- The rail is as wide as this device's rail (a wide screen's is wider than a phone's), and
+	-- the grid takes the rest, which is what HammerPicker.GridFor counted on.
+	local railPx = BuildMenuLogic.SizesFor(phoneNow).rail
+	local rail, grid, note = railList, gridList, emptyNote
+	if rail and grid then
+		rail.Size = UDim2.new(0, railPx, 1, 0)
+		grid.Size = UDim2.new(1, -(railPx + BuildMenuLogic.RailGap), 1, 0)
+	end
+	if note then
+		note.Size = UDim2.new(1, -(railPx + BuildMenuLogic.RailGap), 0, 80)
+	end
 	buildRail()
 	-- Reselect the card last used when it still exists.
 	local kind, id = wantKind or lastKind, wantId or lastTileId
@@ -830,7 +858,7 @@ local function hintItem(parent: Frame, key: Enum.KeyCode, text: string, order: n
 	local glyph = UITheme.Glyph(key, 22)
 	glyph.LayoutOrder = 1
 	glyph.Parent = holder
-	local label = UITheme.label(holder, text, F.Bold, 14, C.Ink)
+	local label = UITheme.label(holder, text, F.Bold, 14, C.PickerInk)
 	label.LayoutOrder = 2
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
@@ -898,7 +926,7 @@ function BuildMenuUI.Start()
 	head.Size = UDim2.new(1, 0, 0, 44)
 	head.BackgroundTransparency = 1
 	head.Parent = card.face
-	local title = UITheme.label(head, "Blueprints", F.Heading, 24, C.Ink)
+	local title = UITheme.label(head, "Blueprints", F.Heading, 24, C.PickerInk)
 	title.Name = "Title"
 	title.Size = UDim2.fromScale(0.5, 1)
 	title.TextXAlignment = Enum.TextXAlignment.Left
@@ -989,7 +1017,7 @@ function BuildMenuUI.Start()
 	note.BackgroundTransparency = 1
 	note.Font = F.Body
 	note.TextSize = 16
-	note.TextColor3 = C.Bark
+	note.TextColor3 = C.PickerInk
 	note.TextWrapped = true
 	note.TextXAlignment = Enum.TextXAlignment.Center
 	note.Visible = false

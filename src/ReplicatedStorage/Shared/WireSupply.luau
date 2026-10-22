@@ -3,13 +3,16 @@
 -- decides), the wire tool (which shows the price as you stretch) and the tests
 -- run the same rules.
 --
---   * Wire is bought by the amount needed, in units (one unit is one stud), at
---     the price in ItemCatalog.Wire (no price lives here).
---   * A wire is placed at an output and stretched to an input up to MaxLength
---     (WireLogic.Span, the longest wire the server accepts).
+--   * Wire comes in packs of 32, 64 or 160 units only (one unit is one stud), at
+--     the price in ItemCatalog.Wire (no price lives here). Any other amount is
+--     refused.
+--   * A run is placed at an output and stretched to an input along up to 4 bends,
+--     at most 64 studs measured along its path (the server measures it from the
+--     piece positions and the bends it validated, never from a number the client
+--     sends). A fifth bend is refused.
 --   * Stretching it uses up its length, rounded up, from your box. Cutting a
 --     wire gives nothing back.
---   * The box holds at most MaxStock; one purchase is at most MaxBuy.
+--   * The box holds at most MaxStock (320).
 
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local Util = require(script.Parent.Util)
@@ -17,10 +20,11 @@ local WireLogic = require(script.Parent.WireLogic)
 
 local WireSupply = {}
 
-WireSupply.MaxLength = WireLogic.Span -- studs in one wire
+WireSupply.MaxLength = WireLogic.MaxRun -- studs in one run, along its path
+WireSupply.MaxBends = WireLogic.MaxBends
 WireSupply.StudsPerUnit = 1
-WireSupply.MaxStock = 200 -- units the box holds
-WireSupply.MaxBuy = 100 -- units in one purchase
+WireSupply.MaxStock = 320 -- units the box holds
+WireSupply.Packs = { 32, 64, 160 } :: { number } -- the only amounts sold, in units
 
 export type Quote = {
 	state: string, -- "ok" | "short" | "far"
@@ -123,11 +127,16 @@ function WireSupply.Use(stock: number?, units: number): number?
 	return have - units
 end
 
+-- Whether `units` is a pack that is sold.
+function WireSupply.IsPack(units: unknown): boolean
+	return type(units) == "number" and table.find(WireSupply.Packs, units) ~= nil
+end
+
 -- A purchase of `units`: (true, nil, cost, newStock) or (false, reason). The
--- reasons are "amount" (not a whole number from 1 to MaxBuy), "full" (the box
--- would pass MaxStock) and "cash".
+-- reasons are "amount" (not one of the packs), "full" (the box would pass
+-- MaxStock) and "cash".
 function WireSupply.Buy(cash: number, stock: number?, units: unknown): (boolean, string?, number?, number?)
-	if not whole(units) or (units :: number) < 1 or (units :: number) > WireSupply.MaxBuy then
+	if not WireSupply.IsPack(units) then
 		return false, "amount", nil, nil
 	end
 	local n = units :: number
@@ -142,16 +151,49 @@ function WireSupply.Buy(cash: number, stock: number?, units: unknown): (boolean,
 	return true, nil, cost, have + n
 end
 
--- How many units to buy for a wire that needs `needed` when the box holds
--- `stock`: the shortfall, and never more than the box has room for.
+-- The smallest pack that covers `missing` units and fits in the box's `room`, or
+-- 0 when none does (or nothing is missing).
+function WireSupply.PackFor(missing: number, room: number): number
+	if not finite(missing) or missing <= 0 then
+		return 0
+	end
+	for _, pack in ipairs(WireSupply.Packs) do
+		if pack >= missing and pack <= room then
+			return pack
+		end
+	end
+	return 0
+end
+
+-- The pack to buy for a run that needs `needed` when the box holds `stock`.
 function WireSupply.BuyAmount(stock: number?, needed: number): number
 	local have = WireSupply.Clean(stock)
 	if not finite(needed) then
 		return 0
 	end
-	local missing = math.max(0, math.floor(needed) - have)
-	local room = WireSupply.MaxStock - have
-	return math.max(0, math.min(missing, room, WireSupply.MaxBuy))
+	return WireSupply.PackFor(math.floor(needed) - have, WireSupply.MaxStock - have)
+end
+
+-- The corners of a run and its length, measured by the server from the two
+-- pieces and the corners it validated. Returns (length, nil) or (nil, why):
+-- "bends" (a fifth corner), "badvia" (a corner that is not a pair of numbers).
+function WireSupply.Path(
+	a: { x: number, z: number },
+	via: unknown,
+	b: { x: number, z: number }
+): (number?, string?, { WireLogic.Point }?)
+	local points, why = WireLogic.CleanVia(via)
+	if points == nil then
+		return nil, why, nil
+	end
+	local total = 0
+	local x, z = a.x, a.z
+	for _, p in ipairs(points) do
+		total += math.sqrt((p.x - x) ^ 2 + (p.z - z) ^ 2)
+		x, z = p.x, p.z
+	end
+	total += math.sqrt((b.x - x) ^ 2 + (b.z - z) ^ 2)
+	return total, nil, points
 end
 
 -- What the player is told. `a` and `b` are the numbers a message names ("short":
@@ -167,9 +209,11 @@ function WireSupply.Message(key: string, a: number?, b: number?): string
 	elseif key == "full" then
 		return string.format("Your box holds %d wire.", WireSupply.MaxStock)
 	elseif key == "far" then
-		return string.format("Too long. A wire reaches %d studs at most.", WireSupply.MaxLength)
+		return string.format("Too long. A run is %d studs at most, bends included.", WireSupply.MaxLength)
+	elseif key == "bends" then
+		return string.format("A run bends at most %d times.", WireSupply.MaxBends)
 	end
-	return "Pick a whole amount of wire."
+	return string.format("Wire comes in packs of %s.", table.concat(WireSupply.Packs :: any, ", "))
 end
 
 -- "$14", for the price on a button.

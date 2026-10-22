@@ -11,13 +11,28 @@
 --   * Grip(): the Tool.Grip that holds the spool at its middle, axis across the hand.
 
 local Kit = require(script.Parent.Kit)
+local Palette = require(script.Parent.Palette)
 
 local WireArt = {}
 
-local WOOD = Color3.fromRGB(150, 98, 56)
+-- TODO(Builder): the spool mesh. Set WireSpoolMeshId to its uploaded MeshPart id
+-- (a number; never guess one). While it is nil the part-built spool below is
+-- used, and only then. With an id, Build() returns one MeshPart Handle instead.
+WireArt.Config = {
+	WireSpoolMeshId = nil :: number?,
+	MeshSize = Vector3.new(1.5, 1.5, 1.4), -- TODO(Builder): the mesh's real size
+}
+
+-- True when the mesh slot is filled (the part-built spool is the fallback).
+function WireArt.UsesMesh(): boolean
+	return WireArt.Config.WireSpoolMeshId ~= nil
+end
+
+local WOOD = Palette.TimberBrown
+-- New, for the part-built stand-in only (the mesh will carry its own look):
 local COPPER = Color3.fromRGB(196, 122, 66)
 local COPPER_DARK = Color3.fromRGB(150, 90, 48)
-local BAND = Color3.fromRGB(210, 190, 120)
+local BAND = Palette.Brass
 
 local FLANGE = 1.5 -- diameter of each end disc
 local COIL = 1.15 -- diameter of the wire on the spool
@@ -39,7 +54,26 @@ local function add(
 	return p
 end
 
+-- The mesh spool: one MeshPart Handle. Only used once WireSpoolMeshId is set.
+local function buildMesh(id: number): Model
+	local model = Kit.model("WireSpool")
+	local handle = Instance.new("MeshPart")
+	handle.Name = "Handle"
+	handle.MeshId = "rbxassetid://" .. tostring(id)
+	handle.Size = WireArt.Config.MeshSize
+	handle.Anchored = true
+	handle.CanTouch = false
+	handle.Parent = model
+	model.PrimaryPart = handle
+	return model
+end
+
 function WireArt.Build(): Model
+	local meshId = WireArt.Config.WireSpoolMeshId
+	if meshId ~= nil then
+		return buildMesh(meshId)
+	end
+	-- TODO(Builder): part-built stand-in until the mesh id above is set.
 	local model = Kit.model("WireSpool")
 	-- The axle is the Handle: a bar through the spool, a little longer than it.
 	local handle = Kit.part(

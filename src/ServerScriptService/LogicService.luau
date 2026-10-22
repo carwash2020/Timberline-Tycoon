@@ -41,6 +41,7 @@ local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
 local WireArt = require(ReplicatedStorage.Shared.Art.WireArt)
 local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
 local WireSupply = require(ReplicatedStorage.Shared.WireSupply)
+local WireToolLogic = require(ReplicatedStorage.Shared.WireToolLogic)
 local PlotDoors = require(script.Parent.PlotDoors)
 local RateLimiter = require(script.Parent.RateLimiter)
 
@@ -837,12 +838,7 @@ local function writeWires(run: Run)
 			list = {}
 			byFrom[wire.from] = list
 		end
-		local name = wire.to
-		local port = wire.toPort
-		if port ~= nil and port ~= 1 then
-			name ..= "@" .. tostring(port)
-		end
-		table.insert(list, name)
+		table.insert(list, WireToolLogic.Encode(wire))
 	end
 	for _, item in ipairs(run.profile.plot.placed) do
 		if WireLogic.IsSource(WireLogic.Role(item.blueprintId)) then
@@ -914,30 +910,43 @@ end
 -- Wiring
 ---------------------------------------------------------------------------
 
--- Adds a wire and uses its length from the owner's wire box. A wire the rules
--- refuse, or that the box cannot pay for, changes nothing. Returns (ok, why,
--- units used, units the box held): why "wire" means the box is short.
+-- Adds a wire run and uses its length from the owner's wire box. The length is
+-- the server's own: the two pieces' places and the corners it validated, never a
+-- number the client sent. At most WireLogic.MaxBends corners (a fifth is
+-- refused) and WireLogic.MaxRun studs along the path. A run the rules refuse, or
+-- that the box cannot pay for, changes nothing. Returns (ok, why, units used,
+-- units the box held): why "wire" means the box is short.
 local function addWire(
 	profile: Profile,
 	fromUid: string,
 	toUid: string,
 	fromPort: number?,
-	toPort: number?
+	toPort: number?,
+	viaIn: unknown?,
+	straightOnly: boolean?
 ): (boolean, string?, number, number)
 	local placed = profile.plot.placed
 	local have = WireSupply.Clean(profile.wireUnits)
 	profile.plot.wires = WireLogic.Live(wiresOf(profile), placed)
-	local ok, why = WireLogic.Check(profile.plot.wires, placed, fromUid, toUid, fromPort, toPort)
+	local via, viaWhy = WireLogic.CleanVia(viaIn)
+	if via == nil then
+		return false, viaWhy, 0, have
+	end
+	-- The switch prompt links straight and no further than it always has.
+	local span = if straightOnly == true then WireLogic.Span else WireSupply.MaxLength
+	local ok, why = WireLogic.Check(profile.plot.wires, placed, fromUid, toUid, fromPort, toPort, span)
 	if not ok then
 		return false, why, 0, have
 	end
-	-- The longest wire is WireLogic.Span (Check refused anything longer); the rest
-	-- is the box.
 	local a, b = findItemIn(placed, fromUid), findItemIn(placed, toUid)
 	if not a or not b then
 		return false, "missing", 0, have
 	end
-	local units = WireSupply.UnitsFor(WireSupply.Length(a, b))
+	local length = WireSupply.Path(a, via, b)
+	if length == nil or not WireSupply.Fits(length) then
+		return false, "span", 0, have
+	end
+	local units = WireSupply.UnitsFor(length)
 	local left = WireSupply.Use(have, units)
 	if left == nil then
 		return false, "wire", units, have
@@ -949,6 +958,9 @@ local function addWire(
 	end
 	if toPort ~= nil and toPort ~= 1 then
 		wire.toPort = toPort
+	end
+	if #via > 0 then
+		wire.via = via
 	end
 	table.insert(profile.plot.wires, wire)
 	return true, nil, units, have
@@ -986,7 +998,8 @@ function LogicService.Link(
 	fromUid: string,
 	toUid: string,
 	fromPort: number?,
-	toPort: number?
+	toPort: number?,
+	via: unknown?
 ): (boolean, string?)
 	local get = hostFn
 	if not get then
@@ -1003,7 +1016,7 @@ function LogicService.Link(
 	if not (near(player, host, from) and near(player, host, to)) then
 		return false, "reach"
 	end
-	local ok, why, units, have = addWire(profile, fromUid, toUid, fromPort, toPort)
+	local ok, why, units, have = addWire(profile, fromUid, toUid, fromPort, toPort, via)
 	if ok then
 		publishWire(owner, profile)
 		LogicService.Refresh(host, profile, player)
@@ -1041,7 +1054,7 @@ local function portOk(value: unknown): number?
 	return value
 end
 
--- Buys `units` of wire (a whole number from 1 to WireSupply.MaxBuy) into the
+-- Buys a pack of wire (`units` must be one of WireSupply.Packs) into the
 -- plot owner's box, at the catalog price, from their cash. Only the owner buys:
 -- a visitor with build rights uses the owner's wire but cannot spend their cash.
 function LogicService.Buy(player: Player, units: unknown): (boolean, string?)
@@ -1068,12 +1081,12 @@ function LogicService.Buy(player: Player, units: unknown): (boolean, string?)
 	return true, nil
 end
 
-function LogicService.OnWire(player: Player, a: unknown, b: unknown, c: unknown, d: unknown)
+function LogicService.OnWire(player: Player, a: unknown, b: unknown, c: unknown, d: unknown, e: unknown)
 	if not RateLimiter.Allow(player, "Wire") then
 		return
 	end
 	if a == "buy" then
-		if c == nil and d == nil then
+		if c == nil and d == nil and e == nil then
 			LogicService.Buy(player, b)
 		end
 		return
@@ -1102,7 +1115,7 @@ function LogicService.OnWire(player: Player, a: unknown, b: unknown, c: unknown,
 				return
 			end
 		end
-		ok, why = LogicService.Link(player, a, c, fp, tp)
+		ok, why = LogicService.Link(player, a, c, fp, tp, e)
 		if ok then
 			notify(player, WireLogic.Message("wired") or "")
 			return
@@ -1235,7 +1248,7 @@ function LogicService.WireNearest(ctx: Context, who: Player)
 	local list = WireLogic.Candidates(profile.plot.wires, profile.plot.placed, uid)
 	local target = list[1]
 	if target then
-		local ok, why, units, have = addWire(profile, uid, target, nil, nil)
+		local ok, why, units, have = addWire(profile, uid, target, nil, nil, nil, true)
 		if ok then
 			local other = findItem(profile, target)
 			notify(who, string.format("Wired to the %s.", if other then nameOf(other) else "piece"))

@@ -93,6 +93,12 @@ UITheme.Colors = {
 	BlueprintBlue = Color3.fromHex("#4FA8FF"),
 	BlueprintEdge = Color3.fromHex("#CFE8FF"),
 	BlueprintBad = Color3.fromHex("#FF5A4F"),
+	-- T420 (Art review): the picker's text, and the stretched wire's warning
+	-- lines. The panel (Paper) and the focus ring (AmberEdge, #C9A24A) are the
+	-- tokens above.
+	PickerInk = Color3.fromHex("#3C2814"),
+	WireShort = Color3.fromHex("#FFC873"), -- a wire the box cannot pay for yet
+	WireTooLong = Color3.fromHex("#C8553D"), -- a wire past the longest
 }
 local C = UITheme.Colors
 
@@ -1508,7 +1514,7 @@ function UITheme.FocusRing(stroke: number, radius: number?): Frame
 	ring.BorderSizePixel = 0
 	UITheme.corner(ring, radius or 10)
 	local gold = Instance.new("UIStroke")
-	gold.Color = Palette.CoinGold
+	gold.Color = C.AmberEdge -- #C9A24A
 	gold.Thickness = stroke
 	gold.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	gold.Parent = ring

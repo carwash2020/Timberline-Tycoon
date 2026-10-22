@@ -121,8 +121,15 @@ return function(t)
 		end
 		t.eq(by.Pick.gamepad, Enum.KeyCode.ButtonR1, "RB picks: the right trigger is never bound")
 		t.eq(by.Cut.gamepad, Enum.KeyCode.ButtonX)
-		t.eq(by.Buy.gamepad, Enum.KeyCode.ButtonY, "Y buys the missing wire")
-		t.ok(by.Buy.gamepad ~= Enum.KeyCode.ButtonR2 and by.Buy.gamepad ~= Enum.KeyCode.ButtonL2, "no trigger")
+		t.eq(by.BuyWire.gamepad, Enum.KeyCode.ButtonR3, "pressing the right stick buys the missing wire")
+		t.ok(by.BuyWire.gamepad ~= Enum.KeyCode.ButtonR2 and by.BuyWire.gamepad ~= Enum.KeyCode.ButtonL2, "no trigger")
+		t.ok(by.BuyWire.gamepad ~= Enum.KeyCode.ButtonY, "Y stays the HUD's Recall: buying never takes it")
+		-- No other context binds the buy key, so nothing else fires with it.
+		for context, binds in pairs(InputKit.Target) do
+			for _, bind in ipairs(binds) do
+				t.ok(bind.gamepad ~= by.BuyWire.gamepad, context .. " " .. bind.action .. " shares the buy key")
+			end
+		end
 		t.eq(by.Done.gamepad, Enum.KeyCode.ButtonB)
 		t.eq(by.Done.gamepad, InputKit.Actions.Cancel.gamepad, "B is the same Cancel everywhere")
 		t.ok(InputKit.WireSafe(InputKit.WireBinds))
@@ -223,18 +230,84 @@ return function(t)
 		t.ok(string.find(string.lower(Logic.BoxLine(0)), "empty", 1, true))
 	end)
 
-	t.test("the buy button asks for the shortfall, or a top-up, and never past the box", function()
-		local sw, lamp = pieces[1], pieces[3]
-		local short = Logic.BuyPlan(4, Logic.Stretch(4, sw, lamp, nil))
-		t.eq(short.amount, 2)
-		t.eq(short.cost, 2 * WireSupply.UnitPrice())
-		t.ok(string.find(short.text, "2", 1, true) and string.find(short.text, "$", 1, true), short.text)
-		local topUp = Logic.BuyPlan(30, Logic.Stretch(30, sw, lamp, nil))
-		t.eq(topUp.amount, Logic.TopUp)
-		local nearlyFull = Logic.BuyPlan(WireSupply.MaxStock - 3, Logic.Stretch(WireSupply.MaxStock - 3, sw, lamp, nil))
-		t.eq(nearlyFull.amount, 3, "only what fits")
-		local full = Logic.BuyPlan(WireSupply.MaxStock, Logic.Stretch(WireSupply.MaxStock, sw, lamp, nil))
-		t.eq(full.amount, 0)
-		t.ok(string.find(string.lower(full.text), "full", 1, true))
+	t.test(
+		"the buy button offers a pack: the smallest that covers the shortfall, else the smallest, never past the box",
+		function()
+			local sw, lamp = pieces[1], pieces[3]
+			local short = Logic.BuyPlan(4, Logic.Stretch(4, sw, lamp, nil))
+			t.eq(short.amount, 32, "2 short: the 32 pack")
+			t.eq(short.cost, 32 * WireSupply.UnitPrice())
+			t.ok(string.find(short.text, "32", 1, true) and string.find(short.text, "$", 1, true), short.text)
+			local topUp = Logic.BuyPlan(30, Logic.Stretch(30, sw, lamp, nil))
+			t.eq(topUp.amount, 32, "nothing missing: a top-up of the smallest pack")
+			local nearlyFull =
+				Logic.BuyPlan(WireSupply.MaxStock - 20, Logic.Stretch(WireSupply.MaxStock - 20, sw, lamp, nil))
+			t.eq(nearlyFull.amount, 0, "no pack fits")
+			local fits = Logic.BuyPlan(WireSupply.MaxStock - 32, Logic.Stretch(WireSupply.MaxStock - 32, sw, lamp, nil))
+			t.eq(fits.amount, 32)
+			local full = Logic.BuyPlan(WireSupply.MaxStock, Logic.Stretch(WireSupply.MaxStock, sw, lamp, nil))
+			t.eq(full.amount, 0)
+			t.ok(string.find(string.lower(full.text), "full", 1, true))
+		end
+	)
+
+	t.test(
+		"Lesson(step) returns the lesson, and nil once all three are seen (the file has no stray block in it)",
+		function()
+			t.eq(Logic.Lesson(1), "Pick an output")
+			t.eq(Logic.Lesson(2), "Pick an input")
+			t.eq(Logic.Lesson(3), "Done: flip it")
+			t.eq(Logic.Lesson(4), nil)
+			local fs = require("@lune/fs")
+			local source = fs.readFile("src/ReplicatedStorage/Shared/WireToolLogic.luau")
+			local _, count = string.gsub(source, "function WireToolLogic.Stretch%(", "")
+			t.eq(count, 1, "one Stretch")
+			local from = string.find(source, "function WireToolLogic.Lesson", 1, true)
+			local to = string.find(source, "function WireToolLogic.Advance", 1, true)
+			t.ok(to - from < 250, "Lesson is three lines long")
+		end
+	)
+
+	t.test("a run's corners: a fifth bend is refused, and a stretch measures along them", function()
+		local sw, lamp = pieces[1], pieces[3] -- 6 studs apart
+		local bends = {}
+		for i = 1, 4 do
+			local added = Logic.AddBend(bends, i, 5)
+			t.ok(added ~= nil, "bend " .. i)
+			bends = added
+		end
+		t.eq({ Logic.AddBend(bends, 9, 9) }, { nil, "bends" }, "the fifth is refused")
+		t.eq(({ Logic.AddBend({}, 0 / 0, 1) })[2], "badvia")
+		local straight = Logic.Stretch(100, sw, lamp, nil, {})
+		local bent = Logic.Stretch(100, sw, lamp, nil, { { x = 0, z = 20 }, { x = 6, z = 20 } })
+		t.eq(straight.length, 6)
+		t.eq(bent.length, 46, "20 up, 6 across, 20 back")
+		t.eq(bent.bends, 2)
+		t.eq(
+			Logic.Stretch(100, sw, lamp, nil, { { x = 0, z = 30 }, { x = 6, z = 30 } }).state,
+			"far",
+			"66 studs along the path"
+		)
+	end)
+
+	t.test("bends travel in the Wire args and the Wires attribute, and are drawn as legs", function()
+		local args = Logic.Args({ op = "link", from = "sw", to = "lamp", via = { { x = 1, z = 2 } } })
+		t.eq(#args, 5)
+		t.eq(args[5], { { x = 1, z = 2 } })
+		t.eq(#Logic.Args({ op = "link", from = "sw", to = "lamp" }), 4, "no corners: the old four")
+		local WireLogic = t.shared("WireLogic")
+		local text =
+			Logic.Encode({ from = "sw", to = "lamp", toPort = 2, via = { { x = 1, z = 2 }, { x = -3.5, z = 4 } } })
+		t.eq(text, "lamp@2~1.00:2.00~-3.50:4.00")
+		local token = Logic.ParseToken(text)
+		t.eq(token.uid, "lamp")
+		t.eq(token.port, 2)
+		t.eq(token.via, { { x = 1, z = 2 }, { x = -3.5, z = 4 } })
+		t.eq(Logic.Parse(text .. ",door"), { "lamp", "door" })
+		local legs = Logic.Segments(pieces, { sw = "lamp~3.00:5.00" })
+		t.eq(#legs, 2, "one bend, two legs")
+		t.eq({ legs[1].bx, legs[1].bz }, { 3, 5 })
+		t.eq({ legs[2].ax, legs[2].az }, { 3, 5 })
+		t.ok(WireLogic.Role("SparkSwitch") ~= nil)
 	end)
 end

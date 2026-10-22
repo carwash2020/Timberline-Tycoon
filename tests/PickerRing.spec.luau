@@ -241,4 +241,27 @@ return function(t)
 		end
 		t.eq(string.find(source, "AnchorPoint = Vector2.new(0.5, 0.5)\n\tring", 1, true), nil)
 	end)
+
+	t.test(
+		"Art's palette: panel #F3E7C9, text #3C2814, focus ring #C9A24A, short line #FFC873, too-long line #C8553D",
+		function()
+			local _, _, UITheme = open(devices[2])
+			local C = UITheme.Colors
+			t.eq(C.Paper:ToHex(), "F3E7C9")
+			t.eq(C.PickerInk:ToHex(), "3C2814")
+			t.eq(C.AmberEdge:ToHex(), "C9A24A")
+			t.eq(C.WireShort:ToHex(), "FFC873")
+			t.eq(C.WireTooLong:ToHex(), "C8553D")
+			local ring = UITheme.FocusRing(4, 8)
+			t.eq(ring:FindFirstChildOfClass("UIStroke").Color:ToHex(), "C9A24A", "the ring's gold")
+			local UI = open(devices[2])
+			local tile = UI.Tiles()[1]
+			t.eq(tile.button.Plate:FindFirstChild("Name").TextColor3:ToHex(), "3C2814")
+			t.eq(tile.button.Blurb.TextColor3:ToHex(), "3C2814")
+			t.eq(tile.button.Cost.TextColor3:ToHex(), "3C2814")
+			local fs = require("@lune/fs")
+			local wire = fs.readFile("src/StarterPlayer/StarterPlayerScripts/WireTool.luau")
+			t.ok(string.find(wire, "C.WireShort", 1, true) and string.find(wire, "C.WireTooLong", 1, true))
+		end
+	)
 end
