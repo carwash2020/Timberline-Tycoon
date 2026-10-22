@@ -39,3 +39,11 @@ commands above.
 2. After the change: shoot the same views, copy to `after`.
 3. Put each pair side by side in the PR with one line each for what changed and what must not have.
 4. The numbers behind the pictures are in CI: `tests/GeometryLint.spec` (nothing solid shares space), `tests/MustKeep.spec` (the doors, counters, spots and machine ends stay put), `tests/PipelineE2E.spec` (the core loop) and the `cloud-test` job.
+
+## T409 round 1: before and after renders
+
+`preview/t409/before` is origin/main (878c4ce) and `preview/t409/after` is this branch, same scenes and
+views (`bash tools/preview/shoot.sh <scene> <view>`): town 1 and 2, town 1 at 844x390, stores 1 and 2,
+roads 1 and 3, plot 1 and 3, machines 1, pads 1, landmarks 2. `sawmill-lanes` (views 1 to 4) draws the
+lane and door boxes from `Shared/Lint/LaneData` over the sawmill (the "before" side uses the same boxes
+over the old sawmill). These are flat-colour previews, not Studio.
