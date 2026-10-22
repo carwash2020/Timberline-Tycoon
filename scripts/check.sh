@@ -64,8 +64,8 @@ if [ "$RUN_LINT" = 1 ]; then
 	echo "== ASSETS.md is current"
 	lune run tools/assets --check
 	echo "== meshlint (no solid in a lane or door of a mesh)"
-	python3 tools/blender/test_meshlint.py
 	python3 tools/blender/meshlint.py
+	python3 tools/blender/test_meshlint.py
 fi
 
 echo "All checks passed."
