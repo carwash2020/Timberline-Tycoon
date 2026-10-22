@@ -260,6 +260,20 @@ return function(t)
 		t.ok(string.find(slipOnly.failures[1], "Post (Sawmill) x lane Sawmill.slip", 1, true), slipOnly.failures[1])
 		local rider = Lanes.Run(sawmill({ { name = "Carriage", at = Vector3.new(25, 3, -0.9) } }), frames)
 		t.eq(rider.failures, {}, "a carriage belongs in the lane")
+		-- another piece's part in the lane counts too (a crate dropped on the slip)
+		local mixed = sawmill({})
+		local crate = Instance.new("Model")
+		crate.Name = "Crate"
+		crate.Parent = mixed
+		local box = Instance.new("Part")
+		box.Name = "Crate"
+		box.Anchored = true
+		box.Size = Vector3.new(2, 2, 2)
+		box.CFrame = frame * CFrame.new(25, 3, -0.9)
+		box.Parent = crate
+		local other = Lanes.Run(mixed, frames)
+		t.eq(#other.failures, 1, show(other.failures))
+		t.ok(string.find(other.failures[1], "Crate (Crate) x lane Sawmill.slip", 1, true), other.failures[1])
 		local missing = Lanes.Run(Instance.new("Folder"), frames)
 		t.eq(#missing.failures, 1, "a lane whose model is gone is a failure, not a pass")
 	end)

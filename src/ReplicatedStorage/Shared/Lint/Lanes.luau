@@ -1,7 +1,7 @@
 --!strict
 -- Lanes: nothing solid stands where wood or a person has to pass. The boxes are LaneData's (the
 -- same ones tools/blender/meshlint.py tests the GLBs with); this checks the part-built model in the
--- built world: every part with CanCollide on, bar the lane's own riders (LaneData.Riders) and the
+-- built world: every part (the model's own and any other piece's) with CanCollide on, bar the lane's own riders (LaneData.Riders) and the
 -- named known hits (LaneData.Allow), that overlaps a lane, door or path box by more than 0.05 studs
 -- is a failure: "<part> (<model>) x lane <model>.<lane>". Pure: takes the root Instance and the
 -- frame (a CFrame) each model's own coordinates sit at.
@@ -16,6 +16,15 @@ local Lanes = {}
 Lanes.MinDepth = 0.05
 
 export type Result = { failures: { string }, checked: number }
+
+-- The child of `root` a part sits under (its own name when it is one).
+local function pieceOf(root: Instance, part: Instance): string
+	local at: Instance = part
+	while at.Parent ~= nil and at.Parent ~= root do
+		at = at.Parent
+	end
+	return at.Name
+end
 
 local function listed(allow: { LaneData.Allow }, lane: string, part: BasePart, frame: CFrame): boolean
 	local local_ = frame:PointToObjectSpace(part.CFrame.Position)
@@ -50,7 +59,9 @@ function Lanes.Run(
 			continue
 		end
 		local parts: { BasePart } = {}
-		for _, d in ipairs(model:GetDescendants()) do
+		-- Everything solid in the root, not just the model's own parts: a crate or a post from another
+		-- piece standing in a log lane is as much in the way.
+		for _, d in ipairs(root:GetDescendants()) do
 			if d:IsA("BasePart") and d.CanCollide and not d:IsA("WedgePart") and not LaneData.Riders[d.Name] then
 				table.insert(parts, d)
 			end
@@ -68,7 +79,7 @@ function Lanes.Run(
 						string.format(
 							"[GeometryLint] %s (%s) x lane %s.%s at (%.1f, %.1f, %.1f), depth %.2f, %s",
 							part.Name,
-							modelName,
+							pieceOf(root, part),
 							modelName,
 							lane.name,
 							at.X,
