@@ -30,6 +30,7 @@ local GameConfig = require(script.Parent.Parent.GameConfig)
 local TreeGen = require(script.Parent.Parent.TreeGen)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
+local StumpLogic = require(script.Parent.Parent.StumpLogic)
 local TreeMeshes = require(script.Parent.TreeMeshes)
 
 type WoodDef = WoodData.WoodDef
@@ -1691,14 +1692,30 @@ function TreeArt.Notch(
 	local y = math.clamp(height, 0, section.Size.Y) - section.Size.Y / 2
 	local size: Vector3
 	local at: Vector3
+	-- A stump's hitbox is a square box round a round, tapering stump: its
+	-- notch follows the stump (the radius there, a strip as wide as the
+	-- chord it has cut) so it never hangs off the corners.
+	local stumpBase = section:GetAttribute("StumpBase")
+	local stumpTop = section:GetAttribute("StumpTop")
+	local reach = t / 2
+	local width = t + 0.04
+	if type(stumpBase) == "number" then
+		local r0: number = stumpBase
+		local r1: number = if type(stumpTop) == "number" then stumpTop else r0
+		local u = if section.Size.Y > 0 then math.clamp(height / section.Size.Y, 0, 1) else 0
+		reach = r0 + (r1 - r0) * u
+		depth = math.min(TreeArt.NotchDepth(reach * 2, damage, required), reach * 2 * TreeArt.NotchMaxDepth)
+		local into = math.clamp(depth, 0, reach)
+		width = math.max(0.15, 2 * math.sqrt(math.max(0, reach * reach - (reach - into) ^ 2)))
+	end
 	if math.abs(lx) >= math.abs(lz) then
 		local side = if lx >= 0 then 1 else -1
-		size = Vector3.new(depth + 0.02, TreeArt.NotchHeight, t + 0.04)
-		at = Vector3.new(side * (t / 2 - depth / 2 + 0.01), y, 0)
+		size = Vector3.new(depth + 0.02, TreeArt.NotchHeight, width)
+		at = Vector3.new(side * (reach - depth / 2 + 0.01), y, 0)
 	else
 		local side = if lz >= 0 then 1 else -1
-		size = Vector3.new(t + 0.04, TreeArt.NotchHeight, depth + 0.02)
-		at = Vector3.new(0, y, side * (t / 2 - depth / 2 + 0.01))
+		size = Vector3.new(width, TreeArt.NotchHeight, depth + 0.02)
+		at = Vector3.new(0, y, side * (reach - depth / 2 + 0.01))
 	end
 	local p = Kit.part(
 		section.Parent or section,
@@ -1826,6 +1843,76 @@ function TreeArt.GrowingSapling(def: WoodDef, seed: number, growth: number): Mod
 		end
 	end
 	return model
+end
+
+---------------------------------------------------------------------------
+-- T420: the stump of a felled section tree (StumpLogic has the rules)
+---------------------------------------------------------------------------
+
+TreeArt.StumpTag = "StumpDress" -- attribute on every part of the stump's own look
+
+-- The stump's look, stood on `base` (its bottom centre, Y up) inside
+-- `parent`: StumpLogic.Frustum's discs in bark colour (the bottom disc is
+-- exactly the trunk's base radius, the top disc the radius at the cut), an
+-- end-grain cap in the wood's core colour flush at the cut height, and the
+-- ring round it (StumpLogic.RingWidth wide, StumpLogic.RingHex). Anchored;
+-- the discs collide, the cap and ring do not. No uploaded mesh: the
+-- frustum is built from parts. Returns every part, bottom up.
+function TreeArt.StumpDress(def: WoodDef, parent: Instance, base: CFrame, shape: StumpLogic.Shape): { BasePart }
+	local out: { BasePart } = {}
+	local bark = paintOf(def).bark
+	local material = TreeArt.BarkMaterial(def)
+	local upright = CFrame.Angles(0, 0, math.pi / 2)
+	local discs = StumpLogic.Frustum(shape.baseRadius, shape.topRadius, shape.height)
+	for i, step in ipairs(discs) do
+		local length = step.y1 - step.y0
+		local disc = Kit.cylinder(
+			parent,
+			"StumpStep",
+			length,
+			step.radius * 2,
+			base * CFrame.new(0, (step.y0 + step.y1) / 2, 0) * upright,
+			bark,
+			material
+		)
+		disc:SetAttribute("Step", i)
+		disc:SetAttribute("Radius", step.radius)
+		disc.CanQuery = false
+		disc.CanTouch = false
+		table.insert(out, disc)
+	end
+	local th = StumpLogic.CapThickness
+	local color, faceMaterial = TreeArt.FaceLook(def)
+	local ringColor = Color3.fromHex(StumpLogic.RingHex)
+	-- The ring sits a hair under the cap so the two never fight over a plane.
+	local ring = Kit.cylinder(
+		parent,
+		"StumpRing",
+		th,
+		shape.topRadius * 2,
+		base * CFrame.new(0, shape.height - 0.01 - th / 2, 0) * upright,
+		ringColor,
+		faceMaterial
+	)
+	local cap = Kit.cylinder(
+		parent,
+		"StumpCap",
+		th,
+		math.max(0.1, (shape.topRadius - StumpLogic.RingWidth) * 2),
+		base * CFrame.new(0, shape.height - th / 2, 0) * upright,
+		color,
+		faceMaterial
+	)
+	for _, d in ipairs({ ring, cap }) do
+		Kit.decor(d, false)
+		table.insert(out, d)
+	end
+	for _, d in ipairs(out) do
+		d:SetAttribute(TreeArt.StumpTag, true)
+		d:SetAttribute("TopRadius", shape.topRadius)
+		d:SetAttribute("BaseRadius", shape.baseRadius)
+	end
+	return out
 end
 
 return TreeArt
