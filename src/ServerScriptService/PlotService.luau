@@ -131,7 +131,7 @@ local slotOf: { [Player]: Slot } = {}
 local placedAt: { [string]: number } = {} -- uid -> os.clock() when placed this session
 -- Last 10 blueprint edits, per player. Memory only: leaving clears it.
 local undoStacks: { [Player]: { EditLogic.Entry } } = {}
-local pickingUntil: { [Player]: number } = {} -- a returning owner's join picker (a timeout takes a free pad)
+local pickingUntil: { [Player]: number } = {} -- a returning owner's join picker is open (math.huge: it has no deadline, it waits for a claim)
 local buying: { [Player]: boolean } = {} -- the Land Office picker is open (no timeout: nothing is given away)
 local claiming: { [Player]: boolean } = {} -- a claim is being charged and assigned right now
 local switching: { [Player]: boolean } = {} -- a base is being packed or swapped right now (BaseLogic)
@@ -782,7 +782,6 @@ local function offerFor(player: Player): PlotPickerLogic.Offer
 		})
 	end
 	return {
-		timeout = PlotPickerLogic.TimeoutSeconds,
 		price = priceFor(ProfileService.GetProfile(player)),
 		plots = plots,
 	}
@@ -945,7 +944,7 @@ local function tryClaim(player: Player, index: number): boolean
 	return true
 end
 
--- A returning owner's join picker timed out, or they asked for any pad:
+-- A returning owner asked for any pad (the picker's button):
 -- the first free one, no charge. Anyone else gets nothing here.
 local function autoAssign(player: Player)
 	if slotOf[player] then
@@ -2451,8 +2450,7 @@ function PlotService.Prepare(player: Player, profile: Profile)
 end
 
 -- The chosen save is loaded: a save that owns a plot now picks a pad for it.
--- The 60 s timer does not start here but when the picker is on the player's
--- screen (PlotService.Shown), so a screen in front of it never eats the time.
+-- The picker has no timer (T406): it stays open until they claim a pad.
 function PlotService.PlayerJoined(player: Player, profile: Profile)
 	PlotService.Prepare(player, profile)
 	if slotOf[player] or not PlotPickerLogic.ShouldPick(slotOf[player] ~= nil) then
@@ -2472,20 +2470,15 @@ function PlotService.PlayerJoined(player: Player, profile: Profile)
 		player:SetAttribute("Picking", nil)
 		return
 	end
-	pickingUntil[player] = math.huge -- armed by Shown
+	pickingUntil[player] = math.huge -- open, no deadline
 	player:SetAttribute("Picking", true)
 	fireOffer(player)
 end
 
--- The client says the join picker is really on its screen. Only then does the
--- timeout that takes a free pad start; asking twice never restarts it.
+-- The client says the join picker is on its screen. Nothing starts from it any
+-- more (there is no timeout, T406); it stays so the remote and its rate limit do.
 function PlotService.Shown(player: Player)
-	if not RateLimiter.Allow(player, "PlotShown") then
-		return
-	end
-	if pickingUntil[player] == math.huge then
-		pickingUntil[player] = os.clock() + PlotPickerLogic.TimeoutSeconds
-	end
+	RateLimiter.Allow(player, "PlotShown")
 end
 
 function PlotService.HasPad(player: Player): boolean
@@ -2530,15 +2523,6 @@ function PlotService.Pass(player: Player)
 		return
 	end
 	autoAssign(player)
-end
-
-function PlotService.Sweep()
-	local now = os.clock()
-	for player, deadline in pairs(pickingUntil) do
-		if now >= deadline then
-			autoAssign(player)
-		end
-	end
 end
 
 -- The same pad, the other save's buildings. Returns false when they
@@ -2902,7 +2886,6 @@ function PlotService.Init(
 	local heartbeat = (RunService :: any).Heartbeat
 	if typeof(heartbeat) == "RBXScriptSignal" or (type(heartbeat) == "table" and heartbeat.Connect) then
 		heartbeat:Connect(function()
-			PlotService.Sweep()
 			PlotService.FillStep()
 			PlotService.VisitStep()
 		end)

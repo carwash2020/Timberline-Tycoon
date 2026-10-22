@@ -425,8 +425,7 @@ local function apply(offer: Offer)
 	showCurrent()
 	PlotPickerUI._open(claimButton)
 	if not wasOpen then
-		-- It is on the screen now: the server's timeout that takes a free pad
-		-- starts here, not when the save loaded (PlotService.Shown).
+		-- It is on the screen now (PlotService.Shown; nothing runs out any more).
 		Net.Remote("PlotShown"):FireServer()
 	end
 end

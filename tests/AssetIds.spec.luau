@@ -239,6 +239,33 @@ return function(t)
 		end
 	end)
 
+	-- T406. Connor's Studio log: "asset 203785492: Asset type does not match
+	-- requested type". Nothing in this repo names 203785492 (src, tools, assets,
+	-- ASSETS.md and the git history were searched), so it is not ours to
+	-- replace: it comes from the place file or an engine default. The rule below
+	-- keeps it, and any other id Roblox rejected by type, out of the source.
+	t.test("every asset id in the code has an expected type, and the rejected ones are not used", function()
+		local serde = require("@lune/serde")
+		local EXPECT = { mesh = 4, model = 10, image = 1, texture = 1, sound = 3 } -- Roblox AssetTypeId: MeshPart 4, Model 10, Image 1, Audio 3
+		local REJECTED = { ["203785492"] = "Asset type does not match requested type (T406 log)" }
+		local listing = serde.decode("json", fs.readFile("tools/asset-ids.json"))
+		t.ok(#listing.assets > 1000, "the inventory is read")
+		for _, entry in ipairs(listing.assets) do
+			local want = EXPECT[entry.kind]
+			t.ok(want ~= nil, entry.id .. " has a kind with an expected type: " .. tostring(entry.kind))
+			t.eq(
+				entry.expectTypeId,
+				want,
+				entry.id .. " (" .. tostring(entry.usedBy) .. ") expects the type of its kind"
+			)
+			t.eq(REJECTED[entry.id], nil, entry.id .. " was rejected by type: " .. tostring(REJECTED[entry.id]))
+		end
+		for _, lit in ipairs(literals) do
+			local id = string.match(lit.text, "%d+")
+			t.eq(REJECTED[id or ""], nil, lit.path .. ":" .. tostring(lit.line) .. " uses a rejected id")
+		end
+	end)
+
 	t.test("MiningArt only asks for a machine skin inside MeshKit.Attempt (never final at build time)", function()
 		local text = fs.readFile("src/ReplicatedStorage/Shared/Mining/MiningArt.luau")
 		local asks = 0

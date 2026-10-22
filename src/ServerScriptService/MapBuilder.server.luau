@@ -87,6 +87,7 @@ local StoreBoard = require(ReplicatedStorage.Shared.StoreBoard)
 local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local TownGroundArt = require(ReplicatedStorage.Shared.Art.TownGroundArt)
+local GroundLift = require(ReplicatedStorage.Shared.World.GroundLift)
 local MaterialSetup = require(script.Parent.MaterialSetup)
 local UndergroundBuilder = require(script.Parent.UndergroundBuilder)
 local SecretService = require(script.Parent.SecretService)
@@ -449,7 +450,32 @@ local townStation: Model? = nil -- the town's gondola cable starts here (section
 -- them is plain Grass. Before the town's buildings and the lot's bays, which
 -- stand on and over them.
 step("4. The town's ground parts", function()
-	TownGroundArt.Build().Parent = map
+	local ground = TownGroundArt.Build()
+	ground.Parent = map
+	-- A footpath is only 0.1 proud of the ground it was planned on: where the
+	-- drawn terrain stands at or over its top it is buried and never shows (T406).
+	-- Raise any such part onto the terrain (GroundLift).
+	local paths = ground:FindFirstChild("TownPaths")
+	local surfaceNear = (TerrainBuilder :: any).SurfaceNear
+	local lifted, total = 0, 0
+	if paths and type(surfaceNear) == "function" then
+		for _, part in ipairs(paths:GetChildren()) do
+			if part:IsA("BasePart") then
+				total += 1
+				local half = part.Size.Z / 2
+				local need = 0
+				for _, along in ipairs({ -0.9, 0, 0.9 }) do
+					local top = part.CFrame * Vector3.new(0, part.Size.Y / 2, half * along)
+					need = math.max(need, GroundLift.Needed(top.Y, surfaceNear(top.X, top.Y, top.Z, 3)))
+				end
+				if need > 0 then
+					lifted += 1
+					part.CFrame += Vector3.new(0, need, 0)
+				end
+			end
+		end
+	end
+	print(string.format("[MapBuilder] town footpaths: %d parts, %d raised onto the drawn terrain", total, lifted))
 end)
 
 step("4. The town", function()
@@ -648,7 +674,7 @@ step("4. The town", function()
 		-- walk: that stretch stays open for the tutorial grove.
 		defer("4. Path rounds", 1, around(0, 60), function(slice)
 			for _, cf in ipairs(town.pathRounds) do
-				place(atomic(BuildingArt.PathRound()), cf, rounds)
+				standOnGround(place(atomic(BuildingArt.PathRound()), cf, rounds), true)
 				slice()
 			end
 		end)

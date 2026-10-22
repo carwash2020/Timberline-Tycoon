@@ -542,6 +542,10 @@ local function applyAxeNow(model: Model, def: AxeDef): boolean
 	for _, d in ipairs(drop) do
 		d:Destroy()
 	end
+	-- The part-built haft stays as the Tool's Handle (a Tool needs one: the grip,
+	-- the swing and the hitbox are its) but is not drawn. Its faces lie inside
+	-- the mesh haft's, so drawing both flickered at the hilt (T406).
+	handle.Transparency = 1
 	return true
 end
 
