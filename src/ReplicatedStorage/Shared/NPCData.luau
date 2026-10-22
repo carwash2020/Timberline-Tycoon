@@ -792,7 +792,7 @@ NPCData.List = {
 	{
 		-- Old Hank, an old farmer, sells the plots from beside the plot
 		-- district's sign (east of the flat town; T420 took the Land Office
-		-- counter away, so he stands in the open, facing the town). He is
+		-- counter away, so he stands in the open on the grass south of the East Link). He is
 		-- there day and night: no `shop`, so ShopHoursLogic never closes him
 		-- and he never sleeps. His Talk prompt opens the plot purchase (PlotService
 		-- hooks it); what he sells, and his price talk, is PlotSalesmanData.
@@ -803,7 +803,7 @@ NPCData.List = {
 		spot = {
 			kind = "fixed",
 			position = Vector3.new(PlotSalesmanData.Stand.x, 0, PlotSalesmanData.Stand.z),
-			lookAt = Vector3.new(0, 0, 40),
+			lookAt = Vector3.new(PlotSalesmanData.Stand.x, 0, PlotSalesmanData.Stand.z + 100), -- facing south
 			-- Outside the flat town: `ground` stands him on the terrain there.
 			ground = 0,
 		},

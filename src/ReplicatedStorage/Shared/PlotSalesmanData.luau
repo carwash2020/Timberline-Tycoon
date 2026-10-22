@@ -35,10 +35,13 @@ local PlotSalesmanData = {}
 PlotSalesmanData.Id = "OldHank" -- NPCData id and model name
 PlotSalesmanData.Name = "Old Hank"
 PlotSalesmanData.Role = "Plot salesman"
--- Where he stands (x, z): the plot district sign's corner, beside the East Link.
--- PlotService measures "near Old Hank" from here; NPCData stands him here.
-PlotSalesmanData.Office = { x = 147, z = 86 }
-PlotSalesmanData.Stand = { x = 149.4, z = 86.7 }
+-- Where he stands (x, z): on the grass south of the East Link (its edge is z 94),
+-- beside the plot district sign, 6.5 studs east of the sign's centre and clear
+-- of its posts, facing south. Not on the road: the link's cars and walkers
+-- pass at z 66 to 94. PlotService measures "near Old Hank" from Office;
+-- NPCData stands him on Stand (the same spot).
+PlotSalesmanData.Office = { x = 153.5, z = 100 }
+PlotSalesmanData.Stand = { x = 153.5, z = 100 }
 
 -- What the server knows about the player when they talk to him.
 export type State = {

@@ -275,6 +275,9 @@ return function(t)
 			"PlotModerate",
 			"WorldFX",
 			"PlotShown",
+			"PlotOffer",
+			"ClaimPlot",
+			"PlotPass",
 			"BaseAction",
 		}) do
 			remotes[name] = Instance.new("RemoteEvent")
@@ -283,6 +286,11 @@ return function(t)
 		local fx = {}
 		remotes.WorldFX.FireClient = function(_, target, kind, payload)
 			table.insert(fx, { to = target, kind = kind, payload = payload })
+		end
+		-- What the picker is sent (the PlotOffer remote), in order.
+		local offers = {}
+		remotes.PlotOffer.FireClient = function(_, target, payload)
+			table.insert(offers, { to = target, payload = payload })
 		end
 		PlotService.Init(map, remotes, function(_, message)
 			table.insert(toasts, message)
@@ -347,6 +355,7 @@ return function(t)
 			end,
 			prompt = prompt,
 			map = map,
+			offers = offers,
 			profiles = profiles,
 			items = items,
 			itemFolder = itemFolder,
@@ -1414,6 +1423,129 @@ return function(t)
 		t.eq(profile.cash, 777)
 		t.eq(profile.plot.claimed, false)
 	end)
+
+	-- T420 fix round: the whole join, through the remote handlers GameServer's
+	-- clients fire (PlotOffer out; ClaimPlot and PlotPass in), with a saved base
+	-- whose pieces block the plot's entrance so the spawn pad has to move.
+	t.test(
+		"the picker end to end: offer, two claims of one pad, the loser re-picks, a saved base blocks the entrance (T420)",
+		function()
+			local s = setup({ cash = 5000 })
+			local PlotLogic = t.shared("PlotLogic")
+			local function spawnPos(i)
+				return s.plot(i):FindFirstChild("PlotSpawn").CFrame.Position
+			end
+			local function localOf(i, before)
+				local d = spawnPos(i) - before
+				return PlotLogic.VisitPad[1] + d.X, PlotLogic.VisitPad[2] + d.Z
+			end
+			local entranceBefore = { [3] = spawnPos(3), [5] = spawnPos(5), [7] = spawnPos(7) }
+			-- Ann's save owns a plot, and a wall of floors stands across its entrance.
+			local ann, annProfile = s.newPlayer(1, "Ann")
+			annProfile.plot.claimed = true
+			annProfile.plot.placed = {}
+			for n, x in ipairs({ -8, 0, 8 }) do
+				table.insert(
+					annProfile.plot.placed,
+					{ uid = "wall" .. n, blueprintId = "Floor", x = x, z = -18, rot = 0 }
+				)
+			end
+			local bob, bobProfile = s.newPlayer(2, "Bob")
+			local cal, calProfile = s.newPlayer(3, "Cal")
+			calProfile.plot.claimed = true
+			-- Joining: Ann and Cal (returning owners) get the picker, nothing is assigned.
+			s.P.PlayerJoined(ann, annProfile)
+			s.P.PlayerJoined(cal, calProfile)
+			t.eq(ann.attrs.Picking, true)
+			t.eq(ann.RespawnLocation, nil, "no pad yet: the town spawn")
+			local sent
+			for _, o in ipairs(s.offers) do
+				if o.to == ann then
+					sent = o.payload
+				end
+			end
+			t.ok(sent ~= nil, "the picker was sent over PlotOffer")
+			t.eq(#sent.plots, #s.PlotData.Slots)
+			t.eq(sent.price, 0, "a returning owner picks free")
+			t.ok(sent.plots[1].region ~= "" and sent.plots[1].size == 80, "region name and pad size ride along")
+			-- Bob has no plot: Old Hank opens his picker (he stands at the office spot).
+			s.atOffice(bob)
+			s.prompt.Triggered.fn(bob)
+			t.eq(bob.attrs.Picking, true)
+			-- Ann and Bob both claim pad 3 through the ClaimPlot remote; Ann's arrives first.
+			s.remotes.ClaimPlot.OnServerEvent.fn(ann, 3)
+			s.remotes.ClaimPlot.OnServerEvent.fn(bob, 3)
+			t.eq(ann.attrs.PlotSlot, 3)
+			t.eq(bob.attrs.PlotSlot, nil, "the second claim lost")
+			t.eq(bobProfile.cash, 5000, "and was not charged")
+			t.eq(s.lastToast(), "Someone else claimed that plot. Pick another.")
+			local lastBobOffer
+			for _, o in ipairs(s.offers) do
+				if o.to == bob then
+					lastBobOffer = o.payload
+				end
+			end
+			t.eq(lastBobOffer.notice, "taken")
+			t.eq(lastBobOffer.plots[3].taken, true)
+			-- Ann is on her pad: it is her respawn point and it is not under her wall.
+			t.ok(ann.RespawnLocation == s.plot(3):FindFirstChild("PlotSpawn"), "the pad is her spawn")
+			local sx, sz = localOf(3, entranceBefore[3])
+			t.ok((spawnPos(3) - entranceBefore[3]).Magnitude > 1, "the spawn pad moved off the entrance")
+			local half = PlotLogic.SpawnSize / 2
+			for _, item in ipairs(annProfile.plot.placed) do
+				local rect = PlotLogic.RectOf(PlotLogic.Blueprint(item.blueprintId), item.x, item.z, item.rot)
+				t.ok(
+					math.abs(sx - rect.x) >= half + rect.w / 2 or math.abs(sz - rect.z) >= half + rect.d / 2,
+					item.uid .. " is under the moved spawn pad"
+				)
+			end
+			t.ok(math.abs(sx) <= 40 and math.abs(sz) <= 40, "and it is still inside the 80 plot")
+			-- Bob re-picks another pad over the same remote, pays once, spawns at its own entrance.
+			s.remotes.ClaimPlot.OnServerEvent.fn(bob, 5)
+			t.eq(bob.attrs.PlotSlot, 5)
+			t.eq(bobProfile.cash, 5000 - s.config.PlotPrice)
+			t.ok(bob.RespawnLocation == s.plot(5):FindFirstChild("PlotSpawn"))
+			t.ok((spawnPos(5) - entranceBefore[5]).Magnitude < 1e-6, "an empty plot keeps its entrance")
+			-- Cal presses "give me any open plot" over PlotPass: the first free pad, free.
+			s.remotes.PlotPass.OnServerEvent.fn(cal)
+			t.eq(cal.attrs.PlotSlot, 1, "pad 1 is the first still open")
+			t.ok(cal.RespawnLocation == s.plot(1):FindFirstChild("PlotSpawn"))
+			-- A junk claim over the remote does nothing.
+			for _, junk in ipairs({ "3", 0, 99, 2.5, {} }) do
+				s.remotes.ClaimPlot.OnServerEvent.fn(bob, junk)
+			end
+			t.eq(bob.attrs.PlotSlot, 5)
+			-- Ann leaves: her pad and its entrance come back for the next player.
+			s.P.PlayerRemoving(ann)
+			t.ok((spawnPos(3) - entranceBefore[3]).Magnitude < 1e-6)
+			t.eq(s.plot(3):GetAttribute("OwnerId"), nil)
+		end
+	)
+
+	t.test(
+		"after the district is built nothing is named LandOffice but the prompt on each plot's sign (T420)",
+		function()
+			local s = setup()
+			local sawSignPrompts = 0
+			local function scan(node, path)
+				for _, child in ipairs(node:GetChildren()) do
+					local here = path .. "/" .. child.Name
+					if string.find(string.lower(child.Name), "landoffice", 1, true) then
+						t.ok(
+							child.ClassName == "ProximityPrompt"
+								and string.match(path, "^map/Plots/Plot_%d+/Sign$") ~= nil,
+							"a LandOffice that is not a plot sign's prompt: " .. here
+						)
+						sawSignPrompts += 1
+					end
+					scan(child, here)
+				end
+			end
+			scan(s.map, "map")
+			t.eq(sawSignPrompts, #s.PlotData.Slots, "one Land panel prompt per plot sign")
+			t.eq(s.map:FindFirstChild("LandOffice"), nil)
+		end
+	)
 
 	t.test("a returning owner's picker: only the button takes a free pad, free; waiting never does (T406)", function()
 		local s = setup()

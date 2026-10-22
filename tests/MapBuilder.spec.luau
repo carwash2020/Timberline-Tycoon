@@ -364,6 +364,22 @@ return function(t)
 		end
 	end)
 
+	t.test("T420: the built town has no Land Office: no model, no counter, no prompt named for it", function()
+		local s = build()
+		lastStepsRan(s)
+		local count = 0
+		for _, d in ipairs(s.map:GetDescendants()) do
+			count += 1
+			local name = string.lower(d.Name)
+			t.ok(not string.find(name, "landoffice", 1, true), "a LandOffice piece is built: " .. d:GetFullName())
+		end
+		t.ok(count > 500, "the whole town was scanned (" .. count .. " instances)")
+		t.eq(s.map:FindFirstChild("LandOffice"), nil)
+		-- Old Hank stands where PlotSalesmanData says, with no model of his own to stand behind.
+		local hank = t.shared("NPCData").Get(t.shared("PlotSalesmanData").Id)
+		t.eq(hank.spot.kind, "fixed")
+	end)
+
 	t.test("a clean build warns nothing, parents SellArea last and lets everyone in", function()
 		local s = build()
 		t.eq(s.warnings, {})
