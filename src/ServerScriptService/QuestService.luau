@@ -155,6 +155,7 @@ local function refreshNext(player: Player, profile: Profile)
 		charterDone = profile.gondolaPass == true or gear.GondolaPass == true,
 		relicsDone = relicsDone,
 		plotFull = type(plot) == "table" and (plot.tier or 1) >= #PlotData.Tiers,
+		hasPlot = type(plot) == "table" and plot.claimed == true,
 	})
 	player:SetAttribute("NextGoal", goal.text)
 	player:SetAttribute("NextGoalBeacon", goal.beacon)

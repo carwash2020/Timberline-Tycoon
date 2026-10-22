@@ -292,11 +292,25 @@ return function(t)
 		local function plot(i)
 			return plots:FindFirstChild("Plot_" .. i)
 		end
-		local office = map:FindFirstChild("LandOffice")
-		local counter = office:FindFirstChild("Counter")
-		local prompt = counter:FindFirstChild("LandOfficePrompt")
+		-- T420: there is no Land Office box. Old Hank stands where it was
+		-- (PlotService.LandOfficeAt) and his Talk prompt opens the picker; NPCService
+		-- builds him after Init, so the spec fakes just his Talk prompt.
+		local prompt
+		do
+			local townsfolk = Instance.new("Folder")
+			townsfolk.Name = "Townsfolk"
+			townsfolk.Parent = map
+			local hank = Instance.new("Model")
+			hank.Name = "OldHank"
+			hank.Parent = townsfolk
+			prompt = Instance.new("ProximityPrompt")
+			prompt.Name = "Talk"
+			prompt.Parent = hank
+			PlotService.HookSalesman(map)
+		end
 		local function atOffice(player)
-			player.root.Position = counter.CFrame.Position
+			local at = PlotService.LandOfficeAt
+			player.root.Position = t.roblox.Vector3.new(at.X, 4, at.Y)
 		end
 		-- Buys plot i the real way (stand at the Land Office, ClaimPlot). The
 		-- price is topped up first, so a test's cash arithmetic is its own;
@@ -332,7 +346,7 @@ return function(t)
 				explode = on
 			end,
 			prompt = prompt,
-			counter = counter,
+			map = map,
 			profiles = profiles,
 			items = items,
 			itemFolder = itemFolder,
@@ -428,10 +442,9 @@ return function(t)
 		end
 	)
 
-	t.test("the district has an open plot per slot, each with a sign, and one Land Office that sells them", function()
+	t.test("the district has an open plot per slot, each with a sign, and Old Hank sells them", function()
 		local s = setup()
-		t.ok(s.prompt ~= nil, "the Land Office has its prompt")
-		t.eq(s.prompt.ActionText, "Buy a plot")
+		t.ok(s.prompt ~= nil, "Old Hank has his Talk prompt")
 		for i = 1, #s.PlotData.Slots do
 			local sign = s.plot(i):FindFirstChild("Sign")
 			t.eq(sign:FindFirstChild("ProximityPrompt"), nil, "no plot is claimable at its own sign: nothing is free")
@@ -448,24 +461,24 @@ return function(t)
 		t.ok(s.remotes.UpgradePlot.OnServerEvent.fn ~= nil)
 	end)
 
-	-- T395: the Land Office counter is a shop counter like the others: 2.6 high, 3.6 deep, Old Hank's
-	-- Talk spot a stud behind it, his posts and roof behind the counter's back face.
-	t.test("the Land Office counter is 2.6 high and 3.6 deep, solid, with Hank's spot a stud behind it", function()
+	-- T420: the Land Office box (counter, posts, roof, sign, pitchfork, bale, its own
+	-- Buy a plot prompt) is gone. Plots are still bought: Old Hank opens the picker.
+	t.test("no Land Office box is built: no counter, no model, no prompt of its own (T420)", function()
 		local s = setup()
-		local counter = s.counter
-		t.ok(math.abs(counter.Size.Y - 2.6) < 1e-3 and math.abs(counter.Size.Z - 3.6) < 1e-3, "2.6 x 3.6")
-		t.ok(counter.Size.X >= 6, "at least 6 wide")
-		t.ok(counter.CanCollide)
-		local NPCData = t.shared("NPCData")
-		local stand = NPCData.BehindCounter(counter.CFrame, counter.Size)
-		local back = counter.CFrame:PointToObjectSpace(stand.Position).Z - counter.Size.Z / 2
-		t.ok(back >= 1 - 1e-3, "the keeper stands at least a stud behind the back face")
-		for _, d in ipairs(counter.Parent:GetChildren()) do
-			if d.Name == "Post" then
-				local at = counter.CFrame:PointToObjectSpace(d.CFrame.Position)
-				t.ok(at.Z - d.Size.Z / 2 >= counter.Size.Z / 2 - 1e-3, "a post stands behind the counter, not in it")
+		t.eq(s.map:FindFirstChild("LandOffice"), nil, "no Land Office model in the map")
+		local function scan(node, path)
+			for _, child in ipairs(node:GetChildren()) do
+				t.ok(
+					child.Name ~= "LandOfficePrompt" and child.Name ~= "Counter",
+					"found " .. path .. "/" .. child.Name
+				)
+				scan(child, path .. "/" .. child.Name)
 			end
 		end
+		scan(s.map, "map")
+		local source = require("@lune/fs").readFile("src/ServerScriptService/PlotService.luau")
+		t.ok(not string.find(source, "buildLandOffice", 1, true), "the builder is gone")
+		t.ok(not string.find(source, "LandOfficePrompt", 1, true), "the prompt is gone")
 	end)
 
 	t.test("claiming a plot makes it yours, once", function()
@@ -1088,12 +1101,12 @@ return function(t)
 		local cash = profile.cash
 		s.prompt.Triggered.fn(ann)
 		t.eq(ann.attrs.Picking, nil, "the prompt from across the map opens nothing")
-		t.eq(s.lastToast(), "Walk up to the Land Office counter to buy a plot.")
+		t.eq(s.lastToast(), t.shared("PlotSalesmanData").FarLine)
 		s.P.Claim(ann, 1)
 		t.eq(profile.plot.claimed, false)
 		t.eq(ann.attrs.PlotSlot, nil)
 		t.eq(profile.cash, cash, "out of range: nothing charged")
-		t.eq(s.lastToast(), "Walk up to the Land Office in town to buy a plot.")
+		t.eq(s.lastToast(), "Walk up to Old Hank to buy a plot.")
 		s.atOffice(ann)
 		s.P.Claim(ann, 1)
 		t.eq(ann.attrs.PlotSlot, 1)
@@ -1254,6 +1267,154 @@ return function(t)
 		t.eq(s.items(jump)[1].Name, "bob")
 	end)
 
+	t.test("three claims of one plot in the same breath: one pad, one owner, one charge (T420)", function()
+		local s = setup({ cash = 5000 })
+		local who = {}
+		for i = 1, 3 do
+			local player, profile = s.newPlayer(i, "P" .. i)
+			s.P.PlayerJoined(player, profile)
+			s.atOffice(player)
+			s.prompt.Triggered.fn(player)
+			table.insert(who, { player = player, profile = profile })
+		end
+		for _, entry in ipairs(who) do
+			s.P.Claim(entry.player, 5)
+		end
+		local owners, charged = 0, 0
+		for _, entry in ipairs(who) do
+			if entry.player.attrs.PlotSlot == 5 then
+				owners += 1
+			end
+			if entry.profile.cash < 5000 then
+				charged += 1
+				t.eq(entry.profile.cash, 5000 - s.config.PlotPrice, "charged the one price")
+			end
+		end
+		t.eq(owners, 1, "exactly one owner")
+		t.eq(charged, 1, "exactly one charge")
+		t.eq(s.plot(5):GetAttribute("OwnerId"), 1, "the first in wins")
+		for i = 2, 3 do
+			local entry = who[i]
+			t.eq(entry.player.attrs.PlotSlot, nil)
+			t.eq(entry.player.attrs.Picking, true, "the loser's picker is still open")
+			local offer = s.P.OfferOf(entry.player)
+			t.eq(offer.notice, "taken", "told, and shown the pad as taken")
+			t.eq(offer.plots[5].taken, true)
+			t.eq(entry.profile.plot.claimed, false, "nothing was granted")
+		end
+		-- The losers re-pick, each a different pad, and both land.
+		s.P.Claim(who[2].player, 6)
+		s.P.Claim(who[3].player, 7)
+		t.eq(who[2].player.attrs.PlotSlot, 6)
+		t.eq(who[3].player.attrs.PlotSlot, 7)
+	end)
+
+	t.test(
+		"the last open pad: a buyer's claim and a returning owner's any-plot press cannot both get it (T420)",
+		function()
+			local s = setup({ cash = 5000 })
+			local count = #s.PlotData.Slots
+			for i = 1, count - 1 do
+				local filler = s.newPlayer(100 + i, "F" .. i)
+				s.claim(filler, i)
+			end
+			local buyer, buyerProfile = s.newPlayer(1, "Buyer")
+			local owner, ownerProfile = s.newPlayer(2, "Owner")
+			ownerProfile.plot.claimed = true
+			s.P.PlayerJoined(buyer, buyerProfile)
+			s.P.PlayerJoined(owner, ownerProfile)
+			s.atOffice(buyer)
+			s.prompt.Triggered.fn(buyer)
+			t.eq(owner.attrs.Picking, true, "the returning owner's picker is open")
+			s.P.Pass(owner) -- the "Give me any open plot" button
+			s.P.Claim(buyer, count)
+			t.eq(owner.attrs.PlotSlot, count, "the first in took the last pad")
+			t.eq(buyer.attrs.PlotSlot, nil, "the other did not")
+			t.eq(buyerProfile.cash, 5000, "and was not charged")
+			t.eq(s.plot(count):GetAttribute("OwnerId"), 2)
+			s.P.Claim(buyer, count)
+			s.P.Pass(buyer)
+			t.eq(s.plot(count):GetAttribute("OwnerId"), 2, "nobody takes it from the owner by any road")
+			t.eq(buyerProfile.cash, 5000)
+		end
+	)
+
+	t.test("a pad whose owner has left is open again for the next claim (T420)", function()
+		local s = setup({ cash = 5000 })
+		local ann = s.newPlayer(1, "Ann")
+		s.claim(ann, 4)
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.atOffice(bob)
+		s.P.Claim(bob, 4)
+		t.eq(bob.attrs.PlotSlot, nil, "taken while Ann is here")
+		s.P.PlayerRemoving(ann)
+		s.P.Claim(bob, 4)
+		t.eq(bob.attrs.PlotSlot, 4, "free once she has gone")
+		t.eq(bobProfile.cash, 5000 - s.config.PlotPrice)
+	end)
+
+	t.test("a player with no plot breaks nothing: the build remotes, visits, saves and leaving (T420)", function()
+		local s = setup({ cash = 777 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local other = s.newPlayer(2, "Other")
+		s.claim(other, 2)
+		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.attrs.Picking, nil, "a first-timer gets no picker and no plot")
+		t.eq(s.P.HasPad(ann), false)
+		t.eq(s.P.OwnerAt(ann.root.Position), nil)
+		local calls = {
+			function()
+				s.P.Place(ann, "Floor", 0, 0, 0, 0)
+			end,
+			function()
+				s.P.Move(ann, "x", 0, 0, 0, 0)
+			end,
+			function()
+				s.P.Sell(ann, "x")
+			end,
+			function()
+				s.P.Upgrade(ann)
+			end,
+			function()
+				s.P.Expand(ann, 0, 0, 1)
+			end,
+			function()
+				s.P.Paint(ann, "x", "y")
+			end,
+			function()
+				s.P.Visit(ann, 2)
+			end,
+			function()
+				s.P.BaseAction(ann, "pack")
+			end,
+			function()
+				s.P.CommitLoose(ann)
+			end,
+			function()
+				s.P.Resend(ann)
+			end,
+			function()
+				s.P.Pass(ann)
+			end,
+			function()
+				s.P.Shown(ann)
+			end,
+		}
+		for i, call in ipairs(calls) do
+			local ok, err = pcall(call)
+			t.ok(ok, "call " .. i .. " errored without a plot: " .. tostring(err))
+		end
+		t.eq(profile.cash, 777, "no cash moved")
+		t.eq(profile.plot.claimed, false)
+		t.eq(#profile.plot.placed, 0, "the save is untouched")
+		t.eq(s.P.RecoverSpot(ann), nil, "no spot to recover to")
+		t.eq(s.P.Reload(ann, profile), false, "a save with no plot loads no base")
+		local ok, err = pcall(s.P.PlayerRemoving, ann)
+		t.ok(ok, "leaving without a plot: " .. tostring(err))
+		t.eq(profile.cash, 777)
+		t.eq(profile.plot.claimed, false)
+	end)
+
 	t.test("a returning owner's picker: only the button takes a free pad, free; waiting never does (T406)", function()
 		local s = setup()
 		local ann, profile = s.newPlayer(1, "Ann")
@@ -1316,6 +1477,32 @@ return function(t)
 		end
 		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
 	end)
+
+	t.test(
+		"the plot's spawn steps off a saved piece standing on the entrance, and goes back when the owner leaves (T420)",
+		function()
+			local s = setup({ cash = 5000 })
+			local function spawnAt(i)
+				return s.plot(i):FindFirstChild("PlotSpawn").CFrame.Position
+			end
+			local home = spawnAt(3)
+			local ann, annProfile = s.newPlayer(1, "Ann")
+			annProfile.plot.placed = { { uid = "wall", blueprintId = "Floor", x = 0, z = -18, rot = 0 } }
+			annProfile.plot.claimed = true
+			s.P.PlayerJoined(ann, annProfile)
+			s.P.Claim(ann, 3)
+			t.eq(ann.attrs.PlotSlot, 3)
+			local moved = spawnAt(3)
+			t.ok((moved - home).Magnitude > 1, "the spawn left the piece")
+			local before = spawnAt(4)
+			local bob, bobProfile = s.newPlayer(2, "Bob")
+			s.claim(bob, 4)
+			t.ok((spawnAt(4) - before).Magnitude < 1e-6, "an empty plot keeps its own entrance")
+			s.P.PlayerRemoving(ann)
+			t.ok((spawnAt(3) - home).Magnitude < 1e-6, "the pad's entrance is back for the next owner")
+			t.eq(bobProfile.plot.claimed, true)
+		end
+	)
 
 	t.test("a claimed plot is the spawn; before that, town", function()
 		local s = setup()
@@ -2035,7 +2222,7 @@ return function(t)
 		s.P.Claim(ann, 3)
 		local after = profile.cash
 		s.prompt.Triggered.fn(ann)
-		t.eq(s.lastToast(), "You already have a plot. Plots are bought here, one each.")
+		t.eq(s.lastToast(), t.shared("PlotSalesmanData").OwnsLine)
 		s.P.Claim(ann, 4)
 		t.eq(profile.cash, after)
 		t.eq(ann.attrs.PlotSlot, 3)
@@ -2144,19 +2331,7 @@ return function(t)
 
 	-- NPCService builds him after PlotService.Init; fake just his Talk prompt.
 	local function withHank(s)
-		local Instance = fakeInstances()
-		local map = Instance.new("Folder")
-		local folder = Instance.new("Folder")
-		folder.Name = "Townsfolk"
-		folder.Parent = map
-		local hank = Instance.new("Model")
-		hank.Name = "OldHank"
-		hank.Parent = folder
-		local talk = Instance.new("ProximityPrompt")
-		talk.Name = "Talk"
-		talk.Parent = hank
-		s.P.HookSalesman(map)
-		return talk
+		return s.prompt
 	end
 
 	t.test("talking to Old Hank at the counter opens the same picker, with the server's price", function()
@@ -2212,16 +2387,6 @@ return function(t)
 		t.eq(#said, 2, "a visitor too far from the counter is told so, in the box too")
 		t.eq(said[2].text, t.shared("PlotSalesmanData").FarLine)
 		t.eq(far.attrs.Picking, nil, "and nothing opens")
-	end)
-
-	t.test("the counter's own Buy a plot prompt still works beside Old Hank", function()
-		local s = setup({ cash = 1000 })
-		withHank(s)
-		local ann = s.newPlayer(1, "Ann")
-		s.atOffice(ann)
-		s.prompt.Triggered.fn(ann)
-		t.eq(ann.attrs.Picking, true)
-		t.eq(s.prompt.ActionText, "Buy a plot")
 	end)
 
 	-- Boxes, as BoxService would answer: a box is ready for one itemId and one buyer, once.

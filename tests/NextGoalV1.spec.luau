@@ -99,6 +99,32 @@ return function(t)
 		t.eq(NextGoal.PickV1(f).kind, "streak")
 	end)
 
+	t.test("no plot yet (T420): the plot goal sends you to Old Hank, and nothing errors", function()
+		local f = facts({
+			bestAxeTier = ItemCatalog.AxeTier("StarfallAxe"),
+			gear = { InsulatedCoat = true, HeatBoots = true, Lantern = true, GondolaPass = true },
+			charterDone = true,
+			relicsDone = true,
+			hasPlot = false,
+		})
+		for _, b in ipairs({ "hills", "snow", "volcano", "grove" }) do
+			f.found[woodOf(b)] = true
+		end
+		local goal = NextGoal.PickV1(f)
+		t.eq(goal.kind, "plot")
+		t.eq(goal.text, "Buy a plot from Old Hank")
+		t.eq(goal.beacon, "oldHank")
+		t.ok(#goal.text <= NextGoal.MaxChars)
+		f.hasPlot = true
+		t.eq(NextGoal.PickV1(f).text, "Grow your plot to full size")
+		f.hasPlot = nil
+		t.eq(NextGoal.PickV1(f).text, "Grow your plot to full size", "facts without the field read as an owner")
+		-- The early ladder never needs a plot.
+		for tier = 1, 9 do
+			t.ok(NextGoal.PickV1(facts({ bestAxeTier = tier, hasPlot = false })).text ~= nil)
+		end
+	end)
+
 	t.test("every goal fits the 40-character line, even a shut shop's", function()
 		local gearSets = { {}, { InsulatedCoat = true }, { InsulatedCoat = true, HeatBoots = true, Lantern = true } }
 		for tier = 1, 9 do

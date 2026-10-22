@@ -8,7 +8,7 @@
 -- lists the saves; the one last played is marked "Last played", not
 -- "Playing". Only when the PICKED save has a plot does the plot picker open
 -- (with its camera, map and pillar) so they choose a pad for that base. A
--- save with no plot just enters the world: the Land Office sells one. A
+-- save with no plot just enters the world: Old Hank sells one. A
 -- player already standing on a base this session (a swap from the SAVES
 -- panel) is not asked again.
 

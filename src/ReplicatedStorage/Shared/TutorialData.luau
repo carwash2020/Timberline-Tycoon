@@ -8,7 +8,7 @@
 -- the old lessons stay: load, mill, plant, the three loads, and the Steel
 -- Axe. QuestService then keeps one next goal on the tracker (NextGoal).
 --
--- v2 order: fell, drag, sell at the sawmill, buy a plot at the Land Office
+-- v2 order: fell, drag, sell at the sawmill, buy a plot from Old Hank
 -- (nobody is given one: GameConfig.PlotPrice), the build lessons, then the
 -- Rustbucket box, its pad and the truck, and the same lessons after it. tutorialStep is an index, so a save from
 -- the plot-first v2 order is remapped by ApplyOrder (old index to the step
@@ -68,7 +68,7 @@ export type TutorialEvent =
 -- What the beacon points at (QuestUI finds it in the world). v2 adds
 -- "wood" (your nearest loose piece, tag Wood) and "truckBed" (your
 -- truck's bed). "sellPad" is the sawmill's sell pad; "plotSign" is plot 1;
--- "landOffice" is the counter that sells the first plot.
+-- "oldHank" is the farmer who sells the first plot.
 export type BeaconTarget =
 	"tree"
 	| "log"
@@ -78,7 +78,7 @@ export type BeaconTarget =
 	| "wood"
 	| "truckBed"
 	| "plotSign"
-	| "landOffice"
+	| "oldHank"
 	| "dealership"
 
 export type Step = {
@@ -143,18 +143,15 @@ local function plotStep(afterSale: boolean?): Step
 	local price = GameConfig.PlotPrice
 	return {
 		id = "plot",
-		objective = "Buy a plot at the Land Office",
+		objective = "Buy a plot from Old Hank",
 		murph = string.format(
-			"That sale's yours, and a little extra from me. A plot is $%d at the Land Office in town. Buy one, follow the arrow.",
+			"That sale's yours, and a little extra from me. A plot is $%d from Old Hank in town. Buy one, follow the arrow.",
 			price
 		),
-		murphShort = string.format(
-			"Sell more wood at the sawmill first. A plot is $%d at the Land Office in town.",
-			price
-		),
+		murphShort = string.format("Sell more wood at the sawmill first. A plot is $%d from Old Hank in town.", price),
 		event = "plotClaimed",
 		count = 1,
-		beacon = "landOffice",
+		beacon = "oldHank",
 		cashItem = "a plot",
 		cashPrice = price,
 		rewardCash = PLOT_REWARD,

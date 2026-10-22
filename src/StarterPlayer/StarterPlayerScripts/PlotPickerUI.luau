@@ -1,5 +1,5 @@
 --!strict
--- PlotPickerUI: pick a homestead. It opens from the Land Office counter
+-- PlotPickerUI: pick a homestead. It opens from Old Hank
 -- (the server sends the offer with the price) or, for a save that already
 -- owns a plot, when you join. Next and Previous walk the pads (taken ones
 -- included, labelled taken). Claim names a pad; the server charges the
@@ -359,7 +359,7 @@ unbindCamera = function()
 end
 
 local function frame(plot: Plot)
-	local shot = PlotPickerMap.Shot(plot)
+	local shot = PlotPickerMap.Shot(plot, plot.size)
 	goalPos = Vector3.new(shot.fromX, shot.fromY, shot.fromZ)
 	goalFocus = Vector3.new(shot.atX, shot.atY, shot.atZ)
 	showMarker(plot)

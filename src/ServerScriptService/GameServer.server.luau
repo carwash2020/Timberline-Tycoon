@@ -807,7 +807,7 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	VisitPlot = remote.VisitPlot,
 	PlotModerate = remote.PlotModerate,
 }, notify, { gates = LoadState.Gates })
--- The pads, the Land Office counter and the plot picker's data exist now (or
+-- The pads, Old Hank and the plot picker's data exist now (or
 -- Init failed and warned: nothing will make them appear, so do not wait).
 LoadState.Gates.Set("plots")
 safely("ForestService.Init", ForestService.Init, { WorldFX = remote.WorldFX }, notify)

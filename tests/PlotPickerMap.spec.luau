@@ -69,6 +69,30 @@ return function(t)
 		t.eq(shot.fromZ, 20 + Map.CameraBack.z)
 	end)
 
+	t.test("the shot keeps a big plot whole in frame (T420)", function()
+		local base = Map.Shot({ x = 0, y = 0, z = 0 })
+		local same = Map.Shot({ x = 0, y = 0, z = 0 }, 80)
+		t.eq(same, base, "an open pad (80) is framed exactly as before")
+		t.eq(Map.Shot({ x = 0, y = 0, z = 0 }, nil), base, "no size known: as before")
+		t.eq(
+			Map.Shot({ x = 0, y = 0, z = 0 }, 40),
+			base,
+			"a smaller plot never moves the camera closer than the base shot"
+		)
+		local far = Map.Shot({ x = 0, y = 0, z = 0 }, 200)
+		local function dist(shot)
+			return math.sqrt(shot.fromX ^ 2 + shot.fromY ^ 2 + shot.fromZ ^ 2)
+		end
+		t.ok(dist(far) > dist(base) * 1.7 and dist(far) < dist(base) * 1.8, "a 200 plot is shot from 1.75 times back")
+		t.ok(dist(Map.Shot({ x = 0, y = 0, z = 0 }, 110)) > dist(base), "a 110 plot a little further")
+		t.eq(far.atX, base.atX, "still looking at the middle")
+		t.eq(far.atY, base.atY)
+		t.eq(far.atZ, base.atZ)
+		t.ok(far.fromX / far.fromZ - base.fromX / base.fromZ < 1e-9, "from the same side")
+		t.eq(Map.Shot({ x = 0, y = 0, z = 0 }, 0 / 0), base, "junk size: as before")
+		t.eq(Map.Shot({ x = 0, y = 0, z = 0 }, math.huge), base, "junk size: as before")
+	end)
+
 	t.test("the glide is frame-rate independent and never overshoots", function()
 		t.eq(Map.Ease(0, 8), 0)
 		t.ok(Map.Ease(1 / 60, 8) > 0 and Map.Ease(1 / 60, 8) < 1)

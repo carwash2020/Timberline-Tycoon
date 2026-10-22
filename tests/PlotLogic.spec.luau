@@ -659,6 +659,28 @@ return function(t)
 		t.eq(PlotLogic.Source(bp("Wall"), 0, true, true), "fee", "unlocked only means something for an unlock")
 	end)
 
+	t.test("SpawnSpot (T420): the saved base never buries the plot's entrance", function()
+		local size = PlotData.Tiers[1].size
+		local ax, az = PlotLogic.SpawnSpot(size, {})
+		t.eq({ ax, az }, { PlotLogic.VisitPad[1], PlotLogic.VisitPad[2] }, "an empty plot: the pad itself")
+		-- A wall across the pad: the next clear candidate wins, and its 6 x 6 square touches nothing.
+		local wall = { x = 0, z = -18, w = 12, d = 4 }
+		local bx, bz = PlotLogic.SpawnSpot(size, { wall })
+		t.ok(not (bx == ax and bz == az), "moved off the wall")
+		t.ok(
+			math.abs(bx - wall.x) * 2 >= PlotLogic.SpawnSize + wall.w
+				or math.abs(bz - wall.z) * 2 >= PlotLogic.SpawnSize + wall.d
+		)
+		t.ok(math.abs(bx) <= size / 2 and math.abs(bz) <= size / 2, "still inside the plot")
+		-- Everything blocked: the pad, never nil or off the plot.
+		local blocked = { { x = 0, z = 0, w = size, d = size } }
+		local cx, cz = PlotLogic.SpawnSpot(size, blocked)
+		t.eq({ cx, cz }, { PlotLogic.VisitPad[1], PlotLogic.VisitPad[2] })
+		-- A piece clear of the pad changes nothing.
+		local dx, dz = PlotLogic.SpawnSpot(size, { { x = 30, z = 30, w = 8, d = 8 } })
+		t.eq({ dx, dz }, { PlotLogic.VisitPad[1], PlotLogic.VisitPad[2] })
+	end)
+
 	t.test("VisitSpot: the spawn pad first, then spots around it, always inside the plot", function()
 		t.eq({ PlotLogic.VisitSpot(120, function()
 			return false

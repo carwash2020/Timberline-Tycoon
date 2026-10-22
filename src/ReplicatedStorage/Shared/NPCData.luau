@@ -413,7 +413,7 @@ NPCData.List = {
 			"A Wood Detector on a belt, a Sweeper on the next one: the planks sort themselves.",
 			"Lasers reach forty studs. Aim the emitter true, and the receiver does the rest.",
 			"Pieces are placed from your hammer for free once you have paid for them.",
-			"You need a plot to wire anything. The Land Office is just up the road.",
+			"You need a plot to wire anything. Old Hank is just up the road.",
 		},
 		react = {
 			morning = { "Copper's cold in the morning. Gloves on, please." },
@@ -790,26 +790,25 @@ NPCData.List = {
 		},
 	},
 	{
-		-- Old Hank, an old farmer, runs the Land Office counter beside the
-		-- plot district's sign (PlotService builds the counter at
-		-- LandOfficeAt, east of the flat town). He stands behind it day and
-		-- night: no `shop`, so ShopHoursLogic never closes him and he never
-		-- sleeps. His Talk prompt opens the plot purchase (PlotService
+		-- Old Hank, an old farmer, sells the plots from beside the plot
+		-- district's sign (east of the flat town; T420 took the Land Office
+		-- counter away, so he stands in the open, facing the town). He is
+		-- there day and night: no `shop`, so ShopHoursLogic never closes him
+		-- and he never sleeps. His Talk prompt opens the plot purchase (PlotService
 		-- hooks it); what he sells, and his price talk, is PlotSalesmanData.
 		id = PlotSalesmanData.Id,
 		persistent = true,
 		name = PlotSalesmanData.Name,
 		role = PlotSalesmanData.Role,
 		spot = {
-			kind = "counter",
-			model = "LandOffice",
-			-- Only if the counter is missing; the Land Office is outside the
-			-- flat town, so `ground` also stands him on the terrain there.
-			fallback = Vector3.new(149.4, 0, 86.7),
+			kind = "fixed",
+			position = Vector3.new(PlotSalesmanData.Stand.x, 0, PlotSalesmanData.Stand.z),
+			lookAt = Vector3.new(0, 0, 40),
+			-- Outside the flat town: `ground` stands him on the terrain there.
 			ground = 0,
 		},
 		idle = "lookAround",
-		promptLift = 70, -- clear of the counter's own Buy a plot prompt
+		promptLift = 70,
 		look = {
 			name = PlotSalesmanData.Name,
 			role = PlotSalesmanData.Role,
@@ -836,11 +835,11 @@ NPCData.List = {
 		react = {
 			morning = { "Up with the sun, same as the hay. Plots are open." },
 			day = { "Good day for a deed. Come see about a plot." },
-			evening = { "Sun's going down. Counter's open all the same." },
+			evening = { "Sun's going down. I'm here all the same." },
 			night = { "Never close. Land doesn't sleep, and neither do I." },
 			rain = { "Good for the crops. Step under the roof and talk plots." },
 			storm = { "Storm's coming in. A homestead has a roof, you know." },
-			fog = { "Foggy as a barn at dawn. The counter's right here." },
+			fog = { "Foggy as a barn at dawn. I'm right here." },
 			unsold = { "Sell some wood first, then come see me about land." },
 			sale = { "Wood money in your pocket? A plot is a fine way to spend it." },
 		},

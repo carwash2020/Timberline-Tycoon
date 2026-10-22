@@ -101,7 +101,7 @@ TownTreeData.Buildings = {
 	{ name = "SellStation", x0 = 37, z0 = 94, x1 = 84, z1 = 129 },
 	{ name = "GondolaStation", x0 = -49, z0 = 140, x1 = -30, z1 = 159 },
 	{ name = "Sparkworks", x0 = 114, z0 = 107, x1 = 157, z1 = 154 },
-	-- The Land Office counter (PlotService.LandOfficeAt) and its sign.
+	-- Old Hank's spot (PlotService.LandOfficeAt; the counter is gone, T420) and the plot district sign.
 	{ name = "LandOffice", x0 = 134, z0 = 72, x1 = 162, z1 = 98 },
 } :: { Rect }
 
