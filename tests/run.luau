@@ -66,16 +66,17 @@ local SLOW_SPECS: { [string]: number } = {
 	["Forest.spec.luau"] = 25,
 	["ForestService.spec.luau"] = 12,
 	["ForestServiceV2.spec.luau"] = 3,
-	["GeometryLint.spec.luau"] = 20,
+	["GeometryLint.spec.luau"] = 8,
+	["CloudCheck.spec.luau"] = 4,
 	["LandscapeStyle.spec.luau"] = 17,
 	["LogicService.spec.luau"] = 3,
 	["MachineSwap.spec.luau"] = 25,
 	["MapBuilder.spec.luau"] = 66,
 	["MonetizationService.spec.luau"] = 6,
-	["MustKeep.spec.luau"] = 20,
+	["MustKeep.spec.luau"] = 6,
 	["NPCService.spec.luau"] = 3,
 	["Phase12World.spec.luau"] = 7,
-	["PipelineE2E.spec.luau"] = 20,
+	["PipelineE2E.spec.luau"] = 14,
 	["PlanPause.spec.luau"] = 14,
 	["PlotLogic.spec.luau"] = 6,
 	["PlotPlatform.spec.luau"] = 5,
@@ -87,6 +88,7 @@ local SLOW_SPECS: { [string]: number } = {
 	["SectionTrees.spec.luau"] = 21,
 	["ShopService.spec.luau"] = 10,
 	["TerrainFit.spec.luau"] = 6,
+	["TownBuild.spec.luau"] = 10,
 	["TownMesh.spec.luau"] = 16,
 	["TownTrees.spec.luau"] = 22,
 	["TreeArtSections.spec.luau"] = 16,
@@ -95,6 +97,17 @@ local SLOW_SPECS: { [string]: number } = {
 	["TruckArt.spec.luau"] = 3,
 	["WorldPlan.spec.luau"] = 69,
 }
+
+-- Specs that build the whole world (tests/support/WorldBuild, about 35 s on CI) share one build per
+-- process, so they are dealt out together to one shard, as a single unit, and pay it once.
+local WORLD_SPECS = {
+	"CloudCheck.spec.luau",
+	"GeometryLint.spec.luau",
+	"MustKeep.spec.luau",
+	"PipelineE2E.spec.luau",
+	"TownBuild.spec.luau",
+}
+local WORLD_BUILD_SECONDS = 35
 
 local function show(value: any): string
 	if type(value) == "string" then
@@ -167,19 +180,51 @@ if shardSpec and shardSpec ~= "" then
 	end)
 	local loads = table.create(shardCount, 0)
 	local mine = {}
+	local isWorld: { [string]: boolean } = {}
+	for _, file in ipairs(WORLD_SPECS) do
+		isWorld[file] = true
+	end
+	local worldDealt = false
 	for _, file in ipairs(bySlowest) do
+		local unit = { file }
+		local weight = SLOW_SPECS[file] or 1
+		if isWorld[file] then
+			if worldDealt then
+				continue
+			end
+			worldDealt = true
+			unit, weight = {}, WORLD_BUILD_SECONDS
+			for _, other in ipairs(WORLD_SPECS) do
+				if table.find(specs, other) then
+					table.insert(unit, other)
+					weight += SLOW_SPECS[other] or 1
+				end
+			end
+		end
 		local best = 1
 		for k = 2, shardCount do
 			if loads[k] < loads[best] then
 				best = k
 			end
 		end
-		loads[best] += SLOW_SPECS[file] or 1
+		loads[best] += weight
 		if best == shardIndex then
-			mine[file] = true
+			for _, f in ipairs(unit) do
+				mine[f] = true
+			end
 		end
 	end
 	inShard = mine
+	if process.env.TEST_SHARD_LIST then
+		-- TEST_SHARD_LIST=1 TEST_SHARD=2/4 lune run tests/run: which specs this shard would run
+		local names = {}
+		for f in pairs(mine) do
+			table.insert(names, f)
+		end
+		table.sort(names)
+		print(table.concat(names, "\n"))
+		process.exit(0)
+	end
 	print(string.format("Shard %d/%d", shardIndex, shardCount))
 end
 
