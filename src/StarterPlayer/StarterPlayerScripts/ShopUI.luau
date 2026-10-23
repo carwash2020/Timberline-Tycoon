@@ -42,6 +42,7 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local VehicleMeshGate = require(ReplicatedStorage.Shared.VehicleMeshGate)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
@@ -277,11 +278,16 @@ local TRUCKS: Shop = {
 	-- Trucks first, then trailers ("Trailer:" ids).
 	ids = function()
 		local ids = {}
+		-- T421: a vehicle whose custom models are not all in is not for sale, so it is not listed (the server refuses it too).
 		for _, truck in ipairs(ItemCatalog.TruckList()) do
-			table.insert(ids, truck.id)
+			if VehicleMeshGate.Complete("Truck", truck.id) then
+				table.insert(ids, truck.id)
+			end
 		end
 		for _, trailer in ipairs(ItemCatalog.TrailerList()) do
-			table.insert(ids, "Trailer:" .. trailer.id)
+			if VehicleMeshGate.Complete("Trailer", trailer.id) then
+				table.insert(ids, "Trailer:" .. trailer.id)
+			end
 		end
 		return ids
 	end,

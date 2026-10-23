@@ -526,6 +526,14 @@ local function stripLooks(model: Model, trailerHalf: boolean)
 			d:Destroy()
 		end
 	end
+	-- What is left of that half is its collision hull and its wheels. The hull stays solid but is not seen: no boards or
+	-- stakes of a part-built trailer show in the meshes' place.
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and isTrailer(d) == trailerHalf and d.Name ~= "Wheel" and not inWheel(d) then
+			d.Transparency = 1
+			d.CastShadow = false
+		end
+	end
 	model:SetAttribute("MeshesMissing", true)
 end
 

@@ -1278,9 +1278,9 @@ function VehicleService.SpawnTruck(
 	-- T421: the pass trucks need their pass (the server's own state, never the client's word) and a T421 vehicle
 	-- with a missing mesh is not drawn part-built, so it is not spawned.
 	local hasPass = def.robux == true
-		and (
-			player:GetAttribute("Pass_" .. def.id) == true
-			or PaidItems.SaveHasPass(ProfileService.GetProfile(player), def.id)
+		and VehicleSpawnRule.OwnsPass(
+			player:GetAttribute("Pass_" .. def.id),
+			PaidItems.SaveHasPass(ProfileService.GetProfile(player), def.id)
 		)
 	local allowed, why = VehicleSpawnRule.CanSpawn(def, hasPass)
 	if not allowed then

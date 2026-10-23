@@ -15,6 +15,13 @@ Rule.NoMeshText = "The %s isn't ready yet: its models are still being added."
 
 export type TruckLike = { id: string, displayName: string, robux: boolean? }
 
+-- Whether the server's own state says the player has this pass truck's pass: the live ownership set
+-- (MonetizationService publishes it as the player attribute Pass_<id>) or the pass kept on the save (the backup
+-- when Roblox did not answer). A failed ownership check never adds to either.
+function Rule.OwnsPass(liveAttribute: any, savedPass: boolean): boolean
+	return liveAttribute == true or savedPass
+end
+
 function Rule.CanSpawn(def: TruckLike, hasPass: boolean): (boolean, string?)
 	if def.robux == true and not hasPass then
 		return false, string.format(Rule.NoPassText, def.displayName)
