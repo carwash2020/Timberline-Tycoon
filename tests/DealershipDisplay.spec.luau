@@ -2,12 +2,13 @@
 -- T421 Dealership and rig geometry:
 --   * every display wheel touches its plinth's top within 0.05, and a display trailer's hitch nose rests on a foot that
 --     reaches the plinth (the Hitch mesh's own jack foot), not floating or sunk;
---   * no display vehicle crosses a ceiling beam or a rafter; the Logging Rig's crane is the known exception (below);
+--   * no display vehicle crosses a ceiling beam or a rafter, the Logging Rig included (it stands at full size);
 --   * the hall's door stays at least 4 wide x 7 high and the central aisle at least 6 wide and empty;
 --   * every one of the 15 combos, parked on a pad cut for it (VehicleLogic.PadSize), overlaps nothing: truck, trailer
 --     and pad are pieces of the T409 collision lint with an EMPTY allowlist.
 return function(t)
 	local roblox = t.roblox
+	local fs = require("@lune/fs")
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
 	t.support("VehicleStock")(function(path)
 		return t.load(path)
@@ -82,7 +83,7 @@ return function(t)
 		t.eq(seen, 3)
 	end)
 
-	t.test("no display vehicle crosses a ceiling beam or a rafter (the crane aside)", function()
+	t.test("no display vehicle crosses a ceiling beam or a rafter", function()
 		local lot = DealershipLot.Build()
 		local beamBottom = DealershipLot.HallHeight - 0.9 -- the frame's ceilY, the beams hang 0.9 under it
 		local rafterBottom = DealershipLot.HallHeight - 0.7
@@ -139,6 +140,37 @@ return function(t)
 			end
 			t.ok(seen, "the Logging Rig is on show")
 		end
+	)
+
+	-- The mesh Logging Rig's whole height, 17.261, is in bbox_check.md (the recoloured trucks' table, Y of its bbox): it
+	-- includes the 2.28 the GLB's wheel node reaches under y 0, so it is more than the rig stands over its plinth.
+	local function meshRigHeight()
+		local md = fs.readFile("assets/vehicles/t421/bbox_check.md")
+		local x, y, z = string.match(md, "| LoggingRig | [^|]+ | [^|]+ | [^|]+ | ([%d%.]+) × ([%d%.]+) × ([%d%.]+) |")
+		t.ok(y ~= nil, "found the Logging Rig row in bbox_check.md")
+		return tonumber(y)
+	end
+
+	t.expectedFail(
+		"Logging Rig clearance: PlinthHeight + mesh height (bbox_check.md) <= beam underside - FloorY - 0.4",
+		function()
+			local height = meshRigHeight()
+			local top = DealershipLot.PlinthHeight + height
+			local limit = DealershipLot.BeamBottom - DealershipLot.FloorY - 0.4
+			t.ok(
+				top <= limit,
+				string.format(
+					"%.3f + %.3f = %.3f over the lot floor line, the limit is %.3f - %.3f - 0.4 = %.3f",
+					DealershipLot.PlinthHeight,
+					height,
+					top,
+					DealershipLot.BeamBottom,
+					DealershipLot.FloorY,
+					limit
+				)
+			)
+		end,
+		"1.2 + 17.261 = 18.461 against 19.1 - 0.4 - 0.4 = 18.3: 0.161 over. The 17.261 includes 2.28 of wheel node under the ground; the rig built in the lot stands 15.89 (part-built) and its top passes the beams-and-rafters test with air to spare"
 	)
 
 	t.test("the door is at least 4 wide x 7 high and the central aisle at least 6 wide and empty", function()

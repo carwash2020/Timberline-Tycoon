@@ -100,6 +100,8 @@ DealershipLot.MaxNeonLuma = 0.86
 -- the rig stands at full size, its top 0.4 (floor) + 1.2 (plinth) + 16.5 = 18.1 over the lot's floor line, the beams'
 -- underside is HallHeight - 0.9 = 19.1 and the rafters' HallHeight - 0.7. The hall's footprint (154 x 61) is unchanged.
 DealershipLot.HallHeight = 20
+-- The beams' underside over the hall floor line (they hang 0.9 under the hall's height).
+DealershipLot.BeamBottom = DealershipLot.HallHeight - 0.9
 DealershipLot.DisplayLens = Color3.fromRGB(255, 205, 125)
 
 -- The vehicles on show: ItemBox.Showroom, the one list.
