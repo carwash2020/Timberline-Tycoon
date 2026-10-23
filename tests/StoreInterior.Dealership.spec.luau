@@ -9,6 +9,10 @@
 --   * lights are warm and modest, no big or near-white Neon (the display vehicles' too);
 --   * nothing the kit adds collides, everything is inside the hall, signs do not overlap.
 return function(t)
+	-- T421: these specs check the stocked Dealership, so every vehicle mesh has a (made-up) id. With the real, empty ids the
+	-- trailers are not stocked (tests/VehicleMeshesMissing.spec.luau).
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
+	Gate.SetIds(Gate.FakeIds())
 	local roblox = t.roblox
 	local Color3, Vector3, Instance = roblox.Color3, roblox.Vector3, roblox.Instance
 	local KIND = "Dealership"

@@ -3,6 +3,11 @@
 -- behind its box, looks only, priced like the server, ordered by price, and
 -- nothing parked outside.
 return function(t)
+	-- T421: these specs check the stocked Dealership, so every vehicle mesh has a (made-up) id. With the real, empty ids the
+	-- trailers are not stocked (tests/VehicleMeshesMissing.spec.luau).
+	t.support("VehicleStock")(function(path)
+		return t.load(path)
+	end, t.roblox)
 	local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
@@ -92,7 +97,10 @@ return function(t)
 						painted = true
 					end
 				end
-				t.ok(painted, child.Name .. " wears its own paint")
+				t.ok(
+					painted or child:GetAttribute("VehicleMesh") == true,
+					child.Name .. " wears its own paint (a meshed vehicle carries its paint in the GLB)"
+				)
 				-- The sign beside it names the vehicle; the price is NOT printed (Connor:
 				-- prices show when you aim at an item). The tag's price is the server's.
 				local sign = child:FindFirstChild("NameSign", true)

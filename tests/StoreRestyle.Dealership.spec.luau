@@ -11,6 +11,10 @@
 --   * the part caps.
 -- (DealershipOverlap checks that no two of these parts share space, and has the guard that no part name goes unchecked.)
 return function(t)
+	-- T421: these specs check the stocked Dealership, so every vehicle mesh has a (made-up) id. With the real, empty ids the
+	-- trailers are not stocked (tests/VehicleMeshesMissing.spec.luau).
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
+	Gate.SetIds(Gate.FakeIds())
 	local roblox = t.roblox
 	local Color3 = roblox.Color3
 	local KIND = "Dealership"

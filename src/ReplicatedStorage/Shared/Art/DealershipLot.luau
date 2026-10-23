@@ -22,6 +22,7 @@ local CollectionService = game:GetService("CollectionService")
 local BoxLook = require(script.Parent.Parent.BoxLook)
 local ItemBox = require(script.Parent.Parent.ItemBox)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local VehicleMeshGate = require(script.Parent.Parent.VehicleMeshGate)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local Kit = require(script.Parent.Kit)
 local MeshKit = require(script.Parent.MeshKit)
@@ -317,6 +318,8 @@ end
 -- What the vehicle hauls, the second line of its name sign (ShopLogic's own words for the
 -- shop card: "Bed: 12 logs", "No bed", "+12 bed space"). The hung sub-signs that used to say
 -- this over each bay are gone: one sign per plinth now carries the name and the bed.
+DealershipLot.ComingSoonText = "COMING SOON"
+
 function DealershipLot.BedText(kind: string, id: string): string
 	if kind == "Truck" then
 		local truck = ItemCatalog.GetTruck(id)
@@ -599,7 +602,31 @@ function DealershipLot.Build(): Model
 			end
 		end
 
-		local model = modelOf(bay.kind, bay.id, true)
+		-- T421: a vehicle whose meshes are not all in is not stocked: no vehicle, no box (nothing can be bought),
+		-- and never a part-built stand-in. The plinth stays (the hall is laid out round it) and says so.
+		local stocked = VehicleMeshGate.Complete(bay.kind, bay.id)
+		local model = if stocked then modelOf(bay.kind, bay.id, true) else nil
+		if not stocked then
+			local sign = Kit.part(
+				lot,
+				"NameSign",
+				DealershipLot.NameSignSize,
+				CFrame.new(
+					cx + bay.width / 2 - DealershipLot.NameSignSize.X / 2,
+					DealershipLot.NameSignSize.Y / 2,
+					cz + aisleSide * (bay.depth / 2 + 0.15)
+				),
+				Color3.fromRGB(62, 42, 24),
+				Enum.Material.Wood
+			)
+			Kit.decor(sign, false)
+			Kit.signText(
+				sign,
+				nameOf(bay.kind, bay.id) .. "\n" .. DealershipLot.ComingSoonText,
+				Color3.fromRGB(245, 235, 215),
+				{ Enum.NormalId.Front, Enum.NormalId.Back }
+			)
+		end
 		if model then
 			model.Parent = lot
 			-- Side-on, nose toward the approach (west), on the plinth: its
@@ -644,6 +671,17 @@ function DealershipLot.Build(): Model
 			end
 		end
 
+		if not stocked then
+			HoverTag.Mark(slab, {
+				key = "Vehicle:" .. bay.kind .. ":" .. bay.id,
+				name = nameOf(bay.kind, bay.id),
+				kind = bay.kind,
+				itemId = bay.id,
+				shop = "Dealership",
+				anchor = true,
+			})
+			continue
+		end
 		-- The box: what you pick up and carry to the counter. On the plinth at
 		-- the aisle edge, the vehicle beside it, so nothing stands in the aisle.
 		-- Its front (the name strip and the big window) faces the aisle: the

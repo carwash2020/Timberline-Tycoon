@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 
 local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
+local VehicleMeshGate = require(ReplicatedStorage.Shared.VehicleMeshGate)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -340,6 +341,11 @@ local function buyTrailer(player: Player, trailerId: string)
 		notify(player, string.format("You already own the %s.", trailer.displayName))
 		return
 	end
+	-- T421: a trailer with a missing mesh is not for sale (and never shown part-built).
+	if not VehicleMeshGate.Complete("Trailer", trailer.id) then
+		notify(player, string.format(ShopLogic.NotStockedText, trailer.displayName))
+		return
+	end
 	local price = ShopLogic.Price(trailer, loop)
 	if loop == 2 then
 		buyVehicleBox(player, profile, trailer.id, trailer.displayName, price)
@@ -412,6 +418,10 @@ local function buyTruck(player: Player, truckId: string)
 	end
 	if not ShopLogic.TruckForCash(truck) then
 		notify(player, string.format("The %s is in the Store.", truck.displayName))
+		return
+	end
+	if not VehicleMeshGate.Complete("Truck", truck.id) then
+		notify(player, string.format(ShopLogic.NotStockedText, truck.displayName))
 		return
 	end
 	local price = ShopLogic.Price(truck, loop)
@@ -1016,7 +1026,12 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		end
 	elseif box.kind == "Truck" then
 		local truck = ItemCatalog.GetTruck(box.itemId)
-		if not truck or truck.sold == false or truck.robux == true then
+		if
+			not truck
+			or truck.sold == false
+			or truck.robux == true
+			or not VehicleMeshGate.Complete("Truck", truck.id)
+		then
 			return fail("locked")
 		end
 		-- Plot check before any cash moves. Yes on the card still calls
@@ -1025,7 +1040,7 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 			return fail("needsPlot")
 		end
 	elseif box.kind == "Trailer" then
-		if not ItemCatalog.GetTrailer(box.itemId) then
+		if not ItemCatalog.GetTrailer(box.itemId) or not VehicleMeshGate.Complete("Trailer", box.itemId) then
 			return fail("locked")
 		end
 		if not hasLand(profile) then

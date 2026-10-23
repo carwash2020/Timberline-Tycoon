@@ -64,6 +64,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
+local VehicleSpawnRule = require(ReplicatedStorage.Shared.VehicleSpawnRule)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
@@ -1272,6 +1273,21 @@ function VehicleService.SpawnTruck(
 	end
 	local def = ItemCatalog.GetTruck(truckId)
 	if not def then
+		return nil, 0
+	end
+	-- T421: the pass trucks need their pass (the server's own state, never the client's word) and a T421 vehicle
+	-- with a missing mesh is not drawn part-built, so it is not spawned.
+	local hasPass = def.robux == true
+		and (
+			player:GetAttribute("Pass_" .. def.id) == true
+			or PaidItems.SaveHasPass(ProfileService.GetProfile(player), def.id)
+		)
+	local allowed, why = VehicleSpawnRule.CanSpawn(def, hasPass)
+	if not allowed then
+		local say = notify
+		if say and why then
+			say(player, why)
+		end
 		return nil, 0
 	end
 	local spot = padSpot or padFor(player, def.id)

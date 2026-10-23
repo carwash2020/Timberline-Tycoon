@@ -22,6 +22,11 @@ Gate.TruckParts = { "Body", "Glass", "Lights", "Bed", "Wheel", "Hitch" }
 -- The trucks that can tow, in the order of the 15 combos.
 Gate.Tow = { "Rustbucket", "Pickup", "Flatbed", "LoggingRig", "TimberClassic" }
 
+-- The Timber Classic's pieces need its stats.json (sizes and `at`), which is not in the repo. Until a
+-- VehicleModels.Truck("TimberClassic") table exists it cannot be drawn, so it counts as missing "TimberClassic/stats.json".
+-- Flip this when that table lands (tests/TimberClassic.spec has the expected-fail that says so).
+Gate.ClassicStats = false
+
 local override: { [string]: string }? = nil
 
 -- A spec's own ids (fake ones so the code path runs); nil puts the generated ones back.
@@ -136,6 +141,9 @@ function Gate.Missing(kind: string, id: string): { string }
 		if not Gate.Has(key) then
 			table.insert(out, key)
 		end
+	end
+	if kind == "Truck" and id == "TimberClassic" and not Gate.ClassicStats then
+		table.insert(out, "TimberClassic/stats.json")
 	end
 	return out
 end
