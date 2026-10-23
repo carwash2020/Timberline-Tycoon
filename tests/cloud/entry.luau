@@ -116,6 +116,10 @@ return function(): CloudCheck.Report
 		stumpMeshes = function(): ({ string }, number)
 			return (require(ServerScriptService.StumpMeshes) :: any).CloudCheck()
 		end,
+		-- T420: the wire spool's model loads, and its meshes are the five listed, 100x scale included.
+		spoolMesh = function(): ({ string }, number)
+			return (require(ServerScriptService.WireSpoolMeshes) :: any).CloudCheck()
+		end,
 		log = print,
 	})
 	map:Destroy()

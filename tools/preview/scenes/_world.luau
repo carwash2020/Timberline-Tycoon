@@ -308,7 +308,7 @@ function World.build(ctx, opts)
 		place(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
 	end
 	for _, sign in ipairs(town.signs) do
-		place(BuildingArt.Signpost(sign.text, sign.lit), sign.cframe)
+		place(BuildingArt.Signpost(sign.text, sign.lit, nil, sign.gateId, sign.noWrap, sign.panel), sign.cframe)
 	end
 	for _, g in ipairs(town.greenery) do
 		place(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)

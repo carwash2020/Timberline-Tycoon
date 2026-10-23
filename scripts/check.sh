@@ -2,8 +2,9 @@
 # Runs every check that doesn't need Roblox Studio:
 #   formatting (StyLua), lint (Selene), strict type-checking against the
 #   real Roblox API (luau-lsp), the unit tests (Lune), and whether ECONOMY.md
-#   matches the balance tables, and meshlint (the GLBs have nothing solid in a
-#   log lane or a doorway: tools/blender/meshlint.py). Run from the repo root: ./scripts/check.sh
+#   matches the balance tables, meshlint (the GLBs have nothing solid in a
+#   log lane or a doorway: tools/blender/meshlint.py), and the render check (no
+#   preview/**/*.png touched without a change: tools/render_touched.py). Run from the repo root: ./scripts/check.sh
 # Tools come from rokit.toml (`rokit install`). GitHub runs this on every
 # push to main and every pull request (.github/workflows/checks.yml).
 #
@@ -66,6 +67,11 @@ if [ "$RUN_LINT" = 1 ]; then
 	echo "== meshlint (no solid in a lane or door of a mesh)"
 	python3 tools/blender/meshlint.py
 	python3 tools/blender/test_meshlint.py
+	echo "== renders: none touched without a change (tools/render_touched.py)"
+	python3 tools/test_render_touched.py
+	# Needs a base ref (CI sets RENDER_BASE on a pull request; locally it is origin/main); without
+	# one it prints a skip line and passes.
+	python3 tools/render_touched.py --base "${RENDER_BASE:-origin/main}"
 fi
 
 echo "All checks passed."

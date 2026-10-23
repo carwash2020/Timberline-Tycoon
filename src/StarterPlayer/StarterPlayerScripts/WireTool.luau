@@ -48,7 +48,7 @@ local LINE = Color3.fromRGB(255, 196, 64)
 local LINE_PICKED = Color3.fromRGB(120, 220, 255)
 local LINE_WARN = C.WireShort -- a stretch the box cannot pay for yet (#FFC873)
 local LINE_BAD = C.WireTooLong -- a stretch past the longest wire (#C8553D)
-local ACTIONS = { "WirePick", "WireCut", "WireBuy", "WireDone" }
+local ACTIONS = { "WirePick", "WireCut", "WireBuy", "WireDone", "WireEnd" }
 
 local active = false
 local building = false
@@ -85,7 +85,12 @@ local function mine(): ({ WireToolLogic.Piece }, { [string]: Model }, { [string]
 	local pieces: { WireToolLogic.Piece } = {}
 	local models: { [string]: Model } = {}
 	local wires: { [string]: string } = {}
-	for _, inst in ipairs(CollectionService:GetTagged("PlacedItem")) do
+	-- Pieces, and the junctions (free ends of runs) the server draws as markers (tag WireJoint).
+	local found = CollectionService:GetTagged("PlacedItem")
+	for _, joint in ipairs(CollectionService:GetTagged("WireJoint")) do
+		table.insert(found, joint)
+	end
+	for _, inst in ipairs(found) do
 		if inst:IsA("Model") and inst:GetAttribute("OwnerId") == player.UserId then
 			local uid = inst:GetAttribute("Uid")
 			local id = inst:GetAttribute("BlueprintId")
@@ -486,6 +491,31 @@ local function cut()
 	fire(action)
 end
 
+-- END HERE (V, L3): ends the run in the open at the last corner tapped. That free end is a
+-- junction another run can start from (tap it like a piece) or end on. Needs a corner; the
+-- server measures and charges the run as any other.
+local function endHere()
+	local pieces = mine()
+	local from = pieceOf(pieces, picked)
+	if not picked or not from or not WireLogic.IsSource(WireLogic.Role(from.blueprintId)) then
+		HUD.Toast("Pick an output (or a wire end) first.")
+		return
+	end
+	if #bends < 1 then
+		HUD.Toast(WireLogic.Message("corner") or "")
+		return
+	end
+	if not reachOk(pieces, picked) then
+		HUD.Toast(WireLogic.Message("reach") or "Stand closer to wire that.")
+		return
+	end
+	fire({ op = "link", from = picked, to = WireLogic.NewEnd, via = table.clone(bends) })
+	bends = {}
+	picked = nil
+	highlight()
+	refreshBar()
+end
+
 -- A tap on bare ground with an output picked bends the run there (at most
 -- WireSupply.MaxBends; a fifth is refused). True when the tap was a bend.
 local function bendAt(x: number, y: number): boolean
@@ -648,7 +678,7 @@ function WireTool.Begin(stopped: (() -> ())?)
 		end)
 	)
 	local binds = InputKit.WireBinds
-	local pickBind, cutBind, buyBind, doneBind = binds[1], binds[2], binds[3], binds[4]
+	local pickBind, cutBind, buyBind, doneBind, endBind = binds[1], binds[2], binds[3], binds[4], binds[5]
 	local top = Enum.ContextActionPriority.High.Value + 100
 	ContextActionService:BindActionAtPriority("WirePick", action(pickAimed), false, top, pickBind.gamepad)
 	ContextActionService:BindActionAtPriority(
@@ -674,6 +704,14 @@ function WireTool.Begin(stopped: (() -> ())?)
 		top,
 		doneBind.gamepad,
 		doneBind.keyboard :: Enum.KeyCode
+	)
+	ContextActionService:BindActionAtPriority(
+		"WireEnd",
+		action(endHere),
+		false,
+		top,
+		endBind.gamepad,
+		endBind.keyboard :: Enum.KeyCode
 	)
 	if bar then
 		bar.outer.Visible = true

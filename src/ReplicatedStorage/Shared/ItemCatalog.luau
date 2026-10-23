@@ -977,24 +977,25 @@ ItemCatalog.Machines = {
 	},
 } :: { [string]: MachineDef }
 
--- Wire (T420): single-use wiring, bought by the amount needed and used up as a
--- wire is stretched between two pieces. One unit is one stud of wire. There was
--- no per-unit wire price before this (the Glow Wire is a placed light, not a
--- length), so `unitPrice` is NEW DATA, flagged for Connor: no other price moved.
--- The longest single wire is WireLogic.Span (the server's reach between pieces)
--- and is not repeated here.
+-- Wire (T420): single-use wiring, sold as ONE box and used up as a wire is
+-- stretched between two pieces. One unit is one stud of wire. The Wire Box holds
+-- boxStuds (160) studs and costs boxPrice ($100, Connor, 23 Oct 2026); no other
+-- size is sold and there is no per-stud price. The longest single wire is
+-- WireLogic.MaxRun (the whole box); WireLogic.Span is the switch prompt's reach.
 export type WireDef = {
 	id: string,
 	displayName: string,
-	unitPrice: number, -- cash per unit (one stud)
+	boxStuds: number, -- studs (units) in the one box that is sold
+	boxPrice: number, -- cash for that box
 	note: string,
 }
 
 ItemCatalog.Wire = {
 	id = "Wire",
-	displayName = "Wire",
-	unitPrice = 2,
-	note = "One unit is one stud of wire. A wire is used up when you stretch it between two pieces.",
+	displayName = "Wire Box (160 studs)",
+	boxStuds = 160,
+	boxPrice = 100,
+	note = "One box is 160 studs of wire. Only the studs a wire uses come out of the box; the rest stay for later.",
 } :: WireDef
 
 function ItemCatalog.GetWire(): WireDef

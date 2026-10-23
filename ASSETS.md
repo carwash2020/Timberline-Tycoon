@@ -42,7 +42,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 | Kind | Distinct ids | Places written | Written in |
 | --- | ---: | ---: | --- |
-| mesh | 1094 | 1371 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, PendingMeshes.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau, WornModels.luau |
+| mesh | 1099 | 1376 | AxeModels.luau, BacklogModels.luau, BlenderAssets.luau, ItemMeshData.luau, KitMeshData.luau, MachineMeshes.luau, ModelSlots.luau, PendingMeshes.luau, RockModels.luau, StoreModelSlots.luau, TownModels.luau, TreeModels.luau, VehicleModels.luau, WireArt.luau, WornModels.luau |
 | model | 206 | 206 | BacklogModels.luau, MachineMeshes.luau, TownModels.luau |
 | template | 1015 | 1015 | src/ReplicatedStorage/MeshTemplates |
 | image | 18 | 18 | StoreData.luau, UIArt.luau, UITheme.luau, WeatherController.luau |
@@ -90,7 +90,7 @@ Not wired by these slots (another lane wires them; no slot here):
 | `assets/glb/store-items/ShedBlueprint.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 | `assets/glb/store-items/WoodSign.glb` | unset | GLB in repo, not uploaded: no Roblox mesh id yet (wired by the Hearth and Home lane) |
 
-## Meshes (MeshId, loaded by MeshKit) (1094)
+## Meshes (MeshId, loaded by MeshKit) (1099)
 
 | Id | Used by | Places | Status |
 | --- | --- | ---: | --- |
@@ -1098,6 +1098,11 @@ Not wired by these slots (another lane wires them; no slot here):
 | 111192039401543 | VehicleModels.luau HeavyHauler Bed | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 76485456462102 | VehicleModels.luau HeavyHauler Wheel | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
 | 76951151154210 | VehicleModels.luau HeavyHauler  | 5 | new GLB in repo, needs re-upload; template, format ok, not checked yet |
+| 80844007658561 | WireArt.luau Pieces  | 1 | no template, format ok, not checked yet |
+| 94852981021651 | WireArt.luau Pieces  | 1 | no template, format ok, not checked yet |
+| 136255398985840 | WireArt.luau Pieces  | 1 | no template, format ok, not checked yet |
+| 105703432161770 | WireArt.luau Pieces  | 1 | no template, format ok, not checked yet |
+| 131695301504197 | WireArt.luau Pieces  | 1 | no template, format ok, not checked yet |
 | 115269271855313 | WornModels.luau CoatBody Body | 1 | template, format ok, not checked yet |
 | 73589596256678 | WornModels.luau CoatSleeve Body | 1 | template, format ok, not checked yet |
 | 116105552771338 | WornModels.luau HeatBoot Body | 1 | template, format ok, not checked yet |

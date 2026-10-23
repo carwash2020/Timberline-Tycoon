@@ -198,7 +198,7 @@ return function(t)
 			local short = Logic.Stretch(4, sw, lamp, nil)
 			t.eq(short.state, "short")
 			t.eq(short.short, 2)
-			t.eq(short.buyCost, 2 * WireSupply.UnitPrice())
+			t.eq(short.buyCost, 100, "the box that covers it: $100")
 			local tooLong = Logic.Stretch(999, sw, far, nil)
 			t.eq(tooLong.state, "far")
 			t.eq(tooLong.short, 0)
@@ -230,26 +230,24 @@ return function(t)
 		t.ok(string.find(string.lower(Logic.BoxLine(0)), "empty", 1, true))
 	end)
 
-	t.test(
-		"the buy button offers a pack: the smallest that covers the shortfall, else the smallest, never past the box",
-		function()
-			local sw, lamp = pieces[1], pieces[3]
-			local short = Logic.BuyPlan(4, Logic.Stretch(4, sw, lamp, nil))
-			t.eq(short.amount, 32, "2 short: the 32 pack")
-			t.eq(short.cost, 32 * WireSupply.UnitPrice())
-			t.ok(string.find(short.text, "32", 1, true) and string.find(short.text, "$", 1, true), short.text)
-			local topUp = Logic.BuyPlan(30, Logic.Stretch(30, sw, lamp, nil))
-			t.eq(topUp.amount, 32, "nothing missing: a top-up of the smallest pack")
-			local nearlyFull =
-				Logic.BuyPlan(WireSupply.MaxStock - 20, Logic.Stretch(WireSupply.MaxStock - 20, sw, lamp, nil))
-			t.eq(nearlyFull.amount, 0, "no pack fits")
-			local fits = Logic.BuyPlan(WireSupply.MaxStock - 32, Logic.Stretch(WireSupply.MaxStock - 32, sw, lamp, nil))
-			t.eq(fits.amount, 32)
-			local full = Logic.BuyPlan(WireSupply.MaxStock, Logic.Stretch(WireSupply.MaxStock, sw, lamp, nil))
-			t.eq(full.amount, 0)
-			t.ok(string.find(string.lower(full.text), "full", 1, true))
-		end
-	)
+	t.test("the buy button offers the one Wire Box, with its $100 price shown, never past the cap of 320", function()
+		local sw, lamp = pieces[1], pieces[3]
+		local short = Logic.BuyPlan(4, Logic.Stretch(4, sw, lamp, nil))
+		t.eq(short.amount, 160, "2 short: the box")
+		t.eq(short.cost, 100)
+		t.ok(string.find(short.text, "160", 1, true) and string.find(short.text, "$100", 1, true), short.text)
+		t.ok(string.find(short.text, "Wire Box", 1, true), short.text)
+		local topUp = Logic.BuyPlan(30, Logic.Stretch(30, sw, lamp, nil))
+		t.eq(topUp.amount, 160, "nothing missing: a top-up is still the box")
+		local nearlyFull =
+			Logic.BuyPlan(WireSupply.MaxStock - 20, Logic.Stretch(WireSupply.MaxStock - 20, sw, lamp, nil))
+		t.eq(nearlyFull.amount, 0, "no room for a whole box")
+		local fits = Logic.BuyPlan(WireSupply.MaxStock - 160, Logic.Stretch(WireSupply.MaxStock - 160, sw, lamp, nil))
+		t.eq(fits.amount, 160)
+		local full = Logic.BuyPlan(WireSupply.MaxStock, Logic.Stretch(WireSupply.MaxStock, sw, lamp, nil))
+		t.eq(full.amount, 0)
+		t.ok(string.find(string.lower(full.text), "full", 1, true))
+	end)
 
 	t.test(
 		"Lesson(step) returns the lesson, and nil once all three are seen (the file has no stray block in it)",
@@ -284,9 +282,9 @@ return function(t)
 		t.eq(bent.length, 46, "20 up, 6 across, 20 back")
 		t.eq(bent.bends, 2)
 		t.eq(
-			Logic.Stretch(100, sw, lamp, nil, { { x = 0, z = 30 }, { x = 6, z = 30 } }).state,
+			Logic.Stretch(200, sw, lamp, nil, { { x = 0, z = 80 }, { x = 6, z = 80 } }).state,
 			"far",
-			"66 studs along the path"
+			"166 studs along the path"
 		)
 	end)
 

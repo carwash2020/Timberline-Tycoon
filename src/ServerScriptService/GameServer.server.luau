@@ -32,6 +32,7 @@ local GateService = require(script.Parent.GateService)
 local HazardService = require(script.Parent.HazardService)
 local HermitService = require(script.Parent.HermitService)
 local LogicService = require(script.Parent.LogicService)
+local WireSpoolMeshes = require(script.Parent.WireSpoolMeshes)
 local PermissionService = require(script.Parent.PermissionService)
 local PolicyGate = require(script.Parent.PolicyGate)
 local DailyService = require(script.Parent.DailyService)
@@ -1139,6 +1140,8 @@ BootReport.StartStubs({
 			if LogicService.Init then
 				LogicService.Init(remote.Wire)
 			end
+			-- The spool's uploaded model loads once, here, in the background (T420).
+			WireSpoolMeshes.Init()
 			-- Wire is bought with cash (T420): EconomyService spends it, the player's
 			-- WireUnits attribute tells the client how much is in the box.
 			LogicService.BindWallet({

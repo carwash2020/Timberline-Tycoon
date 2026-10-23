@@ -137,29 +137,26 @@ return function(t)
 		}
 	end
 
-	local price = 2
-
-	t.test("a buy through the remote spends real cash and fills the box", function()
+	t.test("a buy through the remote spends $100 of real cash and fills the box with the 160 studs", function()
 		local w = world({ cash = 1000 })
-		price = w.WireSupply.UnitPrice()
-		w.fire(w.owner, "buy", 64)
-		t.eq(w.profile.wireUnits, 64)
-		t.eq(w.profile.cash, 1000 - 64 * price)
-		t.eq(w.owner.attrs.WireUnits, 64)
-		t.eq(w.owner.attrs.Cash, 1000 - 64 * price, "EconomyService mirrored the new cash")
+		w.fire(w.owner, "buy", 160)
+		t.eq(w.profile.wireUnits, 160)
+		t.eq(w.profile.cash, 900)
+		t.eq(w.owner.attrs.WireUnits, 160)
+		t.eq(w.owner.attrs.Cash, 900, "EconomyService mirrored the new cash")
 	end)
 
 	t.test("too little cash: nothing bought, nothing spent", function()
-		local w = world({ cash = 32 * 2 - 1 })
-		w.fire(w.owner, "buy", 32)
+		local w = world({ cash = 99 })
+		w.fire(w.owner, "buy", 160)
 		t.eq(w.profile.wireUnits, 0)
-		t.eq(w.profile.cash, 32 * 2 - 1)
+		t.eq(w.profile.cash, 99)
 	end)
 
 	t.test("off your plot you cannot buy or wire", function()
 		local w = world({ cash = 1000, units = 50 })
 		w.leave()
-		w.fire(w.owner, "buy", 32)
+		w.fire(w.owner, "buy", 160)
 		w.fire(w.owner, "sw", 1, "lamp", 1)
 		t.eq(w.profile.wireUnits, 50)
 		t.eq(w.profile.cash, 1000)
@@ -168,17 +165,17 @@ return function(t)
 
 	t.test("a non-owner cannot buy, and a visitor with the build flag cannot spend the owner's cash", function()
 		local w = world({ cash = 1000, units = 10 })
-		w.fire(w.visitor, "buy", 32)
+		w.fire(w.visitor, "buy", 160)
 		t.eq(w.profile.wireUnits, 10, "no flag: refused")
 		w.profile.permissions = { anyone = { build = true } }
-		w.fire(w.visitor, "buy", 32)
+		w.fire(w.visitor, "buy", 160)
 		t.eq(w.profile.wireUnits, 10, "with the flag: still the owner's purse")
 		t.eq(w.profile.cash, 1000)
 	end)
 
-	t.test("fractional and negative amounts, and anything off the packs, are refused", function()
+	t.test("fractional and negative amounts, and anything but the one box, are refused", function()
 		local w = world({ cash = 1e6 })
-		for _, bad in ipairs({ 32.5, 0.5, -32, -1, 0, 31, 33, 96, 200, 320 }) do
+		for _, bad in ipairs({ 32.5, 0.5, -160, -1, 0, 32, 64, 96, 159, 161, 200, 320 }) do
 			w.fire(w.owner, "buy", bad)
 		end
 		t.eq(w.profile.wireUnits, 0)
@@ -187,7 +184,7 @@ return function(t)
 
 	t.test("an over-length run is rejected and uses no wire; a legal one uses its own measured length", function()
 		local w = world({ units = 200 })
-		w.fire(w.owner, "sw", 1, "lamp", 1, { { x = 0, z = 40 }, { x = 30, z = 40 } })
+		w.fire(w.owner, "sw", 1, "lamp", 1, { { x = 0, z = 70 }, { x = 30, z = 70 } })
 		t.eq(w.profile.wireUnits, 200)
 		t.eq(w.profile.plot.wires, {})
 		w.fire(w.owner, "sw", 1, "lamp", 1, { { x = 0, z = 10 }, { x = 30, z = 10 } })
@@ -232,10 +229,15 @@ return function(t)
 
 	t.test("every request is rate limited by the real limiter: a burst past the budget is dropped", function()
 		local w = world({ cash = 1e6 })
+		local bought = 0
 		for _ = 1, 40 do
-			w.fire(w.owner, "buy", 32)
+			w.profile.wireUnits = 0 -- empty the box so the cap never refuses: only the budget can
+			w.fire(w.owner, "buy", 160)
+			if w.profile.wireUnits == 160 then
+				bought += 1
+			end
 		end
-		t.ok(w.profile.wireUnits < 40 * 32, "the budget stopped the burst: " .. w.profile.wireUnits)
-		t.ok(w.profile.wireUnits >= 32)
+		t.ok(bought < 40, "the budget stopped the burst: " .. bought .. " of 40 got through")
+		t.ok(bought >= 1)
 	end)
 end
