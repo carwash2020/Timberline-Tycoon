@@ -14,6 +14,7 @@
 -- calls error() when anything failed, which fails the task.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local Lint = ReplicatedStorage.Shared.Lint
 local CloudCheck = require(Lint.CloudCheck)
@@ -111,6 +112,10 @@ return function(): CloudCheck.Report
 		engineOverlaps = engineOverlaps,
 		meshLoads = meshLoads,
 		buildMachine = MachineArt.BuildAny,
+		-- T420: the 96 stump frustum models (InsertService:LoadAsset) load and hold a MeshPart.
+		stumpMeshes = function(): ({ string }, number)
+			return (require(ServerScriptService.StumpMeshes) :: any).CloudCheck()
+		end,
 		log = print,
 	})
 	map:Destroy()

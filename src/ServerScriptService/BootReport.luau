@@ -18,6 +18,7 @@ local EVENT_NAMES = {
 	{ attribute = "MapBuildSeconds", name = "ServerWorldBuildSeconds" },
 	{ attribute = "MapTerrainSeconds", name = "ServerTerrainBuildSeconds" },
 	{ attribute = "MapBuildFailures", name = "ServerWorldBuildFailures" },
+	{ attribute = "stumpStretchViolations", name = "ServerStumpStretchViolations" },
 }
 
 local function seconds(value: any): string
@@ -52,6 +53,21 @@ function BootReport.Line(world: any, players: number): string
 			", %s failed (see the [MapBuilder] warnings)",
 			count(failures, "build step", "build steps")
 		)
+	end
+	-- T420: stumps. stumpMeshesMissing (the missing stump meshes, "; " joined,
+	-- set by StumpMeshes) and stumpStretchViolations (stumps whose bark stretch
+	-- is outside 1/1.3 to 1.3 or that were dropped for a missing mesh).
+	local missingMeshes = stat("stumpMeshesMissing")
+	if type(missingMeshes) == "string" and missingMeshes ~= "" then
+		local n = select(2, string.gsub(missingMeshes, "; ", "; ")) + 1
+		line ..= string.format(
+			", %s missing (stumpMeshesMissing: see the [Stump] warnings)",
+			count(n, "stump mesh", "stump meshes")
+		)
+	end
+	local stretch = stat("stumpStretchViolations")
+	if type(stretch) == "number" and stretch > 0 then
+		line ..= string.format(", stumpStretchViolations %d", stretch)
 	end
 	return line
 end

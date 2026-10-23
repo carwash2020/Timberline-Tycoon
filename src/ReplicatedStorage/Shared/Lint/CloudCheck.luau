@@ -23,6 +23,8 @@ export type Deps = {
 	meshLoads: (() -> ({ string }, number))?,
 	-- Builds a machine by id for MustKeep's machine entries.
 	buildMachine: ((string) -> Model?)?,
+	-- The 96 stump frustum models load and each holds a MeshPart (T420, StumpMeshes.CloudCheck); nil in lune.
+	stumpMeshes: (() -> ({ string }, number))?,
 	log: ((string) -> ())?,
 }
 
@@ -66,6 +68,11 @@ function CloudCheck.Run(
 		local lines, checked = deps.meshLoads()
 		log(string.format("[cloud-test] meshes checked: %d", checked))
 		section("mesh loads", lines)
+	end
+	if deps.stumpMeshes then
+		local lines, checked = deps.stumpMeshes()
+		log(string.format("[cloud-test] stump meshes checked: %d", checked))
+		section("stump meshes", lines)
 	end
 	return { passed = passed, failed = #failures, failures = failures }
 end

@@ -74,6 +74,7 @@ local GrowLogic = require(ReplicatedStorage.Shared.GrowLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
+local StumpLogic = require(ReplicatedStorage.Shared.StumpLogic)
 local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local TreeGen = require(ReplicatedStorage.Shared.TreeGen)
@@ -87,6 +88,7 @@ local TreeFill = require(ReplicatedStorage.Shared.World.TreeFill)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local GrabService = require(script.Parent.GrabService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local StumpMeshes = require(script.Parent.StumpMeshes)
 local WoodService = require(script.Parent.WoodService)
 
 type WoodDef = WoodData.WoodDef
@@ -97,6 +99,7 @@ local SectionTrees = {}
 SectionTrees.TreeTag = "Tree"
 SectionTrees.StumpTag = "Stump"
 SectionTrees.GhostRetry = 2 -- seconds between checks while something stands where a tree came back
+SectionTrees.StumpStepSec = 0.5 -- seconds between a stump's weathering and fade steps
 SectionTrees.MaxHold = 240 -- seconds: HoldRegrow never keeps a stub longer than this from now
 SectionTrees.ElderStubSec = TreeLogic.FallTime + 8 -- an Elder's stub goes this soon
 SectionTrees.DeadBark = Color3.fromRGB(43, 38, 36) -- a dead tree's bark
@@ -111,6 +114,26 @@ type PartState = { transparency: number, collide: boolean, query: boolean }
 -- A site's tree. The first block is TreeService's TreeRecord, field for
 -- field (ForestService, WeatherService and QuestService read those); the
 -- rest is the section tree's own.
+-- The stump a felled tree leaves (T420, StumpLogic): the root section
+-- stays as an invisible hitbox the Chop handler cuts, and the stump's own
+-- look (TreeArt.StumpDress) stands over it.
+type StumpState = {
+	height: number, -- studs, the cut's height up the trunk
+	segs: { StumpLogic.Seg }, -- the trunk it was cut from (a re-cut keeps the taper)
+	base: CFrame, -- its bottom centre
+	bark: Color3, -- the trunk's own colour at the cut: the stump continues it
+	rootId: number,
+	shape: StumpLogic.Shape,
+	hitbox: BasePart,
+	parts: { BasePart },
+	colors: { [BasePart]: Color3 },
+	cfs: { [BasePart]: CFrame },
+	cutAt: number, -- clock time of the last cut: the decay runs from here
+	goneAt: number, -- it despawns then
+	level: number, -- the weathering step applied
+	fade: number, -- the fade applied
+}
+
 export type TreeRecord = {
 	uid: string,
 	model: Model,
@@ -159,6 +182,8 @@ export type TreeRecord = {
 	zone: WorldPlan.TreeZone?, -- where it may grow back
 	cap: number?, -- boot count for this zone (and wood, except Wild)
 	slot: boolean, -- nothing rooted is left: waiting on regrowAt
+	stumpState: StumpState?, -- the standing stump, while there is one
+	trunkProfile: { StumpLogic.Seg }, -- the trunk's segments, bottom to top
 }
 
 export type SpawnOptions = {
@@ -191,6 +216,7 @@ local counters: { [string]: number } = {}
 local deps: Deps? = nil
 local clock: () -> number = os.clock
 local started = false
+local stumped: { [TreeRecord]: boolean } = {} -- records with a standing stump (T420)
 local makeSolid: (rec: TreeRecord) -> ()
 local openSlot: (rec: TreeRecord, now: number) -> ()
 local tryRegrow: (rec: TreeRecord, now: number) -> ()
@@ -474,6 +500,22 @@ local function readSkeleton(rec: TreeRecord, skel: TreeGen.Skeleton, model: Mode
 	end
 	rec.nextId = #skel.sections + 1
 	rec.trunkSegments = skel.trunkSegments
+	-- The whole trunk, bottom to top, for a stump's taper (the sections above
+	-- a cut are gone by the time the stump is made).
+	local profile: { StumpLogic.Seg } = {}
+	local trunk: { TreeGen.Section } = {}
+	for _, sec in ipairs(skel.sections) do
+		if sec.depth < skel.trunkSegments then
+			table.insert(trunk, sec)
+		end
+	end
+	table.sort(trunk, function(a, b)
+		return a.depth < b.depth
+	end)
+	for _, sec in ipairs(trunk) do
+		table.insert(profile, { length = sec.length, thickness = sec.thickness })
+	end
+	rec.trunkProfile = profile
 end
 
 -- The top of the trunk (its last trunk section), in world space.
@@ -614,6 +656,8 @@ local function rebuild(rec: TreeRecord, grew: boolean)
 	rec.cuts, rec.marks = {}, {}
 	rec.parts, rec.effects = snapshot(model)
 	rec.stump, rec.stumpParts = nil, nil
+	rec.stumpState = nil
+	stumped[rec] = nil
 	byModel[model] = rec
 	-- The connection dies with the model when a rebuild replaces it.
 	model:GetAttributeChangedSignal("TreeMesh"):Connect(function()
@@ -730,6 +774,8 @@ function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOp
 		zone = opts.zone,
 		cap = opts.cap or (if opts.zone then opts.zone.cap else nil),
 		slot = false,
+		stumpState = nil,
+		trunkProfile = {},
 	}
 	trees[uid] = rec
 	rebuild(rec, false)
@@ -830,6 +876,7 @@ function SectionTrees.Remove(uid: string)
 		return
 	end
 	trees[uid] = nil
+	stumped[rec] = nil
 	local model = rec.model
 	if not rec.dead then
 		die(rec)
@@ -1043,6 +1090,222 @@ local function prosperOf(player: Player): number
 	return TemperLogic.Multiplier(profile.temper[uid])
 end
 
+---------------------------------------------------------------------------
+-- The stump (T420)
+---------------------------------------------------------------------------
+
+-- Weathering steps: a part is only repainted when the step moves.
+SectionTrees.WeatherLevels = 20 -- steps in the weathering (a part is only repainted when the step moves)
+
+-- Takes the stump's look off the tree (and its colours, for a re-cut or a
+-- despawn). The hitbox section stays.
+local lookStump: (state: StumpState, now: number) -> ()
+local despawnStump: (rec: TreeRecord, now: number) -> ()
+
+local function dropStumpLook(rec: TreeRecord, state: StumpState)
+	for _, d in ipairs(state.parts) do
+		rec.parts[d] = nil
+		if d.Parent ~= nil then
+			d:Destroy()
+		end
+	end
+	state.parts = {}
+	state.colors, state.cfs = {}, {}
+end
+
+-- Stands the stump over the rooted trunk after a felling, or rebuilds it
+-- shorter after a re-cut (`height` given). Section `sid` is the cut's low
+-- part; everything rooted below it (the lower trunk sections) is folded
+-- into one hitbox section the Chop handler can cut again: invisible,
+-- not colliding (the stump's own discs do), the trunk's base thickness
+-- wide and as tall as the stump.
+local function makeStump(rec: TreeRecord, sid: number, now: number, height: number?)
+	local old = rec.stumpState
+	local bark: Color3
+	local segs: { StumpLogic.Seg }
+	local rootId: number
+	local bottom: CFrame
+	local total: number
+	if old then
+		segs, rootId, bottom, total = old.segs, old.rootId, old.base, height or old.height
+		bark = old.bark
+		dropStumpLook(rec, old)
+	else
+		local chain: { number } = {}
+		local id: number? = sid
+		while id do
+			table.insert(chain, 1, id)
+			local node = rec.nodes[id]
+			id = if node then node.parent else nil
+		end
+		rootId = chain[1]
+		local root = rec.sections[rootId]
+		bark = rec.sections[sid].Color
+		-- The taper is the whole trunk's, the height what is rooted now.
+		segs, total = rec.trunkProfile, 0
+		if #segs == 0 then
+			for _, cid in ipairs(chain) do
+				local cp = rec.sections[cid]
+				table.insert(segs, { length = cp.Size.Y, thickness = math.min(cp.Size.X, cp.Size.Z) })
+			end
+		end
+		for _, cid in ipairs(chain) do
+			total += rec.sections[cid].Size.Y
+		end
+		bottom = root.CFrame * CFrame.new(0, -root.Size.Y / 2, 0)
+		-- Everything rooted above the root section folds into it.
+		for _, cid in ipairs(chain) do
+			WoodService.ClearCuts(rec, cid)
+			local cp = rec.sections[cid]
+			for _, d in ipairs(rec.model:GetDescendants()) do
+				if d:IsA("BasePart") and d ~= cp and d:GetAttribute("Section") == cid and d.Name ~= "Root" then
+					if rec.sections[cid] ~= d then
+						rec.parts[d] = nil
+						d:Destroy()
+					end
+				end
+			end
+			if cid ~= rootId then
+				rec.parts[cp] = nil
+				rec.sections[cid], rec.nodes[cid], rec.depth[cid] = nil, nil, nil
+				cp:Destroy()
+			end
+		end
+		rec.nodes[rootId] = { parent = nil, children = {} }
+		rec.depth[rootId] = 0
+	end
+	local hitbox = rec.sections[rootId]
+	local shape = StumpLogic.Shape(segs, total)
+	-- The hitbox keeps the old square side (the cut maths and the volume);
+	-- the stump itself is round (shape.baseRadius, StumpBase on the hitbox).
+	local side = segs[1].thickness
+	hitbox.Size = Vector3.new(side, total, side)
+	hitbox.CFrame = bottom * CFrame.new(0, total / 2, 0)
+	hitbox.Transparency = 1
+	hitbox.CanCollide = false
+	hitbox:SetAttribute("StumpBase", shape.baseRadius)
+	hitbox:SetAttribute("StumpTop", shape.topRadius)
+	rec.parts[hitbox] = { transparency = 1, collide = false, query = true }
+	local state: StumpState = {
+		height = total,
+		segs = segs,
+		rootId = rootId,
+		shape = shape,
+		bark = bark,
+		base = bottom,
+		hitbox = hitbox,
+		parts = {},
+		colors = {},
+		cfs = {},
+		cutAt = now,
+		goneAt = now + StumpLogic.FadeEnd,
+		level = 0,
+		fade = 0,
+	}
+	rec.stumpState = state
+	stumped[rec] = true
+	-- The look is the uploaded frustum meshes (one per sleeve, of the
+	-- stump's own radius set); they may still be loading. If one is missing
+	-- the stump is dropped: no stump at all (despawnStump: the spot clears
+	-- as it does when a stump goes, the log above the cut is made as usual),
+	-- never a stand-in; stumpMeshesMissing and stumpStretchViolations record it.
+	StumpMeshes.Resolve(shape, function(templates: { MeshPart? }?)
+		if rec.stumpState ~= state or rec.model.Parent == nil then
+			return
+		end
+		StumpMeshes.CountStump(shape, templates == nil)
+		if templates == nil then
+			despawnStump(rec, clock())
+			return
+		end
+		local look = TreeArt.StumpDress(rec.def, rec.model, state.base, shape, templates, state.bark)
+		local colors: { [BasePart]: Color3 } = {}
+		local cfs: { [BasePart]: CFrame } = {}
+		for _, d in ipairs(look) do
+			d.CollisionGroup = hitbox.CollisionGroup
+			colors[d] = d.Color
+			cfs[d] = d.CFrame
+			rec.parts[d] = { transparency = 0, collide = d.CanCollide, query = d.CanQuery }
+			if rec.dormant then
+				d.Transparency = 1
+				d.CanCollide = false
+			elseif rec.ghost then
+				d.CanCollide = false
+			end
+		end
+		state.parts, state.colors, state.cfs = look, colors, cfs
+		lookStump(state, clock())
+	end)
+end
+
+-- Weathers, fades and sinks one stump to how old it is.
+lookStump = function(state: StumpState, now: number)
+	local age = now - state.cutAt
+	local levels = SectionTrees.WeatherLevels
+	local w = StumpLogic.Weathering(age)
+	local level = math.floor(w * levels + 1e-9)
+	if level ~= state.level then
+		state.level = level
+		local steady = level / levels
+		for _, d in ipairs(state.parts) do
+			local orig = state.colors[d]
+			if orig then
+				if d.Name == "StumpMesh" then
+					d.Color = StumpLogic.BarkColor(orig, steady)
+				elseif d.Name == "StumpCap" then
+					d.Color = StumpLogic.CapColor(orig, steady)
+				end -- the ring stays #3C2814
+			end
+		end
+	end
+	local fade = StumpLogic.Fade(age)
+	if fade ~= state.fade then
+		state.fade = fade
+		local sink = StumpLogic.SinkAt(age)
+		for _, d in ipairs(state.parts) do
+			local cf = state.cfs[d]
+			if cf then
+				d.Transparency = fade
+				d.CFrame = cf - Vector3.new(0, sink, 0)
+			end
+		end
+	end
+end
+
+-- The stump's decay is over (190 s) before the species' regrow time: it
+-- goes and the spot is free, and the site grows back when its wood's own
+-- respawn time comes (regrowAt, untouched).
+despawnStump = function(rec: TreeRecord, now: number)
+	if not rec.stumpState then
+		return
+	end
+	local due = rec.regrowAt
+	rec.stumpState = nil
+	stumped[rec] = nil
+	if rec.temporary then
+		SectionTrees.Remove(rec.uid) -- an Elder leaves no stump and no slot
+		return
+	end
+	openSlot(rec, now)
+	rec.regrowAt = math.max(due or now, now)
+	if rec.regrowAt <= now then
+		tryRegrow(rec, now)
+	end
+end
+
+-- Ages every standing stump to `now` (weathering, fade, sink). The growth
+-- loop and its own loop call it; specs call it with a clock.
+function SectionTrees.StumpStep(now: number)
+	for rec in pairs(stumped) do
+		local state = rec.stumpState
+		if state == nil or trees[rec.uid] ~= rec or rec.model.Parent == nil then
+			stumped[rec] = nil
+		else
+			lookStump(state, now)
+		end
+	end
+end
+
 local function split(
 	rec: TreeRecord,
 	player: Player,
@@ -1054,23 +1317,61 @@ local function split(
 	local part = rec.sections[sid]
 	local depth = rec.depth[sid] or 0
 	local felled = depth < rec.trunkSegments
-	-- Only a stump that is already standing alone leaves whole. The first
-	-- cut through the root splits it at the hit like any other section, so
-	-- the stump stays rooted and only the trunk above the cut falls.
-	local rootCut = depth == 0 and rec.felled
+	-- A stump already standing (T420) is cut again as a stump: a normal log
+	-- of at least StumpLogic.MinLog, the cut moving down to keep it; a stump
+	-- too short for that comes away whole.
+	local state = rec.stumpState
+	local reCut = state ~= nil
+	local plan: StumpLogic.Recut? = nil
+	local cutAt = hit.height
+	if state then
+		plan = StumpLogic.Recut(state.height, hit.height)
+		cutAt = (plan :: StumpLogic.Recut).cutAt
+	end
+	-- Where it is cut (the tree tips from here) and the face that was cut
+	-- (the tree falls toward it).
+	local pivotAt = (part.CFrame * CFrame.new(0, -part.Size.Y / 2 + cutAt, 0)).Position
+	local mark = rec.marks[hit.cut]
+	local faceNormal = if mark then mark.normal else nil
+	-- Below StumpLogic.MinHeight a felling leaves no stump: the whole tree drops.
+	local baseCut = felled and not reCut and StumpLogic.IsBaseCut(pivotAt.Y - rec.base.Y)
+	local wholeDrop = baseCut or (plan ~= nil and plan.whole)
+	local top = part
+	local topId = sid
+	if baseCut then
+		for id, d in pairs(rec.depth) do
+			if d == 0 and rec.sections[id] then
+				topId, top = id, rec.sections[id]
+				break
+			end
+		end
+	end
 	WoodService.ClearCuts(rec, sid)
 	local high: BasePart
 	local ids: { [number]: boolean }
 	local stubFace: BasePart? = nil
-	if rootCut then
-		-- The whole rooted section leaves. No bottom sliver, no stub.
-		high = part
-		ids = WoodService.Reach(rec.nodes, sid)
+	if wholeDrop then
+		-- The whole rooted section leaves (and with a base cut, the whole
+		-- tree with it). No bottom sliver, no stub.
+		high = top
+		ids = WoodService.Reach(rec.nodes, topId)
+		if reCut then
+			-- The hitbox becomes a log.
+			high.Transparency = 0
+			high.CanCollide = true
+			high:SetAttribute("StumpBase", nil)
+			high:SetAttribute("StumpTop", nil)
+			TreeArt.CutFace(def, high, true)
+		end
 		TreeArt.CutFace(def, high, false)
 	else
 		local newId = rec.nextId
 		rec.nextId += 1
-		high = WoodService.SplitPart(part, hit.height, newId)
+		high = WoodService.SplitPart(part, cutAt, newId)
+		if reCut then
+			high.CanCollide = true
+			high.Transparency = 0
+		end
 		-- Links: the new part takes the cut section's children.
 		local node = rec.nodes[sid]
 		local children = node.children
@@ -1085,7 +1386,9 @@ local function split(
 		rec.sections[newId] = high
 		rec.depth[newId] = depth
 		ids = WoodService.Reach(rec.nodes, newId)
-		stubFace = TreeArt.CutFace(def, part, true)
+		if not felled then
+			stubFace = TreeArt.CutFace(def, part, true)
+		end
 		TreeArt.CutFace(def, high, false)
 	end
 	local pieceModel = WoodService.NewModel()
@@ -1119,13 +1422,14 @@ local function split(
 	if stubFace then
 		rec.parts[stubFace] = { transparency = stubFace.Transparency, collide = false, query = false }
 	end
-	-- Which way it goes: a trunk away from the cutter, a limb away from the tree.
+	-- Which way it goes: a trunk toward the side that was cut, a limb away from the tree.
 	local char = player.Character
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
 	local from = if hrp and hrp:IsA("BasePart") then hrp.Position else nil
 	local dir: Vector3
 	if felled then
-		dir = TreeLogic.FallDirection(rec.base, from, (math.random() - 0.5) * 0.7)
+		local toward = if faceNormal then StumpLogic.FallDirection(faceNormal) else nil
+		dir = toward or TreeLogic.FallDirection(rec.base, from, (math.random() - 0.5) * 0.7)
 	else
 		local out = high.CFrame.Position - rec.base
 		dir = Vector3.new(out.X, 0, out.Z)
@@ -1145,7 +1449,6 @@ local function split(
 			boost = m
 		end
 	end
-	local pivot = (part.CFrame * CFrame.new(0, part.Size.Y / 2, 0)).Position
 	local piece = WoodService.Adopt(pieceModel, {
 		woodId = def.id,
 		nodes = nodes,
@@ -1159,7 +1462,7 @@ local function split(
 		temper = prosperOf(owner),
 		treeUid = rec.uid,
 		elder = rec.elder,
-		fall = { cutter = player, dir = dir, felled = felled, pivot = pivot },
+		fall = { cutter = player, dir = dir, felled = felled, pivot = pivotAt },
 	})
 	local freed = SectionTrees.OnPieceFreed
 	if freed then
@@ -1172,19 +1475,33 @@ local function split(
 		end
 	end
 	local feller: Player? = nil
-	if rootCut then
-		-- The last of the stump: the site opens now.
+	local function clearSite()
 		if rec.temporary then
 			SectionTrees.Remove(rec.uid)
 		elseif trees[rec.uid] == rec then
 			openSlot(rec, clock())
 		end
+	end
+	if reCut then
+		if wholeDrop then
+			-- The last of the stump: the site opens now.
+			clearSite()
+		else
+			-- The remainder stands, its timer and weathering start again.
+			makeStump(rec, sid, clock(), cutAt)
+		end
+	elseif baseCut then
+		feller = fall(rec, player, dir, piece.uid)
+		clearSite()
 	elseif felled then
 		feller = fall(rec, player, dir, piece.uid)
+		-- The site grows back on its wood's own respawn time (the stump goes
+		-- with it if it is still standing; it decays and goes at 190 s if not;
+		-- a stump with no mesh is dropped at once and the spot waits this long).
 		if not rec.temporary then
-			-- The base stays rooted for a while, then the site grows back.
 			rec.regrowAt = clock() + GrowLogic.RespawnDelay(def.respawnSec, unit())
 		end
+		makeStump(rec, sid, clock())
 	end
 	return piece, feller
 end
@@ -1546,6 +1863,8 @@ openSlot = function(rec: TreeRecord, now: number)
 	end
 	rec.slot = true
 	rec.felled = true
+	rec.stumpState = nil
+	stumped[rec] = nil
 	rec.dead = false
 	rec.deadUntil = nil
 	rec.alive = false
@@ -1625,8 +1944,14 @@ local function nextChange(rec: TreeRecord): number?
 	if rec.temporary then
 		return nil
 	end
+	if rec.felled and rec.stumpState then
+		-- The stump decays and goes at goneAt; the species' own regrow time
+		-- (regrowAt) is untouched and takes the stump with it when it comes first.
+		local goneAt = rec.stumpState.goneAt
+		return if rec.regrowAt then math.min(goneAt, rec.regrowAt) else goneAt
+	end
 	if rec.felled and rec.regrowAt then
-		return rec.regrowAt -- a stump's time is up
+		return rec.regrowAt -- a stub's time is up
 	end
 	-- A felled base still ages on the life clock. The slot opens when it sinks.
 	local growSec = GrowLogic.GrowSec(rec.def)
@@ -1665,6 +1990,19 @@ local function advance(rec: TreeRecord, now: number)
 		end
 		return
 	end
+	if rec.felled and rec.stumpState then
+		if rec.regrowAt and now >= rec.regrowAt then
+			-- The species' own regrow time: the stump goes with it (early, if it
+			-- is still weathering) and the site grows back, as it always has.
+			rec.regrowAt = nil
+			openSlot(rec, now)
+			rec.regrowAt = now
+			tryRegrow(rec, now)
+		elseif now >= rec.stumpState.goneAt then
+			despawnStump(rec, now)
+		end
+		return
+	end
 	if rec.felled and rec.regrowAt then
 		if now >= rec.regrowAt then
 			-- The stump goes and the site grows back (at a new spot).
@@ -1699,6 +2037,7 @@ end
 -- One growth tick: at most TreesPerGrowTick trees whose change is due.
 -- Returns their uids (specs).
 function SectionTrees.GrowTick(now: number): { string }
+	SectionTrees.StumpStep(now)
 	local due: { GrowLogic.Due } = {}
 	for uid, rec in pairs(trees) do
 		local at = nextChange(rec)
@@ -1759,6 +2098,21 @@ function SectionTrees.Init(newDeps: Deps)
 	if newDeps.manual then
 		return
 	end
+	-- The stump meshes load now, so the first felled tree has its stump.
+	task.spawn(StumpMeshes.Preload)
+	-- Stumps weather and fade on a quicker beat than the growth tick.
+	task.spawn(function()
+		while true do
+			task.wait(SectionTrees.StumpStepSec)
+			local ok, err = pcall(function(): any
+				SectionTrees.StumpStep(clock())
+				return nil
+			end)
+			if not ok then
+				warn("[SectionTrees] stump step failed: " .. tostring(err))
+			end
+		end
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(Tune.Get("GrowTickSec") :: number)
@@ -1779,6 +2133,7 @@ end
 function SectionTrees._reset()
 	table.clear(trees)
 	table.clear(claimOf)
+	table.clear(stumped)
 	table.clear(byModel)
 	table.clear(counters)
 	table.clear(rejects)
