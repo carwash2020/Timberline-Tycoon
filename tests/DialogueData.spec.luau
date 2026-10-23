@@ -19,10 +19,7 @@ return function(t)
 		t.ok(string.find(offer, "Steel Axe", 1, true) ~= nil, offer)
 		t.ok(string.find(offer, "$160", 1, true) ~= nil, offer)
 		t.ok(DialogueData.Line("offer", { shop = "HearthAndHome", name = "Coat", price = "$500" }) ~= offer)
-		t.eq(
-			DialogueData.Line("needsPlot", { shop = "Dealership" }),
-			"Buy a plot at the Land Office first, then open this."
-		)
+		t.eq(DialogueData.Line("needsPlot", { shop = "Dealership" }), "Buy a plot from Old Hank first, then open this.")
 		t.eq(DialogueData.Card("needsPlot").noLabel, "Cancel")
 		t.eq(DialogueData.Card("needsPlot").choice, true)
 		t.eq(DialogueData.Card("offer").noLabel, "No")

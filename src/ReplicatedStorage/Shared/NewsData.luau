@@ -24,7 +24,7 @@ NewsData.Entries = {
 	},
 	{
 		line = "Sparkworks sells logic pieces, belts and lasers.",
-		detail = "Up the road past the Land Office. A plot first.",
+		detail = "Up the road past Old Hank. A plot first.",
 		icon = "spark",
 	},
 	{ line = "Refreshed shop icons.", detail = "Clearer pictures on every shelf and sign.", icon = "blueprint" },

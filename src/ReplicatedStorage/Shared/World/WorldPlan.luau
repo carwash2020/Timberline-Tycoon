@@ -2220,7 +2220,7 @@ function WorldPlan.Town(): Town
 		-- (it stood at (148.5, 76), which the link now covers).
 		-- Three short lines, no wrap: line 3 shrinks to fit rather than breaking after "a".
 		{
-			text = "PLOT DISTRICT\nLand Office\nBuy a plot and build on it",
+			text = "PLOT DISTRICT\nOld Hank sells plots\nBuy a plot and build on it",
 			cframe = standing(147, 104, 0, 40),
 			noWrap = true,
 		},

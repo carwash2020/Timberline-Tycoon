@@ -1,7 +1,10 @@
 --!strict
--- BuildMenuUI: the hammer's "Blueprints" menu. A category rail on the left and
--- a grid of picture cards on the right (like the Lumber Tycoon 2 shelves),
--- replacing the ShopUI row list for the blueprint list only. Client only: no
+-- BuildMenuUI: the hammer's blueprint picker (T420). Tabs down the left (Walls,
+-- Floors, Doors, Roofs, Fences, Supports, then any extra that has a piece) and a
+-- grid of cards on the right, one per print: a picture, its name, a sentence on
+-- what it is for and what it costs (Shared/HammerPicker), like the Lumber Tycoon 2
+-- shelves. It replaces the ShopUI row list for the blueprint list only. Taking the
+-- hammer out opens it (PlotUI.OnHammerHeld). Wire is not here: it is its own item. Client only: no
 -- remotes, no server change. Every rule stays where it is: BlueprintBook.Row
 -- says what a card shows, and a tap or A runs PlotUI's own place function (the
 -- toasts, "walk onto your plot", BlueprintBook.Allowed, BlueprintPlacer.Begin),
@@ -16,9 +19,17 @@
 -- name is 16 real px; a computer takes the normal scale, a TV 1.5.
 --
 -- Gamepad: Open selects the first tile (or the one last used); the stick stays
--- in the menu (SelectionGroups); LB and RB change category and select its first
--- tile; B and Esc close and the selection goes back to the button that opened
--- it. Nothing is bound to the right trigger (grab and chop are untouched).
+-- in the menu (SelectionGroups); the D-pad moves over the cards (explicit
+-- NextSelection from HammerPicker.Step), LB and RB change tab and select its first
+-- card, A picks, B and Esc close and the selection goes back to the button that
+-- opened it. The highlight is each button's own rectangle and corner
+-- (UITheme.FocusRing). Nothing is bound to the right trigger (grab and chop are
+-- untouched).
+--
+-- Motion (Shared/PickerMotion, UITheme.Tween): the panel rises and the backdrop
+-- fades in, tabs and cards grow a little under the pointer and shrink when
+-- pressed, a chosen tab or card warms up, the first cards pop in one after
+-- another. All of it is a few short tweens and none runs with "calm the screen".
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -30,6 +41,8 @@ local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local BuildMenuArt = require(ReplicatedStorage.Shared.Art.BuildMenuArt)
 local BuildMenuLogic = require(ReplicatedStorage.Shared.BuildMenuLogic)
 local Palette = require(ReplicatedStorage.Shared.Art.Palette)
+local HammerPicker = require(ReplicatedStorage.Shared.HammerPicker)
+local PickerMotion = require(ReplicatedStorage.Shared.PickerMotion)
 local GamepadNav = require(script.Parent.GamepadNav)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
@@ -53,8 +66,10 @@ local CLOSE_ACTION = "BuildMenuClose"
 local HOLD_ACTION = "BuildMenuHoldStill"
 local PANEL_MIN_WIDTH = 400 -- narrower than this beside the cash row, the panel goes under the row instead
 local PANEL_MAX_H = 640
+local SCRIM_ALPHA = 0.55 -- the dimmed backdrop
 
 local gui: ScreenGui? = nil
+local scrim: TextButton? = nil
 local area: Frame? = nil
 local panel: Frame? = nil
 local railList: ScrollingFrame? = nil
@@ -65,9 +80,12 @@ local closeFace: GuiObject? = nil
 
 local opts: Opts? = nil
 local isOpen = false
-local categories: { BuildMenuLogic.Category } = {}
+local categories: { HammerPicker.Tab } = {}
 local catIndex = 1
-local tiles: { { entry: BlueprintBook.Entry, button: TextButton, view: BuildMenuLogic.TileView } } = {}
+local tiles: { { entry: BlueprintBook.Entry, button: TextButton, view: BuildMenuLogic.TileView, card: HammerPicker.Card } } =
+	{}
+local closeToken = 0 -- a reopen cancels a close that is still fading
+local emptyNote: TextLabel? = nil -- "nothing here yet", over the grid, for a tab with no piece
 local railRows: { TextButton } = {}
 local landRow: TextButton? = nil
 local selectedId: string? = nil
@@ -81,8 +99,20 @@ local lastTileId: string? = nil
 -- Small builders
 ---------------------------------------------------------------------------
 
-local function focusRing(stroke: number): Frame
-	return UITheme.FocusRing(stroke)
+-- The ring a focused button shows. `radius` is the button's own corner, so the
+-- highlight follows its edge exactly (T420).
+local function focusRing(stroke: number, radius: number): Frame
+	return UITheme.FocusRing(stroke, radius)
+end
+
+local CARD_RADIUS = 8
+local ROW_RADIUS = 8
+
+-- The UIScale this screen really runs at: a phone's is 1 (UITheme.Screen's scale
+-- function in Start), anything else the theme's. Sizes read off the screen are
+-- divided by this to get design px.
+local function screenScale(): number
+	return math.max(if phoneNow then 1 else UITheme.Scale(), 0.01)
 end
 
 -- AbsoluteSize / AbsolutePosition, or zero where they cannot be read (before
@@ -118,7 +148,9 @@ end
 local function buildTile(
 	entry: BlueprintBook.Entry,
 	view: BuildMenuLogic.TileView,
+	card: HammerPicker.Card,
 	sizes: BuildMenuLogic.Sizes,
+	cs: HammerPicker.CardSizes,
 	order: number
 ): TextButton
 	local btn = Instance.new("TextButton")
@@ -130,8 +162,8 @@ local function buildTile(
 	btn.BorderSizePixel = 0
 	btn.ClipsDescendants = true
 	btn.Selectable = true
-	btn.SelectionImageObject = focusRing(sizes.stroke)
-	UITheme.corner(btn, 8)
+	btn.SelectionImageObject = focusRing(sizes.stroke, CARD_RADIUS)
+	UITheme.corner(btn, CARD_RADIUS)
 	local edge = UITheme.stroke(btn, UITheme.Skin.Bark, 2)
 	edge.Name = "Edge"
 
@@ -140,7 +172,7 @@ local function buildTile(
 	-- while the picture loads or if it fails). A locked card is dim and desaturated.
 	local art = Instance.new("Frame")
 	art.Name = "Art"
-	art.Size = UDim2.new(1, 0, 1, -sizes.plate)
+	art.Size = UDim2.new(1, 0, 0, cs.artH)
 	art.BackgroundTransparency = 1
 	art.Parent = btn
 	local swatchColor = Color3.fromHex(BuildMenuLogic.Swatch(entry.bp))
@@ -148,7 +180,7 @@ local function buildTile(
 	swatch.Name = "Swatch"
 	swatch.AnchorPoint = Vector2.new(0.5, 0.5)
 	swatch.Position = UDim2.fromScale(0.5, 0.5)
-	swatch.Size = UDim2.fromScale(0.7, 0.7)
+	swatch.Size = UDim2.fromScale(0.7, 0.8)
 	swatch.BackgroundColor3 = if locked then desaturate(swatchColor) else swatchColor
 	swatch.BackgroundTransparency = if locked then 0.38 else 0
 	swatch.BorderSizePixel = 0
@@ -191,9 +223,8 @@ local function buildTile(
 	-- The name plate: Cream, the name wrapped over at most two lines, never cut.
 	local plate = Instance.new("Frame")
 	plate.Name = "Plate"
-	plate.AnchorPoint = Vector2.new(0, 1)
-	plate.Position = UDim2.fromScale(0, 1)
-	plate.Size = UDim2.new(1, 0, 0, sizes.plate)
+	plate.Position = UDim2.fromOffset(0, cs.artH)
+	plate.Size = UDim2.new(1, 0, 0, cs.nameH + cs.gap)
 	plate.BackgroundColor3 = C.Cream
 	plate.BorderSizePixel = 0
 	plate.Active = false
@@ -201,12 +232,12 @@ local function buildTile(
 	local name = Instance.new("TextLabel")
 	name.Name = "Name"
 	name.BackgroundTransparency = 1
-	name.Size = UDim2.new(1, -BuildMenuLogic.PlatePad * 2, 1, 0)
-	name.Position = UDim2.fromOffset(BuildMenuLogic.PlatePad, 0)
+	name.Size = UDim2.new(1, -cs.pad * 2, 1, 0)
+	name.Position = UDim2.fromOffset(cs.pad, 0)
 	name.Font = F.Bold
 	name.Text = view.name
-	name.TextSize = sizes.name
-	name.TextColor3 = C.Ink -- the name stays full contrast, locked or not
+	name.TextSize = cs.nameText
+	name.TextColor3 = C.PickerInk -- the name stays full contrast, locked or not
 	name.TextWrapped = true
 	name.TextTruncate = Enum.TextTruncate.None
 	name.TextScaled = false
@@ -215,9 +246,44 @@ local function buildTile(
 	name.Active = false
 	local fit = Instance.new("UITextSizeConstraint")
 	fit.MinTextSize = sizes.minText
-	fit.MaxTextSize = sizes.name
+	fit.MaxTextSize = cs.nameText
 	fit.Parent = name
 	name.Parent = plate
+
+	-- What it is for: a sentence, at most three lines (HammerPickerFit).
+	local blurb = Instance.new("TextLabel")
+	blurb.Name = "Blurb"
+	blurb.BackgroundTransparency = 1
+	blurb.Position = UDim2.fromOffset(cs.pad, cs.artH + cs.nameH + cs.gap * 2)
+	blurb.Size = UDim2.new(1, -cs.pad * 2, 0, cs.blurbH)
+	blurb.Font = F.Body
+	blurb.Text = card.blurb
+	blurb.TextSize = cs.blurbText
+	blurb.TextColor3 = C.PickerInk
+	blurb.TextWrapped = true
+	blurb.TextTruncate = Enum.TextTruncate.None
+	blurb.TextXAlignment = Enum.TextXAlignment.Left
+	blurb.TextYAlignment = Enum.TextYAlignment.Top
+	blurb.Active = false
+	blurb.Parent = btn
+
+	-- What it costs: planks and the fee from the plan's own data (HammerPicker.Card).
+	local cost = Instance.new("TextLabel")
+	cost.Name = "Cost"
+	cost.BackgroundTransparency = 1
+	cost.AnchorPoint = Vector2.new(0, 1)
+	cost.Position = UDim2.new(0, cs.pad, 1, -cs.gap)
+	cost.Size = UDim2.new(1, -cs.pad * 2, 0, cs.costH)
+	cost.Font = F.Bold
+	cost.Text = card.costText
+	cost.TextSize = cs.costText
+	cost.TextColor3 = if card.state == "cant" then C.Danger else C.PickerInk
+	cost.TextWrapped = true
+	cost.TextTruncate = Enum.TextTruncate.None
+	cost.TextXAlignment = Enum.TextXAlignment.Left
+	cost.TextYAlignment = Enum.TextYAlignment.Bottom
+	cost.Active = false
+	cost.Parent = btn
 
 	-- A lock chip (locked) or a price chip (cannot afford yet).
 	if view.chip then
@@ -238,6 +304,8 @@ local function buildTile(
 		UITheme.padding(chip, 2, 6, 2, 6)
 		chip.Parent = btn
 	end
+	-- Hover and press: the card grows a little under the pointer (PickerMotion).
+	UITheme.Respond(btn)
 	return btn
 end
 
@@ -267,13 +335,18 @@ local function scrollIntoView(button: GuiObject)
 end
 
 local function paintSelected()
+	local reduced = UITheme.MotionReduced()
+	local seconds = PickerMotion.Seconds(PickerMotion.Select, reduced)
 	for _, tile in ipairs(tiles) do
 		local on = tile.entry.id == selectedId
 		local edge = tile.button:FindFirstChild("Edge")
 		if edge and edge:IsA("UIStroke") then
-			edge.Color = if on then Palette.CoinGold else UITheme.Skin.Bark
-			edge.Thickness = if on then BuildMenuLogic.SizesFor(phoneNow).stroke else 2
+			UITheme.Tween(edge, seconds, {
+				Color = if on then C.AmberEdge else UITheme.Skin.Bark,
+				Thickness = if on then BuildMenuLogic.SizesFor(phoneNow).stroke else 2,
+			})
 		end
+		tile.button.BackgroundColor3 = if on then C.PaperDark else C.Cream
 	end
 end
 
@@ -351,6 +424,10 @@ local function clearGrid()
 end
 
 local function paintRail()
+	local reduced = UITheme.MotionReduced()
+	local seconds = PickerMotion.Seconds(PickerMotion.Select, reduced)
+	local nudge = PickerMotion.Slide(PickerMotion.TabIn, reduced) / 2.5
+	local sizes = BuildMenuLogic.SizesFor(phoneNow)
 	for i, row in ipairs(railRows) do
 		local on = i == catIndex
 		local bar = row:FindFirstChild("Bar")
@@ -359,10 +436,19 @@ local function paintRail()
 		end
 		local edge = row:FindFirstChild("Edge")
 		if edge and edge:IsA("UIStroke") then
-			edge.Color = if on then Palette.CoinGold else UITheme.Skin.Bark
-			edge.Thickness = if on then 3 else 1
+			UITheme.Tween(edge, seconds, {
+				Color = if on then C.AmberEdge else UITheme.Skin.Bark,
+				Thickness = if on then 3 else 1,
+			})
 		end
-		row.BackgroundColor3 = if on then C.Cream else C.Paper
+		UITheme.Tween(row, seconds, { BackgroundColor3 = if on then C.Cream else C.Paper })
+		-- The chosen tab's label steps in a little.
+		local label = row:FindFirstChild("Label")
+		if label and label:IsA("GuiObject") then
+			UITheme.Tween(label, seconds, {
+				Position = UDim2.new(0, sizes.bar + sizes.icon + 4 + (if on then nudge else 0), 0.5, 0),
+			})
+		end
 	end
 end
 
@@ -375,28 +461,49 @@ local function buildGrid()
 	end
 	clearGrid()
 	local sizes = BuildMenuLogic.SizesFor(phoneNow)
-	local panelWidth = if panel then absSize(panel).X / math.max(UITheme.Scale(), 0.01) else 0
-	local grid = BuildMenuLogic.GridFor(
+	local cs = HammerPicker.CardSizes(phoneNow)
+	local panelWidth = if panel then absSize(panel).X / screenScale() else 0
+	local grid = HammerPicker.GridFor(
 		if panelWidth > 0 then panelWidth else BuildMenuLogic.Layout(667, phoneNow, 1).panelW,
 		phoneNow
 	)
 	local layout = list:FindFirstChildOfClass("UIGridLayout")
 	if layout then
-		layout.CellSize = UDim2.fromOffset(math.floor(grid.tileW), sizes.tileH)
+		layout.CellSize = UDim2.fromOffset(math.floor(grid.tileW), cs.h)
 		layout.CellPadding = UDim2.fromOffset(BuildMenuLogic.TileGap, BuildMenuLogic.TileGap)
 	end
 	if not cat then
 		return
 	end
 	local ctx = o.ctx()
+	local reduced = UITheme.MotionReduced()
 	for i, entry in ipairs(cat.entries) do
 		local view = BuildMenuLogic.Tile(entry, ctx)
-		local btn = buildTile(entry, view, sizes, i)
+		local card = HammerPicker.Card(entry, ctx)
+		local btn = buildTile(entry, view, card, sizes, cs, i)
 		btn.Parent = list
 		btn.Activated:Connect(function()
 			BuildMenuUI.Press(entry)
 		end)
-		table.insert(tiles, { entry = entry, button = btn, view = view })
+		table.insert(tiles, { entry = entry, button = btn, view = view, card = card })
+		-- The first few cards pop in one after another (a few short tweens, none on a calm screen).
+		if PickerMotion.Animates(i, reduced) then
+			local grow = btn:FindFirstChild("Respond")
+			if grow and grow:IsA("UIScale") then
+				grow.Scale = PickerMotion.CardIn.fromScale :: number
+				local wait = PickerMotion.Delay(i, reduced)
+				task.delay(wait, function()
+					if btn.Parent then
+						UITheme.Tween(
+							grow,
+							PickerMotion.Seconds(PickerMotion.CardIn, UITheme.MotionReduced()),
+							{ Scale = 1 },
+							Enum.EasingStyle.Back
+						)
+					end
+				end)
+			end
+		end
 	end
 	list.CanvasPosition = Vector2.zero
 	wireTileNav(grid.cols)
@@ -411,8 +518,20 @@ local function selectCategory(index: number, focusFirst: boolean)
 	lastKind = categories[catIndex].kind
 	paintRail()
 	buildGrid()
-	if focusFirst and #tiles > 0 then
-		focusTile(BuildMenuLogic.FirstTile(categories[catIndex]))
+	local note = emptyNote
+	if note then
+		note.Visible = #tiles == 0
+		note.Text = string.format(
+			"No %s plans yet. New ones appear here as you learn them.",
+			string.lower(categories[catIndex].label)
+		)
+	end
+	if focusFirst then
+		if #tiles > 0 then
+			focusTile(BuildMenuLogic.FirstTile(categories[catIndex]))
+		elseif railRows[catIndex] then
+			GuiService.SelectedObject = railRows[catIndex] -- an empty tab: stay on its tab
+		end
 	end
 	if titleLabel then
 		titleLabel.Text = "Blueprints"
@@ -443,15 +562,15 @@ local function buildRail()
 		row.BackgroundColor3 = C.Paper
 		row.BorderSizePixel = 0
 		row.Selectable = true
-		row.SelectionImageObject = focusRing(3)
-		UITheme.corner(row, 8)
+		row.SelectionImageObject = focusRing(3, ROW_RADIUS)
+		UITheme.corner(row, ROW_RADIUS)
 		local edge = UITheme.stroke(row, UITheme.Skin.Bark, 1)
 		edge.Name = "Edge"
 		local bar = Instance.new("Frame")
 		bar.Name = "Bar"
 		bar.Size = UDim2.new(0, sizes.bar, 1, -8)
 		bar.Position = UDim2.fromOffset(2, 4)
-		bar.BackgroundColor3 = Palette.CoinGold
+		bar.BackgroundColor3 = C.AmberEdge
 		bar.BorderSizePixel = 0
 		bar.Visible = false
 		UITheme.corner(bar, 3)
@@ -474,18 +593,30 @@ local function buildRail()
 		label.Font = F.Bold
 		label.Text = text
 		label.TextSize = sizes.label
-		label.TextColor3 = C.Ink
+		label.TextColor3 = C.PickerInk
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.TextWrapped = false
+		-- A tab name never runs off the tab (Supports, Fences): it shrinks to fit, to the 14 px floor.
+		label.TextScaled = true
+		local labelFit = Instance.new("UITextSizeConstraint")
+		labelFit.MinTextSize = sizes.minText
+		labelFit.MaxTextSize = sizes.label
+		labelFit.Parent = label
 		label.Active = false
 		label.Parent = row
 		row.Parent = list
+		UITheme.Respond(row)
 		return row
 	end
 	for i, cat in ipairs(categories) do
-		-- The category's icon is its first piece's art (its swatch until the render is set).
+		-- The tab's icon is its first piece's art (its swatch until the render is set);
+		-- an empty tab keeps a plain wood swatch.
 		local first = cat.entries[1]
-		local row = makeRow(cat.label, Color3.fromHex(BuildMenuLogic.Swatch(first.bp)), i)
+		local row = makeRow(
+			cat.label,
+			if first then Color3.fromHex(BuildMenuLogic.Swatch(first.bp)) else Palette.TimberBrown,
+			i
+		)
 		row.Activated:Connect(function()
 			selectCategory(i, false)
 		end)
@@ -512,7 +643,7 @@ local function fitPanel()
 	if not g or not a then
 		return
 	end
-	local scale = math.max(UITheme.Scale(), 0.01)
+	local scale = screenScale()
 	local screen = absSize(g) / scale
 	if screen.X <= 0 then
 		local cam = workspace.CurrentCamera
@@ -549,7 +680,7 @@ local function onTabs(_name: string, state: Enum.UserInputState, input: InputObj
 	if state ~= Enum.UserInputState.Begin or not isOpen then
 		return Enum.ContextActionResult.Pass
 	end
-	local dir = if input.KeyCode == Enum.KeyCode.ButtonL1 then -1 else 1
+	local dir = if HammerPicker.ActionOf(input.KeyCode) == "tabPrev" then -1 else 1
 	selectCategory(BuildMenuLogic.NextCategory(catIndex, #categories, dir), true)
 	return Enum.ContextActionResult.Sink
 end
@@ -587,13 +718,36 @@ function BuildMenuUI.Close()
 	isOpen = false
 	HUD.SetModal(nil)
 	local g, p = gui, panel
-	if g then
-		g.Enabled = false
-	end
 	ContextActionService:UnbindAction(TABS_ACTION)
 	ContextActionService:UnbindAction(CLOSE_ACTION)
 	ContextActionService:UnbindAction(HOLD_ACTION)
 	MenuPad.Close(p) -- the selection goes back to the HUD button that opened the menu
+	-- The panel sinks and the backdrop fades, then the screen goes. A calm screen
+	-- (or no time) hides it at once.
+	closeToken += 1
+	local token = closeToken
+	local reduced = UITheme.MotionReduced()
+	local seconds = PickerMotion.Seconds(PickerMotion.Close, reduced)
+	if g and p and seconds > 0 then
+		UITheme.Tween(
+			p,
+			seconds,
+			{ Position = UDim2.new(0.5, 0, 0.5, PickerMotion.Slide(PickerMotion.Close, reduced)) },
+			Enum.EasingStyle.Quad,
+			Enum.EasingDirection.In
+		)
+		local dim = scrim
+		if dim then
+			UITheme.Tween(dim, seconds, { BackgroundTransparency = 1 })
+		end
+		task.delay(seconds, function()
+			if closeToken == token and not isOpen then
+				g.Enabled = false
+			end
+		end)
+	elseif g then
+		g.Enabled = false
+	end
 end
 
 -- Opens the menu. `wantKind` / `wantId` ask for a card (else the last one used).
@@ -607,11 +761,42 @@ function BuildMenuUI.Open(o: Opts, wantKind: string?, wantId: string?)
 	end
 	opts = o
 	phoneNow = UITheme.IsPhone()
-	categories = BuildMenuLogic.Categories(o.entries())
+	categories = HammerPicker.TabList(o.entries())
+	closeToken += 1 -- a close still fading does not hide it again
 	g.Enabled = true
 	isOpen = true
 	fitPanel()
 	reportModal()
+	-- The panel rises into place and the backdrop fades in (PickerMotion).
+	local reduced = UITheme.MotionReduced()
+	local seconds = PickerMotion.Seconds(PickerMotion.Open, reduced)
+	local dim = scrim
+	if seconds > 0 then
+		p.Position = UDim2.new(0.5, 0, 0.5, PickerMotion.Slide(PickerMotion.Open, reduced))
+		if dim then
+			dim.BackgroundTransparency = 1
+		end
+		UITheme.Tween(p, seconds, { Position = UDim2.fromScale(0.5, 0.5) }, Enum.EasingStyle.Back)
+		if dim then
+			UITheme.Tween(dim, seconds, { BackgroundTransparency = SCRIM_ALPHA })
+		end
+	else
+		p.Position = UDim2.fromScale(0.5, 0.5)
+		if dim then
+			dim.BackgroundTransparency = SCRIM_ALPHA
+		end
+	end
+	-- The rail is as wide as this device's rail (a wide screen's is wider than a phone's), and
+	-- the grid takes the rest, which is what HammerPicker.GridFor counted on.
+	local railPx = BuildMenuLogic.SizesFor(phoneNow).rail
+	local rail, grid, note = railList, gridList, emptyNote
+	if rail and grid then
+		rail.Size = UDim2.new(0, railPx, 1, 0)
+		grid.Size = UDim2.new(1, -(railPx + BuildMenuLogic.RailGap), 1, 0)
+	end
+	if note then
+		note.Size = UDim2.new(1, -(railPx + BuildMenuLogic.RailGap), 0, 80)
+	end
 	buildRail()
 	-- Reselect the card last used when it still exists.
 	local kind, id = wantKind or lastKind, wantId or lastTileId
@@ -673,7 +858,7 @@ local function hintItem(parent: Frame, key: Enum.KeyCode, text: string, order: n
 	local glyph = UITheme.Glyph(key, 22)
 	glyph.LayoutOrder = 1
 	glyph.Parent = holder
-	local label = UITheme.label(holder, text, F.Bold, 14, C.Ink)
+	local label = UITheme.label(holder, text, F.Bold, 14, C.PickerInk)
 	label.LayoutOrder = 2
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
@@ -697,13 +882,14 @@ function BuildMenuUI.Start()
 	dim.Name = "Scrim"
 	dim.Size = UDim2.fromScale(1, 1)
 	dim.BackgroundColor3 = C.Ink
-	dim.BackgroundTransparency = 0.55
+	dim.BackgroundTransparency = SCRIM_ALPHA
 	dim.AutoButtonColor = false
 	dim.Text = ""
 	dim.Selectable = false
 	dim.Modal = true
 	dim.Parent = g
 	dim.Activated:Connect(BuildMenuUI.Close)
+	scrim = dim
 
 	local a = Instance.new("Frame")
 	a.Name = "Area"
@@ -740,7 +926,7 @@ function BuildMenuUI.Start()
 	head.Size = UDim2.new(1, 0, 0, 44)
 	head.BackgroundTransparency = 1
 	head.Parent = card.face
-	local title = UITheme.label(head, "Blueprints", F.Heading, 24, C.Ink)
+	local title = UITheme.label(head, "Blueprints", F.Heading, 24, C.PickerInk)
 	title.Name = "Title"
 	title.Size = UDim2.fromScale(0.5, 1)
 	title.TextXAlignment = Enum.TextXAlignment.Left
@@ -766,10 +952,10 @@ function BuildMenuUI.Start()
 	hint.BackgroundTransparency = 1
 	hint.Visible = false
 	UITheme.list(hint, 10, true).VerticalAlignment = Enum.VerticalAlignment.Center
-	hintItem(hint, Enum.KeyCode.ButtonA, "Place", 1)
+	hintItem(hint, Enum.KeyCode.ButtonA, "Pick", 1)
 	hintItem(hint, Enum.KeyCode.ButtonB, "Close", 2)
 	hintItem(hint, Enum.KeyCode.ButtonL1, "", 3)
-	hintItem(hint, Enum.KeyCode.ButtonR1, "Category", 4)
+	hintItem(hint, Enum.KeyCode.ButtonR1, "Tab", 4)
 	hint.Parent = head
 	hintBar = hint
 
@@ -823,6 +1009,21 @@ function BuildMenuUI.Start()
 	layout.Parent = grid
 	gridList = grid
 
+	local note = Instance.new("TextLabel")
+	note.Name = "EmptyNote"
+	note.AnchorPoint = Vector2.new(1, 0)
+	note.Position = UDim2.fromScale(1, 0)
+	note.Size = UDim2.new(1, -(railSize + BuildMenuLogic.RailGap), 0, 80)
+	note.BackgroundTransparency = 1
+	note.Font = F.Body
+	note.TextSize = 16
+	note.TextColor3 = C.PickerInk
+	note.TextWrapped = true
+	note.TextXAlignment = Enum.TextXAlignment.Center
+	note.Visible = false
+	note.Parent = body
+	emptyNote = note
+
 	g.Parent = UITheme.PlayerGui()
 	UserInputService.LastInputTypeChanged:Connect(updateHint)
 	UITheme.WatchLayout(function()
@@ -844,11 +1045,18 @@ function BuildMenuUI.Press(entry: BlueprintBook.Entry)
 end
 
 -- For the specs.
-function BuildMenuUI.Tiles(): { { entry: BlueprintBook.Entry, button: TextButton, view: BuildMenuLogic.TileView } }
+function BuildMenuUI.Tiles(): {
+	{
+		entry: BlueprintBook.Entry,
+		button: TextButton,
+		view: BuildMenuLogic.TileView,
+		card: HammerPicker.Card,
+	}
+}
 	return tiles
 end
 
-function BuildMenuUI.Category(): BuildMenuLogic.Category?
+function BuildMenuUI.Category(): HammerPicker.Tab?
 	return categories[catIndex]
 end
 

@@ -2,9 +2,9 @@
 -- PlotService: plots and building on them (data in Shared/PlotData, rules
 -- in Shared/PlotLogic, GAME_DESIGN §9).
 --   * Builds the plot district: one pad and signpost per PlotData slot.
---   * Nobody is given a plot. A new player buys the first at the Land
---     Office (a counter in town, next to the plot district's sign): its
---     prompt opens the picker with the price, ClaimPlot names a pad, and
+--   * Nobody is given a plot. A new player buys the first from Old Hank
+--     (he stands by the plot district's sign; the Land Office box is gone,
+--     T420): his Talk prompt opens the picker with the price, ClaimPlot names a pad, and
 --     the server takes GameConfig.PlotPrice (EconomyService.SpendCash)
 --     before it assigns. From then on, each time they join they pick a
 --     free pad again (free: the save already owns a plot) and their saved
@@ -89,7 +89,8 @@ type Profile = ProfileService.Profile
 local PlotService = {}
 
 local BUILD_REACH = 40 -- studs past your plot's edge you can still build from
-local LAND_OFFICE_RANGE = 12 -- studs from the Land Office counter; its prompt uses the same distance
+local OFFICE_AT = Vector2.new(PlotSalesmanData.Office.x, PlotSalesmanData.Office.z)
+local LAND_OFFICE_RANGE = 12 -- studs from Old Hank's spot (PlotService.LandOfficeAt); his Talk prompt reaches about as far
 local UNDO_SECONDS = 60 -- selling something this soon after placing it refunds it all
 PlotService.UndoSeconds = UNDO_SECONDS
 -- GameServer sets this: Old Hank's replies as the dialogue box (else a toast).
@@ -132,10 +133,9 @@ local placedAt: { [string]: number } = {} -- uid -> os.clock() when placed this 
 -- Last 10 blueprint edits, per player. Memory only: leaving clears it.
 local undoStacks: { [Player]: { EditLogic.Entry } } = {}
 local pickingUntil: { [Player]: number } = {} -- a returning owner's join picker is open (math.huge: it has no deadline, it waits for a claim)
-local buying: { [Player]: boolean } = {} -- the Land Office picker is open (no timeout: nothing is given away)
+local buying: { [Player]: boolean } = {} -- the buyer's picker (opened by Old Hank) is open (no timeout: nothing is given away)
 local claiming: { [Player]: boolean } = {} -- a claim is being charged and assigned right now
 local switching: { [Player]: boolean } = {} -- a base is being packed or swapped right now (BaseLogic)
-local officePos: Vector3 = Vector3.zero
 local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
 local watching: { [Player]: boolean } = {}
 local offerRemote: RemoteEvent? = nil
@@ -468,7 +468,9 @@ local function buildSlot(index: number, center: Vector2, parent: Instance): Slot
 	plotSpawn.Duration = 0
 	plotSpawn.CanCollide = false
 	plotSpawn.Transparency = 1
-	plotSpawn.CFrame = cframe * CFrame.new(0, 2, -18) * CFrame.Angles(0, math.pi, 0)
+	plotSpawn.CFrame = cframe
+		* CFrame.new(PlotLogic.VisitPad[1], 2, PlotLogic.VisitPad[2])
+		* CFrame.Angles(0, math.pi, 0)
 	plotSpawn.Parent = model
 
 	local slot: Slot = {
@@ -660,6 +662,27 @@ local function mirrorPlot(player: Player, profile: Profile)
 	player:SetAttribute("PlotBans", PermissionLogic.EncodeBans(profile.permissions))
 end
 
+-- The pad's spawn faces the entrance (south of the centre, plot-local
+-- (0, -18)). A saved base can have a piece on it, so once the items stand the
+-- spawn steps to the first clear spot (PlotLogic.SpawnSpot); an empty or
+-- released pad gets the entrance back.
+local function setSpawn(slot: Slot, x: number, z: number)
+	slot.spawn.CFrame = slot.cframe * CFrame.new(x, 2, z) * CFrame.Angles(0, math.pi, 0)
+end
+
+local function clearSpawn(slot: Slot, profile: Profile)
+	local rects: { PlotLogic.Rect } = {}
+	for _, item in ipairs(profile.plot.placed) do
+		local bp = PlotLogic.Blueprint(item.blueprintId)
+		if bp and (item.y or 0) < 4 then -- a piece overhead does not block the pad
+			table.insert(rects, PlotLogic.RectOf(bp, item.x, item.z, item.rot))
+		end
+	end
+	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+	local x, z = PlotLogic.SpawnSpot(tier.size, rects)
+	setSpawn(slot, x, z)
+end
+
 local function assign(player: Player, slot: Slot, profile: Profile)
 	slot.owner = player
 	slotOf[player] = slot
@@ -676,6 +699,7 @@ local function assign(player: Player, slot: Slot, profile: Profile)
 		buildItem(slot, player, item)
 	end
 	LogicService.Restore(slot :: any, profile, player)
+	clearSpawn(slot, profile)
 	refreshSign(slot)
 end
 
@@ -737,6 +761,7 @@ local function release(player: Player)
 	local who: any = player
 	who.RespawnLocation = nil
 	drawBounds(slot, PlotData.Tiers[1].size, false)
+	setSpawn(slot, PlotLogic.VisitPad[1], PlotLogic.VisitPad[2])
 	refreshSign(slot)
 end
 
@@ -770,8 +795,17 @@ local function offerFor(player: Player): PlotPickerLogic.Offer
 	local plots: { PlotPickerLogic.OfferPlot } = {}
 	for _, slot in ipairs(slots) do
 		local owner = slot.owner
+		-- A taken pad shows the owner's grown plot, so the picker's camera frames all of it.
+		local size = PlotData.Tiers[1].size
+		local ownerProfile = if owner then ProfileService.GetProfile(owner) else nil
+		if ownerProfile and ownerProfile.plot then
+			local tier = PlotData.Tier(ownerProfile.plot.tier) or PlotData.Tiers[1]
+			local squares = if type(ownerProfile.plot.squares) == "table" then ownerProfile.plot.squares else {}
+			size = PlotLogic.Extent(tier.size, squares)
+		end
 		table.insert(plots, {
 			index = slot.index,
+			size = size,
 			name = slot.placeName,
 			region = slot.region,
 			x = slot.cframe.Position.X,
@@ -876,14 +910,15 @@ end
 local FULL = "This server's plot district is full, so your plot isn't out today. Try another server!"
 local TOLD_PICKER = "It's yours! This pad is your spawn. Take out your hammer to start building."
 
--- The Land Office counter: the player has to be standing at it.
+-- Old Hank's spot: the player has to be standing near him.
 local function nearOffice(player: Player): boolean
 	local char = player.Character
 	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 	if not root then
 		return false
 	end
-	return (root.Position - officePos).Magnitude <= LAND_OFFICE_RANGE + GameConfig.RangeTolerance
+	local dx, dz = root.Position.X - OFFICE_AT.X, root.Position.Z - OFFICE_AT.Y
+	return math.sqrt(dx * dx + dz * dz) <= LAND_OFFICE_RANGE + GameConfig.RangeTolerance
 end
 
 -- The server's decision on one ClaimPlot. A new player pays GameConfig.PlotPrice
@@ -910,7 +945,7 @@ local function tryClaim(player: Player, index: number): boolean
 		notify(player, "You already have a plot here.")
 		return false
 	elseif verdict == "range" then
-		notify(player, "Walk up to the Land Office in town to buy a plot.")
+		notify(player, "Walk up to Old Hank to buy a plot.")
 		return false
 	elseif verdict == "taken" then
 		notify(player, "Someone else claimed that plot. Pick another.")
@@ -975,7 +1010,7 @@ local function autoAssign(player: Player)
 	end
 end
 
--- The Land Office prompt: opens the picker with the price. Nothing is
+-- Old Hank's offer: opens the picker with the price. Nothing is
 -- charged or assigned here.
 local function onOfficeOpened(player: Player)
 	if slotOf[player] then
@@ -987,7 +1022,7 @@ local function onOfficeOpened(player: Player)
 		return
 	end
 	if not nearOffice(player) then
-		notify(player, "Walk up to the Land Office counter to buy a plot.")
+		notify(player, "Walk up to Old Hank to buy a plot.")
 		return
 	end
 	if not freeSlot() then
@@ -1010,8 +1045,7 @@ local SALESMAN_OFFERS: { [string]: (Player) -> () } = {
 	end,
 }
 
--- Talking to Old Hank (his Talk prompt, or the counter's, both end up in
--- the same place). Rate-limited like the other prompts' handlers; the
+-- Talking to Old Hank (his Talk prompt opens the plot purchase). Rate-limited like the other prompts' handlers; the
 -- client names nothing, so there is no price or offer to spoof.
 -- What Old Hank says back: the dialogue box when GameServer has wired it
 -- (PlotService.Speak), a toast otherwise (the specs).
@@ -2409,7 +2443,7 @@ end
 -- Call once the save has loaded. A save that already owns a plot gets the
 -- free picker (nothing is assigned until they pick, close it, or the timer
 -- runs out). A save that never bought one gets nothing: no picker, no
--- plot, until it buys one at the Land Office. A pad they already hold this
+-- plot, until it buys one from Old Hank. A pad they already hold this
 -- session (a save-slot swap) is left alone: call Reload.
 local function watchSpawn(player: Player)
 	if watching[player] then
@@ -2457,7 +2491,7 @@ function PlotService.PlayerJoined(player: Player, profile: Profile)
 		return
 	end
 	buying[player] = nil
-	-- Never bought a plot: no free pad. They spawn in town; the Land Office sells one.
+	-- Never bought a plot: no free pad. They spawn in town; Old Hank sells one.
 	if profile.plot == nil or not ownedBefore(profile) then
 		pickingUntil[player] = nil
 		player:SetAttribute("Picking", nil)
@@ -2511,7 +2545,7 @@ function PlotService.Claim(player: Player, index: unknown)
 end
 
 -- Closes the picker. A returning owner's join picker takes a free pad (as
--- it always did); a Land Office picker just closes, and nothing is given.
+-- it always did); a buyer's picker just closes, and nothing is given.
 function PlotService.Pass(player: Player)
 	if not RateLimiter.Allow(player, "PlotPass") then
 		return
@@ -2551,6 +2585,7 @@ function PlotService.Reload(player: Player, profile: Profile): boolean
 		buildItem(slot, player, item)
 	end
 	LogicService.Restore(slot :: any, profile, player)
+	clearSpawn(slot, profile)
 	refreshSign(slot)
 	rescueProfile(profile, slot.cframe * CFrame.new(0, 2, 0))
 	restoreLoose(player, slot, profile)
@@ -2631,98 +2666,11 @@ local function watchReleases()
 	end
 end
 
--- The Land Office: a counter in town, beside the plot district's sign (see
--- WorldPlan.Town signs). Its prompt opens the picker; the server charges.
-PlotService.LandOfficeAt = Vector2.new(147, 86)
-
-local function buildLandOffice(parent: Instance)
-	local at = PlotService.LandOfficeAt
-	local ground = TerrainGen.HeightAt(at.X, at.Y)
-	officePos = Vector3.new(at.X, ground + 2, at.Y)
-	-- Front (-Z) toward the town spawn, like the sign beside it.
-	local facing = CFrame.lookAt(Vector3.new(at.X, ground, at.Y), Vector3.new(0, ground, 40))
-	local model = Instance.new("Model")
-	model.Name = "LandOffice"
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	local wood = Color3.fromRGB(101, 67, 33)
-	local dark = Color3.fromRGB(70, 45, 22)
-	local counter =
-		part("Counter", Vector3.new(7, 2.6, 3.6), facing * CFrame.new(0, 1.3, 0), wood, Enum.Material.Wood, model) -- the shop counter: 2.6 high, 3.6 deep (T395)
-	counter.CanCollide = true
-	model.PrimaryPart = counter
-	for _, x in ipairs({ -3.2, 3.2 }) do
-		part("Post", Vector3.new(0.6, 8, 0.6), facing * CFrame.new(x, 4, 2.3), dark, Enum.Material.Wood, model)
-	end
-	part("Roof", Vector3.new(8.4, 0.5, 5.4), facing * CFrame.new(0, 8.2, 1.2), dark, Enum.Material.Wood, model)
-	local board =
-		part("Sign", Vector3.new(7.4, 2, 0.3), facing * CFrame.new(0, 6.6, -1.5), wood, Enum.Material.Wood, model)
-	board.CanCollide = false
-	local sg = Instance.new("SurfaceGui")
-	sg.Face = Enum.NormalId.Front
-	sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	sg.PixelsPerStud = 40
-	sg.Parent = board
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.Fantasy
-	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(245, 235, 215)
-	label.Text = string.format("LAND OFFICE\nPlots $%d", GameConfig.PlotPrice)
-	label.Parent = sg
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.Name = "LandOfficePrompt"
-	prompt.ActionText = "Buy a plot"
-	prompt.ObjectText = "Land Office"
-	prompt.MaxActivationDistance = LAND_OFFICE_RANGE
-	prompt.HoldDuration = 0
-	prompt.RequiresLineOfSight = false
-	InputKit.PromptDefaults(prompt, "Interact")
-	prompt.Parent = counter
-	prompt.Triggered:Connect(onOfficeOpened)
-	-- Old Hank's props: a pitchfork leaning on the counter's end and a hay
-	-- bale beside it. The fork is not solid; the bale is, so it also keeps
-	-- people from cutting round the counter's end.
-	local steel = Color3.fromRGB(150, 150, 156)
-	local haft = part(
-		"Pitchfork",
-		Vector3.new(0.25, 6.2, 0.25),
-		facing * CFrame.new(-4.4, 3.0, 0.3) * CFrame.Angles(0, 0, math.rad(-8)),
-		Color3.fromRGB(140, 100, 58),
-		Enum.Material.Wood,
-		model
-	)
-	haft.CanCollide = false
-	for _, x in ipairs({ -0.35, 0, 0.35 }) do
-		local tine = part(
-			"Tine",
-			Vector3.new(0.1, 1.1, 0.1),
-			haft.CFrame * CFrame.new(x, 3.6, 0),
-			steel,
-			Enum.Material.Metal,
-			model
-		)
-		tine.CanCollide = false
-	end
-	local bar = part(
-		"TineBar",
-		Vector3.new(0.85, 0.12, 0.12),
-		haft.CFrame * CFrame.new(0, 3.1, 0),
-		steel,
-		Enum.Material.Metal,
-		model
-	)
-	bar.CanCollide = false
-	part(
-		"HayBale",
-		Vector3.new(2.6, 1.8, 1.6),
-		facing * CFrame.new(-5.4, 0.9, 1.2) * CFrame.Angles(0, math.rad(12), 0),
-		Color3.fromRGB(214, 183, 92),
-		Enum.Material.Fabric,
-		model
-	)
-	model.Parent = parent
-end
+-- Old Hank is the whole land office (T420 removed the counter box that stood
+-- here): he stands beside the plot district's sign (see WorldPlan.Town signs)
+-- and his Talk prompt opens the picker; the server charges. "Near him" is
+-- measured from this spot, which PlotSalesmanData also stands him on.
+PlotService.LandOfficeAt = OFFICE_AT
 
 -- Wire Old Hank's Talk prompt to the sales flow. NPCService builds him after
 -- PlotService.Init, so GameServer calls this once both have run. He is in
@@ -2836,7 +2784,6 @@ function PlotService.Init(
 	for i, center in ipairs(PlotData.Slots) do
 		table.insert(slots, buildSlot(i, center, folder))
 	end
-	buildLandOffice(map)
 	remotes.PlaceBlueprint.OnServerEvent:Connect(PlotService.Place)
 	remotes.MoveBlueprint.OnServerEvent:Connect(PlotService.Move)
 	remotes.SellPlaced.OnServerEvent:Connect(PlotService.Sell)

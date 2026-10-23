@@ -100,6 +100,7 @@ export type Facts = {
 	charterDone: boolean, -- the Gondola Pass is earned (SkyQuest done)
 	relicsDone: boolean, -- every relic claimed
 	plotFull: boolean, -- the plot is at its top tier
+	hasPlot: boolean?, -- a plot was bought (nil reads as yes); false sends you to Old Hank
 }
 
 -- The axe rung each gated biome's wood needs (ItemCatalog.AxeTier order).
@@ -197,8 +198,11 @@ function NextGoal.PickV1(facts: Facts): Goal
 	if not facts.relicsDone then
 		return { kind = "relic", text = "Forge the relics up in the sky", beacon = nil }
 	end
+	if facts.hasPlot == false then
+		return { kind = "plot", text = "Buy a plot from Old Hank", beacon = "oldHank" }
+	end
 	if not facts.plotFull then
-		return { kind = "plot", text = "Grow your plot to full size", beacon = "landOffice" }
+		return { kind = "plot", text = "Grow your plot to full size", beacon = "oldHank" }
 	end
 	return fit(NextGoal.Pick(facts.loop, facts.bestAxeTier, facts.found, facts.streak, facts.hour))
 end

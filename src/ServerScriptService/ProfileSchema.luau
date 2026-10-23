@@ -25,6 +25,7 @@ local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
+local WireSupply = require(ReplicatedStorage.Shared.WireSupply)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local MiningSchema = require(ReplicatedStorage.Shared.Mining.MiningSchema)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -208,6 +209,10 @@ export type Profile = {
 		loose: { any }, -- loose wood on the plot; each piece may carry `t`
 		logic: { any }, -- placed logic links, kept with the plot
 	},
+	-- Wire in your box (T420, WireSupply): units left for the Wire tool, a whole
+	-- number from 0 to WireSupply.MaxStock. Bought with cash, used up as wires are
+	-- stretched. Account-wide, so a base swap keeps it.
+	wireUnits: number,
 	-- Unload base (BaseLogic): account-wide, unix time the next unload is allowed.
 	baseCooldownUntil: number,
 	-- Boxes kept for you, per slot. Capped at StorageCap.
@@ -372,6 +377,7 @@ local TEMPLATE: Profile = {
 		loose = {},
 		logic = {},
 	},
+	wireUnits = 0,
 	baseCooldownUntil = 0,
 	storage = {},
 	permissions = {},
@@ -1011,6 +1017,8 @@ function ProfileSchema.Migrate(data: any)
 		data.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} }
 	end
 	cleanPlot(data.plot)
+	-- The wire box (T420): a whole count, 0 for a save from before wire was sold.
+	data.wireUnits = WireSupply.Clean(data.wireUnits)
 	-- The unload-base cooldown (BaseLogic). A shelf of crated bases from an
 	-- earlier, never-released build is dropped; its active base was always
 	-- profile.plot, which is kept. Idempotent.

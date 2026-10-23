@@ -12,7 +12,8 @@ local AutomationLogic = require(script.Parent.AutomationLogic)
 
 local WireLogic = {}
 
-export type Wire = { from: string, to: string, fromPort: number?, toPort: number? }
+export type Point = { x: number, z: number }
+export type Wire = { from: string, to: string, fromPort: number?, toPort: number?, via: { Point }? }
 
 export type Item = {
 	uid: string,
@@ -44,7 +45,9 @@ export type Spec = {
 }
 
 WireLogic.Reach = 30 -- studs from the player to each end of a wire
-WireLogic.Span = 32 -- studs from an output to its input, along the ground
+WireLogic.Span = 32 -- studs from an output to its input, along the ground (the switch prompt's reach)
+WireLogic.MaxRun = 64 -- studs of one wire run, measured along its path (T420; WireSupply)
+WireLogic.MaxBends = 4 -- corners one run may turn; a fifth is refused
 WireLogic.MaxWires = 160 -- per plot (PROPOSAL)
 WireLogic.MaxItems = 80 -- logic pieces per plot (PROPOSAL); a Door is not one
 WireLogic.MaxPerSwitch = 6
@@ -269,7 +272,9 @@ local MESSAGES: { [string]: string } = {
 	to = "A wire ends at an input.",
 	unfinished = "Finish building that first.",
 	dup = "Those two are already wired.",
-	span = "Too far apart. Keep them within 32 studs.",
+	span = "Too far. A run is 64 studs at most, measured along its bends.",
+	bends = "A run bends at most 4 times.",
+	badvia = "That run's corners are not usable.",
 	reach = "Stand closer to wire that.",
 	full = "This plot holds 160 wires.",
 	limit = "That output already feeds six things.",
@@ -297,6 +302,40 @@ local function cleanPort(value: any): number?
 	return value
 end
 
+-- The corners of a run, from a save or the Wire remote: nil or an array of at
+-- most MaxBends points, each { x, z } of finite numbers (array or named). Returns
+-- (points, nil), or (nil, "bends") for too many, (nil, "badvia") for anything else.
+function WireLogic.CleanVia(value: any): ({ Point }?, string?)
+	if value == nil then
+		return {}, nil
+	end
+	if type(value) ~= "table" then
+		return nil, "badvia"
+	end
+	local count = 0
+	for _ in pairs(value) do
+		count += 1
+	end
+	if count ~= #value then
+		return nil, "badvia"
+	end
+	if #value > WireLogic.MaxBends then
+		return nil, "bends"
+	end
+	local out: { Point } = {}
+	for _, p in ipairs(value) do
+		if type(p) ~= "table" then
+			return nil, "badvia"
+		end
+		local x, z = p.x or p[1], p.z or p[2]
+		if not (finite(x) and finite(z)) then
+			return nil, "badvia"
+		end
+		table.insert(out, { x = x, z = z })
+	end
+	return out, nil
+end
+
 -- Wires from a save: only { from, to } pairs of non-empty strings, no
 -- repeats, no loops, at most MaxWires. A port other than 1 is kept.
 -- Anything else is dropped.
@@ -321,6 +360,10 @@ function WireLogic.Clean(value: any): { Wire }
 					end
 					if tp then
 						wire.toPort = tp
+					end
+					local via = WireLogic.CleanVia(entry.via)
+					if via and #via > 0 then
+						wire.via = via
 					end
 					table.insert(out, wire)
 					if #out >= WireLogic.MaxWires then
@@ -448,7 +491,8 @@ function WireLogic.Check(
 	fromUid: string,
 	toUid: string,
 	fromPort: number?,
-	toPort: number?
+	toPort: number?,
+	span: number?
 ): (boolean, string?)
 	local fp = fromPort or 1
 	local tp = toPort or 1
@@ -472,7 +516,7 @@ function WireLogic.Check(
 	if WireLogic.LogicCount(placed) > WireLogic.MaxItems then
 		return false, "items"
 	end
-	if fromUid ~= toUid and WireLogic.Distance(a, b) > WireLogic.Span then
+	if fromUid ~= toUid and WireLogic.Distance(a, b) > (span or WireLogic.Span) then
 		return false, "span"
 	end
 	local live = WireLogic.Live(wires, placed)

@@ -713,13 +713,13 @@ return function(t)
 			table.insert(toasts, message)
 		end)
 		local plots = map:FindFirstChild("Plots")
-		-- Buys plot i at the Land Office (the price is topped up first, so the
+		-- Buys plot i from Old Hank (the price is topped up first, so the
 		-- test's cash arithmetic is its own).
 		local function claim(player, i)
 			local profile = profiles[player]
 			profile.cash += loader:shared("GameConfig").PlotPrice
-			local counter = map:FindFirstChild("LandOffice"):FindFirstChild("Counter")
-			player.root.Position = counter.CFrame.Position
+			local at = PlotService.LandOfficeAt -- Old Hank's spot (T420: no Land Office box)
+			player.root.Position = Vector3.new(at.X, 4, at.Y)
 			PlotService.Claim(player, i)
 		end
 		return {

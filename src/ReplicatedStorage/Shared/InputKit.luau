@@ -127,13 +127,15 @@ InputKit.Target = {
 	},
 } :: { [string]: { Bind } }
 
--- The wiring tool (WireTool, BUILD mode). Like the placer it turns world
--- prompts off while it is up, so X is free to mean Cut there. RB picks what
--- the crosshair is on (a tap or a click does it on phone and PC), B or Q
--- leaves. WireSafe checks the list has no key twice.
+-- The wiring tool (WireTool, the Wire spool in hand). Like the placer it turns
+-- world prompts off while it is up, so X is free to mean Cut there. RB picks what
+-- the crosshair is on (a tap or a click does it on phone and PC), R3 (press the right stick) or G buys the
+-- wire the stretched wire is short of (T420), B or Q leaves. No trigger is bound.
+-- WireSafe checks the list has no key twice.
 InputKit.WireBinds = {
 	{ action = "Pick", gamepad = Enum.KeyCode.ButtonR1 },
 	{ action = "Cut", keyboard = Enum.KeyCode.X, gamepad = Enum.KeyCode.ButtonX },
+	{ action = "BuyWire", keyboard = Enum.KeyCode.G, gamepad = Enum.KeyCode.ButtonR3 },
 	{ action = "Done", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB },
 } :: { Bind }
 

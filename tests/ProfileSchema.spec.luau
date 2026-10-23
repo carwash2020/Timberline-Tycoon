@@ -1459,4 +1459,24 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test("T420: the wire box is a whole count in the save, starting at zero, cleaned on every load", function()
+		local Schema, data = fresh()
+		t.eq(Schema.Template.wireUnits, 0, "a new player has no wire")
+		local WireSupply = t.shared("WireSupply")
+		for _, bad in ipairs({ -5, 0 / 0, "12", {}, true, math.huge }) do
+			data.wireUnits = bad
+			Schema.Migrate(data)
+			t.eq(data.wireUnits, if bad == math.huge then WireSupply.MaxStock else 0, "cleaned: " .. tostring(bad))
+		end
+		data.wireUnits = 37.8
+		Schema.Migrate(data)
+		t.eq(data.wireUnits, 37)
+		Schema.Migrate(data)
+		t.eq(data.wireUnits, 37, "migrating again changes nothing")
+		local old = t.loader():shared("Util").deepCopy(Schema.Template)
+		old.wireUnits = nil
+		Schema.Migrate(old)
+		t.eq(old.wireUnits, 0, "an old save with no field gets zero")
+	end)
 end

@@ -194,4 +194,49 @@ return function(t)
 		local placed = { item("a", "SparkSwitch", 0, 0), item("lamp", "SparkLamp", 4, 0) }
 		t.eq(WireLogic.LiveSwitches({ "a", "gone", "lamp" }, placed), { "a" }, "gone and not-a-switch drop out")
 	end)
+
+	t.test("T420: a run's corners are cleaned (at most 4, finite pairs) and kept in a saved wire", function()
+		local WireLogic = t.shared("WireLogic")
+		t.eq(WireLogic.MaxBends, 4)
+		t.eq(WireLogic.MaxRun, 64)
+		t.eq({ WireLogic.CleanVia(nil) }, { {}, nil })
+		t.eq(({ WireLogic.CleanVia({ { x = 1, z = 2 }, { 3, 4 } }) })[1], { { x = 1, z = 2 }, { x = 3, z = 4 } })
+		t.eq(
+			({ WireLogic.CleanVia({ { x = 1, z = 1 }, { x = 2, z = 2 }, { x = 3, z = 3 }, { x = 4, z = 4 } }) })[2],
+			nil,
+			"four pass"
+		)
+		t.eq(({ WireLogic.CleanVia({ { 1, 1 }, { 2, 2 }, { 3, 3 }, { 4, 4 }, { 5, 5 } }) })[2], "bends", "five fail")
+		for _, bad in ipairs({
+			"x",
+			5,
+			{ 1 },
+			{ { x = 1 } },
+			{ { x = 1, z = math.huge } },
+			{ { x = 0 / 0, z = 1 } },
+			{ k = { 1, 2 } },
+		}) do
+			t.eq(({ WireLogic.CleanVia(bad) })[2], "badvia")
+		end
+		local saved = WireLogic.Clean({
+			{ from = "a", to = "b", via = { { x = 1, z = 2 } } },
+			{ from = "a", to = "c", via = "junk" },
+			{ from = "a", to = "d", via = { { 1, 1 }, { 2, 2 }, { 3, 3 }, { 4, 4 }, { 5, 5 } } },
+		})
+		t.eq(saved[1].via, { { x = 1, z = 2 } })
+		t.eq(saved[2].via, nil, "junk corners are dropped, the wire stays")
+		t.eq(saved[3].via, nil, "a fifth corner is dropped on load too")
+	end)
+
+	t.test("T420: Check takes the longest run as its span; the default stays 32", function()
+		local WireLogic = t.shared("WireLogic")
+		local placed = {
+			{ uid = "sw", blueprintId = "SparkSwitch", x = 0, z = 0 },
+			{ uid = "lamp", blueprintId = "SparkLamp", x = 50, z = 0 },
+		}
+		t.eq(({ WireLogic.Check({}, placed, "sw", "lamp") })[2], "span")
+		t.eq({ WireLogic.Check({}, placed, "sw", "lamp", nil, nil, 64) }, { true })
+		placed[2].x = 64.01
+		t.eq(({ WireLogic.Check({}, placed, "sw", "lamp", nil, nil, 64) })[2], "span")
+	end)
 end

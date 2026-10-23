@@ -56,7 +56,7 @@ return function(t)
 		end
 		local owner = newPlayer(1)
 		local visitor = newPlayer(2)
-		local profile = { plot = { placed = {}, wires = {} }, permissions = {} }
+		local profile = { plot = { placed = {}, wires = {} }, permissions = {}, wireUnits = 500 } -- wire is single use (T420): a full box
 		local items = Instance.new("Folder")
 		local host = { cframe = CFrame.new(100, 0, 100), items = items }
 		LogicService.Bind(function(player, _flag)

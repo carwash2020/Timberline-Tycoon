@@ -208,7 +208,7 @@ return function(t)
 		stump = true,
 		toolShed = true,
 		plotSign = true,
-		landOffice = true,
+		oldHank = true,
 		dealership = true,
 	}
 
@@ -847,7 +847,7 @@ return function(t)
 		t.eq(#V2, 8)
 	end)
 
-	t.test("v2: the plot is bought at the Land Office, after the first sale and before the truck", function()
+	t.test("v2: the plot is bought from Old Hank, after the first sale and before the truck", function()
 		local byId, at = {}, {}
 		for i, step in ipairs(V2) do
 			byId[step.id] = step
@@ -855,11 +855,11 @@ return function(t)
 		end
 		local plot = byId.plot
 		t.eq(plot.event, "plotClaimed", "the server reports the purchase under the old event")
-		t.eq(plot.beacon, "landOffice")
+		t.eq(plot.beacon, "oldHank")
 		t.ok(string.find(plot.objective, "Buy a plot", 1, true), plot.objective)
 		t.eq(plot.cashPrice, GameConfig.PlotPrice, "Murph quotes the price the server charges")
 		t.ok(string.find(plot.murph, "$" .. GameConfig.PlotPrice, 1, true), plot.murph)
-		t.ok(string.find(plot.murph, "Land Office", 1, true), plot.murph)
+		t.ok(string.find(plot.murph, "Old Hank", 1, true), plot.murph)
 		t.ok(not string.find(string.lower(plot.murph), "free"), "nothing is free: " .. plot.murph)
 		t.eq(at.plot, at.sell + 1, "right after the first sale")
 		t.ok(
@@ -869,11 +869,11 @@ return function(t)
 		-- Short of the price: back to the sawmill, and Murph says sell more.
 		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice - 1), "sellPad")
 		t.ok(string.find(TutorialData.MurphLine(plot, false, 10), "the sawmill", 1, true))
-		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice), "landOffice")
+		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice), "oldHank")
 		t.eq(TutorialData.MurphLine(plot, false, GameConfig.PlotPrice), plot.murph)
 		t.eq(
 			TutorialData.ObjectiveText(plot, 0, 40),
-			string.format("Buy a plot at the Land Office · $40 of $%d to a plot", GameConfig.PlotPrice)
+			string.format("Buy a plot from Old Hank · $40 of $%d to a plot", GameConfig.PlotPrice)
 		)
 	end)
 

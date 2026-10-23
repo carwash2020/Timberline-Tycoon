@@ -180,7 +180,7 @@ local GameConfig = {
 	PlankStep = 0.2, -- u
 	PlankMinX = 0.6, -- u
 	PlankMinY = 0.4, -- u
-	-- The first plot itself, bought at the Land Office in town (nobody is
+	-- The first plot itself, bought from Old Hank in town (nobody is
 	-- given one). Not FirstPlotPrice, which is the first expansion square.
 	-- It comes before the Rustbucket in the economy model (tools/economy).
 	PlotPrice = 150,
