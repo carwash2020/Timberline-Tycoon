@@ -381,8 +381,8 @@ return function(t)
 			withMeshes(function()
 				for _, def in ipairs(ItemCatalog.TruckList()) do
 					local spec = VehicleModels.Truck(def.id)
-					if spec == nil then
-						continue -- no uploaded pieces (a part-built truck): nothing to compare
+					if spec == nil or def.id == "TimberClassic" then
+						continue -- no uploaded pieces (a part-built truck), or the Classic (keyed ids: VehicleCoverage.spec): nothing to compare
 					end
 					local model = TruckArt.Build(def)
 					local meshId = tostring(spec.Wheel.meshId)

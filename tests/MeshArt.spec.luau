@@ -249,7 +249,12 @@ return function(t)
 				for _, part in ipairs(parts(model)) do
 					if part.Name == "Wheel" and part:GetAttribute("Radius") ~= nil then
 						wheels += 1
-						t.eq(part:GetAttribute("MeshId"), tostring(VehicleModels.Truck(def.id).Wheel.meshId))
+						t.eq(
+							part:GetAttribute("MeshId"),
+							if def.id == "TimberClassic"
+								then Gate.IdOf("TimberClassic/Wheel")
+								else tostring(VehicleModels.Truck(def.id).Wheel.meshId)
+						)
 					end
 					if part:GetAttribute("VisualMesh") == true then
 						t.eq(part.CanQuery, false, part.Name)

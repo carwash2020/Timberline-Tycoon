@@ -140,7 +140,8 @@ local TRUCK_ROLES = { "Body", "Glass", "Lights", "Bed", "Hitch" }
 local TRAILER_ROLES = { "Body", "Lights", "Bed", "Hitch" }
 
 function VehicleMeshes.PartCap(truckId: string): number
-	if truckId == "Flatbed" or truckId == "LoggingRig" then
+	-- (the Timber Classic keeps its stake bed posts and rails, door plates and gauge: 36 parts meshed)
+	if truckId == "Flatbed" or truckId == "LoggingRig" or truckId == "TimberClassic" then
 		return VehicleMeshes.LongCap
 	end
 	return VehicleMeshes.TruckCap
