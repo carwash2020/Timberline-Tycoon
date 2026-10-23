@@ -3,8 +3,8 @@
 -- Pure. PlotService applies it; the picker UI only shows what an offer says.
 --
 -- Nobody is given a plot. A player who has never owned one buys the first
--- at the Land Office in town (GameConfig.PlotPrice); the picker opens from
--- that counter and shows the price. A player whose save already has a plot
+-- from Old Hank in town (GameConfig.PlotPrice); the picker opens from
+-- him and shows the price. A player whose save already has a plot
 -- (profile.plot.claimed) picks a pad again for free when they join, as
 -- before. There is no timeout: the picker stays open until they claim a pad
 -- (T406; "give me any open plot" is the button, never a timer). Builds
@@ -29,6 +29,7 @@ export type OfferPlot = {
 	x: number,
 	z: number,
 	y: number,
+	size: number?, -- the pad's side in studs (an owner's grown plot is bigger than an open pad); nil reads as the base pad
 	taken: boolean,
 	owner: string,
 }
@@ -55,7 +56,7 @@ function PlotPickerLogic.Price(ownedBefore: boolean, plotPrice: number): number
 end
 
 -- The server's verdict on one claim, in the order it checks. `inRange` is
--- the Land Office check (a returning player's join picker has none).
+-- Old Hank's range check (a returning player's join picker has none).
 -- Returns "ok", "owned", "range", "taken" or "cash", and the dollars short.
 function PlotPickerLogic.Decide(
 	hasPlot: boolean,

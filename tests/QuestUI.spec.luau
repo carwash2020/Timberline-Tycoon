@@ -50,11 +50,14 @@ return function(t)
 		plot.Parent = plots
 		Kit.part(plot, "Sign", Vector3.new(8, 3.5, 0.4), CFrame.new(), Color3.new(1, 1, 1))
 		plots.Parent = map
-		-- PlotService's Land Office counter (it sells the first plot).
-		local office = Instance.new("Model")
-		office.Name = "LandOffice"
-		Kit.part(office, "Counter", Vector3.new(7, 3.4, 2.6), CFrame.new(147, 1.7, 86), Color3.new(1, 1, 1))
-		office.Parent = map
+		-- Old Hank sells the first plot (T420: no Land Office box).
+		local townsfolk = Instance.new("Folder")
+		townsfolk.Name = "Townsfolk"
+		local hank = Instance.new("Model")
+		hank.Name = "OldHank"
+		Kit.part(hank, "HumanoidRootPart", Vector3.new(2, 2, 1), CFrame.new(149, 3, 87), Color3.new(1, 1, 1))
+		hank.Parent = townsfolk
+		townsfolk.Parent = map
 		return map
 	end
 
@@ -255,8 +258,8 @@ return function(t)
 		end
 		t.ok(seen.wood, "the drag step points at wood (the load step is retired; QuestUI still finds a bed)")
 		t.ok(
-			seen.landOffice and seen.tree and seen.sellPad and seen.dealership and not seen.murphCart,
-			"chop, sell at the sawmill, buy a plot at the Land Office, then buy the truck"
+			seen.oldHank and seen.tree and seen.sellPad and seen.dealership and not seen.murphCart,
+			"chop, sell at the sawmill, buy a plot from Old Hank, then buy the truck"
 		)
 		local fs = require("@lune/fs")
 		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")

@@ -1,13 +1,14 @@
 --!strict
--- PlotSalesmanData: Old Hank, the farmer who runs the Land Office counter.
+-- PlotSalesmanData: Old Hank, the farmer who sells the homestead plots.
 -- Pure data plus the few rules around it, so the server (PlotService wires
 -- his Talk prompt), the roster (NPCData builds his lines from here) and the
 -- tests all agree.
 --
 -- He is an NPC like the others (NPCData.List, id = PlotSalesmanData.Id), but
 -- he is not a shopkeeper: NPCData gives him no `shop`, so ShopHoursLogic
--- never closes him and NPCService never lays him down to sleep. He stands at
--- the counter around the clock. IsAvailable says so for the tests.
+-- never closes him and NPCService never lays him down to sleep. He stands in
+-- the open by the plot district sign around the clock (T420: the Land Office
+-- box that stood here is gone; Hank is the whole office). IsAvailable says so for the tests.
 --
 -- WHAT HE SELLS is the Offers list below. Today it has one entry, "Buy a
 -- plot". The price is GameConfig.PlotPrice, read when the line is spoken,
@@ -34,6 +35,13 @@ local PlotSalesmanData = {}
 PlotSalesmanData.Id = "OldHank" -- NPCData id and model name
 PlotSalesmanData.Name = "Old Hank"
 PlotSalesmanData.Role = "Plot salesman"
+-- Where he stands (x, z): on the grass south of the East Link (its edge is z 94),
+-- beside the plot district sign, 6.5 studs east of the sign's centre and clear
+-- of its posts, facing south. Not on the road: the link's cars and walkers
+-- pass at z 66 to 94. PlotService measures "near Old Hank" from Office;
+-- NPCData stands him on Stand (the same spot).
+PlotSalesmanData.Office = { x = 153.5, z = 100 }
+PlotSalesmanData.Stand = { x = 153.5, z = 100 }
 
 -- What the server knows about the player when they talk to him.
 export type State = {
@@ -43,7 +51,7 @@ export type State = {
 
 export type Offer = {
 	id: string, -- also the key into PlotService's SALESMAN_OFFERS
-	label: string, -- the action, as on the counter's prompt
+	label: string, -- the action, as on his prompt
 	pitch: string, -- one %s: the price as "$N"
 	price: () -> number, -- read live from the game's numbers
 	available: (State) -> boolean,
@@ -79,7 +87,7 @@ end
 -- Lines that do not depend on an offer.
 PlotSalesmanData.OwnsLine = "You've got your plot, partner. Come back when there's more land to be had."
 PlotSalesmanData.FullLine = "Every pad's spoken for on this server today. Try another one, friend."
-PlotSalesmanData.FarLine = "Come on up to the counter, I can't hear you from there."
+PlotSalesmanData.FarLine = "Come on over here, I can't hear you from there."
 
 function PlotSalesmanData.Find(id: string): Offer?
 	for _, offer in ipairs(PlotSalesmanData.Offers) do

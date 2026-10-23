@@ -6,7 +6,7 @@
 --     (PickerSequence "slot"), and cannot be closed. The save last played is
 --     marked "Last played", not "Playing". PLAY sends play(index); a save
 --     with a plot then opens the plot picker for its pad, one without just
---     enters the world (the Land Office sells a plot).
+--     enters the world (Old Hank sells a plot).
 --   * THE SAVES BUTTON (any time after). Each slot's name, cash, axe, what is
 --     on its plot and when it was last saved, and LOAD, which asks you to
 --     confirm because the save you're playing is put away first. Restarting

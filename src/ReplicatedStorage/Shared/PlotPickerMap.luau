@@ -90,11 +90,26 @@ end
 -- (x, y, z for each; the UI turns them into Vector3s).
 export type Shot = { fromX: number, fromY: number, fromZ: number, atX: number, atY: number, atZ: number }
 
-function PlotPickerMap.Shot(plot: { x: number, y: number, z: number }): Shot
+-- The base shot frames the 80-stud open pad. A grown plot (up to 200, taken
+-- pads show the owner's) is shot from the same side, further back (by
+-- half the growth), so all of it stays in frame; a smaller or unknown size never
+-- moves the camera in.
+PlotPickerMap.BaseSize = 80
+
+function PlotPickerMap.BackScale(size: number?): number
+	if type(size) ~= "number" or size ~= size or size == math.huge or size <= PlotPickerMap.BaseSize then
+		return 1
+	end
+	-- Half the growth: the base shot already leaves room round an 80 pad (a 200 plot is shot 1.75 times back).
+	return 0.5 + size / (2 * PlotPickerMap.BaseSize)
+end
+
+function PlotPickerMap.Shot(plot: { x: number, y: number, z: number }, size: number?): Shot
+	local k = PlotPickerMap.BackScale(size)
 	return {
-		fromX = plot.x + PlotPickerMap.CameraBack.x,
-		fromY = plot.y + PlotPickerMap.CameraBack.y,
-		fromZ = plot.z + PlotPickerMap.CameraBack.z,
+		fromX = plot.x + PlotPickerMap.CameraBack.x * k,
+		fromY = plot.y + PlotPickerMap.CameraBack.y * k,
+		fromZ = plot.z + PlotPickerMap.CameraBack.z * k,
 		atX = plot.x,
 		atY = plot.y + PlotPickerMap.FocusUp,
 		atZ = plot.z,

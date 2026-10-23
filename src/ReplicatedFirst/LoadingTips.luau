@@ -20,7 +20,7 @@ LoadingTips.Lines = {
 	"Swing low on a tree and keep chopping until it falls.",
 	"Put the axe away, then drag a log onto your truck.",
 	"Odd bark can hide figured wood. The mill pays more.",
-	"Old Hank at the Land Office sells homestead plots.",
+	"Old Hank, by the plot district sign, sells homestead plots.",
 	"A blueprint teaches a building. The hammer places it.",
 	"The Field Guide lists every wood you have found.",
 	"Heat Boots let you walk the volcano safely.",

@@ -276,7 +276,7 @@ QuestUI.BeaconPaths = {
 	sellPad = { "SellArea", "SellZone" },
 	toolShed = { "ToolShed", "Counter" },
 	plotSign = { "Plots", "Plot_1", "Sign" },
-	landOffice = { "LandOffice", "Counter" },
+	oldHank = { "Townsfolk", "OldHank", "HumanoidRootPart" }, -- sells the first plot (no Land Office box since T420)
 	dealership = { "Dealership", "Counter" },
 	gus = { "GondolaTown", "Platform" }, -- the charter keeper's platform (NextGoal.PickV1)
 } :: { [string]: { string } }

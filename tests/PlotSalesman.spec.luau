@@ -73,11 +73,17 @@ return function(t)
 		t.eq(hank.shop, nil, "no shop: NPCService.Apply skips him, so he never sleeps")
 	end)
 
-	t.test("he is an old farmer standing at the Land Office counter", function()
+	t.test("he is an old farmer standing in the open by the plot district sign, no counter (T420)", function()
 		local hank = NPCData.Get(PlotSalesmanData.Id)
 		t.eq(hank.name, "Old Hank")
-		t.eq(hank.spot.kind, "counter")
-		t.eq(hank.spot.model, "LandOffice")
+		t.eq(hank.spot.kind, "fixed")
+		t.eq(hank.spot.model, nil, "the Land Office box is gone")
+		local office = PlotSalesmanData.Office
+		t.ok(
+			math.abs(hank.spot.position.X - office.x) <= 4 and math.abs(hank.spot.position.Z - office.z) <= 4,
+			"he stands where the counter was"
+		)
+		t.ok(hank.spot.ground ~= nil, "on the terrain there")
 		t.eq(hank.route, nil, "he stays put")
 		t.eq(hank.look.hat, "straw")
 		t.ok(hank.look.overalls ~= nil and hank.look.stripe ~= nil, "overalls over a plaid shirt")
@@ -115,7 +121,7 @@ return function(t)
 			end
 		end
 		t.ok(plot ~= nil, "step id plot still exists")
-		t.eq(plot.beacon, "landOffice")
+		t.eq(plot.beacon, "oldHank")
 		t.eq(plot.event, "plotClaimed")
 		t.ok(mentions(plot.murphShort, "$" .. GameConfig.PlotPrice))
 	end)

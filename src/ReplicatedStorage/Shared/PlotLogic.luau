@@ -432,6 +432,32 @@ function PlotLogic.VisitSpot(tierSize: number, bad: (number, number) -> boolean)
 	return PlotLogic.VisitPad[1], PlotLogic.VisitPad[2]
 end
 
+-- The plot's spawn pad is 6 x 6 (PlotService builds it that size). A saved
+-- base can have a piece standing on the entrance (18 studs south of the
+-- centre); SpawnSpot is where the pad goes instead (plot-local x, z): the
+-- first of VisitCandidates whose pad touches no placed piece (`rects`, the
+-- pieces' footprints), else the entrance itself.
+PlotLogic.SpawnSize = 6
+
+function PlotLogic.SpawnSpot(tierSize: number, rects: { Rect }): (number, number)
+	for _, spot in ipairs(PlotLogic.VisitCandidates(tierSize)) do
+		local clear = true
+		for _, rect in ipairs(rects) do
+			if
+				math.abs(spot[1] - rect.x) * 2 < PlotLogic.SpawnSize + rect.w
+				and math.abs(spot[2] - rect.z) * 2 < PlotLogic.SpawnSize + rect.d
+			then
+				clear = false
+				break
+			end
+		end
+		if clear then
+			return spot[1], spot[2]
+		end
+	end
+	return PlotLogic.VisitPad[1], PlotLogic.VisitPad[2]
+end
+
 function PlotLogic.OnRoad(x: number, z: number): boolean
 	local p = Vector2.new(x, z)
 	for _, road in ipairs(WorldLayout.Roads) do

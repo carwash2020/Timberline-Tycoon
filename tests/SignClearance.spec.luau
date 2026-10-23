@@ -180,25 +180,28 @@ return function(t)
 		t.ok(count >= 10)
 	end)
 
-	t.test("the PLOT DISTRICT label does not wrap and reads 'Land Office' then 'Buy a plot and build on it'", function()
-		local plot
-		for _, sign in ipairs(town.signs) do
-			if firstLine(sign) == "PLOT DISTRICT" then
-				plot = sign
+	t.test(
+		"the PLOT DISTRICT label does not wrap and reads 'Old Hank sells plots' then 'Buy a plot and build on it'",
+		function()
+			local plot
+			for _, sign in ipairs(town.signs) do
+				if firstLine(sign) == "PLOT DISTRICT" then
+					plot = sign
+				end
 			end
-		end
-		t.ok(plot ~= nil, "the town has a PLOT DISTRICT sign")
-		t.eq(plot.text, "PLOT DISTRICT\nLand Office\nBuy a plot and build on it")
-		local model = signModel(plot)
-		local board = model:FindFirstChild("Board", true)
-		local labels = 0
-		for _, d in ipairs(board:GetDescendants()) do
-			if d:IsA("TextLabel") then
-				labels += 1
-				t.eq(d.TextWrapped, false, "the label does not wrap")
-				t.eq(d.Text, plot.text)
+			t.ok(plot ~= nil, "the town has a PLOT DISTRICT sign")
+			t.eq(plot.text, "PLOT DISTRICT\nOld Hank sells plots\nBuy a plot and build on it")
+			local model = signModel(plot)
+			local board = model:FindFirstChild("Board", true)
+			local labels = 0
+			for _, d in ipairs(board:GetDescendants()) do
+				if d:IsA("TextLabel") then
+					labels += 1
+					t.eq(d.TextWrapped, false, "the label does not wrap")
+					t.eq(d.Text, plot.text)
+				end
 			end
+			t.ok(labels >= 1, "the board has a label")
 		end
-		t.ok(labels >= 1, "the board has a label")
-	end)
+	)
 end
