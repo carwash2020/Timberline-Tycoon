@@ -24,6 +24,12 @@ export type Shape = {
 	z1: number,
 	r: number?, -- a disc: its centre is the middle of the bounds
 	pts: { Vector2 }?, -- a polygon (not a disc)
+	-- A Clearance.Box only: the vertical range and the box itself (see Clearance.Box).
+	y0: number?,
+	y1: number?,
+	obb: { cf: CFrame, half: Vector3 }?,
+	-- A Clearance.Wedge only: the 6 corners, the face normals and the edge directions (world space).
+	hull: { pts: { Vector3 }, normals: { Vector3 }, dirs: { Vector3 } }?,
 }
 
 function Clearance.Disc(x: number, z: number, r: number): Shape
@@ -41,6 +47,200 @@ end
 
 function Clearance.Rect(x0: number, z0: number, x1: number, z1: number): Shape
 	return Clearance.Poly({ Vector2.new(x0, z0), Vector2.new(x1, z0), Vector2.new(x1, z1), Vector2.new(x0, z1) })
+end
+
+-- A box in 3D: `cf` is its centre and orientation, `size` its full size. The shape's x0..z1 are
+-- its footprint's bounds (so the grid files it like any other shape), y0..y1 its height range,
+-- and `obb` keeps the box for Clearance.BoxDepth. The 2D functions above do not read the
+-- height: use BoxDepth / BoxHits for boxes.
+function Clearance.Box(cf: CFrame, size: Vector3): Shape
+	local half = size / 2
+	local right, up, look = cf.RightVector, cf.UpVector, cf.LookVector
+	-- Half-extent of the rotated box along each world axis.
+	local ex = math.abs(right.X) * half.X + math.abs(up.X) * half.Y + math.abs(look.X) * half.Z
+	local ey = math.abs(right.Y) * half.X + math.abs(up.Y) * half.Y + math.abs(look.Y) * half.Z
+	local ez = math.abs(right.Z) * half.X + math.abs(up.Z) * half.Y + math.abs(look.Z) * half.Z
+	local p = cf.Position
+	return {
+		x0 = p.X - ex,
+		z0 = p.Z - ez,
+		x1 = p.X + ex,
+		z1 = p.Z + ez,
+		y0 = p.Y - ey,
+		y1 = p.Y + ey,
+		obb = { cf = cf, half = half },
+	}
+end
+
+-- A Roblox WedgePart as a convex shape: a right triangle in its Y and Z (the slope rises toward +Z, the tall
+-- face is at +Z), extruded along X. Judged exactly (SAT over its 5 face normals and its edges), not as its box.
+function Clearance.Wedge(cf: CFrame, size: Vector3): Shape
+	local h = size / 2
+	local local_ = {
+		Vector3.new(-h.X, -h.Y, -h.Z),
+		Vector3.new(-h.X, -h.Y, h.Z),
+		Vector3.new(-h.X, h.Y, h.Z),
+		Vector3.new(h.X, -h.Y, -h.Z),
+		Vector3.new(h.X, -h.Y, h.Z),
+		Vector3.new(h.X, h.Y, h.Z),
+	}
+	local pts: { Vector3 } = {}
+	local x0, y0, z0, x1, y1, z1 = math.huge, math.huge, math.huge, -math.huge, -math.huge, -math.huge
+	for _, p in ipairs(local_) do
+		local w = cf * p
+		table.insert(pts, w)
+		x0, y0, z0 = math.min(x0, w.X), math.min(y0, w.Y), math.min(z0, w.Z)
+		x1, y1, z1 = math.max(x1, w.X), math.max(y1, w.Y), math.max(z1, w.Z)
+	end
+	local right, up, look = cf.RightVector, cf.UpVector, cf.ZVector -- (ZVector: the local +Z, LookVector is -Z)
+	-- slope direction in the YZ plane: from (-h.Y, -h.Z) to (+h.Y, +h.Z)
+	local slope = (up * size.Y + look * size.Z).Unit
+	local slopeNormal = (up * size.Z - look * size.Y).Unit
+	return {
+		x0 = x0,
+		z0 = z0,
+		x1 = x1,
+		z1 = z1,
+		y0 = y0,
+		y1 = y1,
+		hull = {
+			pts = pts,
+			normals = { right, up, look, slopeNormal },
+			dirs = { right, up, look, slope },
+		},
+	}
+end
+
+-- A box's hull (corners, axes), for the general test.
+local function hullOf(s: Shape): { pts: { Vector3 }, normals: { Vector3 }, dirs: { Vector3 } }?
+	if s.hull then
+		return s.hull
+	end
+	local o = s.obb
+	if not o then
+		return nil
+	end
+	local pts: { Vector3 } = {}
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sy in ipairs({ -1, 1 }) do
+			for _, sz in ipairs({ -1, 1 }) do
+				table.insert(pts, o.cf * Vector3.new(o.half.X * sx, o.half.Y * sy, o.half.Z * sz))
+			end
+		end
+	end
+	local axes = { o.cf.RightVector, o.cf.UpVector, o.cf.LookVector }
+	return { pts = pts, normals = axes, dirs = axes }
+end
+
+-- How deep two shapes overlap, in studs, when either is a wedge (convex SAT).
+local function hullDepth(a: Shape, b: Shape): number
+	local ha, hb = hullOf(a), hullOf(b)
+	if not ha or not hb then
+		return 0
+	end
+	local best = math.huge
+	local function test(axis: Vector3): boolean
+		local len = axis.Magnitude
+		if len < 1e-6 then
+			return true
+		end
+		local n = axis / len
+		local aMin, aMax, bMin, bMax = math.huge, -math.huge, math.huge, -math.huge
+		for _, p in ipairs(ha.pts) do
+			local d = p:Dot(n)
+			aMin, aMax = math.min(aMin, d), math.max(aMax, d)
+		end
+		for _, p in ipairs(hb.pts) do
+			local d = p:Dot(n)
+			bMin, bMax = math.min(bMin, d), math.max(bMax, d)
+		end
+		local overlap = math.min(aMax, bMax) - math.max(aMin, bMin)
+		if overlap <= 0 then
+			return false
+		end
+		best = math.min(best, overlap)
+		return true
+	end
+	for _, n in ipairs(ha.normals) do
+		if not test(n) then
+			return 0
+		end
+	end
+	for _, n in ipairs(hb.normals) do
+		if not test(n) then
+			return 0
+		end
+	end
+	for _, da in ipairs(ha.dirs) do
+		for _, db in ipairs(hb.dirs) do
+			if not test(da:Cross(db)) then
+				return 0
+			end
+		end
+	end
+	return if best == math.huge then 0 else best
+end
+
+-- How deep two boxes overlap, in studs: the smallest overlap along the 15 SAT axes (3 face normals
+-- of each box and the 9 edge cross products). 0 when they are apart or only touch (or when
+-- either shape is not a Clearance.Box or Wedge). The Y range is tested first, as a cheap exit. A wedge goes
+-- through the convex SAT in hullDepth.
+function Clearance.BoxDepth(a: Shape, b: Shape): number
+	if a.y0 == nil or b.y0 == nil then
+		return 0
+	end
+	if (a.y0 :: number) >= (b.y1 :: number) or (b.y0 :: number) >= (a.y1 :: number) then
+		return 0
+	end
+	if a.x0 >= b.x1 or b.x0 >= a.x1 or a.z0 >= b.z1 or b.z0 >= a.z1 then
+		return 0
+	end
+	if a.hull or b.hull then
+		return hullDepth(a, b)
+	end
+	local oa, ob = a.obb, b.obb
+	if not oa or not ob then
+		return 0
+	end
+	local axesA = { oa.cf.RightVector, oa.cf.UpVector, oa.cf.LookVector }
+	local axesB = { ob.cf.RightVector, ob.cf.UpVector, ob.cf.LookVector }
+	local halfA = { oa.half.X, oa.half.Y, oa.half.Z }
+	local halfB = { ob.half.X, ob.half.Y, ob.half.Z }
+	local delta = ob.cf.Position - oa.cf.Position
+	local best = math.huge
+	local function test(axis: Vector3): boolean
+		local len = axis.Magnitude
+		if len < 1e-6 then
+			return true -- parallel edges: no axis, the face axes cover it
+		end
+		local n = axis / len
+		local ra, rb = 0, 0
+		for i = 1, 3 do
+			ra += math.abs(axesA[i]:Dot(n)) * halfA[i]
+			rb += math.abs(axesB[i]:Dot(n)) * halfB[i]
+		end
+		local overlap = ra + rb - math.abs(delta:Dot(n))
+		if overlap <= 0 then
+			return false
+		end
+		if overlap < best then
+			best = overlap
+		end
+		return true
+	end
+	for i = 1, 3 do
+		if not test(axesA[i]) or not test(axesB[i]) then
+			return 0
+		end
+	end
+	for i = 1, 3 do
+		for j = 1, 3 do
+			if not test(axesA[i]:Cross(axesB[j])) then
+				return 0
+			end
+		end
+	end
+	return if best == math.huge then 0 else best
 end
 
 -- The shape pushed out by `m` studs on every side.
@@ -245,6 +445,46 @@ function Clearance.Hits(
 			end
 		end
 	end
+	return out
+end
+
+export type BoxHit = { a: Entry, b: Entry, depth: number }
+
+-- Every pair of box entries (any kind) that overlap by more than `minDepth` studs (plus 1e-4 for float error: 0.05 passes) (Clearance.BoxDepth).
+-- The XZ grid finds the neighbours, then the Y range and the 15-axis SAT decide. `ignore` skips a pair.
+-- Each pair is listed once. Deepest first.
+function Clearance.BoxHits(grid: Grid, minDepth: number, ignore: ((a: Entry, b: Entry) -> boolean)?): { BoxHit }
+	local out: { BoxHit } = {}
+	local order: { [Entry]: number } = {}
+	for i, entry in ipairs(grid.all) do
+		order[entry] = i
+	end
+	local done: { [number]: boolean } = {}
+	local count = #grid.all + 1
+	for _, list in pairs(grid.cells) do
+		for i = 1, #list do
+			local a = list[i]
+			for j = i + 1, #list do
+				local b = list[j]
+				local oa, ob = order[a], order[b]
+				local lo, hi = math.min(oa, ob), math.max(oa, ob)
+				local id = lo * count + hi
+				if not done[id] then
+					done[id] = true
+					local depth = Clearance.BoxDepth(a.shape, b.shape)
+					if depth > minDepth + 1e-4 and not (ignore and ignore(a, b)) then
+						table.insert(out, { a = a, b = b, depth = depth })
+					end
+				end
+			end
+		end
+	end
+	table.sort(out, function(x, y)
+		if x.depth ~= y.depth then
+			return x.depth > y.depth
+		end
+		return order[x.a] * count + order[x.b] < order[y.a] * count + order[y.b]
+	end)
 	return out
 end
 
