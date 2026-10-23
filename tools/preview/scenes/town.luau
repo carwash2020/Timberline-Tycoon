@@ -76,8 +76,10 @@ return {
 			slot.CastShadow = false
 			BuildingArt.ParkingBay(slot, index)
 		end
-		for _, fence in ipairs(town.fences) do
-			place(BuildingArt.Fence(fence.length), fence.cframe)
+		local BuiltMoves, BuiltTerrain =
+			ctx.load("ReplicatedStorage/Shared/World/BuiltMoves"), ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+		for _, fence in ipairs(BuiltMoves.Fences(town.fences)) do
+			place(BuildingArt.Fence(fence.length, fence.noEndPosts), fence.cframe)
 		end
 		for _, prop in ipairs(town.props) do
 			place(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)

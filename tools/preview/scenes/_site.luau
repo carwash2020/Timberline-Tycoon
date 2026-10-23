@@ -51,17 +51,23 @@ function Site.build(ctx, x0, z0, x1, z1, step)
 		end
 	end
 	-- Boulders, as MapBuilder's "5. The boulders" turns them.
-	for _, b in ipairs(WorldPlan.Boulders()) do
+	local BuiltMoves, BuiltTerrain =
+		ctx.load("ReplicatedStorage/Shared/World/BuiltMoves"), ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+	for _, b in ipairs(BuiltMoves.Boulders(WorldPlan, BuiltTerrain)) do
 		if inside(b.position) then
 			place(PropArt.Rock(b.size, b.seed), CF.new(b.position) * CF.Angles(0, b.seed % 6, 0))
 		end
 	end
-	for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+	local BuiltMoves, BuiltTerrain =
+		ctx.load("ReplicatedStorage/Shared/World/BuiltMoves"), ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+	for _, sign in ipairs(BuiltMoves.RoadSigns(WorldPlan, BuiltTerrain, WorldPlan.BiomeSignText)) do
 		if inside(sign.cframe.Position) then
 			place(BuildingArt.Signpost(sign.text), sign.cframe)
 		end
 	end
-	for _, spot in ipairs(WorldPlan.Scenery()) do
+	local BuiltMoves, BuiltTerrain =
+		ctx.load("ReplicatedStorage/Shared/World/BuiltMoves"), ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+	for _, spot in ipairs(BuiltMoves.Scenery(WorldPlan, BuiltTerrain)) do
 		if inside(spot.center) then
 			for _, item in ipairs(spot.items) do
 				local model
