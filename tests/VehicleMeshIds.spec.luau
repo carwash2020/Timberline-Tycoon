@@ -7,7 +7,15 @@ return function(t)
 
 	local function parse(files)
 		local out, order = {}, {}
-		for _, file in ipairs(files or { "mesh_ids.txt", "truck_mesh_ids.txt" }) do
+		-- mesh_ids.txt is the source of truth; the derived truck_mesh_ids.txt only stands in until it carries the
+		-- trucks_<Truck>_<Part> lines itself.
+		if files == nil then
+			files = { "mesh_ids.txt" }
+			if not string.find(fs.readFile("assets/vehicles/t421/mesh_ids.txt"), "trucks_", 1, true) then
+				table.insert(files, "truck_mesh_ids.txt")
+			end
+		end
+		for _, file in ipairs(files) do
 			for line in string.gmatch(fs.readFile("assets/vehicles/t421/" .. file), "[^\r\n]+") do
 				local name, id = string.match(line, "^%s*([%w_]+)%s*=%s*(%d*)%s*$")
 				t.ok(name, "bad line: " .. line)
@@ -19,12 +27,27 @@ return function(t)
 		return out, order
 	end
 
-	t.test("mesh_ids.txt has the 54 T421 lines and truck_mesh_ids.txt the four trucks' 24", function()
-		local _, order = parse({ "mesh_ids.txt" })
-		t.eq(#order, 54)
-		local _, trucks = parse({ "truck_mesh_ids.txt" })
-		t.eq(#trucks, 24)
+	t.test("the id files hold 78 lines: 54 T421 and 24 trucks/<Truck>/<Part>", function()
+		local _, order = parse()
+		t.eq(#order, 78)
+		local trucks = 0
+		for _, key in ipairs(order) do
+			if string.sub(key, 1, 7) == "trucks/" then
+				trucks += 1
+			end
+		end
+		t.eq(trucks, 24)
 	end)
+
+	t.test(
+		"the real file through the generator: tools/gen_vehicle_mesh_ids --check passes and the module has 78 keys",
+		function()
+			local process = require("@lune/process")
+			local result = process.exec("lune", { "run", "tools/gen_vehicle_mesh_ids", "--check" })
+			t.ok(result.ok, "generator check: " .. result.stdout .. result.stderr)
+			t.eq(#VehicleMeshes.MeshKeys(), 78)
+		end
+	)
 
 	t.test("VehicleMeshes has exactly the keys of the id files (54 + 24 = 78)", function()
 		local fileIds, order = parse()

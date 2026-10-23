@@ -59,9 +59,6 @@ return function(t)
 		withMeshes(function()
 			local total = 0
 			for _, def in ipairs(ItemCatalog.TruckList()) do
-				if def.id == "TimberClassic" then
-					continue
-				end
 				local lay = TruckLayout.For(def)
 				total += checkVisual(TruckArt.Build(def, lay), def.id)
 				if def.look.bedLength > 0 then

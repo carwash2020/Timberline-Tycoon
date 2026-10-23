@@ -478,6 +478,13 @@ function DealershipLot.Preload(): MeshKit.PreloadResult
 	for _, piece in ipairs(VehicleModels.AllPieces()) do
 		table.insert(entries, { id = piece.meshId, hull = piece.wheel })
 	end
+	-- T421: the keyed ids (the trailers', the Timber Classic's and the recoloured trucks').
+	for _, key in ipairs(VehicleMeshGate.AllKeys()) do
+		local n = VehicleMeshGate.NumberFor(key)
+		if n then
+			table.insert(entries, { id = n, hull = string.sub(key, -6) == "/Wheel" })
+		end
+	end
 	return MeshKit.Preload(entries)
 end
 

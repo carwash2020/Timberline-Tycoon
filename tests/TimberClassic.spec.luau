@@ -119,8 +119,56 @@ return function(t)
 		t.ok(math.abs(mass(hull) - before) / before < 0.01, "mass " .. mass(hull) .. " vs " .. before)
 	end)
 
-	t.expectedFail("its part sizes match bbox_check.md and TimberClassic/stats.json within 1%", function()
-		t.ok(fs.isFile("assets/vehicles/t421/TimberClassic/stats.json"), "stats.json is in the repo")
-		t.ok(VehicleModels.Truck("TimberClassic") ~= nil, "a piece table for it")
-	end, "TimberClassic/stats.json and bbox_check.md were not attached to the branch (docs/T421_PLAN.md)")
+	local serde = require("@lune/serde")
+	local stats = serde.decode("json", fs.readFile("assets/vehicles/t421/glb/TimberClassic/stats.json"))
+
+	local function near(a, b)
+		return math.abs(a - b) <= 0.01 * math.max(math.abs(b), 1)
+	end
+
+	t.test("its part sizes and offsets match TimberClassic/stats.json within 1%", function()
+		local pieces = VehicleModels.Truck("TimberClassic")
+		t.ok(pieces ~= nil, "VehicleModels has a piece table for it")
+		for _, role in ipairs({ "Body", "Glass", "Lights", "Bed", "Hitch" }) do
+			local want = stats[role]
+			local got = pieces[role]
+			t.ok(got ~= nil, role)
+			for i, axis in ipairs({ "X", "Y", "Z" }) do
+				t.ok(
+					near(got.size[axis], want.size[i]),
+					role .. " size " .. axis .. " " .. got.size[axis] .. " vs " .. want.size[i]
+				)
+				t.ok(math.abs(got.at[axis] - want.at[i]) <= 0.01, role .. " at " .. axis)
+			end
+		end
+		local wheel = pieces.Wheel
+		for i, axis in ipairs({ "X", "Y", "Z" }) do
+			t.ok(near(wheel.size[axis], stats.Wheel.size[i]), "Wheel size " .. axis)
+		end
+		t.eq(wheel.mirrorLeft, true)
+	end)
+
+	t.test("bbox_check.md's Timber Classic bed row and the hitch agree with stats.json and the data module", function()
+		local md = fs.readFile("assets/vehicles/t421/bbox_check.md")
+		local x, y, z = string.match(md, "| TimberClassic Bed | ([%d%.]+) | ([%d%.]+) | ([%d%.]+) |")
+		t.ok(x ~= nil, "found the bed row")
+		t.ok(
+			near(tonumber(x), stats.Bed.size[1])
+				and near(tonumber(y), stats.Bed.size[2])
+				and near(tonumber(z), stats.Bed.size[3])
+		)
+		t.eq(Data.BedFootprint, roblox.Vector2.new(tonumber(x), tonumber(z)))
+		t.eq(Data.Hitch, Vector3.new(stats.Hitch.at[1], stats.Hitch.at[2], stats.Hitch.at[3]))
+		for i, c in ipairs(stats.Wheel.wheelCentres) do
+			t.eq(Data.WheelCentres[i], Vector3.new(c[1], c[2], c[3]))
+		end
+	end)
+
+	t.test("with its meshes' ids in it is complete: only the ids decide (the stats are in)", function()
+		Gate.SetIds(Gate.FakeIds())
+		t.eq(Gate.Complete("Truck", "TimberClassic"), true)
+		t.eq(#Gate.Missing("Truck", "TimberClassic"), 0)
+		Gate.SetIds(nil)
+		t.eq(#Gate.Missing("Truck", "TimberClassic"), 6, "and with empty ids the six keys are missing")
+	end)
 end

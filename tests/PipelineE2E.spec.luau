@@ -892,7 +892,6 @@ return function(t)
 					local Gate = loader:shared("VehicleMeshGate")
 					local TruckLayout = loader:shared("TruckLayout")
 					Gate.SetIds(Gate.FakeIds()) -- its meshes are in, for this step
-					Gate.ClassicStats = true
 					local classic = Catalog.GetTruck("TimberClassic")
 					local ranch = Catalog.GetTrailer("RanchTrailer")
 					local function mayDrive()
@@ -974,7 +973,6 @@ return function(t)
 					)
 					need(gained > 0, "12 logs paid nothing")
 					Gate.SetIds(nil)
-					Gate.ClassicStats = false
 					result.classicRigSold = gained
 					state(string.format("12 logs on the Classic rig sold for $%d", gained))
 				end)

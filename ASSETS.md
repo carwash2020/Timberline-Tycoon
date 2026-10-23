@@ -54,7 +54,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 
 Not asset ids, so not listed: `rbxasset://` built-ins (engine particle textures, `FellSound`, most of
 `SoundData`), empty sound slots (`id = ""`, silent), badge ids (all 0 by decision), and the owner user id.
-`meshId = 0` slots (no upload yet, part build kept by design): 152. They are not listed.
+`meshId = 0` slots (no upload yet, part build kept by design): 154. They are not listed.
 
 ## Store item models (one slot per item: `Shared/StoreModelSlots.luau`)
 

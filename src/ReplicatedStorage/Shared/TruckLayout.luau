@@ -330,9 +330,6 @@ local TRAILERS: { [TrailerStyle]: TrailerSpec } = {
 	heavy = { wheelRadius = 1.25 * S, tyreWidth = 0.9 * S, wall = 0.32 * S, wallHeight = 2.5 * S },
 }
 local TRAILER_FLOOR_Y = 2.25 * S -- the trailer bed floor's centre (top 3.175)
--- A trailer's tyres tuck this far under its deck, so a trailer as wide as
--- the Rig, fenders and all, still fits a parking slot.
-local TRAILER_TUCK = 0.3 * S
 
 -- A rig's footprint seen from above, in studs: its length (the truck and
 -- its trailer end to end) and width (its body or its tyres, whichever
@@ -370,7 +367,8 @@ function TruckLayout.ForTrailer(trailer: TrailerDef, truck: Layout): TrailerLayo
 	local bedCenterZ = bedStart + bedLength / 2
 	local axleZ: { number } = {}
 	local sum = 0
-	for _, a in ipairs(TrailerAxleData.For(TrailerAxleData.ByStyle[style])) do
+	local trailerId = TrailerAxleData.ByStyle[style]
+	for _, a in ipairs(TrailerAxleData.For(trailerId)) do
 		table.insert(axleZ, bedCenterZ + a)
 		sum += bedCenterZ + a
 	end
@@ -388,7 +386,8 @@ function TruckLayout.ForTrailer(trailer: TrailerDef, truck: Layout): TrailerLayo
 		hitchZ = truck.length / 2,
 		wheelRadius = spec.wheelRadius,
 		tyreWidth = spec.tyreWidth,
-		wheelX = truck.width / 2 + spec.tyreWidth / 2 - TRAILER_TUCK,
+		-- The wheels' X is the approved mesh's own for the tow truck's variant (TrailerAxleData, from stats.json).
+		wheelX = TrailerAxleData.WheelX(trailerId, TrailerAxleData.VariantOfStyle[truck.style] or "Rustbucket"), -- (the Scout ATV tows nothing; a spec may still ask)
 		wheelZ = wheelZ,
 		axleZ = axleZ,
 		logSlots = logSlots(bedLength, trailer.extraCapacity),

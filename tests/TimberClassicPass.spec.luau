@@ -16,11 +16,9 @@ return function(t)
 	-- Its meshes are in (made-up ids, and the stats the piece table needs): the pass is the only thing left to decide.
 	local function stockClassic()
 		Gate.SetIds(Gate.FakeIds())
-		Gate.ClassicStats = true
 	end
 	local function unstock()
 		Gate.SetIds(nil)
-		Gate.ClassicStats = false
 	end
 
 	local function setup(options)

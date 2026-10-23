@@ -73,4 +73,67 @@ return function(t)
 			t.eq(keys[trailerId .. "/ScoutATV/Body"], nil, "no Scout variant")
 		end
 	end)
+	t.test(
+		"each truck's Wheel mesh is cloned onto every wheel centre, the Classic's four from TimberClassicData",
+		function()
+			local roblox = t.roblox
+			local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+			local TruckArt = t.load("ReplicatedStorage/Shared/Art/TruckArt")
+			local Data = t.shared("TimberClassicData")
+			Gate.SetIds(Gate.FakeIds())
+			MeshKit.Reset()
+			MeshKit.Override = function(id, name, size)
+				local part = roblox.Instance.new("MeshPart")
+				part.Name = name
+				part.Size = size
+				part:SetAttribute("MeshId", tostring(id))
+				return part
+			end
+			local ok, err = pcall(function()
+				for _, def in ipairs(ItemCatalog.TruckList()) do
+					local lay = TruckLayout.For(def)
+					local model = TruckArt.Build(def, lay)
+					t.eq(model:GetAttribute("VehicleMesh"), true, def.id .. " is meshed")
+					local found = {}
+					for _, d in ipairs(model:GetDescendants()) do
+						if d:IsA("MeshPart") and d.Name == "Wheel" and d:GetAttribute("Radius") ~= nil then
+							table.insert(found, d)
+						end
+					end
+					t.eq(#found, #lay.wheelZ * 2, def.id .. " has a Wheel mesh per wheel")
+					local want = {}
+					if def.id == "TimberClassic" then
+						for _, c in ipairs(Data.WheelCentres) do
+							table.insert(want, c)
+						end
+					else
+						for _, z in ipairs(lay.wheelZ) do
+							for _, side in ipairs({ -1, 1 }) do
+								table.insert(want, roblox.Vector3.new(side * lay.wheelX, lay.wheelRadius, z))
+							end
+						end
+					end
+					local expectedId = tonumber(Gate.IdOf("TimberClassic/Wheel"))
+					for _, c in ipairs(want) do
+						local hit
+						for _, w in ipairs(found) do
+							if (w.CFrame.Position - c).Magnitude < 0.02 then
+								hit = w
+							end
+						end
+						t.ok(hit ~= nil, def.id .. " has a wheel mesh at " .. tostring(c))
+						if def.id == "TimberClassic" then
+							t.eq(hit:GetAttribute("MeshId"), tostring(expectedId), "the Classic's own Wheel mesh")
+						end
+					end
+				end
+			end)
+			MeshKit.Override = nil
+			MeshKit.Reset()
+			Gate.SetIds(nil)
+			if not ok then
+				error(err, 0)
+			end
+		end
+	)
 end

@@ -81,12 +81,50 @@ return function(t)
 		t.ok(not string.find(trailerPart, "bedLength * 0.6", 1, true), "no 0.6 of the bed")
 	end)
 
-	t.expectedFail(
-		"wheel X per truck variant matches bbox_check.md within 0.01",
-		function()
-			local file = "assets/vehicles/t421/bbox_check.md"
-			t.ok(fs.isFile(file), file .. " is in the repo")
-		end,
-		"assets/vehicles/t421/bbox_check.md was not attached to the branch; its per-variant wheel X cannot be compared"
-	)
+	-- The committed stats.json files and bbox_check.md (Connor's bundle) are what the numbers must match.
+	local serde = require("@lune/serde")
+	local VARIANTS = { "Rustbucket", "Pickup", "Flatbed", "LoggingRig" }
+
+	t.test("axles and wheel X come from the committed stats.json files, per tow-truck variant", function()
+		for trailerId in pairs(WANT) do
+			for _, variant in ipairs(VARIANTS) do
+				local file = string.format("assets/vehicles/t421/glb/%s/%s/stats.json", trailerId, variant)
+				local stats = serde.decode("json", fs.readFile(file))
+				t.eq(TrailerAxleData.For(trailerId), stats.axles, file .. " axles")
+				local truck = ItemCatalog.GetTruck(variant)
+				local tl = TruckLayout.ForTrailer(ItemCatalog.GetTrailer(trailerId), TruckLayout.For(truck))
+				for i, c in ipairs(stats.stats.Wheel.wheelCentres) do
+					local axle = stats.axles[(i + 1) // 2]
+					t.ok(
+						math.abs(math.abs(c[1]) - tl.wheelX) <= 0.01,
+						file .. " wheel " .. i .. " X " .. tl.wheelX .. " vs " .. c[1]
+					)
+					t.ok(math.abs(tl.axleZ[(i + 1) // 2] - tl.bedCenterZ - axle) < 1e-9, file .. " axle " .. i)
+				end
+			end
+		end
+	end)
+
+	t.test("wheel X per truck variant matches bbox_check.md within 0.01", function()
+		local md = fs.readFile("assets/vehicles/t421/bbox_check.md")
+		local rows = 0
+		for trailerId, truckVariant, axles, centres in
+			string.gmatch(md, "| (%a+) | (%a+) | %[([%d%.,%s]+)%] | (%[%[[^|]+%]%]) |")
+		do
+			rows += 1
+			local x = tonumber(string.match(centres, "%[%-?([%d%.]+),"))
+			local truck = ItemCatalog.GetTruck(truckVariant)
+			local tl = TruckLayout.ForTrailer(ItemCatalog.GetTrailer(trailerId), TruckLayout.For(truck))
+			t.ok(
+				math.abs(tl.wheelX - x) <= 0.01,
+				trailerId .. " behind " .. truckVariant .. ": " .. tl.wheelX .. " vs bbox_check " .. x
+			)
+			local n = 0
+			for _ in string.gmatch(axles, "[%d%.]+") do
+				n += 1
+			end
+			t.eq(#tl.axleZ, n, trailerId .. " behind " .. truckVariant .. " axles")
+		end
+		t.eq(rows, 12)
+	end)
 end

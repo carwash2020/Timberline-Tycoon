@@ -39,6 +39,7 @@
 local MeshKit = require(script.Parent.MeshKit)
 local VehicleMeshGate = require(script.Parent.Parent.VehicleMeshGate)
 local VehicleModels = require(script.Parent.VehicleModels)
+local VehicleStats = require(script.Parent.VehicleStats)
 
 local VehicleMeshes = {}
 
@@ -474,8 +475,8 @@ local function truckSpec(truckId: string): { [string]: VehicleModels.Piece }?
 	return out
 end
 
--- A T421 trailer's pieces for the variant that fits `towId`: sizes and `at` from VehicleModels, ids only from the
--- keyed table (an empty id is 0, which addRole reports as missing). Its wheels keep the shared wheel mesh.
+-- A T421 trailer's pieces for the variant that fits `towId`: sizes and `at` from stats.json (VehicleStats), ids only
+-- from the keyed table (an empty id is 0, which addRole reports as missing). Its wheels keep the shared wheel mesh.
 local function trailerSpecFor(trailerId: string, towId: string?): { [string]: VehicleModels.Piece }?
 	local variant = if towId then VehicleMeshGate.VariantFor(towId) else nil
 	if not variant then
@@ -485,17 +486,15 @@ local function trailerSpecFor(trailerId: string, towId: string?): { [string]: Ve
 	if not base then
 		return nil
 	end
-	if not VehicleMeshGate.IsT421("Trailer", trailerId) then
+	local stats = if VehicleStats.Trailers[trailerId] then VehicleStats.Trailers[trailerId][variant] else nil
+	if not VehicleMeshGate.IsT421("Trailer", trailerId) or not stats then
 		return base
 	end
 	local out: { [string]: VehicleModels.Piece } = {}
-	for role, piece in pairs(base) do
-		if role == "Wheel" then
-			out[role] = piece
-		else
-			local n = VehicleMeshGate.NumberFor(VehicleMeshGate.TrailerKey(trailerId, variant, role)) or 0
-			out[role] = { meshId = n, size = piece.size, at = piece.at, mirrorLeft = piece.mirrorLeft }
-		end
+	out.Wheel = base.Wheel
+	for role, piece in pairs(stats.pieces) do
+		local n = VehicleMeshGate.NumberFor(VehicleMeshGate.TrailerKey(trailerId, variant, role)) or 0
+		out[role] = { meshId = n, size = piece.size, at = piece.at }
 	end
 	return out
 end

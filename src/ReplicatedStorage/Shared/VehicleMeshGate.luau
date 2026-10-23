@@ -22,10 +22,9 @@ Gate.TruckParts = { "Body", "Glass", "Lights", "Bed", "Wheel", "Hitch" }
 -- The trucks that can tow, in the order of the 15 combos.
 Gate.Tow = { "Rustbucket", "Pickup", "Flatbed", "LoggingRig", "TimberClassic" }
 
--- The Timber Classic's pieces need its stats.json (sizes and `at`), which is not in the repo. Until a
--- VehicleModels.Truck("TimberClassic") table exists it cannot be drawn, so it counts as missing "TimberClassic/stats.json".
--- Flip this when that table lands (tests/TimberClassic.spec has the expected-fail that says so).
-Gate.ClassicStats = false
+-- The Timber Classic's pieces come from its stats.json (VehicleStats). Set false in a spec to see the old "cannot be
+-- drawn" state; with it true only the ids decide.
+Gate.ClassicStats = true
 
 local override: { [string]: string }? = nil
 
@@ -72,8 +71,12 @@ function Gate.TrailerKey(trailerId: string, variant: string, part: string): stri
 	return trailerId .. "/" .. variant .. "/" .. part
 end
 
+-- The Timber Classic's keys are TimberClassic/<Part>; the four recoloured trucks' are trucks/<Truck>/<Part>.
 function Gate.TruckKey(truckId: string, part: string): string
-	return truckId .. "/" .. part
+	if truckId == "TimberClassic" then
+		return truckId .. "/" .. part
+	end
+	return "trucks/" .. truckId .. "/" .. part
 end
 
 -- The trailer variant a truck tows with. The Timber Classic tows the Pickup's. The Scout ATV tows nothing.

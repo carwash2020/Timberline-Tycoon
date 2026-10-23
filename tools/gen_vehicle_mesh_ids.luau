@@ -4,14 +4,22 @@
 --   lune run tools/gen_vehicle_mesh_ids            write the module
 --   lune run tools/gen_vehicle_mesh_ids --check    fail if the module is not what the file makes (check.sh)
 -- A line is `<Name> = <digits>`; an empty id is allowed and means the mesh is missing. A name is
--- <Trailer>_<Truck>_<Part> (key <Trailer>/<Truck>/<Part>) or TimberClassic_<Part> (key TimberClassic/<Part>).
+-- <Trailer>_<Truck>_<Part> (key <Trailer>/<Truck>/<Part>), TimberClassic_<Part> (key TimberClassic/<Part>) or
+-- trucks_<Truck>_<Part> (key trucks/<Truck>/<Part>).
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 
 assert(fs.isFile("rokit.toml"), "Run this from the repo root")
 
-local SOURCES = { "assets/vehicles/t421/mesh_ids.txt", "assets/vehicles/t421/truck_mesh_ids.txt" }
+local MAIN = "assets/vehicles/t421/mesh_ids.txt"
+-- The recoloured trucks' lines (trucks_<Truck>_<Part>) live in mesh_ids.txt when the real 78-line file is there; until then
+-- the derived truck_mesh_ids.txt supplies them.
+local TRUCKS = "assets/vehicles/t421/truck_mesh_ids.txt"
+local SOURCES = { MAIN }
+if not string.find(fs.readFile(MAIN), "trucks_", 1, true) then
+	table.insert(SOURCES, TRUCKS)
+end
 local OUT = "src/ReplicatedStorage/Shared/Art/VehicleMeshIds.luau"
 
 local keys: { string } = {}

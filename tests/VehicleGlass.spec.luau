@@ -38,9 +38,6 @@ return function(t)
 		withMeshes(function()
 			local seen = 0
 			for _, def in ipairs(ItemCatalog.TruckList()) do
-				if def.id == "TimberClassic" then
-					continue -- no mesh table until its stats.json is in the repo (tests/TimberClassic.spec)
-				end
 				local lay = TruckLayout.For(def)
 				local model = TruckArt.Build(def, lay)
 				t.eq(model:GetAttribute("VehicleMesh"), true, def.id .. " is meshed")

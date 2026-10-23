@@ -78,7 +78,9 @@ return function(t)
 			end
 		end
 		for _, truck in pairs(ItemCatalog.Trucks) do
-			add(truck.id, VehicleModels.Truck(truck.id))
+			if truck.id ~= "TimberClassic" then -- its ids are the TimberClassic/<Part> keys, not VehicleModels'
+				add(truck.id, VehicleModels.Truck(truck.id))
+			end
 		end
 		for _, trailer in pairs(ItemCatalog.Trailers) do
 			add(trailer.id, VehicleModels.Trailer(trailer.id, nil))
@@ -391,7 +393,7 @@ return function(t)
 		function()
 			local rust = ItemCatalog.GetTruck("Rustbucket")
 			templates()
-			local missingId = tonumber(Gate.IdOf("Rustbucket/Bed")) -- the keyed id is the one the truck uses (T421)
+			local missingId = tonumber(Gate.IdOf("trucks/Rustbucket/Bed")) -- the keyed id is the one the truck uses (T421)
 			MeshKit.Override = function(id, name, size)
 				if id == missingId then
 					return nil
