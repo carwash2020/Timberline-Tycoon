@@ -151,7 +151,7 @@ return function(t)
 		return tonumber(y)
 	end
 
-	t.expectedFail(
+	t.test(
 		"Logging Rig clearance: PlinthHeight + mesh height (bbox_check.md) <= beam underside - FloorY - 0.4",
 		function()
 			local height = meshRigHeight()
@@ -169,8 +169,8 @@ return function(t)
 					limit
 				)
 			)
-		end,
-		"1.2 + 17.261 = 18.461 against 19.1 - 0.4 - 0.4 = 18.3: 0.161 over. The 17.261 includes 2.28 of wheel node under the ground; the rig built in the lot stands 15.89 (part-built) and its top passes the beams-and-rafters test with air to spare"
+			t.eq(DealershipLot.PlinthHeight, 1.2, "the plinth is unchanged")
+		end
 	)
 
 	t.test("the door is at least 4 wide x 7 high and the central aisle at least 6 wide and empty", function()
