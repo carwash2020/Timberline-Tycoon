@@ -300,7 +300,9 @@ return function(t)
 						end
 					end
 					t.ok(hitch, def.id .. " trailer hitch mesh")
-					local want = VehicleModels.Trailer(trailer.id, def.id).Hitch.size
+					-- (T421: the hitch is the stats.json one for the tow truck's variant; the Classic tows the Pickup's)
+					local want =
+						t.load("ReplicatedStorage/Shared/Art/VehicleStats").Trailers[trailer.id][Gate.VariantFor(def.id)].pieces.Hitch.size
 					t.ok((hitch.Size - want).Magnitude < 1e-3, def.id .. " hitch size")
 				end
 			end
