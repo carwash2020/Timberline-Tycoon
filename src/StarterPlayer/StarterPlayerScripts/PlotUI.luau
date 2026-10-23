@@ -1,9 +1,11 @@
 --!strict
 -- PlotUI: building on your plot (PlotService on the server; BUILD_SYSTEM.md).
---   * Building is the hammer (HammerController). While the hammer is in your
---     hand on your own plot, a bar offers PLANS, LAND, WIRE and DONE, and the
---     lines of any wiring show. Using the hammer (click, RT, tap) or PLANS
---     opens your blueprint list, drawn by ShopUI.
+--   * Building is the hammer (HammerController). Taking the hammer out on your
+--     own plot opens the blueprint picker (BuildMenuUI, rules in
+--     Shared/HammerPicker). While it is in your hand on your own plot, a bar
+--     offers PLANS, LAND and DONE, and the lines of any wiring show. Using the
+--     hammer (click, RT, tap) or PLANS opens the picker again. Wiring is not
+--     here: wire is its own item, the Wire tool (WireTool, WireSupply).
 --   * The list is the book of buildings you own for good (BlueprintBook): a
 --     row each, with its size and what it needs (planks of one wood, a fee,
 --     a box from the Tool Shed). A sawmill or the chop saw you hold shows with
@@ -27,6 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
+local HammerPicker = require(ReplicatedStorage.Shared.HammerPicker)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -303,6 +306,25 @@ local function setBuilding(on: boolean)
 		BuildMenuUI.Close()
 	end
 	PlotUI.Refresh()
+end
+
+-- The hammer came into your hand or went away. On your own plot it opens the
+-- blueprint picker (once, when nothing else has the screen); away, it ends
+-- building and closes it.
+function PlotUI.OnHammerHeld(on: boolean)
+	local onPlot = on and onMyPlot()
+	setBuilding(onPlot)
+	if
+		on
+		and HammerPicker.OpensOnEquip({
+			onPlot = onPlot,
+			placing = BlueprintPlacer.Active(),
+			panelOpen = ShopUI.IsOpen() or landOpen,
+			pickerOpen = BuildMenuUI.IsOpen(),
+		})
+	then
+		openPlans()
+	end
 end
 
 -- Shows the right buttons for where you are and what you're doing.
@@ -654,23 +676,8 @@ function PlotUI.Start()
 			setLand(not landOpen)
 		end,
 	})
-	local wire = UITheme.Button({
-		text = "WIRE",
-		size = Vector2.new(96, PlotLogic.LandTap),
-		style = "buy",
-		textSize = 15,
-	})
-	wire.root.LayoutOrder = 3
-	wire.root.Parent = bar.row
-	wire.face.Activated:Connect(function()
-		ShopUI.Close()
-		BuildMenuUI.Close()
-		setLand(false)
-		WireTool.Begin(PlotUI.Refresh)
-		PlotUI.Refresh()
-	end)
 	local done = UITheme.Button({ text = "DONE", size = Vector2.new(98, PlotLogic.LandTap), style = "skip" })
-	done.root.LayoutOrder = 4
+	done.root.LayoutOrder = 3
 	done.root.Parent = bar.row
 	done.face.Activated:Connect(function()
 		setLand(false)
@@ -697,11 +704,9 @@ function PlotUI.Start()
 	-- The hammer: using it opens the list, and the Land panel keeps the click.
 	HammerController.SetOpener(openPlans)
 	HammerController.SetPanelCheck(function()
-		return landOpen
+		return landOpen or BuildMenuUI.IsOpen()
 	end)
-	HammerController.OnHeldChanged(function(on: boolean)
-		setBuilding(on and onMyPlot())
-	end)
+	HammerController.OnHeldChanged(PlotUI.OnHammerHeld)
 	for _, attribute in ipairs({ "PlotSlot", "PlotTier", "Cash", "SawmillStock", "PlotSquares", "Blueprints" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
 			ShopUI.Refresh()

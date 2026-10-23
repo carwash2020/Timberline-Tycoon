@@ -38,7 +38,10 @@ local MachineSkin = require(ReplicatedStorage.Shared.Art.MachineSkin)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
+local WireArt = require(ReplicatedStorage.Shared.Art.WireArt)
 local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
+local WireSupply = require(ReplicatedStorage.Shared.WireSupply)
+local WireToolLogic = require(ReplicatedStorage.Shared.WireToolLogic)
 local PlotDoors = require(script.Parent.PlotDoors)
 local RateLimiter = require(script.Parent.RateLimiter)
 
@@ -137,6 +140,26 @@ function LogicService.Bind(host: HostFn, notifyFn: Notify)
 	notify = notifyFn
 end
 
+-- The wallet wire is bought with (T420). GameServer binds EconomyService's
+-- SpendCash and a publisher for the player's WireUnits attribute; until it does
+-- (and in specs that bind nothing) a buy does nothing. Cash never moves here.
+export type Wallet = {
+	spend: (Player, number, string, string?) -> boolean,
+	publish: (Player, number) -> (),
+}
+local wallet: Wallet? = nil
+
+function LogicService.BindWallet(w: Wallet?)
+	wallet = w
+end
+
+local function publishWire(owner: Player?, profile: Profile)
+	local w = wallet
+	if w and owner then
+		w.publish(owner, WireSupply.Clean(profile.wireUnits))
+	end
+end
+
 function LogicService.Reset()
 	table.clear(lastFlip)
 	table.clear(targets)
@@ -156,13 +179,17 @@ local function wiresOf(profile: Profile): { WireLogic.Wire }
 	return plot.wires
 end
 
-local function findItem(profile: Profile, uid: string): PlotLogic.Placed?
-	for _, item in ipairs(profile.plot.placed) do
+local function findItemIn(placed: { PlotLogic.Placed }, uid: string): PlotLogic.Placed?
+	for _, item in ipairs(placed) do
 		if item.uid == uid then
 			return item
 		end
 	end
 	return nil
+end
+
+local function findItem(profile: Profile, uid: string): PlotLogic.Placed?
+	return findItemIn(profile.plot.placed, uid)
 end
 
 local function modelOf(host: Host, uid: string): Model?
@@ -811,12 +838,7 @@ local function writeWires(run: Run)
 			list = {}
 			byFrom[wire.from] = list
 		end
-		local name = wire.to
-		local port = wire.toPort
-		if port ~= nil and port ~= 1 then
-			name ..= "@" .. tostring(port)
-		end
-		table.insert(list, name)
+		table.insert(list, WireToolLogic.Encode(wire))
 	end
 	for _, item in ipairs(run.profile.plot.placed) do
 		if WireLogic.IsSource(WireLogic.Role(item.blueprintId)) then
@@ -888,19 +910,48 @@ end
 -- Wiring
 ---------------------------------------------------------------------------
 
+-- Adds a wire run and uses its length from the owner's wire box. The length is
+-- the server's own: the two pieces' places and the corners it validated, never a
+-- number the client sent. At most WireLogic.MaxBends corners (a fifth is
+-- refused) and WireLogic.MaxRun studs along the path. A run the rules refuse, or
+-- that the box cannot pay for, changes nothing. Returns (ok, why, units used,
+-- units the box held): why "wire" means the box is short.
 local function addWire(
 	profile: Profile,
 	fromUid: string,
 	toUid: string,
 	fromPort: number?,
-	toPort: number?
-): (boolean, string?)
+	toPort: number?,
+	viaIn: unknown?,
+	straightOnly: boolean?
+): (boolean, string?, number, number)
 	local placed = profile.plot.placed
+	local have = WireSupply.Clean(profile.wireUnits)
 	profile.plot.wires = WireLogic.Live(wiresOf(profile), placed)
-	local ok, why = WireLogic.Check(profile.plot.wires, placed, fromUid, toUid, fromPort, toPort)
-	if not ok then
-		return false, why
+	local via, viaWhy = WireLogic.CleanVia(viaIn)
+	if via == nil then
+		return false, viaWhy, 0, have
 	end
+	-- The switch prompt links straight and no further than it always has.
+	local span = if straightOnly == true then WireLogic.Span else WireSupply.MaxLength
+	local ok, why = WireLogic.Check(profile.plot.wires, placed, fromUid, toUid, fromPort, toPort, span)
+	if not ok then
+		return false, why, 0, have
+	end
+	local a, b = findItemIn(placed, fromUid), findItemIn(placed, toUid)
+	if not a or not b then
+		return false, "missing", 0, have
+	end
+	local length = WireSupply.Path(a, via, b)
+	if length == nil or not WireSupply.Fits(length) then
+		return false, "span", 0, have
+	end
+	local units = WireSupply.UnitsFor(length)
+	local left = WireSupply.Use(have, units)
+	if left == nil then
+		return false, "wire", units, have
+	end
+	profile.wireUnits = left
 	local wire: WireLogic.Wire = { from = fromUid, to = toUid }
 	if fromPort ~= nil and fromPort ~= 1 then
 		wire.fromPort = fromPort
@@ -908,8 +959,11 @@ local function addWire(
 	if toPort ~= nil and toPort ~= 1 then
 		wire.toPort = toPort
 	end
+	if #via > 0 then
+		wire.via = via
+	end
 	table.insert(profile.plot.wires, wire)
-	return true, nil
+	return true, nil, units, have
 end
 
 local function cutWires(profile: Profile, uid: string): number
@@ -944,13 +998,14 @@ function LogicService.Link(
 	fromUid: string,
 	toUid: string,
 	fromPort: number?,
-	toPort: number?
+	toPort: number?,
+	via: unknown?
 ): (boolean, string?)
 	local get = hostFn
 	if not get then
 		return false, "bad"
 	end
-	local host, profile = get(player, "build")
+	local host, profile, owner = get(player, "build")
 	if not host or not profile then
 		return false, "missing"
 	end
@@ -961,9 +1016,12 @@ function LogicService.Link(
 	if not (near(player, host, from) and near(player, host, to)) then
 		return false, "reach"
 	end
-	local ok, why = addWire(profile, fromUid, toUid, fromPort, toPort)
+	local ok, why, units, have = addWire(profile, fromUid, toUid, fromPort, toPort, via)
 	if ok then
+		publishWire(owner, profile)
 		LogicService.Refresh(host, profile, player)
+	elseif why == "wire" then
+		notify(player, WireSupply.Message("short", have, units))
 	end
 	return ok, why
 end
@@ -996,8 +1054,41 @@ local function portOk(value: unknown): number?
 	return value
 end
 
-function LogicService.OnWire(player: Player, a: unknown, b: unknown, c: unknown, d: unknown)
+-- Buys a pack of wire (`units` must be one of WireSupply.Packs) into the
+-- plot owner's box, at the catalog price, from their cash. Only the owner buys:
+-- a visitor with build rights uses the owner's wire but cannot spend their cash.
+function LogicService.Buy(player: Player, units: unknown): (boolean, string?)
+	local get, w = hostFn, wallet
+	if not get or not w then
+		return false, "bad"
+	end
+	local host, profile, owner = get(player, "build")
+	if not host or not profile or owner ~= player then
+		return false, "bad"
+	end
+	local ok, why, cost, stock = WireSupply.Buy(profile.cash or 0, profile.wireUnits, units)
+	if not ok or cost == nil or stock == nil then
+		notify(player, WireSupply.Message(why or "amount"))
+		return false, why
+	end
+	if not w.spend(player, cost, "wire", "Wire") then
+		notify(player, WireSupply.Message("cash"))
+		return false, "cash"
+	end
+	profile.wireUnits = stock
+	publishWire(player, profile)
+	notify(player, WireSupply.Message("bought", units :: number))
+	return true, nil
+end
+
+function LogicService.OnWire(player: Player, a: unknown, b: unknown, c: unknown, d: unknown, e: unknown)
 	if not RateLimiter.Allow(player, "Wire") then
+		return
+	end
+	if a == "buy" then
+		if c == nil and d == nil and e == nil then
+			LogicService.Buy(player, b)
+		end
 		return
 	end
 	local ok: boolean, why: string?
@@ -1024,7 +1115,7 @@ function LogicService.OnWire(player: Player, a: unknown, b: unknown, c: unknown,
 				return
 			end
 		end
-		ok, why = LogicService.Link(player, a, c, fp, tp)
+		ok, why = LogicService.Link(player, a, c, fp, tp, e)
 		if ok then
 			notify(player, WireLogic.Message("wired") or "")
 			return
@@ -1036,6 +1127,45 @@ function LogicService.OnWire(player: Player, a: unknown, b: unknown, c: unknown,
 	if text then
 		notify(player, text)
 	end
+end
+
+---------------------------------------------------------------------------
+-- The wire spool (T420): wire is its own tool, not part of the hammer
+---------------------------------------------------------------------------
+
+-- Hands over the Wire tool once. Holding it starts the wire tool on the client
+-- (WireTool); the box it draws on is the player's wireUnits. Returns the Tool.
+function LogicService.GiveSpool(player: Player): Tool?
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if not backpack then
+		return nil
+	end
+	local containers: { Instance } = { backpack }
+	if player.Character then
+		table.insert(containers, player.Character)
+	end
+	for _, container in ipairs(containers) do
+		for _, child in ipairs(container:GetChildren()) do
+			if child:IsA("Tool") and child:GetAttribute("WireSpool") == true then
+				return child
+			end
+		end
+	end
+	local tool = Instance.new("Tool")
+	tool.Name = "Wire"
+	tool.ToolTip =
+		"Equip to wire. Pick an output, then stretch the wire to an input. Wire is bought by the amount you need."
+	tool.RequiresHandle = true
+	tool.CanBeDropped = false
+	tool:SetAttribute("WireSpool", true)
+	tool.Grip = WireArt.Grip()
+	local art = WireArt.Held()
+	for _, child in ipairs(art:GetChildren()) do
+		child.Parent = tool -- each part carries its own weld to the Handle
+	end
+	art:Destroy()
+	tool.Parent = backpack
+	return tool
 end
 
 ---------------------------------------------------------------------------
@@ -1118,11 +1248,14 @@ function LogicService.WireNearest(ctx: Context, who: Player)
 	local list = WireLogic.Candidates(profile.plot.wires, profile.plot.placed, uid)
 	local target = list[1]
 	if target then
-		local ok, why = addWire(profile, uid, target, nil, nil)
+		local ok, why, units, have = addWire(profile, uid, target, nil, nil, nil, true)
 		if ok then
 			local other = findItem(profile, target)
 			notify(who, string.format("Wired to the %s.", if other then nameOf(other) else "piece"))
+			publishWire(owner, profile)
 			LogicService.Refresh(ctx.slot, profile, who)
+		elseif why == "wire" then
+			notify(who, WireSupply.Message("short", have, units))
 		else
 			notify(who, WireLogic.Message(why) or "")
 		end

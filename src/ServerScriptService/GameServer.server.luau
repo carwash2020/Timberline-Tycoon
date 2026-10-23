@@ -1139,6 +1139,16 @@ BootReport.StartStubs({
 			if LogicService.Init then
 				LogicService.Init(remote.Wire)
 			end
+			-- Wire is bought with cash (T420): EconomyService spends it, the player's
+			-- WireUnits attribute tells the client how much is in the box.
+			LogicService.BindWallet({
+				spend = function(buyer: Player, amount: number, reason: string, sku: string?): boolean
+					return EconomyService.SpendCash(buyer, amount, reason, sku)
+				end,
+				publish = function(buyer: Player, units: number)
+					buyer:SetAttribute("WireUnits", units)
+				end,
+			})
 		end,
 	},
 	{
@@ -1499,6 +1509,7 @@ local function onCharacterAdded(player: Player, character: Model)
 	if player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 10) then
 		AxeService.GiveLoadout(player, character)
 		BlueprintService.GiveLoadout(player, character) -- the Hammer, then any plans you carry
+		LogicService.GiveSpool(player) -- and the wire spool (T420)
 	end
 end
 
