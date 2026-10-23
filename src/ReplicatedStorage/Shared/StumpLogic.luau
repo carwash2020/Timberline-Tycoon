@@ -6,10 +6,11 @@
 --   * Otherwise the stump is the same trunk below the cut: a tapered
 --     segment whose bottom radius is the trunk's base radius and whose top
 --     radius is the trunk's radius at the cut height. It is one of 16
---     uploaded frustum meshes (StumpMeshIds; top / base ratios 0.85, 0.86 ...
---     1.00): the one nearest the trunk's real ratio, scaled so its base
---     radius is the trunk's base radius exactly and it stands as tall as the
---     cut. The cut is capped flush at its height by an end-grain disc (the
+--     uploaded frustum meshes (StumpMeshIds: 16 tapers 0.85 ... 1.00, each in
+--     3, 5 and 8 stud heights): the taper nearest the trunk's real ratio and
+--     the height bucket by stretch (Bucket), scaled so its base radius is the
+--     trunk's base radius exactly and it stands as tall as the cut. A stump is
+--     never clamped: over SleeveMax it stacks sleeves. The cut is capped flush at its height by an end-grain disc (the
 --     wood's core colour) inside a 0.1 stud ring (RingHex).
 --   * Trunks are round (T420): a section's square side `t` is the old
 --     hitbox and the volume the prices use; its round radius is
@@ -52,14 +53,82 @@ end
 -- A segment of the trunk, bottom to top.
 export type Seg = { length: number, thickness: number }
 
-export type Shape = {
-	height: number,
+-- One mesh of a stump, bottom to top: it spans y0..y1 up the stump, starts
+-- at baseRadius and ends at topRadius = baseRadius * ratio (ratio = one of
+-- the 16 tapers, `index` 1..16), and is the `bucket` (3, 5 or 8 studs tall)
+-- mesh stretched to the sleeve's height.
+export type Sleeve = {
+	set: string, -- "R13" or "R22": the radius set of its mesh
+	y0: number,
+	y1: number,
 	baseRadius: number,
-	realTop: number, -- the trunk's radius at the cut
-	ratio: number, -- the frustum chosen
-	index: number, -- 1..16
-	topRadius: number, -- baseRadius * ratio
+	topRadius: number,
+	ratio: number,
+	index: number,
+	bucket: number,
 }
+
+export type Shape = {
+	set: string, -- the radius set (StumpLogic.SetFor of the base radius)
+	height: number, -- the cut height: never clamped
+	baseRadius: number, -- the trunk's base radius, exactly
+	realTop: number, -- the trunk's radius at the cut
+	ratio: number, -- topRadius / baseRadius (the whole stump)
+	index: number, -- the first sleeve's taper, 1..16
+	topRadius: number, -- where the last sleeve ends (within 0.05 of realTop)
+	sleeves: { Sleeve },
+}
+
+-- The height bucket by stretch. A mesh of native height H (3, 5 or 8) is
+-- stretched by h / H. The boundaries make the stretch consistent: 3.87 is
+-- 3 x 1.29 (H3 up to 1.29), 6.32 is 5 x 1.264 (H5 up to 1.264, and from
+-- 3.87 / 5 = 0.774), and a sleeve of 6.32 to 10.4 is H8 (from 0.79 up to
+-- 10.4 / 8 = 1.3). Inclusive at the top of each bucket: h <= 3.87 is H3,
+-- 3.87 < h <= 6.32 is H5, h > 6.32 is H8.
+StumpLogic.Bucket3Max = 3.87
+StumpLogic.Bucket5Max = 6.32
+StumpLogic.SleeveMax = 10.4 -- 8 x 1.3: a taller stump stacks sleeves
+
+-- The two radius sets. R22's UVs are set up for a reference stump with base
+-- radius 2.2; R13's reference radius is not stated anywhere, so it is
+-- assumed to be 1.3: the radius the split implies (1.69 = 1.3 x 1.3 is the
+-- most a 1.3 reference can be stretched, and 2.2 / 1.3 = 1.692 is the least
+-- the 2.2 reference can be squeezed to: the sets meet at the split).
+-- A stump whose base radius is at most SplitRadius uses R13, above it R22.
+StumpLogic.RefRadius = { R13 = 1.3, R22 = 2.2 } :: { [string]: number }
+StumpLogic.SplitRadius = 1.69
+StumpLogic.StretchMax = 1.3 -- a mesh may be stretched by 1/1.3 to 1.3, round and up
+
+function StumpLogic.SetFor(baseRadius: number): string
+	return if baseRadius <= StumpLogic.SplitRadius then "R13" else "R22"
+end
+
+-- How far a sleeve of `set` is stretched from the mesh as made: round it
+-- (its base radius over the set's reference radius) and up it (its height
+-- over the bucket's mesh height).
+function StumpLogic.BarkStretch(sleeve: Sleeve, set: string): (number, number)
+	return sleeve.baseRadius / StumpLogic.RefRadius[set], (sleeve.y1 - sleeve.y0) / sleeve.bucket
+end
+
+-- Whether a stretch (round, up) is inside 1/1.3 to 1.3 both ways.
+function StumpLogic.StretchOk(round: number, up: number): boolean
+	local lo, hi = 1 / StumpLogic.StretchMax - 1e-9, StumpLogic.StretchMax + 1e-9
+	return round >= lo and round <= hi and up >= lo and up <= hi
+end
+
+function StumpLogic.Bucket(h: number): number
+	if h <= StumpLogic.Bucket3Max then
+		return 3
+	elseif h <= StumpLogic.Bucket5Max then
+		return 5
+	end
+	return 8
+end
+
+-- The vertical stretch a mesh of `bucket` studs gets to stand `h` tall.
+function StumpLogic.Stretch(h: number, bucket: number): number
+	return h / bucket
+end
 
 -- The radius of a round trunk whose old square side was `thickness`: the
 -- same cross-section area (pi r^2 = t^2), so volume and price don't move.
@@ -105,19 +174,66 @@ function StumpLogic.RadiusAt(segs: { Seg }, h: number): number
 	return 0
 end
 
--- The stump for a cut `h` studs up a trunk made of `segs`.
+-- The stump for a cut `h` studs up a trunk made of `segs`. Never clamped:
+-- over SleeveMax studs it stacks equal sleeves (each at most SleeveMax tall,
+-- and more of them when the trunk narrows faster than a 0.85 taper over one
+-- sleeve), so the total is the real cut height. The taper runs across the whole
+-- stump: the first sleeve starts at the trunk's base radius, each next one
+-- starts exactly where the one below ended (no step), and every sleeve picks
+-- the nearest of the 16 tapers to reach the trunk's own radius at the top of
+-- that sleeve from where it stands, so the stack ends within one taper step
+-- (0.005 x radius) of the trunk's radius at h.
 function StumpLogic.Shape(segs: { Seg }, h: number): Shape
 	local base = if segs[1] then StumpLogic.RoundRadius(segs[1].thickness) else 0
-	local realTop = StumpLogic.RadiusAt(segs, h)
-	local real = if base > 0 then realTop / base else 1
-	local ratio, index = StumpLogic.NearestRatio(real)
+	local set = StumpLogic.SetFor(base)
+	local function stack(n: number): ({ Sleeve }, boolean)
+		local each = h / n
+		local sleeves: { Sleeve } = {}
+		local current = base
+		local clamped = false
+		for i = 1, n do
+			local y1 = each * i
+			local target = StumpLogic.RadiusAt(segs, y1)
+			local real = if current > 0 then target / current else 1
+			if real < StumpLogic.Ratios[1] - 1e-9 then
+				clamped = true -- steeper than the 0.85 taper reaches
+			end
+			local ratio, index = StumpLogic.NearestRatio(real)
+			local top = current * ratio
+			table.insert(sleeves, {
+				set = set,
+				y0 = each * (i - 1),
+				y1 = y1,
+				baseRadius = current,
+				topRadius = top,
+				ratio = ratio,
+				index = index,
+				bucket = StumpLogic.Bucket(each),
+			})
+			current = top
+		end
+		return sleeves, clamped
+	end
+	-- At least enough sleeves to stay under SleeveMax; more when a trunk
+	-- narrows faster than one 0.85 taper over a sleeve can follow.
+	local n = math.max(1, math.ceil(h / StumpLogic.SleeveMax - 1e-9))
+	local sleeves, clamped = stack(n)
+	local tries = 0
+	while clamped and tries < 40 do
+		tries += 1
+		n += 1
+		sleeves, clamped = stack(n)
+	end
+	local top = sleeves[#sleeves].topRadius
 	return {
+		set = set,
 		height = h,
 		baseRadius = base,
-		realTop = realTop,
-		ratio = ratio,
-		index = index,
-		topRadius = base * ratio,
+		realTop = StumpLogic.RadiusAt(segs, h),
+		ratio = if base > 0 then top / base else 1,
+		index = sleeves[1].index,
+		topRadius = top,
+		sleeves = sleeves,
 	}
 end
 

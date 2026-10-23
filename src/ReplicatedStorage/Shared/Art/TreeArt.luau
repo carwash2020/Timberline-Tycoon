@@ -1883,51 +1883,62 @@ end
 TreeArt.StumpTag = "StumpDress" -- attribute on every part of the stump's own look
 
 -- The stump's look, stood on `base` (its bottom centre, Y up) inside
--- `parent`: a clone of `template` (one of the 16 uploaded frustum
--- MeshParts, StumpMeshes) sized so its base radius is exactly the trunk's
--- base radius and it stands as tall as the cut, painted with the trunk's own
--- bark (its Material and `bark`, the trunk section's own Color at the cut, so
--- there is no colour step there: the trunk has no SurfaceAppearance, so none
--- is applied and any the template brings is dropped; see
--- StumpLogic.BarkMapping for the day it does); an end-grain cap in
--- the wood's core colour flush at the cut height; and the ring round it
--- (StumpLogic.RingWidth wide, StumpLogic.RingHex). Anchored; the mesh
--- collides (Hull), the cap and ring do not. With no template (it did not
--- load) there is no stump look at all, never a stand-in built from parts.
--- Returns every part, bottom up.
+-- `parent`: one clone per sleeve of shape.sleeves from `templates` (the
+-- uploaded frustum MeshParts, StumpMeshes; a stump over 10.4 studs stacks
+-- several), each sized so its base radius is exactly the sleeve's (the first
+-- is the trunk's base radius, each next starts where the one below ended) and
+-- it stands as tall as the sleeve, so the stack is the real cut height. They
+-- are painted with the trunk's own bark (its Material and `bark`, the trunk
+-- section's own Color at the cut, so there is no colour step there: the trunk
+-- has no SurfaceAppearance, so none is applied and any a template brings is
+-- dropped; see StumpLogic.BarkMapping for the day it does); an end-grain cap
+-- in the wood's core colour flush at the cut height; and the ring round it
+-- (StumpLogic.RingWidth wide, StumpLogic.RingHex). Anchored; the meshes
+-- collide (Hull), the cap and ring do not. With a template missing (it did
+-- not load) there is no stump look at all, never a stand-in built from
+-- parts. Returns every part, bottom up.
 function TreeArt.StumpDress(
 	def: WoodDef,
 	parent: Instance,
 	base: CFrame,
 	shape: StumpLogic.Shape,
-	template: MeshPart?,
+	templates: { MeshPart? },
 	bark: Color3?
 ): { BasePart }
 	local out: { BasePart } = {}
-	if not template then
-		return out
-	end
-	local mesh = template:Clone()
-	for _, child in ipairs(mesh:GetChildren()) do
-		if child:IsA("SurfaceAppearance") then
-			child:Destroy()
+	for i = 1, #shape.sleeves do
+		if templates[i] == nil then
+			return out
 		end
 	end
-	mesh.Name = "StumpMesh"
-	mesh.Size = Vector3.new(shape.baseRadius * 2, shape.height, shape.baseRadius * 2)
-	mesh.CFrame = base * CFrame.new(0, shape.height / 2, 0)
-	mesh.Color = bark or paintOf(def).bark
-	mesh.Material = TreeArt.BarkMaterial(def)
-	mesh.Anchored = true
-	mesh.CanCollide = true
-	mesh.CanQuery = false
-	mesh.CanTouch = false
-	mesh:SetAttribute("Ratio", shape.ratio)
-	mesh.Parent = parent
-	table.insert(out, mesh)
+	local color = bark or paintOf(def).bark
+	local material = TreeArt.BarkMaterial(def)
+	for i, sleeve in ipairs(shape.sleeves) do
+		local mesh = (templates[i] :: MeshPart):Clone()
+		for _, child in ipairs(mesh:GetChildren()) do
+			if child:IsA("SurfaceAppearance") then
+				child:Destroy()
+			end
+		end
+		local height = sleeve.y1 - sleeve.y0
+		mesh.Name = "StumpMesh"
+		mesh.Size = Vector3.new(sleeve.baseRadius * 2, height, sleeve.baseRadius * 2)
+		mesh.CFrame = base * CFrame.new(0, sleeve.y0 + height / 2, 0)
+		mesh.Color = color
+		mesh.Material = material
+		mesh.Anchored = true
+		mesh.CanCollide = true
+		mesh.CanQuery = false
+		mesh.CanTouch = false
+		mesh:SetAttribute("Ratio", sleeve.ratio)
+		mesh:SetAttribute("Sleeve", i)
+		mesh:SetAttribute("Bucket", sleeve.bucket)
+		mesh.Parent = parent
+		table.insert(out, mesh)
+	end
 	local upright = CFrame.Angles(0, 0, math.pi / 2)
 	local th = StumpLogic.CapThickness
-	local color, faceMaterial = TreeArt.FaceLook(def)
+	local capColor, faceMaterial = TreeArt.FaceLook(def)
 	local ringColor = Color3.fromHex(StumpLogic.RingHex)
 	-- The ring sits a hair under the cap so the two never fight over a plane.
 	local ring = Kit.cylinder(
@@ -1945,7 +1956,7 @@ function TreeArt.StumpDress(
 		th,
 		math.max(0.1, (shape.topRadius - StumpLogic.RingWidth) * 2),
 		base * CFrame.new(0, shape.height - th / 2, 0) * upright,
-		color,
+		capColor,
 		faceMaterial
 	)
 	for _, d in ipairs({ ring, cap }) do

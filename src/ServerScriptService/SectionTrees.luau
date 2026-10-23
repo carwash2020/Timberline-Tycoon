@@ -1203,15 +1203,15 @@ local function makeStump(rec: TreeRecord, sid: number, now: number, height: numb
 	}
 	rec.stumpState = state
 	stumped[rec] = true
-	-- The look is the uploaded frustum mesh; it may still be loading.
-	StumpMeshes.Request(shape.index, function(template: MeshPart?)
-		if rec.stumpState ~= state or rec.model.Parent == nil then
+	-- The look is the uploaded frustum meshes (one per sleeve, the stump's
+	-- radius set or the other when that stretches fine); they may still be
+	-- loading. With none usable there is no visual, only the hitbox (and a
+	-- loud stumpMeshesMissing warning).
+	StumpMeshes.Resolve(shape, function(templates: { MeshPart? }?)
+		if rec.stumpState ~= state or rec.model.Parent == nil or templates == nil then
 			return
 		end
-		if template == nil then
-			return -- no stand-in: the invisible hitbox is all there is
-		end
-		local look = TreeArt.StumpDress(rec.def, rec.model, state.base, shape, template, state.bark)
+		local look = TreeArt.StumpDress(rec.def, rec.model, state.base, shape, templates, state.bark)
 		local colors: { [BasePart]: Color3 } = {}
 		local cfs: { [BasePart]: CFrame } = {}
 		for _, d in ipairs(look) do

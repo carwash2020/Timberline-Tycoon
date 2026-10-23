@@ -184,6 +184,7 @@ return function(t)
 		s.Trees = loader:server("SectionTrees")
 		s.Wood = loader:server("WoodService")
 		s.Grab = loader:server("GrabService")
+		s.StumpLogic = loader:shared("StumpLogic")
 		s.StumpMeshes = loader:server("StumpMeshes")
 		-- The uploaded frustum models, mocked: LoadAsset hands back a Model
 		-- holding one MeshPart (native size 200 x 100 x 200) carrying its id.
@@ -657,7 +658,7 @@ return function(t)
 	end)
 
 	---------------------------------------------------------------------
-	t.test("8.5 the stump is the same trunk below the cut: 16 frustums, base exact, top within 0.05", function()
+	t.test("8.5 the stump is the same trunk below the cut: 48 frustum meshes, base exact, top within 0.05", function()
 		-- The 16 shapes.
 		t.eq(#StumpLogic.Ratios, 16)
 		for i, r in ipairs(StumpLogic.Ratios) do
@@ -681,24 +682,22 @@ return function(t)
 		local trunkR = first.Size.X / math.sqrt(math.pi)
 		t.ok(math.abs(mesh.Size.X / 2 - trunkR) < 1e-4, "the mesh's base radius is the trunk's, exactly")
 		t.ok(math.abs(mesh.Size.Y - result.hit.height) < 1e-4, "and it is as tall as the cut")
-		-- Which model: the nearest ratio's.
-		local segsHere = { { length = 4.5, thickness = first.Size.X } }
+		-- Which model: the taper nearest the trunk's, in the height bucket.
+		local segsHere = {}
+		for _, sec in ipairs(rec.skel.sections) do
+			if sec.depth < rec.skel.trunkSegments then
+				table.insert(segsHere, { length = sec.length, thickness = sec.thickness })
+			end
+		end
 		local id = tonumber(mesh:GetAttribute("ModelId"))
 		t.ok(id ~= nil and table.find(s.loaded, id) ~= nil, "loaded with InsertService:LoadAsset")
-		local shapeHere = StumpLogic.Shape(
-			(function()
-				local sk = rec.skel
-				local segs = {}
-				for _, sec in ipairs(sk.sections) do
-					if sec.depth < sk.trunkSegments then
-						table.insert(segs, { length = sec.length, thickness = sec.thickness })
-					end
-				end
-				return segs
-			end)(),
-			result.hit.height
+		local shapeHere = StumpLogic.Shape(segsHere, result.hit.height)
+		t.eq(#shapeHere.sleeves, 1, "a 3 stud cut is one sleeve")
+		t.eq(
+			id,
+			StumpMeshIds.IdFor(shapeHere.set, shapeHere.sleeves[1].index, StumpLogic.Bucket(result.hit.height)),
+			"the model for the radius set, the nearest taper and the height bucket"
 		)
-		t.eq(id, StumpMeshIds.ModelIds[84 + shapeHere.index], "the model for the nearest ratio")
 		local cap = stumpParts(rec.model, "StumpCap")[1]
 		local ring = stumpParts(rec.model, "StumpRing")[1]
 		t.ok(cap and ring, "cap and ring")
@@ -716,51 +715,87 @@ return function(t)
 		t.eq(mesh.Material, first.Material, "bark: the trunk's material")
 		t.eq(mesh.Color, first.Color, "and the trunk's own colour at the cut: no colour step")
 		local listed = false
-		for _, listedId in pairs(StumpMeshIds.ModelIds) do
-			if listedId == id then
+		for _, row in ipairs(StumpMeshIds.Rows) do
+			if row.id == id then
 				listed = true
 			end
 		end
-		t.ok(listed, "the MeshPart came from one of the 16 listed assets")
-		t.ok(segsHere ~= nil)
+		t.ok(listed, "the MeshPart came from one of the 96 listed assets")
 		-- Two radii, across species, sizes, seeds and cut heights, with the
-		-- mesh's own top / base ratio (known from its model id).
-		local ratioOfId = {}
-		for key, modelId in pairs(StumpMeshIds.ModelIds) do
-			ratioOfId[modelId] = key / 100
+		-- meshes' own top / base ratios (known from each model's row). A stump
+		-- is never clamped: tall cuts stack sleeves, each starting where the
+		-- one below ended.
+		local rowOfId = {}
+		for _, row in ipairs(StumpMeshIds.Rows) do
+			rowOfId[row.id] = row
 		end
-		local checked, worst, largestBase = 0, 0, 0
+		local checked, stacked, worst, largestBase = 0, 0, 0, 0
 		for _, def in ipairs(WoodData.All()) do
 			local sizes = {}
-			for _, size in ipairs(TreeLogic.Sizes) do
-				table.insert(sizes, { scale = size.scale, elder = false })
+			for _, name in ipairs({ "small", "normal", "large" }) do
+				table.insert(sizes, { name = name, scale = TreeGen.ScaleFor(name), elder = false })
 			end
-			table.insert(sizes, { scale = ForestData.Elder.scale, elder = true })
+			table.insert(sizes, { name = "elder", scale = ForestData.Elder.scale, elder = true })
 			for _, size in ipairs(sizes) do
 				for seed = 1, 3 do
 					local segs, total = segsOf(def.id, seed, size.scale, size.elder)
 					largestBase = math.max(largestBase, segs[1].thickness / math.sqrt(math.pi))
-					local heights = { 2.5, 3, 3.5, 4, 4.5, 5, 6, math.min(total, 6) }
+					local heights = { 2.5, 3, 3.5, 3.87, 3.88, 4.5, 6, 6.32, 6.33, 8, 10.4, 10.41, 15, 25, total }
 					for _, height in ipairs(heights) do
 						if height >= 2.5 and height <= total + 1e-9 then
 							local shape = StumpLogic.Shape(segs, height)
-							local template = Instance.new("MeshPart")
-							template.Size = Vector3.new(200, 100, 200)
-							template:SetAttribute("ModelId", tostring(StumpMeshIds.ModelIds[84 + shape.index]))
+							local templates = {}
+							for i, sleeve in ipairs(shape.sleeves) do
+								local template = Instance.new("MeshPart")
+								template.Size = Vector3.new(200, 100, 200)
+								local row = StumpMeshIds.Rows[StumpMeshIds.Key(sleeve.set, sleeve.index, sleeve.bucket)]
+								template:SetAttribute(
+									"ModelId",
+									tostring(
+										StumpMeshIds.Row(StumpMeshIds.Key(sleeve.set, sleeve.index, sleeve.bucket)).id
+									)
+								)
+								templates[i] = template
+								t.ok(row ~= nil)
+							end
 							local model = Instance.new("Model")
-							local parts = TreeArt.StumpDress(def, model, CFrame.identity, shape, template)
-							local built, capPart = nil, nil
+							local parts = TreeArt.StumpDress(def, model, CFrame.identity, shape, templates)
+							local built, capPart = {}, nil
 							for _, part in ipairs(parts) do
 								if part.Name == "StumpMesh" then
-									built = part
+									table.insert(built, part)
 								elseif part.Name == "StumpCap" then
 									capPart = part
 								end
 							end
-							local label = string.format("%s x%.2f seed %d cut %.1f", def.id, size.scale, seed, height)
+							local label = string.format("%s x%.2f seed %d cut %.2f", def.id, size.scale, seed, height)
 							local baseRadius = segs[1].thickness / math.sqrt(math.pi)
-							t.ok(math.abs(built.Size.X / 2 - baseRadius) < 1e-4, label .. ": base radius exact")
-							local topRadius = built.Size.X / 2 * ratioOfId[tonumber(built:GetAttribute("ModelId"))]
+							t.eq(#built, #shape.sleeves, label .. ": one mesh per sleeve")
+							if #built > 1 then
+								stacked += 1
+							end
+							t.ok(math.abs(built[1].Size.X / 2 - baseRadius) < 1e-4, label .. ": base radius exact")
+							local rise = 0
+							local topRadius = baseRadius
+							for i, mesh_ in ipairs(built) do
+								local row = rowOfId[tonumber(mesh_:GetAttribute("ModelId"))]
+								t.ok(
+									math.abs(mesh_.Size.X / 2 - topRadius) < 1e-4,
+									label .. ": sleeve " .. i .. " starts where the last ended"
+								)
+								t.eq(
+									row.height,
+									StumpLogic.Bucket(mesh_.Size.Y - 1e-4),
+									label .. ": the height bucket by stretch"
+								)
+								t.ok(mesh_.Size.Y / row.height <= 1.3 + 1e-9, label .. ": stretch at most 1.3")
+								topRadius = mesh_.Size.X / 2 * (row.taper / 100)
+								rise += mesh_.Size.Y
+							end
+							t.ok(
+								math.abs(rise - height) < 1e-3,
+								string.format("%s: stack is %.3f tall, cut is %.3f", label, rise, height)
+							)
 							local topError = math.abs(topRadius - trunkRadius(segs, height))
 							worst = math.max(worst, topError)
 							t.ok(topError <= 0.05, string.format("%s: top radius off by %.4f", label, topError))
@@ -774,7 +809,8 @@ return function(t)
 				end
 			end
 		end
-		t.ok(checked > 400, "the sweep covered " .. checked .. " stumps")
+		t.ok(checked > 600, "the sweep covered " .. checked .. " stumps")
+		t.ok(stacked > 0, "some stacked sleeves: " .. stacked)
 		t.ok(worst <= 0.05, "worst top-radius error " .. worst)
 		-- The mesh scale: StumpDress sets Size = 2 x base radius, so a mesh
 		-- of native base diameter D is scaled by 2R / D. A scale step of
@@ -788,42 +824,278 @@ return function(t)
 		)
 	end)
 
-	t.test("8.5b the 16 frustum model ids: exactly 16, unique, one per ratio, loaded once and cached", function()
-		local keys = 0
-		local seen = {}
-		for key, id in pairs(StumpMeshIds.ModelIds) do
-			keys += 1
-			t.ok(not seen[id], "unique id " .. id)
-			seen[id] = true
-			t.ok(type(id) == "number" and id > 0, "a model id")
-		end
-		t.eq(keys, 16)
-		for i, ratio in ipairs(StumpLogic.Ratios) do
-			t.ok(StumpMeshIds.ModelIds[math.floor(ratio * 100 + 0.5)] ~= nil, "a model for ratio " .. ratio)
-			t.eq(StumpMeshIds.IdFor(i), StumpMeshIds.ModelIds[math.floor(ratio * 100 + 0.5)])
-		end
-		-- Two oaks, one load.
-		local s = setup()
-		s.attrs.CoreLoopActive = 2
-		for i = 1, 2 do
-			local rec = s.tree("oak", Vector3.new(i * 40, 0, 0))
-			local p = s.player(i, Vector3.new(i * 40 + 4, 3, 0))
-			s.cutThrough(p, rec.sections[1], 3000)
-		end
-		t.eq(#s.loaded, 1, "one LoadAsset for two stumps of the same shape")
-		local cached = 0
-		for index = 1, 16 do
-			if s.StumpMeshes.Get(index) ~= nil then
-				cached += 1
+	t.test(
+		"8.5b the 96 frustum model rows: 2 sets x 16 tapers x 3 heights, tagged, unique ids, loaded once and cached",
+		function()
+			t.eq(#StumpMeshIds.Rows, 96)
+			local seen = {}
+			local combos = {}
+			for _, row in ipairs(StumpMeshIds.Rows) do
+				t.ok(not seen[row.id], "unique id " .. row.id)
+				seen[row.id] = true
+				t.ok(type(row.id) == "number" and row.id > 0, "a model id")
+				t.ok(row.set == "R13" or row.set == "R22", row.name .. " set")
+				t.ok(row.height == 3 or row.height == 5 or row.height == 8, row.name .. " height")
+				t.ok(row.taper >= 85 and row.taper <= 100, row.name .. " taper")
+				combos[row.set .. "_" .. row.taper .. "_" .. row.height] = true
+				local suffix = if row.set == "R22" then "_R22" else ""
+				t.eq(
+					row.name,
+					string.format("StumpTaper%03d_H%d%s", row.taper, row.height, suffix),
+					"named by taper, height and set"
+				)
+			end
+			for _, set in ipairs({ "R13", "R22" }) do
+				for i, ratio in ipairs(StumpLogic.Ratios) do
+					for _, height in ipairs({ 3, 5, 8 }) do
+						local taper = math.floor(ratio * 100 + 0.5)
+						t.ok(
+							combos[set .. "_" .. taper .. "_" .. height],
+							"a model for " .. set .. " taper " .. taper .. " height " .. height
+						)
+						local key = StumpMeshIds.Key(set, i, height)
+						t.ok(key ~= nil and StumpMeshIds.IdFor(set, i, height) ~= nil)
+						t.eq(StumpMeshIds.Row(key).taper, taper)
+						t.eq(StumpMeshIds.Row(key).height, height)
+						t.eq(StumpMeshIds.Row(key).set, set)
+					end
+				end
+			end
+			t.eq(StumpLogic.SplitRadius, 1.69)
+			t.eq(StumpLogic.SetFor(1.69), "R13")
+			t.eq(StumpLogic.SetFor(1.6901), "R22")
+			t.eq(StumpLogic.RefRadius.R22, 2.2)
+			-- Two oaks, one load.
+			local s = setup()
+			s.attrs.CoreLoopActive = 2
+			for i = 1, 2 do
+				local rec = s.tree("oak", Vector3.new(i * 40, 0, 0))
+				local p = s.player(i, Vector3.new(i * 40 + 4, 3, 0))
+				s.cutThrough(p, rec.sections[1], 3000)
+			end
+			t.eq(#s.loaded, 1, "one LoadAsset for two stumps of the same shape")
+			local cached = 0
+			for key = 1, 48 do
+				if s.StumpMeshes.Get(key) ~= nil then
+					cached += 1
+				end
+			end
+			t.eq(cached, 1, "one template cached")
+			for _, d in ipairs(s.map:GetDescendants()) do
+				if d.Name == "StumpMesh" then
+					t.eq(d.CollisionFidelity, Enum.CollisionFidelity.Hull, "Hull collision from the cached template")
+				end
 			end
 		end
-		t.eq(cached, 1, "one template cached")
-		for _, d in ipairs(s.map:GetDescendants()) do
-			if d.Name == "StumpMesh" then
-				t.eq(d.CollisionFidelity, Enum.CollisionFidelity.Hull, "Hull collision from the cached template")
+	)
+
+	t.test("8.5g height buckets by stretch: H3 up to 3.87, H5 up to 6.32, H8 beyond (inclusive at the top)", function()
+		t.eq(StumpLogic.Bucket3Max, 3.87)
+		t.eq(StumpLogic.Bucket5Max, 6.32)
+		t.eq(StumpLogic.SleeveMax, 10.4)
+		t.eq(StumpLogic.Bucket(2.5), 3)
+		t.eq(StumpLogic.Bucket(3.87), 3, "3.87 itself is H3")
+		t.eq(StumpLogic.Bucket(3.8701), 5)
+		t.eq(StumpLogic.Bucket(6.32), 5, "6.32 itself is H5")
+		t.eq(StumpLogic.Bucket(6.3201), 8)
+		t.eq(StumpLogic.Bucket(10.4), 8)
+		-- Stretch = h / the mesh's native height: 3.87 / 3 = 1.29, 6.32 / 5 = 1.264, 10.4 / 8 = 1.3.
+		t.ok(math.abs(StumpLogic.Stretch(3.87, 3) - 1.29) < 1e-9)
+		t.ok(math.abs(StumpLogic.Stretch(6.32, 5) - 1.264) < 1e-9)
+		t.ok(math.abs(StumpLogic.Stretch(10.4, 8) - 1.3) < 1e-9)
+		local lowest, highest = math.huge, 0
+		for tenth = 25, 104 do
+			local h = tenth / 10
+			local stretch = StumpLogic.Stretch(h, StumpLogic.Bucket(h))
+			lowest, highest = math.min(lowest, stretch), math.max(highest, stretch)
+		end
+		t.ok(highest <= 1.3 + 1e-9, "no stump from 2.5 to 10.4 is stretched past 1.3: " .. highest)
+		t.ok(lowest >= 0.77, "or squeezed under 0.77: " .. lowest)
+		-- Over 10.4 it stacks sleeves, each at most 10.4 tall, adding up to the cut.
+		for _, h in ipairs({ 10.41, 15, 20.8, 25, 40 }) do
+			local shape = StumpLogic.Shape({ { length = 60, thickness = 2.6 }, { length = 60, thickness = 2.6 } }, h)
+			t.ok(#shape.sleeves >= 2, h .. " stacks")
+			local total = 0
+			for i, sleeve in ipairs(shape.sleeves) do
+				t.ok(sleeve.y1 - sleeve.y0 <= 10.4 + 1e-9, "a sleeve at most 10.4")
+				total += sleeve.y1 - sleeve.y0
+				if i > 1 then
+					t.ok(
+						math.abs(sleeve.baseRadius - shape.sleeves[i - 1].topRadius) < 1e-9,
+						"each starts where the last ended"
+					)
+				end
 			end
+			t.ok(math.abs(total - h) < 1e-9, "the stack is the cut height")
 		end
 	end)
+
+	t.test("8.5h a 15 stud cut leaves a 15 stud stump and an unchanged log: nothing clamps", function()
+		local s = setup()
+		s.attrs.CoreLoopActive = 2
+		s.Trees._roll = function()
+			return 0.5
+		end
+		local model = s.Trees.SpawnTree("pine", CFrame.new(0, 0, 0), { seed = 7, size = TreeLogic.Sizes[3], stage = 1 })
+		local rec = s.Trees.GetTree(model:GetAttribute("Uid"))
+		local before = {}
+		local volume = 0
+		for id, part in pairs(rec.sections) do
+			before[id] = part.Size.Y
+			volume += s.SectionLogic.Volume(part.Size.X, part.Size.Y, part.Size.Z)
+		end
+		local p = s.player(1, Vector3.new(6, 15, 0))
+		local _, ok, _, result = s.cutThrough(p, rec.sections[1], 6000)
+		t.ok(ok and result ~= nil and #result.freed == 1, "cut through")
+		t.ok(math.abs(result.hit.height - 15) < 0.01, "cut 15 up: " .. result.hit.height)
+		local hitbox = rec.sections[1]
+		t.ok(math.abs(hitbox.Size.Y - 15) < 1e-3, "the stump is 15 tall, not clamped: " .. hitbox.Size.Y)
+		local rise, count = 0, 0
+		for _, mesh in ipairs(stumpParts(rec.model, "StumpMesh")) do
+			rise += mesh.Size.Y
+			count += 1
+		end
+		t.ok(count >= 2, "stacked sleeves: " .. count)
+		t.ok(math.abs(rise - 15) < 1e-3, "the stack stands 15: " .. rise)
+		-- The log: every section is as it was, but the one that was cut, which is
+		-- what is left above 15.
+		local log = result.freed[1]
+		local sections, cutPart = 0, nil
+		for id, part in pairs(log.parts) do
+			sections += 1
+			if before[id] == nil then
+				cutPart = part
+			else
+				t.ok(math.abs(part.Size.Y - before[id]) < 1e-6, "section " .. id .. " is unchanged")
+			end
+		end
+		t.ok(
+			cutPart ~= nil and math.abs(cutPart.Size.Y - (before[1] - 15)) < 1e-3,
+			"the cut section keeps all it had above the cut"
+		)
+		t.ok(
+			math.abs(log.volume - (volume - s.SectionLogic.Volume(rec.sections[1].Size.X, 15, rec.sections[1].Size.Z)))
+				< 1e-3,
+			"the log's volume is the tree's, less the 15 studs left standing"
+		)
+		t.ok(sections >= 1)
+	end)
+
+	-- Bark stretch: a mesh of a radius set is made for a reference stump (R13:
+	-- base radius 1.3, assumed, see StumpLogic.RefRadius; R22: 2.2) and is
+	-- stretched round by baseRadius / reference and up by sleeve height /
+	-- the bucket's mesh height. Both must stay in 1/1.3 to 1.3.
+	local function stretchCases()
+		local bad, total = {}, 0
+		local byTree = {}
+		local rounds = { math.huge, 0 }
+		local ups = { math.huge, 0 }
+		for _, def in ipairs(WoodData.All()) do
+			local sizes = {}
+			for _, name in ipairs({ "small", "normal", "large" }) do
+				table.insert(sizes, { name = name, scale = TreeGen.ScaleFor(name), elder = false })
+			end
+			table.insert(sizes, { name = "elder", scale = ForestData.Elder.scale, elder = true })
+			for _, size in ipairs(sizes) do
+				for seed = 1, 3 do
+					local segs, trunk = segsOf(def.id, seed, size.scale, size.elder)
+					for _, h in ipairs({ 2.5, 3, 3.5, 3.87, 3.88, 4.5, 6, 6.32, 6.33, 8, 10.4, 10.41, 15, 25, trunk }) do
+						if h >= 2.5 and h <= trunk + 1e-9 then
+							local shape = StumpLogic.Shape(segs, h)
+							for i, sleeve in ipairs(shape.sleeves) do
+								local round, up = StumpLogic.BarkStretch(sleeve, shape.set)
+								total += 1
+								rounds = { math.min(rounds[1], round), math.max(rounds[2], round) }
+								ups = { math.min(ups[1], up), math.max(ups[2], up) }
+								local name = def.id .. " " .. size.name
+								local tree = byTree[name]
+								if not tree then
+									tree = { set = shape.set, base = shape.baseRadius, bad = 0, lo = math.huge, hi = 0 }
+									byTree[name] = tree
+								end
+								tree.lo, tree.hi = math.min(tree.lo, round), math.max(tree.hi, round)
+								if not StumpLogic.StretchOk(round, up) then
+									tree.bad += 1
+									table.insert(
+										bad,
+										string.format(
+											"%s seed %d cut %.2f sleeve %d (%s): round %.2f, up %.2f",
+											name,
+											seed,
+											h,
+											i,
+											shape.set,
+											round,
+											up
+										)
+									)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		return bad, total, byTree, rounds, ups
+	end
+
+	t.test("8.5i vertical bark stretch stays in 1/1.3 to 1.3 for every wood, size, Elder and cut 2.5 to 25+", function()
+		local _, total, _, _, ups = stretchCases()
+		t.ok(total > 2000, "cases: " .. total)
+		t.ok(ups[1] >= 1 / 1.3 - 1e-9 and ups[2] <= 1.3 + 1e-9, string.format("up %.3f to %.3f", ups[1], ups[2]))
+	end)
+
+	t.test("8.5j each set is inside 1/1.3 to 1.3 round for the radii it was made for", function()
+		-- R13 (reference 1.3) covers base radii 1.0 to 1.69; R22 (2.2) covers
+		-- 1.692 to 2.86. Every sleeve of a stump in those ranges stretches fine.
+		local checked = 0
+		for _, def in ipairs(WoodData.All()) do
+			for _, size in ipairs({ TreeGen.ScaleFor("small"), 1, TreeGen.ScaleFor("large"), ForestData.Elder.scale }) do
+				local segs, trunk = segsOf(def.id, 2, size, size == ForestData.Elder.scale)
+				local shape = StumpLogic.Shape(segs, math.min(trunk, 4.5))
+				local round, up = StumpLogic.BarkStretch(shape.sleeves[1], shape.set)
+				if (shape.set == "R13" and shape.baseRadius >= 1.0) or shape.set == "R22" then
+					t.ok(
+						StumpLogic.StretchOk(round, up),
+						string.format("%s x%.2f %s round %.2f up %.2f", def.id, size, shape.set, round, up)
+					)
+					checked += 1
+				end
+			end
+		end
+		t.ok(checked > 20, "checked " .. checked)
+	end)
+
+	t.expectedFail(
+		"8.5k bark stretch stays in 1/1.3 to 1.3 round for every wood and size",
+		function()
+			local bad, total, byTree, rounds = stretchCases()
+			local names = {}
+			for name in pairs(byTree) do
+				table.insert(names, name)
+			end
+			table.sort(names)
+			for _, name in ipairs(names) do
+				local tree = byTree[name]
+				print(
+					string.format(
+						"[stretch] %s: set %s base %.3f round %.2f to %.2f, %d sleeve(s) outside",
+						name,
+						tree.set,
+						tree.base,
+						tree.lo,
+						tree.hi,
+						tree.bad
+					)
+				)
+			end
+			print(
+				string.format("[stretch] %d sleeves, %d outside; round %.2f to %.2f", total, #bad, rounds[1], rounds[2])
+			)
+			t.eq(#bad, 0, #bad .. " of " .. total .. " sleeves outside; first: " .. tostring(bad[1]))
+		end,
+		"BLOCKED: needs Connor's decision. With R13 reference 1.3 (assumed) and R22 reference 2.2, the sets stretch fine only for base radii 1.0 to 1.69 (R13) and 1.692 to 2.86 (R22): small and birch trees (base radius under 1.0), and tall cuts whose later sleeves narrow, fall outside. See the [stretch] lines."
+	)
 
 	t.test("8.5c a mesh that does not load leaves no stand-in: only the invisible hitbox, and a warning", function()
 		local s = setup()
@@ -1091,24 +1363,26 @@ return function(t)
 		end
 	end)
 
-	t.test("8.6d boot check: all 16 frustum models load and are MeshParts, one line says so", function()
+	t.test("8.6d boot check: all 96 frustum models load and are MeshParts, one line says so", function()
 		local s = setup()
 		local result
 		s.StumpMeshes.Preload(function(loaded, failures)
 			result = { loaded = loaded, failures = failures }
 		end)
 		t.ok(result ~= nil, "the check finished")
-		t.eq(result.loaded, 16)
+		t.eq(result.loaded, 96)
 		t.eq(#result.failures, 0)
-		t.eq(s.StumpMeshes.Lines(16, {})[1], "[Stump] 16/16 frustum meshes loaded")
-		-- One model fails to load, one holds no MeshPart: each is named by ratio and id.
+		t.eq(#s.loaded, 96, "every row asked for once")
+		t.eq(#s.StumpMeshes.Missing(), 0, "nothing missing")
+		t.eq(s.StumpMeshes.Lines(96, {})[1], "[Stump] 96/96 frustum meshes loaded")
+		-- One model fails to load, one holds no MeshPart: each is named by set, taper, height and id.
 		local bad = setup()
-		local badIdA, badIdB = StumpMeshIds.ModelIds[90], StumpMeshIds.ModelIds[97]
+		local rowA, rowB = StumpMeshIds.Rows[17], StumpMeshIds.Rows[70]
 		local plain = bad.StumpMeshes.LoadModel
 		bad.StumpMeshes.LoadModel = function(id)
-			if id == badIdA then
+			if id == rowA.id then
 				error("HTTP 403")
-			elseif id == badIdB then
+			elseif id == rowB.id then
 				return Instance.new("Model")
 			end
 			return plain(id)
@@ -1117,17 +1391,122 @@ return function(t)
 		bad.StumpMeshes.Preload(function(loaded, failures)
 			failed = { loaded = loaded, failures = failures }
 		end)
-		t.eq(failed.loaded, 14)
+		t.eq(failed.loaded, 94)
 		t.eq(#failed.failures, 2)
 		local text = table.concat(failed.failures, "\n")
-		t.ok(string.find(text, "ratio 0.90", 1, true) and string.find(text, tostring(badIdA), 1, true), text)
-		t.ok(string.find(text, "ratio 0.97", 1, true) and string.find(text, tostring(badIdB), 1, true), text)
-		t.eq(bad.StumpMeshes.Lines(14, failed.failures)[1], "[Stump] 14/16 frustum meshes loaded")
+		for _, row in ipairs({ rowA, rowB }) do
+			t.ok(string.find(text, row.name, 1, true) and string.find(text, tostring(row.id), 1, true), text)
+			t.ok(string.find(text, row.set, 1, true), "names its set")
+		end
+		t.eq(bad.StumpMeshes.Lines(94, failed.failures)[1], "[Stump] 94/96 frustum meshes loaded")
+		-- Loud: stumpMeshesMissing is recorded and warned, by name.
+		t.eq(#bad.StumpMeshes.Missing(), 2, "stumpMeshesMissing records both")
+		local loud = 0
+		for _, w in ipairs(bad.loader.warnings) do
+			if string.find(w, "[Stump] stumpMeshesMissing:", 1, true) then
+				loud += 1
+			end
+		end
+		t.eq(loud, 2, "and each is warned")
 		-- The cloud test's call: the same check, run against the real InsertService.
 		local cloud = setup()
-		t.eq(#cloud.StumpMeshes.CloudCheck(), 0, "CloudCheck passes with every model loading")
-		t.eq(#bad.StumpMeshes.CloudCheck(), 2, "and reports the two that do not")
+		local lines, tried = cloud.StumpMeshes.CloudCheck()
+		t.eq(#lines, 0, "CloudCheck passes with every model loading")
+		t.eq(tried, 96)
+		t.eq(#(bad.StumpMeshes.CloudCheck()), 2, "and reports the two that do not")
 	end)
+
+	t.test(
+		"8.6e a missing set or mesh: the other set stands in only when its stretch is fine, else loud and no visual",
+		function()
+			local function oak(s)
+				local rec = s.tree("oak")
+				local p = s.player(1, Vector3.new(4, 3, 0))
+				s.cutThrough(p, rec.sections[1], 3000)
+				return rec
+			end
+			local rowOf = {}
+			for _, row in ipairs(StumpMeshIds.Rows) do
+				rowOf[row.id] = row
+			end
+			local function failing(s, test)
+				local plain = s.StumpMeshes.LoadModel
+				s.StumpMeshes.LoadModel = function(id)
+					if test(rowOf[id]) then
+						error("not approved")
+					end
+					return plain(id)
+				end
+			end
+			local function warned(s)
+				local n = 0
+				for _, w in ipairs(s.loader.warnings) do
+					if string.find(w, "[Stump] stumpMeshesMissing:", 1, true) then
+						n += 1
+					end
+				end
+				return n
+			end
+			-- A normal oak (base radius 1.128) is R13. Its whole set is missing; R22 (reference
+			-- 2.2) would squeeze it to 0.51 round: not allowed. Loud, no visual, no stand-in.
+			local a = setup()
+			a.attrs.CoreLoopActive = 2
+			failing(a, function(row)
+				return row.set == "R13"
+			end)
+			local recA = oak(a)
+			t.eq(#stumpParts(recA.model), 0, "no stump look: no mesh, no stand-in")
+			t.ok(recA.sections[1].Transparency == 1 and recA.felled, "the invisible hitbox stands")
+			t.ok(#a.StumpMeshes.Missing() >= 1 and warned(a) >= 1, "stumpMeshesMissing is recorded and warned")
+			for _, id in ipairs(a.loaded) do
+				t.eq(rowOf[id].set, "R13", "R22 was not even tried: its stretch is outside")
+			end
+			-- Same, but R22's reference radius is 1.1 here (a spec-only change): 1.128 / 1.1 = 1.03
+			-- stretches fine, so R22 stands in, with its own mesh at the exact radius.
+			local b = setup()
+			b.attrs.CoreLoopActive = 2
+			b.StumpLogic.RefRadius.R22 = 1.1
+			failing(b, function(row)
+				return row.set == "R13"
+			end)
+			local recB = oak(b)
+			local meshes = stumpParts(recB.model, "StumpMesh")
+			t.ok(#meshes >= 1, "the fallback set made a stump")
+			for _, mesh in ipairs(meshes) do
+				t.eq(rowOf[tonumber(mesh:GetAttribute("ModelId"))].set, "R22", "from the other set")
+			end
+			t.ok(
+				math.abs(meshes[1].Size.X / 2 - recB.sections[1].Size.X / math.sqrt(math.pi)) < 1e-4,
+				"at the trunk's exact base radius"
+			)
+			t.eq(#b.StumpMeshes.Missing(), 0, "a fallback is not a failure")
+			-- One mesh of the set missing (this oak's own taper and height): the same rule.
+			local c = setup()
+			c.attrs.CoreLoopActive = 2
+			local ownId = tonumber(stumpParts(oak(c).model, "StumpMesh")[1]:GetAttribute("ModelId"))
+			local d = setup()
+			d.attrs.CoreLoopActive = 2
+			failing(d, function(row)
+				return row.id == ownId
+			end)
+			local recD = oak(d)
+			t.eq(#stumpParts(recD.model), 0, "one mesh missing, the other set's stretch outside: loud, no visual")
+			t.ok(#d.StumpMeshes.Missing() >= 1 and warned(d) >= 1)
+			-- And with the other set inside its stretch the one mesh comes from it.
+			local e = setup()
+			e.attrs.CoreLoopActive = 2
+			e.StumpLogic.RefRadius.R22 = 1.1
+			failing(e, function(row)
+				return row.id == ownId
+			end)
+			local meshesE = stumpParts(oak(e).model, "StumpMesh")
+			t.ok(
+				#meshesE >= 1 and rowOf[tonumber(meshesE[1]:GetAttribute("ModelId"))].set == "R22",
+				"the one mesh comes from R22"
+			)
+			t.eq(#e.StumpMeshes.Missing(), 0)
+		end
+	)
 
 	---------------------------------------------------------------------
 	t.test("8.7 a re-cut frees a normal log of at least 2 studs; the remainder restarts its timer", function()

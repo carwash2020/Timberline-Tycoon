@@ -1,8 +1,8 @@
 --!nocheck
 -- T420: stumps next to the round trunks they were cut from. PREVIEW ONLY:
 -- this tool cannot load the 16 uploaded frustum MeshParts (InsertService),
--- so the stump body here is a stand-in of 14 stacked discs between the real
--- base radius and the real top radius (StumpLogic.Shape), drawn only so the
+-- so the stump body here is a stand-in of 14 stacked discs per sleeve between the
+-- real radii (StumpLogic.Shape), drawn only so the
 -- taper and the colours can be judged. The cap, the ring, the radii, the
 -- heights and the weathering colours are the game's own code (TreeArt.StumpDress,
 -- StumpLogic). Lit by the viewer's sun and sky with shadows (three.js), not
@@ -21,7 +21,7 @@ return {
 		local StumpLogic = ctx.shared("StumpLogic")
 		local WoodData = ctx.shared("WoodData")
 		local root = roblox.Instance.new("Model")
-		Common.ground(ctx, root, 300, nil, V3.new(0, -0.5, 0))
+		Common.ground(ctx, root, 500, nil, V3.new(80, -0.5, 0))
 
 		local function segsOf(skel)
 			local trunk = {}
@@ -41,18 +41,22 @@ return {
 		end
 
 		-- A stump at `at`: the stand-in body, the game's cap and ring.
-		local function stump(woodId, seed, h, at, weather)
+		local function stump(woodId, seed, h, at, weather, scale, elder)
 			local def = WoodData.Get(woodId)
-			local skel = TreeGen.Skeleton(woodId, seed, 1, {})
+			local skel = TreeGen.Skeleton(woodId, seed, scale or 1, { elder = elder == true })
 			local segs = segsOf(skel)
 			local shape = StumpLogic.Shape(segs, h)
 			local bark = Kit.vary(TreeArt.Palette(def).bark or def.trunkColor, Kit.rng(1), 0)
 			local model = roblox.Instance.new("Model")
 			model.Parent = root
-			local template = roblox.Instance.new("MeshPart")
-			template.Size = V3.new(2, 2, 2)
+			local templates = {}
+			for i = 1, #shape.sleeves do
+				local template = roblox.Instance.new("MeshPart")
+				template.Size = V3.new(2, 2, 2)
+				templates[i] = template
+			end
 			local base = CF.new(at)
-			local parts = TreeArt.StumpDress(def, model, base, shape, template, bark)
+			local parts = TreeArt.StumpDress(def, model, base, shape, templates, bark)
 			for _, d in ipairs(parts) do
 				if d.Name == "StumpMesh" then
 					d:Destroy()
@@ -61,19 +65,22 @@ return {
 				end
 			end
 			local n = 14
-			for i = 1, n do
-				local u0, u1 = (i - 1) / n, i / n
-				local r = shape.baseRadius + (shape.topRadius - shape.baseRadius) * (u0 + u1) / 2
-				local disc = Kit.cylinder(
-					model,
-					"PreviewStandIn",
-					h / n + 0.01,
-					r * 2,
-					base * CF.new(0, h * (u0 + u1) / 2, 0) * CF.Angles(0, 0, math.pi / 2),
-					StumpLogic.BarkColor(bark, weather),
-					TreeArt.BarkMaterial(def)
-				)
-				Kit.decor(disc)
+			for _, sleeve in ipairs(shape.sleeves) do
+				local length = sleeve.y1 - sleeve.y0
+				for i = 1, n do
+					local u0, u1 = (i - 1) / n, i / n
+					local r = sleeve.baseRadius + (sleeve.topRadius - sleeve.baseRadius) * (u0 + u1) / 2
+					local disc = Kit.cylinder(
+						model,
+						"PreviewStandIn",
+						length / n + 0.01,
+						r * 2,
+						base * CF.new(0, sleeve.y0 + length * (u0 + u1) / 2, 0) * CF.Angles(0, 0, math.pi / 2),
+						StumpLogic.BarkColor(bark, weather),
+						TreeArt.BarkMaterial(def)
+					)
+					Kit.decor(disc)
+				end
 			end
 			return shape, skel
 		end
@@ -100,14 +107,31 @@ return {
 		stump("oak", 7, 4.2, V3.new(90, 0, 0), 0)
 		stump("oak", 7, 4.2, V3.new(96, 0, 0), w)
 		label("fresh | 150 s", V3.new(93, 0.8, 5))
+		-- A 15 stud cut (large pine): two stacked sleeves, no clamp.
+		stump("pine", 7, 15, V3.new(120, 0, 0), 0)
+		label("pine, cut 15 up: 2 sleeves", V3.new(120, 0.8, 6))
+		-- An Elder (scale 1.7, base radius about 2.49: the R22 set), cut 4.2 up, beside a normal pine.
+		stump("pine", 7, 4.2, V3.new(150, 0, 0), 0, 1.7, true)
+		stump("pine", 7, 4.2, V3.new(158, 0, 0), 0)
+		label("Elder pine (R22) | normal pine (R13)", V3.new(154, 0.8, 6))
 		return {
 			root = root,
-			shadowRadius = 140,
+			shadowRadius = 160,
 			cameras = {
 				{ pos = { 5, 8.5, -9 }, target = { 0, 3.2, 0 }, label = "oak stump, cut 4.2 up (stand-in body)" },
 				{ pos = { 35, 8.5, -9 }, target = { 30, 3.2, 0 }, label = "pine stump, cut 4.2 up (stand-in body)" },
 				{ pos = { 63, 6, -20 }, target = { 63, 4, 0 }, label = "oak trunk and stump, same taper" },
 				{ pos = { 93, 9, -10 }, target = { 93, 3, 0 }, label = "stump at 150 s (right) beside fresh (left)" },
+				{
+					pos = { 154, 7, -16 },
+					target = { 154, 3, 0 },
+					label = "Elder pine stump (R22) beside a normal pine (R13), cut 4.2 up (stand-in body)",
+				},
+				{
+					pos = { 128, 12, -18 },
+					target = { 120, 7, 0 },
+					label = "pine cut 15 up: stacked sleeves (stand-in body)",
+				},
 			},
 		}
 	end,
