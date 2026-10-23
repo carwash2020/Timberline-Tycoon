@@ -323,6 +323,14 @@ return function(t)
 		"BackRoomKnob",
 		-- the counter's two hidden end blockers (invisible, nothing to see)
 		"CounterBack",
+		-- a plinth that is not for sale yet: sheet, stanchions, rope and board (DealershipLot.ComingSoon; none collides)
+		"ComingSoonSheet",
+		"ComingSoonSheetRidge",
+		"ComingSoonBoard",
+		"ComingSoonBoardFrame",
+		"ComingSoonBoardLeg",
+		"StanchionPost",
+		"StanchionRope",
 	}) do
 		LOOKS_ONLY[name] = true
 	end

@@ -134,6 +134,42 @@ return function(t)
 		Gate.SetIds(nil)
 	end)
 
+	t.test("a missing-mesh vehicle's plinth is dressed COMING SOON, not empty, mesh-free and collision-free", function()
+		Gate.SetIds(emptyIds())
+		local root = lot()
+		local count = function(name)
+			local n = 0
+			for _, d in ipairs(root:GetDescendants()) do
+				if d.Name == name then
+					n += 1
+					t.ok(d:IsA("Part"), name .. " is a plain part, no mesh")
+					t.eq(d.CanCollide, false, name .. " does not collide")
+				end
+			end
+			return n
+		end
+		t.eq(count("ComingSoonBoard"), 3, "a board per trailer plinth")
+		t.eq(count("ComingSoonBoardFrame"), 3)
+		t.eq(count("ComingSoonSheet"), 3, "a dust sheet over a vehicle-sized hump")
+		t.eq(count("ComingSoonSheetRidge"), 3)
+		t.eq(count("StanchionPost"), 12, "four stanchions each")
+		t.eq(count("StanchionRope"), 12)
+		local texts = {}
+		for _, d in ipairs(root:GetDescendants()) do
+			if d.Name == "ComingSoonBoard" then
+				for _, label in ipairs(d:GetDescendants()) do
+					if label:IsA("TextLabel") then
+						texts[label.Text] = true
+					end
+				end
+			end
+		end
+		for _, id in ipairs({ "Pony Trailer", "Ranch Trailer", "Heavy Hauler" }) do
+			t.ok(texts[id .. "\n" .. DealershipLot.ComingSoonText], id .. " is named over COMING SOON on its board")
+		end
+		Gate.SetIds(nil)
+	end)
+
 	t.test("with the ids in, all eight are stocked (the control)", function()
 		Gate.SetIds(Gate.FakeIds())
 		local boxes = stock(lot())

@@ -317,7 +317,124 @@ end
 -- What the vehicle hauls, the second line of its name sign (ShopLogic's own words for the
 -- shop card: "Bed: 12 logs", "No bed", "+12 bed space"). The hung sub-signs that used to say
 -- this over each bay are gone: one sign per plinth now carries the name and the bed.
+-- The plinth of a vehicle that is not for sale yet (its meshes are missing): not an empty slot, and never a part-built
+-- stand-in. Kit parts only, no mesh and nothing that collides: a dust sheet over a vehicle-sized hump (a base and a
+-- ridge), four brass stanchions with a rope between them, and a dark board in the Dealership signs' style (dark ground,
+-- brass frame, cream letters) naming the vehicle over COMING SOON. The plinth keeps its own lamp post. `vz` is the
+-- vehicle's middle line (lot space).
 DealershipLot.ComingSoonText = "COMING SOON"
+DealershipLot.BoardSize = Vector3.new(9, 2.6, 0.25)
+function DealershipLot.ComingSoon(
+	lot: Model,
+	bay: Bay,
+	cx: number,
+	vz: number,
+	top: number,
+	aisleSide: number,
+	name: string
+)
+	local sheetColor = Color3.fromRGB(214, 208, 196)
+	local ropeColor = Color3.fromRGB(150, 36, 28)
+	local baseSize = Vector3.new(bay.length * 0.55, 2.6, bay.span * 0.7)
+	Kit.decor(
+		Kit.part(
+			lot,
+			"ComingSoonSheet",
+			baseSize,
+			CFrame.new(cx, top + baseSize.Y / 2, vz),
+			sheetColor,
+			Enum.Material.Fabric
+		),
+		false
+	)
+	local ridgeSize = Vector3.new(baseSize.X * 0.8, 1.6, baseSize.Z * 0.6)
+	Kit.decor(
+		Kit.part(
+			lot,
+			"ComingSoonSheetRidge",
+			ridgeSize,
+			CFrame.new(cx, top + baseSize.Y + ridgeSize.Y / 2 - 0.05, vz),
+			Kit.shade(sheetColor, -0.05),
+			Enum.Material.Fabric
+		),
+		false
+	)
+	local sx, sz = baseSize.X / 2 + 2, baseSize.Z / 2 + 1.6
+	local postH = 2.8
+	local corners = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }
+	for _, c in ipairs(corners) do
+		Kit.decor(
+			Kit.part(
+				lot,
+				"StanchionPost",
+				Vector3.new(0.3, postH, 0.3),
+				CFrame.new(cx + c[1] * sx, top + postH / 2, vz + c[2] * sz),
+				BRASS,
+				Enum.Material.Metal
+			),
+			false
+		)
+	end
+	for i, c in ipairs(corners) do
+		local n = corners[i % 4 + 1]
+		local x0, z0, x1, z1 = cx + c[1] * sx, vz + c[2] * sz, cx + n[1] * sx, vz + n[2] * sz
+		local len = math.sqrt((x1 - x0) ^ 2 + (z1 - z0) ^ 2)
+		Kit.decor(
+			Kit.part(
+				lot,
+				"StanchionRope",
+				Vector3.new(len, 0.14, 0.14),
+				CFrame.new((x0 + x1) / 2, top + postH - 0.45, (z0 + z1) / 2)
+					* CFrame.Angles(0, -math.atan2(z1 - z0, x1 - x0), 0),
+				ropeColor,
+				Enum.Material.Fabric
+			),
+			false
+		)
+	end
+	local board = DealershipLot.BoardSize
+	local legH = 1.4
+	local bz = vz + aisleSide * (baseSize.Z / 2 + 3.2)
+	Kit.decor(
+		Kit.part(
+			lot,
+			"ComingSoonBoardFrame",
+			board + Vector3.new(0.4, 0.4, -0.05),
+			CFrame.new(cx, top + legH + board.Y / 2, bz),
+			BRASS,
+			Enum.Material.Metal
+		),
+		false
+	)
+	local sign = Kit.part(
+		lot,
+		"ComingSoonBoard",
+		board,
+		CFrame.new(cx, top + legH + board.Y / 2, bz),
+		Color3.fromRGB(26, 19, 12),
+		Enum.Material.SmoothPlastic
+	)
+	Kit.decor(sign, false)
+	Kit.signText(
+		sign,
+		name .. "\n" .. DealershipLot.ComingSoonText,
+		SIGN_CREAM,
+		{ Enum.NormalId.Front, Enum.NormalId.Back }
+	)
+	for _, dx in ipairs({ -board.X / 2 + 0.7, board.X / 2 - 0.7 }) do
+		Kit.decor(
+			Kit.part(
+				lot,
+				"ComingSoonBoardLeg",
+				Vector3.new(0.3, legH, 0.3),
+				CFrame.new(cx + dx, top + legH / 2, bz),
+				BRASS,
+				Enum.Material.Metal
+			),
+			false
+		)
+	end
+end
 
 function DealershipLot.BedText(kind: string, id: string): string
 	if kind == "Truck" then
@@ -579,25 +696,7 @@ function DealershipLot.Build(): Model
 		local stocked = VehicleMeshGate.Complete(bay.kind, bay.id)
 		local model = if stocked then modelOf(bay.kind, bay.id, true) else nil
 		if not stocked then
-			local sign = Kit.part(
-				lot,
-				"NameSign",
-				DealershipLot.NameSignSize,
-				CFrame.new(
-					cx + bay.width / 2 - DealershipLot.NameSignSize.X / 2,
-					DealershipLot.NameSignSize.Y / 2,
-					cz + aisleSide * (bay.depth / 2 + 0.15)
-				),
-				Color3.fromRGB(62, 42, 24),
-				Enum.Material.Wood
-			)
-			Kit.decor(sign, false)
-			Kit.signText(
-				sign,
-				nameOf(bay.kind, bay.id) .. "\n" .. DealershipLot.ComingSoonText,
-				Color3.fromRGB(245, 235, 215),
-				{ Enum.NormalId.Front, Enum.NormalId.Back }
-			)
+			DealershipLot.ComingSoon(lot, bay, cx, oz + bay.vz, top, aisleSide, nameOf(bay.kind, bay.id))
 		end
 		if model then
 			model.Parent = lot

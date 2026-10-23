@@ -6,7 +6,7 @@
 -- inside the door), 2 tier stand (a plinth's T-flag, mat and name sign from the
 -- aisle), 3 phone (667x375, from the door), 4 night, then extras: 5 counter and CHECKOUT,
 -- 6 the tables (reception and finance), 7 a plinth's name sign, 8 the hall from above, 9 down the
--- aisle, 10 the lot row (front row from the aisle), 11 the back row, 12 the lobby's west wall, 13 the lobby's back wall, 14 the front wall (racks and the event banner).
+-- aisle, 10 the lot row (front row from the aisle), 11 the back row, 12 the lobby's west wall, 13 the lobby's back wall, 14 a COMING SOON plinth at eye height (the Pony Trailer), 15 the front wall (racks and the event banner).
 -- See _store.luau.
 local Dealer = require("./_dealership")
 
@@ -27,6 +27,12 @@ return Dealer.scene({
 				{ pos = { 20, 9, -2 }, target = { 20, 6, 18 }, fov = 70, label = "back row from the aisle" },
 				{ pos = { -56, 8, -4 }, target = { -77, 6, 8 }, fov = 78, label = "the lobby's west wall" },
 				{ pos = { -58, 9, 6 }, target = { -50, 7, 30 }, fov = 66, label = "the lobby's back wall" },
+				{
+					pos = { -14, 5.8, 9 },
+					target = { 6, 3, -10 },
+					fov = 62,
+					label = "a COMING SOON plinth at eye height (the Pony Trailer)",
+				},
 				{
 					pos = { -64, 8, -8 },
 					target = { -55, 3.5, -29.5 },
