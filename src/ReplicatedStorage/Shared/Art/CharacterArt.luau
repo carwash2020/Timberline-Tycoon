@@ -1734,6 +1734,9 @@ function CharacterArt.Build(spec: Spec): Model
 	root.Transparency = 1
 	root.CanTouch = false
 	root.CastShadow = false
+	-- The one solid part of a standing townsperson: its collision body. Named for the
+	-- geometry lint (T409 rule 2c); no behaviour change.
+	Kit.blocker(root, "NPC collision body (the figure's limbs are decor)")
 	model.PrimaryPart = root
 
 	local torso = limbPart(ctx, "Torso", Vector3.new(tw, TORSO_H, td), CFrame.new(0, ROOT_Y, 0), spec.shirt, FABRIC)

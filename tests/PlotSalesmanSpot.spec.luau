@@ -4,12 +4,12 @@
 -- footpath, a curb or a lane; his body stays at least a stud from the sign's
 -- posts and clear of every sign part, lamp, prop, fence and building.
 --
--- The world-wide overlap lint (#257, Clearance.Box on every NPC) is not on
--- main yet; this is the equivalent for Hank with the 2D Clearance shapes that
--- are: the built NPC model's part footprints against the built sign model.
+-- The first three tests use the 2D Clearance shapes on the built NPC model and
+-- sign. The last two run T409's world overlap lint (Geometry.Run, rule 2b, the
+-- Clearance.Box SAT) with Hank and a moved spawn pad added to the built world.
 return function(t)
 	local roblox = t.roblox
-	local Vector2, Vector3, CFrame = roblox.Vector2, roblox.Vector3, roblox.CFrame
+	local Vector2, Vector3, CFrame, Instance = roblox.Vector2, roblox.Vector3, roblox.CFrame, roblox.Instance
 	local PlotSalesmanData = t.shared("PlotSalesmanData")
 	local NPCData = t.shared("NPCData")
 	local TownTreeData = t.shared("TownTreeData")
@@ -21,6 +21,12 @@ return function(t)
 	local CharacterArt = t.load("ReplicatedStorage/Shared/Art/CharacterArt")
 	local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
 	local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
+	local Geometry = t.load("ReplicatedStorage/Shared/Lint/Geometry")
+	local PlotLogic = t.shared("PlotLogic")
+	local PlotData = t.shared("PlotData")
+	local BlueprintModels = t.shared("BlueprintModels")
+	local serde = require("@lune/serde")
+	local allow = serde.decode("json", require("@lune/fs").readFile("tests/geometry_allow.json"))
 
 	local hank = NPCData.Get(PlotSalesmanData.Id)
 	local at = hank.spot.position
@@ -161,5 +167,86 @@ return function(t)
 				"fence " .. i .. " is under him"
 			)
 		end
+	end)
+
+	local function hitsOf(result, id)
+		local out = {}
+		for _, hit in ipairs(result.hits) do
+			if hit.a == id or hit.b == id then
+				table.insert(out, Geometry.Line(hit))
+			end
+		end
+		return out
+	end
+
+	t.test(
+		"world overlap lint (rule 2b): Old Hank's whole body, made solid, overlaps nothing in the built town",
+		function()
+			local world = t.support("WorldBuild").Get(t)
+			local function lintWith(offset)
+				local root = world.map:Clone()
+				local body = builtHank()
+				body.Name = "OldHank"
+				body:PivotTo(CFrame.new(offset) * body:GetPivot())
+				for _, d in ipairs(body:GetDescendants()) do
+					if d:IsA("BasePart") then
+						d.CanCollide = true -- stricter than the game: his limbs are decor there
+					end
+				end
+				body.Parent = root
+				return Geometry.Run(root, allow, nil, { skipStale = true })
+			end
+			local result = lintWith(Vector3.zero)
+			t.eq(hitsOf(result, "OldHank"), {}, "Hank overlaps a solid piece")
+			t.eq(result.failures, {}, "the lint itself is clean")
+			-- Control: the same body moved onto the sign's post is found.
+			local sign = plotSign()
+			local post = sign.cframe * Vector3.new(4.95, 0, 0)
+			local moved = lintWith(Vector3.new(post.X - at.X, 0, post.Z - at.Z))
+			t.ok(#hitsOf(moved, "OldHank") > 0, "the lint sees Hank when he stands in the sign")
+			t.ok(#allow <= 3, "no new geometry_allow entries (AllowlistCap)")
+		end
+	)
+
+	t.test("world overlap lint: the moved spawn pad overlaps none of the saved base; the old spot does", function()
+		local size = PlotData.Tiers[1].size
+		local rects = {}
+		local function plotWith(padX, padZ)
+			local root = Instance.new("Folder")
+			root.Name = "TimberlineMap"
+			rects = {}
+			for n, x in ipairs({ -8, 0, 8 }) do
+				local bp = PlotData.Blueprint("Floor")
+				local model = BlueprintModels.Build(bp, false)
+				model.Name = "Floor" .. n
+				model.Parent = root
+				BlueprintModels.Place(model, CFrame.new(), x, -18, 0, 0)
+				table.insert(rects, PlotLogic.RectOf(PlotLogic.Blueprint("Floor"), x, -18, 0))
+			end
+			local pad = Instance.new("Model")
+			pad.Name = "PlotSpawn"
+			local part = Instance.new("Part")
+			part.Name = "PlotSpawn"
+			part.Anchored = true
+			part.CanCollide = true
+			part.Size = Vector3.new(PlotLogic.SpawnSize, 1, PlotLogic.SpawnSize)
+			part.CFrame = CFrame.new(padX, 0.5, padZ)
+			part.Parent = pad
+			pad.Parent = root
+			return Geometry.Run(root, {}, nil, { skipStale = true })
+		end
+		-- The floors themselves must be solid for the control to mean anything.
+		local nx, nz = PlotLogic.SpawnSpot(
+			size,
+			(function()
+				plotWith(0, 0)
+				return rects
+			end)()
+		)
+		local moved = plotWith(nx, nz)
+		t.eq(hitsOf(moved, "PlotSpawn"), {}, "the moved pad overlaps a piece")
+		local old = plotWith(PlotLogic.VisitPad[1], PlotLogic.VisitPad[2])
+		t.ok(#hitsOf(old, "PlotSpawn") > 0, "the lint sees the pad under the floors at the old spot")
+		t.ok(nx ~= PlotLogic.VisitPad[1] or nz ~= PlotLogic.VisitPad[2], "the pad moved")
 	end)
 end
