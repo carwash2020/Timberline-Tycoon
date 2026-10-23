@@ -221,7 +221,7 @@ return function(t)
 			{ "ShopService", "local function onEquipItem(", { "category", "itemId" } },
 			{ "BoxService", "function onBoxOpen(", { "action" } },
 			{ "VehicleService", "local function onPadPress(", { "pad" } },
-			{ "LogicService", "function LogicService.OnWire(", { "a", "b", "c", "d" } },
+			{ "LogicService", "function LogicService.OnWire(", { "a", "b", "c", "d", "e" } },
 			{ "MonetizationService", "local function onBuy(", { "kind", "key" } },
 			{ "QuestService", "local function onSeen(", { "what" } },
 			{ "CodeService", "local function onRedeem(", { "raw" } },

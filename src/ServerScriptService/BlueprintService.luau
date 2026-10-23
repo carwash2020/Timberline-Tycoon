@@ -32,6 +32,7 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local Util = require(ReplicatedStorage.Shared.Util)
+local WireSupply = require(ReplicatedStorage.Shared.WireSupply)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
 
@@ -81,6 +82,8 @@ function BlueprintService.Publish(player: Player)
 		end
 	end
 	player:SetAttribute("Blueprints", ShopLogic.EncodeSet(ids))
+	-- The wire box (T420): how many units the Wire tool can still use.
+	player:SetAttribute("WireUnits", WireSupply.Clean(profile.wireUnits))
 end
 
 -- Stage unlocks (BlueprintBook.UnlockStage, wired to StageOf.Current): teaches
