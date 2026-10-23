@@ -36,6 +36,36 @@ return function(t)
 		)
 	end)
 
+	t.test(
+		"stump mesh problems (T420): stumpMeshesMissing and stumpStretchViolations are in the line and the events",
+		function()
+			local base = { MapBuildSeconds = 4, MapTerrainSeconds = 1, MapTrees = 300 }
+			t.eq(
+				BootReport.Line(world(base), 0),
+				"[GameServer] Online: world built in 4.0s (terrain 1.0s), 300 trees, 0 players",
+				"nothing to say when nothing is missing"
+			)
+			local with = {
+				MapBuildSeconds = 4,
+				MapTerrainSeconds = 1,
+				MapTrees = 300,
+				stumpMeshesMissing = "StumpTaper090_H3_R22 (set R22, taper 0.90, height 3) model 1: x; StumpTaper090_H5_R22 (set R22, taper 0.90, height 5) model 2: x",
+				stumpStretchViolations = 3,
+			}
+			local line = BootReport.Line(world(with), 0)
+			t.ok(string.find(line, "2 stump meshes missing", 1, true), line)
+			t.ok(string.find(line, "stumpMeshesMissing", 1, true), line)
+			t.ok(string.find(line, "stumpStretchViolations 3", 1, true), line)
+			local found = false
+			for _, event in ipairs(BootReport.Events(world(with))) do
+				if event.name == "ServerStumpStretchViolations" then
+					found = event.value == 3
+				end
+			end
+			t.ok(found, "the count goes out as an analytics event")
+		end
+	)
+
 	t.test("missing stats show as ? and never error", function()
 		t.eq(BootReport.Line(world({}), 0), "[GameServer] Online: world built in ?s (terrain ?s), ? trees, 0 players")
 		t.eq(

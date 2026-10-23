@@ -1097,17 +1097,16 @@ return function(t)
 		"BLOCKED: needs Connor's decision. With R13 reference 1.3 (assumed) and R22 reference 2.2, the sets stretch fine only for base radii 1.0 to 1.69 (R13) and 1.692 to 2.86 (R22): small and birch trees (base radius under 1.0), and tall cuts whose later sleeves narrow, fall outside. See the [stretch] lines."
 	)
 
-	t.test("8.5c a mesh that does not load leaves no stand-in: only the invisible hitbox, and a warning", function()
+	t.test("8.5c every mesh failing to load: no stump, no stand-in, the log is still made, a warning", function()
 		local s = setup()
 		s.attrs.CoreLoopActive = 2
 		s.meshFails = true
 		local rec = s.tree("oak")
 		local p = s.player(1, Vector3.new(4, 3, 0))
 		local _, ok, _, result = s.cutThrough(p, rec.sections[1], 3000)
-		t.ok(ok and result ~= nil, "the tree still falls")
-		t.eq(#stumpParts(rec.model), 0, "no stump look at all")
-		t.ok(rec.sections[1] ~= nil and rec.sections[1].Transparency == 1, "the hitbox stands, invisible")
-		t.ok(rec.felled and not rec.slot, "and can still be re-cut")
+		t.ok(ok and result ~= nil and #result.freed == 1, "the tree still falls and the log is made")
+		t.eq(#stumpParts(s.map), 0, "no stump look at all: no part discs, cap or ring")
+		t.ok(rec.slot and rec.stumpState == nil, "no stump and no hitbox: the spot is cleared")
 		local warned = false
 		for _, w in ipairs(s.loader.warnings) do
 			if string.find(w, "StumpMeshes", 1, true) then
@@ -1115,15 +1114,6 @@ return function(t)
 			end
 		end
 		t.ok(warned, "a warning was logged")
-		-- A stump of a shape that arrives late gets its look then.
-		local late = setup()
-		late.attrs.CoreLoopActive = 2
-		local waiting = {}
-		late.StumpMeshes.LoadModel = function(id)
-			table.insert(waiting, id)
-			error("offline")
-		end
-		t.ok(true)
 	end)
 
 	t.test("8.5d trunks are round: radius side / sqrt(pi), volume and price unchanged from main", function()
@@ -1416,97 +1406,118 @@ return function(t)
 		t.eq(#(bad.StumpMeshes.CloudCheck()), 2, "and reports the two that do not")
 	end)
 
-	t.test(
-		"8.6e a missing set or mesh: the other set stands in only when its stretch is fine, else loud and no visual",
-		function()
-			local function oak(s)
-				local rec = s.tree("oak")
-				local p = s.player(1, Vector3.new(4, 3, 0))
-				s.cutThrough(p, rec.sections[1], 3000)
-				return rec
-			end
-			local rowOf = {}
-			for _, row in ipairs(StumpMeshIds.Rows) do
-				rowOf[row.id] = row
-			end
-			local function failing(s, test)
-				local plain = s.StumpMeshes.LoadModel
-				s.StumpMeshes.LoadModel = function(id)
-					if test(rowOf[id]) then
-						error("not approved")
-					end
-					return plain(id)
-				end
-			end
-			local function warned(s)
-				local n = 0
-				for _, w in ipairs(s.loader.warnings) do
-					if string.find(w, "[Stump] stumpMeshesMissing:", 1, true) then
-						n += 1
-					end
-				end
-				return n
-			end
-			-- A normal oak (base radius 1.128) is R13. Its whole set is missing; R22 (reference
-			-- 2.2) would squeeze it to 0.51 round: not allowed. Loud, no visual, no stand-in.
-			local a = setup()
-			a.attrs.CoreLoopActive = 2
-			failing(a, function(row)
-				return row.set == "R13"
-			end)
-			local recA = oak(a)
-			t.eq(#stumpParts(recA.model), 0, "no stump look: no mesh, no stand-in")
-			t.ok(recA.sections[1].Transparency == 1 and recA.felled, "the invisible hitbox stands")
-			t.ok(#a.StumpMeshes.Missing() >= 1 and warned(a) >= 1, "stumpMeshesMissing is recorded and warned")
-			for _, id in ipairs(a.loaded) do
-				t.eq(rowOf[id].set, "R13", "R22 was not even tried: its stretch is outside")
-			end
-			-- Same, but R22's reference radius is 1.1 here (a spec-only change): 1.128 / 1.1 = 1.03
-			-- stretches fine, so R22 stands in, with its own mesh at the exact radius.
-			local b = setup()
-			b.attrs.CoreLoopActive = 2
-			b.StumpLogic.RefRadius.R22 = 1.1
-			failing(b, function(row)
-				return row.set == "R13"
-			end)
-			local recB = oak(b)
-			local meshes = stumpParts(recB.model, "StumpMesh")
-			t.ok(#meshes >= 1, "the fallback set made a stump")
-			for _, mesh in ipairs(meshes) do
-				t.eq(rowOf[tonumber(mesh:GetAttribute("ModelId"))].set, "R22", "from the other set")
-			end
-			t.ok(
-				math.abs(meshes[1].Size.X / 2 - recB.sections[1].Size.X / math.sqrt(math.pi)) < 1e-4,
-				"at the trunk's exact base radius"
-			)
-			t.eq(#b.StumpMeshes.Missing(), 0, "a fallback is not a failure")
-			-- One mesh of the set missing (this oak's own taper and height): the same rule.
-			local c = setup()
-			c.attrs.CoreLoopActive = 2
-			local ownId = tonumber(stumpParts(oak(c).model, "StumpMesh")[1]:GetAttribute("ModelId"))
-			local d = setup()
-			d.attrs.CoreLoopActive = 2
-			failing(d, function(row)
-				return row.id == ownId
-			end)
-			local recD = oak(d)
-			t.eq(#stumpParts(recD.model), 0, "one mesh missing, the other set's stretch outside: loud, no visual")
-			t.ok(#d.StumpMeshes.Missing() >= 1 and warned(d) >= 1)
-			-- And with the other set inside its stretch the one mesh comes from it.
-			local e = setup()
-			e.attrs.CoreLoopActive = 2
-			e.StumpLogic.RefRadius.R22 = 1.1
-			failing(e, function(row)
-				return row.id == ownId
-			end)
-			local meshesE = stumpParts(oak(e).model, "StumpMesh")
-			t.ok(
-				#meshesE >= 1 and rowOf[tonumber(meshesE[1]:GetAttribute("ModelId"))].set == "R22",
-				"the one mesh comes from R22"
-			)
-			t.eq(#e.StumpMeshes.Missing(), 0)
+	t.test("8.6e a stump with no mesh in its own set leaves no stump; the log is made; counted and listed", function()
+		local rowOf = {}
+		for _, row in ipairs(StumpMeshIds.Rows) do
+			rowOf[row.id] = row
 		end
-	)
+		local function failing(s, set)
+			local plain = s.StumpMeshes.LoadModel
+			s.StumpMeshes.LoadModel = function(id)
+				if rowOf[id].set == set then
+					error("not approved")
+				end
+				return plain(id)
+			end
+		end
+		local function warned(s)
+			local n = 0
+			for _, w in ipairs(s.loader.warnings) do
+				if string.find(w, "[Stump] stumpMeshesMissing:", 1, true) then
+					n += 1
+				end
+			end
+			return n
+		end
+		-- R22 stubbed as missing. An Elder (base radius 1.918, R22) is cut through.
+		local s = setup()
+		s.attrs.CoreLoopActive = 2
+		failing(s, "R22")
+		local ForestLogic = t.shared("ForestLogic")
+		local model = s.Trees.SpawnTree(
+			"oak",
+			CFrame.new(0, 0, 0),
+			{ seed = 5, size = ForestLogic.ElderSize(s.WoodData.Get("oak")), temporary = true }
+		)
+		local uid = model:GetAttribute("Uid")
+		local rec = s.Trees.GetTree(uid)
+		local base = rec.sections[1]
+		local p = s.player(1, Vector3.new(base.Size.X / 2 + 3, 3, 0))
+		local _, ok, _, result = s.cutThrough(p, base, 6000)
+		t.ok(ok and result ~= nil, "the Elder was cut through")
+		t.eq(#result.freed, 1, "the log above the cut is made")
+		t.ok(next(result.freed[1].parts) ~= nil, "with its sections")
+		t.eq(#stumpParts(s.map), 0, "no stump look anywhere (no mesh, no part discs, no cap or ring)")
+		t.eq(rec.stumpState, nil, "no stump state")
+		s.run()
+		t.eq(s.Trees.GetTree(uid), nil, "and no hitbox left: the Elder is gone with its log")
+		local missingLines = s.StumpMeshes.Missing()
+		t.ok(#missingLines >= 1, "stumpMeshesMissing lists the missing ids")
+		for _, line in ipairs(missingLines) do
+			t.ok(string.find(line, "R22", 1, true) ~= nil, "names the set: " .. line)
+		end
+		t.ok(
+			s.StumpMeshes.Violations() >= 1,
+			"stumpStretchViolations counts the dropped stump: " .. s.StumpMeshes.Violations()
+		)
+		local warnings = warned(s)
+		t.ok(warnings >= 1, "the server warned")
+		-- Once per mesh, not per stump: asking again for the same meshes adds nothing.
+		local shape = StumpLogic.Shape(segsOf("oak", 5, ForestData.Elder.scale, true), 3)
+		t.eq(shape.set, "R22")
+		s.StumpMeshes.Resolve(shape, function() end)
+		s.StumpMeshes.Resolve(shape, function() end)
+		t.eq(warned(s), warnings, "no repeat warning for the same mesh")
+		t.eq(#s.StumpMeshes.Missing(), #missingLines)
+		-- A stump with base radius 1.3 still uses R13 (the same stub: R13 present).
+		local b = setup()
+		b.attrs.CoreLoopActive = 2
+		failing(b, "R22")
+		local big = b.Trees.SpawnTree("oak", CFrame.new(0, 0, 0), { seed = 7, size = TreeLogic.Sizes[3], stage = 1 })
+		local recB = b.Trees.GetTree(big:GetAttribute("Uid"))
+		local radius = recB.sections[1].Size.X / math.sqrt(math.pi)
+		t.ok(math.abs(radius - 1.298) < 0.01, "a large oak: base radius " .. radius)
+		local q = b.player(1, Vector3.new(4, 3, 0))
+		b.cutThrough(q, recB.sections[1], 3000)
+		local meshes = stumpParts(recB.model, "StumpMesh")
+		t.ok(#meshes >= 1, "the stump stands")
+		for _, mesh in ipairs(meshes) do
+			t.eq(rowOf[tonumber(mesh:GetAttribute("ModelId"))].set, "R13", "from R13")
+		end
+		t.eq(#b.StumpMeshes.Missing(), 0, "nothing missing for it")
+		t.eq(b.StumpMeshes.Violations(), 0, "and its stretch is inside: no violation")
+		-- R13 missing: a normal oak (not temporary) leaves no stump, its spot clears and
+		-- regrows on the wood's own time, and its log is still made.
+		local c = setup()
+		c.attrs.CoreLoopActive = 2
+		c.Trees._roll = function()
+			return 0.5
+		end
+		failing(c, "R13")
+		local recC = c.tree("oak")
+		local at = c.now
+		local pC = c.player(1, Vector3.new(4, 3, 0))
+		local _, okC, _, resultC = c.cutThrough(pC, recC.sections[1], 3000)
+		t.ok(okC and #resultC.freed == 1, "the tree fell and the log is made")
+		t.eq(#stumpParts(c.map), 0, "no stump")
+		t.ok(recC.slot and recC.stumpState == nil, "the spot is cleared")
+		t.ok(
+			math.abs(recC.regrowAt - (at + c.WoodData.Get("oak").respawnSec)) < 20,
+			"and regrows on the wood's own time"
+		)
+		t.ok(c.StumpMeshes.Violations() >= 1 and #c.StumpMeshes.Missing() >= 1)
+		-- All 96 present: in-range stumps count 0; an out-of-range one is counted but still drawn.
+		local d = setup()
+		d.attrs.CoreLoopActive = 2
+		local recD = d.tree("oak")
+		d.cutThrough(d.player(1, Vector3.new(4, 3, 0)), recD.sections[1], 3000)
+		t.eq(d.StumpMeshes.Violations(), 0, "a normal oak at 3 studs is in range")
+		local birch = d.tree("birch", Vector3.new(60, 0, 0))
+		d.cutThrough(d.player(2, Vector3.new(64, 3, 0)), birch.sections[1], 3000)
+		t.ok(d.StumpMeshes.Violations() >= 1, "a normal birch (round stretch 0.69) is counted")
+		t.ok(#stumpParts(birch.model, "StumpMesh") >= 1, "and still drawn: only a missing mesh drops a stump")
+		t.eq(#d.StumpMeshes.Missing(), 0)
+	end)
 
 	---------------------------------------------------------------------
 	t.test("8.7 a re-cut frees a normal log of at least 2 studs; the remainder restarts its timer", function()

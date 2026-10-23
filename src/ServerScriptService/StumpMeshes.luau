@@ -164,109 +164,92 @@ end
 -- Choosing the meshes of a stump, and what to do when some are missing
 ---------------------------------------------------------------------------
 
--- What could not be had, as lines: "<set> taper <t> height <h> (model <id>)".
--- Recorded when a stump finds its meshes missing and cannot fall back, and by
--- the boot check; StumpMeshes.Missing() returns it (and the workspace
--- attribute StumpMeshesMissing counts it).
+-- A stump uses the meshes of its OWN radius set only (R13 for base radius up
+-- to 1.69, R22 above); there is no cross-set fallback (the other set can
+-- never stay inside the 1/1.3 to 1.3 stretch). With a mesh of its own set
+-- missing the stump is dropped (SectionTrees: no stump, the spot clears, the
+-- log above the cut is made as usual) and the miss is recorded.
+--
+-- stumpMeshesMissing: one line per missing mesh, "<name> (set, taper, height)
+-- model <id>: why", warned ONCE per mesh (not per stump). StumpMeshes.Missing()
+-- returns the lines; the workspace attribute stumpMeshesMissing holds them
+-- joined by "; " (BootReport shows the count).
+--
+-- stumpStretchViolations counts STUMPS (each felling or re-cut that makes a
+-- stump, counted once each): a stump counts when any of its sleeves would
+-- have a bark stretch outside 1/1.3 to 1.3 (round: base radius over the set's
+-- reference radius; up: sleeve height over the bucket's mesh height), or
+-- when it was dropped because a mesh of its own set is missing. A stump that
+-- is outside the stretch but has its meshes is still drawn (the count is the
+-- review signal); a dropped one is not. The workspace attribute
+-- stumpStretchViolations holds the number.
 local missing: { string } = {}
-local missingSeen: { [string]: boolean } = {}
+local missingSeen: { [number]: boolean } = {}
+local violations = 0
 
-local function noteMissing(line: string)
-	if missingSeen[line] then
+local function publish()
+	pcall(function()
+		workspace:SetAttribute("stumpMeshesMissing", table.concat(missing, "; "))
+		workspace:SetAttribute("stumpStretchViolations", violations)
+	end)
+end
+
+local function noteMissing(key: number)
+	if missingSeen[key] then
 		return
 	end
-	missingSeen[line] = true
+	missingSeen[key] = true
+	local line = describe(key, "did not load as a MeshPart")
 	table.insert(missing, line)
 	warn("[Stump] stumpMeshesMissing: " .. line)
-	pcall(function()
-		workspace:SetAttribute("StumpMeshesMissing", #missing)
-	end)
+	publish()
 end
 
 function StumpMeshes.Missing(): { string }
 	return table.clone(missing)
 end
 
-local function keysOf(shape: StumpLogic.Shape, set: string): { number }
+function StumpMeshes.Violations(): number
+	return violations
+end
+
+local function keysOf(shape: StumpLogic.Shape): { number }
 	local keys: { number } = {}
 	for _, sleeve in ipairs(shape.sleeves) do
-		table.insert(keys, StumpMeshIds.Key(set, sleeve.index, sleeve.bucket) :: number)
+		table.insert(keys, StumpMeshIds.Key(shape.set, sleeve.index, sleeve.bucket) :: number)
 	end
 	return keys
 end
 
--- Whether the other radius set can stand in: every sleeve's stretch with the
--- other set's reference radius stays inside 1/1.3 to 1.3, round and up.
-function StumpMeshes.FallbackOk(shape: StumpLogic.Shape, set: string): boolean
+-- Counts a stump for stumpStretchViolations when its stretch is outside
+-- 1/1.3 to 1.3 or `dropped` (a mesh of its own set was missing).
+function StumpMeshes.CountStump(shape: StumpLogic.Shape, dropped: boolean)
+	local outside = dropped
 	for _, sleeve in ipairs(shape.sleeves) do
-		local round, up = StumpLogic.BarkStretch(sleeve, set)
+		local round, up = StumpLogic.BarkStretch(sleeve, shape.set)
 		if not StumpLogic.StretchOk(round, up) then
-			return false
+			outside = true
 		end
 	end
-	return true
+	if outside then
+		violations += 1
+		publish()
+	end
 end
 
--- Hands `done` one template per sleeve of `shape`, from the shape's own set;
--- if any of those is missing, from the other set when its stretch is fine
--- (FallbackOk). With nothing usable it records stumpMeshesMissing (a loud
--- warning) and answers nil: the stump has no visual, never a part-built
--- stand-in. The second argument says which set was used.
-function StumpMeshes.Resolve(shape: StumpLogic.Shape, done: ({ MeshPart? }?, string?) -> ())
-	local own = shape.set
-	StumpMeshes.RequestMany(keysOf(shape, own), function(got: { MeshPart? })
+-- Hands `done` one template per sleeve of `shape` from the shape's own set,
+-- or nil when any is missing (recorded as stumpMeshesMissing).
+function StumpMeshes.Resolve(shape: StumpLogic.Shape, done: ({ MeshPart? }?) -> ())
+	local keys = keysOf(shape)
+	StumpMeshes.RequestMany(keys, function(got: { MeshPart? })
 		local complete = true
-		for i = 1, #shape.sleeves do
+		for i, key in ipairs(keys) do
 			if got[i] == nil then
 				complete = false
+				noteMissing(key)
 			end
 		end
-		if complete then
-			done(got, own)
-			return
-		end
-		local other = if own == "R13" then "R22" else "R13"
-		if StumpMeshes.FallbackOk(shape, other) then
-			StumpMeshes.RequestMany(keysOf(shape, other), function(spare: { MeshPart? })
-				for i = 1, #shape.sleeves do
-					if spare[i] == nil then
-						noteMissing(
-							string.format(
-								"%s and %s taper %.2f height %d (base radius %.3f)",
-								own,
-								other,
-								shape.sleeves[i].ratio,
-								shape.sleeves[i].bucket,
-								shape.baseRadius
-							)
-						)
-						done(nil, nil)
-						return
-					end
-				end
-				done(spare, other)
-			end)
-			return
-		end
-		for i, sleeve in ipairs(shape.sleeves) do
-			if got[i] == nil then
-				local row = StumpMeshIds.Row(StumpMeshIds.Key(own, sleeve.index, sleeve.bucket) :: number)
-				local round, up = StumpLogic.BarkStretch(sleeve, other)
-				noteMissing(
-					string.format(
-						"%s taper %.2f height %d (model %s), no %s fallback (stretch %.2f round, %.2f up)",
-						own,
-						sleeve.ratio,
-						sleeve.bucket,
-						tostring(if row then row.id else "?"),
-						other,
-						round,
-						up
-					)
-				)
-			end
-		end
-		done(nil, nil)
+		done(if complete then got else nil)
 	end)
 end
 
@@ -294,6 +277,7 @@ function StumpMeshes.Preload(done: ((number, { string }) -> ())?)
 				loaded += 1
 			else
 				table.insert(failures, describe(key, "did not load as a MeshPart"))
+				noteMissing(key)
 			end
 			if answered == StumpMeshes.Count then
 				local lines = StumpMeshes.Lines(loaded, failures)
@@ -301,12 +285,7 @@ function StumpMeshes.Preload(done: ((number, { string }) -> ())?)
 				for i = 2, #lines do
 					warn(lines[i])
 				end
-				-- A missing mesh is loud: unless the other set can stand in for
-				-- every stump that would use it (it never can across a set's
-				-- whole radius range), say so, once, by name.
-				for _, failure in ipairs(failures) do
-					noteMissing(failure)
-				end
+				-- A missing mesh is a hard failure: recorded as stumpMeshesMissing.
 				if done then
 					done(loaded, failures)
 				end
@@ -347,6 +326,7 @@ function StumpMeshes._reset()
 	table.clear(waiting)
 	table.clear(missing)
 	table.clear(missingSeen)
+	violations = 0
 	StumpMeshes.Loads = 0
 end
 

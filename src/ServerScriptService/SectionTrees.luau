@@ -1100,6 +1100,7 @@ SectionTrees.WeatherLevels = 20 -- steps in the weathering (a part is only repai
 -- Takes the stump's look off the tree (and its colours, for a re-cut or a
 -- despawn). The hitbox section stays.
 local lookStump: (state: StumpState, now: number) -> ()
+local despawnStump: (rec: TreeRecord, now: number) -> ()
 
 local function dropStumpLook(rec: TreeRecord, state: StumpState)
 	for _, d in ipairs(state.parts) do
@@ -1203,12 +1204,18 @@ local function makeStump(rec: TreeRecord, sid: number, now: number, height: numb
 	}
 	rec.stumpState = state
 	stumped[rec] = true
-	-- The look is the uploaded frustum meshes (one per sleeve, the stump's
-	-- radius set or the other when that stretches fine); they may still be
-	-- loading. With none usable there is no visual, only the hitbox (and a
-	-- loud stumpMeshesMissing warning).
+	-- The look is the uploaded frustum meshes (one per sleeve, of the
+	-- stump's own radius set); they may still be loading. If one is missing
+	-- the stump is dropped: no stump at all (despawnStump: the spot clears
+	-- as it does when a stump goes, the log above the cut is made as usual),
+	-- never a stand-in; stumpMeshesMissing and stumpStretchViolations record it.
 	StumpMeshes.Resolve(shape, function(templates: { MeshPart? }?)
-		if rec.stumpState ~= state or rec.model.Parent == nil or templates == nil then
+		if rec.stumpState ~= state or rec.model.Parent == nil then
+			return
+		end
+		StumpMeshes.CountStump(shape, templates == nil)
+		if templates == nil then
+			despawnStump(rec, clock())
 			return
 		end
 		local look = TreeArt.StumpDress(rec.def, rec.model, state.base, shape, templates, state.bark)
@@ -1268,7 +1275,7 @@ end
 -- The stump's decay is over (190 s) before the species' regrow time: it
 -- goes and the spot is free, and the site grows back when its wood's own
 -- respawn time comes (regrowAt, untouched).
-local function despawnStump(rec: TreeRecord, now: number)
+despawnStump = function(rec: TreeRecord, now: number)
 	if not rec.stumpState then
 		return
 	end
@@ -1276,6 +1283,7 @@ local function despawnStump(rec: TreeRecord, now: number)
 	rec.stumpState = nil
 	stumped[rec] = nil
 	if rec.temporary then
+		SectionTrees.Remove(rec.uid) -- an Elder leaves no stump and no slot
 		return
 	end
 	openSlot(rec, now)
@@ -1487,12 +1495,13 @@ local function split(
 		clearSite()
 	elseif felled then
 		feller = fall(rec, player, dir, piece.uid)
-		makeStump(rec, sid, clock())
 		-- The site grows back on its wood's own respawn time (the stump goes
-		-- with it if it is still standing; it decays and goes at 190 s if not).
+		-- with it if it is still standing; it decays and goes at 190 s if not;
+		-- a stump with no mesh is dropped at once and the spot waits this long).
 		if not rec.temporary then
 			rec.regrowAt = clock() + GrowLogic.RespawnDelay(def.respawnSec, unit())
 		end
+		makeStump(rec, sid, clock())
 	end
 	return piece, feller
 end

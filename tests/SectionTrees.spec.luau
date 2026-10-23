@@ -166,6 +166,16 @@ return function(t)
 		s.Trees = loader:server("SectionTrees")
 		s.Wood = loader:server("WoodService")
 		s.Grab = loader:server("GrabService")
+		-- The stump meshes (T420) are uploaded models loaded with InsertService; a stump
+		-- with no mesh is dropped, so the harness hands back a MeshPart for every id.
+		s.StumpMeshes = loader:server("StumpMeshes")
+		s.StumpMeshes.LoadModel = function()
+			local model = Instance.new("Model")
+			local mesh = Instance.new("MeshPart")
+			mesh.Size = Vector3.new(200, 100, 200)
+			mesh.Parent = model
+			return model
+		end
 		s.ItemCatalog = loader:shared("ItemCatalog")
 		s.SectionLogic = loader:shared("SectionLogic")
 		s.TreeLogic = loader:shared("TreeLogic")
