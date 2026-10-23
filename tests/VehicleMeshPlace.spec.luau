@@ -11,6 +11,7 @@
 -- the chassis bottom" are "at its authored place, above the ground".
 return function(t)
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
 	local TruckArt = t.load("ReplicatedStorage/Shared/Art/TruckArt")
 	local VehicleModels = t.load("ReplicatedStorage/Shared/Art/VehicleModels")
 	local ItemCatalog = t.shared("ItemCatalog")
@@ -19,6 +20,7 @@ return function(t)
 
 	local function withMeshes(fn)
 		MeshKit.Reset()
+		Gate.SetIds(Gate.FakeIds()) -- T421: trailers and the Timber Classic take their ids from the keyed table
 		MeshKit.Override = function(id, name, size)
 			local part = Instance.new("MeshPart")
 			part.Name = name
@@ -27,6 +29,7 @@ return function(t)
 			return part
 		end
 		local ok, err = pcall(fn)
+		Gate.SetIds(nil)
 		MeshKit.Override = nil
 		MeshKit.Reset()
 		if not ok then

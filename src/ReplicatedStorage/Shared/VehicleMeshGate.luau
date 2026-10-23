@@ -29,6 +29,15 @@ function Gate.SetIds(ids: { [string]: string }?)
 	override = ids
 end
 
+-- Made-up ids for every key (specs only: they make the code path run; none is a real asset).
+function Gate.FakeIds(): { [string]: string }
+	local out: { [string]: string } = {}
+	for i, key in ipairs(VehicleMeshIds.keys) do
+		out[key] = tostring(9000000 + i)
+	end
+	return out
+end
+
 function Gate.IdOf(key: string): string?
 	if override then
 		return override[key]
