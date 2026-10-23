@@ -1,55 +1,79 @@
 --!nocheck
--- T421: VehicleMeshes keys are exactly the lines of assets/vehicles/t421/mesh_ids.txt (parsed here, so the file and the
--- code cannot drift), 54 of them, an empty id allowed.
+-- T421: VehicleMeshes keys are exactly the lines of assets/vehicles/t421/mesh_ids.txt, Connor's 78-line file as supplied
+-- (parsed here, so the file and the code cannot drift): 48 trailer lines, 6 Timber Classic lines and 24
+-- trucks/<Truck>/<Part> lines. An empty id is allowed and stays an empty string.
 return function(t)
 	local fs = require("@lune/fs")
+	local process = require("@lune/process")
 	local VehicleMeshes = t.load("ReplicatedStorage/Shared/Art/VehicleMeshes")
 
-	local function parse(files)
+	-- The file as Connor wrote it: '#' comment lines, then `name = id` (an empty id, a trailing space). Trailers and the
+	-- Timber Classic use underscores (PonyTrailer_Pickup_Body), the four trucks the slash form (trucks/Pickup/Body).
+	local function parse()
 		local out, order = {}, {}
-		-- mesh_ids.txt is the source of truth; the derived truck_mesh_ids.txt only stands in until it carries the
-		-- trucks_<Truck>_<Part> lines itself.
-		if files == nil then
-			files = { "mesh_ids.txt" }
-			if not string.find(fs.readFile("assets/vehicles/t421/mesh_ids.txt"), "trucks_", 1, true) then
-				table.insert(files, "truck_mesh_ids.txt")
+		for line in string.gmatch(fs.readFile("assets/vehicles/t421/mesh_ids.txt"), "[^\r\n]+") do
+			if string.match(line, "^%s*#") or string.match(line, "^%s*$") then
+				continue
 			end
-		end
-		for _, file in ipairs(files) do
-			for line in string.gmatch(fs.readFile("assets/vehicles/t421/" .. file), "[^\r\n]+") do
-				local name, id = string.match(line, "^%s*([%w_]+)%s*=%s*(%d*)%s*$")
-				t.ok(name, "bad line: " .. line)
-				local key = string.gsub(name, "_", "/")
-				out[key] = id
-				table.insert(order, key)
-			end
+			local name, id = string.match(line, "^%s*([%w_/]+)%s*=%s*(%d*)%s*$")
+			t.ok(name, "bad line: " .. line)
+			local key = if string.find(name, "/", 1, true) then name else (string.gsub(name, "_", "/"))
+			out[key] = id
+			table.insert(order, key)
 		end
 		return out, order
 	end
 
-	t.test("the id files hold 78 lines: 54 T421 and 24 trucks/<Truck>/<Part>", function()
+	t.test("mesh_ids.txt holds 78 lines: 48 trailer + 6 Timber Classic + 24 trucks/<Truck>/<Part>", function()
 		local _, order = parse()
 		t.eq(#order, 78)
-		local trucks = 0
+		local trailers, classic, trucks = 0, 0, 0
 		for _, key in ipairs(order) do
 			if string.sub(key, 1, 7) == "trucks/" then
 				trucks += 1
+			elseif string.sub(key, 1, 14) == "TimberClassic/" then
+				classic += 1
+			else
+				trailers += 1
+				t.ok(string.match(key, "^%a+/%a+/%a+$") ~= nil, key .. " is <Trailer>/<Truck>/<Part>")
 			end
 		end
-		t.eq(trucks, 24)
+		t.eq({ trailers, classic, trucks }, { 48, 6, 24 })
+		t.eq(fs.isFile("assets/vehicles/t421/truck_mesh_ids.txt"), false, "the stand-in truck file is gone")
 	end)
 
 	t.test(
-		"the real file through the generator: tools/gen_vehicle_mesh_ids --check passes and the module has 78 keys",
+		"the REAL file through the generator: --check passes and the module has exactly 78 keys, 48 + 6 + 24",
 		function()
-			local process = require("@lune/process")
 			local result = process.exec("lune", { "run", "tools/gen_vehicle_mesh_ids", "--check" })
 			t.ok(result.ok, "generator check: " .. result.stdout .. result.stderr)
-			t.eq(#VehicleMeshes.MeshKeys(), 78)
+			local keys = VehicleMeshes.MeshKeys()
+			t.eq(#keys, 78)
+			local trucks, classic, trailers, empties = 0, 0, 0, 0
+			for _, key in ipairs(keys) do
+				if string.sub(key, 1, 7) == "trucks/" then
+					trucks += 1
+				elseif string.sub(key, 1, 14) == "TimberClassic/" then
+					classic += 1
+				else
+					trailers += 1
+				end
+				if VehicleMeshes.MeshId(key) == "" then
+					empties += 1
+				end
+			end
+			t.eq({ trailers, classic, trucks }, { 48, 6, 24 }, "the truck keys stay trucks/<Truck>/<Part>")
+			local fileEmpties = 0
+			for _, id in pairs((parse())) do
+				if id == "" then
+					fileEmpties += 1
+				end
+			end
+			t.eq(empties, fileEmpties, "an empty id stays an empty string")
 		end
 	)
 
-	t.test("VehicleMeshes has exactly the keys of the id files (54 + 24 = 78)", function()
+	t.test("VehicleMeshes has exactly the keys of the file, each with the file's id", function()
 		local fileIds, order = parse()
 		local keys = VehicleMeshes.MeshKeys()
 		t.eq(#keys, 78)
@@ -57,10 +81,6 @@ return function(t)
 		for _, key in ipairs(keys) do
 			seen[key] = true
 			t.ok(fileIds[key] ~= nil, key .. " is not in mesh_ids.txt")
-			t.ok(
-				string.match(key, "^%a+/%a+/%a+$") ~= nil or string.match(key, "^%a+/%a+$") ~= nil,
-				key .. " has a bad form"
-			)
 			t.eq(VehicleMeshes.MeshId(key), fileIds[key], key .. " id")
 		end
 		for _, key in ipairs(order) do
@@ -68,16 +88,16 @@ return function(t)
 		end
 	end)
 
-	t.test("an empty id is allowed and reads as missing", function()
+	t.test("an empty id reads as missing: the T421 keys with no id are reported", function()
 		local missing = VehicleMeshes.MissingKeys()
-		local fileIds = parse({ "mesh_ids.txt" })
+		local fileIds = parse()
 		local empties = 0
-		for _, id in pairs(fileIds) do
-			if id == "" then
+		for key, id in pairs(fileIds) do
+			if id == "" and string.sub(key, 1, 7) ~= "trucks/" then
 				empties += 1
 			end
 		end
-		t.eq(#missing, empties, "every empty id of the 54 is reported")
+		t.eq(#missing, empties, "every empty id of the 54 T421 meshes is reported (the trucks' are optional)")
 		for _, key in ipairs(missing) do
 			t.eq(VehicleMeshes.MeshId(key), "")
 		end

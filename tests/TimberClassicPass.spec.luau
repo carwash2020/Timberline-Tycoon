@@ -40,10 +40,12 @@ return function(t)
 				return self.attrs[key]
 			end,
 		}
-		local calls = { owns = 0 }
+		local calls = { owns = 0, prompts = {}, toasts = {} }
 		local passFinished
 		local market = {
-			PromptGamePassPurchase = function() end,
+			PromptGamePassPurchase = function(_, _, id)
+				table.insert(calls.prompts, id)
+			end,
 			PromptProductPurchase = function() end,
 			UserOwnsGamePassAsync = function(_, _, id)
 				calls.owns += 1
@@ -104,8 +106,21 @@ return function(t)
 		for i, item in ipairs(StoreData.Passes) do
 			item.id = 100 + i
 		end
+		local gate = loader:shared("VehicleMeshGate")
+		if options.stocked then
+			gate.SetIds(gate.FakeIds())
+		end
 		local Monetization = loader:server("MonetizationService")
-		Monetization.Init({ OnServerEvent = { Connect = function() end } }, function() end, function()
+		local buy
+		Monetization.Init({
+			OnServerEvent = {
+				Connect = function(_, fn)
+					buy = fn
+				end,
+			},
+		}, function(_, message)
+			table.insert(calls.toasts, message)
+		end, function()
 			return 1_000_000
 		end)
 		Monetization.PlayerJoined(player, profile)
@@ -115,6 +130,9 @@ return function(t)
 			player = player,
 			profile = profile,
 			calls = calls,
+			buyPass = function()
+				buy(player, "Pass", "TimberClassic")
+			end,
 			finish = function(purchased)
 				passFinished(player, StoreData.Pass("TimberClassic").id, purchased)
 			end,
@@ -209,5 +227,26 @@ return function(t)
 		-- Its priceCash is the recall-fee basis it already had (ShopLogic.RespawnFee): it is not offered for sale.
 		t.eq(classic.sold, false)
 		t.eq(classic.robux, true)
+	end)
+
+	t.test('the Classic pass is off sale until VehicleMeshGate.Complete("Truck", "TimberClassic") is true', function()
+		-- empty ids: no prompt, told it is not for sale
+		Gate.SetIds(nil)
+		t.eq(Gate.Complete("Truck", "TimberClassic"), false)
+		local s = setup({})
+		s.buyPass()
+		t.eq(s.calls.prompts, {}, "no Robux prompt while the truck's meshes are missing")
+		t.ok(#s.calls.toasts >= 1, "the player is told")
+		-- ids in: the prompt opens for the pass
+		stockClassic()
+		t.eq(Gate.Complete("Truck", "TimberClassic"), true)
+		local again = setup({ stocked = true })
+		again.buyPass()
+		t.eq(
+			again.calls.prompts,
+			{ again.StoreData.Pass("TimberClassic").id },
+			"the pass prompt opens once it is complete"
+		)
+		unstock()
 	end)
 end

@@ -1,3 +1,5 @@
+# T421 MeshIds. Paste each number after the "=". One line per MeshPart, 78 lines.
+# File is glb/<Trailer>/<Truck>/<name>.glb or glb/TimberClassic/<name>.glb. Take each number from the MeshPart MeshId property, not Copy asset ID.
 PonyTrailer_Rustbucket_Body = 
 PonyTrailer_Rustbucket_Bed = 
 PonyTrailer_Rustbucket_Lights = 
@@ -52,3 +54,28 @@ TimberClassic_Lights =
 TimberClassic_Bed = 
 TimberClassic_Wheel = 
 TimberClassic_Hitch = 
+# Recoloured trucks (replace the repo truck meshes): glb/<Truck>_recolour/<Truck>.glb. One line per MeshPart; take each number from that MeshPart's MeshId property.
+trucks/Rustbucket/Bed = 
+trucks/Rustbucket/Body = 
+trucks/Rustbucket/Glass = 
+trucks/Rustbucket/Hitch = 
+trucks/Rustbucket/Lights = 
+trucks/Rustbucket/Wheel = 
+trucks/Pickup/Bed = 
+trucks/Pickup/Body = 
+trucks/Pickup/Glass = 
+trucks/Pickup/Hitch = 
+trucks/Pickup/Lights = 
+trucks/Pickup/Wheel = 
+trucks/Flatbed/Bed = 
+trucks/Flatbed/Body = 
+trucks/Flatbed/Glass = 
+trucks/Flatbed/Hitch = 
+trucks/Flatbed/Lights = 
+trucks/Flatbed/Wheel = 
+trucks/LoggingRig/Bed = 
+trucks/LoggingRig/Body = 
+trucks/LoggingRig/Glass = 
+trucks/LoggingRig/Hitch = 
+trucks/LoggingRig/Lights = 
+trucks/LoggingRig/Wheel = 

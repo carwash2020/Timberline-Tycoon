@@ -25,12 +25,14 @@ return function(t)
 		return ids
 	end
 
-	-- The 54 names from the file the id table is made from.
+	-- The 54 T421 names from the file (its trailer and Timber Classic lines; the 24 trucks/ lines are optional keys).
 	local function t421Names()
 		local out = {}
 		for line in string.gmatch(fs.readFile("assets/vehicles/t421/mesh_ids.txt"), "[^\r\n]+") do
-			local name = string.match(line, "^%s*([%w_]+)%s*=")
-			table.insert(out, (string.gsub(name, "_", "/")))
+			local name = string.match(line, "^%s*([%w_/]+)%s*=")
+			if name and not string.find(name, "/", 1, true) then
+				table.insert(out, (string.gsub(name, "_", "/")))
+			end
 		end
 		return out
 	end

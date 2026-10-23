@@ -113,7 +113,6 @@ return function(t)
 							end
 						end
 					end
-					local expectedId = tonumber(Gate.IdOf("TimberClassic/Wheel"))
 					for _, c in ipairs(want) do
 						local hit
 						for _, w in ipairs(found) do
@@ -122,8 +121,14 @@ return function(t)
 							end
 						end
 						t.ok(hit ~= nil, def.id .. " has a wheel mesh at " .. tostring(c))
-						if def.id == "TimberClassic" then
-							t.eq(hit:GetAttribute("MeshId"), tostring(expectedId), "the Classic's own Wheel mesh")
+						-- the clone is that truck's own Wheel mesh: trucks/<Truck>/Wheel, or TimberClassic/Wheel
+						local wheelKey = Gate.TruckKey(def.id, "Wheel")
+						if Gate.IdOf(wheelKey) ~= nil then
+							t.eq(
+								hit:GetAttribute("MeshId"),
+								Gate.IdOf(wheelKey),
+								def.id .. " wheel mesh is " .. wheelKey
+							)
 						end
 					end
 				end
