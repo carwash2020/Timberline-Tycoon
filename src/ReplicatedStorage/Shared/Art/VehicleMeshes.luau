@@ -501,6 +501,17 @@ end
 
 -- T421: a vehicle whose meshes are missing is never drawn part-built. Its decorative hull goes, the functional
 -- parts stay (so an owned one still spawns and drives), and it is marked.
+local function inWheel(part: Instance): boolean
+	local node: Instance? = part.Parent
+	while node and not node:IsA("Model") do
+		if node.Name == "Wheel" then
+			return true
+		end
+		node = node.Parent
+	end
+	return false
+end
+
 local function stripLooks(model: Model, trailerHalf: boolean)
 	for _, d in ipairs(model:GetDescendants()) do
 		if
@@ -508,6 +519,9 @@ local function stripLooks(model: Model, trailerHalf: boolean)
 			and not KEEP[d.Name]
 			and d:GetAttribute("VisualMesh") ~= true
 			and isTrailer(d) == trailerHalf
+			-- a wheel with its rim, hub and lugs is drawn part-built on purpose: the 54 meshes have no trailer wheel
+			and d.Name ~= "Wheel"
+			and not inWheel(d)
 		then
 			d:Destroy()
 		end
@@ -526,11 +540,12 @@ local function applyNow(model: Model, truckId: string?, trailerId: string?, vari
 		keepPartBuilt(name, "all", "the copy was already fitted")
 		return false
 	end
-	local classic = truckId == "TimberClassic"
 	local truck = if truckId then truckSpec(truckId) else nil
 	if truckId and not truck then
-		if classic then
-			stripLooks(model, false)
+		-- The Timber Classic has no piece table yet; it is never sold or spawned while its meshes are missing
+		-- (VehicleMeshGate), so nothing part-built of it is shown to a player. Its trailer is stripped the same way.
+		if trailerId and VehicleMeshGate.IsT421("Trailer", trailerId) then
+			stripLooks(model, true)
 		end
 		return false
 	end

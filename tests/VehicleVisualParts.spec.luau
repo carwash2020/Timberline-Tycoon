@@ -76,14 +76,6 @@ return function(t)
 		end)
 	end)
 
-	-- Parts of a trailer's wheels, axles and fenders move with the real axles (T421, TrailerAxles.spec); everything
-	-- else, and every truck part, must be exactly as before.
-	local MOVES = { Wheel = true, Axle = true, Fender = true }
-	local function movable(row)
-		local name = string.match(row, "^([^|]*)|")
-		return MOVES[name] == true or string.find(name, "^Fender") ~= nil
-	end
-
 	t.test("the colliding parts TruckArt builds are unchanged for every truck and rig", function()
 		local base = serde.decode("json", fs.readFile("tests/vehicle_collision_baseline.json"))
 		local seen = 0
@@ -117,43 +109,21 @@ return function(t)
 				table.sort(out)
 				return out
 			end
-			local function same(key, model, skipTrailerMoves)
+			local function same(key, model)
 				local want, got = base[key], rows(model)
 				t.ok(want ~= nil, key .. " has a baseline")
-				if skipTrailerMoves then
-					local function keep(list)
-						local out = {}
-						for _, row in ipairs(list) do
-							if
-								not movable(row)
-								or tonumber(
-										string.match(
-											row,
-											"|[^|]*|[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,([^,]*)"
-										)
-									)
-									< lay.length / 2
-							then
-								table.insert(out, row)
-							end
-						end
-						return out
-					end
-					want, got = keep(want), keep(got)
-				end
 				t.eq(#got, #want, key .. " part count")
 				for i = 1, math.min(#got, #want) do
 					t.eq(got[i], want[i], key .. " part " .. i)
 				end
 				seen += 1
 			end
-			same("Truck/" .. def.id, TruckArt.Build(def, lay), false)
+			same("Truck/" .. def.id, TruckArt.Build(def, lay))
 			if def.look.bedLength > 0 then
 				for _, trailer in ipairs(ItemCatalog.TrailerList()) do
 					same(
 						"Rig/" .. def.id .. "/" .. trailer.id,
-						TruckArt.Build(def, lay, trailer, TruckLayout.ForTrailer(trailer, lay)),
-						true
+						TruckArt.Build(def, lay, trailer, TruckLayout.ForTrailer(trailer, lay))
 					)
 				end
 			end

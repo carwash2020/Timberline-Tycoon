@@ -22,6 +22,7 @@
 -- its look. Drivers stay avatar-sized, sat a little higher in bigger cabs.
 
 local ItemCatalog = require(script.Parent.ItemCatalog)
+local TrailerAxleData = require(script.Parent.TrailerAxleData)
 
 type TruckDef = ItemCatalog.TruckDef
 type TrailerDef = ItemCatalog.TrailerDef
@@ -319,15 +320,14 @@ local TRAILER_STYLE_FOR: { [string]: TrailerStyle } = {
 type TrailerSpec = {
 	wheelRadius: number,
 	tyreWidth: number,
-	tandemGap: number, -- 0: one axle
 	wall: number,
 	wallHeight: number,
 }
 
 local TRAILERS: { [TrailerStyle]: TrailerSpec } = {
-	pony = { wheelRadius = 1.15 * S, tyreWidth = 0.85 * S, tandemGap = 0, wall = 0.25 * S, wallHeight = 1.2 * S },
-	ranch = { wheelRadius = 1.2 * S, tyreWidth = 0.85 * S, tandemGap = 0, wall = 0.26 * S, wallHeight = 2 * S },
-	heavy = { wheelRadius = 1.25 * S, tyreWidth = 0.9 * S, tandemGap = 2.6 * S, wall = 0.32 * S, wallHeight = 2.5 * S },
+	pony = { wheelRadius = 1.15 * S, tyreWidth = 0.85 * S, wall = 0.25 * S, wallHeight = 1.2 * S },
+	ranch = { wheelRadius = 1.2 * S, tyreWidth = 0.85 * S, wall = 0.26 * S, wallHeight = 2 * S },
+	heavy = { wheelRadius = 1.25 * S, tyreWidth = 0.9 * S, wall = 0.32 * S, wallHeight = 2.5 * S },
 }
 local TRAILER_FLOOR_Y = 2.25 * S -- the trailer bed floor's centre (top 3.175)
 -- A trailer's tyres tuck this far under its deck, so a trailer as wide as
@@ -365,10 +365,16 @@ function TruckLayout.ForTrailer(trailer: TrailerDef, truck: Layout): TrailerLayo
 	local spec = TRAILERS[style]
 	local bedLength = trailer.look.bedLength
 	local bedStart = truck.length / 2 + TruckLayout.Tongue
-	local wheelZ = bedStart + bedLength * 0.6
-	local axleZ = if spec.tandemGap > 0
-		then { wheelZ - spec.tandemGap / 2, wheelZ + spec.tandemGap / 2 }
-		else { wheelZ }
+	-- The axles are the approved meshes' own (TrailerAxleData), measured from the bed's middle: no tandem gap and
+	-- no fraction of the bed's length is made up here.
+	local bedCenterZ = bedStart + bedLength / 2
+	local axleZ: { number } = {}
+	local sum = 0
+	for _, a in ipairs(TrailerAxleData.For(TrailerAxleData.ByStyle[style])) do
+		table.insert(axleZ, bedCenterZ + a)
+		sum += bedCenterZ + a
+	end
+	local wheelZ = sum / #axleZ
 	return {
 		style = style,
 		width = truck.width,
