@@ -366,7 +366,13 @@ return function(t)
 					DisplayName = "Tester",
 					Character = character,
 					Parent = Players,
-					SetAttribute = function() end,
+					attrs = {},
+					SetAttribute = function(self, name, value)
+						self.attrs[name] = value
+					end,
+					GetAttribute = function(self, name)
+						return self.attrs[name]
+					end,
 					-- (a Backpack-less player: AxeService keeps the axe in the save and hands the tool over later)
 					FindFirstChildOfClass = function()
 						return nil
@@ -879,6 +885,102 @@ return function(t)
 			end)
 
 			----------------------------------------------------------------------------------------
+			if options.classicRig then
+				-- T421: the player owns the Classic pass, drives the Timber Classic with a Ranch Trailer, and sells 12 logs.
+				step("12 logs on a Timber Classic and a Ranch Trailer reach the sell zone and pay out", function()
+					local Rule = loader:shared("VehicleSpawnRule")
+					local Gate = loader:shared("VehicleMeshGate")
+					local TruckLayout = loader:shared("TruckLayout")
+					Gate.SetIds(Gate.FakeIds()) -- its meshes are in, for this step
+					Gate.ClassicStats = true
+					local classic = Catalog.GetTruck("TimberClassic")
+					local ranch = Catalog.GetTrailer("RanchTrailer")
+					local function mayDrive()
+						return (Rule.CanSpawn(classic, Rule.OwnsPass(player:GetAttribute("Pass_TimberClassic"), false)))
+					end
+					need(mayDrive() == false, "the Timber Classic spawned without the Classic pass")
+					player:SetAttribute("Pass_TimberClassic", true) -- what MonetizationService does for an owner
+					local cashBefore = Economy.GetCash(player)
+					need(mayDrive() == true, "an owner of the Classic pass was refused its truck")
+					need(Economy.GetCash(player) == cashBefore, "spawning the pass truck charged cash")
+					local lay = TruckLayout.For(classic)
+					local tl = TruckLayout.ForTrailer(ranch, lay)
+					need(#tl.axleZ == 2, "the Ranch Trailer has " .. #tl.axleZ .. " axles, not 2")
+					need(classic.bedCapacity + ranch.extraCapacity >= 12, "the rig cannot carry 12 logs")
+
+					local zone = world.map.SellArea.SellZone
+					local logs = {}
+					local trees = 0
+					while #logs < 12 and trees < 40 do
+						trees += 1
+						local at = Vector3.new(-120 + trees * 7, 0, 440)
+						local model = Trees.SpawnTree("oak", CFrame.new(at), {
+							seed = 100 + trees,
+							size = loader:shared("TreeLogic").Sizes[2],
+							stage = 1,
+						})
+						local rec = Trees.GetTree(model:GetAttribute("Uid"))
+						root.Position = at + Vector3.new(4, 3, 0)
+						local base = rec.sections[1]
+						for _ = 1, 120 do
+							s.now += 0.7
+							local hit, normal = SectionLogic.AimAt(base.CFrame, base.Size, root.Position, nil, nil)
+							local accepted, _, outcome = Trees.Chop(player, base, hit, normal)
+							if outcome and #outcome.freed > 0 then
+								for _, freed in ipairs(outcome.freed) do
+									table.insert(logs, freed)
+								end
+								break
+							end
+							if not accepted then
+								break
+							end
+						end
+					end
+					need(#logs >= 12, "only " .. #logs .. " logs came down from " .. trees .. " trees")
+					while #logs > 12 do
+						table.remove(logs)
+					end
+					-- loaded: the 12 logs ride the truck's bed (the slots TruckLayout hands out), then the rig drives onto the pad
+					need(#lay.logSlots >= 12, "the Classic's bed has " .. #lay.logSlots .. " log slots")
+					local expected = 0
+					for _, piece in ipairs(logs) do
+						piece.model:PivotTo(zone.CFrame)
+						expected += SellLogic.PieceValue(
+							piece.woodId,
+							"log",
+							piece.volume,
+							piece.figure,
+							piece.boost,
+							piece.lux,
+							nil,
+							nil,
+							nil
+						)
+					end
+					local before = Economy.GetCash(player)
+					Sell.Tick()
+					s.now += Sell.Settle + 0.1
+					local sales = Sell.Tick()
+					local sold = 0
+					for _, sale in ipairs(sales) do
+						sold += sale.pieces
+					end
+					need(sold == 12, "the sell zone took " .. sold .. " of the 12 logs")
+					local gained = Economy.GetCash(player) - before
+					need(
+						gained == SellLogic.Payout(expected, 1),
+						string.format("12 logs paid $%d, expected $%d", gained, SellLogic.Payout(expected, 1))
+					)
+					need(gained > 0, "12 logs paid nothing")
+					Gate.SetIds(nil)
+					Gate.ClassicStats = false
+					result.classicRigSold = gained
+					state(string.format("12 logs on the Classic rig sold for $%d", gained))
+				end)
+			end
+
+			----------------------------------------------------------------------------------------
 			step("save, rejoin: cash and the axe read back", function()
 				local cash = Economy.GetCash(player)
 				local earned = profile.totalEarned
@@ -946,6 +1048,27 @@ return function(t)
 		t.eq(r.step, 9)
 		t.ok(r.planksSold > 0 and r.logSold > 0)
 	end)
+
+	t.test(
+		"12 logs loaded on a Timber Classic and a Ranch Trailer (Classic pass owned) reach the sell zone and pay out",
+		function()
+			local r = story({ classicRig = true })
+			if not r.ok then
+				error(
+					string.format(
+						"PipelineE2E step %d (%s) failed: %s | last state: %s",
+						r.step,
+						r.stepName,
+						r.err,
+						r.state
+					),
+					0
+				)
+			end
+			t.eq(r.step, 10)
+			t.ok(r.classicRigSold > 0)
+		end
+	)
 
 	t.test(
 		"a mill without its Intake fails at the log-to-Intake step, naming it, not later and not with a nil error",
