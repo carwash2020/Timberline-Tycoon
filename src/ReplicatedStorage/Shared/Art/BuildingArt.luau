@@ -860,6 +860,7 @@ local function placeCounter(model: Model, x: number, z: number)
 		block.CastShadow = false
 		block.CanQuery = false
 		block.CanTouch = false
+		Kit.blocker(block, "keeps people from walking round or climbing over the end of the counter")
 	end
 	local left = x - size.X / 2 + BuildingArt.CounterClutterWidth / 2
 	register(model, CF(left, COUNTER_TOP, z - 0.7), 0.7)
@@ -974,13 +975,20 @@ function BuildingArt.Sawmill(scale: number?): Model
 		)
 	end
 	Kit.wedge(model, "Ramp", V3(18, FLOOR, 1.5), CF(0, FLOOR / 2, Z0 - 0.75), PLANK[2], MAT.WoodPlanks)
+	-- T409 (lane lint): the carriage and outfeed lanes run out to x +-10.8 and the east opening is where the
+	-- log comes in, so the walls keep clear of them: the east wall has no middle post (it stood in the opening,
+	-- in the log's way), and the west wall and its posts stand a little further out (the posts 0.6, the wall 0.25),
+	-- clear of the carriage's end.
 	for _, x in ipairs({ X0, X1 }) do
 		for _, z in ipairs({ Z0, 0.75, Z1 }) do
-			Kit.part(model, "Post", V3(1.4, TOP - FLOOR, 1.4), CF(x, (TOP + FLOOR) / 2, z), TIMBER, MAT.Wood)
+			if not (x == X1 and z == 0.75) then
+				local px = if x == X0 then x - 0.6 else x
+				Kit.part(model, "Post", V3(1.4, TOP - FLOOR, 1.4), CF(px, (TOP + FLOOR) / 2, z), TIMBER, MAT.Wood)
+			end
 		end
 	end
 	panel(model, CF(0, 0, Z1) * ANG(0, PI, 0), X0, X1, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
-	panel(model, CF(X0, 0, 0) * ANG(0, PI / 2, 0), -Z1, -Z0, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
+	panel(model, CF(X0 - 0.25, 0, 0) * ANG(0, PI / 2, 0), -Z1, -Z0, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
 	local east = CF(X1, 0, 0) * ANG(0, -PI / 2, 0) -- local x = world z
 	panel(model, east, Z0, -3.6, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
 	panel(model, east, 2.4, Z1, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
@@ -1022,7 +1030,10 @@ function BuildingArt.Sawmill(scale: number?): Model
 	local ccx, ccz = (CX0 + CX1) / 2, (CZ0 + CZ1) / 2
 	local cabinRoof: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 2.1, pieceLen = 6.5 }
 	plinth(model, CF(ccx, 0, ccz), cw, cd, FLOOR, rng, { front = true, left = true, back = true }, 2.9)
-	panel(model, CF(0, 0, CZ0), CX0, CX1, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
+	-- (the door is an opening, 3 wide, with a lintel over it: the front lane box in tools/blender/lanes.json)
+	panel(model, CF(0, 0, CZ0), CX0, -15.55, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
+	panel(model, CF(0, 0, CZ0), -12.65, CX1, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
+	panel(model, CF(0, 0, CZ0), -15.55, -12.65, 7.05, CTOP, 0.6, rng, CABIN, 1.9)
 	panel(model, CF(CX0, 0, 0) * ANG(0, PI / 2, 0), -CZ1, -CZ0, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
 	panel(model, CF(0, 0, CZ1) * ANG(0, PI, 0), -CX1, -CX0, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
 	for _, c in ipairs({ { CX0, CZ0 }, { CX0, CZ1 }, { CX1, CZ0 } }) do
@@ -1171,13 +1182,14 @@ function BuildingArt.Sawmill(scale: number?): Model
 	-- the disc down to the deck, short of the log on the carriage. A rail
 	-- across the front of the headrig and one in the east opening keep
 	-- people on the deck side of the saw.
-	local sawGuard = Kit.part(model, "SawGuard", V3(8.2, 11, 2.2), CF(-3.9, 6.55, 1.35), TIMBER, MAT.Wood)
+	local sawGuard = Kit.part(model, "SawGuard", V3(8.2, 11, 1.6), CF(-3.9, 6.55, 1.65), TIMBER, MAT.Wood)
 	sawGuard.Transparency = 1
 	sawGuard.CastShadow = false
 	sawGuard.CanTouch = false
+	Kit.blocker(sawGuard, "the saw blade spins, so it cannot collide: this box keeps people out of its disc")
 	local frontRail = Kit.part(model, "GuardRail", V3(14, 3.4, 0.4), CF(-2, 2.75, -3.1), TIMBER, MAT.Wood)
 	frontRail.CanTouch = false
-	local eastRail = Kit.part(model, "GuardRail", V3(0.45, 5.2, 6.2), CF(9.7, 3.65, -0.5), TIMBER, MAT.Wood)
+	local eastRail = Kit.part(model, "GuardRail", V3(0.45, 5.2, 6.2), CF(11.1, 3.65, -0.5), TIMBER, MAT.Wood)
 	eastRail.CanTouch = false
 
 	-- Inside: cut lumber, sawdust, barrels, lanterns from the tie beam.
@@ -2549,17 +2561,24 @@ end
 
 -- A split-rail fence `length` studs long along X (posts and rails
 -- collide).
-function BuildingArt.Fence(length: number): Model
+function BuildingArt.Fence(length: number, noEndPosts: boolean?): Model
 	local model = Kit.model("Fence")
 	local posts = math.max(2, math.floor(length / 8) + 1)
 	local step = length / (posts - 1)
 	for i = 0, posts - 1 do
+		-- (noEndPosts: this run's ends are another fence's corner posts, which it butts against)
+		if noEndPosts and (i == 0 or i == posts - 1) then
+			continue
+		end
 		local x = -length / 2 + i * step
 		Kit.part(model, "Post", V3(0.6, 3.6, 0.6), CF(x, 1.8, 0), TIMBER, MAT.Wood)
 	end
 	for i = 0, posts - 2 do
 		local x = -length / 2 + (i + 0.5) * step
 		local railLen = math.min(8.2, step + 0.2)
+		if noEndPosts then
+			railLen = step - 0.6
+		end
 		for _, y in ipairs({ 1.4, 2.8 }) do
 			local rail = Kit.part(model, "Rail", V3(railLen, 0.35, 0.25), CF(x, y, 0), PLANK[3], MAT.Wood)
 			rail.CastShadow = true
@@ -3556,6 +3575,7 @@ function BuildingArt.Bridge(a: Vector3, b: Vector3, width: number): Model
 		guard.Transparency = 1
 		guard.CastShadow = false
 		guard.CanTouch = false
+		Kit.blocker(guard, "the rope bridge's side rail: keeps people from walking off the planks")
 		-- Roblox ignores this while the part collides (raycasts still hit it),
 		-- but it says what's meant: nothing to click.
 		guard.CanQuery = false

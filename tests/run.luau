@@ -60,38 +60,63 @@ local filter = process.args[1]
 local SLOW_SPECS: { [string]: number } = {
 	["AetherServiceV2.spec.luau"] = 6,
 	["BoxService.spec.luau"] = 5,
+	["CloudCheck.spec.luau"] = 2,
 	["DailyService.spec.luau"] = 20,
 	["DecorCover.spec.luau"] = 13,
 	["DriveMath.spec.luau"] = 24,
-	["Forest.spec.luau"] = 25,
+	["Forest.spec.luau"] = 32,
 	["ForestService.spec.luau"] = 12,
 	["ForestServiceV2.spec.luau"] = 3,
+	["GeometryLint.spec.luau"] = 2,
+	["GroundHills.spec.luau"] = 47,
 	["LandscapeStyle.spec.luau"] = 17,
 	["LogicService.spec.luau"] = 3,
 	["MachineSwap.spec.luau"] = 25,
-	["MapBuilder.spec.luau"] = 66,
+	["MapBuilder.spec.luau"] = 118,
 	["MonetizationService.spec.luau"] = 6,
+	["MustKeep.spec.luau"] = 1,
 	["NPCService.spec.luau"] = 3,
+	["Overlap.spec.luau"] = 16,
 	["Phase12World.spec.luau"] = 7,
+	["PipelineE2E.spec.luau"] = 2,
 	["PlanPause.spec.luau"] = 14,
 	["PlotLogic.spec.luau"] = 6,
 	["PlotPlatform.spec.luau"] = 5,
 	["PlotService.spec.luau"] = 32,
+	["PoiPlanSplit.spec.luau"] = 12,
 	["ProfileSchema.spec.luau"] = 7,
-	["QualityBudgets.spec.luau"] = 8,
+	["QualityBudgets.spec.luau"] = 14,
 	["QuestService.spec.luau"] = 5,
 	["RegionLogic.spec.luau"] = 6,
-	["SectionTrees.spec.luau"] = 21,
+	["SectionTrees.spec.luau"] = 46,
 	["ShopService.spec.luau"] = 10,
-	["TerrainFit.spec.luau"] = 6,
-	["TownMesh.spec.luau"] = 16,
-	["TownTrees.spec.luau"] = 22,
+	["Terrain.spec.luau"] = 14,
+	["TerrainFit.spec.luau"] = 18,
+	["TerrainStaged.spec.luau"] = 15,
+	["TownBuild.spec.luau"] = 2,
+	["TownMesh.spec.luau"] = 27,
+	["TownTrees.spec.luau"] = 65,
 	["TreeArtSections.spec.luau"] = 16,
-	["TreeFill.spec.luau"] = 79,
+	["TreeCover.spec.luau"] = 29,
+	["TreeFill.spec.luau"] = 181,
 	["TreeGen.spec.luau"] = 38,
+	["TreeShapes.spec.luau"] = 13,
+	["TreeSpreadRows.spec.luau"] = 16,
+	["TreeSpreadThin.spec.luau"] = 13,
 	["TruckArt.spec.luau"] = 3,
 	["WorldPlan.spec.luau"] = 69,
 }
+
+-- Specs that build the whole world (tests/support/WorldBuild, about 20 s on CI) share one build per
+-- process, so they are dealt out together to one shard, as a single unit, and pay it once.
+local WORLD_SPECS = {
+	"CloudCheck.spec.luau",
+	"GeometryLint.spec.luau",
+	"MustKeep.spec.luau",
+	"PipelineE2E.spec.luau",
+	"TownBuild.spec.luau",
+}
+local WORLD_BUILD_SECONDS = 20
 
 local function show(value: any): string
 	if type(value) == "string" then
@@ -133,6 +158,10 @@ end
 local passed, failed = 0, 0
 local failures = {}
 
+-- tests/support/<name>.luau: helper modules a spec asks for with t.support(name). Each is
+-- loaded once per run, so what it caches (the built world) is shared by every spec.
+local supportModules: { [string]: any } = {}
+
 local specs = {}
 for _, file in ipairs(fs.readDir("tests")) do
 	if string.match(file, "%.spec%.luau$") then
@@ -160,19 +189,51 @@ if shardSpec and shardSpec ~= "" then
 	end)
 	local loads = table.create(shardCount, 0)
 	local mine = {}
+	local isWorld: { [string]: boolean } = {}
+	for _, file in ipairs(WORLD_SPECS) do
+		isWorld[file] = true
+	end
+	local worldDealt = false
 	for _, file in ipairs(bySlowest) do
+		local unit = { file }
+		local weight = SLOW_SPECS[file] or 1
+		if isWorld[file] then
+			if worldDealt then
+				continue
+			end
+			worldDealt = true
+			unit, weight = {}, WORLD_BUILD_SECONDS
+			for _, other in ipairs(WORLD_SPECS) do
+				if table.find(specs, other) then
+					table.insert(unit, other)
+					weight += SLOW_SPECS[other] or 1
+				end
+			end
+		end
 		local best = 1
 		for k = 2, shardCount do
 			if loads[k] < loads[best] then
 				best = k
 			end
 		end
-		loads[best] += SLOW_SPECS[file] or 1
+		loads[best] += weight
 		if best == shardIndex then
-			mine[file] = true
+			for _, f in ipairs(unit) do
+				mine[f] = true
+			end
 		end
 	end
 	inShard = mine
+	if process.env.TEST_SHARD_LIST then
+		-- TEST_SHARD_LIST=1 TEST_SHARD=2/4 lune run tests/run: which specs this shard would run
+		local names = {}
+		for f in pairs(mine) do
+			table.insert(names, f)
+		end
+		table.sort(names)
+		print(table.concat(names, "\n"))
+		process.exit(0)
+	end
 	print(string.format("Shard %d/%d", shardIndex, shardCount))
 end
 
@@ -254,6 +315,13 @@ for _, file in ipairs(specs) do
 	end
 	function t.load(path: string)
 		return shared:load(path)
+	end
+	function t.support(name: string)
+		if supportModules[name] == nil then
+			local file = "tests/support/" .. name .. ".luau"
+			supportModules[name] = luau.load(fs.readFile(file), { debugName = file })()()
+		end
+		return supportModules[name]
 	end
 
 	local specStart = os.clock()

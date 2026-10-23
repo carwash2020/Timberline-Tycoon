@@ -713,7 +713,10 @@ function LandmarkArt.GorgeWalls(shelfY: number): Model
 	local left = (strip.x0 + (WorldLayout.BridgeCenterX - gap / 2)) / 2
 	local right = ((WorldLayout.BridgeCenterX + gap / 2) + strip.x1) / 2
 	lip(left, z0)
-	lip(right, z0)
+	-- T409: the lip beside the toll booth ran 1 stud into its roof (the booth's roof reaches z 893, the lip's
+	-- south face stood at 892). Shortening it at the booth end could not clear it (the booth spans x 16 to 28 along
+	-- the whole lip), so this one lip stands 1.5 studs further into the gorge: still one unbroken wall.
+	solid(model, "Lip", V3(span, height, LIP_THICK), CF(right, shelfY + height / 2, z0 + 1.5), STONE[2], MAT.Rock)
 	lip(left, z1)
 	lip(right, z1)
 	local endZ = (z0 + z1) / 2

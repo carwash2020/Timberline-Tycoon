@@ -200,7 +200,9 @@ function World.build(ctx, opts)
 	local C3 = roblox.Color3
 	local SNOWY = { C3.fromRGB(232, 238, 245), C3.fromRGB(200, 208, 218), C3.fromRGB(150, 150, 156) }
 	local DARK = { C3.fromRGB(58, 52, 50), C3.fromRGB(44, 40, 40), C3.fromRGB(72, 64, 60) }
-	for _, b in ipairs(WorldPlan.Boulders()) do
+	local BuiltMoves, BuiltTerrain =
+		ctx.load("ReplicatedStorage/Shared/World/BuiltMoves"), ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+	for _, b in ipairs(BuiltMoves.Boulders(WorldPlan, BuiltTerrain)) do
 		local colors = if b.snowy then SNOWY elseif b.dark then DARK else PropArt.BrownTones[b.seed % 2 + 1]
 		local moss = if colors ~= SNOWY and colors ~= DARK and b.seed % 3 == 0 then PropArt.Moss else nil
 		place(PropArt.Rock(b.size, b.seed, colors, moss), CF.new(b.position) * CF.Angles(0, b.seed % 6, 0))
@@ -297,8 +299,10 @@ function World.build(ctx, opts)
 	for _, cf in ipairs(town.lamps) do
 		place(BuildingArt.LampPost(), cf)
 	end
-	for _, fence in ipairs(town.fences) do
-		place(BuildingArt.Fence(fence.length), fence.cframe)
+	local BuiltMoves, BuiltTerrain =
+		ctx.load("ReplicatedStorage/Shared/World/BuiltMoves"), ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+	for _, fence in ipairs(BuiltMoves.Fences(town.fences)) do
+		place(BuildingArt.Fence(fence.length, fence.noEndPosts), fence.cframe)
 	end
 	for _, prop in ipairs(town.props) do
 		place(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
@@ -324,11 +328,15 @@ function World.build(ctx, opts)
 		BuildingArt.ParkingBay(slot, index)
 	end
 	-- The biome signs where the roads arrive, saying what MapBuilder's say.
-	for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+	local BuiltMoves, BuiltTerrain =
+		ctx.load("ReplicatedStorage/Shared/World/BuiltMoves"), ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+	for _, sign in ipairs(BuiltMoves.RoadSigns(WorldPlan, BuiltTerrain, WorldPlan.BiomeSignText)) do
 		place(BuildingArt.Signpost(sign.text), sign.cframe)
 	end
 	-- The open country's scenery (WLD-01), as MapBuilder's "5. The scenery" builds it.
-	for _, spot in ipairs(WorldPlan.Scenery()) do
+	local BuiltMoves, BuiltTerrain =
+		ctx.load("ReplicatedStorage/Shared/World/BuiltMoves"), ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+	for _, spot in ipairs(BuiltMoves.Scenery(WorldPlan, BuiltTerrain)) do
 		for _, item in ipairs(spot.items) do
 			local model
 			if item.builder == "Fence" then
