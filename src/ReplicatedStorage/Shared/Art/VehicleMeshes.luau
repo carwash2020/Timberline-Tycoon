@@ -37,9 +37,26 @@
 -- so once, naming the vehicle and the part.
 
 local MeshKit = require(script.Parent.MeshKit)
+local VehicleMeshGate = require(script.Parent.Parent.VehicleMeshGate)
 local VehicleModels = require(script.Parent.VehicleModels)
 
 local VehicleMeshes = {}
+
+-- T421: the keyed mesh ids (<Trailer>/<Truck>/<Part>, TimberClassic/<Part>, and the four recoloured trucks'
+-- <Truck>/<Part>), read from the module tools/gen_vehicle_mesh_ids.luau makes from assets/vehicles/t421/*.txt.
+-- An empty string means the mesh is missing.
+function VehicleMeshes.MeshKeys(): { string }
+	return VehicleMeshGate.AllKeys()
+end
+
+function VehicleMeshes.MeshId(key: string): string?
+	return VehicleMeshGate.IdOf(key)
+end
+
+-- The T421 keys with no id (BootReport's vehicleMeshesMissing).
+function VehicleMeshes.MissingKeys(): { string }
+	return VehicleMeshGate.MissingKeys()
+end
 
 -- One warning per vehicle and part (a spec swaps this for a recorder).
 VehicleMeshes.Warn = function(message: string)
