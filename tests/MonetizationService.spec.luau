@@ -108,6 +108,9 @@ return function(t)
 		for i, item in ipairs(StoreData.Products) do
 			item.id = 200 + i
 		end
+		-- T421: the Timber Classic pass is only offered once its truck has every model (made-up ids here)
+		local gate = loader:shared("VehicleMeshGate")
+		gate.SetIds(gate.FakeIds())
 		local Monetization = loader:server("MonetizationService")
 		if options.notifyThrows then
 			options.notify = function()
