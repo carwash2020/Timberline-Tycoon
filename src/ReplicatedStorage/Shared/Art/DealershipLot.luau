@@ -95,12 +95,11 @@ local SIGN_INK = Palette.Get("SignInk")
 -- A display vehicle's Neon lenses are never near-white (ShopKit.NearWhite, luma 0.86): the live
 -- trucks' pale headlamp lens (#FFE9B0) blows out in a lit hall, so the display copy wears warm amber.
 DealershipLot.MaxNeonLuma = 0.86
--- The tallest a display vehicle may stand over its plinth: the hall's ceiling
--- beams hang to 14.1 over the floor (15 less their 0.9), the floor top is
--- FloorY and the plinth PlinthHeight, less a little air. The Logging Rig's
--- crane and stacks stand 15.8 tall, so its display copy (never the gameplay
--- truck) is scaled down to fit; every other vehicle is already under this.
-DealershipLot.MaxVehicleHeight = 12.0
+-- The hall's height (T421): walls, glass band, beams and roof are built from it. It was 15, and the Logging Rig's crane
+-- (16.5 over its wheels' ground) did not fit, so its display copy was scaled down. No display copy is scaled any more:
+-- the rig stands at full size, its top 0.4 (floor) + 1.2 (plinth) + 16.5 = 18.1 over the lot's floor line, the beams'
+-- underside is HallHeight - 0.9 = 19.1 and the rafters' HallHeight - 0.7. The hall's footprint (154 x 61) is unchanged.
+DealershipLot.HallHeight = 20
 DealershipLot.DisplayLens = Color3.fromRGB(255, 205, 125)
 
 -- The vehicles on show: ItemBox.Showroom, the one list.
@@ -368,44 +367,10 @@ local function paintOf(kind: string, id: string): Color3
 	return Color3.fromRGB(150, 150, 150)
 end
 
--- (The bays and the hall are still laid out from the full-size vehicle, so
--- the footprint the world and the shop's shell are built round does not move;
--- only the copy on the plinth is fitted.)
--- A display copy taller than DealershipLot.MaxVehicleHeight is scaled down
--- about its feet (at the origin, as built) so it clears the
--- ceiling beams. Looks only: the vehicle the player drives is another model.
+-- A display copy is never scaled (T421): the hall is tall enough for the tallest vehicle. The copy is still marked
+-- "Fitted" once the lot has measured and moved it: no mesh may be placed on it later.
 local function fitUnderCeiling(model: Model)
-	local lo, hi = math.huge, -math.huge
-	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BasePart") then
-			local c = d.CFrame
-			local half = (
-				math.abs(c.RightVector.Y) * d.Size.X
-				+ math.abs(c.UpVector.Y) * d.Size.Y
-				+ math.abs(c.LookVector.Y) * d.Size.Z
-			) / 2
-			lo = math.min(lo, c.Position.Y - half)
-			hi = math.max(hi, c.Position.Y + half)
-		end
-	end
-	local height = hi - lo
-	-- Whatever the height, this copy is now fitted: no mesh may be placed on it later.
 	model:SetAttribute("Fitted", true)
-	if height > DealershipLot.MaxVehicleHeight then
-		-- Like TruckArt's grow: each part's size and position (its turn kept)
-		-- and each attachment's offset (set by CFrame, which Lune reads).
-		local k = DealershipLot.MaxVehicleHeight / height
-		for _, d in ipairs(model:GetDescendants()) do
-			if d:IsA("BasePart") then
-				local cf = d.CFrame
-				d.Size = d.Size * k
-				d.CFrame = CFrame.new(cf.Position * k) * (cf - cf.Position)
-			elseif d:IsA("Attachment") then
-				local cf = d.CFrame
-				d.CFrame = CFrame.new(cf.Position * k) * (cf - cf.Position)
-			end
-		end
-	end
 end
 
 -- One display vehicle, in this order and no other: build it (the meshes go on inside the build),

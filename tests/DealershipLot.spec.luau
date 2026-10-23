@@ -245,9 +245,9 @@ return function(t)
 						bottom = math.min(bottom, c.Position.Y - half)
 					end
 				end
-				-- The plinth top is PlinthHeight; the beams hang to 14.1 over the floor (FloorY).
+				-- The plinth top is PlinthHeight; the beams hang 0.9 under the hall's height over the floor (FloorY).
 				t.ok(
-					top <= 14.1 - DealershipLot.FloorY + 1e-3,
+					top <= DealershipLot.HallHeight - 0.9 - DealershipLot.FloorY + 1e-3,
 					child.Name .. " tops out at " .. top .. ", under the ceiling beams"
 				)
 				tallest = math.max(tallest, top)

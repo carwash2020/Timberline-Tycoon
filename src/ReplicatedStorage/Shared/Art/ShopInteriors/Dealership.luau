@@ -61,7 +61,7 @@ Dealership.CheckoutY = 9.9 -- the CHECKOUT board's middle, flat on the back wall
 Dealership.HeaderWidth = 10.4
 Dealership.HeaderYaw = math.rad(90) -- a header faces the door end (west), so it reads from the lobby and down the aisle
 Dealership.WallTuck = 0.5 -- a beam or rafter runs this far past the interior frame, into the wall (the wall's face is 0.4 out)
-Dealership.TopY = 15.1 -- the highest part the interior adds (the beams' tops)
+Dealership.TopY = DealershipLot.HallHeight + 0.1 -- the highest part the interior adds (the beams' tops)
 
 ---------------------------------------------------------------------------
 -- What the signs say, from the vehicle stock (DealershipLot.Layout: the same

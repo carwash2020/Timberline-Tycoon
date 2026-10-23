@@ -84,8 +84,8 @@ return function(t)
 
 	t.test("no display vehicle crosses a ceiling beam or a rafter (the crane aside)", function()
 		local lot = DealershipLot.Build()
-		local beamBottom = 15 - 0.9 -- BuildingArt's frame ceilY 15, the beams hang 0.9 under it
-		local rafterBottom = 15 - 0.7
+		local beamBottom = DealershipLot.HallHeight - 0.9 -- the frame's ceilY, the beams hang 0.9 under it
+		local rafterBottom = DealershipLot.HallHeight - 0.7
 		local limit = math.min(beamBottom, rafterBottom) - DealershipLot.FloorY
 		for _, model in ipairs(displayModels(lot)) do
 			local top = -math.huge
@@ -98,35 +98,47 @@ return function(t)
 		end
 	end)
 
-	t.expectedFail(
-		"the Logging Rig's display is its full height: nothing is scaled down to fit under the roof",
+	t.test(
+		"the display Logging Rig is at scale 1 (every part its built size) and its top is under the beams and rafters",
 		function()
 			local lot = DealershipLot.Build()
-			for _, model in ipairs(displayModels(lot)) do
-				if model:GetAttribute("ItemId") == "LoggingRig" then
-					local top = -math.huge
-					for _, d in ipairs(model:GetDescendants()) do
-						if d:IsA("BasePart") and d.Name ~= "NameSign" then
-							top = math.max(top, d.CFrame.Position.Y + d.Size.Y / 2)
-						end
-					end
-					-- the rig as TruckLayout builds it, unscaled
-					local lay = TruckLayout.For(ItemCatalog.GetTruck("LoggingRig"))
-					local full = TruckArt.Build(ItemCatalog.GetTruck("LoggingRig"), lay)
-					local hi = -math.huge
-					for _, d in ipairs(full:GetDescendants()) do
-						if d:IsA("BasePart") then
-							hi = math.max(hi, d.CFrame.Position.Y + d.Size.Y / 2)
-						end
-					end
-					t.ok(
-						math.abs((top - DealershipLot.PlinthHeight) - hi) < 0.05,
-						"scaled: displays " .. (top - DealershipLot.PlinthHeight) .. " of " .. hi
-					)
+			local truck = ItemCatalog.GetTruck("LoggingRig")
+			local full = TruckArt.Build(truck, TruckLayout.For(truck))
+			local builtTop, builtSizes = -math.huge, {}
+			for _, d in ipairs(full:GetDescendants()) do
+				if d:IsA("BasePart") then
+					builtTop = math.max(builtTop, d.CFrame.Position.Y + d.Size.Y / 2)
+					builtSizes[d.Name] = (builtSizes[d.Name] or 0) + d.Size.Magnitude
 				end
 			end
-		end,
-		"the 15-stud hall has no room for the Logging Rig's crane; raising the roof over its bay is a building change that needs a decision (see the PR)"
+			local seen = false
+			for _, model in ipairs(displayModels(lot)) do
+				if model:GetAttribute("ItemId") ~= "LoggingRig" then
+					continue
+				end
+				seen = true
+				local top, sizes = -math.huge, {}
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") and d.Name ~= "NameSign" then
+						top = math.max(top, d.CFrame.Position.Y + d.Size.Y / 2)
+						sizes[d.Name] = (sizes[d.Name] or 0) + d.Size.Magnitude
+					end
+				end
+				for name, size in pairs(builtSizes) do
+					t.ok(
+						math.abs((sizes[name] or 0) - size) < 0.01,
+						"part " .. name .. " is not scaled: " .. tostring(sizes[name]) .. " vs " .. size
+					)
+				end
+				t.ok(
+					math.abs((top - DealershipLot.PlinthHeight) - builtTop) < 0.05,
+					"it stands " .. (top - DealershipLot.PlinthHeight) .. " tall, built " .. builtTop
+				)
+				local beamBottom = DealershipLot.HallHeight - 0.9 - DealershipLot.FloorY
+				t.ok(top <= beamBottom - 0.4, "its top " .. top .. " is under the beams at " .. beamBottom)
+			end
+			t.ok(seen, "the Logging Rig is on show")
+		end
 	)
 
 	t.test("the door is at least 4 wide x 7 high and the central aisle at least 6 wide and empty", function()
