@@ -269,6 +269,14 @@ function Kit.decor<T>(p: T & BasePart, castShadow: boolean?): T
 	return p
 end
 
+-- An invisible wall that is meant: T409's lint fails any part with Transparency 1 and CanCollide on
+-- unless it says so here, with the reason (Shared/Lint/Geometry). Returns the part.
+function Kit.blocker<T>(p: T & BasePart, reason: string): T
+	p:SetAttribute("InvisibleBlocker", true)
+	p:SetAttribute("InvisibleBlockerReason", reason)
+	return p
+end
+
 -- Every BasePart under `root` becomes decoration (see Kit.decor), except
 -- parts named in `keep`.
 function Kit.decorAll(root: Instance, keep: { [string]: boolean }?)

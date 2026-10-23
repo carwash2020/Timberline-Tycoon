@@ -164,6 +164,10 @@ function ShopKit.SteppedUnit(
 			-- (the solid core stays as the collider so nobody walks through the unit, but you see the tables on their legs)
 			core.Transparency = 1
 			core.CastShadow = false
+			Kit.blocker(
+				core,
+				"the solid core of a display table: the tables stand on legs and nobody walks through the unit"
+			)
 		end
 		for r = 1, last do
 			local row = rows[r]

@@ -1,0 +1,17 @@
+[
+ {
+  "a": "WorldEdge#*",
+  "b": "WorldEdge#*",
+  "reason": "the invisible world-edge walls are segments that overlap at their joints and corners by design (4 studs thick); nobody can reach them"
+ },
+ {
+  "a": "NorthStrip",
+  "b": "WorldEdge#*",
+  "reason": "the north strip's end caps and lips stand inside the invisible world-edge wall that closes the map beside the strip; nobody can reach the overlap, so it is harmless"
+ },
+ {
+  "a": "BoulderClusters/BoulderCluster#17",
+  "b": "WorldEdge#*",
+  "reason": "a boulder of cluster 17 stands in the invisible world-edge wall (depth up to 1.3); nobody can reach it, so it is harmless"
+ }
+]
