@@ -40,4 +40,11 @@ jobs:
           call("assets read (operation lookup)", "GET", "https://apis.roblox.com/assets/v1/operations/00000000-0000-0000-0000-000000000000")
           # asset:write: an empty create request (400 or 415 means the scope passed and nothing was created)
           call("assets write (empty create)", "POST", "https://apis.roblox.com/assets/v1/assets", b"{}", {"Content-Type": "application/json"})
+          # asset:write again, with a multipart body that has the request part but NO file (400 means the scope passed)
+          b = "----probe"
+          part = ('--%s\r\nContent-Disposition: form-data; name="request"\r\nContent-Type: application/json\r\n\r\n'
+                  '{"assetType":"Model","displayName":"probe","description":"probe","creationContext":{"creator":{"userId":"5682024709"}}}\r\n--%s--\r\n') % (b, b)
+          call("assets write (multipart, no file)", "POST", "https://apis.roblox.com/assets/v1/assets", part.encode(), {"Content-Type": "multipart/form-data; boundary=" + b})
+          # the key's own two proven scopes, as a control: a place lookup on the TEST universe (read-only)
+          call("control: universe info", "GET", "https://apis.roblox.com/cloud/v2/universes/10772436908")
           PY
