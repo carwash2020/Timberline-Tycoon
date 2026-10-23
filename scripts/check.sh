@@ -63,6 +63,8 @@ if [ "$RUN_LINT" = 1 ]; then
 	lune run tools/economy1 --check
 	echo "== VehicleMeshIds.luau matches assets/vehicles/t421"
 	lune run tools/gen_vehicle_mesh_ids --check
+	echo "== VehicleStats.luau matches the T421 stats.json files"
+	lune run tools/gen_vehicle_stats --check
 	echo "== ASSETS.md is current"
 	lune run tools/assets --check
 	echo "== meshlint (no solid in a lane or door of a mesh)"

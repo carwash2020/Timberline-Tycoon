@@ -13,3 +13,10 @@ keys `<Truck>/<Part>`, one per MeshPart. The part names are the real node names 
 (Bed, Body, Glass, Hitch, Lights, Wheel; checked with tools/blender/glbstats.py). 24 keys, so 54 + 24 = 78 in all. They are
 kept out of mesh_ids.txt so that file stays exactly the 54-line set the brief names. An empty id here keeps the truck's
 current mesh (VehicleModels.luau); these four trucks are never removed from sale.
+
+## Data bundle (Connor, for PR 265)
+
+`bbox_check.md` and every `glb/<Trailer>/<Truck>/stats.json` plus `glb/TimberClassic/stats.json` are Connor's T421 data bundle,
+saved here unchanged. `Shared/Art/VehicleStats.luau` is generated from the stats files by `tools/gen_vehicle_stats.luau`
+(checked by scripts/check.sh). The axles, wheel X, sizes and `at` offsets in code come from there and nowhere else.
+(The earlier note that these files were not attached no longer applies.)
