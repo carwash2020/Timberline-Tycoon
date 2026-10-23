@@ -4,7 +4,7 @@
 -- its size and place (MeshKit.Override, as vehiclemesh does): body red (see-through), glass cyan, lights yellow, bed brown,
 -- hitch magenta, wheels black. The trailers use the keyed variant table with made-up ids. The Timber Classic has no piece
 -- table yet (no stats.json in the repo), so it is drawn part-built here, as a stand-in; its trailers are the Pickup variants.
--- Rows: Pony, Ranch, Heavy Hauler. Columns: Rustbucket, Pickup, Flatbed, Logging Rig, Timber Classic.
+-- Columns (x): Rustbucket, Pickup, Flatbed, Logging Rig, Timber Classic. Rows (z): Pony, Ranch, Heavy Hauler.
 -- Views: 1 from above, 2 eye level along the rows.
 local Common = require("./_common")
 
@@ -19,7 +19,7 @@ return {
 		local TruckLayout = ctx.shared("TruckLayout")
 		local Gate = ctx.shared("VehicleMeshGate")
 		local root = roblox.Instance.new("Model")
-		Common.ground(ctx, root, 700, C3.fromRGB(116, 164, 84), V3.new(180, -0.5, 100))
+		Common.ground(ctx, root, 700, C3.fromRGB(116, 164, 84), V3.new(80, -0.5, 100))
 
 		local colours = {
 			MeshBody = { C3.fromRGB(200, 60, 50), 0.45 },
@@ -45,7 +45,7 @@ return {
 
 		local trucks = { "Rustbucket", "Pickup", "Flatbed", "LoggingRig", "TimberClassic" }
 		local trailers = { "PonyTrailer", "RanchTrailer", "HeavyHauler" }
-		local colSpacing, rowSpacing = 100, 55
+		local colSpacing, rowSpacing = 40, 110
 		for col, truckId in ipairs(trucks) do
 			for row, trailerId in ipairs(trailers) do
 				local truck = ItemCatalog.GetTruck(truckId)
@@ -82,8 +82,8 @@ return {
 			root = root,
 			shadowRadius = 400,
 			cameras = {
-				{ pos = { 200, 420, 40 }, target = { 200, 0, 40 }, fov = 60, label = "all 15 combos from above" },
-				{ pos = { -60, 14, -90 }, target = { 160, 4, 55 }, fov = 62, label = "eye level along the rows" },
+				{ pos = { 80, 330, 110 }, target = { 80, 0, 110 }, fov = 60, label = "all 15 combos from above" },
+				{ pos = { -90, 16, -70 }, target = { 80, 4, 110 }, fov = 62, label = "eye level across the rows" },
 			},
 		}
 	end,
