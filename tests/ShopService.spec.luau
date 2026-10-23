@@ -111,6 +111,9 @@ return function(t)
 				},
 			},
 		})
+		-- T421: trailers are only for sale with their meshes (made-up ids here; tests/VehicleMeshesMissing.spec has the empty case)
+		local gate = loader:shared("VehicleMeshGate")
+		gate.SetIds(gate.FakeIds())
 		local ShopService = loader:server("ShopService")
 		local handler, equipHandler
 		local function remote(set)

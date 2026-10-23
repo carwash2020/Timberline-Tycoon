@@ -35,10 +35,19 @@ function Gate.SetIds(ids: { [string]: string }?)
 end
 
 -- Made-up ids for every key (specs only: they make the code path run; none is a real asset).
-function Gate.FakeIds(): { [string]: string }
+-- `t421Only`: just the 54 T421 keys, so the four recoloured trucks keep the meshes they have today.
+function Gate.FakeIds(t421Only: boolean?): { [string]: string }
 	local out: { [string]: string } = {}
+	local only: { [string]: boolean } = {}
+	if t421Only == true then
+		for _, key in ipairs(Gate.T421Keys()) do
+			only[key] = true
+		end
+	end
 	for i, key in ipairs(VehicleMeshIds.keys) do
-		out[key] = tostring(9000000 + i)
+		if t421Only ~= true or only[key] then
+			out[key] = tostring(9000000 + i)
+		end
 	end
 	return out
 end

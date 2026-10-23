@@ -6,6 +6,7 @@
 -- C10–C12 cargo/section budgets. V1–V10 vehicles. X1–X2 axes. P5–P6 Lux and plots.
 return function(t)
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
 	local AxeArt = t.load("ReplicatedStorage/Shared/Art/AxeArt")
 	local AxeModels = t.load("ReplicatedStorage/Shared/Art/AxeModels")
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
@@ -45,6 +46,7 @@ return function(t)
 
 	local function withMeshes(fn)
 		MeshKit.Reset()
+		Gate.SetIds(Gate.FakeIds(true)) -- T421: trailers take their ids from the keyed table
 		MeshKit.Override = function(id, name, size)
 			local part = Instance.new("MeshPart")
 			part.Name = name
@@ -53,6 +55,7 @@ return function(t)
 			return part
 		end
 		local ok, err = pcall(fn)
+		Gate.SetIds(nil)
 		MeshKit.Override = nil
 		MeshKit.Reset()
 		if not ok then

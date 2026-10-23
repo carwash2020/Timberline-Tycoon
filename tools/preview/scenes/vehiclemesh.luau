@@ -29,6 +29,10 @@ return {
 			Wheel = { C3.fromRGB(25, 25, 25), 0 },
 		}
 		MeshKit.Reset()
+		-- T421: the trailers' pieces take their ids from the keyed table, which is empty until the uploads exist, so this
+		-- review scene gives every key a made-up id (blocks stand in for the meshes either way).
+		local Gate = ctx.shared("VehicleMeshGate")
+		Gate.SetIds(Gate.FakeIds())
 		MeshKit.Override = function(id, name, size)
 			local part = roblox.Instance.new("MeshPart")
 			part.Name = name

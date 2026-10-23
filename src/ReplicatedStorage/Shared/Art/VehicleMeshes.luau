@@ -94,7 +94,8 @@ VehicleMeshes.LongCap = 80
 -- wheels, lights, bed zone) is already about that before the four look
 -- meshes. Ranch is the heaviest: six stakes, four rails, and the front
 -- board, which lands at 25. Dropping those rails would open the sides.
-VehicleMeshes.TrailerCap = 25
+-- T421: 27, the Ranch Trailer's second axle (its real two, TrailerAxleData) is two more wheels.
+VehicleMeshes.TrailerCap = 27
 
 local KEEP = {
 	Chassis = true,
