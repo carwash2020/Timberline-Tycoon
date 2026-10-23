@@ -1,0 +1,43 @@
+name: Key scope probe
+# Throwaway (branch t421-key-probe only, never merged): asks the Open Cloud Assets API two harmless questions with
+# ROBLOX_API_KEY and prints ONLY the HTTP status and the error code/message, to see which scopes the key lacks.
+on:
+  push:
+    branches: [t421-key-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          key = os.environ.get("ROBLOX_API_KEY", "")
+          if not key:
+              print("no key in this run")
+              raise SystemExit(0)
+          def call(label, method, url, body=None, headers=None):
+              h = {"x-api-key": key}
+              h.update(headers or {})
+              req = urllib.request.Request(url, data=body, method=method, headers=h)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      status, raw = r.status, r.read()
+              except urllib.error.HTTPError as e:
+                  status, raw = e.code, e.read()
+              msg = ""
+              try:
+                  d = json.loads(raw)
+                  msg = " ".join(str(d.get(k, "")) for k in ("code", "message"))[:300].replace(key, "***")
+              except Exception:
+                  pass
+              print(label, status, msg)
+          # asset:read: ask for an operation that does not exist (404 or a scope message; nothing is read or changed)
+          call("assets read (operation lookup)", "GET", "https://apis.roblox.com/assets/v1/operations/00000000-0000-0000-0000-000000000000")
+          # asset:write: an empty create request (400 or 415 means the scope passed and nothing was created)
+          call("assets write (empty create)", "POST", "https://apis.roblox.com/assets/v1/assets", b"{}", {"Content-Type": "application/json"})
+          PY
