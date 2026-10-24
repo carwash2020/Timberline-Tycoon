@@ -311,8 +311,9 @@ return function(t)
 
 	t.test("V10: one failed vehicle mesh keeps the part-built truck", function()
 		MeshKit.Reset()
+		local glassId = Gate.NumberFor(Gate.TruckKey("Pickup", "Glass")) or VehicleModels.Truck("Pickup").Glass.meshId
 		MeshKit.Override = function(id)
-			if id == VehicleModels.Truck("Pickup").Glass.meshId then
+			if id == glassId then
 				return nil
 			end
 			local part = Instance.new("MeshPart")

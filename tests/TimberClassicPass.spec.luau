@@ -11,6 +11,14 @@ return function(t)
 	local ItemBox = t.shared("ItemBox")
 	local Rule = t.shared("VehicleSpawnRule")
 	local Gate = t.shared("VehicleMeshGate")
+
+	local function emptyClassic()
+		local ids = {}
+		for _, part in ipairs(Gate.ClassicParts) do
+			ids[Gate.TruckKey("TimberClassic", part)] = ""
+		end
+		return ids
+	end
 	local classic = ItemCatalog.GetTruck("TimberClassic")
 
 	-- Its meshes are in (made-up ids, and the stats the piece table needs): the pass is the only thing left to decide.
@@ -107,7 +115,13 @@ return function(t)
 			item.id = 100 + i
 		end
 		local gate = loader:shared("VehicleMeshGate")
-		if options.stocked then
+		if options.emptyMeshes then
+			local empty = {}
+			for _, part in ipairs(gate.ClassicParts) do
+				empty[gate.TruckKey("TimberClassic", part)] = ""
+			end
+			gate.SetIds(empty)
+		elseif options.stocked then
 			gate.SetIds(gate.FakeIds())
 		end
 		local Monetization = loader:server("MonetizationService")
@@ -209,7 +223,7 @@ return function(t)
 	end)
 
 	t.test("with its meshes missing it is not spawned, even for the owner", function()
-		Gate.SetIds(nil) -- the real, empty ids
+		Gate.SetIds(emptyClassic()) -- force Classic missing
 		local ok, why = Rule.CanSpawn(classic, true)
 		t.eq(ok, false)
 		t.ok(string.find(why, "isn't ready", 1, true), tostring(why))
@@ -230,16 +244,13 @@ return function(t)
 	end)
 
 	t.test('the Classic pass is off sale until VehicleMeshGate.Complete("Truck", "TimberClassic") is true', function()
-		-- empty ids: no prompt, told it is not for sale
-		Gate.SetIds(nil)
-		t.eq(Gate.Complete("Truck", "TimberClassic"), false)
-		local s = setup({})
+		-- empty ids on the loader's Gate (filled mesh_ids.txt is the live default after T421 upload)
+		local s = setup({ emptyMeshes = true })
+		t.eq(s.M and true, true)
 		s.buyPass()
 		t.eq(s.calls.prompts, {}, "no Robux prompt while the truck's meshes are missing")
 		t.ok(#s.calls.toasts >= 1, "the player is told")
 		-- ids in: the prompt opens for the pass
-		stockClassic()
-		t.eq(Gate.Complete("Truck", "TimberClassic"), true)
 		local again = setup({ stocked = true })
 		again.buyPass()
 		t.eq(

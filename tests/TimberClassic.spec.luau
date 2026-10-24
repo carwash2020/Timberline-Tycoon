@@ -168,7 +168,12 @@ return function(t)
 		Gate.SetIds(Gate.FakeIds())
 		t.eq(Gate.Complete("Truck", "TimberClassic"), true)
 		t.eq(#Gate.Missing("Truck", "TimberClassic"), 0)
-		Gate.SetIds(nil)
+		local empty = {}
+		for _, part in ipairs(Gate.ClassicParts) do
+			empty[Gate.TruckKey("TimberClassic", part)] = ""
+		end
+		Gate.SetIds(empty)
 		t.eq(#Gate.Missing("Truck", "TimberClassic"), 6, "and with empty ids the six keys are missing")
+		Gate.SetIds(nil)
 	end)
 end
