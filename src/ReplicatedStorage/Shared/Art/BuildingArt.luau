@@ -1402,7 +1402,7 @@ local function dealership(model: Model, title: string, accent: Color3)
 	local hx, hz = hall.innerW / 2, hall.innerD / 2
 	local cream = Palette.PlankHoney
 	local dark = Kit.shade(accent, -0.35)
-	local FLOOR, H, T = 0.4, 15, 0.8
+	local FLOOR, H, T = 0.4, DealershipLot.HallHeight, 0.8
 	local doorX0 = -hx + 0.75
 	local doorX1 = doorX0 + 15
 	local doorCx = (doorX0 + doorX1) / 2
@@ -1427,7 +1427,7 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- the showroom windows. It is see-through (the view from the spawn to the
 	-- lighthouse crosses the east end of the hall), solid glass you cannot walk
 	-- through, with solid wall below and above it.
-	local GLASS_LO, GLASS_HI = 6, 14.4
+	local GLASS_LO, GLASS_HI = 6, DealershipLot.HallHeight - 0.6
 	local glass = Color3.fromRGB(170, 205, 225)
 	local function glassBand(name: string, size: Vector3, cf: CFrame)
 		local g = Kit.part(model, name, size, cf, glass, MAT.Glass)
@@ -2038,7 +2038,7 @@ function BuildingArt.InteriorFrame(kind: string, s: number): { frame: ShopInteri
 		local hall = DealershipLot.Hall()
 		local hx, hz = hall.innerW / 2, hall.innerD / 2
 		return {
-			frame = { floorTop = 0.4, halfW = hx - 0.4, halfD = hz - 0.4, ceilY = 15 },
+			frame = { floorTop = 0.4, halfW = hx - 0.4, halfD = hz - 0.4, ceilY = DealershipLot.HallHeight },
 			extra = { -hx + 0.4, hx - 0.4, -hz + 0.4, hz - 0.4 },
 		}
 	elseif kind == "Sparkworks" then
@@ -2105,8 +2105,8 @@ function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFa
 			doorCx = -hx + 0.75 + 7.5,
 			doorHalf = 7.5,
 			doorTop = 11.9,
-			wallTop = 15,
-			roofTop = 15.8,
+			wallTop = DealershipLot.HallHeight,
+			roofTop = DealershipLot.HallHeight + 0.8,
 			groundY = 0.4,
 			matY = 0, -- the door's walk is left open in the forecourt: the mat lies on the street
 			accent = accent,

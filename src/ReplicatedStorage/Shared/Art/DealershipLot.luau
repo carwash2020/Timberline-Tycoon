@@ -22,6 +22,7 @@ local CollectionService = game:GetService("CollectionService")
 local BoxLook = require(script.Parent.Parent.BoxLook)
 local ItemBox = require(script.Parent.Parent.ItemBox)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local VehicleMeshGate = require(script.Parent.Parent.VehicleMeshGate)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local Kit = require(script.Parent.Kit)
 local MeshKit = require(script.Parent.MeshKit)
@@ -94,12 +95,13 @@ local SIGN_INK = Palette.Get("SignInk")
 -- A display vehicle's Neon lenses are never near-white (ShopKit.NearWhite, luma 0.86): the live
 -- trucks' pale headlamp lens (#FFE9B0) blows out in a lit hall, so the display copy wears warm amber.
 DealershipLot.MaxNeonLuma = 0.86
--- The tallest a display vehicle may stand over its plinth: the hall's ceiling
--- beams hang to 14.1 over the floor (15 less their 0.9), the floor top is
--- FloorY and the plinth PlinthHeight, less a little air. The Logging Rig's
--- crane and stacks stand 15.8 tall, so its display copy (never the gameplay
--- truck) is scaled down to fit; every other vehicle is already under this.
-DealershipLot.MaxVehicleHeight = 12.0
+-- The hall's height (T421): walls, glass band, beams and roof are built from it. It was 15, and the Logging Rig's crane
+-- (16.5 over its wheels' ground) did not fit, so its display copy was scaled down. No display copy is scaled any more:
+-- the rig stands at full size, its top 0.4 (floor) + 1.2 (plinth) + 16.5 = 18.1 over the lot's floor line, the beams'
+-- underside is HallHeight - 0.9 = 19.6 and the rafters' HallHeight - 0.7 = 19.8. The hall's footprint (154 x 61) is unchanged.
+DealershipLot.HallHeight = 20.5
+-- The beams' underside over the hall floor line (they hang 0.9 under the hall's height).
+DealershipLot.BeamBottom = DealershipLot.HallHeight - 0.9
 DealershipLot.DisplayLens = Color3.fromRGB(255, 205, 125)
 
 -- The vehicles on show: ItemBox.Showroom, the one list.
@@ -317,6 +319,125 @@ end
 -- What the vehicle hauls, the second line of its name sign (ShopLogic's own words for the
 -- shop card: "Bed: 12 logs", "No bed", "+12 bed space"). The hung sub-signs that used to say
 -- this over each bay are gone: one sign per plinth now carries the name and the bed.
+-- The plinth of a vehicle that is not for sale yet (its meshes are missing): not an empty slot, and never a part-built
+-- stand-in. Kit parts only, no mesh and nothing that collides: a dust sheet over a vehicle-sized hump (a base and a
+-- ridge), four brass stanchions with a rope between them, and a dark board in the Dealership signs' style (dark ground,
+-- brass frame, cream letters) naming the vehicle over COMING SOON. The plinth keeps its own lamp post. `vz` is the
+-- vehicle's middle line (lot space).
+DealershipLot.ComingSoonText = "COMING SOON"
+DealershipLot.BoardSize = Vector3.new(9, 2.6, 0.25)
+function DealershipLot.ComingSoon(
+	lot: Model,
+	bay: Bay,
+	cx: number,
+	vz: number,
+	top: number,
+	aisleSide: number,
+	name: string
+)
+	local sheetColor = Color3.fromRGB(214, 208, 196)
+	local ropeColor = Color3.fromRGB(150, 36, 28)
+	local baseSize = Vector3.new(bay.length * 0.55, 2.6, bay.span * 0.7)
+	Kit.decor(
+		Kit.part(
+			lot,
+			"ComingSoonSheet",
+			baseSize,
+			CFrame.new(cx, top + baseSize.Y / 2, vz),
+			sheetColor,
+			Enum.Material.Fabric
+		),
+		false
+	)
+	local ridgeSize = Vector3.new(baseSize.X * 0.8, 1.6, baseSize.Z * 0.6)
+	Kit.decor(
+		Kit.part(
+			lot,
+			"ComingSoonSheetRidge",
+			ridgeSize,
+			CFrame.new(cx, top + baseSize.Y + ridgeSize.Y / 2 - 0.05, vz),
+			Kit.shade(sheetColor, -0.05),
+			Enum.Material.Fabric
+		),
+		false
+	)
+	local sx, sz = baseSize.X / 2 + 2, baseSize.Z / 2 + 1.6
+	local postH = 2.8
+	local corners = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }
+	for _, c in ipairs(corners) do
+		Kit.decor(
+			Kit.part(
+				lot,
+				"StanchionPost",
+				Vector3.new(0.3, postH, 0.3),
+				CFrame.new(cx + c[1] * sx, top + postH / 2, vz + c[2] * sz),
+				BRASS,
+				Enum.Material.Metal
+			),
+			false
+		)
+	end
+	for i, c in ipairs(corners) do
+		local n = corners[i % 4 + 1]
+		local x0, z0, x1, z1 = cx + c[1] * sx, vz + c[2] * sz, cx + n[1] * sx, vz + n[2] * sz
+		local len = math.sqrt((x1 - x0) ^ 2 + (z1 - z0) ^ 2)
+		Kit.decor(
+			Kit.part(
+				lot,
+				"StanchionRope",
+				Vector3.new(len, 0.14, 0.14),
+				CFrame.new((x0 + x1) / 2, top + postH - 0.45, (z0 + z1) / 2)
+					* CFrame.Angles(0, -math.atan2(z1 - z0, x1 - x0), 0),
+				ropeColor,
+				Enum.Material.Fabric
+			),
+			false
+		)
+	end
+	local board = DealershipLot.BoardSize
+	local legH = 1.4
+	local bz = vz + aisleSide * (baseSize.Z / 2 + 3.2)
+	Kit.decor(
+		Kit.part(
+			lot,
+			"ComingSoonBoardFrame",
+			board + Vector3.new(0.4, 0.4, -0.05),
+			CFrame.new(cx, top + legH + board.Y / 2, bz),
+			BRASS,
+			Enum.Material.Metal
+		),
+		false
+	)
+	local sign = Kit.part(
+		lot,
+		"ComingSoonBoard",
+		board,
+		CFrame.new(cx, top + legH + board.Y / 2, bz),
+		Color3.fromRGB(26, 19, 12),
+		Enum.Material.SmoothPlastic
+	)
+	Kit.decor(sign, false)
+	Kit.signText(
+		sign,
+		name .. "\n" .. DealershipLot.ComingSoonText,
+		SIGN_CREAM,
+		{ Enum.NormalId.Front, Enum.NormalId.Back }
+	)
+	for _, dx in ipairs({ -board.X / 2 + 0.7, board.X / 2 - 0.7 }) do
+		Kit.decor(
+			Kit.part(
+				lot,
+				"ComingSoonBoardLeg",
+				Vector3.new(0.3, legH, 0.3),
+				CFrame.new(cx + dx, top + legH / 2, bz),
+				BRASS,
+				Enum.Material.Metal
+			),
+			false
+		)
+	end
+end
+
 function DealershipLot.BedText(kind: string, id: string): string
 	if kind == "Truck" then
 		local truck = ItemCatalog.GetTruck(id)
@@ -365,44 +486,10 @@ local function paintOf(kind: string, id: string): Color3
 	return Color3.fromRGB(150, 150, 150)
 end
 
--- (The bays and the hall are still laid out from the full-size vehicle, so
--- the footprint the world and the shop's shell are built round does not move;
--- only the copy on the plinth is fitted.)
--- A display copy taller than DealershipLot.MaxVehicleHeight is scaled down
--- about its feet (at the origin, as built) so it clears the
--- ceiling beams. Looks only: the vehicle the player drives is another model.
+-- A display copy is never scaled (T421): the hall is tall enough for the tallest vehicle. The copy is still marked
+-- "Fitted" once the lot has measured and moved it: no mesh may be placed on it later.
 local function fitUnderCeiling(model: Model)
-	local lo, hi = math.huge, -math.huge
-	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BasePart") then
-			local c = d.CFrame
-			local half = (
-				math.abs(c.RightVector.Y) * d.Size.X
-				+ math.abs(c.UpVector.Y) * d.Size.Y
-				+ math.abs(c.LookVector.Y) * d.Size.Z
-			) / 2
-			lo = math.min(lo, c.Position.Y - half)
-			hi = math.max(hi, c.Position.Y + half)
-		end
-	end
-	local height = hi - lo
-	-- Whatever the height, this copy is now fitted: no mesh may be placed on it later.
 	model:SetAttribute("Fitted", true)
-	if height > DealershipLot.MaxVehicleHeight then
-		-- Like TruckArt's grow: each part's size and position (its turn kept)
-		-- and each attachment's offset (set by CFrame, which Lune reads).
-		local k = DealershipLot.MaxVehicleHeight / height
-		for _, d in ipairs(model:GetDescendants()) do
-			if d:IsA("BasePart") then
-				local cf = d.CFrame
-				d.Size = d.Size * k
-				d.CFrame = CFrame.new(cf.Position * k) * (cf - cf.Position)
-			elseif d:IsA("Attachment") then
-				local cf = d.CFrame
-				d.CFrame = CFrame.new(cf.Position * k) * (cf - cf.Position)
-			end
-		end
-	end
 end
 
 -- One display vehicle, in this order and no other: build it (the meshes go on inside the build),
@@ -474,6 +561,13 @@ function DealershipLot.Preload(): MeshKit.PreloadResult
 	local entries: { MeshKit.Entry } = {}
 	for _, piece in ipairs(VehicleModels.AllPieces()) do
 		table.insert(entries, { id = piece.meshId, hull = piece.wheel })
+	end
+	-- T421: the keyed ids (the trailers', the Timber Classic's and the recoloured trucks').
+	for _, key in ipairs(VehicleMeshGate.AllKeys()) do
+		local n = VehicleMeshGate.NumberFor(key)
+		if n then
+			table.insert(entries, { id = n, hull = string.sub(key, -6) == "/Wheel" })
+		end
 	end
 	return MeshKit.Preload(entries)
 end
@@ -599,7 +693,13 @@ function DealershipLot.Build(): Model
 			end
 		end
 
-		local model = modelOf(bay.kind, bay.id, true)
+		-- T421: a vehicle whose meshes are not all in is not stocked: no vehicle, no box (nothing can be bought),
+		-- and never a part-built stand-in. The plinth stays (the hall is laid out round it) and says so.
+		local stocked = VehicleMeshGate.Complete(bay.kind, bay.id)
+		local model = if stocked then modelOf(bay.kind, bay.id, true) else nil
+		if not stocked then
+			DealershipLot.ComingSoon(lot, bay, cx, oz + bay.vz, top, aisleSide, nameOf(bay.kind, bay.id))
+		end
 		if model then
 			model.Parent = lot
 			-- Side-on, nose toward the approach (west), on the plinth: its
@@ -644,6 +744,17 @@ function DealershipLot.Build(): Model
 			end
 		end
 
+		if not stocked then
+			HoverTag.Mark(slab, {
+				key = "Vehicle:" .. bay.kind .. ":" .. bay.id,
+				name = nameOf(bay.kind, bay.id),
+				kind = bay.kind,
+				itemId = bay.id,
+				shop = "Dealership",
+				anchor = true,
+			})
+			continue
+		end
 		-- The box: what you pick up and carry to the counter. On the plinth at
 		-- the aisle edge, the vehicle beside it, so nothing stands in the aisle.
 		-- Its front (the name strip and the big window) faces the aisle: the

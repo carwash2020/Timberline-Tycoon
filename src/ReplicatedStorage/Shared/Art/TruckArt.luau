@@ -103,9 +103,12 @@ local GLASS = hex("#9CCBE0")
 local HEADLIGHT = hex("#FFE9B0")
 local TAILLIGHT = hex("#B0241C")
 local AMBER = hex("#FFB23F")
+-- The trailer coupler's red (T421): the same red as the tail lamps' #B0241C.
+local COUPLER = hex("#B0241C")
 
 TruckArt.HeadlightColor = HEADLIGHT
 TruckArt.TaillightColor = TAILLIGHT
+TruckArt.CouplerColor = COUPLER
 
 -- The builders draw in M1.5's units (see Sizes above); Build grows them
 -- by S. A bed floor's thickness in those units, so it's TruckLayout's once
@@ -1271,7 +1274,7 @@ local function drawTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
 			M.Metal
 		)
 	end
-	deco(model, "Coupler", V3(0.6, 0.45, 0.9), CF(0, hitchY, hitchZ + 0.4), BLACK, M.Metal)
+	deco(model, "Coupler", V3(0.6, 0.45, 0.9), CF(0, hitchY, hitchZ + 0.4), COUPLER, M.Metal)
 
 	-- Axles, wheels and flat-topped fenders just outside the deck.
 	local heavy = tl.style == "heavy"

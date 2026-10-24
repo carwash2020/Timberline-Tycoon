@@ -4,6 +4,8 @@
 -- ScoutATV has no bed and no hitch. Trailer hitch width follows the tow truck.
 -- Triangle budget for a truck plus its trailer: 12,000 (not measured here).
 
+local VehicleStats = require(script.Parent.VehicleStats)
+
 local VehicleModels = {}
 
 -- Piece fields:
@@ -92,6 +94,17 @@ local trucks: { [string]: { [string]: Piece } } = {
 		Hitch = { meshId = 79514319620242, size = Vector3.new(0.7, 1.06, 1.68), at = Vector3.new(0, 2.005, 23.275) },
 	},
 }
+
+-- The Timber Classic (T421): sizes and `at` from TimberClassic/stats.json (VehicleStats). Its mesh ids are the
+-- TimberClassic/<Part> keys (VehicleMeshGate), so meshId is 0 here and VehicleMeshes fills it in.
+do
+	local classic: { [string]: Piece } = {}
+	for role, piece in pairs(VehicleStats.TimberClassic.pieces) do
+		classic[role] = { meshId = 0, size = piece.size, at = piece.at }
+	end
+	classic.Wheel = { meshId = 0, size = VehicleStats.TimberClassic.wheelSize, mirrorLeft = true }
+	trucks.TimberClassic = classic
+end
 
 local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 	PonyTrailer = {

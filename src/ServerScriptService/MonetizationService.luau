@@ -46,6 +46,7 @@ local PolicyLogic = require(ReplicatedStorage.Shared.PolicyLogic)
 local StageOf = require(ReplicatedStorage.Shared.StageOf)
 local StoreCopy = require(ReplicatedStorage.Shared.Store.StoreCopy)
 local StoreData = require(ReplicatedStorage.Shared.StoreData)
+local VehicleMeshGate = require(ReplicatedStorage.Shared.VehicleMeshGate)
 local StoreSale = require(ReplicatedStorage.Shared.Store.StoreSale)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
@@ -293,6 +294,12 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 			return
 		end
 		if not StoreData.IsForSale(pass.id) then
+			tell(player, StoreCopy.NotForSale)
+			return
+		end
+		-- T421: the Timber Classic pass stays off sale until the truck it grants has all its models
+		-- (VehicleMeshGate.Complete): nobody pays Robux for a truck that cannot be shown or spawned yet.
+		if pass.key == "TimberClassic" and not VehicleMeshGate.Complete("Truck", "TimberClassic") then
 			tell(player, StoreCopy.NotForSale)
 			return
 		end

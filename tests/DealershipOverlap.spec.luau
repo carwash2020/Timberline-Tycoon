@@ -13,6 +13,10 @@
 --      such as a barrel and its hoops, are named together and skipped).
 -- Each check counts its pairs, so a spec that silently tests nothing fails.
 return function(t)
+	-- T421: these specs check the stocked Dealership, so every vehicle mesh has a (made-up) id. With the real, empty ids the
+	-- trailers are not stocked (tests/VehicleMeshesMissing.spec.luau).
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
+	Gate.SetIds(Gate.FakeIds())
 	local roblox = t.roblox
 	local Color3 = roblox.Color3
 	local KIND = "Dealership"
@@ -319,6 +323,14 @@ return function(t)
 		"BackRoomKnob",
 		-- the counter's two hidden end blockers (invisible, nothing to see)
 		"CounterBack",
+		-- a plinth that is not for sale yet: sheet, stanchions, rope and board (DealershipLot.ComingSoon; none collides)
+		"ComingSoonSheet",
+		"ComingSoonSheetRidge",
+		"ComingSoonBoard",
+		"ComingSoonBoardFrame",
+		"ComingSoonBoardLeg",
+		"StanchionPost",
+		"StanchionRope",
 	}) do
 		LOOKS_ONLY[name] = true
 	end

@@ -49,6 +49,7 @@ local ChopSawService = require(script.Parent.ChopSawService)
 local BeltService = require(script.Parent.BeltService)
 local PlanerService = require(script.Parent.PlanerService)
 local SawmillService = require(script.Parent.SawmillService)
+local VehicleMeshGate = require(ReplicatedStorage.Shared.VehicleMeshGate)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SellService = require(script.Parent.SellService)
 local LeaveCommit = require(script.Parent.LeaveCommit)
@@ -1798,6 +1799,12 @@ local function onPlayerAdded(player: Player)
 	safely("DailyService.Start", DailyService.Start, player, profile)
 	safely("EventService.Start", EventService.Start, player, profile)
 	safely("ShopService.PlayerJoined", ShopService.PlayerJoined, player, profile)
+	-- T421: a vehicle they own whose meshes are missing still spawns (the Timber Classic does not): log it.
+	local ownedMissing =
+		BootReport.OwnedMissingLine(player.Name, profile.ownedTrucks, profile.ownedTrailers, VehicleMeshGate.Missing)
+	if ownedMissing then
+		warn(ownedMissing)
+	end
 	safely("MonetizationService.PlayerJoined", MonetizationService.PlayerJoined, player, profile)
 	safely("FieldGuideService.Refresh", FieldGuideService.Refresh, player)
 	safely("NodeService.Publish", NodeService.Publish, player)
@@ -1974,6 +1981,8 @@ print(
 	)
 )
 LoadState.Seal() -- "fully built" can now be declared once the queue and forest are done
+-- T421: the vehicle meshes with no id (those vehicles are not for sale), for the boot line below.
+workspace:SetAttribute("vehicleMeshesMissing", table.concat(VehicleMeshGate.MissingKeys(), "; "))
 print(BootReport.Line(workspace, #Players:GetPlayers()))
 if not BootReport.Log(workspace, Players:GetPlayers(), AnalyticsService) then
 	local bootConn: RBXScriptConnection? = nil

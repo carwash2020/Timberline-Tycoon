@@ -37,9 +37,29 @@
 -- so once, naming the vehicle and the part.
 
 local MeshKit = require(script.Parent.MeshKit)
+local VehicleMeshGate = require(script.Parent.Parent.VehicleMeshGate)
 local VehicleModels = require(script.Parent.VehicleModels)
+local VehicleStats = require(script.Parent.VehicleStats)
 
 local VehicleMeshes = {}
+
+-- T421: the keyed mesh ids (<Trailer>/<Truck>/<Part>, TimberClassic/<Part>, and the four recoloured trucks'
+-- <Truck>/<Part>), read from the module tools/gen_vehicle_mesh_ids.luau makes from assets/vehicles/t421/*.txt.
+-- An empty string means the mesh is missing.
+function VehicleMeshes.MeshKeys(): { string }
+	return VehicleMeshGate.AllKeys()
+end
+
+function VehicleMeshes.MeshId(key: string): string?
+	return VehicleMeshGate.IdOf(key)
+end
+
+-- The T421 keys with no id (BootReport's vehicleMeshesMissing).
+function VehicleMeshes.MissingKeys(): { string }
+	return VehicleMeshGate.MissingKeys()
+end
+
+VehicleMeshes.GlassTransparency = 0.4
 
 -- One warning per vehicle and part (a spec swaps this for a recorder).
 VehicleMeshes.Warn = function(message: string)
@@ -75,7 +95,8 @@ VehicleMeshes.LongCap = 80
 -- wheels, lights, bed zone) is already about that before the four look
 -- meshes. Ranch is the heaviest: six stakes, four rails, and the front
 -- board, which lands at 25. Dropping those rails would open the sides.
-VehicleMeshes.TrailerCap = 25
+-- T421: 27, the Ranch Trailer's second axle (its real two, TrailerAxleData) is two more wheels.
+VehicleMeshes.TrailerCap = 27
 
 local KEEP = {
 	Chassis = true,
@@ -119,7 +140,8 @@ local TRUCK_ROLES = { "Body", "Glass", "Lights", "Bed", "Hitch" }
 local TRAILER_ROLES = { "Body", "Lights", "Bed", "Hitch" }
 
 function VehicleMeshes.PartCap(truckId: string): number
-	if truckId == "Flatbed" or truckId == "LoggingRig" then
+	-- (the Timber Classic keeps its stake bed posts and rails, door plates and gauge: 36 parts meshed)
+	if truckId == "Flatbed" or truckId == "LoggingRig" or truckId == "TimberClassic" then
 		return VehicleMeshes.LongCap
 	end
 	return VehicleMeshes.TruckCap
@@ -384,6 +406,17 @@ local function addRole(
 	fidelity(part, role)
 	if role ~= "Wheel" then
 		MeshKit.Visual(part, piece.meshId)
+		-- Looks only, in every flag (T421): no mass, no collision, no touch, no query, box fidelity.
+		part.Massless = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.CollisionFidelity = Enum.CollisionFidelity.Box
+		if role == "Glass" then
+			-- A GLB cannot store these: see-through and no shadow, set here.
+			part.Transparency = VehicleMeshes.GlassTransparency
+			part.CastShadow = false
+		end
 		-- Anchored like every other part TruckArt.Build makes (Rig frees and welds them).
 		part.Anchored = true
 	end
@@ -427,6 +460,84 @@ local function swapWheel(mesh: MeshPart, wheel: BasePart, mirror: boolean)
 	wheel:Destroy()
 end
 
+-- The pieces a truck is dressed in: VehicleModels' (size, `at`) with the keyed id where the keys supply one. A
+-- recoloured truck whose key is empty keeps the id it has. The Timber Classic has no table until its stats.json is
+-- in the repo (the sizes and `at` of its meshes), so it cannot be dressed.
+local function truckSpec(truckId: string): { [string]: VehicleModels.Piece }?
+	local base = VehicleModels.Truck(truckId)
+	if not base then
+		return nil
+	end
+	local out: { [string]: VehicleModels.Piece } = {}
+	for role, piece in pairs(base) do
+		local n = VehicleMeshGate.NumberFor(VehicleMeshGate.TruckKey(truckId, role))
+		out[role] = if n then { meshId = n, size = piece.size, at = piece.at, mirrorLeft = piece.mirrorLeft } else piece
+	end
+	return out
+end
+
+-- A T421 trailer's pieces for the variant that fits `towId`: sizes and `at` from stats.json (VehicleStats), ids only
+-- from the keyed table (an empty id is 0, which addRole reports as missing). Its wheels keep the shared wheel mesh.
+local function trailerSpecFor(trailerId: string, towId: string?): { [string]: VehicleModels.Piece }?
+	local variant = if towId then VehicleMeshGate.VariantFor(towId) else nil
+	if not variant then
+		return nil
+	end
+	local base = VehicleModels.Trailer(trailerId, variant)
+	if not base then
+		return nil
+	end
+	local stats = if VehicleStats.Trailers[trailerId] then VehicleStats.Trailers[trailerId][variant] else nil
+	if not VehicleMeshGate.IsT421("Trailer", trailerId) or not stats then
+		return base
+	end
+	local out: { [string]: VehicleModels.Piece } = {}
+	out.Wheel = base.Wheel
+	for role, piece in pairs(stats.pieces) do
+		local n = VehicleMeshGate.NumberFor(VehicleMeshGate.TrailerKey(trailerId, variant, role)) or 0
+		out[role] = { meshId = n, size = piece.size, at = piece.at }
+	end
+	return out
+end
+
+-- T421: a vehicle whose meshes are missing is never drawn part-built. Its decorative hull goes, the functional
+-- parts stay (so an owned one still spawns and drives), and it is marked.
+local function inWheel(part: Instance): boolean
+	local node: Instance? = part.Parent
+	while node and not node:IsA("Model") do
+		if node.Name == "Wheel" then
+			return true
+		end
+		node = node.Parent
+	end
+	return false
+end
+
+local function stripLooks(model: Model, trailerHalf: boolean)
+	for _, d in ipairs(model:GetDescendants()) do
+		if
+			d:IsA("BasePart")
+			and not KEEP[d.Name]
+			and d:GetAttribute("VisualMesh") ~= true
+			and isTrailer(d) == trailerHalf
+			-- a wheel with its rim, hub and lugs is drawn part-built on purpose: the 54 meshes have no trailer wheel
+			and d.Name ~= "Wheel"
+			and not inWheel(d)
+		then
+			d:Destroy()
+		end
+	end
+	-- What is left of that half is its collision hull and its wheels. The hull stays solid but is not seen: no boards or
+	-- stakes of a part-built trailer show in the meshes' place.
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and isTrailer(d) == trailerHalf and d.Name ~= "Wheel" and not inWheel(d) then
+			d.Transparency = 1
+			d.CastShadow = false
+		end
+	end
+	model:SetAttribute("MeshesMissing", true)
+end
+
 -- True when meshes replaced the decorative body. False leaves `model` as built.
 -- `truckId` is nil for a trailer shown alone (the lot's trailer bays); `variantOf` is the
 -- truck whose trailer variant (VehicleModels.Trailer) is drawn then.
@@ -438,14 +549,24 @@ local function applyNow(model: Model, truckId: string?, trailerId: string?, vari
 		keepPartBuilt(name, "all", "the copy was already fitted")
 		return false
 	end
-	local truck = if truckId then VehicleModels.Truck(truckId) else nil
+	local truck = if truckId then truckSpec(truckId) else nil
 	if truckId and not truck then
+		-- The Timber Classic has no piece table yet; it is never sold or spawned while its meshes are missing
+		-- (VehicleMeshGate), so nothing part-built of it is shown to a player. Its trailer is stripped the same way.
+		if trailerId and VehicleMeshGate.IsT421("Trailer", trailerId) then
+			stripLooks(model, true)
+		end
 		return false
 	end
 	local made: { Made } = {}
+	local t421Trailer = trailerId ~= nil and VehicleMeshGate.IsT421("Trailer", trailerId)
 	local function fail(): boolean
 		destroyMade(made)
-		keepPartBuilt(name, missing, "no mesh for it")
+		if t421Trailer then
+			stripLooks(model, true)
+		else
+			keepPartBuilt(name, missing, "no mesh for it")
+		end
 		return false
 	end
 
@@ -469,7 +590,7 @@ local function applyNow(model: Model, truckId: string?, trailerId: string?, vari
 		end
 	end
 
-	local trailerSpec = if trailerId then VehicleModels.Trailer(trailerId, truckId or variantOf) else nil
+	local trailerSpec = if trailerId then trailerSpecFor(trailerId, truckId or variantOf) else nil
 	if trailerId then
 		if not trailerSpec then
 			missing = "trailer"

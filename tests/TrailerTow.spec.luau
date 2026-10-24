@@ -55,6 +55,9 @@ return function(t)
 				},
 			},
 		})
+		-- T421: trailers are only for sale with their meshes (made-up ids here; tests/VehicleMeshesMissing.spec has the empty case)
+		local gate = loader:shared("VehicleMeshGate")
+		gate.SetIds(gate.FakeIds())
 		local ShopService = loader:server("ShopService")
 		local buy
 		local function remote(set)
@@ -144,4 +147,51 @@ return function(t)
 			end
 		end
 	end)
+	-- T421: every wheel of every one of the 15 combos (3 trailers x the 5 towing trucks, the Timber Classic among
+	-- them) has its tyre's bottom on the ground, parked and with the whole rig pitched 15 degrees onto a slope.
+	-- The engine's physics cannot run here: the 3 seconds of towing (a rig that bounces or sinks) are a Studio check
+	-- (tests/TrailerTow.spec cannot see them). What this pins is the geometry the physics starts from: each wheel
+	-- centre is one radius above the ground plane, so a rigid rig on any plane touches with all of them.
+	t.test(
+		"all 15 combos: every wheel's tyre bottom is within 0.05 of the ground, flat and on a 15 degree slope",
+		function()
+			local roblox = t.roblox
+			local CFrame, Vector3 = roblox.CFrame, roblox.Vector3
+			local ItemCatalog = t.shared("ItemCatalog")
+			local TruckLayout = t.shared("TruckLayout")
+			local TruckArt = t.shared("Art/TruckArt")
+			local Gate = t.shared("VehicleMeshGate")
+			local combos = Gate.Combos()
+			t.eq(#combos, 15)
+			local pitch = math.rad(15)
+			for _, combo in ipairs(combos) do
+				local def = ItemCatalog.GetTruck(combo.truck)
+				local trailer = ItemCatalog.GetTrailer(combo.trailer)
+				local lay = TruckLayout.For(def)
+				local model = TruckArt.Build(def, lay, trailer, TruckLayout.ForTrailer(trailer, lay))
+				local label = combo.truck .. " + " .. combo.trailer
+				-- The slope: the rig tilted about its first contact (the front wheels'), the plane through that point.
+				local rotate = CFrame.Angles(-pitch, 0, 0)
+				local up = rotate:VectorToWorldSpace(Vector3.new(0, 1, 0))
+				local wheels = {}
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") and d.Name == "Wheel" and type(d:GetAttribute("Radius")) == "number" then
+						table.insert(wheels, d)
+					end
+				end
+				t.ok(#wheels >= 6, label .. " has wheels")
+				local origin = rotate:PointToWorldSpace(Vector3.new(0, 0, lay.wheelZ[1]))
+				for _, w in ipairs(wheels) do
+					local r = w:GetAttribute("Radius")
+					t.ok(
+						math.abs(w.CFrame.Position.Y - r) <= 0.05,
+						label .. " wheel at z " .. w.CFrame.Position.Z .. " is on the ground"
+					)
+					local centre = rotate:PointToWorldSpace(w.CFrame.Position)
+					local gap = (centre - origin):Dot(up) - r
+					t.ok(math.abs(gap) <= 0.05, label .. " wheel at z " .. w.CFrame.Position.Z .. " is on the slope")
+				end
+			end
+		end
+	)
 end

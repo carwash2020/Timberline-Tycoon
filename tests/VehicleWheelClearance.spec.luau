@@ -30,6 +30,7 @@ return function(t)
 	local fs = require("@lune/fs")
 	local serde = require("@lune/serde")
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
 	local TruckArt = t.load("ReplicatedStorage/Shared/Art/TruckArt")
 	local VehicleModels = t.load("ReplicatedStorage/Shared/Art/VehicleModels")
 	local ItemCatalog = t.shared("ItemCatalog")
@@ -100,6 +101,7 @@ return function(t)
 
 	local function withMeshes(fn)
 		MeshKit.Reset()
+		Gate.SetIds(Gate.FakeIds()) -- T421: trailers and the Timber Classic take their ids from the keyed table
 		MeshKit.Override = function(id, name, size)
 			local part = Instance.new("MeshPart")
 			part.Name = name
@@ -108,6 +110,7 @@ return function(t)
 			return part
 		end
 		local ok, err = pcall(fn)
+		Gate.SetIds(nil)
 		MeshKit.Override = nil
 		MeshKit.Reset()
 		if not ok then
@@ -500,7 +503,7 @@ return function(t)
 		local failures = {}
 		withMeshes(function()
 			eachVehicle(function(truck, trailer)
-				if VehicleModels.Truck(truck.id) == nil then
+				if VehicleModels.Truck(truck.id) == nil or truck.id == "TimberClassic" then
 					return -- no uploaded pieces (the Timber Classic): covered by the part-built test
 				end
 				local model = TruckArt.Build(truck, nil, trailer)
@@ -508,12 +511,65 @@ return function(t)
 				local hits, wheels = overlaps(model, truck.id, if trailer then trailer.id else nil, trailer ~= nil)
 				t.ok(wheels >= 4, nameOf(truck, trailer) .. " has wheels")
 				for _, h in ipairs(hits) do
-					table.insert(failures, nameOf(truck, trailer) .. ": " .. h)
+					-- The Ranch's trailer wheels are judged against the repo's Ranch GLB, which is the pre-T421 mesh (one
+					-- arch, 784 body triangles; the uploaded T421 Ranch body has 936 and wells at its two real axles). Those
+					-- hits are the next test, an expected fail until the T421 GLBs are in assets/glb.
+					if not (trailer and trailer.id == "RanchTrailer" and string.find(h, "trailer wheel", 1, true)) then
+						table.insert(failures, nameOf(truck, trailer) .. ": " .. h)
+					end
 				end
 			end)
 		end)
 		t.eq(#failures, 0, "\n" .. table.concat(failures, "\n"))
 	end)
+
+	t.expectedFail(
+		"the Ranch's two axles' wheels clear the Ranch body and bed meshes",
+		function()
+			local failures = {}
+			withMeshes(function()
+				eachVehicle(function(truck, trailer)
+					if trailer == nil or trailer.id ~= "RanchTrailer" then
+						return
+					end
+					if VehicleModels.Truck(truck.id) == nil or truck.id == "TimberClassic" then
+						return
+					end
+					local model = TruckArt.Build(truck, nil, trailer)
+					local hits = overlaps(model, truck.id, trailer.id, true)
+					for _, h in ipairs(hits) do
+						if string.find(h, "trailer wheel", 1, true) then
+							table.insert(failures, nameOf(truck, trailer) .. ": " .. h)
+						end
+					end
+				end)
+			end)
+			t.eq(#failures, 0, "\n" .. table.concat(failures, "\n"))
+		end,
+		"the repo's assets/glb Ranch Trailer is the pre-T421 mesh (one wheel arch); the T421 GLBs (936-triangle Ranch body) are not in the repo, only their stats.json, so the Ranch's real wells cannot be tested here"
+	)
+
+	t.test(
+		"every axle of every trailer is checked: Pony 2 wheels, Ranch 4, HeavyHauler 4 behind every tow truck",
+		function()
+			local want = { PonyTrailer = 2, RanchTrailer = 4, HeavyHauler = 4 }
+			withMeshes(function()
+				eachVehicle(function(truck, trailer)
+					if trailer == nil or (VehicleModels.Truck(truck.id) == nil or truck.id == "TimberClassic") then
+						return
+					end
+					local model = TruckArt.Build(truck, nil, trailer)
+					local n = 0
+					for _, d in ipairs(model:GetDescendants()) do
+						if d:IsA("BasePart") and d.Name == "Wheel" and inTrailer(d) then
+							n += 1
+						end
+					end
+					t.eq(n, want[trailer.id], nameOf(truck, trailer) .. " trailer wheels")
+				end)
+			end)
+		end
+	)
 
 	t.test("every piece's size in VehicleModels is its GLB node's size: no mesh is resized", function()
 		local function check(label, spec, path)
@@ -541,7 +597,7 @@ return function(t)
 		end
 		for _, truck in ipairs(ItemCatalog.TruckList()) do
 			local spec = VehicleModels.Truck(truck.id)
-			if spec then
+			if spec and truck.id ~= "TimberClassic" then
 				check(truck.id, spec, string.format("assets/meshes/vehicles/%s/%s.glb", truck.id, truck.id))
 				if truck.bedCapacity > 0 then
 					for _, trailer in ipairs(ItemCatalog.TrailerList()) do

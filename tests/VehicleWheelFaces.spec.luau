@@ -28,6 +28,7 @@ return function(t)
 	local fs = require("@lune/fs")
 	local serde = require("@lune/serde")
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
 	local TruckArt = t.load("ReplicatedStorage/Shared/Art/TruckArt")
 	local VehicleModels = t.load("ReplicatedStorage/Shared/Art/VehicleModels")
 	local ItemCatalog = t.shared("ItemCatalog")
@@ -38,6 +39,7 @@ return function(t)
 
 	local function withMeshes(fn)
 		MeshKit.Reset()
+		Gate.SetIds(Gate.FakeIds()) -- T421: trailers and the Timber Classic take their ids from the keyed table
 		MeshKit.Override = function(id, name, size)
 			local part = Instance.new("MeshPart")
 			part.Name = name
@@ -46,6 +48,7 @@ return function(t)
 			return part
 		end
 		local ok, err = pcall(fn)
+		Gate.SetIds(nil)
 		MeshKit.Override = nil
 		MeshKit.Reset()
 		if not ok then
@@ -84,7 +87,7 @@ return function(t)
 		local out = {}
 		for _, truck in ipairs(ItemCatalog.TruckList()) do
 			local spec = VehicleModels.Truck(truck.id)
-			if spec then
+			if spec and truck.id ~= "TimberClassic" then
 				table.insert(out, { truck.id, spec.Wheel })
 			end
 			for _, trailer in ipairs(ItemCatalog.TrailerList()) do
@@ -121,7 +124,7 @@ return function(t)
 		function()
 			withMeshes(function()
 				eachVehicle(function(truck, trailer)
-					if VehicleModels.Truck(truck.id) == nil then
+					if VehicleModels.Truck(truck.id) == nil or truck.id == "TimberClassic" then
 						return -- the Timber Classic is part-built (both faces, test 6)
 					end
 					local label = nameOf(truck, trailer)
@@ -214,7 +217,7 @@ return function(t)
 			end
 			withMeshes(function()
 				eachVehicle(function(truck, trailer)
-					if VehicleModels.Truck(truck.id) == nil then
+					if VehicleModels.Truck(truck.id) == nil or truck.id == "TimberClassic" then
 						return
 					end
 					local label = nameOf(truck, trailer)
@@ -378,7 +381,7 @@ return function(t)
 	t.test("every repo wheel GLB (8 vehicles, 12 trailer variants) is dished the same on both faces", function()
 		local paths = {}
 		for _, truck in ipairs(ItemCatalog.TruckList()) do
-			if VehicleModels.Truck(truck.id) then
+			if VehicleModels.Truck(truck.id) and truck.id ~= "TimberClassic" then
 				table.insert(paths, string.format("assets/meshes/vehicles/%s/%s.glb", truck.id, truck.id))
 				table.insert(paths, string.format("assets/glb/vehicles/%s.glb", truck.id))
 			end
@@ -387,7 +390,7 @@ return function(t)
 			table.insert(paths, string.format("assets/meshes/vehicles/%s/%s.glb", trailer.id, trailer.id))
 			table.insert(paths, string.format("assets/glb/vehicles/%s.glb", trailer.id))
 			for _, truck in ipairs(ItemCatalog.TruckList()) do
-				if truck.bedCapacity > 0 and VehicleModels.Truck(truck.id) then
+				if truck.bedCapacity > 0 and VehicleModels.Truck(truck.id) and truck.id ~= "TimberClassic" then
 					table.insert(
 						paths,
 						string.format(

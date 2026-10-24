@@ -11,6 +11,9 @@ return function(t)
 
 	local function fresh()
 		local loader = t.loader()
+		-- T421: trailers are only for sale with their meshes (made-up ids here; tests/VehicleMeshesMissing.spec has the empty case)
+		local gate = loader:shared("VehicleMeshGate")
+		gate.SetIds(gate.FakeIds())
 		return {
 			catalog = loader:shared("ItemCatalog"),
 			tier = loader:shared("StoreTier"),

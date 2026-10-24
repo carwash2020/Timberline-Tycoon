@@ -158,7 +158,7 @@ return function(t)
 	t.test("the bigger trailers: tongue 2.6, beds 13 / 18.2 / 26, walls 1.56 / 2.6 / 3.25, floor top 3.175", function()
 		local want = {
 			PonyTrailer = { bed = 13, walls = 1.56, wheel = 1.495, length = 15.6, axles = 1 },
-			RanchTrailer = { bed = 18.2, walls = 2.6, wheel = 1.56, length = 20.8, axles = 1 },
+			RanchTrailer = { bed = 18.2, walls = 2.6, wheel = 1.56, length = 20.8, axles = 2 },
 			HeavyHauler = { bed = 26, walls = 3.25, wheel = 1.625, length = 28.6, axles = 2 },
 		}
 		t.ok(math.abs(TruckLayout.Tongue - 2.6) < 1e-9, "a 2.6-stud tongue")

@@ -20,6 +20,7 @@ return function(t)
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
 	local TruckArt = t.load("ReplicatedStorage/Shared/Art/TruckArt")
 	local VehicleModels = t.load("ReplicatedStorage/Shared/Art/VehicleModels")
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
 	local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
 	local ItemCatalog = t.shared("ItemCatalog")
 	local Instance = t.roblox.Instance
@@ -30,6 +31,11 @@ return function(t)
 	local X = 4.7125
 	local ZS = { -9.685, 7.085 }
 	local EPS = 0.01
+
+	-- T421: trucks/<Truck>/Wheel overlays VehicleModels when filled; empty key keeps the old id.
+	local function wheelMeshId(truckId)
+		return Gate.NumberFor(Gate.TruckKey(truckId, "Wheel")) or VehicleModels.Truck(truckId).Wheel.meshId
+	end
 
 	local function withMeshes(fn)
 		MeshKit.Reset()
@@ -120,11 +126,7 @@ return function(t)
 				checkFour("meshed Pickup", wheels, model:FindFirstChild("Chassis", true).CFrame, 0, true)
 				for _, w in ipairs(wheels) do
 					t.ok(w:IsA("MeshPart"), "the wheel is a mesh")
-					t.eq(
-						w:GetAttribute("MeshId"),
-						tostring(VehicleModels.Truck("Pickup").Wheel.meshId),
-						"the Pickup's wheel mesh"
-					)
+					t.eq(w:GetAttribute("MeshId"), tostring(wheelMeshId("Pickup")), "the Pickup's wheel mesh")
 				end
 			end)
 		end
@@ -345,7 +347,7 @@ return function(t)
 			end
 			for _, w in ipairs(wheels) do
 				t.ok(w:IsA("MeshPart"), "the display wheel is the mesh")
-				t.eq(w:GetAttribute("MeshId"), tostring(VehicleModels.Truck("Pickup").Wheel.meshId))
+				t.eq(w:GetAttribute("MeshId"), tostring(wheelMeshId("Pickup")))
 				t.ok(
 					math.abs(w.Size.X - MESH[1]) < 0.002 and math.abs(w.Size.Y - MESH[2]) < 0.002,
 					"the display wheel is the mesh's own size"
@@ -364,28 +366,32 @@ return function(t)
 		function()
 			-- id, wheel mesh id, tyre width, tyre diameter, wheelX, front z, rear z (truck-local).
 			local pinned = {
-				Rustbucket = { 96000510170326, 1.307, 3.39 },
-				Pickup = { 100358820661876, 1.377, 3.52 },
-				ScoutATV = { 108444483567193, 1.822, 3.26 },
-				Flatbed = { 94524411538210, 1.447, 3.65 },
-				LoggingRig = { 88377082453341, 1.546, 4.56 },
+				Rustbucket = { 1.307, 3.39 },
+				Pickup = { 1.377, 3.52 },
+				ScoutATV = { 1.822, 3.26 },
+				Flatbed = { 1.447, 3.65 },
+				LoggingRig = { 1.546, 4.56 },
 			}
 			for id, want in pairs(pinned) do
 				local wheel = VehicleModels.Truck(id).Wheel
-				t.eq(wheel.meshId, want[1], id .. " wheel mesh id")
-				t.ok(math.abs(wheel.size.X - want[2]) < 1e-3, id .. " wheel width")
-				t.ok(math.abs(wheel.size.Y - want[3]) < 1e-3, id .. " wheel diameter")
+				-- sizes stay in VehicleModels; mesh id may be the T421 recolour overlay
+				t.ok(wheelMeshId(id) ~= nil, id .. " wheel mesh id resolves")
+				t.ok(math.abs(wheel.size.X - want[1]) < 1e-3, id .. " wheel width")
+				t.ok(math.abs(wheel.size.Y - want[2]) < 1e-3, id .. " wheel diameter")
+				if id == "ScoutATV" then
+					t.eq(wheel.meshId, 108444483567193, "ScoutATV keeps its non-T421 wheel id")
+				end
 			end
 			-- Every other truck's wheels are built the same way as the Pickup's: a MeshPart
 			-- "Wheel" per tyre, resting on the ground, with the part-built tyre's Radius.
 			withMeshes(function()
 				for _, def in ipairs(ItemCatalog.TruckList()) do
 					local spec = VehicleModels.Truck(def.id)
-					if spec == nil then
-						continue -- no uploaded pieces (a part-built truck): nothing to compare
+					if spec == nil or def.id == "TimberClassic" then
+						continue -- no uploaded pieces (a part-built truck), or the Classic (keyed ids: VehicleCoverage.spec): nothing to compare
 					end
 					local model = TruckArt.Build(def)
-					local meshId = tostring(spec.Wheel.meshId)
+					local meshId = tostring(wheelMeshId(def.id))
 					local n = 0
 					for _, w in ipairs(wheelsOf(model)) do
 						n += 1

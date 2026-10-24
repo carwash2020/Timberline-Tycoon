@@ -181,6 +181,9 @@ function ShopLogic.RecallFee(truck: TruckDef, loop: number, ownsTow: boolean?, c
 	return ShopLogic.RespawnFee(truck, loop)
 end
 
+-- T421: the toast for a vehicle whose models are not all in yet (VehicleMeshGate): not for sale.
+ShopLogic.NotStockedText = "The %s isn't in stock yet."
+
 -- Pass trucks are granted, never charged at the Dealership.
 function ShopLogic.TruckForCash(truck: TruckDef): boolean
 	return truck.robux ~= true

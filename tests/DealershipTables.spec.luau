@@ -11,6 +11,8 @@
 --                   skipped: nothing is shown on them but the card.
 --   lobby tables    Reception (a desk) and Finance (brochures): furniture, not displays.
 return function(t)
+	-- T421: these specs check the stocked Dealership, so every vehicle mesh has a (made-up) id. With the real, empty ids the
+	-- trailers are not stocked (tests/VehicleMeshesMissing.spec.luau).
 	local roblox = t.roblox
 	local Color3 = roblox.Color3
 	local KIND = "Dealership"
@@ -18,6 +20,9 @@ return function(t)
 
 	local function fresh(events)
 		local loader = t.loader()
+		t.support("VehicleStock")(function(path)
+			return loader:load(path)
+		end, t.roblox)
 		local data = loader:shared("StoreEventData")
 		for _, event in ipairs(events or {}) do
 			table.insert(data.Events, event)

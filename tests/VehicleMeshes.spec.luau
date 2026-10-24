@@ -24,6 +24,7 @@
 return function(t)
 	local fs = require("@lune/fs")
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
 	local TruckArt = t.load("ReplicatedStorage/Shared/Art/TruckArt")
 	local VehicleMeshes = t.load("ReplicatedStorage/Shared/Art/VehicleMeshes")
 	local VehicleModels = t.load("ReplicatedStorage/Shared/Art/VehicleModels")
@@ -41,6 +42,7 @@ return function(t)
 		MeshKit.Reset()
 		VehicleMeshes.ResetWarnings()
 		table.clear(warnings)
+		Gate.SetIds(Gate.FakeIds()) -- T421: trailers and the Timber Classic take their ids from the keyed table
 		MeshKit.Override = function(id, name, size)
 			local part = Instance.new("MeshPart")
 			part.Name = name
@@ -51,6 +53,7 @@ return function(t)
 	end
 
 	local function done()
+		Gate.SetIds(nil)
 		MeshKit.Override = nil
 		MeshKit.Reset()
 		VehicleMeshes.ResetWarnings()
@@ -75,7 +78,9 @@ return function(t)
 			end
 		end
 		for _, truck in pairs(ItemCatalog.Trucks) do
-			add(truck.id, VehicleModels.Truck(truck.id))
+			if truck.id ~= "TimberClassic" then -- its ids are the TimberClassic/<Part> keys, not VehicleModels'
+				add(truck.id, VehicleModels.Truck(truck.id))
+			end
 		end
 		for _, trailer in pairs(ItemCatalog.Trailers) do
 			add(trailer.id, VehicleModels.Trailer(trailer.id, nil))
@@ -387,8 +392,8 @@ return function(t)
 		"a missing template keeps the full part-built truck and warns once, naming the truck and the part",
 		function()
 			local rust = ItemCatalog.GetTruck("Rustbucket")
-			local missingId = VehicleModels.Truck("Rustbucket").Bed.meshId
 			templates()
+			local missingId = tonumber(Gate.IdOf("trucks/Rustbucket/Bed")) -- the keyed id is the one the truck uses (T421)
 			MeshKit.Override = function(id, name, size)
 				if id == missingId then
 					return nil

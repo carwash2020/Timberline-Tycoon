@@ -65,6 +65,17 @@ function BootReport.Line(world: any, players: number): string
 			count(n, "stump mesh", "stump meshes")
 		)
 	end
+	-- T421: vehicleMeshesMissing (the T421 mesh names with no id, "; " joined, set by GameServer from
+	-- VehicleMeshGate). Those vehicles are not for sale and not shown.
+	local vehicleMissing = stat("vehicleMeshesMissing")
+	if type(vehicleMissing) == "string" and vehicleMissing ~= "" then
+		local n = select(2, string.gsub(vehicleMissing, "; ", "; ")) + 1
+		line ..= string.format(
+			", %s missing (vehicleMeshesMissing: %s)",
+			count(n, "vehicle mesh", "vehicle meshes"),
+			vehicleMissing
+		)
+	end
 	local stretch = stat("stumpStretchViolations")
 	if type(stretch) == "number" and stretch > 0 then
 		line ..= string.format(", stumpStretchViolations %d", stretch)
@@ -82,6 +93,33 @@ end
 -- The custom events for this boot. A stat that isn't a number is left out
 -- (the printed line shows "?" instead). Zero failures are included, so a
 -- clean boot shows up as 0.
+-- A player's owned vehicles whose meshes are missing (they still spawn, or for the Timber Classic do not: say so).
+-- nil when every one they own is complete.
+function BootReport.OwnedMissingLine(
+	playerName: string,
+	trucks: { string },
+	trailers: { string },
+	missingOf: (kind: string, id: string) -> { string }
+): string?
+	local parts: { string } = {}
+	for _, id in ipairs(trucks) do
+		local missing = missingOf("Truck", id)
+		if #missing > 0 then
+			table.insert(parts, string.format("%s (%s)", id, table.concat(missing, ", ")))
+		end
+	end
+	for _, id in ipairs(trailers) do
+		local missing = missingOf("Trailer", id)
+		if #missing > 0 then
+			table.insert(parts, string.format("%s (%s)", id, table.concat(missing, ", ")))
+		end
+	end
+	if #parts == 0 then
+		return nil
+	end
+	return string.format("[GameServer] vehicleMeshesMissing: %s owns %s", playerName, table.concat(parts, "; "))
+end
+
 function BootReport.Events(world: any): { Event }
 	local out: { Event } = {}
 	for _, item in ipairs(EVENT_NAMES) do

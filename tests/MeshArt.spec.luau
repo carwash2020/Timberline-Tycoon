@@ -6,6 +6,7 @@
 -- C10–C12 cargo/section budgets. V1–V10 vehicles. X1–X2 axes. P5–P6 Lux and plots.
 return function(t)
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+	local Gate = t.load("ReplicatedStorage/Shared/VehicleMeshGate")
 	local AxeArt = t.load("ReplicatedStorage/Shared/Art/AxeArt")
 	local AxeModels = t.load("ReplicatedStorage/Shared/Art/AxeModels")
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
@@ -45,6 +46,7 @@ return function(t)
 
 	local function withMeshes(fn)
 		MeshKit.Reset()
+		Gate.SetIds(Gate.FakeIds(true)) -- T421: trailers take their ids from the keyed table
 		MeshKit.Override = function(id, name, size)
 			local part = Instance.new("MeshPart")
 			part.Name = name
@@ -53,6 +55,7 @@ return function(t)
 			return part
 		end
 		local ok, err = pcall(fn)
+		Gate.SetIds(nil)
 		MeshKit.Override = nil
 		MeshKit.Reset()
 		if not ok then
@@ -246,7 +249,12 @@ return function(t)
 				for _, part in ipairs(parts(model)) do
 					if part.Name == "Wheel" and part:GetAttribute("Radius") ~= nil then
 						wheels += 1
-						t.eq(part:GetAttribute("MeshId"), tostring(VehicleModels.Truck(def.id).Wheel.meshId))
+						t.eq(
+							part:GetAttribute("MeshId"),
+							if def.id == "TimberClassic"
+								then Gate.IdOf("TimberClassic/Wheel")
+								else tostring(VehicleModels.Truck(def.id).Wheel.meshId)
+						)
 					end
 					if part:GetAttribute("VisualMesh") == true then
 						t.eq(part.CanQuery, false, part.Name)
@@ -292,7 +300,9 @@ return function(t)
 						end
 					end
 					t.ok(hitch, def.id .. " trailer hitch mesh")
-					local want = VehicleModels.Trailer(trailer.id, def.id).Hitch.size
+					-- (T421: the hitch is the stats.json one for the tow truck's variant; the Classic tows the Pickup's)
+					local want =
+						t.load("ReplicatedStorage/Shared/Art/VehicleStats").Trailers[trailer.id][Gate.VariantFor(def.id)].pieces.Hitch.size
 					t.ok((hitch.Size - want).Magnitude < 1e-3, def.id .. " hitch size")
 				end
 			end
@@ -301,8 +311,9 @@ return function(t)
 
 	t.test("V10: one failed vehicle mesh keeps the part-built truck", function()
 		MeshKit.Reset()
+		local glassId = Gate.NumberFor(Gate.TruckKey("Pickup", "Glass")) or VehicleModels.Truck("Pickup").Glass.meshId
 		MeshKit.Override = function(id)
-			if id == VehicleModels.Truck("Pickup").Glass.meshId then
+			if id == glassId then
 				return nil
 			end
 			local part = Instance.new("MeshPart")
