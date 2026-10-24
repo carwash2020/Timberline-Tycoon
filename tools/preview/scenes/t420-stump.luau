@@ -1,14 +1,21 @@
 --!nocheck
 -- T420: stumps next to the round trunks they were cut from. PREVIEW ONLY:
--- this tool cannot load the 16 uploaded frustum MeshParts (InsertService),
--- so the stump body here is a stand-in of 14 stacked discs per sleeve between the
--- real radii (StumpLogic.Shape), drawn only so the
--- taper and the colours can be judged. The cap, the ring, the radii, the
+-- this tool cannot load the uploaded R13 and R22 frustum models (they are
+-- Model assets that only InsertService:LoadAsset can open, from Roblox's asset
+-- CDN, which this machine cannot reach, and the repo holds no GLB of them:
+-- Shared/StumpMeshIds lists model ids, not the meshes' own ids or files). So the
+-- stump body here is a STAND-IN: 40 stacked discs per sleeve, a frustum
+-- generated from the real base and top radii (StumpLogic.Shape: the R13 or R22
+-- radius set the game would pick, and the sleeve's taper), drawn only so the
+-- taper, the stacking and the colours can be judged. It has no UV bark texture,
+-- no 4-studs-per-tile tiling and no end-grain texture: those only exist on the
+-- uploaded mesh and in Studio. The cap, the ring, the radii, the
 -- heights and the weathering colours are the game's own code (TreeArt.StumpDress,
 -- StumpLogic). Lit by the viewer's sun and sky with shadows (three.js), not
 -- by Roblox: no material textures. Views:
 --   1  oak stump, cut 4.2 up              2  pine stump, cut 4.2 up
 --   3  oak trunk and its stump together   4  oak stump weathered, 150 s (next to a fresh one)
+--   5  Elder pine (R22) beside a normal pine (R13)   6  pine cut 15 up (two sleeves)   7  the Elder stump alone
 local Common = require("./_common")
 
 return {
@@ -64,7 +71,7 @@ return {
 					d.Color = StumpLogic.CapColor(d.Color, weather)
 				end
 			end
-			local n = 14
+			local n = 40
 			for _, sleeve in ipairs(shape.sleeves) do
 				local length = sleeve.y1 - sleeve.y0
 				for i = 1, n do
@@ -114,23 +121,47 @@ return {
 		stump("pine", 7, 4.2, V3.new(150, 0, 0), 0, 1.7, true)
 		stump("pine", 7, 4.2, V3.new(158, 0, 0), 0)
 		label("Elder pine (R22) | normal pine (R13)", V3.new(154, 0.8, 6))
+		-- The Elder alone.
+		stump("pine", 7, 4.2, V3.new(180, 0, 0), 0, 1.7, true)
+		label("Elder pine stump (R22)", V3.new(180, 0.8, 6))
 		return {
 			root = root,
-			shadowRadius = 160,
+			shadowRadius = 190,
 			cameras = {
-				{ pos = { 5, 8.5, -9 }, target = { 0, 3.2, 0 }, label = "oak stump, cut 4.2 up (stand-in body)" },
-				{ pos = { 35, 8.5, -9 }, target = { 30, 3.2, 0 }, label = "pine stump, cut 4.2 up (stand-in body)" },
-				{ pos = { 63, 6, -20 }, target = { 63, 4, 0 }, label = "oak trunk and stump, same taper" },
-				{ pos = { 93, 9, -10 }, target = { 93, 3, 0 }, label = "stump at 150 s (right) beside fresh (left)" },
+				{
+					pos = { 5, 8.5, -9 },
+					target = { 0, 3.2, 0 },
+					label = "oak stump, cut 4.2 up (frustum STAND-IN, not the uploaded mesh)",
+				},
+				{
+					pos = { 35, 8.5, -9 },
+					target = { 30, 3.2, 0 },
+					label = "pine stump, cut 4.2 up (frustum STAND-IN, not the uploaded mesh)",
+				},
+				{
+					pos = { 63, 6, -20 },
+					target = { 63, 4, 0 },
+					label = "oak trunk and stump, same taper (frustum STAND-IN, not the uploaded mesh)",
+				},
+				{
+					pos = { 93, 9, -10 },
+					target = { 93, 3, 0 },
+					label = "stump at 150 s (right) beside fresh (left) (frustum STAND-IN, not the uploaded mesh)",
+				},
 				{
 					pos = { 154, 7, -16 },
 					target = { 154, 3, 0 },
-					label = "Elder pine stump (R22) beside a normal pine (R13), cut 4.2 up (stand-in body)",
+					label = "Elder pine stump (R22) beside a normal pine (R13), cut 4.2 up (frustum STAND-IN, not the uploaded mesh)",
 				},
 				{
 					pos = { 128, 12, -18 },
 					target = { 120, 7, 0 },
-					label = "pine cut 15 up: stacked sleeves (stand-in body)",
+					label = "pine cut 15 up: stacked sleeves (frustum STAND-IN, not the uploaded mesh)",
+				},
+				{
+					pos = { 180, 5.5, -12 },
+					target = { 180, 2, 0 },
+					label = "the Elder pine stump alone (R22 radii), cut 4.2 up (frustum STAND-IN, not the uploaded mesh)",
 				},
 			},
 		}

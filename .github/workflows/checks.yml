@@ -23,8 +23,15 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
+    env:
+      # The render check (tools/render_touched.py) compares the pull request's preview/**/*.png with
+      # the base branch: it needs the base's history, so this job fetches all of it (the tests and the
+      # cloud test do not). Empty on a push to main, where the script falls back to origin/main.
+      RENDER_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Only the tool binaries are cached, never ~/.rokit/auth.toml (the token).
       - name: Cache Rokit tools

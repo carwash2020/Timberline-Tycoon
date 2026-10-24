@@ -84,7 +84,7 @@ function TownBuild.Build(): Folder
 		place(BuildingArt.Prop(prop.name, prop.seed), prop.cframe, map)
 	end
 	for _, sign in ipairs(town.signs) do
-		place(BuildingArt.Signpost(sign.text, sign.lit, nil, nil, sign.noWrap), sign.cframe, map)
+		place(BuildingArt.Signpost(sign.text, sign.lit, nil, nil, sign.noWrap, sign.panel), sign.cframe, map)
 	end
 	return map
 end

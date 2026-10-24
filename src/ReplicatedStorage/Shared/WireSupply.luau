@@ -3,15 +3,14 @@
 -- decides), the wire tool (which shows the price as you stretch) and the tests
 -- run the same rules.
 --
---   * Wire comes in packs of 32, 64 or 160 units only (one unit is one stud), at
---     the price in ItemCatalog.Wire (no price lives here). Any other amount is
---     refused.
+--   * Wire is sold as ONE box of 160 units (one unit is one stud), at the price
+--     in ItemCatalog.Wire (no price lives here). Any other amount is refused.
 --   * A run is placed at an output and stretched to an input along up to 4 bends,
---     at most 64 studs measured along its path (the server measures it from the
+--     at most 160 studs (the whole box) measured along its path (the server measures it from the
 --     piece positions and the bends it validated, never from a number the client
 --     sends). A fifth bend is refused.
---   * Stretching it uses up its length, rounded up, from your box. Cutting a
---     wire gives nothing back.
+--   * Stretching it uses up its length, rounded up, from your box; the rest of
+--     the box stays for later runs. Cutting a wire gives nothing back.
 --   * The box holds at most MaxStock (320).
 
 local ItemCatalog = require(script.Parent.ItemCatalog)
@@ -24,21 +23,17 @@ WireSupply.MaxLength = WireLogic.MaxRun -- studs in one run, along its path
 WireSupply.MaxBends = WireLogic.MaxBends
 WireSupply.StudsPerUnit = 1
 WireSupply.MaxStock = 320 -- units the box holds
-WireSupply.Packs = { 32, 64, 160 } :: { number } -- the only amounts sold, in units
+WireSupply.BoxUnits = ItemCatalog.GetWire().boxStuds -- the only amount sold, in units
+WireSupply.BoxPrice = ItemCatalog.GetWire().boxPrice
 
 export type Quote = {
 	state: string, -- "ok" | "short" | "far"
 	length: number,
 	units: number, -- what the wire uses (0 for a bad length)
-	cost: number, -- what those units cost at the shop price
 	short: number, -- units missing from the box (0 unless "short")
-	buyCost: number, -- what the missing units cost
+	buyCost: number, -- what the box that covers them costs (0 unless "short")
 	left: number, -- units left in the box after the wire (ok only)
 }
-
-function WireSupply.UnitPrice(): number
-	return ItemCatalog.GetWire().unitPrice
-end
 
 local function finite(n: unknown): boolean
 	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
@@ -83,23 +78,20 @@ function WireSupply.Quote(stock: number?, length: number): Quote
 			state = "far",
 			length = length,
 			units = WireSupply.UnitsFor(length),
-			cost = 0,
 			short = 0,
 			buyCost = 0,
 			left = have,
 		}
 	end
 	local units = WireSupply.UnitsFor(length)
-	local price = WireSupply.UnitPrice()
 	if units > have then
 		local missing = units - have
 		return {
 			state = "short",
 			length = length,
 			units = units,
-			cost = units * price,
 			short = missing,
-			buyCost = missing * price,
+			buyCost = WireSupply.BoxPrice,
 			left = have,
 		}
 	end
@@ -107,7 +99,6 @@ function WireSupply.Quote(stock: number?, length: number): Quote
 		state = "ok",
 		length = length,
 		units = units,
-		cost = units * price,
 		short = 0,
 		buyCost = 0,
 		left = have - units,
@@ -127,51 +118,45 @@ function WireSupply.Use(stock: number?, units: number): number?
 	return have - units
 end
 
--- Whether `units` is a pack that is sold.
-function WireSupply.IsPack(units: unknown): boolean
-	return type(units) == "number" and table.find(WireSupply.Packs, units) ~= nil
+-- Whether `units` is the one box that is sold.
+function WireSupply.IsBox(units: unknown): boolean
+	return type(units) == "number" and units == WireSupply.BoxUnits
 end
 
 -- A purchase of `units`: (true, nil, cost, newStock) or (false, reason). The
--- reasons are "amount" (not one of the packs), "full" (the box would pass
--- MaxStock) and "cash".
+-- reasons are "amount" (not the box), "full" (the box would pass MaxStock) and
+-- "cash".
 function WireSupply.Buy(cash: number, stock: number?, units: unknown): (boolean, string?, number?, number?)
-	if not WireSupply.IsPack(units) then
+	if not WireSupply.IsBox(units) then
 		return false, "amount", nil, nil
 	end
-	local n = units :: number
 	local have = WireSupply.Clean(stock)
-	if have + n > WireSupply.MaxStock then
+	if have + WireSupply.BoxUnits > WireSupply.MaxStock then
 		return false, "full", nil, nil
 	end
-	local cost = n * WireSupply.UnitPrice()
+	local cost = WireSupply.BoxPrice
 	if not finite(cash) or cash < cost then
 		return false, "cash", nil, nil
 	end
-	return true, nil, cost, have + n
+	return true, nil, cost, have + WireSupply.BoxUnits
 end
 
--- The smallest pack that covers `missing` units and fits in the box's `room`, or
--- 0 when none does (or nothing is missing).
-function WireSupply.PackFor(missing: number, room: number): number
-	if not finite(missing) or missing <= 0 then
+-- The box to buy for a run that is `missing` units short with `room` left in the
+-- box: its units, or 0 (nothing missing, or no room for a whole box).
+function WireSupply.BoxFor(missing: number, room: number): number
+	if not finite(missing) or missing <= 0 or room < WireSupply.BoxUnits then
 		return 0
 	end
-	for _, pack in ipairs(WireSupply.Packs) do
-		if pack >= missing and pack <= room then
-			return pack
-		end
-	end
-	return 0
+	return WireSupply.BoxUnits
 end
 
--- The pack to buy for a run that needs `needed` when the box holds `stock`.
+-- The box to buy for a run that needs `needed` when the box holds `stock`.
 function WireSupply.BuyAmount(stock: number?, needed: number): number
 	local have = WireSupply.Clean(stock)
 	if not finite(needed) then
 		return 0
 	end
-	return WireSupply.PackFor(math.floor(needed) - have, WireSupply.MaxStock - have)
+	return WireSupply.BoxFor(math.floor(needed) - have, WireSupply.MaxStock - have)
 end
 
 -- The corners of a run and its length, measured by the server from the two
@@ -200,7 +185,7 @@ end
 -- what the box holds, then what the wire needs).
 function WireSupply.Message(key: string, a: number?, b: number?): string
 	if key == "bought" then
-		return string.format("Bought %d wire.", a or 0)
+		return string.format("Bought a Wire Box: %d studs for %s.", a or 0, Util.formatCash(WireSupply.BoxPrice))
 	elseif key == "short" then
 		local have, need = a or 0, b or 0
 		return string.format("That wire needs %d and you have %d. Buy %d more.", need, have, math.max(0, need - have))
@@ -213,7 +198,7 @@ function WireSupply.Message(key: string, a: number?, b: number?): string
 	elseif key == "bends" then
 		return string.format("A run bends at most %d times.", WireSupply.MaxBends)
 	end
-	return string.format("Wire comes in packs of %s.", table.concat(WireSupply.Packs :: any, ", "))
+	return string.format("Wire is sold as one box of %d studs.", WireSupply.BoxUnits)
 end
 
 -- "$14", for the price on a button.

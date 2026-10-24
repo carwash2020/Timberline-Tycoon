@@ -9077,6 +9077,51 @@
     {
       "collision": false,
       "expectTypeId": 4,
+      "id": "80844007658561",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WireArt.luau Pieces "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "94852981021651",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WireArt.luau Pieces "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "136255398985840",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WireArt.luau Pieces "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "105703432161770",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WireArt.luau Pieces "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
+      "id": "131695301504197",
+      "kind": "mesh",
+      "places": 1,
+      "priority": 2,
+      "usedBy": "WireArt.luau Pieces "
+    },
+    {
+      "collision": false,
+      "expectTypeId": 4,
       "id": "115269271855313",
       "kind": "mesh",
       "places": 1,

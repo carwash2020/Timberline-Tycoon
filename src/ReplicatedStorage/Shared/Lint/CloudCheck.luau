@@ -25,6 +25,9 @@ export type Deps = {
 	buildMachine: ((string) -> Model?)?,
 	-- The 96 stump frustum models load and each holds a MeshPart (T420, StumpMeshes.CloudCheck); nil in lune.
 	stumpMeshes: (() -> ({ string }, number))?,
+	-- The wire spool's model loads, holds the five named MeshParts with the listed ids, and InitialSize / 100
+	-- assembles to the spool's box (T420, WireSpoolMeshes.CloudCheck); nil in lune.
+	spoolMesh: (() -> ({ string }, number))?,
 	log: ((string) -> ())?,
 }
 
@@ -73,6 +76,11 @@ function CloudCheck.Run(
 		local lines, checked = deps.stumpMeshes()
 		log(string.format("[cloud-test] stump meshes checked: %d", checked))
 		section("stump meshes", lines)
+	end
+	if deps.spoolMesh then
+		local lines, checked = deps.spoolMesh()
+		log(string.format("[cloud-test] wire spool models checked: %d", checked))
+		section("wire spool mesh", lines)
 	end
 	return { passed = passed, failed = #failures, failures = failures }
 end
