@@ -1014,15 +1014,15 @@ function BuildingArt.Sawmill(scale: number?): Model
 	dCyl(model, "Medallion", 0.36, 2.9, slice, HEART)
 	dCyl(model, "Medallion", 0.42, 1.7, slice, Kit.shade(HEART, -0.1))
 	dCyl(model, "Medallion", 0.48, 0.6, slice, Kit.shade(HEART, -0.25))
-	-- The shed's eave stands BuildingArt.EaveOverhang past the walls' outside faces (T404): the side walls at x +-11.33,
+	-- The shed's eave stands BuildingArt.EaveOverhang past the walls' outside faces (T404): the side walls at x -11.58 (the west wall stands 0.25 out for the lane lint) and 11.33,
 	-- the gables' front face at z -11.8 and the back wall's at 13.33, at any Scale.
 	local eave = BuildingArt.EaveOverhang / (scale or BuildingArt.Scale.Sawmill)
 	local roofFront, roofBack = Z0 - 0.3 - eave, Z1 + 0.33 + eave
 	gableRoof(
 		model,
-		CF(0, TOP, (roofFront + roofBack) / 2) * ANG(0, PI / 2, 0),
+		CF(-0.125, TOP, (roofFront + roofBack) / 2) * ANG(0, PI / 2, 0),
 		roofBack - roofFront,
-		2 * (11.33 + eave - 1.4), -- (the roof runs 1.4 past this span)
+		2 * (11.455 + eave - 1.4), -- (the roof runs 1.4 past this span)
 		RISE,
 		1.4,
 		rng,

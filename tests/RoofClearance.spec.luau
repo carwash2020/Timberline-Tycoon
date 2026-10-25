@@ -304,12 +304,12 @@ return function(t)
 	for _, scale in ipairs({ 1.5, 2.25 }) do
 		local label = "Sawmill at scale " .. tostring(scale)
 		local function shed(model)
-			-- the mill shed's walls and gables (the office cabin's walls are further out than |x| 11.4)
+			-- the mill shed's walls and gables (the office cabin's walls are further out than |x| 11.7)
 			local out = {}
 			for _, p in ipairs(partsOf(model)) do
 				if p.Name == "Wall" or p.Name == "Gable" then
 					local lo, hi = bounds(p)
-					if hi.X <= 11.4 * scale and lo.X >= -11.4 * scale then
+					if hi.X <= 11.4 * scale and lo.X >= -11.7 * scale then
 						table.insert(out, p)
 					end
 				end
