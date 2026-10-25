@@ -98,10 +98,12 @@ local function ensure(tool: Tool): Fx?
 	trail.Attachment1 = bottom
 	trail.Parent = handle
 
-	local sparkle = emitter("LuxSparkle", handle)
+	-- Both emitters sit on the blade attachment, never on the grip end of the
+	-- handle where the hand is, so nothing glitters around the player's body.
+	local burstParent: Instance = if burstAt and burstAt:IsA("Attachment") then burstAt else handle
+	local sparkle = emitter("LuxSparkle", burstParent)
 	sparkle.SpreadAngle = Vector2.new(180, 180)
 	sparkle.Speed = NumberRange.new(0.1, 0.4)
-	local burstParent: Instance = if burstAt and burstAt:IsA("Attachment") then burstAt else handle
 	local burst = emitter("LuxBurst", burstParent)
 	burst.Lifetime = NumberRange.new(0.2, 0.4)
 
@@ -160,32 +162,63 @@ local function syncTrails()
 	end
 end
 
+-- The effects live only while their axe is held: an axe that is back in the
+-- backpack (or gone) loses its trail and emitters, so nothing Lux is left in
+-- the world for a player who is not holding it.
+local function heldBySomeone(tool: Tool): boolean
+	local parent = tool.Parent
+	if not parent then
+		return false
+	end
+	for _, other in ipairs(Players:GetPlayers()) do
+		if other.Character == parent then
+			return true
+		end
+	end
+	return false
+end
+
+local function releaseUnheld()
+	for tool, fx in pairs(built) do
+		if not heldBySomeone(tool) then
+			built[tool] = nil
+			fx.trail:Destroy()
+			fx.sparkle:Destroy()
+			fx.burst:Destroy()
+		end
+	end
+end
+
+-- One frame of the effect. Exposed so a test can drive it.
+function LuxFX.Step(dt: number)
+	syncTrails()
+	releaseUnheld()
+	if not owns() then
+		return
+	end
+	local tool = equippedLux()
+	if not tool then
+		return
+	end
+	local fx = ensure(tool)
+	if not fx then
+		return
+	end
+	fx.cosmeticElapsed += dt
+	fx.sparkleElapsed += dt
+	local budget = Quality.Budget()
+	local due = QualityBudgets.CosmeticDue(budget.CosmeticHz, fx.cosmeticElapsed)
+	if due then
+		fx.cosmeticElapsed = 0
+	end
+	if LuxEffect.SparkleDue(budget.Tier, fx.sparkleElapsed, due) then
+		fx.sparkleElapsed = 0
+		fx.sparkle:Emit(1)
+	end
+end
+
 function LuxFX.Start()
-	RunService.Heartbeat:Connect(function(dt: number)
-		syncTrails()
-		if not owns() then
-			return
-		end
-		local tool = equippedLux()
-		if not tool then
-			return
-		end
-		local fx = ensure(tool)
-		if not fx then
-			return
-		end
-		fx.cosmeticElapsed += dt
-		fx.sparkleElapsed += dt
-		local budget = Quality.Budget()
-		local due = QualityBudgets.CosmeticDue(budget.CosmeticHz, fx.cosmeticElapsed)
-		if due then
-			fx.cosmeticElapsed = 0
-		end
-		if LuxEffect.SparkleDue(budget.Tier, fx.sparkleElapsed, due) then
-			fx.sparkleElapsed = 0
-			fx.sparkle:Emit(1)
-		end
-	end)
+	RunService.Heartbeat:Connect(LuxFX.Step)
 
 	Net.Remote("WorldFX").OnClientEvent:Connect(function(kind: unknown, payload: unknown)
 		if kind ~= "Cut" or type(payload) ~= "table" or not owns() then
