@@ -15,8 +15,10 @@ return function(t)
 	local fs = require("@lune/fs")
 	local GameConfig = t.shared("GameConfig")
 
-	-- Lune's ParticleEmitter has no Emit; count them.
-	pcall(roblox.implementMethod, "ParticleEmitter", "Emit", function() end)
+	-- Lune's ParticleEmitter has no Emit, and TreeFX.spec registers one on the
+	-- shared class registry (a second registration throws). So this spec
+	-- registers nothing: the fake quality tier is "low", where the sparkle
+	-- never emits, and the effects are checked by where they sit, not by Emit.
 
 	local FX_CLASSES = { "ParticleEmitter", "Trail", "Beam" }
 
@@ -122,10 +124,10 @@ return function(t)
 				},
 				Quality = {
 					Tier = function()
-						return "high"
+						return "low"
 					end,
 					Budget = function()
-						return { Tier = "high", CosmeticHz = 60 }
+						return { Tier = "low", CosmeticHz = 60 }
 					end,
 				},
 				SwingPose = {
