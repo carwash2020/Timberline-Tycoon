@@ -56,7 +56,7 @@ WireArt.Config = {
 			meshId = 94852981021651,
 			size = Vector3.new(0.944, 1.315, 1.07),
 			x = 0,
-			color = Color3.fromHex("#C47A42"),
+			color = Palette.Copper,
 			material = Enum.Material.Metal,
 		},
 		{

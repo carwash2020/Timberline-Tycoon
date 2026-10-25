@@ -28,6 +28,7 @@ return function(t)
 		StoneBase = "#8C877E",
 		IronBlack = "#2B2B2E",
 		Brass = "#C9A24A",
+		Copper = "#C47A42",
 		SignCream = "#F3E7C9",
 		SignInk = "#2A2420",
 		Ink = "#3C2814",
@@ -56,7 +57,7 @@ return function(t)
 		for name in pairs(HEX) do
 			t.eq(seen[name], true, name .. " is listed")
 		end
-		t.eq(#Palette.Names(), 38)
+		t.eq(#Palette.Names(), 39)
 	end)
 
 	t.test("an unknown name fails", function()

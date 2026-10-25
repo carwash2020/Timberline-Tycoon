@@ -196,20 +196,24 @@ return function(t)
 		t.eq(#parts(model), 7, "the five, the Handle and the SpoolCollider: nothing else")
 	end)
 
-	t.test("colours and materials: flanges and hub TimberBrown Wood, coil #C47A42 Metal, band Brass Metal", function()
-		local model = WireArt.Build((loadedTemplates()))
-		local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
-		local Enum = t.roblox.Enum
-		for _, name in ipairs({ "FlangeLeft", "FlangeRight", "Hub" }) do
-			t.eq(model[name].Color:ToHex(), "7A5230", name)
-			t.eq(model[name].Material, Enum.Material.Wood, name)
+	t.test(
+		"colours and materials: flanges and hub TimberBrown Wood, coil Palette.Copper (#C47A42) Metal, band Brass Metal",
+		function()
+			local model = WireArt.Build((loadedTemplates()))
+			local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
+			local Enum = t.roblox.Enum
+			for _, name in ipairs({ "FlangeLeft", "FlangeRight", "Hub" }) do
+				t.eq(model[name].Color:ToHex(), "7A5230", name)
+				t.eq(model[name].Material, Enum.Material.Wood, name)
+			end
+			t.eq(model.Coil.Color, Palette.Copper)
+			t.eq(model.Coil.Color:ToHex(), "C47A42")
+			t.eq(model.Coil.Material, Enum.Material.Metal)
+			t.eq(model.Band.Color, Palette.Brass)
+			t.eq(model.Band.Color:ToHex(), "C9A24A")
+			t.eq(model.Band.Material, Enum.Material.Metal)
 		end
-		t.eq(model.Coil.Color:ToHex(), "C47A42")
-		t.eq(model.Coil.Material, Enum.Material.Metal)
-		t.eq(model.Band.Color, Palette.Brass)
-		t.eq(model.Band.Color:ToHex(), "C9A24A")
-		t.eq(model.Band.Material, Enum.Material.Metal)
-	end)
+	)
 
 	t.test("the assembled bounding box is 1.0 (X) x 1.5 x 1.5 within 0.05 (a wrong /100 scale fails)", function()
 		local box = boxOf(WireArt.Build((loadedTemplates())))
