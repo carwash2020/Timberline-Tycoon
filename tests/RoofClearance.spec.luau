@@ -435,4 +435,118 @@ return function(t)
 		t.eq(a.backY, 12.15)
 		t.eq(a.reach, 4.8)
 	end)
+
+	-- The part-built porch and door frame. PorchPost is the Hearth's post inside the front wall, not this.
+	local function isSecondPorch(name)
+		return string.sub(name, 1, 6) == "Awning"
+			or string.sub(name, 1, 9) == "DoorFrame"
+			or string.sub(name, 1, 8) == "DoorPost"
+			or name == "DoorThreshold"
+	end
+
+	-- MapBuilder does not wait for meshes. Dress returns before TownMesh is set, ShopFacade then
+	-- builds the awning, and the swap dresses the mesh later. That swap used to leave the awning
+	-- posts as invisible solids and destroy the door and lanterns added in between.
+	t.test("RoofClearance: a mesh that lands after the facade leaves no porch and keeps the door", function()
+		MeshKit.Reset()
+		TownMeshes.ResetFallbacks()
+		MeshKit.Override = nil
+		local jobs = {}
+		local savedScheduler = MeshKit.Scheduler
+		local savedEngine = MeshKit.EngineLoad
+		MeshKit.Scheduler = {
+			spawn = function(fn)
+				table.insert(jobs, fn)
+			end,
+			wait = function() end,
+			clock = os.clock,
+		}
+		MeshKit.EngineLoad = function(_meshId, _fidelity)
+			local part = roblox.Instance.new("MeshPart")
+			part.Size = roblox.Vector3.new(4, 4, 4)
+			return part, nil
+		end
+		local function meshPart(_id, name, size)
+			local part = roblox.Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			return part
+		end
+		local function runJobs()
+			local n = 0
+			while #jobs > 0 and n < 40 do
+				n += 1
+				local batch = jobs
+				jobs = {}
+				for _, fn in ipairs(batch) do
+					fn()
+				end
+			end
+		end
+		local function visibleCount(model, name)
+			local n = 0
+			for _, p in ipairs(partsOf(model)) do
+				if p.Name == name and p.Transparency < 1 then
+					n += 1
+				end
+			end
+			return n
+		end
+		local ok, err = pcall(function()
+			local expect = {
+				ToolShed = { leaf = "BarnDoor", arm = "LampArm" },
+				HearthAndHome = { leaf = "DoorLeaf", planter = "Planter" },
+			}
+			for _, kind in ipairs({ "ToolShed", "HearthAndHome" }) do
+				MeshKit.Reset()
+				TownMeshes.ResetFallbacks()
+				MeshKit.Override = nil
+				table.clear(jobs)
+				local model = BuildingArt.Shop(kind, kind, ACCENT, 1.5)
+				model.Parent = roblox.Instance.new("Folder")
+				local before = 0
+				for _, p in ipairs(partsOf(model)) do
+					if isSecondPorch(p.Name) then
+						before += 1
+					end
+				end
+				t.ok(before > 0, kind .. " still builds the awning while the mesh is pending")
+				t.eq(model:GetAttribute("TownMesh"), nil, kind .. " has no TownMesh yet")
+				MeshKit.Override = meshPart
+				runJobs()
+				t.ok(model:GetAttribute("TownMesh") ~= nil, kind .. " mesh landed")
+				local left = {}
+				for _, p in ipairs(partsOf(model)) do
+					if isSecondPorch(p.Name) then
+						table.insert(
+							left,
+							string.format(
+								"%s transparency %s CanCollide %s",
+								p.Name,
+								tostring(p.Transparency),
+								tostring(p.CanCollide)
+							)
+						)
+					end
+				end
+				t.eq(left, {}, kind .. " porch and door frame are gone, not left as invisible solids")
+				local want = expect[kind]
+				t.ok(visibleCount(model, want.leaf) >= 1, kind .. " door leaf is still visible")
+				if want.arm then
+					t.ok(visibleCount(model, want.arm) >= 2, kind .. " lantern arms are still visible")
+				end
+				if want.planter then
+					t.ok(visibleCount(model, want.planter) >= 2, kind .. " planters are still visible")
+				end
+			end
+		end)
+		MeshKit.Scheduler = savedScheduler
+		MeshKit.EngineLoad = savedEngine
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		TownMeshes.ResetFallbacks()
+		if not ok then
+			error(err, 0)
+		end
+	end)
 end

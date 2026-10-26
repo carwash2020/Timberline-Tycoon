@@ -21,12 +21,20 @@ local TownMeshes = {}
 -- MeshFallback attribute naming the asset.
 local fellBack: { [string]: boolean } = {}
 
+-- Parts that already stood when a dress started. The world build does not wait for
+-- meshes (MapBuilder), so a shop's door, lanterns and facade are added while the
+-- first dress is still waiting. A later swap must not treat those as the shell.
+local shellParts: { [BasePart]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local shellMarked: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
 function TownMeshes.FellBack(assetId: string): boolean
 	return fellBack[assetId] == true
 end
 
 function TownMeshes.ResetFallbacks()
 	table.clear(fellBack)
+	table.clear(shellParts)
+	table.clear(shellMarked)
 end
 
 local function noteFallback(target: Instance, assetId: string)
@@ -468,11 +476,40 @@ local function keepPartCounter(model: Model, asset: TownModels.Asset, host: Base
 	return out
 end
 
+local function markShell(model: Model)
+	if shellMarked[model] then
+		return
+	end
+	shellMarked[model] = true
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and not nestedMesh(d, model) then
+			shellParts[d] = true
+		end
+	end
+end
+
+-- The uploaded shop mesh brings its own porch and door frame (T404). These names
+-- are the part-built copies. A colliding one (the awning posts) would otherwise
+-- stay as an invisible solid when the mesh lands after ShopFacade has built them.
+local function meshReplaces(name: string): boolean
+	return string.sub(name, 1, 6) == "Awning"
+		or string.sub(name, 1, 9) == "DoorFrame"
+		or string.sub(name, 1, 8) == "DoorPost"
+		or name == "DoorThreshold"
+end
+
 local function retire(model: Model, fresh: { [BasePart]: boolean })
 	local snapshot = model:GetDescendants()
 	for _, d in ipairs(snapshot) do
 		if d:IsA("BasePart") and not fresh[d] and not nestedMesh(d, model) then
-			if d:GetAttribute("VisualMesh") == true or not precious(d, model) then
+			if shellParts[d] ~= true then
+				-- Added while the mesh was loading: keep the door and the lanterns.
+				-- The part-built porch and door frame still go. They are the second
+				-- roof, and a post that collides would be left invisible.
+				if meshReplaces(d.Name) then
+					d:Destroy()
+				end
+			elseif d:GetAttribute("VisualMesh") == true or not precious(d, model) then
 				d:Destroy()
 			else
 				d.Transparency = 1
@@ -529,6 +566,9 @@ local function dressNow(model: Model, assetId: string, options: Options?): boole
 	if scale.X <= 0 or scale.Y <= 0 or scale.Z <= 0 then
 		return false
 	end
+	-- Remember the shell before this attempt parents any mesh. A retry (the mesh
+	-- was still loading) must not mark the door and facade that were added since.
+	markShell(model)
 	local made: { MeshPart } = {}
 	local ids: { number } = {}
 	local wantsCollider = options ~= nil and options.collision == true
