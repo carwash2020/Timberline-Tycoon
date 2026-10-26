@@ -1,0 +1,878 @@
+{
+  "bay": [
+    {
+      "x": 780,
+      "z": 420
+    },
+    {
+      "x": 1000,
+      "z": 420
+    },
+    {
+      "x": 1000,
+      "z": -1000
+    },
+    {
+      "x": 780,
+      "z": -1000
+    }
+  ],
+  "branchWidth": 24,
+  "bridge": {
+    "fee": 100,
+    "half": 18,
+    "x": 113,
+    "z": 80
+  },
+  "built": false,
+  "cab": {
+    "x": 18,
+    "y": 12,
+    "z": 18
+  },
+  "carFerry": true,
+  "cloudRadius": 64,
+  "cloudY": 840,
+  "coast": {
+    "beachWidth": 70,
+    "northZ": 420,
+    "shoreX": 780
+  },
+  "doc": "docs/MAP_T408.md",
+  "doorway": 10,
+  "fastTravel": false,
+  "ferryDeckLength": 22,
+  "ferryDeckWidth": 14,
+  "ferryFare": 400,
+  "ferryTravelSec": 40,
+  "footWidth": 8,
+  "gondola": false,
+  "islandDock": {
+    "x": 910.5396740131167,
+    "z": -25.86919577626479
+  },
+  "liftBridgeFee": 100,
+  "liftLogs": 5,
+  "liftY0": 800,
+  "liftY1": 880,
+  "lighthouse": {
+    "pictureOnly": true,
+    "searchZ0": -440,
+    "searchZ1": -180,
+    "x": 760,
+    "z": -310
+  },
+  "liveSky": {
+    "radius": 100,
+    "x": 680,
+    "y": 650,
+    "z": 280
+  },
+  "lodge": {
+    "x": -200,
+    "z": 860
+  },
+  "mainWidth": 32,
+  "mainlandDock": {
+    "x": 780,
+    "z": 136
+  },
+  "palette": {
+    "ash": "3A3433",
+    "bayou": "4E4A36",
+    "canopy": "F2E6C8",
+    "cliff": "7E766C",
+    "cream": "F3E7C9",
+    "ember": "FF7A1A",
+    "frostGlow": "BFE3F2",
+    "gloam": "5A4A3E",
+    "gloamGlow": "7A4FD0",
+    "ink": "3C2814",
+    "lumen": "FFF4C2",
+    "mesa": "C8693E",
+    "pine": "5A8A3C",
+    "sand": "D8C69A",
+    "snow": "EEF3F7",
+    "trail": "8E6C4A",
+    "valley": "6E9F45",
+    "water": "4E7E93"
+  },
+  "plume": {
+    "x": 486,
+    "z": 536
+  },
+  "regions": [
+    {
+      "id": "valley",
+      "name": "Timber Valley",
+      "order": 1,
+      "proposed": false,
+      "radius": 143,
+      "tint": "6E9F45",
+      "x": 8,
+      "z": -178
+    },
+    {
+      "id": "pine",
+      "name": "Pine Ridge",
+      "order": 2,
+      "proposed": false,
+      "radius": 150,
+      "tint": "5A8A3C",
+      "x": -500,
+      "z": 110
+    },
+    {
+      "id": "frost",
+      "name": "Frostpeak",
+      "order": 3,
+      "proposed": false,
+      "radius": 115,
+      "tint": "EEF3F7",
+      "x": 0,
+      "z": 720
+    },
+    {
+      "id": "caldera",
+      "name": "Ember Caldera",
+      "order": 4,
+      "proposed": false,
+      "radius": 125,
+      "tint": "3A3433",
+      "x": 450,
+      "z": 500
+    },
+    {
+      "id": "gloam",
+      "name": "Gloam Ravine",
+      "order": 5,
+      "proposed": false,
+      "radius": 80,
+      "tint": "5A4A3E",
+      "x": 10,
+      "z": -720
+    },
+    {
+      "id": "bayou",
+      "name": "Bayou",
+      "order": 6,
+      "proposed": false,
+      "radius": 140,
+      "tint": "4E4A36",
+      "x": -760,
+      "z": -700
+    },
+    {
+      "id": "mesa",
+      "name": "Red Mesa",
+      "order": 7,
+      "proposed": false,
+      "radius": 115,
+      "tint": "C8693E",
+      "x": 590,
+      "z": -790
+    },
+    {
+      "id": "isle",
+      "name": "Lantern Isle",
+      "order": 8,
+      "proposed": false,
+      "radius": 55,
+      "tint": "D8C69A",
+      "x": 930,
+      "z": -50
+    },
+    {
+      "id": "skyroot",
+      "name": "Skyroot Highlands",
+      "order": 9,
+      "proposed": true,
+      "radius": 100,
+      "tint": "F2E6C8",
+      "x": -200,
+      "z": 900
+    }
+  ],
+  "removals": [
+    {
+      "deleteInThisPr": false,
+      "id": "gondola-station",
+      "mustKeep": false,
+      "reason": "Town station at the live gondola spot. Cloud access is the trunk lift, so the station has no job. Not on the MustKeep list.",
+      "title": "Gondola station",
+      "x": -40,
+      "z": 150
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "gondola-cabin",
+      "mustKeep": false,
+      "reason": "GondolaService builds a cabin tagged GondolaCabin for the ride. No ride, no cabin. It has no fixed plot.",
+      "title": "Gondola cabin"
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "gondola-cable",
+      "mustKeep": false,
+      "points": [
+        {
+          "x": -40,
+          "z": 150
+        },
+        {
+          "x": 680,
+          "z": 280
+        }
+      ],
+      "reason": "The cable runs from the town station to the live sky disc. The overview draws no cable. The trunk lift replaces the ride.",
+      "title": "Gondola cable"
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "turnstile",
+      "mustKeep": false,
+      "reason": "BuildingArt.SkyTurnstile is the Gondola Pass gate. MapBuilder does not place it. It should not be built for a ride that is leaving.",
+      "title": "Gondola turnstile"
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "cloud-chute",
+      "mustKeep": false,
+      "reason": "The isle CloudChute and its flume sit on the live sky disc. The trunk lift has its own log chute. The Sky Bin stays until that chute exists.",
+      "title": "Cloud chute",
+      "x": 680,
+      "z": 280
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "sky-forge-court",
+      "mustKeep": true,
+      "reason": "The court stands on the south meadow. The forge belongs on the clouds. KeeperSpot, TemperSpot and the four relic sockets are MustKeep: they move with the forge, they do not vanish.",
+      "title": "Ground Sky Forge court",
+      "x": -112,
+      "z": -20
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "ring-road",
+      "mustKeep": false,
+      "points": [
+        {
+          "x": 600,
+          "z": 80
+        },
+        {
+          "x": 502.28143310546875,
+          "z": 214.58590698242188
+        },
+        {
+          "x": 363.7306823730469,
+          "z": 290
+        },
+        {
+          "x": 275.7716369628906,
+          "z": 355.7716369628906
+        },
+        {
+          "x": 200,
+          "z": 426.41015625
+        },
+        {
+          "x": 103.52761840820312,
+          "z": 466.3703308105469
+        },
+        {
+          "x": 2.4492935145879226e-14,
+          "z": 480
+        },
+        {
+          "x": -108.7040023803711,
+          "z": 485.6888427734375
+        },
+        {
+          "x": -260,
+          "z": 530.3331909179688
+        },
+        {
+          "x": -424.2640686035156,
+          "z": 504.2640686035156
+        },
+        {
+          "x": -519.615234375,
+          "z": 380
+        },
+        {
+          "x": -579.5554809570312,
+          "z": 235.2914276123047
+        },
+        {
+          "x": -600,
+          "z": 80
+        },
+        {
+          "x": -579.5554809570312,
+          "z": -75.29142761230469
+        },
+        {
+          "x": -519.615234375,
+          "z": -220
+        },
+        {
+          "x": -424.2640686035156,
+          "z": -344.2640686035156
+        },
+        {
+          "x": -300,
+          "z": -439.615234375
+        },
+        {
+          "x": -155.2914276123047,
+          "z": -499.55548095703125
+        },
+        {
+          "x": -1.1021821069755536e-13,
+          "z": -520
+        },
+        {
+          "x": 155.2914276123047,
+          "z": -499.55548095703125
+        },
+        {
+          "x": 300,
+          "z": -439.615234375
+        },
+        {
+          "x": 424.2640686035156,
+          "z": -344.2640686035156
+        },
+        {
+          "x": 519.615234375,
+          "z": -220
+        },
+        {
+          "x": 579.5554809570312,
+          "z": -75.29142761230469
+        },
+        {
+          "x": 600,
+          "z": 80
+        }
+      ],
+      "reason": "RingRoad only exists to circle the old map. The valley plan has no ring. Roads that still go to a region stay, under the new names.",
+      "title": "Ring road"
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "truck-tunnel",
+      "mustKeep": false,
+      "points": [
+        {
+          "x": 60,
+          "z": 700
+        },
+        {
+          "x": 180,
+          "z": 660
+        },
+        {
+          "x": 300,
+          "z": 600
+        },
+        {
+          "x": 400,
+          "z": 560
+        }
+      ],
+      "reason": "The tunnel is the ring's shortcut between the peak and the caldera. Caldera Road is a surface road, so the bore has no job.",
+      "title": "Truck tunnel"
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "floating-isles",
+      "mustKeep": false,
+      "reason": "The live sky disc floats in the east, reached by the gondola. The highlands are the north summit, the switchback, and the trunk lift. Lumenwood moves. The gondola top station and the root bridges do not.",
+      "title": "Floating isles with no road summit",
+      "x": 680,
+      "z": 280
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "skyroot-bloom",
+      "mustKeep": false,
+      "reason": "WORLD_DESIGN retires the bloom. ForestService still sets SkyrootBloom and it still doubles figure chances, so it is not dead. It is not a reason to visit. Leave the clock until Connor says to remove it.",
+      "title": "Skyroot Bloom clock",
+      "x": -200,
+      "z": 900
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "north-toll",
+      "mustKeep": true,
+      "reason": "Old Tolly's booth gates a spruce strip the nine regions do not name. The counter is MustKeep. The lift bridge is the crossing this plan prices. Connor picks whether the booth stays.",
+      "title": "Folded north toll booth",
+      "x": 22,
+      "z": 888
+    },
+    {
+      "deleteInThisPr": false,
+      "id": "meadow-lookout",
+      "mustKeep": false,
+      "reason": "It stands just west of the ground court, telescope toward town. If the court goes, this may still be a deliberate view. Connor decides. It is not deleted here.",
+      "title": "Meadow lookout beside the court",
+      "x": -136,
+      "z": -20
+    }
+  ],
+  "river": [
+    {
+      "x": -200,
+      "z": 876
+    },
+    {
+      "x": 170,
+      "z": 820
+    },
+    {
+      "x": 170,
+      "z": 640
+    },
+    {
+      "x": 113,
+      "z": 520
+    },
+    {
+      "x": 113,
+      "z": -280
+    },
+    {
+      "x": 780,
+      "z": -160
+    }
+  ],
+  "riverHalf": 18,
+  "riverX": 113,
+  "roads": [
+    {
+      "kind": "main",
+      "name": "Main Street",
+      "points": [
+        {
+          "x": -128,
+          "z": 80
+        },
+        {
+          "x": 64,
+          "z": 80
+        }
+      ],
+      "width": 32
+    },
+    {
+      "kind": "main",
+      "name": "Pine Road",
+      "points": [
+        {
+          "x": -125,
+          "z": 80
+        },
+        {
+          "x": -600,
+          "z": 80
+        },
+        {
+          "x": -560,
+          "z": 200
+        }
+      ],
+      "sign": "PINE RIDGE",
+      "width": 32
+    },
+    {
+      "kind": "main",
+      "name": "Frost Road",
+      "points": [
+        {
+          "x": 0,
+          "z": 205
+        },
+        {
+          "x": 0,
+          "z": 480
+        },
+        {
+          "x": 0,
+          "z": 760
+        }
+      ],
+      "sign": "FROSTPEAK",
+      "width": 32
+    },
+    {
+      "kind": "main",
+      "name": "Bay Road",
+      "points": [
+        {
+          "x": 64,
+          "z": 80
+        },
+        {
+          "x": 113,
+          "z": 80
+        },
+        {
+          "x": 276,
+          "z": 80
+        },
+        {
+          "x": 600,
+          "z": 80
+        },
+        {
+          "x": 780,
+          "z": 136
+        }
+      ],
+      "sign": "FERRY",
+      "width": 32
+    },
+    {
+      "kind": "branch",
+      "name": "Dealership Spur",
+      "points": [
+        {
+          "x": 189.25,
+          "z": 80
+        },
+        {
+          "x": 189.25,
+          "z": 100.3
+        }
+      ],
+      "width": 24
+    },
+    {
+      "kind": "main",
+      "name": "Caldera Road",
+      "points": [
+        {
+          "x": 276,
+          "z": 80
+        },
+        {
+          "x": 276,
+          "z": 356
+        },
+        {
+          "x": 410,
+          "z": 460
+        }
+      ],
+      "sign": "EMBER CALDERA",
+      "width": 32
+    },
+    {
+      "kind": "main",
+      "name": "Mesa Road",
+      "points": [
+        {
+          "x": 600,
+          "z": 80
+        },
+        {
+          "x": 424,
+          "z": -344
+        },
+        {
+          "x": 540,
+          "z": -470
+        },
+        {
+          "x": 585,
+          "z": -700
+        }
+      ],
+      "sign": "RED MESA",
+      "width": 32
+    },
+    {
+      "kind": "main",
+      "name": "Gloam Road",
+      "points": [
+        {
+          "x": 0,
+          "z": 20
+        },
+        {
+          "x": 0,
+          "z": -32
+        },
+        {
+          "x": 0,
+          "z": -520
+        },
+        {
+          "x": 10,
+          "z": -720
+        }
+      ],
+      "sign": "GLOAM RAVINE",
+      "width": 32
+    },
+    {
+      "kind": "main",
+      "name": "Skyroad",
+      "points": [
+        {
+          "x": 0,
+          "z": 760
+        },
+        {
+          "x": -180,
+          "z": 800
+        },
+        {
+          "x": -180,
+          "z": 860
+        },
+        {
+          "x": -200,
+          "z": 860
+        }
+      ],
+      "sign": "SKY PASS",
+      "width": 32
+    },
+    {
+      "kind": "branch",
+      "name": "Pine Link",
+      "points": [
+        {
+          "x": -600,
+          "z": 80
+        },
+        {
+          "x": -460,
+          "z": -300
+        }
+      ],
+      "width": 24
+    },
+    {
+      "kind": "branch",
+      "name": "Gloam Link",
+      "points": [
+        {
+          "x": -460,
+          "z": -300
+        },
+        {
+          "x": 0,
+          "z": -520
+        }
+      ],
+      "width": 24
+    },
+    {
+      "kind": "branch",
+      "name": "Bayou Road",
+      "points": [
+        {
+          "x": -460,
+          "z": -300
+        },
+        {
+          "x": -692,
+          "z": -612
+        },
+        {
+          "x": -760,
+          "z": -700
+        }
+      ],
+      "sign": "BAYOU",
+      "width": 24
+    },
+    {
+      "kind": "foot",
+      "name": "Cave Path",
+      "points": [
+        {
+          "x": 10,
+          "z": -720
+        },
+        {
+          "x": 32,
+          "z": -744
+        }
+      ],
+      "width": 8
+    },
+    {
+      "kind": "foot",
+      "name": "Lodge Path",
+      "points": [
+        {
+          "x": -200,
+          "z": 860
+        },
+        {
+          "x": -200,
+          "z": 900
+        }
+      ],
+      "width": 8
+    }
+  ],
+  "rootBridges": false,
+  "sawmill": {
+    "x": 0,
+    "z": 110
+  },
+  "sellFloor": {
+    "x0": 31,
+    "x1": 87,
+    "z0": 84,
+    "z1": 139
+  },
+  "shaft": 24,
+  "shops": [
+    {
+      "id": "ToolShed",
+      "kept": true,
+      "label": "TOOL SHED",
+      "n": 1,
+      "why": "Axes and mill tools. In town, in sight of spawn.",
+      "x": -84,
+      "z": 117.7
+    },
+    {
+      "id": "GeneralStore",
+      "kept": true,
+      "label": "GENERAL STORE",
+      "n": 2,
+      "why": "Home goods. In town, in sight of spawn. Live shop id HearthAndHome.",
+      "x": -100,
+      "z": 187.5
+    },
+    {
+      "id": "WeighHouse",
+      "kept": true,
+      "label": "WEIGH HOUSE",
+      "n": 3,
+      "why": "Millie buys logs. Truck back-in off Main Street, on the river. Kept.",
+      "x": 53,
+      "z": 111
+    },
+    {
+      "id": "LandOffice",
+      "kept": true,
+      "label": "LAND OFFICE",
+      "n": 4,
+      "why": "Old Hank sells plots, at the plot edge.",
+      "x": 153.5,
+      "z": 100
+    },
+    {
+      "id": "Dealership",
+      "kept": true,
+      "label": "DEALERSHIP",
+      "n": 5,
+      "why": "Trucks. Across the first lift bridge.",
+      "x": 189.25,
+      "z": 100.3
+    },
+    {
+      "id": "CoatKiosk",
+      "kept": false,
+      "label": "COAT KIOSK",
+      "n": 6,
+      "why": "Insulated Coat, $500. At the Frostpeak road foot, before the cold.",
+      "x": -28,
+      "z": 480
+    },
+    {
+      "id": "HeatBoots",
+      "kept": false,
+      "label": "HEAT BOOTS",
+      "n": 7,
+      "why": "Heat Boots, $800. Caldera rest stop, before the heat.",
+      "x": 392.83252811501563,
+      "z": 482.11962723642216
+    },
+    {
+      "id": "OddsAndEnds",
+      "kept": false,
+      "label": "ODDS AND ENDS",
+      "n": 8,
+      "why": "Odd finds, where the Pine link meets the Gloam link.",
+      "x": -460,
+      "z": -300
+    },
+    {
+      "id": "Sparkworks",
+      "kept": false,
+      "label": "SPARKWORKS",
+      "n": 9,
+      "why": "Logic and machines, on the Lantern Isle harbour.",
+      "x": 923.0947230369123,
+      "z": -41.43745656577138
+    },
+    {
+      "id": "SkyForge",
+      "kept": false,
+      "label": "SKY FORGE",
+      "n": 10,
+      "why": "End-game forge. On the clouds only.",
+      "x": -172,
+      "y": 840,
+      "z": 918
+    },
+    {
+      "id": "SkyMarket",
+      "kept": false,
+      "label": "SKY MARKET",
+      "n": 11,
+      "why": "Sky goods. On the clouds only.",
+      "x": -230,
+      "y": 840,
+      "z": 884
+    },
+    {
+      "id": "SecretShop",
+      "kept": false,
+      "label": "SECRET SHOP",
+      "n": 12,
+      "why": "One shop in the Gloam caves. No name until Connor gives it one.",
+      "x": 32,
+      "z": -744
+    },
+    {
+      "id": "BaitShack",
+      "kept": true,
+      "label": "BAIT SHACK",
+      "n": 13,
+      "why": "Waders for the mud. Already standing; this plan does not move it.",
+      "x": -720,
+      "z": -660
+    }
+  ],
+  "skyroot": {
+    "x": -200,
+    "z": 900
+  },
+  "spawn": {
+    "x": 0,
+    "z": 40
+  },
+  "town": {
+    "x0": -125,
+    "x1": 140,
+    "z0": -32,
+    "z1": 205
+  },
+  "updraft": false,
+  "weighHouse": {
+    "x": 53,
+    "z": 111
+  }
+}

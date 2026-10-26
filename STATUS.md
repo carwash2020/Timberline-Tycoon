@@ -19,6 +19,10 @@ block the build; #157 client audit; #158 world first look; #159 store interiors:
 
 **Still open:** only this branch (docs, CI pin, Reduce flashing). All four store interiors (Tool Shed, Hearth & Home, Sparkworks, Dealership; #159 squashed #160 to #162 in) are on main, with `previews/store-interiors/`.
 
+## T408 map plan (draft, not built)
+
+Connor's nine-region river valley is drawn for approval. It does not change the live map: `TerrainGen`, `WorldPlan` and `MapBuilder` do not read it. The plan is `docs/MAP_T408.md` and `Shared/World/WorldPlanDraft.luau`. The picture is `previews/t408/overview.png` (north up). Removals, including the ground Sky Forge court, are cards in `previews/t408/removals/` and are not deleted. No gondola, no ring road. Trunk lift is cloud access. Bridge $100 and ferry $400 are the live `GameConfig` keys until Connor picks. Studio cannot show this: it is a picture, not a place.
+
 **Stages:** with #138 on main the `Stage:S1` to `S8` keys are written (`MilestoneService.CheckStages`); the stage (`StageOf`)
 still also comes from the best axe and gear. S8 (Master Timber) is set only by its key: deriving it from a full plot is awaiting
 Connor (it would raise cash packs about 25%).
