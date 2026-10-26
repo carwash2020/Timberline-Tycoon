@@ -4428,6 +4428,8 @@ Connor's Studio playtest: second porch roofs clip inside building fronts (the Sa
 **Existing spec changed on purpose**
 - `DealershipLot.spec` ("the hall and the lot stay off the street, plaza and paths"): the Dealership's new 1.05 eave hangs over the last stud of `DealershipPath` at the hall's front. The roof slab's underside is 15 studs up, so a part named Roof whose underside is 10 or more studs up is exempt from that one check; nothing else is.
 
+**Follow-up (mesh lands after the facade).** MapBuilder does not wait for meshes, so `TownMeshes.Dress` often returns before `TownMesh` is set and `ShopFacade` still builds the awning. When the mesh arrived, the swap hid colliding awning posts (invisible solids, no blocker reason) and destroyed the door and the Tool Shed lanterns added in between. The swap now remembers the shell from the first attempt: the part-built awning and door frame are removed, and the door, lanterns and planters stay. `RoofClearance` covers that late landing for the Tool Shed and Hearth & Home.
+
 **Not done**
 - The Sawmill mesh/GLB is untouched (and needs no change).
 - Dealership and Sparkworks have no uploaded shop mesh, so there are no mesh renders of them.
