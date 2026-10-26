@@ -75,11 +75,11 @@ local function roadPoints(name: string): { Vector2 }
 end
 
 local function pointAt(points: { Vector2 }, index: number): Vector2
-	local p = points[index]
-	if p == nil then
+	-- A Vector2 cannot be compared with nil under the Roblox type checker.
+	if index < 1 or index > #points then
 		error("short road", 2)
 	end
-	return p
+	return points[index]
 end
 
 local function paintNamed(name: string): WorldLayout.Paint
