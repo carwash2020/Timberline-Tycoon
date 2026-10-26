@@ -2427,12 +2427,19 @@ end
 -- rocks at the posts' feet are looks only (SELL LOGS HERE's stand by the
 -- pad's lane, some road signs' 1.5 studs off the road).
 -- `noWrap` turns the label's TextWrapped off so a long line shrinks to fit.
+-- `creamPanel` (T420, the PLOT DISTRICT sign): the board is PlankHoney planks and
+-- the text sits ON the board face, in Ink on a SignCream panel (SignPanel,
+-- one on each face, a hair proud of the board so nothing z-fights), where
+-- the other signs write cream on the plank itself.
+BuildingArt.SignPanelInset = 0.06 -- how far a panel stands off the board's face
+BuildingArt.SignPanelMargin = 0.4 -- the plank showing round a panel
 function BuildingArt.Signpost(
 	text: string,
 	lit: boolean?,
 	solidBoard: boolean?,
 	gateId: string?,
-	noWrap: boolean?
+	noWrap: boolean?,
+	creamPanel: boolean?
 ): Model
 	local model = Kit.model("Signpost")
 	local rng = Kit.rng(#text * 13 + 5)
@@ -2440,13 +2447,42 @@ function BuildingArt.Signpost(
 		Kit.part(model, "Post", V3(0.7, 9.8, 0.7), CF(s * 4.95, 4.9, 0), TIMBER, MAT.Wood)
 		dBox(model, "PostCap", V3(0.95, 0.3, 0.95), CF(s * 4.95, 9.9, 0), TIMBER_LIGHT)
 	end
-	local board = signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, text, PLANK[2], TIMBER, SIGN_INK, true)
+	local board: Part
+	local textParts: { Part } = {}
+	if creamPanel then
+		board = signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, "", PLANK[1], TIMBER, SIGN_INK, true)
+		for _, gui in ipairs(board:GetChildren()) do
+			gui:Destroy() -- the text goes on the panels, not under them
+		end
+		-- Plank seams (the margin shows them), then a cream panel on each face.
+		for _, y in ipairs({ -1.1, 0, 1.1 }) do
+			dBox(model, "PlankSeam", V3(9, 0.07, 0.42), CF(0, 7 + y, 0), Kit.shade(Palette.PlankHoney, -0.22))
+		end
+		local m, inset = BuildingArt.SignPanelMargin, BuildingArt.SignPanelInset
+		for _, s in ipairs({ -1, 1 }) do
+			local face = dBox(
+				model,
+				"SignPanel",
+				V3(9 - 2 * m, 4.4 - 2 * m, inset),
+				CF(0, 7, s * (0.2 + inset / 2)),
+				Palette.SignCream,
+				MAT.SmoothPlastic
+			)
+			Kit.signText(face, text, Palette.Ink, { if s < 0 then Enum.NormalId.Front else Enum.NormalId.Back })
+			table.insert(textParts, face)
+		end
+	else
+		board = signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, text, PLANK[2], TIMBER, SIGN_INK, true)
+		table.insert(textParts, board)
+	end
 	if noWrap then
 		-- TextScaled shrinks a long line to fit once wrapping is off.
-		for _, gui in ipairs(board:GetChildren()) do
-			for _, label in ipairs(gui:GetChildren()) do
-				if label:IsA("TextLabel") then
-					label.TextWrapped = false
+		for _, holder in ipairs(textParts) do
+			for _, gui in ipairs(holder:GetChildren()) do
+				for _, label in ipairs(gui:GetChildren()) do
+					if label:IsA("TextLabel") then
+						label.TextWrapped = false
+					end
 				end
 			end
 		end
@@ -2485,7 +2521,11 @@ function BuildingArt.Signpost(
 			Kit.decor(p)
 		end
 	end
-	TownMeshes.Dress(model, "Signpost")
+	-- The mesh signpost sets its board low on the ground, away from the text, so a panel sign
+	-- (its board is the kit's own planks, with the text on it) is never swapped for it.
+	if not creamPanel then
+		TownMeshes.Dress(model, "Signpost")
+	end
 	return model
 end
 

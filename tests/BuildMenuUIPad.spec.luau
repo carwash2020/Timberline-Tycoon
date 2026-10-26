@@ -350,21 +350,23 @@ return function(t)
 	end)
 
 	t.test(
-		"a card's name is 16 px wrapped over two lines, never truncated; the corner tab is the seal colour",
+		"a card's name is 16 px wrapped over two lines, never truncated; the corner tab is Blueprint blue #2F5D8A, the same on every card",
 		function()
 			local s = setup()
 			s.UI.Start()
 			s.UI.Open(opts({}))
-			local BlueprintArt = t.load("ReplicatedStorage/Shared/Art/BlueprintArt")
+			local tabs = 0
 			for _, tile in ipairs(s.UI.Tiles()) do
 				local name = tile.button.Plate:FindFirstChild("Name")
 				t.eq(name.TextWrapped, true)
 				t.eq(name.TextTruncate, Enum.TextTruncate.None, "no ellipsis")
 				t.eq(name.TextScaled, false)
 				t.ok(name.TextSize >= 14)
-				t.eq(tile.button.SealTab.Wedge.BackgroundColor3, BlueprintArt.SealColor(tile.entry.id))
+				t.eq(tile.button.SealTab.Wedge.BackgroundColor3:ToHex(), "2F5D8A", "Blueprint blue")
+				tabs += 1
 				t.ok(tile.button.SelectionImageObject ~= nil, "a focus ring, not Roblox's default box")
 			end
+			t.ok(tabs > 0, "there are cards")
 		end
 	)
 end

@@ -340,10 +340,13 @@ return function(t)
 		-- server at runtime, in the background, after the build (StumpMeshes
 		-- preloads them from SectionTrees.Init). That one loader is the only
 		-- allowed InsertService user; nothing on the map build path may be.
+		-- The wire spool (T420) is one uploaded model, loaded once at boot by
+		-- WireSpoolMeshes: the second named runtime exception. Both are server-only
+		-- loaders started after the build; neither is reachable from it.
 		t.eq(
 			filesWith("InsertService", true),
-			{ "src/ServerScriptService/StumpMeshes.luau" },
-			"no model downloads on the build path (the stump loader is the one runtime exception)"
+			{ "src/ServerScriptService/StumpMeshes.luau", "src/ServerScriptService/WireSpoolMeshes.luau" },
+			"no model downloads on the build path (the stump loader and the spool loader are the two runtime exceptions)"
 		)
 		for path, text in pairs(codeOf) do
 			if string.find(path, "ServerScriptService", 1, true) then

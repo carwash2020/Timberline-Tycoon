@@ -1,6 +1,6 @@
 --!nocheck
--- WireStock (T420, server): wire is a single-use item. The server sells it by
--- the amount (the Wire remote's "buy"), takes the wire a link uses out of your
+-- WireStock (T420, server): wire is a single-use item. The server sells it as one Wire Box of
+-- 160 studs for $100 (the Wire remote's "buy"), takes the wire a link uses out of your
 -- box, refuses a link you have too little wire for or that is longer than the
 -- longest wire, and checks every request again (rate, owner, range, whole
 -- numbers). Cash only moves through the wallet the game binds (EconomyService).
@@ -152,17 +152,39 @@ return function(t)
 		return out
 	end
 
-	t.test("a run of exactly 64 studs along its bends passes and uses exactly 64 units", function()
-		local s = pair(100)
-		t.eq({ s.Service.Link(s.owner, "sw", "lamp", 1, 1, via({ 0, 17 }, { 30, 17 })) }, { true })
-		t.eq(s.profile.wireUnits, 36)
-		t.eq(s.profile.plot.wires[1].via, via({ 0, 17 }, { 30, 17 }), "the corners are kept")
+	t.test("a run of exactly 160 studs along its bends passes and uses exactly 160 units", function()
+		local s = pair(160)
+		t.eq({ s.Service.Link(s.owner, "sw", "lamp", 1, 1, via({ 0, 65 }, { 30, 65 })) }, { true })
+		t.eq(s.profile.wireUnits, 0)
+		t.eq(s.profile.plot.wires[1].via, via({ 0, 65 }, { 30, 65 }), "the corners are kept")
 	end)
 
-	t.test("64.01 studs along the path fails whatever is in the box, and nothing is used", function()
-		local s = pair(300)
-		t.eq({ s.Service.Link(s.owner, "sw", "lamp", 1, 1, via({ 0, 17.005 }, { 30, 17.005 })) }, { false, "span" })
-		t.eq(s.profile.wireUnits, 300)
+	t.test("160.01 and 161 studs along the path fail whatever is in the box, and nothing is used", function()
+		for _, y in ipairs({ 65.005, 65.5 }) do
+			local s = pair(320)
+			t.eq({ s.Service.Link(s.owner, "sw", "lamp", 1, 1, via({ 0, y }, { 30, y })) }, { false, "span" })
+			t.eq(s.profile.wireUnits, 320)
+			t.eq(s.profile.plot.wires, {})
+		end
+	end)
+
+	t.test("a 40 stud run from a full box of 160 uses 40 and leaves 120 for later runs", function()
+		local s = pair(160)
+		s.add("lamp2", "SparkLamp", 0, 40)
+		s.owner.root.Position = Vector3.new(100, 3, 120)
+		t.eq({ s.Service.Link(s.owner, "sw", "lamp2") }, { true })
+		t.eq(s.profile.wireUnits, 120, "only the 40 studs placed are used")
+		s.owner.root.Position = Vector3.new(115, 3, 100)
+		t.eq({ s.Service.Link(s.owner, "sw", "lamp") }, { true }, "the rest is there for the next run")
+		t.eq(s.profile.wireUnits, 120 - 30)
+	end)
+
+	t.test("a short box (30 left, a 40 stud run) leaves wireUnits and wires untouched", function()
+		local s = pair(30)
+		s.add("far", "SparkLamp", 0, 40)
+		s.owner.root.Position = Vector3.new(100, 3, 120)
+		t.eq({ s.Service.Link(s.owner, "sw", "far") }, { false, "wire" })
+		t.eq(s.profile.wireUnits, 30)
 		t.eq(s.profile.plot.wires, {})
 	end)
 
@@ -171,7 +193,7 @@ return function(t)
 		local four = via({ 5, 3 }, { 10, -3 }, { 15, 3 }, { 20, -3 })
 		t.eq({ s.Service.Link(s.owner, "sw", "lamp", 1, 1, four) }, { true })
 		local used = 100 - s.profile.wireUnits
-		t.ok(used > 30 and used <= 64, "used " .. used)
+		t.ok(used > 30 and used <= 160, "used " .. used)
 		local s2 = pair(100)
 		local five = via({ 5, 3 }, { 10, -3 }, { 15, 3 }, { 20, -3 }, { 25, 3 })
 		t.eq({ s2.Service.Link(s2.owner, "sw", "lamp", 1, 1, five) }, { false, "bends" })
@@ -179,13 +201,13 @@ return function(t)
 		t.eq(s2.profile.plot.wires, {})
 	end)
 
-	t.test("two pieces nearer than 64 apart are refused when their bends make the run longer", function()
-		local s = pair(300)
-		t.eq(({ s.Service.Link(s.owner, "sw", "lamp", 1, 1, via({ 0, 40 }, { 30, 40 })) })[2], "span")
-		t.eq(s.profile.wireUnits, 300)
+	t.test("two pieces near each other are refused when their bends make the run longer than 160", function()
+		local s = pair(320)
+		t.eq(({ s.Service.Link(s.owner, "sw", "lamp", 1, 1, via({ 0, 70 }, { 30, 70 })) })[2], "span")
+		t.eq(s.profile.wireUnits, 320)
 	end)
 
-	t.test("pieces more than 64 studs apart in a straight line are refused", function()
+	t.test("pieces too far apart for the player's reach are refused", function()
 		local s = setup({ units = 300 })
 		s.add("sw", "SparkSwitch", 0, 0)
 		s.add("lamp", "SparkLamp", 64.01, 0)
@@ -244,32 +266,53 @@ return function(t)
 		t.eq(s.profile.wireUnits, 6)
 	end)
 
-	t.test("buying: a pack at the catalog price, from your cash, into your box", function()
+	t.test("buying: the Wire Box ($100, 160 studs) from your cash, into your box", function()
 		local s = setup({ units = 3, cash = 500 })
-		local price = s.WireSupply.UnitPrice()
-		s.Service.OnWire(s.owner, "buy", 64)
-		t.eq(s.profile.wireUnits, 67)
-		t.eq(s.profile.cash, 500 - 64 * price)
+		s.Service.OnWire(s.owner, "buy", 160)
+		t.eq(s.profile.wireUnits, 163)
+		t.eq(s.profile.cash, 400)
 		t.eq(#s.spent, 1)
-		t.eq(s.spent[1].amount, 64 * price)
-		t.eq(s.published[#s.published].units, 67)
+		t.eq(s.spent[1].amount, 100)
+		t.eq(s.published[#s.published].units, 163)
 	end)
 
-	t.test("every pack is sold: 32, 64 and 160", function()
-		for _, pack in ipairs({ 32, 64, 160 }) do
+	t.test("the box is the only thing sold: 32, 64 and the old packs are refused, 160 is bought", function()
+		for _, pack in ipairs({ 32, 64 }) do
 			local s = setup({ units = 0, cash = 1e6 })
 			s.Service.OnWire(s.owner, "buy", pack)
-			t.eq(s.profile.wireUnits, pack)
+			t.eq(s.profile.wireUnits, 0, pack .. " is refused")
+			t.eq(#s.spent, 0)
 		end
+		local s = setup({ units = 0, cash = 1e6 })
+		s.Service.OnWire(s.owner, "buy", 160)
+		t.eq(s.profile.wireUnits, 160)
 	end)
 
 	t.test("any other amount is refused, with no cash moved", function()
 		local s = setup({ units = 3, cash = 1e9 })
-		for _, bad in ipairs({ 0, -1, -32, 1, 10, 31, 33, 63, 100, 161, 2.5, 32.5, 0 / 0, math.huge, "32", {}, true }) do
+		for _, bad in ipairs({
+			0,
+			-1,
+			-160,
+			1,
+			10,
+			32,
+			64,
+			100,
+			159,
+			161,
+			2.5,
+			160.5,
+			0 / 0,
+			math.huge,
+			"160",
+			{},
+			true,
+		}) do
 			s.Service.OnWire(s.owner, "buy", bad)
 		end
 		s.Service.OnWire(s.owner, "buy")
-		s.Service.OnWire(s.owner, "buy", 32, "extra")
+		s.Service.OnWire(s.owner, "buy", 160, "extra")
 		t.eq(s.profile.wireUnits, 3)
 		t.eq(#s.spent, 0, "no cash moved")
 		t.eq(s.profile.cash, 1e9)
@@ -277,8 +320,8 @@ return function(t)
 
 	t.test("too little cash buys nothing", function()
 		local s = setup({ units = 3, cash = 500 })
-		s.profile.cash = s.WireSupply.UnitPrice() * 32 - 1
-		s.Service.OnWire(s.owner, "buy", 32)
+		s.profile.cash = 99
+		s.Service.OnWire(s.owner, "buy", 160)
 		t.eq(s.profile.wireUnits, 3)
 		t.ok(#s.toasts > 0, "told why")
 	end)
@@ -296,21 +339,21 @@ return function(t)
 					table.insert(s.published, { player = player, units = units })
 				end,
 			})
-			s.Service.OnWire(s.owner, "buy", 32)
+			s.Service.OnWire(s.owner, "buy", 160)
 			t.eq(s.profile.wireUnits, 3)
 			t.eq(#s.published, before)
 			t.eq(s.profile.cash, 1e6)
 		end
 	)
 
-	t.test("a box holds at most 320: a pack that would pass it is refused", function()
+	t.test("a box holds at most 320 (two boxes): a box that would pass it is refused", function()
 		local s = setup({ units = 0, cash = 1e9 })
-		s.profile.wireUnits = s.WireSupply.MaxStock - 31
-		s.Service.OnWire(s.owner, "buy", 32)
-		t.eq(s.profile.wireUnits, s.WireSupply.MaxStock - 31)
+		s.profile.wireUnits = s.WireSupply.MaxStock - 159
+		s.Service.OnWire(s.owner, "buy", 160)
+		t.eq(s.profile.wireUnits, s.WireSupply.MaxStock - 159)
 		t.eq(#s.spent, 0)
-		s.profile.wireUnits = s.WireSupply.MaxStock - 32
-		s.Service.OnWire(s.owner, "buy", 32)
+		s.profile.wireUnits = s.WireSupply.MaxStock - 160
+		s.Service.OnWire(s.owner, "buy", 160)
 		t.eq(s.profile.wireUnits, 320)
 	end)
 
@@ -318,7 +361,7 @@ return function(t)
 		local s = setup({ units = 10, cash = 500, visitorBuilds = true })
 		s.add("sw", "SparkSwitch", 0, 0)
 		s.add("lamp", "SparkLamp", 6, 0)
-		s.Service.OnWire(s.visitor, "buy", 32)
+		s.Service.OnWire(s.visitor, "buy", 160)
 		t.eq(s.profile.wireUnits, 10, "the visitor's buy did nothing")
 		t.eq(#s.spent, 0)
 	end)
@@ -326,7 +369,7 @@ return function(t)
 	t.test("every request is rate limited under the Wire budget, buying included", function()
 		local keys = {}
 		local s = setup({ units = 0, cash = 500, rate = false, keys = keys })
-		s.Service.OnWire(s.owner, "buy", 32)
+		s.Service.OnWire(s.owner, "buy", 160)
 		t.eq(s.profile.wireUnits, 0)
 		t.eq(keys, { "Wire" })
 		t.eq(#s.spent, 0)
@@ -335,7 +378,7 @@ return function(t)
 	t.test("with no wallet bound a buy does nothing (and does not error)", function()
 		local s = setup({ units = 0, cash = 500 })
 		s.Service.BindWallet(nil)
-		s.Service.OnWire(s.owner, "buy", 32)
+		s.Service.OnWire(s.owner, "buy", 160)
 		t.eq(s.profile.wireUnits, 0)
 	end)
 end

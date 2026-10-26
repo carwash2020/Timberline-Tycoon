@@ -39,6 +39,7 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
 local WireArt = require(ReplicatedStorage.Shared.Art.WireArt)
+local WireSpoolMeshes = require(script.Parent.WireSpoolMeshes)
 local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
 local WireSupply = require(ReplicatedStorage.Shared.WireSupply)
 local WireToolLogic = require(ReplicatedStorage.Shared.WireToolLogic)
@@ -849,6 +850,52 @@ local function writeWires(run: Run)
 			end
 		end
 	end
+	-- A junction is drawn as a small marker the client reads like a piece (tag WireJoint:
+	-- Uid, BlueprintId, X, Z, OwnerId, Wires). Markers of runs that are gone are removed.
+	local wanted: { [string]: boolean } = {}
+	for _, joint in ipairs(WireLogic.Joints(run.wires)) do
+		wanted[joint.uid] = true
+		local marker = run.host.items:FindFirstChild(joint.uid)
+		if marker == nil then
+			local m = Instance.new("Model")
+			m.Name = joint.uid
+			local dot = Instance.new("Part")
+			dot.Name = "Dot"
+			dot.Shape = Enum.PartType.Ball
+			dot.Size = Vector3.new(0.6, 0.6, 0.6)
+			dot.Anchored = true
+			dot.CanCollide = false
+			dot.CanQuery = false
+			dot.CanTouch = false
+			dot.CastShadow = false
+			dot.Material = Enum.Material.Neon
+			dot.Color = Color3.fromRGB(255, 200, 90)
+			dot.CFrame = run.host.cframe * CFrame.new(joint.x, 0.4, joint.z)
+			dot.Parent = m
+			m.PrimaryPart = dot
+			m:SetAttribute("Uid", joint.uid)
+			m:SetAttribute("BlueprintId", "WireJoint")
+			m:SetAttribute("X", joint.x)
+			m:SetAttribute("Z", joint.z)
+			m:SetAttribute("Joint", true)
+			if run.owner then
+				m:SetAttribute("OwnerId", run.owner.UserId)
+			end
+			pcall(function()
+				game:GetService("CollectionService"):AddTag(m, "WireJoint")
+			end)
+			m.Parent = run.host.items
+			marker = m
+		end
+		local list = byFrom[joint.uid]
+		local target = marker :: Instance
+		target:SetAttribute("Wires", if list then table.concat(list, ",") else "")
+	end
+	for _, child in ipairs(run.host.items:GetChildren()) do
+		if child:GetAttribute("Joint") == true and not wanted[child.Name] then
+			child:Destroy()
+		end
+	end
 end
 
 local function settingsOf(profile: Profile): LogicGraph.Settings
@@ -863,7 +910,13 @@ end
 function LogicService.Refresh(host: Host, profile: Profile, who: Player?)
 	local placed: { PlotLogic.Placed } = profile.plot.placed
 	local live = WireLogic.Live(profile.plot.wires, placed :: any)
-	local graph = LogicGraph.Build(placed :: any, live, settingsOf(profile))
+	-- The junctions (free ends of runs) are pieces of the graph, so a chain of joined runs
+	-- carries a signal like one wire; they are never in plot.placed.
+	local pieces: { any } = table.clone(placed :: any)
+	for _, joint in ipairs(WireLogic.Joints(live)) do
+		table.insert(pieces, joint)
+	end
+	local graph = LogicGraph.Build(pieces :: any, live, settingsOf(profile))
 	local run = slotRun(host, profile, nil)
 	run.graph = graph
 	run.wires = live
@@ -910,12 +963,107 @@ end
 -- Wiring
 ---------------------------------------------------------------------------
 
+-- The junction (a run's free end) with this uid among the wires, as a piece, or nil.
+local function jointIn(wires: { WireLogic.Wire }, uid: string): WireLogic.Item?
+	for _, joint in ipairs(WireLogic.Joints(wires)) do
+		if joint.uid == uid then
+			return joint
+		end
+	end
+	return nil
+end
+
+-- The two ends of a run as pieces: a placed piece, a junction that exists, or (for
+-- WireLogic.NewEnd) a new free end at the last corner. Returns (from, to, why).
+-- A junction must exist among the owner's live wires: only a run's END is a junction, so
+-- no mid-run point can be named, and the wires are the owner's own so it is the same plot.
+local function endsOf(
+	profile: Profile,
+	fromUid: string,
+	toUid: string,
+	via: { WireLogic.Point }
+): (WireLogic.Item?, WireLogic.Item?, string?)
+	local wires = WireLogic.Live(wiresOf(profile), profile.plot.placed)
+	local a: WireLogic.Item? = if WireLogic.IsJoint(fromUid)
+		then jointIn(wires, fromUid)
+		else findItemIn(profile.plot.placed, fromUid) :: any
+	local b: WireLogic.Item? = nil
+	if toUid == WireLogic.NewEnd then
+		local last = via[#via]
+		if last == nil then
+			return nil, nil, "corner"
+		end
+		b = { uid = toUid, blueprintId = "WireJoint", x = last.x, z = last.z }
+	elseif WireLogic.IsJoint(toUid) then
+		b = jointIn(wires, toUid)
+	else
+		b = findItemIn(profile.plot.placed, toUid) :: any
+	end
+	if a == nil or b == nil then
+		return nil, nil, if WireLogic.IsJoint(fromUid) or WireLogic.IsJoint(toUid) then "joint" else "missing"
+	end
+	return a, b, nil
+end
+
+-- The rules for a run that has a junction at one end (the item-to-item rules are
+-- WireLogic.Check): the piece ends need the right ports, nothing unfinished, room for
+-- another wire, no repeat, and no loop of junctions.
+local function checkJoin(
+	wires: { WireLogic.Wire },
+	a: WireLogic.Item,
+	b: WireLogic.Item,
+	fromUid: string,
+	toUid: string,
+	fromPort: number?,
+	toPort: number?
+): (boolean, string?)
+	if fromUid == toUid then
+		return false, "bad"
+	end
+	local fp, tp = fromPort or 1, toPort or 1
+	if a.blueprintId ~= "WireJoint" and not WireLogic.HasOut(a.blueprintId, fp) then
+		return false, "from"
+	end
+	if b.blueprintId ~= "WireJoint" and not WireLogic.HasIn(b.blueprintId, tp) then
+		return false, "to"
+	end
+	if (a.blueprintId == "WireJoint" and fp ~= 1) or (b.blueprintId == "WireJoint" and tp ~= 1) then
+		return false, "bad"
+	end
+	if (a :: any).fill ~= nil or (b :: any).fill ~= nil then
+		return false, "unfinished"
+	end
+	if #wires >= WireLogic.MaxWires then
+		return false, "full"
+	end
+	local feeds = 0
+	for _, wire in ipairs(wires) do
+		if wire.from == fromUid then
+			feeds += 1
+			if wire.to == toUid and (wire.fromPort or 1) == fp and (wire.toPort or 1) == tp then
+				return false, "dup"
+			end
+		end
+	end
+	if a.blueprintId ~= "WireJoint" and feeds >= WireLogic.MaxPerSwitch then
+		return false, "limit"
+	end
+	if WireLogic.IsJoint(fromUid) and WireLogic.IsJoint(toUid) and WireLogic.JointLoop(wires, fromUid, toUid) then
+		return false, "loop"
+	end
+	return true, nil
+end
+
 -- Adds a wire run and uses its length from the owner's wire box. The length is
--- the server's own: the two pieces' places and the corners it validated, never a
--- number the client sent. At most WireLogic.MaxBends corners (a fifth is
--- refused) and WireLogic.MaxRun studs along the path. A run the rules refuse, or
--- that the box cannot pay for, changes nothing. Returns (ok, why, units used,
--- units the box held): why "wire" means the box is short.
+-- the server's own: the two ends' places and the corners it validated, never a
+-- number the client sent. At most WireLogic.MaxBends corners per run (a fifth is
+-- refused) and WireLogic.MaxRun (160) studs along the path; only those studs come out
+-- of the box, the rest stays. A run may start at a junction (a free end of another
+-- run) and end on one, or end in the open (`toUid` = WireLogic.NewEnd: it ends at its
+-- last corner, which becomes a new junction), so runs join end to end. Each run is
+-- measured and charged on its own. A run the rules refuse, or that the box cannot pay
+-- for, changes nothing. Returns (ok, why, units used, units the box held): why "wire"
+-- means the box is short.
 local function addWire(
 	profile: Profile,
 	fromUid: string,
@@ -928,19 +1076,34 @@ local function addWire(
 	local placed = profile.plot.placed
 	local have = WireSupply.Clean(profile.wireUnits)
 	profile.plot.wires = WireLogic.Live(wiresOf(profile), placed)
-	local via, viaWhy = WireLogic.CleanVia(viaIn)
+	local via, viaWhy = WireLogic.CleanVia(viaIn, if toUid == WireLogic.NewEnd then 1 else 0)
 	if via == nil then
 		return false, viaWhy, 0, have
 	end
+	local open = toUid == WireLogic.NewEnd
+	if open and straightOnly == true then
+		return false, "bad", 0, have
+	end
+	local a, b, endsWhy = endsOf(profile, fromUid, toUid, via)
+	if a == nil or b == nil then
+		return false, endsWhy, 0, have
+	end
+	local endAt: WireLogic.Point? = nil
+	if open then
+		endAt = { x = b.x, z = b.z }
+		via = table.move(via, 1, #via - 1, 1, {}) -- the last corner is the end, not a bend
+	end
+	local joined = open or WireLogic.IsJoint(fromUid) or WireLogic.IsJoint(toUid)
 	-- The switch prompt links straight and no further than it always has.
 	local span = if straightOnly == true then WireLogic.Span else WireSupply.MaxLength
-	local ok, why = WireLogic.Check(profile.plot.wires, placed, fromUid, toUid, fromPort, toPort, span)
+	local ok, why
+	if joined then
+		ok, why = checkJoin(profile.plot.wires, a, b, fromUid, toUid, fromPort, toPort)
+	else
+		ok, why = WireLogic.Check(profile.plot.wires, placed, fromUid, toUid, fromPort, toPort, span)
+	end
 	if not ok then
 		return false, why, 0, have
-	end
-	local a, b = findItemIn(placed, fromUid), findItemIn(placed, toUid)
-	if not a or not b then
-		return false, "missing", 0, have
 	end
 	local length = WireSupply.Path(a, via, b)
 	if length == nil or not WireSupply.Fits(length) then
@@ -953,6 +1116,14 @@ local function addWire(
 	end
 	profile.wireUnits = left
 	local wire: WireLogic.Wire = { from = fromUid, to = toUid }
+	if joined then
+		local id = WireLogic.NextId(profile.plot.wires)
+		wire.id = id
+		if open then
+			wire.to = WireLogic.JointUid(id)
+			wire.endAt = endAt
+		end
+	end
 	if fromPort ~= nil and fromPort ~= 1 then
 		wire.fromPort = fromPort
 	end
@@ -1009,11 +1180,17 @@ function LogicService.Link(
 	if not host or not profile then
 		return false, "missing"
 	end
-	local from, to = findItem(profile, fromUid), findItem(profile, toUid)
-	if not from or not to then
-		return false, "missing"
+	local extra = if toUid == WireLogic.NewEnd then 1 else 0
+	local cleanVia, viaWhy = WireLogic.CleanVia(via, extra)
+	if cleanVia == nil then
+		return false, viaWhy
 	end
-	if not (near(player, host, from) and near(player, host, to)) then
+	-- Each end is a piece, a junction (a free end of a run) or a new end at the last corner.
+	local from, to, endsWhy = endsOf(profile, fromUid, toUid, cleanVia)
+	if not from or not to then
+		return false, endsWhy
+	end
+	if not (near(player, host, from :: any) and near(player, host, to :: any)) then
 		return false, "reach"
 	end
 	local ok, why, units, have = addWire(profile, fromUid, toUid, fromPort, toPort, via)
@@ -1035,6 +1212,21 @@ function LogicService.Cut(player: Player, uid: string): (boolean, string?)
 	if not host or not profile then
 		return false, "missing"
 	end
+	-- A junction names the one run that ends there: that run goes (nothing is refunded) and
+	-- the runs that start at its end are left starved, so the chain breaks at that run.
+	if WireLogic.IsJoint(uid) then
+		local joint = jointIn(WireLogic.Live(wiresOf(profile), profile.plot.placed), uid)
+		if joint == nil then
+			return false, "joint"
+		end
+		if not near(player, host, joint :: any) then
+			return false, "reach"
+		end
+		local rest, cutRun = WireLogic.WithoutRun(wiresOf(profile), string.sub(uid, #WireLogic.JointPrefix + 1))
+		profile.plot.wires = rest
+		LogicService.Refresh(host, profile, player)
+		return cutRun > 0, if cutRun > 0 then nil else "none"
+	end
 	local item = findItem(profile, uid)
 	if not item or WireLogic.Role(item.blueprintId) == nil then
 		return false, "missing"
@@ -1054,7 +1246,7 @@ local function portOk(value: unknown): number?
 	return value
 end
 
--- Buys a pack of wire (`units` must be one of WireSupply.Packs) into the
+-- Buys the Wire Box (`units` must be WireSupply.BoxUnits, 160: nothing else is sold) into the
 -- plot owner's box, at the catalog price, from their cash. Only the owner buys:
 -- a visitor with build rights uses the owner's wire but cannot spend their cash.
 function LogicService.Buy(player: Player, units: unknown): (boolean, string?)
@@ -1114,6 +1306,10 @@ function LogicService.OnWire(player: Player, a: unknown, b: unknown, c: unknown,
 			then
 				return
 			end
+			-- A junction end has the one port.
+			if (WireLogic.IsJoint(a) or WireLogic.IsJoint(c)) and (fp ~= 1 or tp ~= 1) then
+				return
+			end
 		end
 		ok, why = LogicService.Link(player, a, c, fp, tp, e)
 		if ok then
@@ -1158,13 +1354,22 @@ function LogicService.GiveSpool(player: Player): Tool?
 	tool.RequiresHandle = true
 	tool.CanBeDropped = false
 	tool:SetAttribute("WireSpool", true)
+	tool:SetAttribute("MeshedArt", true) -- Shared/Lint/StandIn: whatever shows on it is a mesh, never parts
 	tool.Grip = WireArt.Grip()
+	-- The Handle alone (invisible). The spool's meshes are loaded once at boot
+	-- (WireSpoolMeshes); they go on now if they are here, or the moment they
+	-- arrive. If the load failed the spool is simply not shown, never a stand-in.
 	local art = WireArt.Held()
 	for _, child in ipairs(art:GetChildren()) do
 		child.Parent = tool -- each part carries its own weld to the Handle
 	end
 	art:Destroy()
 	tool.Parent = backpack
+	WireSpoolMeshes.OnReady(function(templates)
+		if templates and tool.Parent ~= nil then
+			WireArt.Dress(tool, templates)
+		end
+	end)
 	return tool
 end
 

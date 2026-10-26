@@ -33,7 +33,7 @@ function District.scene(ctx, hankAt, hankLook, views)
 
 	for _, sign in ipairs(WorldPlan.Town().signs) do
 		if string.match(sign.text, "^[^\n]+") == "PLOT DISTRICT" then
-			local model = BuildingArt.Signpost(sign.text, sign.lit, nil, sign.gateId, sign.noWrap)
+			local model = BuildingArt.Signpost(sign.text, sign.lit, nil, sign.gateId, sign.noWrap, sign.panel)
 			Kit.placeAt(model, sign.cframe)
 			-- The viewer draws a SurfaceGui through the board, so the back face's
 			-- text shows mirrored over the front's. Drop the back face for the

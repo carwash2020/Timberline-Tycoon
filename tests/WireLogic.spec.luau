@@ -198,7 +198,7 @@ return function(t)
 	t.test("T420: a run's corners are cleaned (at most 4, finite pairs) and kept in a saved wire", function()
 		local WireLogic = t.shared("WireLogic")
 		t.eq(WireLogic.MaxBends, 4)
-		t.eq(WireLogic.MaxRun, 64)
+		t.eq(WireLogic.MaxRun, 160)
 		t.eq({ WireLogic.CleanVia(nil) }, { {}, nil })
 		t.eq(({ WireLogic.CleanVia({ { x = 1, z = 2 }, { 3, 4 } }) })[1], { { x = 1, z = 2 }, { x = 3, z = 4 } })
 		t.eq(

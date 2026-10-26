@@ -43,7 +43,7 @@ export type TreeSpot = {
 	zone: TreeZone?,
 }
 export type Placement = { name: string, cframe: CFrame, seed: number }
-export type Sign = { text: string, cframe: CFrame, lit: boolean?, gateId: string?, noWrap: boolean? } -- lit: gooseneck lamps (TWN-07); noWrap: its label shrinks a long line instead of breaking it
+export type Sign = { text: string, cframe: CFrame, lit: boolean?, gateId: string?, noWrap: boolean?, panel: boolean? } -- panel: Ink on a SignCream panel over PlankHoney planks (T420); lit: gooseneck lamps (TWN-07); noWrap: its label shrinks a long line instead of breaking it
 export type Fence = { length: number, cframe: CFrame }
 
 local function hashString(s: string): number
@@ -2223,6 +2223,7 @@ function WorldPlan.Town(): Town
 			text = "PLOT DISTRICT\nOld Hank sells plots\nBuy a plot and build on it",
 			cframe = standing(147, 104, 0, 40),
 			noWrap = true,
+			panel = true, -- Ink on a SignCream panel, ON the board face (T420)
 		},
 		-- The turn off the street's east end, just north of PlazaEastMouth,
 		-- facing back down the path to the truck lot.

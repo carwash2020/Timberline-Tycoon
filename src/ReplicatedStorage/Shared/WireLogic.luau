@@ -13,7 +13,18 @@ local AutomationLogic = require(script.Parent.AutomationLogic)
 local WireLogic = {}
 
 export type Point = { x: number, z: number }
-export type Wire = { from: string, to: string, fromPort: number?, toPort: number?, via: { Point }? }
+-- A run (T420). `id` names it (so another run can join its end); `endAt` is set when the run ends
+-- IN THE OPEN: that free end is a junction, uid "J_<id>" (WireLogic.JointUid), and is the run's `to`.
+-- A run may start at a junction (from = its uid) and a run may end on one (to = its uid).
+export type Wire = {
+	from: string,
+	to: string,
+	fromPort: number?,
+	toPort: number?,
+	via: { Point }?,
+	id: string?,
+	endAt: Point?,
+}
 
 export type Item = {
 	uid: string,
@@ -46,7 +57,7 @@ export type Spec = {
 
 WireLogic.Reach = 30 -- studs from the player to each end of a wire
 WireLogic.Span = 32 -- studs from an output to its input, along the ground (the switch prompt's reach)
-WireLogic.MaxRun = 64 -- studs of one wire run, measured along its path (T420; WireSupply)
+WireLogic.MaxRun = 160 -- studs of one wire run (the whole box), measured along its path (T420; WireSupply)
 WireLogic.MaxBends = 4 -- corners one run may turn; a fifth is refused
 WireLogic.MaxWires = 160 -- per plot (PROPOSAL)
 WireLogic.MaxItems = 80 -- logic pieces per plot (PROPOSAL); a Door is not one
@@ -97,6 +108,9 @@ local SPECS: { [string]: Spec } = {
 		step = 0.5,
 		default = 2,
 	},
+	-- A junction (a free end of a run that others join): passes any wire in to any wire out. It
+	-- exists only as a wire record (WireLogic.Joints), never in plot.placed, and is not a logic piece.
+	WireJoint = { role = "gate", outs = { 1 }, ins = { 1 }, op = "or" },
 	SparkLamp = { role = "lamp", outs = {}, ins = { 1 }, sink = true },
 	GlowWire = { role = "glow", outs = {}, ins = { 1 }, sink = true },
 	Hatch = { role = "hatch", outs = {}, ins = { 1 }, sink = true },
@@ -196,7 +210,7 @@ function WireLogic.IsTarget(role: string?): boolean
 end
 
 function WireLogic.IsLogicItem(blueprintId: string): boolean
-	return SPECS[blueprintId] ~= nil and blueprintId ~= "Door"
+	return SPECS[blueprintId] ~= nil and blueprintId ~= "Door" and blueprintId ~= "WireJoint"
 end
 
 function WireLogic.Latches(blueprintId: string): boolean
@@ -272,7 +286,10 @@ local MESSAGES: { [string]: string } = {
 	to = "A wire ends at an input.",
 	unfinished = "Finish building that first.",
 	dup = "Those two are already wired.",
-	span = "Too far. A run is 64 studs at most, measured along its bends.",
+	span = "Too far. A run is 160 studs at most, measured along its bends.",
+	joint = "That wire end isn't there.",
+	loop = "That would join a wire back onto itself.",
+	corner = "End a run in the open after at least one corner tap.",
 	bends = "A run bends at most 4 times.",
 	badvia = "That run's corners are not usable.",
 	reach = "Stand closer to wire that.",
@@ -283,6 +300,17 @@ local MESSAGES: { [string]: string } = {
 	cleared = "Wires cleared.",
 	wired = "Wired.",
 }
+
+WireLogic.JointPrefix = "J_"
+WireLogic.NewEnd = "J_new" -- the remote's "end this run here, in the open" (at its last corner)
+
+function WireLogic.JointUid(id: string): string
+	return WireLogic.JointPrefix .. id
+end
+
+function WireLogic.IsJoint(uid: any): boolean
+	return type(uid) == "string" and string.sub(uid, 1, #WireLogic.JointPrefix) == WireLogic.JointPrefix
+end
 
 function WireLogic.Message(key: string?): string?
 	return MESSAGES[key or ""]
@@ -304,8 +332,9 @@ end
 
 -- The corners of a run, from a save or the Wire remote: nil or an array of at
 -- most MaxBends points, each { x, z } of finite numbers (array or named). Returns
--- (points, nil), or (nil, "bends") for too many, (nil, "badvia") for anything else.
-function WireLogic.CleanVia(value: any): ({ Point }?, string?)
+-- (points, nil), or (nil, "bends") for too many (`extra` more points are let through for a run that
+-- ends in the open: its last point is the end, not a bend), (nil, "badvia") for anything else.
+function WireLogic.CleanVia(value: any, extra: number?): ({ Point }?, string?)
 	if value == nil then
 		return {}, nil
 	end
@@ -319,7 +348,7 @@ function WireLogic.CleanVia(value: any): ({ Point }?, string?)
 	if count ~= #value then
 		return nil, "badvia"
 	end
-	if #value > WireLogic.MaxBends then
+	if #value > WireLogic.MaxBends + (extra or 0) then
 		return nil, "bends"
 	end
 	local out: { Point } = {}
@@ -364,6 +393,18 @@ function WireLogic.Clean(value: any): { Wire }
 					local via = WireLogic.CleanVia(entry.via)
 					if via and #via > 0 then
 						wire.via = via
+					end
+					if type(entry.id) == "string" and string.match(entry.id, "^w%d+$") and #entry.id <= 12 then
+						wire.id = entry.id
+						local e = entry.endAt
+						if
+							type(e) == "table"
+							and finite(e.x)
+							and finite(e.z)
+							and to == WireLogic.JointUid(entry.id)
+						then
+							wire.endAt = { x = e.x, z = e.z }
+						end
 					end
 					table.insert(out, wire)
 					if #out >= WireLogic.MaxWires then
@@ -428,6 +469,73 @@ function WireLogic.LiveSwitches(switches: any, placed: { Item }): { string }
 	return out
 end
 
+-- The junctions the wires make: one per run that ends in the open, at its endAt. They are pieces
+-- for the logic graph and the client (blueprint "WireJoint") but never part of plot.placed.
+function WireLogic.Joints(wires: { Wire }?): { Item }
+	local out: { Item } = {}
+	if type(wires) ~= "table" then
+		return out
+	end
+	for _, wire in ipairs(wires) do
+		if wire.id ~= nil and wire.endAt ~= nil and wire.to == WireLogic.JointUid(wire.id) then
+			table.insert(out, { uid = wire.to, blueprintId = "WireJoint", x = wire.endAt.x, z = wire.endAt.z })
+		end
+	end
+	return out
+end
+
+-- The next free run id: "w1", "w2", ...
+function WireLogic.NextId(wires: { Wire }?): string
+	local top = 0
+	for _, wire in ipairs(wires or {}) do
+		local n = if wire.id then tonumber(string.match(wire.id, "^w(%d+)$")) else nil
+		if n and n > top then
+			top = n
+		end
+	end
+	return "w" .. tostring(top + 1)
+end
+
+-- Would a run from junction `fromUid` to junction `toUid` close a loop of junctions (a chain that
+-- feeds itself with no piece in it)? True when toUid already reaches fromUid through runs that go
+-- junction to junction, or they are the same junction.
+function WireLogic.JointLoop(wires: { Wire }, fromUid: string, toUid: string): boolean
+	if fromUid == toUid then
+		return true
+	end
+	local seen: { [string]: boolean } = {}
+	local stack = { toUid }
+	while #stack > 0 do
+		local at = table.remove(stack) :: string
+		if at == fromUid then
+			return true
+		end
+		if not seen[at] then
+			seen[at] = true
+			for _, wire in ipairs(wires) do
+				if wire.from == at and WireLogic.IsJoint(wire.to) then
+					table.insert(stack, wire.to)
+				end
+			end
+		end
+	end
+	return false
+end
+
+-- The runs without the one named `id` (its junction goes with it). (list, cut count)
+function WireLogic.WithoutRun(wires: { Wire }, id: string): ({ Wire }, number)
+	local out: { Wire } = {}
+	local cut = 0
+	for _, wire in ipairs(wires) do
+		if wire.id == id then
+			cut += 1
+		else
+			table.insert(out, wire)
+		end
+	end
+	return out, cut
+end
+
 local function find(placed: { Item }, uid: string): Item?
 	for _, item in ipairs(placed) do
 		if item.uid == uid then
@@ -456,12 +564,18 @@ function WireLogic.Live(wires: { Wire }?, placed: { Item }): { Wire }
 	for _, item in ipairs(placed) do
 		byUid[item.uid] = item
 	end
+	for _, joint in ipairs(WireLogic.Joints(wires)) do
+		byUid[joint.uid] = joint
+	end
 	for _, wire in ipairs(wires) do
 		local a, b = byUid[wire.from], byUid[wire.to]
+		-- A run that starts at a junction whose run was cut stays, starved: its far end is still
+		-- fed (a lamp on it is dark, not "unwired"), it just has nothing to carry.
+		local starved = a == nil and WireLogic.IsJoint(wire.from)
 		if
-			a
+			(a or starved)
 			and b
-			and WireLogic.HasOut(a.blueprintId, portFrom(wire))
+			and (starved or WireLogic.HasOut((a :: Item).blueprintId, portFrom(wire)))
 			and WireLogic.HasIn(b.blueprintId, portTo(wire))
 		then
 			table.insert(out, wire)
