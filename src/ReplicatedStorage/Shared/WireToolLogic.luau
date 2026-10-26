@@ -464,19 +464,20 @@ end
 
 export type BuyPlan = { amount: number, cost: number, text: string }
 
--- What the buy button does: the smallest pack that covers what the run is short
--- of (or the smallest pack, as a top-up, when nothing is missing), never more
--- than the box has room for. Wire is sold in packs only.
-function WireToolLogic.BuyPlan(stock: number?, stretch: Stretch): BuyPlan
+-- What the buy button does: the one Wire Box (160 studs, $100), when the box has
+-- room for it. Wire is sold as that box only.
+function WireToolLogic.BuyPlan(stock: number?, _stretch: Stretch): BuyPlan
 	local have = WireSupply.Clean(stock)
 	local room = WireSupply.MaxStock - have
-	local want = if stretch.short > 0 then stretch.short else WireSupply.Packs[1]
-	local amount = WireSupply.PackFor(want, room)
-	if amount <= 0 then
+	if room < WireSupply.BoxUnits then
 		return { amount = 0, cost = 0, text = "Box full" }
 	end
-	local cost = amount * WireSupply.UnitPrice()
-	return { amount = amount, cost = cost, text = string.format("BUY %d · %s", amount, WireSupply.PriceText(cost)) }
+	local cost = WireSupply.BoxPrice
+	return {
+		amount = WireSupply.BoxUnits,
+		cost = cost,
+		text = string.format("BUY Wire Box (%d studs) · %s", WireSupply.BoxUnits, WireSupply.PriceText(cost)),
+	}
 end
 
 return WireToolLogic

@@ -137,6 +137,8 @@ InputKit.WireBinds = {
 	{ action = "Cut", keyboard = Enum.KeyCode.X, gamepad = Enum.KeyCode.ButtonX },
 	{ action = "BuyWire", keyboard = Enum.KeyCode.G, gamepad = Enum.KeyCode.ButtonR3 },
 	{ action = "Done", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB },
+	-- End the run in the open at its last corner (a junction another run joins): V, or L3.
+	{ action = "EndHere", keyboard = Enum.KeyCode.V, gamepad = Enum.KeyCode.ButtonL3 },
 } :: { Bind }
 
 -- Putting down the axe or plan in hand (AxeController, rules in DropControls):

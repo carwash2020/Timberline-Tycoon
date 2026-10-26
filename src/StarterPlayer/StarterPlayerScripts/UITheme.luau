@@ -97,6 +97,9 @@ UITheme.Colors = {
 	-- lines. The panel (Paper) and the focus ring (AmberEdge, #C9A24A) are the
 	-- tokens above.
 	PickerInk = Color3.fromHex("#3C2814"),
+	-- T420 (Art Director): the picker cards' corner tab, Blueprint blue. One colour for
+	-- every card; the 3D scroll's wax seal keeps BlueprintArt.SealColor.
+	BlueprintTab = Color3.fromHex("#2F5D8A"),
 	WireShort = Color3.fromHex("#FFC873"), -- a wire the box cannot pay for yet
 	WireTooLong = Color3.fromHex("#C8553D"), -- a wire past the longest
 }

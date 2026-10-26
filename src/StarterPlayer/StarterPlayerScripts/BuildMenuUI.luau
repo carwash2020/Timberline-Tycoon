@@ -36,7 +36,6 @@ local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local BlueprintArt = require(ReplicatedStorage.Shared.Art.BlueprintArt)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local BuildMenuArt = require(ReplicatedStorage.Shared.Art.BuildMenuArt)
 local BuildMenuLogic = require(ReplicatedStorage.Shared.BuildMenuLogic)
@@ -202,7 +201,7 @@ local function buildTile(
 		image.Parent = art
 	end
 
-	-- The corner tab: the plan's seal colour (BlueprintArt.SealColor).
+	-- The corner tab: Blueprint blue (UITheme.Colors.BlueprintTab), the same on every card.
 	local tab = Instance.new("Frame")
 	tab.Name = "SealTab"
 	tab.Size = UDim2.fromOffset(30, 30)
@@ -215,7 +214,7 @@ local function buildTile(
 	wedge.Position = UDim2.fromOffset(0, 0)
 	wedge.Size = UDim2.fromOffset(42, 42)
 	wedge.Rotation = 45
-	wedge.BackgroundColor3 = BlueprintArt.SealColor(entry.id)
+	wedge.BackgroundColor3 = UITheme.Colors.BlueprintTab
 	wedge.BorderSizePixel = 0
 	wedge.Parent = tab
 	tab.Parent = btn

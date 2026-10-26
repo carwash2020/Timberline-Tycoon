@@ -58,7 +58,7 @@ export type PlacedItem = {
 }
 
 -- A wire from a switch to a lamp or door, by placed-item uid (WireLogic).
-export type WireLink = { from: string, to: string }
+export type WireLink = { from: string, to: string, id: string?, endAt: { x: number, z: number }? } -- id and endAt: a run that ends in the open or is joined (WireLogic.Joints); other optional fields as WireLogic.Wire
 
 -- A box the server kept when you left it in the world. uid is server-made.
 -- It is never an axe, a truck, or something already placed on the plot.

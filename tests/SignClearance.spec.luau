@@ -39,7 +39,7 @@ return function(t)
 	end
 
 	local function signModel(sign)
-		local model = BuildingArt.Signpost(sign.text, sign.lit, nil, sign.gateId, sign.noWrap)
+		local model = BuildingArt.Signpost(sign.text, sign.lit, nil, sign.gateId, sign.noWrap, sign.panel)
 		Kit.placeAt(model, sign.cframe)
 		return model
 	end
@@ -192,16 +192,86 @@ return function(t)
 			t.ok(plot ~= nil, "the town has a PLOT DISTRICT sign")
 			t.eq(plot.text, "PLOT DISTRICT\nOld Hank sells plots\nBuy a plot and build on it")
 			local model = signModel(plot)
-			local board = model:FindFirstChild("Board", true)
 			local labels = 0
-			for _, d in ipairs(board:GetDescendants()) do
+			for _, d in ipairs(model:GetDescendants()) do
 				if d:IsA("TextLabel") then
 					labels += 1
 					t.eq(d.TextWrapped, false, "the label does not wrap")
 					t.eq(d.Text, plot.text)
 				end
 			end
-			t.ok(labels >= 1, "the board has a label")
+			t.eq(labels, 2, "one label on each face")
 		end
 	)
+
+	-- T420: the plot sign's text sits ON the board face, in Ink on a SignCream panel, over
+	-- PlankHoney planks on TimberBrown posts.
+	t.test("the PLOT DISTRICT sign writes Ink on a SignCream panel that stands on the PlankHoney board face", function()
+		local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
+		local plot
+		for _, sign in ipairs(town.signs) do
+			if firstLine(sign) == "PLOT DISTRICT" then
+				plot = sign
+			end
+		end
+		t.ok(plot ~= nil and plot.panel == true, "the plan asks for the panel")
+		local model = signModel(plot)
+		local board = model:FindFirstChild("Board", true)
+		t.eq(board.Color, Palette.PlankHoney, "the board is PlankHoney")
+		t.eq(Palette.Hex("PlankHoney"), "#C49A63")
+		t.eq(Palette.Hex("TimberBrown"), "#7A5230")
+		t.eq(Palette.Hex("SignCream"), "#F3E7C9")
+		t.eq(Palette.Hex("Ink"), "#3C2814")
+		for _, d in ipairs(board:GetDescendants()) do
+			t.ok(not d:IsA("TextLabel"), "no text under a panel (on the board itself)")
+		end
+		local posts = 0
+		for _, d in ipairs(model:GetChildren()) do
+			if d.Name == "Post" then
+				posts += 1
+				t.eq(d.Color, Palette.TimberBrown, "posts are TimberBrown")
+			end
+		end
+		t.eq(posts, 2)
+		local faces = {}
+		for _, d in ipairs(model:GetChildren()) do
+			if d.Name == "SignPanel" then
+				table.insert(faces, d)
+			end
+		end
+		t.eq(#faces, 2, "a panel on the front and one on the back")
+		for _, face in ipairs(faces) do
+			t.eq(face.Color, Palette.SignCream, "the panel is SignCream")
+			local offset = (board.CFrame:Inverse() * face.CFrame.Position).Z -- along the board's own Z
+			local side = if offset < 0 then -1 else 1
+			local boardFace = side * board.Size.Z / 2
+			local panelBack = offset - side * face.Size.Z / 2
+			t.ok(
+				math.abs(panelBack - boardFace) < 1e-3,
+				string.format("panel back %.4f board face %.4f off %.4f", panelBack, boardFace, offset)
+			)
+			t.ok(face.Size.Z > 0, "and it stands off it")
+			t.ok(face.Size.X <= board.Size.X - 0.5 and face.Size.Y <= board.Size.Y - 0.5, "inside the board's edge")
+			local guis = 0
+			for _, gui in ipairs(face:GetChildren()) do
+				if gui:IsA("SurfaceGui") then
+					guis += 1
+					t.eq(gui.Face, if side < 0 then roblox.Enum.NormalId.Front else roblox.Enum.NormalId.Back)
+					for _, label in ipairs(gui:GetChildren()) do
+						if label:IsA("TextLabel") then
+							t.eq(label.TextColor3, Palette.Ink, "the text is Ink")
+							t.eq(label.Text, plot.text)
+						end
+					end
+				end
+			end
+			t.eq(guis, 1, "one text face on each panel")
+		end
+		-- The other signs keep the old look: no panel.
+		for _, sign in ipairs(town.signs) do
+			if firstLine(sign) ~= "PLOT DISTRICT" then
+				t.ok(sign.panel ~= true, firstLine(sign) .. " keeps its own board")
+			end
+		end
+	end)
 end

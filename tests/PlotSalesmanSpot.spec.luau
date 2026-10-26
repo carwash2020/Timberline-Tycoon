@@ -116,7 +116,7 @@ return function(t)
 
 	t.test("his built body stays at least a stud from the sign's posts and clear of every sign part", function()
 		local sign = plotSign()
-		local signModel = BuildingArt.Signpost(sign.text, sign.lit, nil, sign.gateId, sign.noWrap)
+		local signModel = BuildingArt.Signpost(sign.text, sign.lit, nil, sign.gateId, sign.noWrap, sign.panel)
 		Kit.placeAt(signModel, sign.cframe)
 		local body = builtHank()
 		local parts = 0
