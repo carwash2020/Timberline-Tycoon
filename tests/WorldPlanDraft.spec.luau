@@ -52,7 +52,7 @@ return function(t)
 			t.eq(Draft.Regions[i].name, name)
 			t.eq(Draft.Regions[i].order, i)
 		end
-		t.eq(Draft.Gondola, false)
+		t.eq(Draft.Gondola, nil)
 		t.eq(Draft.FastTravel, false)
 		t.eq(Draft.RootBridges, false)
 		t.eq(Draft.Updraft, false)
@@ -130,39 +130,53 @@ return function(t)
 		t.ok(Draft.RiverX - Draft.RiverHalf > Draft.SellFloor.x1, "the west bank stays off the sell floor")
 	end)
 
-	t.test("ground discs follow the live biomes; the Skyroot foot is a new north summit", function()
-		local function disc(id, biomeId)
-			local row = region(id)
-			local area = BiomeData.Get(biomeId).area
-			t.eq(row.x, area.x)
-			t.eq(row.z, area.z)
-			t.eq(row.radius, area.radius)
-			t.eq(row.proposed, false)
+	t.test("builder centres, with Skyroot on the north summit, and the overlap check green", function()
+		local want = {
+			valley = { 0, 80, 220, "ground" },
+			pine = { -420, 110, 180, "ground" },
+			frost = { -200, 900, 160, "ground" },
+			caldera = { 700, 900, 160, "ground" },
+			gloam = { -565, -455, 140, "ground" },
+			bayou = { -700, -700, 150, "ground" },
+			mesa = { 700, -500, 150, "ground" },
+			isle = { 1200, -700, 120, "ground" },
+			skyroot = { -60, 800, 120, "cloud" },
+		}
+		for id, row in pairs(want) do
+			local x, z, r = Draft.Centre(id)
+			local regionRow = Draft.GetRegion(id)
+			t.eq(x, row[1], id)
+			t.eq(z, row[2], id)
+			t.eq(r, row[3], id)
+			t.eq(regionRow.layer, row[4], id)
+			t.eq(regionRow.proposed, true, id)
 		end
-		disc("pine", "hills")
-		disc("frost", "snow")
-		disc("caldera", "volcano")
-		disc("gloam", "grove")
-		local isle = region("isle")
-		t.eq(isle.x, BiomeData.FerryCenterX)
-		t.eq(isle.z, BiomeData.FerryCenterZ)
-		t.eq(isle.x, WorldLayout.Island.x)
-		t.eq(isle.z, WorldLayout.Island.z)
-		local bayou = region("bayou")
-		t.eq(bayou.x, WorldLayout.Bayou.x)
-		t.eq(bayou.z, WorldLayout.Bayou.z)
-		local mesa = region("mesa")
-		t.eq(mesa.x, WorldLayout.RedMesa.x)
-		t.eq(mesa.z, WorldLayout.RedMesa.z)
-		local skyroot = region("skyroot")
-		t.eq(skyroot.proposed, true)
-		t.eq(skyroot.x, Draft.Skyroot.x)
-		t.eq(skyroot.z, Draft.Skyroot.z)
-		t.ok(Draft.Skyroot.z > region("frost").z, "the summit is north of Frostpeak")
-		t.ok(math.abs(Draft.Skyroot.x - Draft.LiveSky.x) > 200, "the summit is not the live east disc")
-		t.ok(math.abs(Draft.LiveSky.x) <= WorldLayout.WorldHalf)
-		t.ok(math.abs(Draft.Skyroot.x) < WorldLayout.WorldHalf)
-		t.ok(math.abs(Draft.Skyroot.z) < WorldLayout.WorldHalf)
+		t.eq(#Draft.OverlapHits(), 0)
+		local kiss = Draft.DiscGap(Draft.GetRegion("bayou"), Draft.GetRegion("gloam"))
+		t.ok(kiss < 0 and kiss >= -Draft.OverlapSlop, string.format("bayou/gloam kiss %.1f", kiss))
+		local shoulder = Draft.DiscGap(Draft.GetRegion("skyroot"), Draft.GetRegion("frost"))
+		t.ok(shoulder < 0, "the cloud disc sits over Frostpeak's north shoulder")
+		t.eq(Draft.LiveSky.x, 680)
+		t.eq(Draft.LiveSky.z, 280)
+		t.ok(math.abs(Draft.Skyroot.x - Draft.LiveSky.x) > 400, "not the old gondola top")
+		t.eq(Draft.Spawn.x, 0)
+		t.eq(Draft.Spawn.z, 40)
+		t.eq(Draft.SpawnY, 0.5)
+		t.eq(Draft.SpawnY, WorldLayout.Spawn.Y)
+		t.eq(Draft.Sawmill.x, 0)
+		t.eq(Draft.Sawmill.z, 110)
+		t.eq(Draft.Sawmill.x, WorldLayout.Sawmill.X)
+		t.eq(Draft.Sawmill.z, WorldLayout.Sawmill.Z)
+		t.eq(Draft.TrunkLift.built, false)
+		t.eq(Draft.TrunkLift.x, -60)
+		t.eq(Draft.TrunkLift.z, 800)
+		t.ok(#Draft.Clouds >= 2)
+		for _, isle in ipairs(Draft.Clouds) do
+			t.eq(isle.built, false, isle.id)
+			t.ok(dist(isle, Draft.Skyroot) + isle.radius <= region("skyroot").radius, isle.id)
+		end
+		t.eq(Draft.LiveFerry.x, BiomeData.FerryCenterX)
+		t.ok(math.abs(region("isle").x - Draft.LiveFerry.x) > 100, "the picture isle is not the live ferry centre")
 	end)
 
 	t.test("the new shops sit where the brief puts them", function()
@@ -174,8 +188,9 @@ return function(t)
 		local market = shop("SkyMarket")
 		local secret = shop("SecretShop")
 		local frost = region("frost")
-		t.ok(dist(coat, { x = 0, z = 480 }) > 16 and dist(coat, { x = 0, z = 480 }) < 40, "coat shoulder")
-		t.ok(dist(coat, frost) > frost.radius * 0.4, "at the road foot, not the summit")
+		local frostRoad = Draft.GetRoad("Frost Road")
+		t.ok(dist(coat, frostRoad.points[1]) > 16 and dist(coat, frostRoad.points[1]) < 40, "coat shoulder")
+		t.ok(dist(coat, frost) > frost.radius, "at the road foot, outside the snow")
 		t.eq(odds.x, -460)
 		t.eq(odds.z, -300)
 		local isle = region("isle")
@@ -189,18 +204,21 @@ return function(t)
 		t.ok(dist(secret, gloam) < gloam.radius, "the secret shop is in the ravine")
 		t.eq(coat.why:find(tostring(ItemCatalog.Gear.InsulatedCoat.priceCash), 1, true) ~= nil, true)
 		t.eq(heat.why:find(tostring(ItemCatalog.Gear.HeatBoots.priceCash), 1, true) ~= nil, true)
-		t.eq(Draft.Lodge.x, Draft.Skyroot.x)
-		t.ok(dist(Draft.Lodge, Draft.Skyroot) < 80)
-		local skyroad
-		for _, road in ipairs(Draft.Roads) do
-			if road.name == "Skyroad" then
-				skyroad = road
-			end
-		end
+		t.ok(dist(Draft.Lodge, Draft.Skyroot) < region("skyroot").radius, "lodge is on the highlands")
+		t.ok(Draft.Lodge.z > 650, "lodge is on the north approach")
+		t.ok(math.abs(Draft.Lodge.x - 650) > 400, "lodge is not the old gondola approach")
+		t.ok(math.abs(Draft.Lodge.z - 300) > 300, "lodge is not toward (650, 300)")
+		local skyroad = Draft.GetRoad("Skyroot Road")
 		local last = skyroad.points[#skyroad.points]
 		t.eq(last.x, Draft.Lodge.x)
 		t.eq(last.z, Draft.Lodge.z)
 		t.eq(skyroad.sign, "SKY PASS")
+		t.eq(skyroad.width, 32)
+		local trunk = Draft.GetRoad("Valley Trunk")
+		t.eq(trunk.width, 32)
+		t.ok(trunk.points[1].z < trunk.points[#trunk.points].z, "the trunk runs south to north")
+		t.eq(trunk.points[#trunk.points].x, skyroad.points[1].x)
+		t.eq(trunk.points[#trunk.points].z, skyroad.points[1].z)
 	end)
 
 	t.test("art tints are the locked hexes", function()
@@ -230,11 +248,8 @@ return function(t)
 			"turnstile",
 			"cloud-chute",
 			"sky-forge-court",
-			"ring-road",
-			"truck-tunnel",
 			"floating-isles",
 			"skyroot-bloom",
-			"north-toll",
 			"meadow-lookout",
 		}
 		t.eq(#Draft.Removals, #want)
@@ -244,8 +259,18 @@ return function(t)
 			t.eq(row.deleteInThisPr, false)
 			t.ok(#row.reason > 20, id)
 		end
-		t.eq(Draft.Removals[6].mustKeep, true, "the ground court holds MustKeep spots")
-		t.eq(Draft.Removals[11].mustKeep, true, "the toll counter is MustKeep")
+		t.eq(Draft.GetRegion("valley").id, "valley")
+		local court = Draft.Removals[6]
+		t.eq(court.id, "sky-forge-court")
+		t.eq(court.mustKeep, true, "the ground court holds MustKeep spots")
+		t.eq(#Draft.Redo, 2)
+		t.eq(Draft.Redo[1].id, "ring-road")
+		t.eq(Draft.Redo[2].id, "truck-tunnel")
+		t.ok(string.find(Draft.Redo[1].note, "T409", 1, true) ~= nil)
+		t.ok(string.find(Draft.Redo[2].note, "silent-delete", 1, true) ~= nil)
+		for _, row in ipairs(Draft.Removals) do
+			t.ok(row.id ~= "ring-road" and row.id ~= "truck-tunnel", row.id)
+		end
 	end)
 
 	t.test("the live map modules do not read the draft", function()

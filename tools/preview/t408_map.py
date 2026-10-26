@@ -23,8 +23,11 @@ OUT = os.path.join(ROOT, "previews", "t408")
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONTB = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-# Map covers the playable square with a margin, north up.
-HALF = 1100.0
+# Plan bounds. The isle sits past the live WorldHalf, so the picture is
+# wider than the current square. North is up. One scale, no stretch.
+X0 = -1000.0
+Z1 = 1500.0
+SPAN = 2500.0
 MAP = 1500
 
 
@@ -48,12 +51,12 @@ class Map:
 
     def px(self, x: float, z: float) -> tuple[float, float]:
         return (
-            self.ox + (x + HALF) / (2 * HALF) * MAP,
-            self.oy + (HALF - z) / (2 * HALF) * MAP,
+            self.ox + (x - X0) / SPAN * MAP,
+            self.oy + (Z1 - z) / SPAN * MAP,
         )
 
     def scale(self, studs: float) -> float:
-        return studs / (2 * HALF) * MAP
+        return studs / SPAN * MAP
 
 
 def disc(draw: ImageDraw.ImageDraw, m: Map, x, z, r, fill):
@@ -120,7 +123,7 @@ def draw_overview(plan: dict) -> Image.Image:
     lumen = rgb(pal["lumen"])
     ember = rgb(pal["ember"])
     snow = rgb(pal["snow"])
-    W, H = 2460, 1780
+    W, H = 2460, 1900
     im = Image.new("RGB", (W, H), mix(cream, trail, 0.35))
     draw = ImageDraw.Draw(im)
     title = load_font(FONTB, 28)
@@ -148,25 +151,16 @@ def draw_overview(plan: dict) -> Image.Image:
     for i in range(8):
         t = i / 7
         band = mix(cliff, mix(valley, trail, 0.4), 0.35 + 0.5 * (1 - abs(t - 0.15)))
-        z0 = HALF - t * 2 * HALF
-        z1 = HALF - (t + 1 / 7) * 2 * HALF
-        y0 = bm.px(0, z0)[1]
-        y1 = bm.px(0, z1)[1]
+        z_hi = Z1 - t * SPAN
+        z_lo = Z1 - (t + 1 / 7) * SPAN
+        y0 = bm.px(0, z_hi)[1]
+        y1 = bm.px(0, z_lo)[1]
         bd.rectangle((0, min(y0, y1), MAP, max(y0, y1)), fill=band)
     # Edge rock, so the square does not read as a flat baseplate.
     fringe = bm.scale(80)
     bd.rectangle((0, 0, MAP, fringe), fill=cliff)
     bd.rectangle((0, 0, fringe, MAP), fill=cliff)
     im.paste(base, (ox, oy))
-
-    coast = plan["coast"]
-    shore = coast["shoreX"]
-    beach = coast["beachWidth"]
-    north_z = coast["northZ"]
-    sand = rgb(pal["sand"])
-    b0 = m.px(shore - beach, north_z)
-    b1 = m.px(shore, -HALF)
-    draw.rectangle((b0[0], b0[1], b1[0], b1[1]), fill=mix(sand, cream, 0.25))
 
     bay = [m.px(p["x"], p["z"]) for p in plan["bay"]]
     draw.polygon(bay, fill=water)
@@ -187,7 +181,9 @@ def draw_overview(plan: dict) -> Image.Image:
         if region["id"] == "gloam":
             disc(draw, m, region["x"], region["z"], region["radius"] * 0.45, rgb(pal["gloamGlow"]))
         if region["id"] == "skyroot":
-            disc(draw, m, region["x"], region["z"], plan["cloudRadius"], mix(lumen, snow, 0.35))
+            disc(draw, m, region["x"], region["z"], region["radius"], mix(lumen, canopy, 0.45))
+            for cloud in plan.get("clouds", []):
+                disc(draw, m, cloud["x"], cloud["z"], cloud["radius"], mix(lumen, cream, 0.35))
 
     valley_r = next(r for r in plan["regions"] if r["id"] == "valley")
     disc(draw, m, valley_r["x"], valley_r["z"], valley_r["radius"], valley)
@@ -235,7 +231,11 @@ def draw_overview(plan: dict) -> Image.Image:
             fill=cream,
             width=3,
         )
-    halo(draw, m.px(860, 210), "CAR FERRY  $400", tiny, ink, cream, "mm")
+    ferry_at = (
+        (plan["mainlandDock"]["x"] + plan["islandDock"]["x"]) / 2,
+        (plan["mainlandDock"]["z"] + plan["islandDock"]["z"]) / 2 + 50,
+    )
+    halo(draw, m.px(*ferry_at), "CAR FERRY  $400", tiny, ink, cream, "mm")
 
     # Landmarks from spawn: plume, Skyroot, lighthouse.
     plume = plan["plume"]
@@ -248,7 +248,12 @@ def draw_overview(plan: dict) -> Image.Image:
     disc(draw, m, root["x"], root["z"], 18, mix(lumen, valley, 0.3))
     tx, ty = m.px(root["x"], root["z"])
     draw.rectangle((tx - 4, ty - 16, tx + 4, ty + 10), fill=mix(ink, trail, 0.3))
-    halo(draw, m.px(root["x"] - 78, root["z"]), "TRUNK LIFT", tiny, ink, lumen, "mm")
+    halo(draw, m.px(root["x"] - 90, root["z"] + 20), "TRUNK LIFT", tiny, ink, lumen, "mm")
+    halo(draw, m.px(root["x"] + 70, root["z"] - 70), "CLOUDS NOT BUILT", tiny, ink, lumen, "mm")
+    lodge = plan["lodge"]
+    lx, ly = m.px(lodge["x"], lodge["z"])
+    draw.rectangle((lx - 5, ly - 5, lx + 5, ly + 5), fill=ink)
+    halo(draw, m.px(lodge["x"] - 20, lodge["z"] - 28), "GATE LODGE", tiny, ink, cream, "mm")
 
     light = plan["lighthouse"]
     lx, ly = m.px(light["x"], light["z"])
@@ -258,20 +263,21 @@ def draw_overview(plan: dict) -> Image.Image:
 
     # Region names.
     name_font = load_font(FONTB, 14)
-    placements = {
-        "valley": (0, -60),
-        "pine": (-500, 110),
-        "frost": (0, 700),
-        "caldera": (450, 470),
-        "gloam": (10, -700),
-        "bayou": (-760, -700),
-        "mesa": (590, -790),
-        "isle": (930, 20),
-        "skyroot": (-250, 960),
+    nudges = {
+        "valley": (0, -50),
+        "pine": (0, 30),
+        "frost": (-20, 30),
+        "caldera": (0, -30),
+        "gloam": (0, 20),
+        "bayou": (0, -20),
+        "mesa": (0, 20),
+        "isle": (0, 20),
+        "skyroot": (0, 50),
     }
     light_names = {"frost", "isle", "skyroot", "valley"}
     for region in plan["regions"]:
-        pos = placements[region["id"]]
+        nudge = nudges.get(region["id"], (0, 0))
+        pos = (region["x"] + nudge[0], region["z"] + nudge[1])
         fill = ink if region["id"] in light_names else cream
         back = cream if fill == ink else ink
         halo(draw, m.px(*pos), region["name"].upper(), name_font, fill, back, "mm")
@@ -300,8 +306,8 @@ def draw_overview(plan: dict) -> Image.Image:
     halo(draw, (ox + 28, oy + 18), "N", label, ink, cream, "mm")
     draw.line((ox + 28, oy + 28, ox + 28, oy + 52), fill=ink, width=2)
     draw.polygon([(ox + 28, oy + 24), (ox + 23, oy + 34), (ox + 33, oy + 34)], fill=ink)
-    bar0 = m.px(-900, -980)
-    bar1 = m.px(-700, -980)
+    bar0 = m.px(-900, -920)
+    bar1 = m.px(-700, -920)
     draw.line((bar0, bar1), fill=ink, width=3)
     halo(draw, (bar0[0], bar0[1] + 6), "200 STUDS", tiny, ink, cream, "lt")
     halo(draw, (ox + 12, oy + MAP - 36), "DRAFT. The live map is not changed.", tiny, ink, cream, "lt")
@@ -315,7 +321,7 @@ def draw_overview(plan: dict) -> Image.Image:
     for region in plan["regions"]:
         tint = rgb(region["tint"])
         draw.rectangle((lx0, y, lx0 + 16, y + 16), fill=tint, outline=ink)
-        mark = "  proposed summit" if region["proposed"] else ""
+        mark = "  clouds, not built" if region["id"] == "skyroot" else ""
         draw.text((lx0 + 22, y - 1), f"{region['order']}. {region['name']}{mark}", font=small, fill=ink)
         y += 20
     y += 8
@@ -368,6 +374,8 @@ def draw_overview(plan: dict) -> Image.Image:
         "East of the river: the shore and the bay.",
         "Fares are GameConfig until Connor picks.",
         "Ferry crossing is the live 40s (see the doc).",
+        "Ring and tunnel: redo in T409, not deleted.",
+        "Cloud isles and the trunk lift are notes only.",
     ]
     for note in notes:
         draw.text((lx0, y), note, font=small, fill=ink)
@@ -399,8 +407,8 @@ def card(plan: dict, row: dict) -> Image.Image:
 
     def lp(x, z):
         return (
-            ox + (x + HALF) / (2 * HALF) * side,
-            oy + (HALF - z) / (2 * HALF) * side,
+            ox + (x - X0) / SPAN * side,
+            oy + (Z1 - z) / SPAN * side,
         )
 
     # River ghost, so the card still shows the draft the item is leaving.

@@ -6,10 +6,10 @@
 -- not require it, and this file does not require them. Approving the
 -- picture is what allows a later terrain build. This PR does not build it.
 --
--- Numbers that already exist (shop pins, biome discs, toll, ferry, the
--- trunk-lift sizes the designer locked) are read from those modules or
--- copied from the MustKeep list. A coordinate marked proposed is a draft
--- tune for the picture, not a second price or a second fare.
+-- Shop pins, toll, ferry fares and the trunk-lift sizes are read from
+-- the live modules or copied from the MustKeep list. The nine region
+-- centres are the builder's draft discs (Skyroot is the manager's north
+-- summit, not BiomeData.sky). Nothing here is built.
 
 local BayouData = require(script.Parent.Parent.Regions.BayouData)
 local BiomeData = require(script.Parent.Parent.BiomeData)
@@ -44,8 +44,11 @@ export type Region = {
 	z: number,
 	radius: number,
 	tint: string,
+	layer: string,
 	proposed: boolean,
 }
+export type CloudIsle = { id: string, x: number, z: number, radius: number, y: number, built: boolean }
+export type Redo = { id: string, title: string, note: string, points: { XZ } }
 export type Removal = {
 	id: string,
 	title: string,
@@ -126,7 +129,6 @@ WorldPlanDraft.FerryTravelSec = FerryLogic.TravelSec
 WorldPlanDraft.FerryDeckWidth = FerryLogic.DeckWidth
 WorldPlanDraft.FerryDeckLength = FerryLogic.DeckLength
 WorldPlanDraft.FastTravel = false
-WorldPlanDraft.Gondola = false
 WorldPlanDraft.CarFerry = true
 
 -- Cloud access option B. The y band is the cab's travel, not a gondola.
@@ -164,10 +166,8 @@ WorldPlanDraft.Palette = {
 	water = "4E7E93",
 }
 
--- Proposed tunes for the picture. Not live, and not a price.
-local SKYROOT_X = -200
-local SKYROOT_Z = 900
-local LODGE_Z = 860
+-- Builder discs. Skyroot is the manager's north summit, about (-60, 800),
+-- not the old gondola top at BiomeData.sky (680, 280).
 local CLOUD_R = 64
 local RIVER_PAST_SELL = 26 -- studs from the sell floor's east edge to the channel centre
 local CHANNEL_HALF = 18
@@ -178,148 +178,83 @@ local spawn = WorldLayout.Spawn
 local sellFloor = floorNamed("SellStationFloor")
 local street = paintNamed("MainStreet")
 local eastLink = roadPoints("EastLink")
-local snowRoad = roadPoints("SnowRoad")
-local hillsRoad = roadPoints("HillsRoad")
-local hillsCross = roadPoints("HillsCross")
-local volcanoRoad = roadPoints("VolcanoRoad")
-local mesaRoad = roadPoints("MesaRoad")
-local bayouRoad = roadPoints("BayouRoad")
-local southLink = roadPoints("SouthLink")
-local forestPath = roadPoints("ForestPath")
 local ringRoad = roadPoints("RingRoad")
 
 local spineX = sellFloor.x1 + RIVER_PAST_SELL
 local bridgeZ = pointAt(eastLink, 1).Y
 local deckY = (WorldPlanDraft.LiftY0 + WorldPlanDraft.LiftY1) / 2
 
-local starter = areaOf("starter")
-local hills = areaOf("hills")
-local snow = areaOf("snow")
-local volcano = areaOf("volcano")
-local grove = areaOf("grove")
 local sky = areaOf("sky")
-local coast = WorldLayout.Coast
 
-local skyroot = xz(SKYROOT_X, SKYROOT_Z)
-local lodge = xz(SKYROOT_X, LODGE_Z)
-local snowFoot = v2(pointAt(snowRoad, 2))
-local snowEnd = v2(pointAt(snowRoad, 3))
-local cross = v2(pointAt(hillsCross, 1))
-local volStart = v2(pointAt(volcanoRoad, 1))
-local volEnd = v2(pointAt(volcanoRoad, 2))
+-- Same-layer discs may kiss by this many studs. Bayou and Gloam, at the
+-- locked centres, miss a tangent by about 10. A deeper pile-up fails.
+WorldPlanDraft.OverlapSlop = 12
+
+local function disc(
+	order: number,
+	id: string,
+	name: string,
+	x: number,
+	z: number,
+	radius: number,
+	tint: string,
+	layer: string
+): Region
+	return {
+		order = order,
+		id = id,
+		name = name,
+		x = x,
+		z = z,
+		radius = radius,
+		tint = tint,
+		layer = layer,
+		proposed = true,
+	}
+end
+
+local skyroot = xz(-60, 800)
+-- On the switchback, inside the highlands disc, south-west of the summit.
+-- Not the old gondola approach at (650, 300).
+local lodge = xz(-110, 730)
+local cross = xz(-460, -300)
+local frostFoot = xz(-180, 710)
+local frostPeak = xz(-200, 900)
+local calderaRest = xz(700, 700)
+local calderaCone = xz(700, 900)
 
 -- Dealership hall entrance. tests/mustkeep.json. The live building stays
 -- until a terrain build; the bridge is drawn so this door is across it.
 local dealership = xz(189.25, 100.3)
 
-local landingX, landingZ = WorldLayout.FerryLanding()
-local facingX, facingZ = WorldLayout.FerryFacing()
-local harbour = xz(landingX - facingX * WorldLayout.FerryPathLength, landingZ - facingZ * WorldLayout.FerryPathLength)
+-- Picture ferry. The live dock and the live isle stay until a build.
+local harbour = xz(1115, -700)
+local mainlandDock = xz(920, -640)
+local islandDock = xz(1100, -700)
 
 local coatItem = ItemCatalog.Gear.InsulatedCoat
 local heatItem = ItemCatalog.Gear.HeatBoots
-local coatAt = beside(v2(pointAt(snowRoad, 1)), snowFoot, SHOULDER)
-local heatAt = beside(volStart, volEnd, SHOULDER)
-local secretAt = xz(grove.x + 22, grove.z - 24)
+local coatAt = beside(frostPeak, frostFoot, SHOULDER)
+local heatAt = beside(calderaCone, calderaRest, SHOULDER)
+local secretAt = xz(-543, -479)
 local forgeAt = xz(skyroot.x + 28, skyroot.z + 18)
 local marketAt = xz(skyroot.x - 30, skyroot.z - 16)
 
-local town: Region = {
-	order = 1,
-	id = "valley",
-	name = "Timber Valley",
-	x = starter.x,
-	z = starter.z,
-	radius = starter.radius,
-	tint = WorldPlanDraft.Palette.valley,
-	proposed = false,
-}
-
+local pal = WorldPlanDraft.Palette
 WorldPlanDraft.Regions = {
-	town,
-	{
-		order = 2,
-		id = "pine",
-		name = "Pine Ridge",
-		x = hills.x,
-		z = hills.z,
-		radius = hills.radius,
-		tint = WorldPlanDraft.Palette.pine,
-		proposed = false,
-	},
-	{
-		order = 3,
-		id = "frost",
-		name = "Frostpeak",
-		x = snow.x,
-		z = snow.z,
-		radius = snow.radius,
-		tint = WorldPlanDraft.Palette.snow,
-		proposed = false,
-	},
-	{
-		order = 4,
-		id = "caldera",
-		name = "Ember Caldera",
-		x = volcano.x,
-		z = volcano.z,
-		radius = volcano.radius,
-		tint = WorldPlanDraft.Palette.ash,
-		proposed = false,
-	},
-	{
-		order = 5,
-		id = "gloam",
-		name = "Gloam Ravine",
-		x = grove.x,
-		z = grove.z,
-		radius = grove.radius,
-		tint = WorldPlanDraft.Palette.gloam,
-		proposed = false,
-	},
-	{
-		order = 6,
-		id = "bayou",
-		name = "Bayou",
-		x = WorldLayout.Bayou.x,
-		z = WorldLayout.Bayou.z,
-		radius = WorldLayout.Bayou.radius,
-		tint = WorldPlanDraft.Palette.bayou,
-		proposed = false,
-	},
-	{
-		order = 7,
-		id = "mesa",
-		name = "Red Mesa",
-		x = WorldLayout.RedMesa.x,
-		z = WorldLayout.RedMesa.z,
-		radius = WorldLayout.RedMesa.radius,
-		tint = WorldPlanDraft.Palette.mesa,
-		proposed = false,
-	},
-	{
-		order = 8,
-		id = "isle",
-		name = "Lantern Isle",
-		x = BiomeData.FerryCenterX,
-		z = BiomeData.FerryCenterZ,
-		radius = BiomeData.FerryRadius,
-		tint = WorldPlanDraft.Palette.sand,
-		proposed = false,
-	},
-	{
-		order = 9,
-		id = "skyroot",
-		name = "Skyroot Highlands",
-		x = skyroot.x,
-		z = skyroot.z,
-		radius = 100,
-		tint = WorldPlanDraft.Palette.canopy,
-		proposed = true,
-	},
+	disc(1, "valley", "Timber Valley", 0, 80, 220, pal.valley, "ground"),
+	disc(2, "pine", "Pine Ridge", -420, 110, 180, pal.pine, "ground"),
+	disc(3, "frost", "Frostpeak", -200, 900, 160, pal.snow, "ground"),
+	disc(4, "caldera", "Ember Caldera", 700, 900, 160, pal.ash, "ground"),
+	disc(5, "gloam", "Gloam Ravine", -565, -455, 140, pal.gloam, "ground"),
+	disc(6, "bayou", "Bayou", -700, -700, 150, pal.bayou, "ground"),
+	disc(7, "mesa", "Red Mesa", 700, -500, 150, pal.mesa, "ground"),
+	disc(8, "isle", "Lantern Isle", 1200, -700, 120, pal.sand, "ground"),
+	disc(9, "skyroot", "Skyroot Highlands", skyroot.x, skyroot.z, 120, pal.canopy, "cloud"),
 } :: { Region }
 
 WorldPlanDraft.Spawn = xz(spawn.X, spawn.Z)
+WorldPlanDraft.SpawnY = spawn.Y
 WorldPlanDraft.Sawmill = xz(mill.X, mill.Z)
 WorldPlanDraft.WeighHouse = xz(mill.X + 53, mill.Z + 1)
 WorldPlanDraft.Town = { x0 = 0, z0 = 0, x1 = 0, z1 = 0 }
@@ -337,18 +272,19 @@ WorldPlanDraft.SellFloor = { x0 = sellFloor.x0, z0 = sellFloor.z0, x1 = sellFloo
 WorldPlanDraft.RiverX = spineX
 WorldPlanDraft.RiverHalf = CHANNEL_HALF
 WorldPlanDraft.River = {
-	xz(skyroot.x, skyroot.z - 24),
-	xz(170, 820),
-	xz(170, 640),
+	xz(80, 780),
 	xz(spineX, 520),
 	xz(spineX, -280),
-	xz(coast.shoreX, -160),
+	xz(480, -460),
+	xz(960, -680),
 }
+-- Southeast water, east of Red Mesa, holding Lantern Isle. The live coast
+-- stays where it is until a build.
 WorldPlanDraft.Bay = {
-	xz(coast.shoreX, coast.northZ),
-	xz(WorldLayout.WorldHalf, coast.northZ),
-	xz(WorldLayout.WorldHalf, -WorldLayout.WorldHalf),
-	xz(coast.shoreX, -WorldLayout.WorldHalf),
+	xz(960, -200),
+	xz(1460, -200),
+	xz(1460, -920),
+	xz(960, -920),
 }
 WorldPlanDraft.Bridge = {
 	x = spineX,
@@ -356,55 +292,63 @@ WorldPlanDraft.Bridge = {
 	fee = WorldPlanDraft.LiftBridgeFee,
 	half = CHANNEL_HALF,
 }
-WorldPlanDraft.MainlandDock = xz(WorldLayout.FerryDock.x, WorldLayout.FerryDock.z)
-WorldPlanDraft.IslandDock = xz(landingX, landingZ)
+WorldPlanDraft.MainlandDock = mainlandDock
+WorldPlanDraft.IslandDock = islandDock
+WorldPlanDraft.LiveFerry = {
+	dock = xz(WorldLayout.FerryDock.x, WorldLayout.FerryDock.z),
+	x = BiomeData.FerryCenterX,
+	z = BiomeData.FerryCenterZ,
+}
 
 local W = WorldPlanDraft.MainWidth
 local B = WorldPlanDraft.BranchWidth
 local F = WorldPlanDraft.FootWidth
+local trunkX = -36
 
--- Street end, lift bridge, then east along the bridge's latitude so the
--- 32-wide road does not pave the Land Office (z 100). The dealership door
--- is a short spur off this road, still on the east bank.
-local bayRoad: { XZ } = {
-	xz(street.x1, bridgeZ),
-	xz(spineX, bridgeZ),
-	xz(volStart.x, bridgeZ),
-	v2(pointAt(eastLink, 2)),
-	WorldPlanDraft.MainlandDock,
-}
-
-local gloamFloor = xz(grove.x, grove.z)
-local southEnd = v2(pointAt(southLink, 2))
-
+-- East from town along the bridge's latitude so the road does not pave the
+-- Land Office (z 100). The dealership door is a short spur on the east bank.
 WorldPlanDraft.Roads = {
+	{
+		name = "Valley Trunk",
+		width = W,
+		kind = "main",
+		sign = nil,
+		points = { xz(trunkX, -360), xz(trunkX, 40), xz(trunkX, 520) },
+	},
 	{
 		name = "Main Street",
 		width = W,
 		kind = "main",
 		sign = nil,
-		points = { xz(street.x0, bridgeZ), xz(street.x1, bridgeZ) },
+		points = { xz(street.x0, bridgeZ), xz(spineX, bridgeZ) },
+	},
+	{
+		name = "Skyroot Road",
+		width = W,
+		kind = "main",
+		sign = "SKY PASS",
+		points = { xz(trunkX, 520), xz(-180, 600), xz(-50, 660), xz(-180, 710), lodge },
 	},
 	{
 		name = "Pine Road",
-		width = W,
-		kind = "main",
+		width = B,
+		kind = "branch",
 		sign = "PINE RIDGE",
-		points = { v2(pointAt(hillsRoad, 1)), v2(pointAt(hillsRoad, 2)), v2(pointAt(hillsRoad, 3)) },
+		points = { xz(trunkX, 110), xz(-420, 110) },
 	},
 	{
 		name = "Frost Road",
-		width = W,
-		kind = "main",
+		width = B,
+		kind = "branch",
 		sign = "FROSTPEAK",
-		points = { v2(pointAt(snowRoad, 1)), snowFoot, snowEnd },
+		points = { frostFoot, frostPeak },
 	},
 	{
 		name = "Bay Road",
-		width = W,
-		kind = "main",
+		width = B,
+		kind = "branch",
 		sign = "FERRY",
-		points = bayRoad,
+		points = { xz(spineX, bridgeZ), xz(400, 80), xz(880, 80), xz(880, -640), mainlandDock },
 	},
 	{
 		name = "Dealership Spur",
@@ -415,64 +359,45 @@ WorldPlanDraft.Roads = {
 	},
 	{
 		name = "Caldera Road",
-		width = W,
-		kind = "main",
+		width = B,
+		kind = "branch",
 		sign = "EMBER CALDERA",
-		points = { xz(volStart.x, bridgeZ), volStart, volEnd },
+		points = { xz(400, 80), xz(700, 80), calderaRest, calderaCone },
 	},
 	{
 		name = "Mesa Road",
-		width = W,
-		kind = "main",
+		width = B,
+		kind = "branch",
 		sign = "RED MESA",
-		points = {
-			v2(pointAt(eastLink, 2)),
-			v2(pointAt(mesaRoad, 1)),
-			v2(pointAt(mesaRoad, 2)),
-			v2(pointAt(mesaRoad, 3)),
-		},
+		points = { xz(700, 80), xz(700, -500) },
 	},
 	{
 		name = "Gloam Road",
-		width = W,
-		kind = "main",
+		width = B,
+		kind = "branch",
 		sign = "GLOAM RAVINE",
-		points = { v2(pointAt(forestPath, 1)), v2(pointAt(southLink, 1)), southEnd, gloamFloor },
-	},
-	{
-		name = "Skyroad",
-		width = W,
-		kind = "main",
-		sign = "SKY PASS",
-		points = { snowEnd, xz(-180, 800), xz(-180, lodge.z), lodge },
+		points = { xz(trunkX, -360), cross, xz(-565, -455) },
 	},
 	{
 		name = "Pine Link",
 		width = B,
 		kind = "branch",
 		sign = nil,
-		points = { xz(pointAt(hillsRoad, 2).X, pointAt(hillsRoad, 2).Y), cross },
-	},
-	{
-		name = "Gloam Link",
-		width = B,
-		kind = "branch",
-		sign = nil,
-		points = { cross, southEnd },
+		points = { xz(-420, 110), cross },
 	},
 	{
 		name = "Bayou Road",
 		width = B,
 		kind = "branch",
 		sign = "BAYOU",
-		points = { cross, v2(pointAt(bayouRoad, 2)), xz(WorldLayout.Bayou.x, WorldLayout.Bayou.z) },
+		points = { cross, xz(-700, -700) },
 	},
 	{
 		name = "Cave Path",
 		width = F,
 		kind = "foot",
 		sign = nil,
-		points = { gloamFloor, secretAt },
+		points = { xz(-565, -455), secretAt },
 	},
 	{
 		name = "Lodge Path",
@@ -488,6 +413,20 @@ WorldPlanDraft.Skyroot = skyroot
 WorldPlanDraft.CloudRadius = CLOUD_R
 WorldPlanDraft.CloudY = deckY
 WorldPlanDraft.LiveSky = { x = sky.x, z = sky.z, y = sky.y or 0, radius = sky.radius }
+-- Annotated only. The trunk lift and the cloud isles are not built.
+WorldPlanDraft.Clouds = {
+	{ id = "forge", x = forgeAt.x, z = forgeAt.z, radius = 36, y = deckY, built = false },
+	{ id = "market", x = marketAt.x, z = marketAt.z, radius = 32, y = deckY, built = false },
+	{ id = "lookout", x = skyroot.x + 8, z = skyroot.z - 36, radius = 24, y = deckY, built = false },
+} :: { CloudIsle }
+WorldPlanDraft.TrunkLift = {
+	x = skyroot.x,
+	z = skyroot.z,
+	y0 = WorldPlanDraft.LiftY0,
+	y1 = WorldPlanDraft.LiftY1,
+	shaft = WorldPlanDraft.Shaft,
+	built = false,
+}
 
 local function shop(n: number, id: string, label: string, at: XZ, why: string, kept: boolean, y: number?): Shop
 	return { n = n, id = id, label = label, x = at.x, z = at.z, y = y, why = why, kept = kept }
@@ -565,17 +504,18 @@ WorldPlanDraft.Shops = {
 	),
 } :: { Shop }
 
--- The live lighthouse is WorldPlan.Lighthouse(), searched on z -440 to -180.
--- The marker is the picture's stand-in on that band. The tower is not moved.
+-- Picture marker on the east headland of the new bay. The live tower is
+-- still WorldPlan.Lighthouse(), searched on z -440 to -180. It is not moved.
+local coast = WorldLayout.Coast
 WorldPlanDraft.Coast = { shoreX = coast.shoreX, beachWidth = coast.beachWidth, northZ = coast.northZ }
 WorldPlanDraft.Lighthouse = {
-	x = coast.shoreX - 20,
-	z = -310,
+	x = 940,
+	z = -240,
 	pictureOnly = true,
 	searchZ0 = -440,
 	searchZ1 = -180,
 }
-WorldPlanDraft.Plume = xz(volcano.x + 36, volcano.z + 36)
+WorldPlanDraft.Plume = xz(calderaCone.x + 36, calderaCone.z + 36)
 
 local function removal(id: string, title: string, reason: string, mustKeep: boolean, at: XZ?, points: { XZ }?): Removal
 	return {
@@ -649,22 +589,6 @@ WorldPlanDraft.Removals = {
 		nil
 	),
 	removal(
-		"ring-road",
-		"Ring road",
-		"RingRoad only exists to circle the old map. The valley plan has no ring. Roads that still go to a region stay, under the new names.",
-		false,
-		nil,
-		ringPts
-	),
-	removal(
-		"truck-tunnel",
-		"Truck tunnel",
-		"The tunnel is the ring's shortcut between the peak and the caldera. Caldera Road is a surface road, so the bore has no job.",
-		false,
-		nil,
-		tunnelPts
-	),
-	removal(
 		"floating-isles",
 		"Floating isles with no road summit",
 		"The live sky disc floats in the east, reached by the gondola. The highlands are the north summit, the switchback, and the trunk lift. Lumenwood moves. The gondola top station and the root bridges do not.",
@@ -675,17 +599,9 @@ WorldPlanDraft.Removals = {
 	removal(
 		"skyroot-bloom",
 		"Skyroot Bloom clock",
-		"WORLD_DESIGN retires the bloom. ForestService still sets SkyrootBloom and it still doubles figure chances, so it is not dead. It is not a reason to visit. Leave the clock until Connor says to remove it.",
+		"WORLD_DESIGN retires the bloom. ForestService still sets SkyrootBloom and it still doubles figure chances, so it is not dead. Leave the clock until Connor says to remove it. The pin is the old gondola top, not the new summit.",
 		false,
-		skyroot,
-		nil
-	),
-	removal(
-		"north-toll",
-		"Folded north toll booth",
-		"Old Tolly's booth gates a spruce strip the nine regions do not name. The counter is MustKeep. The lift bridge is the crossing this plan prices. Connor picks whether the booth stays.",
-		true,
-		xz(WorldLayout.BoothX, WorldLayout.BoothZ),
+		xz(sky.x, sky.z),
 		nil
 	),
 	removal(
@@ -697,5 +613,75 @@ WorldPlanDraft.Removals = {
 		nil
 	),
 } :: { Removal }
+
+-- Not a removal. T409 rebuilds these. This PR does not delete them.
+WorldPlanDraft.Redo = {
+	{
+		id = "ring-road",
+		title = "Ring road",
+		note = "T409+ replaces the live RingRoad. The valley plan has no ring. Do not silent-delete it in this PR.",
+		points = ringPts,
+	},
+	{
+		id = "truck-tunnel",
+		title = "Truck tunnel",
+		note = "T409+ replaces the peak-to-caldera bore with a surface road. Do not silent-delete the live tunnel.",
+		points = tunnelPts,
+	},
+} :: { Redo }
+
+function WorldPlanDraft.GetRegion(id: string): Region
+	for _, row in ipairs(WorldPlanDraft.Regions) do
+		if row.id == id then
+			return row
+		end
+	end
+	error("no region " .. id, 2)
+end
+
+function WorldPlanDraft.Centre(id: string): (number, number, number)
+	local row = WorldPlanDraft.GetRegion(id)
+	return row.x, row.z, row.radius
+end
+
+function WorldPlanDraft.DiscGap(a: Region, b: Region): number
+	local dx, dz = a.x - b.x, a.z - b.z
+	return math.sqrt(dx * dx + dz * dz) - a.radius - b.radius
+end
+
+function WorldPlanDraft.OverlapHits(): { string }
+	local hits: { string } = {}
+	local regions = WorldPlanDraft.Regions
+	for i = 1, #regions do
+		for j = i + 1, #regions do
+			local a, b = regions[i], regions[j]
+			if a.layer == b.layer then
+				local gap = WorldPlanDraft.DiscGap(a, b)
+				if gap < -WorldPlanDraft.OverlapSlop then
+					table.insert(hits, string.format("%s/%s overlap by %.0f", a.id, b.id, -gap))
+				end
+			end
+		end
+	end
+	return hits
+end
+
+function WorldPlanDraft.GetShop(id: string): Shop
+	for _, row in ipairs(WorldPlanDraft.Shops) do
+		if row.id == id then
+			return row
+		end
+	end
+	error("no shop " .. id, 2)
+end
+
+function WorldPlanDraft.GetRoad(name: string): Road
+	for _, row in ipairs(WorldPlanDraft.Roads) do
+		if row.name == name then
+			return row
+		end
+	end
+	error("no road " .. name, 2)
+end
 
 return WorldPlanDraft

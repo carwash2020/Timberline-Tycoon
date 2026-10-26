@@ -31,13 +31,27 @@ Locked, because the game or the brief already has the number:
 - Land Office at `PlotSalesmanData.Office` (153.5, 100).
 - Dealership door (189.25, 100.3), the MustKeep hall entrance. It is east of the bridge.
 - Coat and Heat Boots keep their `ItemCatalog` prices ($500 and $800).
-- Pine Ridge, Frostpeak, Ember Caldera, Gloam Ravine, Bayou, Red Mesa and Lantern Isle use the live discs (`BiomeData` / `WorldLayout`). The Bait Shack stays at `BayouData.BaitShackSpot` (−720, −660).
-- Mainland ferry dock `WorldLayout.FerryDock` (780, 136). The isle harbour pin is the inland end of the live ferry path.
-- Odds & Ends sits on the first point of the live `HillsCross` road, (−460, −300).
+- The Bait Shack stays at `BayouData.BaitShackSpot` (−720, −660). It falls inside the draft Bayou disc.
+- Odds & Ends stays at the Pine/Gloam cross, (−460, −300).
+- The live ferry dock `(780, 136)` and the live isle centre stay until a build. The picture draws the ferry to the draft isle.
 
-Proposed, for this picture only. Connor can move them before anyone builds terrain:
+Builder discs, for this picture only. `OverlapHits()` is empty: same-layer discs may kiss by 12 studs (Bayou and Gloam miss a tangent by about 10, and those centres stay). Skyroot is the cloud layer, so it may sit over Frostpeak in plan. Connor can move them before anyone builds terrain:
 
-- Skyroot foot (−200, 900) and the gate lodge (−200, 860). The live sky disc stays at (680, 280), y 650, until a build.
+| Region | Centre | r | Layer |
+|---|---|---|---|
+| Timber Valley | (0, 80) | 220 | ground |
+| Pine Ridge | (−420, 110) | 180 | ground |
+| Frostpeak | (−200, 900) | 160 | ground |
+| Ember Caldera | (700, 900) | 160 | ground |
+| Gloam Ravine | (−565, −455) | 140 | ground |
+| Bayou | (−700, −700) | 150 | ground |
+| Red Mesa | (700, −500) | 150 | ground |
+| Lantern Isle | (1200, −700) | 120 | ground |
+| Skyroot Highlands | (−60, 800) | 120 | cloud |
+
+Skyroot is the north summit on the switchback. It is not `BiomeData.sky` at (680, 280), which was the gondola top. The gate lodge is (−110, 730), at the end of Skyroot Road. The trunk lift and the cloud isles are annotated there and `built = false`.
+
+- Spawn stays (0, 0.5, 40). The sawmill stays (0, 110).
 - River centre x = 113 (26 studs east of the sell floor's east edge). Channel half-width 18. The west bank stays off the sell floor.
 - Cloud picture radius 64. Not a build size. The shaft, cab and doors above are the build sizes.
 - The switchback's hairpins. The grade is not locked. See the questions.
@@ -45,7 +59,7 @@ Proposed, for this picture only. Connor can move them before anyone builds terra
 
 ## The river and the bay
 
-The channel leaves the Skyroot falls, runs east of Frostpeak, then south on x = 113 past the Weigh House, and meets the east water at the live shore (x 780). West of that channel is the timber country: town, Pine Ridge, Frostpeak, the Skyroot, Gloam Ravine, the Bayou. East of it is the shore the Dealership, the plots, the Caldera and Red Mesa sit on, and then the bay. Lantern Isle is in the bay. The lighthouse is on the east headland, not on the ferry dock.
+The channel starts east of Frostpeak, runs south on x = 113 past the Weigh House, and opens into the southeast bay (water east of x 960). West of the channel is the timber country: town, Pine Ridge, Frostpeak, the Skyroot, Gloam Ravine, the Bayou. East of it is the shore the Dealership, the plots, the Caldera and Red Mesa sit on, and then the bay. Lantern Isle is in that bay, past the live world edge. The lighthouse mark is on the east headland. The live tower is not moved.
 
 One lift bridge, at (113, 80), where the east road leaves town. Towers on the two banks. $100. The Caldera road branches off on the east bank, so it does not need a second bridge and a second fare. Logs on the river are later. This plan does not float them.
 
@@ -53,21 +67,22 @@ One lift bridge, at (113, 80), where the east road leaves town. Towers on the tw
 
 | Road | Width | Where it goes |
 |---|---|---|
-| Main Street | 32 | Along the live street to the bridge |
-| Pine Road | 32 | The live Hills Road |
-| Frost Road | 32 | The live Snow Road. Coat kiosk at the foot, (−28, 480) |
-| Bay Road | 32 | Bridge, east bank, live east-link point, mainland dock |
+| Valley Trunk | 32 | North–south on x = −36, from the south country through town to the switchback |
+| Main Street | 32 | Town street to the one lift bridge |
+| Skyroot Road | 32 | Switchback from the trunk's north end to the gate lodge (−110, 730). Sign: SKY PASS |
+| Pine Road | 24 | Trunk to Pine Ridge |
+| Frost Road | 24 | Switchback to Frostpeak. Coat kiosk at the foot |
+| Bay Road | 24 | Bridge, east bank, mainland dock for the picture ferry |
 | Dealership Spur | 24 | Up from the bay road to the hall door |
-| Caldera Road | 32 | East bank north to the live Volcano Road. Heat Boots beside the last bend |
-| Mesa Road | 32 | From the east link down the live Mesa Road |
-| Gloam Road | 32 | Forest path, south link, ravine floor |
-| Skyroad | 32 | Switchback from the frost road's end to the gate lodge. Sign: SKY PASS |
-| Pine Link, Gloam Link | 24 | Meet at (−460, −300). Odds & Ends |
-| Bayou Road | 24 | From that cross to the Bayou centre |
-| Cave Path | 8 | Ravine floor to the secret shop (32, −744) |
+| Caldera Road | 24 | East bank north to the caldera. Heat Boots at the rest stop |
+| Mesa Road | 24 | South to Red Mesa |
+| Gloam Road | 24 | Trunk to the crossroads, then the ravine |
+| Pine Link | 24 | Pine Ridge down to the crossroads (−460, −300). Odds & Ends |
+| Bayou Road | 24 | Crossroads to the Bayou centre |
+| Cave Path | 8 | Ravine floor to the secret shop |
 | Lodge Path | 8 | Lodge to the trunk, and the lift |
 
-There is no ring, and no truck tunnel, on this plan. The live ring and the live tunnel are removal candidates below.
+There is no ring, and no truck tunnel, on this plan. The live ring and the live tunnel are a T409 redo, not a deletion. See below.
 
 ## Shops
 
@@ -78,13 +93,13 @@ There is no ring, and no truck tunnel, on this plan. The live ring and the live 
 | 3 | Weigh House (53, 111) | Millie buys logs. Truck back-in. Kept. |
 | 4 | Land Office (153.5, 100) | Old Hank, at the plot edge. |
 | 5 | Dealership (189.25, 100.3) | Trucks, across the first lift bridge. |
-| 6 | Coat kiosk (−28, 480) | Insulated Coat, $500, before the cold. |
-| 7 | Heat Boots (393, 482) | Heat Boots, $800, before the caldera. |
-| 8 | Odds & Ends (−460, −300) | Where the Pine link meets the Gloam link. |
-| 9 | Sparkworks (923, −41) | Logic and machines, on the isle harbour. The live shop at (135, 132) stays until a build. |
-| 10 | Sky Forge (−172, 918), y 840 | On the clouds only. |
-| 11 | Sky Market (−230, 884), y 840 | On the clouds only. |
-| 12 | Secret shop (32, −744) | In the Gloam caves. No name yet. |
+| 6 | Coat kiosk (−152, 713) | Insulated Coat, $500, at the Frostpeak road foot. |
+| 7 | Heat Boots (728, 700) | Heat Boots, $800, at the caldera rest stop. |
+| 8 | Odds & Ends (−460, −300) | Where the Pine link meets the Gloam road. |
+| 9 | Sparkworks (1115, −700) | On the draft isle harbour. The live shop at (135, 132) stays until a build. |
+| 10 | Sky Forge (−32, 818), y 840 | On the clouds only. Not built. |
+| 11 | Sky Market (−90, 784), y 840 | On the clouds only. Not built. |
+| 12 | Secret shop (−543, −479) | In the Gloam caves. No name yet. |
 | 13 | Bait Shack (−720, −660) | Waders. Already there. Not moved. |
 
 ## Trunk lift
@@ -103,14 +118,15 @@ Cards: `previews/t408/removals/<id>.png` and `contact-sheet.png`.
 | turnstile | `SkyTurnstile`, signed Gondola Pass. Not placed. Do not build it. | No |
 | cloud-chute | Isle chute and flume on the live sky disc. The trunk has its own chute. The Sky Bin stays until that chute exists. | No |
 | sky-forge-court | Ground court at (−112, −20). The forge belongs on the clouds. | Yes. Keeper, temper spot, four relic sockets. They move with the forge. They do not vanish. |
-| ring-road | `RingRoad` only circles the old map. | No |
-| truck-tunnel | The ring's shortcut from the peak to the caldera. Caldera Road is on the surface. | No |
-| floating-isles | Live sky disc at (680, 280), y 650, with no road to a summit. Lumenwood moves. The gondola top and the root bridges do not. | No |
+| floating-isles | Live sky disc at (680, 280), y 650. That was the gondola top, not this summit. | No |
 | skyroot-bloom | WORLD_DESIGN retires it. `ForestService` still runs the clock, and it still doubles figure chances. | No |
-| north-toll | Old Tolly's booth at (22, 888). The nine regions do not name that strip. | Yes. The counter stays until Connor picks. |
 | meadow-lookout | At (−136, −20), beside the court, telescope toward town. It may be a deliberate view. | No |
 
-Roads that still go somewhere (Snow Road, Hills Road, the dock, Bayou, Mesa) are not on this list. The plan reuses their points under the new names. The timber footbridge and the fishing dock are landmarks from the art direction. They are not on the list.
+## Redo in T409+ (do not silent-delete)
+
+The live ring road and the live truck tunnel are not on the removal list. `WorldPlanDraft.Redo` names them. A later terrain build replaces the ring with the valley roads and the bore with the surface Caldera Road. This PR leaves both in the live place.
+
+The picture's roads are new lines to the draft centres. The live Snow Road, Hills Road and the rest stay in the place until T409. The timber footbridge and the fishing dock are landmarks from the art direction. They are not on the list.
 
 ## What Connor checks
 
@@ -129,13 +145,15 @@ This is a picture. Studio has nothing new to walk. Look at `previews/t408/overvi
 3. The draft prices the bridge at `TollFee` $100 and the ferry at `FerryFare` $400. An earlier note said both free for V1. The picture uses the two live keys. Which do you want?
 4. The ground court's keeper, temper spot and four sockets are MustKeep. Move them onto the cloud forge, or keep a court on the ground?
 5. The north toll counter is also MustKeep. Is the town lift bridge that toll moved, or do both crossings stay?
-6. Is the Skyroot foot at (−200, 900) the right summit? The live isles stay where they are until you say build.
+6. Skyroot is (−60, 800), the north summit, not the gondola disc at (680, 280). Its cloud disc overlaps Frostpeak in plan on purpose. Is the gate lodge at (−110, 730) the right end of the switchback?
 7. y 800→880 is an 80-stud ride. A haul grade of 0.2 cannot climb to world-height 800 inside this square (that wants about 4,000 studs of road). Is 800 the height up the trunk from the lodge, or the world height of the lodge?
-8. One cloud deck, because root bridges are out. Do you still want separate walkable isles, and if so how do you cross?
-9. The secret shop has no name and no stock. What is it, and what does it sell?
-10. Sparkworks moves to the harbour only when this plan is built. The live shop stays at (135, 132). Confirm the move.
-11. The meadow lookout: keep it as a view of town, or remove it with the court?
-12. The Skyroot Bloom still doubles figure chances. Retire the clock with the gondola, or keep the bonus?
-13. Gus's charter grants the Gondola Pass. Replace that check with the Sky Pass at the lodge?
-14. The Featherfall Cloak was the glide off the high isles. There is no updraft, and the lift is short. Does the cloak still have a job?
-15. River half-width 18 and the cloud picture radius 64 are tunes for the drawing. Say if you want them different before a terrain build.
+8. Three cloud isles are drawn and not built. Root bridges are out. Do you still want separate walkable isles, and if so how do you cross?
+9. Lantern Isle at (1200, −700) sits outside the live world (WorldHalf 1000). The picture ferry runs from (920, −640) to (1100, −700). The live dock stays at (780, 136). Grow the map in T409?
+10. The secret shop has no name and no stock. What is it, and what does it sell?
+11. Sparkworks moves to the harbour only when this plan is built. The live shop stays at (135, 132). Confirm the move.
+12. The meadow lookout: keep it as a view of town, or remove it with the court?
+13. The Skyroot Bloom still doubles figure chances. Retire the clock with the gondola, or keep the bonus?
+14. Gus's charter grants the Gondola Pass. Replace that check with the Sky Pass at the lodge?
+15. The Featherfall Cloak was the glide off the high isles. There is no updraft, and the lift is short. Does the cloak still have a job?
+16. River half-width 18 and the cloud picture radius 64 are tunes for the drawing. Say if you want them different before a terrain build.
+17. Bayou and Gloam overlap by about 10 studs at the locked centres. The plan-level check allows a 12-stud kiss so those centres stay. Move one before T409?

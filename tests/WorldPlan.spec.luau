@@ -3314,4 +3314,45 @@ return function(t)
 		local l = again.Lighthouse()
 		t.ok((l.cframe.Position - lighthouse.cframe.Position).Magnitude < 1e-6, "the lighthouse in the same place")
 	end)
+
+	t.test("T408 draft centres stay a plan, and the plan-level overlap check is green", function()
+		local Draft = t.load("ReplicatedStorage/Shared/World/WorldPlanDraft")
+		local want = {
+			valley = { 0, 80, 220 },
+			pine = { -420, 110, 180 },
+			frost = { -200, 900, 160 },
+			caldera = { 700, 900, 160 },
+			gloam = { -565, -455, 140 },
+			bayou = { -700, -700, 150 },
+			mesa = { 700, -500, 150 },
+			isle = { 1200, -700, 120 },
+			skyroot = { -60, 800, 120 },
+		}
+		t.eq(#Draft.OverlapHits(), 0)
+		t.eq(Draft.Gondola, nil)
+		t.eq(Draft.Built, false)
+		t.eq(Draft.Spawn.x, 0)
+		t.eq(Draft.Spawn.z, 40)
+		t.eq(Draft.SpawnY, 0.5)
+		t.eq(Draft.Sawmill.x, 0)
+		t.eq(Draft.Sawmill.z, 110)
+		for id, centre in pairs(want) do
+			local x, z, r = Draft.Centre(id)
+			t.eq(x, centre[1], id)
+			t.eq(z, centre[2], id)
+			t.eq(r, centre[3], id)
+		end
+		t.eq(Draft.GetRegion("skyroot").layer, "cloud")
+		t.ok(Draft.Lodge.z > 650, "gate lodge is on the north switchback")
+		t.ok(math.abs(Draft.Lodge.x - 650) > 400, "gate lodge is not the old gondola top")
+		t.eq(Draft.TrunkLift.built, false)
+		t.eq(Draft.TrunkLift.x, Draft.Skyroot.x)
+		t.eq(Draft.TrunkLift.z, Draft.Skyroot.z)
+		local skyroad = Draft.GetRoad("Skyroot Road")
+		local lodge = skyroad.points[#skyroad.points]
+		t.eq(lodge.x, Draft.Lodge.x)
+		t.eq(lodge.z, Draft.Lodge.z)
+		t.eq(Draft.LiveSky.x, 680)
+		t.eq(Draft.LiveSky.z, 280)
+	end)
 end
