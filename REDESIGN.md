@@ -120,11 +120,13 @@ when changing art.
   X axis (tag `SawBlade`; its teeth are welded and unanchored: never
   re-anchor them). TownFX turns it every frame by dt (TownMotion.BladeSpeed,
   3 rad/s), not at the quality tier's cosmetic rate. Campfire `Flame` parts (tag `Flame`) flicker.
-- Gondola: models `GondolaTown`/`GondolaBase`/`GondolaTop`, each with a
-  `Platform` (10x1x10, top at y 1); stations turn their open back (+Z)
-  along the cable. Tags `CloudChute` (the 4x3x4 hopper; its flume runs
-  out along +Z), `StarfallForge` (the anvil; its -Z faces the approach),
-  `ParkingSlot` (+Index), `StreetLamp`.
+- Gate lodge: Persistent model `GateLodge` under TimberlineMap, on the
+  Snow Road's north end (`WorldPlan.GateLodge`). Named parts: `Door`
+  (the charter), `PromptPad`, `GateBar`, `GateEdge`, `GateRim`, `Sign`
+  ("Sky Pass"), `SignRim`. The front is -Z, toward the road. Tag
+  `GateSign` and attribute `GateId` = `sky`. No cabin and no cable.
+  `StarfallForge` (the anvil; its -Z faces the approach), `ParkingSlot`
+  (+Index), `StreetLamp`. Cloud Chute hoppers are not placed.
 - Night lights: parts named `WindowGlass`, `LampGlow`, `LanternGlow`
   anywhere under TimberlineMap (Kit.window and Kit.lantern use them).
 - Town props collide (lamp posts, fences, the well, barrels...): keep them
@@ -142,7 +144,7 @@ when changing art.
   Beard, Beanie, Torso, LeftArm, RightArm (QuestUI's portrait). Every NPC
   carries tag `NPC` and attributes NPCId, Route, Speed, RouteOffset,
   Scale, RootHeight, Height, TopOffset. Keepers stand behind their shop's
-  Counter, Gus beside GondolaTown's Platform; walkers' routes are checked
+  Counter, Gus beside GateLodge's Door; walkers' routes are checked
   against WorldPlan.Town by NPCData.spec. AxeArt.Grip defines how a hand
   holds an axe.
 

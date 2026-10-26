@@ -99,7 +99,7 @@ TownTreeData.Buildings = {
 	{ name = "Showroom", x0 = 178, z0 = 93.4, x1 = 337, z1 = 163.4 },
 	{ name = "Sawmill", x0 = -32, z0 = 95, x1 = 33, z1 = 139 },
 	{ name = "SellStation", x0 = 37, z0 = 94, x1 = 84, z1 = 129 },
-	{ name = "GondolaStation", x0 = -49, z0 = 140, x1 = -30, z1 = 159 },
+	{ name = "NorthYard", x0 = -49, z0 = 140, x1 = -30, z1 = 159 },
 	{ name = "Sparkworks", x0 = 114, z0 = 107, x1 = 157, z1 = 154 },
 	-- Old Hank's spot (PlotService.LandOfficeAt; the counter is gone, T420) and the plot district sign.
 	{ name = "LandOffice", x0 = 134, z0 = 72, x1 = 162, z1 = 98 },
@@ -111,9 +111,8 @@ TownTreeData.Camp = { name = "MurphsCamp", x0 = -40, z0 = 38, x1 = -23, z1 = 53 
 TownTreeData.ParkingLot = { name = "ParkingLot", x0 = 8, z0 = -18, x1 = 146, z1 = 68 } :: Rect
 TownTreeData.PullOut = { name = "PullOut", x0 = 8, z0 = -46, x1 = 140, z1 = -18 } :: Rect
 
--- Lanes people queue or ride in: Old Hank's counter faces the spawn, and the
--- gondola leaves its station toward the isles (its cable and cabins pass
--- over the first stretch).
+-- Lanes people queue in: Old Hank's counter faces the spawn. The north
+-- yard lane is the old cable's first stretch, kept so town trees do not move.
 TownTreeData.Lanes = {
 	{ name = "LandOfficeQueue", ax = 147, az = 86, bx = 112, bz = 74, half = 14 },
 	-- The lighthouse's lamp stays in view from the spawn pad (WorldPlan.Lighthouse,
@@ -121,9 +120,9 @@ TownTreeData.Lanes = {
 	-- eye to the lamp. 11 here; the spec compares the lamp's place.
 	{ name = "LighthouseSight", ax = 0, az = 40, bx = 794, bz = -240, half = 11 },
 } :: { Lane }
-TownTreeData.GondolaStation = { x = -40, z = 150 } -- WorldPlan.TownGondolaSpot (the spec compares)
-TownTreeData.GondolaLaneLength = 280
-TownTreeData.GondolaLaneHalf = 22
+TownTreeData.NorthYard = { x = -40, z = 150 }
+TownTreeData.NorthLaneLength = 280
+TownTreeData.NorthLaneHalf = 22
 
 -- Where NPCs walk and stand (NPCData is the source; the spec compares).
 TownTreeData.Walks = {

@@ -45,8 +45,6 @@ return function(t)
 		Kit.placeAt(model, spot.cframe)
 		shops[spot.kind] = { model = model, spot = spot }
 	end
-	local station = BuildingArt.GondolaStation()
-	Kit.placeAt(station, town.gondola)
 	local sawmill = BuildingArt.Sawmill()
 	Kit.placeAt(sawmill, town.sawmill)
 	-- The sell station beside the mill: SELL LOGS floats over its pad.
@@ -62,8 +60,6 @@ return function(t)
 			return part and part.CFrame.Position, storeBoard
 		elseif top == "SellArea" and name == "SellZone" then
 			return town.sellZone.Position, sellStation
-		elseif top == "GondolaTown" and name == "Platform" then
-			return station.PrimaryPart.CFrame.Position, station
 		elseif shops[top] then
 			local part = shops[top].model:FindFirstChild(name)
 			return part and part.CFrame.Position, shops[top].model
@@ -88,13 +84,12 @@ return function(t)
 		return x0, x1, z0, z1
 	end
 
-	t.test("six markers, one per service and the store board, each over its own building", function()
+	t.test("five markers, one per service and the store board, each over its own building", function()
 		local expect = {
 			{ "SellLogs", "SellArea", "SellZone", "SELL LOGS" },
 			{ "Axes", "ToolShed", "Counter", "AXES" },
 			{ "Trucks", "Dealership", "Counter", "TRUCKS" },
 			{ "Gear", "HearthAndHome", "Counter", "GENERAL\nSTORE" },
-			{ "Gondola", "GondolaTown", "Platform", "GONDOLA" },
 			{ "Store", "StoreBoard", "Board", "STORE" },
 		}
 		t.eq(#TownMarkers.Markers, #expect)

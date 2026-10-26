@@ -83,7 +83,7 @@ end
 -- The V1 ladder (S1 to S8): the next unmet milestone, one line.
 --   S1 Steel Axe, S2 the Hills, S3 the Coat then the Snow, S4 the Boots then
 --   the Volcano, S5 the Lantern then the Gloam at night, S6 the Obsidian Axe
---   then Gus's Charter, S7 the Gondola Pass, the Starfall Axe and the relics,
+--   then Gus's Charter, S7 the Sky Pass, the Starfall Axe and the relics,
 --   S8 the full plot. Axe rungs sit between, so each biome is reachable with
 --   an axe that fells its wood. After S8, the Field Guide and the streak
 --   (the old Pick).
@@ -97,7 +97,7 @@ export type Facts = {
 	streak: number,
 	hour: number?,
 	night: boolean?,
-	charterDone: boolean, -- the Gondola Pass is earned (SkyQuest done)
+	charterDone: boolean, -- the Sky Pass is earned (SkyQuest done)
 	relicsDone: boolean, -- every relic claimed
 	plotFull: boolean, -- the plot is at its top tier
 	hasPlot: boolean?, -- a plot was bought (nil reads as yes); false sends you to Old Hank

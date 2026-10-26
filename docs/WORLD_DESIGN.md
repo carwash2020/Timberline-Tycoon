@@ -26,7 +26,7 @@ The timber footbridge on the west river (`WorldPlan`, sign "TIMBER BRIDGE") stay
 
 ## 2. Unlock path
 
-Prices below are the keys already in `GameConfig`, except the gondola fee, which is `BiomeData.sky.gondola`.
+Prices below are the keys already in `GameConfig`. The Skyroot gate takes no cash: Gus's charter grants the Sky Pass.
 
 | Step | Region | Wood | How you get in | Where it sits |
 |---|---|---|---|---|
@@ -37,7 +37,7 @@ Prices below are the keys already in `GameConfig`, except the gondola fee, which
 | 2 | North strip | Northern Spruce (`spruce`) | toll bridge, Old Tolly, $100 for 3 minutes | x −400 to 400, z 1500 to 1900. Bridge centre (0, 1580) |
 | 3 | Gloam Hollow, back way, and the Secret Cave | gloamwood (`phantomwood`) | blasting charge on the cracked boulders | hollow (−565, −455), radius 120. Cave on the Petrified Reach, about (−765, −655), radius 46 |
 | 4 | Ferry Island | palmwood, and 6 Lanternwood at night | ferry, Cap'n Moss, $400 per rider, every 6 minutes. No trucks | island (1395, −760), radius 70. Dock on the Strand at (1180, −700) |
-| 5 | Skyroot and the Aether Isles | lumenwood, and the forge | gondola, already in the world ($250, 40 s) | foot (−1050, 1050). Isles at y 650, radius 170 |
+| 5 | Skyroot and the Aether Isles | lumenwood, and the forge | Sky Pass from Gus, then the gate lodge on the north road (about −30, 790). No ride fee. The isles stay at y 650 and are not reachable yet | isles (680, 280), floor y 650, radius 100 |
 
 The blasting charge is `GameConfig.DynamitePrice` (220). `BlastingChargePrice` is an alias of that key. A broken boulder may return after `GameConfig.BoulderRespawnSec` (1200 seconds), and only when its box is clear (§11). The ferry fare is `GameConfig.FerryFare` (400) per rider. The boat leaves every `GameConfig.FerryIntervalSec` (360 seconds).
 
@@ -61,7 +61,7 @@ Shared reasons, once the matching batch lands: trees regrow in random spots (the
 
 - **Wood.** Oak and birch. `BiomeData` plants 40 oak and 15 birch. Town is the hub, not a grove.
 - **Way in.** Free. Spawn is in town. `ForestPath` (16 wide) runs south into the starter disc. Haul 190.
-- **Landmarks.** The sawmill at (0, 110), the sell pad, the Tool Shed, Dealership, and Hearth & Home, the gondola station, Murph's camp by the spawn, the parking lot, and the signposts (`BuildingArt.nameSign`), including "TO THE WOODS" and "SELL LOGS HERE". The Skyroot is on the northern horizon. The Wood Demand board stands in town, where a seller can read today's two woods.
+- **Landmarks.** The sawmill at (0, 110), the sell pad, the Tool Shed, Dealership, and Hearth & Home, the north-yard Skyroot sign, Murph's camp by the spawn, the parking lot, and the signposts (`BuildingArt.nameSign`), including "TO THE WOODS" and "SELL LOGS HERE". The Skyroot is on the northern horizon. The Wood Demand board stands in town, where a seller can read today's two woods.
 - **Come back for.** Selling, the demand board, the shops, the limited shelf (B01), regrowth, Halloween trees, dailies, and the town badge.
 - **Air and sound.** Starter air is the warm green nudge. Night mist is the grey-blue that thickens from 22:00 and lifts by 09:30. `BirdsDay` by day. `CricketsNight` and `Owl` at night.
 
@@ -120,8 +120,8 @@ A player who leaves or resets mid-crossing keeps the cargo that was welded to th
 ### Skyroot and the Aether Isles
 
 - **Wood.** Lumenwood, 12 trees, and the forge on the main isle (Starfall Axe, as `V2_PLAN.md` already specifies). Sky Shards are the isle nodes (`SkyShard` 8). Lumenwood is a rare wood. The demand board never names it.
-- **Way in.** The gondola, already built. $250 a ride, 40 seconds (`BiomeData.sky.gondola`). Cash only (§15). One station is by the sawmill. The other is at the Skyroot's foot. `SkyrootRoad` (24 wide) stays free. No vehicles on the isles. Logs go down the Cloud Chute into the Sky Bin (`skyBinVolume` 120 u³).
-- **Landmarks.** The Skyroot, visible from everywhere. Skyroot Falls. The gondola cables. The forge.
+- **Way in.** The Sky Pass, from Gus at the gate lodge on the Snow Road's north end (about −30, 790). No ride and no fare. The floating isles stay at y 650 (`BiomeData.sky.area`) and a player cannot reach them until a later map pass; the lodge is the access check, not a teleporter. `SkyrootRoad` stays free. No vehicles on the isles. Cloud Chute hoppers are not built (they only moved ride cargo). A Sky Bin on a plot still sells (`skyBinVolume` 120 u³). The economy does not treat a trip up there as a full truck bed.
+- **Landmarks.** The Skyroot, visible from everywhere. Skyroot Falls. The gate lodge and its brass lamp. The forge.
 - **Come back for.** Lumenwood, the forge, and Sky Shards. Regrowth, Halloween trees, dailies, and the isle badge. Wind and lightning are the pressure. Wood that falls off the isles is lost. Axes stay. The Featherfall Cloak is the glide down (`GAME_DESIGN` §10).
 - **Air and sound.** Thin air above the clouds, density 0.2. The night mist does not apply up here. `WindHowl` on the isles. `WaterfallRoar` at the falls.
 - **Skyroot Bloom.** Retired. It is not a reason to visit. B12 removes the leftover.
@@ -284,11 +284,11 @@ PR #36's `TreeFill.Ground` rule is where the ground refuses a tree. W2 adds all 
 
 ## 15. Paid crossings
 
-The toll, the ferry, and the gondola take in-game cash only. They never take Robux. Only `EconomyService` changes cash.
+The toll and the ferry take in-game cash only. They never take Robux. Only `EconomyService` changes cash. The Skyroot gate does not charge: the Sky Pass is Gus's charter.
 
-If the player is short, the server refuses. It does not charge. It toasts the price: $100 for the toll, $400 for a ferry rider, $250 for the gondola.
+If the player is short, the server refuses. It does not charge. It toasts the price: $100 for the toll, $400 for a ferry rider.
 
-A double tap inside one paid window charges once. The toll window is `TollSeconds`. The ferry window is that departure. The gondola window is that ride.
+A double tap inside one paid window charges once. The toll window is `TollSeconds`. The ferry window is that departure.
 
 The toll push-back toast names Old Tolly and the $100 fee. The short-cash toast is the price alone. They are different toasts.
 
@@ -340,7 +340,7 @@ Each row is a pass/fail line. The key is set once per account, by the server, af
 - Southbound entry does not charge and does not move anyone.
 - A second toll tap inside `TollSeconds` does not charge again. Short on cash does not charge, and the toast is the price.
 - The ferry welds riders and cargo, charges $400 per rider aboard at departure, and refuses trucks. A leave or reset mid-crossing keeps that cargo, undamaged.
-- The gondola charges $250 in cash, once per ride.
+- The Skyroot gate does not charge. The Sky Pass opens the lodge bar; leaving the summit side does not need the pass.
 - A boulder whose box overlaps a character or a vehicle does not respawn. The server waits 10 seconds and tries again.
 - None of these charges Robux.
 

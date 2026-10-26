@@ -5,7 +5,7 @@
 -- belongs to the map remake.
 -- The end game starts here too (it was EndGameBoot): AetherService.V1Init
 -- binds the Sky Forge (SkyForgeService) and SkyQuestService.V1Init starts
--- Gus's Charter once the town gondola station is built.
+-- Gus's Charter once the Skyroot gate lodge is built.
 -- LogicService is called by name: V1Init gets the LogicSet remote so the
 -- settings panel is bound. GameServer still calls Init with the Wire remote.
 
@@ -13,16 +13,16 @@ local V1Boot = {}
 
 V1Boot.Services = { "SecretService" }
 
--- The specs swap these: how a task is spawned, and how the town gondola
--- station's platform is found (nil when the map has none).
+-- The specs swap these: how a task is spawned, and how the gate lodge
+-- door is found (nil when the map has none).
 V1Boot.Spawn = nil :: ((() -> ()) -> ())?
 V1Boot.WaitStation = nil :: (() -> BasePart?)?
 
 local function waitTownStation(): BasePart?
 	local map = workspace:WaitForChild("TimberlineMap", 60)
-	local town = if map then map:WaitForChild("GondolaTown", 60) else nil
-	local platform = if town then town:WaitForChild("Platform", 30) else nil
-	return if platform and platform:IsA("BasePart") then platform else nil
+	local lodge = if map then map:WaitForChild("GateLodge", 60) else nil
+	local door = if lodge then lodge:WaitForChild("Door", 30) else nil
+	return if door and door:IsA("BasePart") then door else nil
 end
 
 local function isModule(child: any): boolean

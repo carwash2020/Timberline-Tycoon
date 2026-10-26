@@ -326,9 +326,6 @@ return function(t)
 		local sawmill = BuildingArt.Sawmill()
 		Kit.placeAt(sawmill, town.sawmill)
 		out.Sawmill = footprint(sawmill)
-		local station = BuildingArt.GondolaStation()
-		Kit.placeAt(station, town.gondola)
-		out.Gondola = footprint(station)
 		-- The Land Office kiosk (PlotService.buildLandOffice at LandOfficeAt (147, 86)):
 		-- a counter 7 x 2.6, posts and a roof 8.4 x 4.2, Old Hank's bale, 11 studs across.
 		out.LandOffice = { x0 = 140, x1 = 154, z0 = 83, z1 = 90 }
@@ -459,10 +456,6 @@ return function(t)
 				local p = sign.cframe.Position
 				t.ok(not inside(p.X, p.Z, rect, 2), "a sign at (" .. p.X .. ", " .. p.Z .. ") is inside the " .. kind)
 			end
-			t.ok(
-				not inside(town.gondola.Position.X, town.gondola.Position.Z, rect, 0),
-				"the gondola station is inside the " .. kind
-			)
 			t.ok(
 				not inside(town.campsite.Position.X, town.campsite.Position.Z, rect, 0),
 				"Murph's camp is inside the " .. kind

@@ -14,7 +14,6 @@ return function(t)
 		HearthAndHomePath = 3,
 		ToolShedPath = 1,
 		SparkworksPath = 1,
-		GondolaPath = 2,
 	}
 
 	local function paths()
@@ -27,9 +26,9 @@ return function(t)
 		return out
 	end
 
-	t.test("eight footpaths, by name, as T402 made them", function()
+	t.test("six footpaths, by name, as the town builds them", function()
 		local list = paths()
-		t.eq(#list, 8)
+		t.eq(#list, 6)
 		local seen = {}
 		for _, p in ipairs(list) do
 			seen[p.name] = (seen[p.name] or 0) + 1
@@ -48,12 +47,12 @@ return function(t)
 		end
 	end)
 
-	t.test("built: eight visible parts, Transparency 0, 6 wide, TrailDirt, in TownPaths", function()
+	t.test("built: six visible parts, Transparency 0, 6 wide, TrailDirt, in TownPaths", function()
 		local root = TownGroundArt.Build()
 		local group = root:FindFirstChild("TownPaths")
 		t.ok(group, "the TownPaths model exists")
 		local parts = group:GetChildren()
-		t.eq(#parts, 8)
+		t.eq(#parts, 6)
 		for _, part in ipairs(parts) do
 			t.eq(part.Transparency, 0, part.Name)
 			t.eq(part.Color:ToHex(), "8E6C4A", part.Name)

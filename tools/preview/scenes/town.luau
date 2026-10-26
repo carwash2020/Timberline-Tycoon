@@ -2,7 +2,7 @@
 -- The town exactly as MapBuilder builds it (section 4), from
 -- WorldPlan.Town(): the sawmill at (0, 110) with the sell station (pad, Weigh
 -- House, log rack) beside it to the east, the Tool Shed, the Dealership and Hearth & Home along the street,
--- the gondola station behind them, Murph's camp by the spawn, the spawn pad,
+-- the north yard behind them, Murph's camp by the spawn, the spawn pad,
 -- the parking lot's slots, lamps, fences, props, signs and the town's
 -- greenery (its ornamental trees, bushes, flower beds and rocks), on the
 -- real terrain (TerrainGen paints the cobbled plaza, the street and the
@@ -53,7 +53,9 @@ return {
 			place(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
 		end
 		place(DealershipLot.Build(), town.displayLot)
-		place(BuildingArt.GondolaStation(), town.gondola)
+		local skySign = BuildingArt.Signpost("SKYROOT\nThe north road")
+		skySign.Name = "SkyrootSign"
+		place(skySign, roblox.CFrame.new(-40, 0, 168))
 		place(BuildingArt.Campsite(), town.campsite)
 		-- The ground parts (T402: roads, curbs, footpaths, the lot's pavement and edge).
 		-- Before T402 the lot's slab and 2-stud dirt shoulder stood here instead.
@@ -124,7 +126,7 @@ return {
 				{ pos = { -84, 7, 56 }, target = { -84, 8, 104 }, label = "Tool Shed, up its path" },
 				{ pos = { 190, 9, 62 }, target = { 205, 8, 104 }, label = "Dealership" },
 				{ pos = { -118, 8.5, 140 }, target = { -102, 8, 172 }, label = "Hearth & Home" },
-				{ pos = { -36, 12, 116 }, target = { -40, 6, 150 }, label = "gondola station" },
+				{ pos = { -36, 12, 116 }, target = { -40, 6, 150 }, label = "north yard" },
 				{ pos = { -10, 6, 30 }, target = { -28, 2, 42 }, label = "Murph's camp" },
 				{ pos = { 36, 6, 70 }, target = { 53, 3, 111 }, label = "sell station + mill" },
 				{ pos = { 80, 14, 24 }, target = { 0, 9, 100 }, label = "from the lot" },

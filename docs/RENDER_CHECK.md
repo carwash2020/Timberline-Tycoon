@@ -23,7 +23,7 @@ Baseline taken at the T409 head (no art change in this PR: the only code that to
 | 6 | Roads, paths, bridges | `roads`, `landmarks` | `roads 3` | `roads 1`, `landmarks 2` | `roads 1 844x390` | nothing | the fork, the footbridge, path widths |
 | 7 | Cabin and camp | `town` (Murph's camp, view 7) | view 2 | view 7 | `town 7 844x390` | nothing | the camp's tents and fire against the spawn walk |
 | 8 | Biome gates | `world` views 4 to 6 | not rendered here (heavy: up to 3 minutes a view) | not rendered here | not rendered here | nothing | the gate signs and road ends |
-| 9 | Sky island forges | `isles` | ON HOLD (the sky is being reworked; the gondola is being removed) | | | | |
+| 9 | Sky island forges | `isles`, `gate-lodge` | `gate-lodge` 1 | `gate-lodge` 2 and 4 | `gate-lodge` 2 | the gondola is gone; the gate lodge is the north-road checkpoint (`gate-lodge` views 1–4, `town` view 6 is the old station pad) | isles still float; shops, ferry, sell pad |
 
 ## What was actually rendered for the baseline
 

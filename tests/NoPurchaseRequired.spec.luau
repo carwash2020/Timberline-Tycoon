@@ -144,7 +144,7 @@ return function(t)
 		"src/ServerScriptService/MilestoneService.luau",
 		"src/ServerScriptService/QuestService.luau",
 		"src/ServerScriptService/SkyQuestService.luau",
-		"src/ServerScriptService/GondolaService.luau",
+		"src/ReplicatedStorage/Shared/GateLodgeLogic.luau",
 		"src/ServerScriptService/FerryService.luau",
 		"src/ServerScriptService/RegionService.luau",
 		"src/ServerScriptService/BiomeService.luau",

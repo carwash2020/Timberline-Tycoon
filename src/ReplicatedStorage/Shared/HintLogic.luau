@@ -123,7 +123,7 @@ end
 -- (BedCount) only if the truck stands within `sellRange` studs
 -- (GameConfig.SellTruckRange) of the sell zone, measured flat
 -- (`truckFromZone`; nil with no truck or one that isn't streamed in), and
--- your Sky Bin (SkyBin: logs sent down the Cloud Chute). The same sum
+-- your Sky Bin (SkyBin: wood held for the isles). The same sum
 -- CarryController's Sell prompt shows (and the server sells).
 function HintLogic.SellCount(
 	carried: unknown,

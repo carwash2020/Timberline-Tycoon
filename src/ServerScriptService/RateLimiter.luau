@@ -31,7 +31,6 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	Sprint = 8, -- Shift or L1 down and up
 	BuyRobuxItem = 2,
 	MineNode = 4,
-	Gondola = 1,
 	PlaceBlueprint = 2,
 	MoveBlueprint = 2,
 	BlueprintEdit = 5, -- rotate, move, resize, copy, delete, undo

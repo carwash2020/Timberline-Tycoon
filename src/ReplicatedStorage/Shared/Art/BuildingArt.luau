@@ -7,16 +7,17 @@
 -- draws exactly what the game builds (scenes "buildings" and "town").
 --
 -- Every builder returns a Model built around the origin: ground at y = 0,
--- the front (door, counter, open side) facing -Z. Only GondolaStation has a
--- PrimaryPart, so place the others with Kit.placeAt right after building.
+-- the front (door, counter, open side) facing -Z. GateLodge sets PrimaryPart
+-- (an invisible pivot at the origin). Place the others with Kit.placeAt.
 -- MapBuilder adds the gameplay bits (attachments, tags, zones). Parts other
 -- systems look up by name are listed per builder: keep them.
 --
 -- Only what players stand on or bump into collides (floors, walls, posts,
 -- roofs, counters, big props); everything else is Kit.decor, and small
 -- parts cast no shadow. Part budgets (tests/BuildingArt.spec.luau holds
--- them): Sawmill 400, each Shop 227, GondolaStation 140, Campsite 110,
+-- them): Sawmill 400, each Shop 227, Campsite 110,
 -- a TownTree 70. The extra shop part is the hours board.
+-- GateLodge is the Skyroot checkpoint (a steep roof and one tall lamp).
 --
 -- The sawmill and the shops are built at their design size, then scaled up
 -- by BuildingArt.Scale (TWN-13: Connor wanted the town's buildings much
@@ -2359,100 +2360,124 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 end
 
 ---------------------------------------------------------------------------
--- The gondola station
+-- The Skyroot gate lodge
 ---------------------------------------------------------------------------
 
--- A gondola station: a stone platform under a timber A-frame with a
--- shingled roof and the cable's bullwheel overhead. The cabin hangs at the
--- platform's middle and leaves through the open back gable (+Z): turn the
--- model so +Z points along the cable. Steps up on the front (-Z).
--- Named parts: "Platform" (the PrimaryPart: 10 x 1 x 10, its top at
--- y = 1, collides).
-function BuildingArt.GondolaStation(): Model
-	local model = Kit.model("GondolaStation")
-	local rng = Kit.rng(2207)
-	local roofStyle: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 2, pieceLen = 4.6 }
-	local platform = Kit.part(model, "Platform", V3(10, 1, 10), CF(0, 0.5, 0), hex("#A39C92"), MAT.Slate)
-	model.PrimaryPart = platform
-	for _, f in ipairs({
-		CF(0, 0, 5) * ANG(0, PI, 0),
-		CF(-5, 0, 0) * ANG(0, PI / 2, 0),
-		CF(5, 0, 0) * ANG(0, -PI / 2, 0),
-	}) do
-		stones(model, f, 10.4, 0.95, 0.6, rng, 1.8, 2.8)
-	end
-	Kit.wedge(model, "Steps", V3(6, 1, 1.8), CF(0, 0.5, -5.9), STONE[2], MAT.Slate)
+-- A mountain-road checkpoint at the end of the Skyroot road. Not a cable
+-- house: a steep slate A-frame over a stone base, one tall brass lamp, and
+-- one cream board facing the road (-Z). The silhouette is the lamp, 80 studs
+-- and more. The iron GateBar stops a driver who has no Sky Pass; GateEdge is
+-- StopRed while it is shut and SaleGreen once it is open (WorldUI). LumenGlow
+-- is only the thin SignRim and GateRim. Named parts: Door (Gus and the
+-- charter), Sign ("Sky Pass"), GateBar, GateEdge, GateRim, SignRim.
+-- PrimaryPart is an invisible pivot at the origin so Kit.placeAt keeps the
+-- floor on y = 0.
+-- The Skyroot checkpoint. Shell 28 wide (X), 20 deep (Z), peak 14. The
+-- front faces -Z (the road). One brass lamp carries the silhouette past
+-- 80 studs; the shell itself stays the checkpoint size. The person door
+-- is a 6-stud opening. The iron bar crosses the lane beside it, not the
+-- door. Named parts: Door, PromptPad, GateBar, GateRim, GateEdge, Sign,
+-- SignRim, State (the label), Lamp, LampPost, LampCap, LampBulb.
+function BuildingArt.GateLodge(): Model
+	local model = Kit.model("GateLodge")
+	local SPAN, DEPTH, EAVE, RISE = 28, 20, 6, 8
+	local pivot = Kit.part(model, "Pivot", V3(1, 1, 1), CF(0, 0, 0), Palette.StoneBase, MAT.Cobblestone)
+	pivot.Transparency = 1
+	Kit.decor(pivot, false)
+	model.PrimaryPart = pivot
 
-	local PX, PZ, TOP, RISE = 5.6, 4.4, 10.5, 3.6
-	for _, sx in ipairs({ -1, 1 }) do
-		for _, sz in ipairs({ -1, 1 }) do
-			Kit.part(model, "Post", V3(0.9, TOP, 0.9), CF(sx * PX, TOP / 2, sz * PZ), TIMBER, MAT.Wood)
-			dBox(model, "Footing", V3(1.6, 0.8, 1.6), CF(sx * PX, 0.4, sz * PZ), STONE[1], MAT.Slate)
-			dBeam(
-				model,
-				"Brace",
-				V3(sx * PX, TOP - 3, sz * (PZ - 0.1)),
-				V3(sx * PX, TOP - 0.7, sz * (PZ - 2.3)),
-				0.5,
-				0.5,
-				TIMBER
-			)
-		end
-		dBox(model, "Plate", V3(1, 0.9, 2 * PZ + 1), CF(sx * PX, TOP - 0.45, 0), TIMBER)
-		-- a railing along the platform's side
-		for _, z in ipairs({ -3.6, 0, 3.6 }) do
-			dBox(model, "RailPost", V3(0.35, 3, 0.35), CF(sx * 4.6, 2.5, z), TIMBER_LIGHT)
-		end
-		Kit.part(model, "Rail", V3(0.3, 0.3, 7.6), CF(sx * 4.6, 3.85, 0), TIMBER_LIGHT, MAT.Wood)
-		dBox(model, "Rail", V3(0.25, 0.25, 7.6), CF(sx * 4.6, 2.5, 0), TIMBER_LIGHT)
-		wallLantern(model, CF(sx * PX, 7.6, -PZ - 0.45), 0.9)
-	end
-	dBox(model, "TieBeam", V3(2 * PX + 1, 0.9, 1), CF(0, TOP - 0.45, -PZ), TIMBER)
-	gable(model, CF(0, TOP, -PZ), 2 * PX, RISE, 0.5, PLANK[2])
-	battens(model, CF(0, TOP, -PZ), 2 * PX, RISE, 0.5, 1.6, PLANK_DARK[1])
-	gableRoof(model, CF(0, TOP, -0.55) * ANG(0, PI / 2, 0), 2 * PZ + 2.1, 2 * PX + 0.9, RISE, 1.2, rng, roofStyle)
+	-- Stone shoulders. The lane (x -6 to 2) and the door (x 5 to 11, on -Z)
+	-- stay open.
+	Kit.part(model, "Foundation", V3(6, 2, 14), CF(-11, 1, 1), Palette.StoneBase, MAT.Cobblestone)
+	Kit.part(model, "Foundation", V3(8, 2, 12), CF(8, 1, 2.5), Palette.StoneBase, MAT.Cobblestone)
 
-	-- The bullwheel: a ring in front of the cabin's hanging point, on a
-	-- shaft from a bearer beam.
-	local wheelY, wheelZ, r = 8.9, -3.4, 3.4
-	for i = 0, 7 do
-		local a0, a1 = i / 8 * PI * 2, (i + 1) / 8 * PI * 2
-		dBeam(
-			model,
-			"Bullwheel",
-			V3(math.cos(a0) * r, wheelY, wheelZ + math.sin(a0) * r),
-			V3(math.cos(a1) * r, wheelY, wheelZ + math.sin(a1) * r),
-			0.7,
-			0.8,
-			hex("#8E3426"),
-			MAT.Metal
-		)
-	end
-	for _, a in ipairs({ 0, PI / 2 }) do
-		local d = V3(math.cos(a), 0, math.sin(a)) * r
-		dBeam(model, "Spoke", V3(0, wheelY, wheelZ) - d, V3(0, wheelY, wheelZ) + d, 0.3, 0.3, STEEL_DARK, MAT.Metal)
-	end
-	dec(Kit.post(model, "Hub", V3(0, wheelY - 0.45, wheelZ), 0.9, 1.2, IRON, MAT.Metal))
-	dBox(model, "Shaft", V3(0.45, TOP - wheelY, 0.45), CF(0, (TOP + wheelY) / 2, wheelZ), STEEL_DARK, MAT.Metal)
-	dBox(model, "Bearer", V3(2 * PX, 0.8, 0.8), CF(0, TOP - 0.4, wheelZ), TIMBER)
+	-- Office on the right, honey planks. The front wall stops at the door.
+	Kit.part(model, "Wall", V3(0.5, 6.2, 18), CF(13.6, 3.1, 0.5), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(0.5, 6.2, 16), CF(4.2, 3.1, 1.5), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(9.2, 6.2, 0.5), CF(8.7, 3.1, 9.6), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(1.2, 6.2, 0.5), CF(4.7, 3.1, -9.6), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(2.4, 6.2, 0.5), CF(12.5, 3.1, -9.6), Palette.PlankHoney, MAT.WoodPlanks)
+	-- Looks only: the 6-stud opening is the walk. A clickable door would
+	-- steal the charter prompt on the pad behind it.
+	Kit.decor(Kit.part(model, "Door", V3(6, 6.2, 0.35), CF(8, 3.1, -10.05), hex("#D8C08A"), MAT.WoodPlanks), false)
+	-- Left shoulder wall. It does not cross the lane.
+	Kit.part(model, "Wall", V3(0.5, 6.2, 18), CF(-13.6, 3.1, 0.5), Palette.PlankHoney, MAT.WoodPlanks)
 
-	-- The crest sign and a ticket lectern with a bell.
-	signBoard(
-		model,
-		"Sign",
-		CF(0, TOP + RISE + 1.4, -PZ - 1.3),
-		6.4,
-		1.5,
-		"GONDOLA",
-		SIGN_BOARD,
-		TIMBER_LIGHT,
-		SIGN_INK,
-		true
+	-- Inside the office, off the walk from the door. Nothing here collides.
+	local pad = Kit.part(model, "PromptPad", V3(4, 0.2, 4), CF(8, 0.12, 1), Palette.PlankHoney, MAT.WoodPlanks)
+	pad.CanCollide = false
+	Kit.decor(pad, false)
+
+	for _, x in ipairs({ -12, 12 }) do
+		Kit.part(model, "Post", V3(0.9, EAVE, 0.9), CF(x, EAVE / 2, -DEPTH / 2 + 1.4), Palette.TimberBrown, MAT.Wood)
+		Kit.part(model, "Post", V3(0.9, EAVE, 0.9), CF(x, EAVE / 2, DEPTH / 2 - 1.4), Palette.TimberBrown, MAT.Wood)
+	end
+	Kit.decor(
+		Kit.part(model, "Trim", V3(SPAN, 0.28, 0.35), CF(0, EAVE - 0.1, -DEPTH / 2 + 0.3), Palette.Brass, MAT.Metal),
+		false
 	)
-	Kit.solid(dBox(model, "Lectern", V3(1.2, 2.6, 0.9), CF(3.2, 2.3, -3.6), TIMBER_LIGHT)) -- its stand collides
-	dBox(model, "Lectern", V3(1.5, 0.2, 1.1), CF(3.2, 3.7, -3.6) * ANG(-0.3, 0, 0), PLANK[4])
-	dBall(model, "Bell", 0.55, CF(3.5, 4.0, -3.5), BRASS, MAT.Metal)
-	TownMeshes.Dress(model, "GondolaStation")
+
+	-- Slate A-frame. The ridge runs along Z; the peak is 14.
+	local roofSize = V3(DEPTH + 2, RISE, SPAN / 2)
+	Kit.wedge(
+		model,
+		"Roof",
+		roofSize,
+		CF(-SPAN / 4, EAVE + RISE / 2, 0) * ANG(0, PI / 2, 0),
+		Palette.RoofSlate,
+		MAT.Slate
+	)
+	Kit.wedge(
+		model,
+		"Roof",
+		roofSize,
+		CF(SPAN / 4, EAVE + RISE / 2, 0) * ANG(0, -PI / 2, 0),
+		Palette.RoofSlate,
+		MAT.Slate
+	)
+
+	-- Iron bar across the lane only (x -6 to 2). Closed until the pass.
+	Kit.part(model, "GateBar", V3(7.6, 4.2, 0.45), CF(-2, 2.6, -1), Palette.IronBlack, MAT.Metal)
+	Kit.decor(Kit.part(model, "GateRim", V3(7.8, 0.1, 0.14), CF(-2, 4.76, -1.26), Palette.LumenGlow, MAT.Neon), false)
+	Kit.decor(Kit.part(model, "GateEdge", V3(7.8, 0.14, 0.08), CF(-2, 4.6, -1.3), Palette.StopRed, MAT.Metal), false)
+
+	-- One cream board on the front, facing the road. Glow is the rim only.
+	local board =
+		Kit.decor(Kit.part(model, "Sign", V3(8, 2.4, 0.28), CF(0, 9.2, -10.5), Palette.SignCream, MAT.SmoothPlastic))
+	Kit.signText(board, "Sky Pass", Palette.SignInk, { Enum.NormalId.Front })
+	Kit.decor(Kit.part(model, "SignRim", V3(8.4, 0.16, 0.12), CF(0, 10.48, -10.62), Palette.LumenGlow, MAT.Neon), false)
+	Kit.decor(Kit.part(model, "SignRim", V3(8.4, 0.16, 0.12), CF(0, 7.92, -10.62), Palette.LumenGlow, MAT.Neon), false)
+	Kit.decor(
+		Kit.part(model, "SignRim", V3(0.16, 2.4, 0.12), CF(-4.12, 9.2, -10.62), Palette.LumenGlow, MAT.Neon),
+		false
+	)
+	Kit.decor(
+		Kit.part(model, "SignRim", V3(0.16, 2.4, 0.12), CF(4.12, 9.2, -10.62), Palette.LumenGlow, MAT.Neon),
+		false
+	)
+	local plaque = Kit.decor(
+		Kit.part(model, "StatePlaque", V3(5, 0.7, 0.2), CF(0, 7.2, -10.55), Palette.SignCream, MAT.SmoothPlastic)
+	)
+	for _, label in ipairs(Kit.signText(plaque, "Gate", Palette.SignInk, { Enum.NormalId.Front })) do
+		label.Name = "State"
+	end
+
+	-- One brass lamp inside the footprint. The cap clears 80 studs.
+	Kit.part(model, "LampPost", V3(1.1, 78, 1.1), CF(-12, 39, -6), Palette.Brass, MAT.Metal)
+	local lamp = Kit.part(model, "Lamp", V3(2.6, 2.8, 2.6), CF(-12, 79.2, -6), Palette.Brass, MAT.Metal)
+	Kit.decor(Kit.part(model, "LampCap", V3(3.2, 0.4, 3.2), CF(-12, 80.8, -6), Palette.IronBlack, MAT.Metal), false)
+	local bulb =
+		Kit.decor(Kit.part(model, "LampBulb", V3(1.0, 1.0, 1.0), CF(-12, 79.2, -7.2), Palette.Brass, MAT.Metal), false)
+	local lampLight = Instance.new("PointLight")
+	lampLight.Color = Palette.Brass
+	lampLight.Brightness = 1.1
+	lampLight.Range = 28
+	lampLight.Shadows = false
+	lampLight.Parent = bulb
+	lamp.Name = "Lamp"
+
+	model:SetAttribute("GateId", "sky")
+	CollectionService:AddTag(model, "GateSign")
 	return model
 end
 
@@ -3848,19 +3873,6 @@ function BuildingArt.SkyMarket(): Model
 			dCyl(model, "ShardJar", 0.9, 0.7, CF(-2.2 + (i - 1) * 1.6, 1.2, -0.8) * ANG(0, 0, PI / 2), color, MAT.Glass)
 		jar.Transparency = 0.35
 	end
-	return model
-end
-
-function BuildingArt.SkyTurnstile(): Model
-	local model = Kit.model("SkyTurnstile")
-	Kit.part(model, "Post", V3(1, 3.5, 1), CF(-1.2, 1.75, 0), Palette.IronBlack, MAT.Metal)
-	Kit.part(model, "Post", V3(1, 3.5, 1), CF(1.2, 1.75, 0), Palette.IronBlack, MAT.Metal)
-	dBox(model, "Bar", V3(2.2, 0.3, 0.3), CF(0, 2.4, 0), Palette.IronBlack, MAT.Metal)
-	local sign = Kit.part(model, "Sign", V3(4, 2, 0.2), CF(0, 4.2, -0.2), Palette.SignInk, MAT.Wood)
-	Kit.signText(sign, "Gondola Pass", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	sign.CanCollide = false
-	sign.CanQuery = false
-	sign.CanTouch = false
 	return model
 end
 

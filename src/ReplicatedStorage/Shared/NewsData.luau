@@ -20,7 +20,7 @@ NewsData.Entries = {
 	{
 		line = "New vehicles with wheels on both sides.",
 		detail = "Every truck rebuilt. See the Dealership.",
-		icon = "gondola",
+		icon = "blueprint",
 	},
 	{
 		line = "Sparkworks sells logic pieces, belts and lasers.",

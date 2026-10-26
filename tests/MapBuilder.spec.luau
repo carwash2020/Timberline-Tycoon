@@ -48,7 +48,7 @@ return function(t)
 				pointsOfInterest = count("PointsOfInterest"),
 				backdrop = if map and map:FindFirstChild("Backdrop") then 1 else 0,
 				shops = if map and map:FindFirstChild("ToolShed") then 1 else 0,
-				stations = if map and map:FindFirstChild("GondolaTop") then 1 else 0,
+				gateLodge = if map and map:FindFirstChild("GateLodge") then 1 else 0,
 				parking = if map and map:FindFirstChild("ParkingSlot_1") then 1 else 0,
 			}
 		end
@@ -327,7 +327,7 @@ return function(t)
 		local ground = t.shared("Art/TownGroundArt")
 		local plain = build({ townGroundArt = ground })
 		local n, tops = count(plain)
-		t.eq(n, 8, "the eight footpaths T402 made")
+		t.eq(n, 6, "the six footpaths left after the north-yard path went with the station")
 		local line
 		for _, l in ipairs(plain.prints) do
 			if string.find(l, "town footpaths", 1, true) then
@@ -347,8 +347,8 @@ return function(t)
 			end,
 		})
 		local m, raised = count(buried)
-		t.eq(m, 8)
-		for i = 1, 8 do
+		t.eq(m, 6)
+		for i = 1, 6 do
 			t.ok(raised[i] > tops[i] + 0.3, "path " .. i .. " is lifted over the terrain")
 		end
 		-- Terrain that sits well under the paths changes nothing.
@@ -359,7 +359,7 @@ return function(t)
 			end,
 		})
 		local _, same = count(fine)
-		for i = 1, 8 do
+		for i = 1, 6 do
 			t.ok(math.abs(same[i] - tops[i]) < 1e-6, "path " .. i .. " stays where it was planned")
 		end
 	end)
@@ -431,7 +431,7 @@ return function(t)
 		-- What a player needs to stand and play was built first.
 		t.eq(s.atReady.shops, 1, "the shops")
 		t.eq(s.atReady.parking, 1, "the parking lot (VehicleService reads its slots)")
-		t.eq(s.atReady.stations, 1, "the gondola stations GondolaService waits for")
+		t.eq(s.atReady.gateLodge, 1, "the gate lodge Gus's charter waits for")
 		-- Everything else is a deferred step, built after SellArea.
 		t.eq(s.atReady.boulders, 0, "no boulders yet")
 		t.eq(s.atReady.scenery, 0, "no scenery yet")
@@ -526,7 +526,7 @@ return function(t)
 			},
 		})
 		local TownMarkers = client:load("StarterPlayer/StarterPlayerScripts/TownMarkers")
-		t.eq(#TownMarkers.Markers, 6)
+		t.eq(#TownMarkers.Markers, 5)
 		for _, marker in ipairs(TownMarkers.Markers) do
 			local at = s.map
 			for _, name in ipairs(marker.path) do
@@ -762,7 +762,7 @@ return function(t)
 					end
 				end
 			end
-			t.ok(seen >= 3, "footpath gaps seen: " .. seen)
+			t.ok(seen >= 2, "footpath gaps seen: " .. seen)
 		end
 	)
 
@@ -1033,7 +1033,7 @@ return function(t)
 		t.ok(string.find(s.warnings[1], "function step", 1, true), "with a traceback: " .. s.warnings[1])
 		lastStepsRan(s)
 		t.ok(s.sellArea:FindFirstChild("SellZone"), "the sell zone still exists (GameServer waits on it)")
-		for _, shop in ipairs({ "ToolShed", "Dealership", "HearthAndHome", "GondolaTown" }) do
+		for _, shop in ipairs({ "ToolShed", "Dealership", "HearthAndHome" }) do
 			t.ok(s.map:FindFirstChild(shop), shop .. " still built")
 		end
 		t.ok(s.map:FindFirstChild("ParkingSlot_1"), "the parking lot still built")
@@ -1145,30 +1145,9 @@ return function(t)
 		end
 		t.eq(solidBoards, 9, "the four road signs, the three gate signs and the Bayou and Red Mesa ends")
 		t.ok(boards >= 8, boards .. " signposts")
-		-- One flume per chute, along WorldPlan.ChuteFlume (out off the isle).
-		local flumes = {}
-		for _, child in ipairs(s.map:GetChildren()) do
-			if child.Name == "Flume" then
-				table.insert(flumes, child)
-			end
-		end
-		local chutes = WorldPlan.Sky().chutes
-		t.eq(#flumes, #chutes)
-		for i, cf in ipairs(chutes) do
-			local from, to = WorldPlan.ChuteFlume(cf)
-			local found = false
-			for _, flume in ipairs(flumes) do
-				local at = flume.CFrame
-				if (at.Position - (from + to) / 2).Magnitude < 1e-3 then
-					found = true
-					t.ok(
-						at.LookVector:Dot((to - from).Unit) > 0.9999,
-						"chute " .. i .. ": the flume runs from its lip out"
-					)
-					t.ok(math.abs(flume.Size.Z - (to - from).Magnitude) < 1e-3, "chute " .. i .. ": the flume's length")
-				end
-			end
-			t.ok(found, "chute " .. i .. " has its flume")
+		-- Chute hoppers and their flumes are not built.
+		for _, child in ipairs(s.map:GetDescendants()) do
+			t.ok(child.Name ~= "Flume" and child.Name ~= "CloudChute", "no chute art in the map")
 		end
 	end)
 
@@ -1183,18 +1162,13 @@ return function(t)
 		})
 		t.eq(#s.warnings, 1)
 		t.ok(string.find(s.warnings[1], "6. The Starfall Forge failed", 1, true), s.warnings[1])
-		-- The only other failure is the gondola cable, and only because Lune
-		-- can't read BasePart.Position.
 		for _, line in ipairs(s.allWarnings) do
-			t.ok(
-				line == s.warnings[1] or string.find(line, "[MapBuilder] 6. The gondola failed", 1, true),
-				"unexpected warning: " .. line
-			)
+			t.ok(line == s.warnings[1], "unexpected warning: " .. line)
 		end
 		lastStepsRan(s)
 		local isles = s.map:FindFirstChild("AetherIsles")
 		t.ok(isles and isles:FindFirstChild("MainIsle"), "the isles are built")
-		t.ok(s.map:FindFirstChild("GondolaTop") and s.map:FindFirstChild("GondolaBase"), "the sky stations")
+		t.ok(s.map:FindFirstChild("GateLodge"), "the gate lodge")
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(

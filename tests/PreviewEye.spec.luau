@@ -77,7 +77,7 @@ return function(t)
 		t.ok(flat(at(3), Vector3.new(0, 0, 480)) < 1e-4, "3 on the Snow Road at (0, 480)")
 		-- Ring map: the shore is at x 780, so the beach eye is at (740, 0), it was (1150, 0).
 		t.ok(flat(at(4), Vector3.new(740, 0, 0)) < 1e-6, "4 on the beach at (740, 0)")
-		t.ok(flat(at(5), town.gondola.Position) < 30, "5 by the town gondola station")
+		t.ok(flat(at(5), Vector3.new(-40, 0, 150)) < 30, "5 by the north yard")
 		t.ok(flat(at(7), roadEnd("HillsRoad")) < 50, "7 near the Hills Road's end")
 		t.ok(flat(at(8), roadEnd("VolcanoRoad")) < 20, "8 at the Volcano Road's end")
 	end)

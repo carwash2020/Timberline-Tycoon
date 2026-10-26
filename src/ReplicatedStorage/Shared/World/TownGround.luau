@@ -245,7 +245,7 @@ local function paintsNamed(name: string): { WorldLayout.Paint }
 end
 
 local YARDS = { "ForestMouth", "HillsMouth", "PlazaEastMouth", "MillYard" }
-local PATHS = { "SpawnWalk", "HearthAndHomePath", "ToolShedPath", "SparkworksPath", "GondolaPath" }
+local PATHS = { "SpawnWalk", "HearthAndHomePath", "ToolShedPath", "SparkworksPath" }
 local LANES = { ForestPath = true, MillRoad = true, LotLoop = true }
 local MAINS = { SouthLink = true, EastLink = true }
 

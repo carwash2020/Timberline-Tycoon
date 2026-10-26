@@ -1,11 +1,9 @@
 --!strict
--- AetherService: the Aether Isles (GAME_DESIGN §10), apart from the gondola
--- (GondolaService) and the crystal nodes (NodeService).
---   * Cloud Chutes on the outer isles: "Send logs down" moves the logs in
---     your hands into your Sky Bin (profile.skyBin, up to BiomeData
---     sky.skyBinCapacity). Selling on the sawmill pad sells the bin too
---     (GameServer calls TakeSkyBin). That is the v1 loop, kept for a rollback
---     until M1.10; it knows nothing of the bin item below.
+-- AetherService: the Aether Isles (GAME_DESIGN §10) and the crystal nodes
+-- live in NodeService. Chute hoppers are not built (they only moved ride
+-- cargo). SendDown and ChuteInfo do nothing and toast nothing. The Sky Bin
+-- on a plot still sells (SellSkyBin, PayOutBin). T413 owns a replacement.
+-- Selling on the sawmill pad sells the bin too (GameServer calls TakeSkyBin).
 --   * The Starfall Forge on the main isle: "Add lumenwood" puts carried
 --     logs into it (profile.forgeLogs); "Forge" takes the recipe's cash and
 --     Sky Shards and makes a Starfall Axe (ItemCatalog forge recipe,
@@ -126,15 +124,6 @@ local function sky(): BiomeData.BiomeDef
 	return BiomeData.Get("sky") :: BiomeData.BiomeDef
 end
 
-local function binCapacity(): number
-	return sky().skyBinCapacity or 30
-end
-
--- u³ the v2 Sky Bin holds at most.
-local function binVolume(): number
-	return sky().skyBinVolume or 120
-end
-
 -- u³ in the player's v2 Sky Bin.
 local function binUsed(profile: Profile): number
 	local _value, volume = SellLogic.EntriesValue(profile.skyWood)
@@ -192,43 +181,10 @@ local function figuredInHand(player: Player, woodIds: { [string]: any }): number
 	return n
 end
 
--- Sends the logs in the player's hands down the Cloud Chute.
-function AetherService.SendDown(player: Player)
-	if not RateLimiter.Allow(player, "LoadToTruck") then
-		return
-	end
-	local profile = ProfileService.GetProfile(player)
-	if not profile then
-		return
-	end
-	local space = binCapacity() - #profile.skyBin
-	if space <= 0 then
-		notify(player, string.format("Your Sky Bin is full (%d). Sell it at the sawmill.", binCapacity()))
-		return
-	end
-	-- Each log keeps its value and figure in the bin.
-	local sent = CarryService.TakeLogs(player, function()
-		return true
-	end, space)
-	if #sent == 0 then
-		notify(player, "Bring logs to send them down the Cloud Chute.")
-		return
-	end
-	for _, log in ipairs(sent) do
-		table.insert(profile.skyBin, { woodId = log.woodId, value = log.value, figure = log.figure })
-	end
-	publish(player, profile)
-	notify(
-		player,
-		string.format(
-			"Sent %d log%s down the Cloud Chute. Sky Bin %d/%d.",
-			#sent,
-			if #sent == 1 then "" else "s",
-			#profile.skyBin,
-			binCapacity()
-		)
-	)
-end
+-- Chute hoppers are not built (they only moved ride cargo). T413 owns the
+-- replacement. Callers do nothing and say nothing, so nobody is sent
+-- looking for a hopper that is not in the world.
+function AetherService.SendDown(_player: Player) end
 
 -- Empties the player's Sky Bin (selling at the sawmill) and returns its logs.
 function AetherService.TakeSkyBin(player: Player): { ProfileSchema.BedLog }
@@ -418,64 +374,8 @@ local function refuse(player: Player, text: string, now: number)
 	notify(player, text)
 end
 
--- One poll of a chute: each settled piece that fits goes down into its
--- payee's Sky Bin; one toast per payee for what went.
-local function chuteTick(h: Hopper, d: V2Deps, now: number)
-	local cap = binVolume()
-	local sent: { [Player]: number } = {}
-	local order: { Player } = {}
-	for _, model in ipairs(settled(h, d, now)) do
-		local f = factsOf(d, model)
-		if not f then
-			continue
-		end
-		-- No Sky Bin on the payee's plot: the chute is locked. The piece stays.
-		local lock = SkyBinLogic.ChuteLock(SkyBinLogic.HoldingsOf(f.profile))
-		if lock then
-			refuse(f.payee, SkyBinLogic.LockLine(lock), now)
-			continue
-		end
-		if not SellLogic.Fits(binUsed(f.profile), f.volume, cap) then
-			local text = if f.volume > cap
-				then string.format(
-					"That piece is too big for the Sky Bin (%s). Cut it smaller.",
-					SellLogic.VolumeText(cap)
-				)
-				else string.format(
-					"Your Sky Bin is full (%s). Sell it from the bin on your plot.",
-					SellLogic.VolumeText(cap)
-				)
-			refuse(f.payee, text, now)
-			continue
-		end
-		take(d, h, model, f.piece)
-		table.insert(
-			f.profile.skyWood,
-			SellLogic.Entry(f.woodId, f.kind, f.volume, f.figure, f.boost, f.lux, f.mill, f.board, f.temper)
-		)
-		if sent[f.payee] == nil then
-			sent[f.payee] = 0
-			table.insert(order, f.payee)
-		end
-		sent[f.payee] += 1
-	end
-	for _, player in ipairs(order) do
-		local profile = ProfileService.GetProfile(player)
-		if profile then
-			publish(player, profile)
-			local n = sent[player]
-			notify(
-				player,
-				string.format(
-					"Sent %d piece%s down the Cloud Chute. Sky Bin %s.",
-					n,
-					if n == 1 then "" else "s",
-					SellLogic.BinText(binUsed(profile), cap)
-				)
-			)
-		end
-	end
-end
+-- Chute hoppers are not built. A poll deposits nothing and toasts nothing.
+local function chuteTick(_h: Hopper, _d: V2Deps, _now: number) end
 
 -- One poll of the forge: each settled piece it takes (ForgeLogic.RefusalV2:
 -- plain wood of the recipe's, while it still wants some) adds its u³ to
@@ -549,23 +449,8 @@ function AetherService.HopperTick()
 	end
 end
 
--- The chute's prompt under v2: how it works, and how full your bin is.
-function AetherService.ChuteInfo(player: Player)
-	if not RateLimiter.Allow(player, "LoadToTruck") then
-		return
-	end
-	local profile = ProfileService.GetProfile(player)
-	if not profile then
-		return
-	end
-	notify(
-		player,
-		SkyBinLogic.ChuteInfo(
-			SkyBinLogic.ChuteLock(SkyBinLogic.HoldingsOf(profile)),
-			SellLogic.BinText(binUsed(profile), binVolume())
-		)
-	)
-end
+-- No chute prompt. Kept so a caller cannot toast a missing hopper.
+function AetherService.ChuteInfo(_player: Player) end
 
 -- The forge's "Add lumenwood" prompt under v2: what it takes, and how
 -- far along it is.
@@ -964,8 +849,8 @@ local function addHopper(part: Instance, kind: HopperKind)
 	table.insert(hoppers, { part = part, kind = kind, firstSeen = {} })
 end
 
--- MapBuilder tags the chutes "CloudChute" and the forge's anvil
--- "StarfallForge"; the prompts go on them as they appear.
+-- MapBuilder tags the forge's anvil "StarfallForge". Chute hoppers are
+-- not built, so nothing here grows a Cloud Chute prompt.
 local function onTagged(tag: string, setup: (Instance) -> ())
 	for _, inst in ipairs(CollectionService:GetTagged(tag)) do
 		setup(inst)
@@ -976,16 +861,6 @@ end
 -- `notifyFn` shows a toast (GameServer's notify).
 function AetherService.Init(notifyFn: (Player, string) -> ())
 	notify = notifyFn
-	onTagged("CloudChute", function(part)
-		loopPrompt(part, "Send logs down", "Check Sky Bin", "Cloud Chute", function(player: Player)
-			if v2 then
-				AetherService.ChuteInfo(player)
-			else
-				AetherService.SendDown(player)
-			end
-		end)
-		addHopper(part, "chute")
-	end)
 	-- A Sky Bin placed on a plot (PlotService builds it, MachineArt tags it):
 	-- its prompt sells the bin's wood, for its owner only (SellSkyBin checks).
 	onTagged(SkyBinLogic.Tag, function(model)

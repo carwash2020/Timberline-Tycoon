@@ -23,6 +23,12 @@ block the build; #157 client audit; #158 world first look; #159 store interiors:
 still also comes from the best axe and gear. S8 (Master Timber) is set only by its key: deriving it from a full plot is awaiting
 Connor (it would raise cash packs about 25%).
 
+## T407 remove the gondola (26 October 2026, branch `cursor/remove-gondola-823b`)
+
+Travel is roads, bridges, the ferry and trucks. The ride, the stations, the cables, the turnstile and the Cloud Chute hoppers are gone. The Sky Pass stays: Gus still signs the charter, the save keys `gondolaPass` and `skyPass` still migrate together, and the gear id is still `GondolaPass`. Player-facing copy says Sky Pass. The gate lodge (28×20, peak 14, a brass lamp past 80) stands on the Snow Road's north end, about (−30, 790), front toward the road. The bar blocks the lane until the pass; leaving the summit side does not need it. There is no ride fee. The floating isles stay at (680, 280), y 650, and are not reachable until a later map pass. A Sky Bin on a plot still sells. Hoppers are not built; T413 owns whatever replaces the chute. Nothing here has been seen in Studio.
+
+**Studio:** walk the old station pad (north yard, about −40, 150): no station, no cable, no turnstile, no chute hopper, a Skyroot sign or bare ground. Drive north to the snow-road end and find the lodge near (−30, 790). The sign reads Sky Pass. The bar blocks without the pass. Gus's charter still grants it; the bar's edge goes green and you can pass. You can leave the summit side without the pass and you are not stranded. No ride prompt and no $250 charge. A Sky Bin on a plot still sells. Shops, the ferry and the sell pad are unchanged. The isles are still up there and no ride reaches them.
+
 **Rules that did not change:** the five formerly off-sale products now have their ids (T387, 20 Oct 2026; no Robux price in code), badge ids stay 0 until Connor
 pastes them, no trading or gifting, ButtonR2 is named once in the source (`GrabLogic.PadGrabKey`, the empty-hand grab, read and
 never bound; `NoButtonR2.spec`), no Robux price in code.

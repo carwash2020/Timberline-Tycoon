@@ -59,9 +59,8 @@ return {
 		)
 
 		-- Row 2: the station, Murph's camp, the isle pieces, street furniture.
-		place(BuildingArt.GondolaStation(), 0, 60, "GondolaStation", -11, { -14, 10, -20, 6 })
+		place(BuildingArt.GateLodge(), 0, 60, "GateLodge", -16, { -40, 42, -64, 24 })
 		place(BuildingArt.Campsite(), 30, 60, "Campsite", -7, { -9, 7, -14, 2 })
-		place(BuildingArt.CloudChute(), 55, 60, "CloudChute", -6, { -12, 7, -10, 1 })
 		place(BuildingArt.StarfallForge(), 78, 60, "StarfallForge", -6, { -9, 6, -10, 3 })
 		place(BuildingArt.Signpost("TO THE WOODS\nHills 400\nSnow 1200"), 100, 60, "Signpost", -4, { -6, 7, -12, 6 })
 		place(BuildingArt.LampPost(), 114, 60, "LampPost", -4, { -6, 7, -9, 6 })

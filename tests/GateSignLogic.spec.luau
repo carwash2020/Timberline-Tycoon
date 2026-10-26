@@ -18,7 +18,7 @@ return function(t)
 		t.eq(G.State("grove", { Lantern = true }).text, "Protected")
 		local sky = G.State("sky", {})
 		t.eq(sky.met, false)
-		t.ok(string.find(sky.text, "Gondola Pass", 1, true) ~= nil)
+		t.ok(string.find(sky.text, "Sky Pass", 1, true) ~= nil)
 		t.eq(G.State("sky", { GondolaPass = true }).text, "Protected")
 	end)
 

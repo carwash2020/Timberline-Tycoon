@@ -1,13 +1,14 @@
 --!strict
--- SkyQuestLogic: Gus's Charter, the quest that earns the Gondola Pass.
--- Pure. SkyQuestService (server) owns the save and the remote.
+-- SkyQuestLogic: Gus's Charter, the quest that earns the Sky Pass
+-- (saved as gondolaPass, gear id GondolaPass). Pure. SkyQuestService
+-- (server) owns the save and the remote.
 -- Designer findings (Oct 8, approved), in order:
 --   1. proven: own the Obsidian Axe.
 --   2. frost:  turn in 120 u³ of Frostwood planks.
 --   3. ember:  turn in 120 u³ of Emberwood planks.
 --   4. gloam:  turn in 40 u³ of Gloamwood planks.
--- Then Gus gives the Gondola Pass. No cash fee, no Robux, no random step.
--- Turned-in planks are used up and pay nothing. The $250 fare stays.
+-- Then Gus gives the Sky Pass. No cash fee, no Robux, no ride, no random step.
+-- Turned-in planks are used up and pay nothing.
 -- Progress is a per-slot save field (profile.skyQuest), so it survives a
 -- rejoin and a slot swap.
 
@@ -24,10 +25,9 @@ SkyQuestLogic.Steps = {
 	{ id = "gloam", kind = "handin", target = "phantomwood", amount = 40 },
 } :: { Step }
 
--- The words a gate sign and a refused ride show (no price: the fare is in
--- the prompt).
+-- What the gate says, and what a player without the pass is told.
 SkyQuestLogic.GateWords = BiomeData.Gate("sky").words
-SkyQuestLogic.RefuseText = "Gondola Pass needed. Ask Gus about his charter."
+SkyQuestLogic.RefuseText = "Sky Pass needed. Ask Gus at the Skyroot gate."
 
 local WOOD_NAMES: { [string]: string } = {
 	frostwood = "Frostwood",
@@ -105,7 +105,7 @@ function SkyQuestLogic.View(state: State, facts: Facts): View
 		return {
 			step = "done",
 			title = "Gus's Charter",
-			text = "The Gondola Pass is yours. Ride up any time.",
+			text = "The Sky Pass is yours. The Skyroot gate is open.",
 			progress = "Done",
 			canTurnIn = false,
 			done = true,
@@ -115,7 +115,7 @@ function SkyQuestLogic.View(state: State, facts: Facts): View
 		return {
 			step = "none",
 			title = "Gus's Charter",
-			text = "Prove you can work the hard woods and I'll sign you onto the sky line. Accept the charter.",
+			text = "Prove you can work the hard woods and I'll sign you onto the sky road. Accept the charter.",
 			progress = "Not started",
 			canTurnIn = true,
 			done = false,
@@ -139,7 +139,7 @@ function SkyQuestLogic.View(state: State, facts: Facts): View
 	return {
 		step = step.id,
 		title = string.format("Step %d of %d", index, #SkyQuestLogic.Steps),
-		text = string.format("Bring me %s %s planks. Lay them by the station and talk to me.", u3(step.amount), name),
+		text = string.format("Bring me %s %s planks. Lay them by the gate and talk to me.", u3(step.amount), name),
 		progress = string.format("%s / %s %s", u3(have), u3(step.amount), name),
 		canTurnIn = offered > EPS,
 		done = false,
@@ -201,10 +201,10 @@ function SkyQuestLogic.Advance(state: State, action: string, facts: Facts): (Sta
 	return nextState, "GondolaPass", used
 end
 
--- Whether a ride from a station may set off. Down from the top is never
--- refused, so nobody is stranded on the isles.
-function SkyQuestLogic.CanRide(direction: "up" | "down", hasPass: boolean): boolean
-	return direction == "down" or hasPass
+-- The gate. "enter" is the road side: the Sky Pass is required. "leave" is
+-- the summit side: a player already past the bar is never stranded.
+function SkyQuestLogic.MayPass(direction: "enter" | "leave", hasPass: boolean): boolean
+	return direction == "leave" or hasPass == true
 end
 
 return SkyQuestLogic

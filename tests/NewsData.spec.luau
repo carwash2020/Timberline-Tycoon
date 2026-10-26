@@ -11,7 +11,7 @@ return function(t)
 	t.test("every line is short and complete, and the list fits the phone card", function()
 		t.ok(#Data.Entries >= 1)
 		t.ok(#Data.Entries <= Data.MaxEntries, "no more rows than the 667 x 375 card shows")
-		local icons = { map = 1, mine = 1, blueprint = 1, daily = 1, temper = 1, spark = 1, gondola = 1 }
+		local icons = { map = 1, mine = 1, blueprint = 1, daily = 1, temper = 1, spark = 1 }
 		for i, entry in ipairs(Data.Entries) do
 			t.ok(#entry.line > 0 and #entry.line <= Data.MaxLine, "line " .. i .. " headline is short")
 			t.ok(#entry.detail > 0 and #entry.detail <= Data.MaxLine, "line " .. i .. " detail is short")

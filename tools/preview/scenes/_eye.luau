@@ -76,12 +76,9 @@ function Eye.cameras(ctx)
 	local island = WorldLayout.Island
 	add("the beach, to the palm island", beach, V3.new(island.x, beach.Y, island.z))
 
-	-- 5: in front of the town's gondola station (its front is -Z), looking
-	-- through it along the cable toward the Skyroot (its open back, +Z).
-	local station = town.gondola
-	local front = station.Position + station.LookVector * 22
-	local beyond = station.Position - station.LookVector * 40
-	add("the town gondola station", eye(front.X, front.Z), V3.new(beyond.X, under(beyond.X, beyond.Z) + 14, beyond.Z))
+	-- 5: the north yard, where the station stood. The Skyroot sign is at
+	-- (-40, 168), facing -Z.
+	add("the north yard", eye(-40, 140), V3.new(-40, under(-40, 168) + 8, 168))
 
 	-- 6: on the main isle by the top station, across it to the far isle.
 	if sky then

@@ -38,8 +38,8 @@ return function(t)
 			end
 		end
 		local station = Instance.new("Model")
-		station.Name = "GondolaTown"
-		part(station, "Platform", Vector3.new(10, 1, 10), CFrame.new(-40, 0.5, 150))
+		station.Name = "GateLodge"
+		part(station, "Door", Vector3.new(6, 6.2, 0.35), CFrame.new(-38, 3.1, 150))
 		station.Parent = map
 		local sell = Instance.new("Model")
 		sell.Name = "SellArea"

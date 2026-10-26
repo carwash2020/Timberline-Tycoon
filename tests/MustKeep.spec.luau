@@ -45,6 +45,7 @@ return function(t)
 			"TimberlineMap/SpawnLocation",
 			"TimberlineMap/FerryDock#1",
 			"TimberlineMap/TollBooth/Counter",
+			"TimberlineMap/GateLodge/Door",
 		}) do
 			t.ok(p[path], path .. " is on the list")
 		end

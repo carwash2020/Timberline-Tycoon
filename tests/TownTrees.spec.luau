@@ -143,10 +143,7 @@ return function(t)
 			walkers += 1
 		end
 		t.eq(count, walkers, "every NPC route is in TownTreeData.Walks")
-		t.eq(
-			{ TownTreeData.GondolaStation.x, TownTreeData.GondolaStation.z },
-			{ WorldPlan.TownGondolaSpot.X, WorldPlan.TownGondolaSpot.Z }
-		)
+		t.eq({ TownTreeData.NorthYard.x, TownTreeData.NorthYard.z }, { -40, 150 })
 		-- The sight line to the lighthouse's lamp runs from the spawn pad to the lamp.
 		local lamp = WorldPlan.Lighthouse().lamp
 		local sight
@@ -338,7 +335,6 @@ return function(t)
 			add("sign", BuildingArt.Signpost(s.text), s.cframe)
 		end
 		add("Murph's camp", BuildingArt.Campsite(), town.campsite)
-		add("gondola station", BuildingArt.GondolaStation(), town.gondola)
 		add("sawmill", BuildingArt.Sawmill(), town.sawmill)
 		add("sell station", BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad)
 		for _, spot in ipairs(town.shops) do
@@ -358,7 +354,6 @@ return function(t)
 
 	-- The reasons a town tree may not stand at (x, z), measured on the real
 	-- art and layout rather than on the planner's own lists. nil: all clear.
-	local gondolaPath
 	local function problem(x, z)
 		-- Connor's keep-out, and the spawn.
 		if x > -60 and x < 60 and z > 80 and z < 140 then
@@ -445,28 +440,17 @@ return function(t)
 				return "by " .. npc.id
 			end
 		end
-		-- The gondola's first stretch out of town.
-		if not gondolaPath then
-			local sky = WorldPlan.Sky()
-			local town = WorldPlan.Town()
-			local station = BuildingArt.GondolaStation()
-			Kit.placeAt(station, town.gondola)
-			local platform = station.PrimaryPart
-			local top = sky.gondolaTop.Position
-			gondolaPath = WorldPlan.GondolaPath(sky, platform.CFrame.Position, platform.CFrame.ZVector, top)
-		end
-		do
-			local length = 0
-			for i = 1, #gondolaPath - 1 do
-				length += (gondolaPath[i + 1] - gondolaPath[i]).Magnitude
-			end
-			local k = 0
-			while k <= 300 do
-				local at = WorldPlan.AlongPath(gondolaPath, k / length)
-				if dist(x, z, at.X, at.Z) < 14 then
-					return "under the gondola, " .. k .. " studs out"
-				end
-				k += 4
+		-- The north yard lane (the old cable's first stretch).
+		local skyBiome = BiomeData.Get("sky")
+		local area = if skyBiome then skyBiome.area else nil
+		if area then
+			local fromX, fromZ = TownTreeData.NorthYard.x, TownTreeData.NorthYard.z
+			local dx, dz = area.x - fromX, area.z - fromZ
+			local len = math.sqrt(dx * dx + dz * dz)
+			local toX = fromX + dx / len * TownTreeData.NorthLaneLength
+			local toZ = fromZ + dz / len * TownTreeData.NorthLaneLength
+			if segmentDistance(x, z, fromX, fromZ, toX, toZ) < TownTreeData.NorthLaneHalf then
+				return "in the north yard lane"
 			end
 		end
 		for _, slot in ipairs(PlotData.Slots) do

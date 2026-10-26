@@ -150,7 +150,6 @@ function OverlapCheck.Build(plan: any): (Clearance.Grid, { [string]: number })
 		local town = WorldPlan.Town()
 		addParts("sawmill", BuildingArt.Sawmill(), town.sawmill)
 		addParts("sell station", BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad)
-		addParts("gondola station", BuildingArt.GondolaStation(), town.gondola)
 		for _, spot in ipairs(town.shops) do
 			addParts(spot.kind, BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
 		end

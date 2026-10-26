@@ -56,7 +56,7 @@ Wood counts stay as they are today (Frostwood 70, Emberwood 60, Phantomwood 22, 
 | Volcano | (450, 500) | 125 | Emberwood | cone on the far side. Heat, boots give immunity |
 | Gloam ravine | (10, −720) | 80 | Phantomwood | 72 wide, 48 deep, one 28-wide road to the floor. Night plus the Lantern |
 | Ferry isle | (930, −50) | 55 | palms | dock (860, 160), east coast at x 780 |
-| Lumen isles | (680, 280) | 100, floor y 650 | Lumenwood | 216 studs from the dock (inside 400). Gondola from town |
+| Lumen isles | (680, 280) | 100, floor y 650 | Lumenwood | Still floating. Not reachable until a later map pass. The gate lodge is on the Snow Road's north end, about (−30, 790) |
 | Bayou | (−760, −700) | 140 | none yet | flat basin sunk 7 studs. Lane R fills it |
 | Red Mesa | (590, −790) | 115 | none yet | flat at the base height. Lane R fills it |
 
@@ -198,7 +198,7 @@ Anchors on `WorldPlan` (Lane R reads these):
 | SlabNodes | 8 points on the mesa's east rim, 8 studs in from the edge (angles 4 to 53 degrees from +X; Lane R moved them off the junction, `MesaData.QuarryNodes`) |
 | MesaTruckLot | (620, −770), 40 × 30 |
 | UniqueItemSpawn | one in the Bayou at (−780, −780), one on the mesa at (590, −860) |
-| LeaderboardBoard | CFrame (−50, 0, 92), facing south onto MainStreet, between GondolaPath x −37.5 and ToolShedFloor x −62 |
+| LeaderboardBoard | CFrame (−50, 0, 92), facing south onto MainStreet, between the north yard (x −37.5) and ToolShedFloor x −62 |
 
 Resource regions (a wood biome, or one of these two) are at least 500 studs apart centre to centre. A pair under 700 keeps 70 trees or fewer combined. Lane R planted 44 Bog Cypress and 38 Ironwood (`WorldPlan.RegionTrees`); Mesa plus Gloam Hollow is 60, under the 70 cap. The Lanternwood grotto stays at (−240, −420): its nearest corner is about 416 studs from the Bayou edge, past the 100-stud gap, so it was not moved.
 

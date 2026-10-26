@@ -69,7 +69,6 @@ return {
 		place(BuildingArt.OddsAndEnds(), 120, 280, { -14, 10, -16, 0, 3, 0 }, "odds-and-ends")
 		place(BuildingArt.Sparkworks(), 170, 280, { -16, 12, -18, 0, 4, 0 }, "sparkworks")
 		place(BuildingArt.SkyMarket(), 220, 280, { -8, 7, -12, 0, 3, 0 }, "sky-market")
-		place(BuildingArt.SkyTurnstile(), 250, 280, { -4, 4, -8, 0, 2, 0 }, "sky-turnstile")
 		place(BuildingArt.PlotMapBoard(), 275, 280, { -6, 5, -10, 0, 4, 0 }, "plot-map")
 		place(BuildingArt.ArrivalArch(), 310, 280, { -8, 8, -14, 0, 6, 0 }, "arrival-arch")
 		place(BuildingArt.LandOffice(), 360, 280, { -14, 10, -18, 0, 4, 0 }, "land-office")
@@ -120,7 +119,6 @@ return {
 		street(BuildingArt.OddsAndEnds(), -8, -236)
 		street(BuildingArt.Sparkworks(), 24, -236)
 		street(BuildingArt.SkyMarket(), 48, -240)
-		street(BuildingArt.SkyTurnstile(), 64, -243.5)
 		street(BuildingArt.SkyForgeCourt(), 100, -232)
 		street(BuildingArt.LampPost(), 150, -243.3)
 

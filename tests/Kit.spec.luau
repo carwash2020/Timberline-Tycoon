@@ -46,7 +46,7 @@ return function(t)
 			BuildingArt.SellPad(24, 18),
 			BuildingArt.SellStation(28, 32),
 			BuildingArt.SkyBin(),
-			BuildingArt.GondolaStation(),
+			BuildingArt.GateLodge(),
 			BuildingArt.Campsite(),
 			BuildingArt.Shop("ToolShed", "TOOL SHED", Color3.new(1, 0, 0)),
 			BuildingArt.Shop("Dealership", "DEALERSHIP", Color3.new(0, 0, 1)),

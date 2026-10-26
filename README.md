@@ -109,8 +109,8 @@ measure the economy model against your real play (saved in
   - `WorldClock`: day and night, the same on every server
   - `MonetizationService`: Robux passes and products (receipts granted once)
   - `FieldGuideService`: the woods each player has found
-  - `AetherService`, `GondolaService`, `NodeService`: the Aether Isles
-    (Cloud Chute, Sky Bin, forge, falling), the gondola, crystal nodes
+  - `AetherService`, `SkyQuestService`, `NodeService`: the Aether Isles
+    (Sky Bin, forge, falling), the Skyroot gate lodge, crystal nodes
   - `CarryService`: the logs in each player's hands
   - `PlotService`: the plot district, claiming, placing, moving, selling
     back and growing plots

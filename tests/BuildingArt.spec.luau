@@ -343,16 +343,14 @@ return function(t)
 		t.ok(model:FindFirstChild("Counter"), "Counter")
 	end)
 
-	t.test("the gondola station: Platform is the 10 x 1 x 10 PrimaryPart, the cabin has room", function()
-		local station = BuildingArt.GondolaStation()
-		local platform = station.PrimaryPart
-		t.ok(platform and platform.Name == "Platform", "PrimaryPart is Platform")
-		t.ok(near(platform.Size, V3.new(10, 1, 10)), "Platform is 10 x 1 x 10")
-		t.ok(math.abs(platform.CFrame.Position.Y + platform.Size.Y / 2 - 1) < 1e-4, "its top is at y = 1")
-		t.ok(platform.CanCollide, "it collides")
-		-- The 5 x 5 cabin rides from the platform's middle out the back (+Z).
-		t.eq(blockers(station, V3.new(-2.6, 1.2, -2.6), V3.new(2.6, 7.5, 9), platform), {}, "cabin path")
-		t.ok(#parts(station) <= 140, "station parts: " .. #parts(station))
+	t.test("the gate lodge: a 6-stud door on the front, no cabin", function()
+		local lodge = BuildingArt.GateLodge()
+		local door = lodge:FindFirstChild("Door")
+		t.ok(door and door:IsA("BasePart"), "Door")
+		t.ok(not door.CanCollide, "the door opening does not collide")
+		t.ok(math.abs(door.Size.X - 6) < 1e-3, "the opening is 6 wide")
+		t.ok(door.Size.Y >= 6, "the opening is at least 6 tall")
+		t.eq(lodge:FindFirstChild("Cabin"), nil)
 	end)
 
 	t.test("sign lamps (TWN-07): every shop sign and the lit signpost have gooseneck LampBulbs", function()
@@ -1022,15 +1020,6 @@ return function(t)
 			end
 		end
 		t.eq(aisle, 4, "two shelves each side")
-		-- The gondola station's lectern stand (not its sloped top).
-		local stands = 0
-		for _, p in ipairs(parts(BuildingArt.GondolaStation())) do
-			if p.Name == "Lectern" and p.CanCollide then
-				stands += 1
-				t.ok(near(p.Size, V3.new(1.2, 2.6, 0.9)), "the lectern's stand")
-			end
-		end
-		t.eq(stands, 1)
 		-- Murph's camp: the log seats, the firewood behind the tent, its rocks.
 		local camp = BuildingArt.Campsite()
 		solid(camp, "Log", "Murph's camp", 7)
@@ -1054,7 +1043,7 @@ return function(t)
 	end)
 
 	t.test("art rules: CFrame only, deterministic, decoration can't be clicked", function()
-		local models = { BuildingArt.Sawmill(), BuildingArt.GondolaStation(), BuildingArt.Campsite() }
+		local models = { BuildingArt.Sawmill(), BuildingArt.GateLodge(), BuildingArt.Campsite() }
 		for _, shop in ipairs(SHOPS) do
 			table.insert(models, BuildingArt.Shop(shop.kind, shop.title, shop.accent))
 		end
@@ -1276,10 +1265,6 @@ return function(t)
 		local arch = BuildingArt.ArrivalArch()
 		lo, hi = extent(arch)
 		t.ok(math.abs((hi.X - lo.X) - 12) < 0.2, "arch is 12 wide")
-		local turn = BuildingArt.SkyTurnstile()
-		t.ok(texts(turn)["Gondola Pass"], "gondola pass sign")
-		lo, hi = extent(turn)
-		t.ok(hi.X - lo.X <= 4.2 and hi.Z - lo.Z <= 2.2, "turnstile 4 x 2")
 		local market = BuildingArt.SkyMarket()
 		lo, hi = extent(market)
 		t.ok(hi.X - lo.X <= 10.2 and hi.Z - lo.Z <= 8.2, "sky market 10 x 8")
