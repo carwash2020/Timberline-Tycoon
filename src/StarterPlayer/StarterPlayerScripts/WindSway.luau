@@ -40,6 +40,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local ChopFeelLogic = require(ReplicatedStorage.Shared.ChopFeelLogic)
+local SectionMetrics = require(ReplicatedStorage.Shared.SectionMetrics)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local LightingController = require(script.Parent.LightingController)
 local Quality = require(script.Parent.Quality)
@@ -156,7 +157,8 @@ local function capture(tree: Model): Sway?
 	if typeof(swayTop) == "Vector3" then
 		-- A v2 section tree: its trunk's top, and how tall that is.
 		top = swayTop
-		length = math.max(4, swayTop.Y - (home.Position.Y - (if trunk then trunk.Size.Y / 2 else 0)))
+		local half = if trunk then SectionMetrics.Length(trunk) / 2 else 0
+		length = math.max(4, swayTop.Y - (home.Position.Y - half))
 	end
 	local p = home.Position
 	local phase = (math.sin(p.X * 0.137 + p.Z * 0.071) * 0.5 + 0.5) * math.pi * 2

@@ -16,24 +16,50 @@ CargoLock.FarStuds = 18 -- a release farther than this from the bed never locks
 CargoLock.MinInside = 0.5 -- more than half hanging off never locks
 CargoLock.WeldName = "BedWeld"
 CargoLock.LockedAttr = "CargoLocked" -- set on parts made massless for the weld
+-- A headed drive (200 studs, two turns, a T409 grade) is a Studio playtest.
+-- The rules below are the settle math that drive has to satisfy.
+CargoLock.LiveDrive = "playtest"
+CargoLock.DriveStuds = 200
+CargoLock.DriveTurns = 2
 
 export type Sample = { pos: Vector3, at: number, since: number? }
 
+-- Support of a cylinder (length along local X, radius min(Y, Z) / 2) in
+-- a unit direction, measured from its centre. Rolling about the length
+-- does not change it: the corners of the bounding box do.
+local function cylinderSupport(rel: CFrame, size: Vector3, axis: Vector3): number
+	local along = math.abs(rel.XVector:Dot(axis))
+	local halfLen = size.X / 2
+	local radius = math.min(size.Y, size.Z) / 2
+	local radial = math.sqrt(math.max(0, 1 - along * along))
+	return along * halfLen + radius * radial
+end
+
 -- The footprint of `size` at `rel` (both in one box's space) that lies
 -- inside that box's XZ rectangle, as a share of the footprint. Y is
--- ignored, so a stack still counts.
-function CargoLock.InsideShare(bedSize: Vector3, rel: CFrame, size: Vector3): number
-	local half = size / 2
-	local minX, maxX = math.huge, -math.huge
-	local minZ, maxZ = math.huge, -math.huge
-	for _, sx in ipairs({ -1, 1 }) do
-		for _, sy in ipairs({ -1, 1 }) do
-			for _, sz in ipairs({ -1, 1 }) do
-				local p = rel * Vector3.new(sx * half.X, sy * half.Y, sz * half.Z)
-				minX = math.min(minX, p.X)
-				maxX = math.max(maxX, p.X)
-				minZ = math.min(minZ, p.Z)
-				maxZ = math.max(maxZ, p.Z)
+-- ignored, so a stack still counts. `shape` "cylinder" uses the round
+-- support instead of the eight corners.
+function CargoLock.InsideShare(bedSize: Vector3, rel: CFrame, size: Vector3, shape: string?): number
+	local minX, maxX, minZ, maxZ
+	if shape == "cylinder" then
+		local c = rel.Position
+		local sx = cylinderSupport(rel, size, Vector3.xAxis)
+		local sz = cylinderSupport(rel, size, Vector3.zAxis)
+		minX, maxX = c.X - sx, c.X + sx
+		minZ, maxZ = c.Z - sz, c.Z + sz
+	else
+		local half = size / 2
+		minX, maxX = math.huge, -math.huge
+		minZ, maxZ = math.huge, -math.huge
+		for _, sx in ipairs({ -1, 1 }) do
+			for _, sy in ipairs({ -1, 1 }) do
+				for _, sz in ipairs({ -1, 1 }) do
+					local p = rel * Vector3.new(sx * half.X, sy * half.Y, sz * half.Z)
+					minX = math.min(minX, p.X)
+					maxX = math.max(maxX, p.X)
+					minZ = math.min(minZ, p.Z)
+					maxZ = math.max(maxZ, p.Z)
+				end
 			end
 		end
 	end
@@ -51,8 +77,8 @@ function CargoLock.InsideShare(bedSize: Vector3, rel: CFrame, size: Vector3): nu
 end
 
 -- True when more than half the footprint hangs past the bed.
-function CargoLock.Overhangs(bedSize: Vector3, rel: CFrame, size: Vector3): boolean
-	return CargoLock.InsideShare(bedSize, rel, size) < CargoLock.MinInside
+function CargoLock.Overhangs(bedSize: Vector3, rel: CFrame, size: Vector3, shape: string?): boolean
+	return CargoLock.InsideShare(bedSize, rel, size, shape) < CargoLock.MinInside
 end
 
 local function extentY(rel: CFrame, size: Vector3): (number, number)
@@ -70,17 +96,20 @@ local function extentY(rel: CFrame, size: Vector3): (number, number)
 	return lo, hi
 end
 
-function CargoLock.BottomY(rel: CFrame, size: Vector3): number
+function CargoLock.BottomY(rel: CFrame, size: Vector3, shape: string?): number
+	if shape == "cylinder" then
+		return rel.Position.Y - cylinderSupport(rel, size, Vector3.yAxis)
+	end
 	local lo = extentY(rel, size)
 	return lo
 end
 
 -- The piece's underside is on the bed's top (the bed is `bedSize`, the
 -- piece is `rel`/`size` in the bed's space).
-function CargoLock.ContactsBed(bedSize: Vector3, rel: CFrame, size: Vector3, gap: number?): boolean
+function CargoLock.ContactsBed(bedSize: Vector3, rel: CFrame, size: Vector3, gap: number?, shape: string?): boolean
 	local slack = gap or CargoLock.ContactGap
 	local top = bedSize.Y / 2
-	local bottom = CargoLock.BottomY(rel, size)
+	local bottom = CargoLock.BottomY(rel, size, shape)
 	return bottom >= top - 0.2 and bottom <= top + slack
 end
 

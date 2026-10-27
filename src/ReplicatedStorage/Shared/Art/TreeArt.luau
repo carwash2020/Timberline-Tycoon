@@ -27,6 +27,7 @@
 -- Log stay as they are for the v1 loop until the flip.
 
 local GameConfig = require(script.Parent.Parent.GameConfig)
+local SectionMetrics = require(script.Parent.Parent.SectionMetrics)
 local TreeGen = require(script.Parent.Parent.TreeGen)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
@@ -1046,9 +1047,11 @@ end
 ---------------------------------------------------------------------------
 -- Contract with SectionTrees / WoodService / WoodFX / CutController (M1.3):
 --   * FromSkeleton returns a Model tagged "Tree" (ModelStreamingMode
---     Atomic) whose PrimaryPart is section 1. Each section is a Block named
---     "Section" (tag "WoodSection", attribute Section = its id), its length
---     up the part's Y axis, bark-coloured (Wood, or SmoothPlastic / Concrete
+--     Atomic) whose PrimaryPart is section 1. Each section is a Cylinder named
+--     "Section" (tag "WoodSection", attribute Section = its id). Roblox puts a
+--     cylinder's length on local X; SectionMetrics.BlockFrame is the Y-up
+--     box (t, L, t) the cut, the price and the save still use. Bark-coloured
+--     (Wood, or SmoothPlastic / Concrete
 --     for the pale and glassy woods — TreeArt.BarkMaterial), anchored, colliding,
 --     queryable, untouchable, in collision group "Wood".
 --   * Everything else is dress: parts named Leaves, Frond or Facet (inside
@@ -1081,6 +1084,8 @@ TreeArt.NotchShade = -0.25
 -- t, so volume and price do not move. Anything that copies a section
 -- (WoodService's split) copies the mesh with it.
 TreeArt.RoundScale = 2 / math.sqrt(math.pi)
+-- Bark tiles every 4 studs. The attribute is what a mesh or a shader reads.
+TreeArt.BarkStuds = 4
 
 function TreeArt.Roundify(section: BasePart): SpecialMesh
 	local mesh = Instance.new("SpecialMesh")
@@ -1561,23 +1566,24 @@ function TreeArt.FromSkeleton(def: WoodDef, skel: Skeleton, opts: SkeletonOption
 		if only and not only[sec.id] then
 			continue
 		end
+		local logicalCf = sec.cf * CFrame.new(0, sec.length / 2, 0)
+		local logicalSize = Vector3.new(sec.thickness, sec.length, sec.thickness)
 		local p = Kit.part(
 			model,
 			"Section",
-			Vector3.new(sec.thickness, sec.length, sec.thickness),
-			sec.cf * CFrame.new(0, sec.length / 2, 0),
+			logicalSize,
+			logicalCf,
 			Kit.vary(paint.bark, rng, 0.04),
 			TreeArt.BarkMaterial(def)
 		)
+		SectionMetrics.ApplyBlockFrame(p, logicalCf, logicalSize)
 		p.CanCollide = true
 		p.CanQuery = true
 		p.CanTouch = false
 		p.CollisionGroup = TreeArt.WoodGroup
 		p:SetAttribute("Section", sec.id)
+		p:SetAttribute("BarkStuds", TreeArt.BarkStuds)
 		p:AddTag("WoodSection")
-		if sec.depth < skel.trunkSegments then
-			TreeArt.Roundify(p)
-		end
 		first = first or p
 		for _, d in ipairs(sec.dress) do
 			local parts = buildDress(model, def, paint, d)
@@ -1614,9 +1620,9 @@ function TreeArt.FromSkeleton(def: WoodDef, skel: Skeleton, opts: SkeletonOption
 	return model
 end
 
--- A section part's thickness (the square's side).
+-- A section part's thickness (the square's side, not the round diameter).
 local function widthOf(section: BasePart): number
-	return math.min(section.Size.X, section.Size.Z)
+	return SectionMetrics.SquareSide(section)
 end
 
 -- Anchored on a standing section, welded and massless on a loose one.
@@ -1634,11 +1640,11 @@ local function ride(p: BasePart, section: BasePart)
 end
 
 -- What a cut face and a notch look like: the wood's core colour on plain
--- WoodPlanks, never Neon, Ice or Foil (a glowing stump face is not wanted).
+-- Wood, never Neon, Ice or Foil (a glowing stump face is not wanted).
 -- TreeArt.Core is untouched: buildings and the wood effects read it.
 function TreeArt.FaceLook(def: WoodDef): (Color3, Enum.Material)
 	local color = TreeArt.Core(def)
-	return color, Enum.Material.WoodPlanks
+	return color, Enum.Material.Wood
 end
 
 -- The fresh face on one end of a cut section (`top` = its +Y end): a thin
@@ -1649,9 +1655,11 @@ end
 -- can't be queried.
 function TreeArt.CutFace(def: WoodDef, section: BasePart, top: boolean): Part
 	local color, material = TreeArt.FaceLook(def)
-	local t = widthOf(section) * TreeArt.CutFaceInset
+	local frame, size = SectionMetrics.BlockFrame(section)
+	local side = math.min(size.X, size.Z)
+	local t = side * TreeArt.CutFaceInset
 	local th = TreeArt.CutFaceThickness
-	local y = (section.Size.Y / 2 + TreeArt.CutFaceProud - th / 2) * (if top then 1 else -1)
+	local y = (size.Y / 2 + TreeArt.CutFaceProud - th / 2) * (if top then 1 else -1)
 	local end_ = if top then "Top" else "Bottom"
 	local home = section.Parent
 	local id = section:GetAttribute("Section")
@@ -1662,21 +1670,29 @@ function TreeArt.CutFace(def: WoodDef, section: BasePart, top: boolean): Part
 			end
 		end
 	end
-	local p = Kit.part(
-		section.Parent or section,
-		"CutFace",
-		Vector3.new(t, th, t),
-		section.CFrame * CFrame.new(0, y, 0),
-		color,
-		material
-	)
+	local at = frame * CFrame.new(0, y, 0)
+	local p: Part
+	if SectionMetrics.IsCylinder(section) then
+		local dia = SectionMetrics.Diameter(side) * TreeArt.CutFaceInset
+		p = Kit.cylinder(
+			section.Parent or section,
+			"CutFace",
+			th,
+			dia,
+			at * CFrame.Angles(0, 0, math.pi / 2),
+			color,
+			material
+		)
+	else
+		p = Kit.part(section.Parent or section, "CutFace", Vector3.new(t, th, t), at, color, material)
+		if section:FindFirstChildOfClass("SpecialMesh") then
+			TreeArt.Roundify(p) -- a round trunk's end is a round plate
+		end
+	end
 	p.CanCollide = false
 	p.CanQuery = false
 	p.CanTouch = false
 	p.CastShadow = false
-	if section:FindFirstChildOfClass("SpecialMesh") then
-		TreeArt.Roundify(p) -- a round trunk's end is a round plate
-	end
 	p:SetAttribute("Section", section:GetAttribute("Section"))
 	p:SetAttribute("End", end_)
 	p.Massless = true
@@ -1707,11 +1723,12 @@ function TreeArt.Notch(
 	required: number
 ): Part
 	local color, material = TreeArt.FaceLook(def)
-	local cf = section.CFrame
+	local cf, frameSize = SectionMetrics.BlockFrame(section)
+	local length = frameSize.Y
 	local lx, lz = cf.XVector:Dot(normal), cf.ZVector:Dot(normal)
 	local t = widthOf(section)
 	local depth = TreeArt.NotchDepth(t, damage, required)
-	local y = math.clamp(height, 0, section.Size.Y) - section.Size.Y / 2
+	local y = math.clamp(height, 0, length) - length / 2
 	local size: Vector3
 	local at: Vector3
 	-- A stump's hitbox is a square box round a round, tapering stump: its
@@ -1726,15 +1743,15 @@ function TreeArt.Notch(
 	if type(stumpBase) == "number" then
 		r0 = stumpBase
 		r1 = if type(stumpTop) == "number" then stumpTop else stumpBase
-	elseif section:FindFirstChildOfClass("SpecialMesh") then
-		r0 = t / 2 * TreeArt.RoundScale
+	elseif SectionMetrics.IsRound(section) or section:FindFirstChildOfClass("SpecialMesh") then
+		r0 = StumpLogic.RoundRadius(t)
 		r1 = r0
 	end
 	if r0 and r1 then
 		-- A round trunk or stump: the notch follows its surface (the radius
 		-- there, a strip as wide as the chord it has cut), so it never
-		-- hangs off the corners of the square block round it.
-		local u = if section.Size.Y > 0 then math.clamp(height / section.Size.Y, 0, 1) else 0
+		-- hangs off the corners of the square it used to be.
+		local u = if length > 0 then math.clamp(height / length, 0, 1) else 0
 		reach = r0 + (r1 - r0) * u
 		local into = math.clamp(depth, 0, reach)
 		width = math.max(0.15, 2 * math.sqrt(math.max(0, reach * reach - (reach - into) ^ 2)))

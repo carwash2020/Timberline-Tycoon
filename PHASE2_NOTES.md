@@ -1,5 +1,18 @@
 # Phase 2+ build notes
 
+## T410 round bark logs (27 October 2026, branch `cursor/t410-round-bark-logs-bc65`)
+
+Nothing here has been seen in Studio. Cloud tests do not run physics. The live fall and a CargoLock drive are playtest (`FallLogic.LiveFall`, `CargoLock.LiveDrive`). Before and after renders of the part-built fallback are in `preview/t410/before` and `preview/t410/after` (`oak`, `birch`, `oak-end`, `silhouette`, plus `oak-end-phone` in after). In game, oak and birch section meshes replace that fallback when they load.
+
+Studio checks:
+1. Chop an oak in the starter grove, then a birch. The notch is where the axe hits, not a lied height. The tree tips toward that face and is down in about 1 to 2 seconds. Nine of ten falls match the cut face.
+2. The log is round, bark-covered, and shows a wood-coloured core ring on the cut. It is not a square block and the cut face is not Neon. Oak bark reads #7A5230 with leaf #5DA24A and core #E2BE84. Birch bark reads #D8D2C4 with leaf #A6CE5C and core #F1E3C2.
+3. Drag the log, set it on the Rustbucket, and drive about 200 studs with two turns on a T409 slope. It stays in the bed (CargoLock). A rolled log does not suddenly overhang.
+4. A cut under 2.5 studs leaves no stump. A cut at or above 2.5 leaves one T420 stump (the existing sleeves), which weathers and returns to a sapling. Cutting the stump again frees a log and leaves a shorter stump until it is gone. The stump cannot be dragged or sold.
+5. Mill the log and sell the wood. Cash moves only through the usual sell. Prices match the old square-side volume.
+6. Tool Shed, General Store, Dealership, vehicles, axes, NPCs, the gate lodge door and the T408 centres are unchanged. WorldHalf is still 1350.
+7. Phone (667×375): the cut-end ring is readable. The chop still lands where you aim.
+
 ## T409 living ground (27 October 2026, branch `cursor/t409-terrain-86a7`)
 
 Nothing here has been seen in Studio. Cloud tests sample `HeightAt` and materials only; they do not run physics. No cliff MeshIds were uploaded, so there is no part-built cliff. The roadside stamps reuse the prop kit and are not trees you can cut.

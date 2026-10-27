@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `92555e3` (#211).**
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `c62b2c3` (#270, T409).** This branch is T410.
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
 (#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
@@ -17,7 +17,15 @@ GrabService spec fix; #147 launch settings; #148 and #149 hardening; #150 client
 first screen fix; #153 startup errors; #154 server audit (staged terrain, save prefetch); #155 client freeze; #156 meshes never
 block the build; #157 client audit; #158 world first look; #159 store interiors: the kit, Tool Shed, Hearth & Home, Sparkworks and Dealership (#160 to #162 squashed in).
 
-**Still open:** T409 (this branch) builds the river-valley ground. Older "only this branch" notes below are history.
+**Still open:** T410 (this branch) makes oak and birch fall as round bark logs. T409 is on main (#270). Older "only this branch" notes below are history.
+
+## T410 round bark logs (27 October 2026, branch `cursor/t410-round-bark-logs-bc65`)
+
+Starter trees cut where the axe hits and fall toward the notch (`StumpLogic.FallDirection`). Every wood section is a round log: a Cylinder along local X, or a MeshPart once its mesh loads. Gameplay, prices and saves stay on the logical Y-up frame `(side, length, side)` in `SectionMetrics`. A priced volume is still `side² × length`. No WoodData size or price changed. Planks stay Blocks. The stump is the existing T420 kit: no stump under `MinHeight` 2.5, and a cut at or above that leaves one stump. Cut faces are the core colour on `Enum.Material.Wood` (lumenwood's `Core` itself stays Neon). Oak and birch bark stay Wood, not SmoothPlastic.
+
+`FallLogic.LiveFall` and `CargoLock.LiveDrive` are `"playtest"`. Cloud cannot run the fall or a truck drive. The pure specs cover the notch ray, the Block ban, volume, the stump, MeshId (no part fallback), the 20k triangle cap, and a round log's bed share when it rolls. A live oak or birch section stays a Y-up MeshPart `(t, L, t)`. `SectionMetrics.CargoPose` hands the bed a cylinder of size `(L, d, d)` with `d = 2 * RoundRadius(t)`, so the lock uses that diameter and a roll does not shrink its share. A resting log is kinematic: it sits on the ground or the river bed and does not sink (`FallLogic.WaterPolicy = "drag"`).
+
+MustKeep, `WorldLayout.WorldHalf` (1350), the gate lodge door, T408 centres and `StoreData.CreatorIds` are untouched. Near the spawn (70 studs) the grove is still oak only. The part-built before and after shots are `preview/t410/before` and `preview/t410/after`. Studio checks: PHASE2_NOTES.md "T410 round bark logs". Nothing here has been seen in Studio.
 
 ## T409 living ground (27 October 2026, branch `cursor/t409-terrain-86a7`)
 

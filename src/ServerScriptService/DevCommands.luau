@@ -10,8 +10,9 @@
 --                               name), `length` studs long (default: the
 --                               wood's whole trunk)
 -- The pieces are v2-style loose wood, like the ones a felled tree leaves:
--- a Model "Wood_<uid>" tagged Wood under TimberlineMap/Wood, one block
--- section (its length along Y) with a cut face at each end in the wood's
+-- a Model "Wood_<uid>" tagged Wood under TimberlineMap/Wood, one round
+-- section (a Cylinder, length along local X; the priced size stays
+-- thickness by length by thickness) with a cut face at each end in the wood's
 -- core colour, unanchored, CustomPhysicalProperties(WoodDensity,
 -- WoodFriction, WoodElasticity), and the attributes Uid, Owner (you),
 -- WoodId, Kind, Volume (u³), Value ($), HeldBy. WoodService files them
@@ -29,7 +30,9 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Tune = require(ReplicatedStorage.Shared.Tune)
 local Util = require(ReplicatedStorage.Shared.Util)
+local SectionMetrics = require(ReplicatedStorage.Shared.SectionMetrics)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local GrabService = require(script.Parent.GrabService)
 local WoodService = require(script.Parent.WoodService)
 
@@ -147,7 +150,6 @@ end
 function DevCommands.Build(spec: PieceSpec, ownerId: number, uid: string): Model
 	local wood = WoodData.Get(spec.woodId)
 	assert(wood and wood.v2, "[DevCommands] no v2 wood " .. spec.woodId)
-	local v2 = wood.v2
 	local t, length = spec.thickness, spec.length
 	local physics = PhysicalProperties.new(
 		Tune.Get("WoodDensity") :: number,
@@ -170,27 +172,12 @@ function DevCommands.Build(spec: PieceSpec, ownerId: number, uid: string): Model
 	section.CustomPhysicalProperties = physics
 	section:SetAttribute("Section", 1)
 	section.Parent = model
+	model:SetAttribute("Kind", "log")
 	model.PrimaryPart = section
-	local material = (Enum.Material :: any)[v2.coreMaterial] or Enum.Material.Wood
-	for _, side in ipairs({ 1, -1 }) do
-		local face = Instance.new("Part")
-		face.Name = "CutFace"
-		face.Size = Vector3.new(0.86 * t, 0.06, 0.86 * t)
-		face.CFrame = CFrame.new(0, side * (length / 2 + 0.03), 0)
-		face.Material = material
-		face.Color = Color3.fromHex(v2.core)
-		face.Anchored = false
-		face.Massless = true
-		face.CanCollide = false
-		face.CanQuery = false
-		face.CanTouch = false
-		face.CastShadow = false
-		face.Parent = model
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = section
-		weld.Part1 = face
-		weld.Parent = face
-	end
+	SectionMetrics.ApplyBlockFrame(section, CFrame.identity, Vector3.new(t, length, t))
+	section:SetAttribute("BarkStuds", TreeArt.BarkStuds)
+	TreeArt.CutFace(wood, section, true)
+	TreeArt.CutFace(wood, section, false)
 	local volume, value = DevCommands.Worth(spec)
 	CollectionService:AddTag(model, "Wood")
 	model:SetAttribute("Uid", uid)

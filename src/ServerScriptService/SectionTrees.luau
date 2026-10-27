@@ -74,6 +74,7 @@ local GrowLogic = require(ReplicatedStorage.Shared.GrowLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
+local SectionMetrics = require(ReplicatedStorage.Shared.SectionMetrics)
 local StumpLogic = require(ReplicatedStorage.Shared.StumpLogic)
 local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
@@ -531,7 +532,8 @@ local function trunkTop(rec: TreeRecord): Vector3?
 	if not best then
 		return nil
 	end
-	return (best.CFrame * CFrame.new(0, best.Size.Y / 2, 0)).Position
+	local cf, size = SectionMetrics.BlockFrame(best)
+	return (cf * CFrame.new(0, size.Y / 2, 0)).Position
 end
 
 -- A tree registered before its meshes loaded is part-built; when they land
@@ -578,7 +580,7 @@ local function resync(rec: TreeRecord)
 	end
 	local first = rec.sections[1]
 	if first then
-		rec.radius = math.min(first.Size.X, first.Size.Z) / 2
+		rec.radius = SectionMetrics.SquareSide(first) / 2
 		model:SetAttribute("TrunkRadius", rec.radius)
 	end
 	model:SetAttribute("SwayTop", trunkTop(rec))
@@ -637,7 +639,7 @@ local function rebuild(rec: TreeRecord, grew: boolean)
 	rec.pivot = pivot
 	model:SetAttribute("HomePivot", pivot)
 	local first = rec.sections[1]
-	local thickness = if first then math.min(first.Size.X, first.Size.Z) else 0.4
+	local thickness = if first then SectionMetrics.SquareSide(first) else 0.4
 	rec.radius = thickness / 2
 	local hardness = if def.v2 then def.v2.hardness else def.hardness
 	rec.maxHp = SectionLogic.Required(hardness, thickness, thickness)
@@ -1146,13 +1148,15 @@ local function makeStump(rec: TreeRecord, sid: number, now: number, height: numb
 		if #segs == 0 then
 			for _, cid in ipairs(chain) do
 				local cp = rec.sections[cid]
-				table.insert(segs, { length = cp.Size.Y, thickness = math.min(cp.Size.X, cp.Size.Z) })
+				local _, sz = SectionMetrics.BlockFrame(cp)
+				table.insert(segs, { length = sz.Y, thickness = math.min(sz.X, sz.Z) })
 			end
 		end
 		for _, cid in ipairs(chain) do
-			total += rec.sections[cid].Size.Y
+			total += SectionMetrics.Length(rec.sections[cid])
 		end
-		bottom = root.CFrame * CFrame.new(0, -root.Size.Y / 2, 0)
+		local rootCf, rootSize = SectionMetrics.BlockFrame(root)
+		bottom = rootCf * CFrame.new(0, -rootSize.Y / 2, 0)
 		-- Everything rooted above the root section folds into it.
 		for _, cid in ipairs(chain) do
 			WoodService.ClearCuts(rec, cid)
@@ -1179,8 +1183,7 @@ local function makeStump(rec: TreeRecord, sid: number, now: number, height: numb
 	-- The hitbox keeps the old square side (the cut maths and the volume);
 	-- the stump itself is round (shape.baseRadius, StumpBase on the hitbox).
 	local side = segs[1].thickness
-	hitbox.Size = Vector3.new(side, total, side)
-	hitbox.CFrame = bottom * CFrame.new(0, total / 2, 0)
+	SectionMetrics.ApplyBlockFrame(hitbox, bottom * CFrame.new(0, total / 2, 0), Vector3.new(side, total, side))
 	hitbox.Transparency = 1
 	hitbox.CanCollide = false
 	hitbox:SetAttribute("StumpBase", shape.baseRadius)
@@ -1330,7 +1333,8 @@ local function split(
 	end
 	-- Where it is cut (the tree tips from here) and the face that was cut
 	-- (the tree falls toward it).
-	local pivotAt = (part.CFrame * CFrame.new(0, -part.Size.Y / 2 + cutAt, 0)).Position
+	local cutCf, cutSize = SectionMetrics.BlockFrame(part)
+	local pivotAt = (cutCf * CFrame.new(0, -cutSize.Y / 2 + cutAt, 0)).Position
 	local mark = rec.marks[hit.cut]
 	local faceNormal = if mark then mark.normal else nil
 	-- Below StumpLogic.MinHeight a felling leaves no stump: the whole tree drops.
@@ -1658,12 +1662,20 @@ local function chopChecked(
 		piece = p
 		def = p.def
 	end
+	local frame, frameSize = SectionMetrics.BlockFrame(target)
+	if not SectionLogic.InBox(frame, frameSize, at) then
+		return false, "bad", nil
+	end
+	-- The notch is where the server's ray from the eyes meets the section.
+	-- A lied client height inside the box does not move it.
+	local rayHit = SectionLogic.RayHit(eyeOf(char, hrp), at, frame, frameSize)
+	if not rayHit then
+		return false, "bad", nil
+	end
+	at = rayHit
 	if not ((hrp.Position - at).Magnitude <= stats.range + GameConfig.RangeTolerance) then
 		notify(player, SectionLogic.Message("far"))
 		return false, "far", nil
-	end
-	if not SectionLogic.InBox(target.CFrame, target.Size, at) then
-		return false, "bad", nil
 	end
 	if not canSee(char, eyeOf(char, hrp), at, target) then
 		notify(player, SectionLogic.Message("noLOS"))

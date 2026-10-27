@@ -273,6 +273,7 @@ return function(t)
 			local ShopLogic = loader:shared("ShopLogic")
 			local SellLogic = loader:shared("SellLogic")
 			local SectionLogic = loader:shared("SectionLogic")
+			local SectionMetrics = loader:shared("SectionMetrics")
 			local GameConfig = loader:shared("GameConfig")
 			local SawmillLogic = loader:shared("SawmillLogic")
 			local GrabLogic = loader:shared("GrabLogic")
@@ -482,7 +483,8 @@ return function(t)
 				repeat
 					swings += 1
 					s.now += 0.7
-					local hit, normal = SectionLogic.AimAt(base.CFrame, base.Size, root.Position, nil, nil)
+					local frame, frameSize = SectionMetrics.BlockFrame(base)
+					local hit, normal = SectionLogic.AimAt(frame, frameSize, root.Position, nil, nil)
 					local accepted, why, outcome = Trees.Chop(player, base, hit, normal)
 					need(accepted, "swing " .. swings .. " refused: " .. tostring(why))
 					freed = outcome and outcome.freed[1]
@@ -515,7 +517,8 @@ return function(t)
 				local through = false
 				for _ = 1, 160 do
 					s.now += 0.7
-					local hit, normal = SectionLogic.AimAt(forkPart.CFrame, forkPart.Size, root.Position, nil, nil)
+					local frame, frameSize = SectionMetrics.BlockFrame(forkPart)
+					local hit, normal = SectionLogic.AimAt(frame, frameSize, root.Position, nil, nil)
 					local accepted, why, outcome = Trees.Chop(player, forkPart, hit, normal)
 					need(accepted, "a swing under the limbs was refused: " .. tostring(why))
 					cuts += 1
@@ -841,7 +844,8 @@ return function(t)
 				local freed
 				for _ = 1, 120 do
 					s.now += 0.7
-					local hit, normal = SectionLogic.AimAt(base.CFrame, base.Size, root.Position, nil, nil)
+					local frame, frameSize = SectionMetrics.BlockFrame(base)
+					local hit, normal = SectionLogic.AimAt(frame, frameSize, root.Position, nil, nil)
 					local accepted, _, outcome = Trees.Chop(player, base, hit, normal)
 					freed = outcome and outcome.freed[1]
 					if freed or not accepted then
@@ -923,7 +927,8 @@ return function(t)
 						local base = rec.sections[1]
 						for _ = 1, 120 do
 							s.now += 0.7
-							local hit, normal = SectionLogic.AimAt(base.CFrame, base.Size, root.Position, nil, nil)
+							local frame, frameSize = SectionMetrics.BlockFrame(base)
+							local hit, normal = SectionLogic.AimAt(frame, frameSize, root.Position, nil, nil)
 							local accepted, _, outcome = Trees.Chop(player, base, hit, normal)
 							if outcome and #outcome.freed > 0 then
 								for _, freed in ipairs(outcome.freed) do

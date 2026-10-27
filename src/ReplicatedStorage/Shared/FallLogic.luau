@@ -13,6 +13,12 @@ FallLogic.MaxSpin = 2.2 -- rad/s: the fastest a trunk may turn while it falls
 FallLogic.MaxSpeed = 45 -- studs/s: the fastest any part of it may travel
 FallLogic.LiftGap = 0.06 -- studs: a freed trunk starts this far above its stump
 FallLogic.CapSec = 6 -- how long the caps are held
+-- Live topple (tip, thud, settle on a grade) is a Studio playtest. These
+-- rules only place the rested trunk: on the ground, not in it.
+FallLogic.LiveFall = "playtest"
+-- A log in the river is dragged out or despawns with the other loose wood.
+-- Nothing here floats it.
+FallLogic.WaterPolicy = "drag"
 
 -- The first spin: impulse / reach, never above `maxSpin`.
 function FallLogic.StartSpin(impulse: number, reach: number, maxSpin: number?): number
@@ -45,6 +51,50 @@ function FallLogic.Capped(linear: Vector3, angular: Vector3): (Vector3?, Vector3
 		return nil
 	end
 	return FallLogic.Clamp(linear, FallLogic.MaxSpeed), FallLogic.Clamp(angular, FallLogic.MaxSpin)
+end
+
+local function flatUnit(dir: Vector3): Vector3
+	local flat = Vector3.new(dir.X, 0, dir.Z)
+	if flat.Magnitude < 1e-6 then
+		return Vector3.xAxis
+	end
+	return flat.Unit
+end
+
+-- Where the trunk's centre rests: axis horizontal along `dir`, butt at
+-- `butt`'s XZ, underside touching `groundY` (centre one radius up).
+function FallLogic.RestCentre(butt: Vector3, length: number, radius: number, dir: Vector3, groundY: number): Vector3
+	return Vector3.new(butt.X, groundY + radius, butt.Z) + flatUnit(dir) * (length / 2)
+end
+
+-- True when the cylinder is not through the ground (touching is clear).
+function FallLogic.ClearsGround(centre: Vector3, radius: number, groundY: number): boolean
+	return centre.Y + 1e-6 >= groundY + radius
+end
+
+-- Same rest on a tilted plane: the axis lies in the plane, the centre is
+-- one radius along the normal. `butt` is the cut end, already on the plane
+-- in the tests; a butt off the plane is dropped onto it first.
+function FallLogic.RestOnPlane(
+	butt: Vector3,
+	length: number,
+	radius: number,
+	dir: Vector3,
+	planePoint: Vector3,
+	planeNormal: Vector3
+): Vector3
+	local n = planeNormal.Unit
+	local flat = dir - n * dir:Dot(n)
+	if flat.Magnitude < 1e-4 then
+		flat = n:Cross(Vector3.yAxis)
+		if flat.Magnitude < 1e-4 then
+			flat = n:Cross(Vector3.xAxis)
+		end
+	end
+	flat = flat.Unit
+	local mid = butt + flat * (length / 2)
+	local onPlane = mid - n * (mid - planePoint):Dot(n)
+	return onPlane + n * radius
 end
 
 return FallLogic

@@ -52,6 +52,7 @@ local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
+local SectionMetrics = require(ReplicatedStorage.Shared.SectionMetrics)
 local CameraShake = require(script.Parent.CameraShake)
 local ChopHaptics = require(script.Parent.ChopHaptics)
 local Quality = require(script.Parent.Quality)
@@ -1156,7 +1157,8 @@ local function onWorldFX(kind: string, payload: any)
 			-- A trunk is coming down: creak, crack and whoosh (the thud is "Felled").
 			local mass = 40
 			if typeof(part) == "Instance" and part:IsA("BasePart") then
-				mass = part.Size.X * part.Size.Y * part.Size.Z
+				local _, massSize = SectionMetrics.BlockFrame(part)
+				mass = massSize.X * massSize.Y * massSize.Z
 			end
 			if not predicted then
 				SoundData.PlayAt("ChopFinal", pos, ChopFeelLogic.ThunkPitch(progress))
@@ -1304,8 +1306,11 @@ local function spring(tree: Model)
 	end
 	springing[tree] = true
 	local home = tree:GetPivot()
-	local half = root.Size.Y / 2
-	local foot = home * CFrame.new(0, -half, 0)
+	local logical, logicalSize = SectionMetrics.BlockFrame(root)
+	local half = logicalSize.Y / 2
+	local foot = logical * CFrame.new(0, -half, 0)
+	-- A cylinder's pivot is the logical frame turned onto X. Keep that turn.
+	local extra = logical:ToObjectSpace(home)
 	task.spawn(function()
 		local t = 0
 		while t < WoodFX.SpringTime do
@@ -1314,7 +1319,7 @@ local function spring(tree: Model)
 			end
 			local s = WoodFX.SpringScale(t / WoodFX.SpringTime)
 			tree:ScaleTo(s)
-			tree:PivotTo(foot * CFrame.new(0, half * s, 0))
+			tree:PivotTo(foot * CFrame.new(0, half * s, 0) * extra)
 			t += RunService.Heartbeat:Wait()
 		end
 		if tree.Parent then

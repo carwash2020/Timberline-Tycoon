@@ -40,6 +40,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
+local SectionMetrics = require(ReplicatedStorage.Shared.SectionMetrics)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local EditRights = require(script.Parent.EditRights)
@@ -119,11 +120,12 @@ local function viewOf(piece: Piece): SawmillLogic.PieceView
 	local sections: { SawmillLogic.Section } = {}
 	for id, part in pairs(piece.parts) do
 		local node = piece.nodes[id]
+		local cf, size = SectionMetrics.BlockFrame(part)
 		table.insert(sections, {
-			length = part.Size.Y,
-			sx = part.Size.X,
-			sz = part.Size.Z,
-			dir = part.CFrame.UpVector,
+			length = size.Y,
+			sx = size.X,
+			sz = size.Z,
+			dir = cf.UpVector,
 			children = if node then #node.children else 0,
 			root = node == nil or node.parent == nil,
 		})
@@ -196,7 +198,7 @@ end
 local function lengthOf(piece: Piece): number
 	local n = 0
 	for _, part in pairs(piece.parts) do
-		n += part.Size.Y
+		n += SectionMetrics.Length(part)
 	end
 	return math.max(n, 0.2)
 end
@@ -204,7 +206,10 @@ end
 local function radiusOf(piece: Piece): number
 	local r = 0.2
 	for _, part in pairs(piece.parts) do
-		r = math.max(r, math.min(part.Size.X, part.Size.Z) / 2)
+		local visual = if SectionMetrics.IsRound(part)
+			then SectionMetrics.Radius(part)
+			else math.min(part.Size.X, part.Size.Z) / 2
+		r = math.max(r, visual)
 	end
 	return r
 end

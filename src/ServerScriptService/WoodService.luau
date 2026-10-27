@@ -7,8 +7,10 @@
 -- A piece is a Model "Wood_<uid>" under TimberlineMap/Wood, tagged Wood,
 -- Atomic. Its PrimaryPart is its largest section; every other part is
 -- welded (WeldConstraint) to it and nothing is anchored. Sections are
--- Blocks named "Section" (tag WoodSection, attribute Section = its id,
--- length along Y) with CustomPhysicalProperties(WoodDensity,
+-- round logs named "Section" (tag WoodSection, attribute Section = its
+-- id). A Part is a Cylinder along local X; gameplay, prices and saves use
+-- the logical Y-up frame (side, length, side) from SectionMetrics.
+-- CustomPhysicalProperties(WoodDensity,
 -- WoodFriction, WoodElasticity); everything else (cut faces, notches,
 -- bark details, clues, leaves until they drop) is massless dress riding a
 -- section (attribute Section). Attributes, for display only: Uid, Owner
@@ -21,7 +23,7 @@
 --
 --   * Adopt(model, info): a component a cut just freed from a standing tree
 --     (SectionTrees). Welded, unanchored, given its physics and its record.
---     A felled trunk tips away from the cutter (info.fall): turned a few
+--     A felled trunk tips toward the cut face (info.fall): turned a few
 --     degrees over its far edge and set spinning that way, its device the
 --     cutter's for FellOwnerSec, in collision group WoodFalling (no
 --     players) for FallNoCollideSec, its leaves gone after LeafDropSec
@@ -61,6 +63,7 @@ local FallenLogic = require(ReplicatedStorage.Shared.FallenLogic)
 local FallLogic = require(ReplicatedStorage.Shared.FallLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
+local SectionMetrics = require(ReplicatedStorage.Shared.SectionMetrics)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local Tune = require(ReplicatedStorage.Shared.Tune)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -164,7 +167,7 @@ export type Piece = {
 -- What SectionTrees knows about a component it freed.
 export type Fall = {
 	cutter: Player?, -- its device simulates the fall
-	dir: Vector3, -- flat: the way it falls (away from the cutter)
+	dir: Vector3, -- flat: the way it falls (toward the cut face)
 	felled: boolean, -- a trunk (tip it over its far edge) or a limb (let it drop)
 	pivot: Vector3?, -- felled: the cut's centre, where it tips from
 }
@@ -346,14 +349,16 @@ local function partsIn(model: Model): number
 end
 
 -- A live section part as SectionLogic's Node (its bottom centre, Y up).
+-- The logical frame is Y-up even when the part is a cylinder along X.
 local function liveNode(id: number, part: BasePart, node: Node): SectionLogic.Node
+	local cf, size = SectionMetrics.BlockFrame(part)
 	return {
 		id = id,
 		parent = node.parent,
 		children = table.clone(node.children),
-		cf = part.CFrame * CFrame.new(0, -part.Size.Y / 2, 0),
-		length = part.Size.Y,
-		thickness = math.min(part.Size.X, part.Size.Z),
+		cf = cf * CFrame.new(0, -size.Y / 2, 0),
+		length = size.Y,
+		thickness = math.min(size.X, size.Z),
 	}
 end
 
@@ -495,7 +500,8 @@ end
 local function worth(p: Piece): (number, number)
 	local volume = 0
 	for _, part in pairs(p.parts) do
-		volume += SectionLogic.Volume(part.Size.X, part.Size.Y, part.Size.Z)
+		local _, size = SectionMetrics.BlockFrame(part)
+		volume += SectionLogic.Volume(size.X, size.Y, size.Z)
 	end
 	return volume, SellLogic.PieceValue(p.woodId, p.kind, volume, p.figure, p.boost, p.lux, p.mill, p.board, p.temper)
 end
@@ -505,7 +511,10 @@ end
 function WoodService.MassOf(p: Piece): number
 	local studs = 0
 	for _, part in pairs(p.parts) do
-		studs += part.Size.X * part.Size.Y * part.Size.Z
+		-- A cylinder's engine mass is pi*r^2*L, which RoundRadius makes equal
+		-- to the logical t^2*L. The part's box product is larger.
+		local _, size = SectionMetrics.BlockFrame(part)
+		studs += size.X * size.Y * size.Z
 	end
 	return studs * (Tune.Get("WoodDensity") :: number)
 end
@@ -875,7 +884,7 @@ local function reachOf(p: Piece): number
 	local most = 0
 	local at = p.root.CFrame.Position
 	for _, part in pairs(p.parts) do
-		local d = (part.CFrame.Position - at).Magnitude + part.Size.Y / 2
+		local d = (part.CFrame.Position - at).Magnitude + SectionMetrics.Length(part) / 2
 		most = math.max(most, d)
 	end
 	return math.max(1, most)
@@ -960,7 +969,9 @@ function WoodService.Adopt(model: Model, info: Info): Piece
 		local dir = Vector3.new(fall.dir.X, 0, fall.dir.Z)
 		if dir.Magnitude > 1e-6 then
 			dir = dir.Unit
-			local half = math.min(root.Size.X, root.Size.Z) / 2
+			local half = if SectionMetrics.IsCylinder(root)
+				then SectionMetrics.Radius(root)
+				else math.min(root.Size.X, root.Size.Z) / 2
 			local edge = fall.pivot + dir * half
 			local axis = Vector3.new(0, 1, 0):Cross(dir)
 			local turn = CFrame.new(0, FallLogic.LiftGap, 0)
@@ -995,12 +1006,14 @@ WoodService.ContactSlack = 0.15
 -- Whether box `b` reaches box `a`: b's centre within b's own largest half
 -- extent (plus slack) of a's box, in a's frame.
 local function reaches(a: BasePart, b: BasePart): boolean
-	local half = a.Size / 2
-	local rel = a.CFrame:PointToObjectSpace(b.CFrame.Position)
+	local acf, asize = SectionMetrics.BlockFrame(a)
+	local bcf, bsize = SectionMetrics.BlockFrame(b)
+	local half = asize / 2
+	local rel = acf:PointToObjectSpace(bcf.Position)
 	local dx = math.max(0, math.abs(rel.X) - half.X)
 	local dy = math.max(0, math.abs(rel.Y) - half.Y)
 	local dz = math.max(0, math.abs(rel.Z) - half.Z)
-	local reach = math.max(b.Size.X, b.Size.Y, b.Size.Z) / 2 + WoodService.ContactSlack
+	local reach = math.max(bsize.X, bsize.Y, bsize.Z) / 2 + WoodService.ContactSlack
 	return dx * dx + dy * dy + dz * dz <= reach * reach
 end
 
@@ -1170,8 +1183,9 @@ function WoodService.ApplyHit(
 	damage: number,
 	userId: number
 ): Hit
-	local length = part.Size.Y
-	local localY = part.CFrame:PointToObjectSpace(hitPos).Y
+	local frame, size = SectionMetrics.BlockFrame(part)
+	local length = size.Y
+	local localY = frame:PointToObjectSpace(hitPos).Y
 	local h = SectionLogic.ClampHeight(localY, length)
 	local list = holder.cuts[sectionId]
 	if not list then
@@ -1194,11 +1208,11 @@ function WoodService.ApplyHit(
 	end
 	local mark = holder.marks[cut]
 	if not mark then
-		mark = { normal = SectionLogic.SideFacing(part.CFrame, normal), notch = nil }
+		mark = { normal = SectionLogic.SideFacing(frame, normal), notch = nil }
 		holder.marks[cut] = mark
 	end
 	local hardness = if def.v2 then def.v2.hardness else def.hardness
-	local required = SectionLogic.Required(hardness, part.Size.X, part.Size.Z)
+	local required = SectionLogic.Required(hardness, size.X, size.Z)
 	local through = SectionLogic.IsThrough(cut, required)
 	local old = mark.notch
 	if old then
@@ -1252,8 +1266,15 @@ local function copySection(s: BasePart): Part
 	p.CollisionGroup = s.CollisionGroup
 	p.CustomPhysicalProperties = s.CustomPhysicalProperties
 	p.Massless = s.Massless
+	if s:IsA("Part") then
+		p.Shape = s.Shape
+	end
+	local side = s:GetAttribute(SectionMetrics.SquareSideAttr)
+	if type(side) == "number" then
+		p:SetAttribute(SectionMetrics.SquareSideAttr, side)
+	end
 	CollectionService:AddTag(p, WoodService.SectionTag)
-	-- A round trunk (TreeArt.Roundify) stays round when it is cut.
+	-- A round trunk (TreeArt.Roundify, or a real cylinder) stays round when it is cut.
 	for _, child in ipairs(s:GetChildren()) do
 		if child:IsA("SpecialMesh") then
 			child:Clone().Parent = p
@@ -1272,16 +1293,25 @@ local HIT_DRESSING: { [string]: boolean } = { Notch = true, Chip = true, HitMark
 -- riding `s` above the cut rides the new part now; its notches go (the
 -- cut that made them is done). Returns the new part.
 function WoodService.SplitPart(s: BasePart, h: number, newId: number): BasePart
-	local length = s.Size.Y
+	local cf, size = SectionMetrics.BlockFrame(s)
+	local length = size.Y
 	local cut = math.clamp(h, 0, length)
-	local cf = s.CFrame
 	local sid = sectionOf(s)
 	local high = copySection(s)
-	high.Size = Vector3.new(s.Size.X, length - cut, s.Size.Z)
-	high.CFrame = cf * CFrame.new(0, cut / 2, 0)
+	local bottomSize = Vector3.new(size.X, cut, size.Z)
+	local topSize = Vector3.new(size.X, length - cut, size.Z)
+	local bottomCf = cf * CFrame.new(0, -(length - cut) / 2, 0)
+	local topCf = cf * CFrame.new(0, cut / 2, 0)
 	high:SetAttribute("Section", newId)
-	s.Size = Vector3.new(s.Size.X, cut, s.Size.Z)
-	s.CFrame = cf * CFrame.new(0, -(length - cut) / 2, 0)
+	if SectionMetrics.IsCylinder(s) or s:IsA("MeshPart") then
+		SectionMetrics.ApplyBlockFrame(s, bottomCf, bottomSize)
+		SectionMetrics.ApplyBlockFrame(high, topCf, topSize)
+	else
+		s.Size = bottomSize
+		s.CFrame = bottomCf
+		high.Size = topSize
+		high.CFrame = topCf
+	end
 	local parent = s.Parent
 	if parent and sid then
 		for _, item in ipairs(parent:GetChildren()) do

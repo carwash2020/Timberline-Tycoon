@@ -21,6 +21,13 @@ return function(t)
 	local Vector3, CFrame, Instance, Color3, Enum =
 		roblox.Vector3, roblox.CFrame, roblox.Instance, roblox.Color3, roblox.Enum
 	local StumpLogic = t.shared("StumpLogic")
+	local SectionMetrics = t.load("ReplicatedStorage/Shared/SectionMetrics")
+	local function secLen(part)
+		return SectionMetrics.Length(part)
+	end
+	local function secSide(part)
+		return SectionMetrics.SquareSide(part)
+	end
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
 	local StumpMeshIds = t.shared("StumpMeshIds")
 	local TreeGen = t.shared("TreeGen")
@@ -319,7 +326,8 @@ return function(t)
 		-- moves on by the axe's cooldown first.
 		function s.swing(p, part, wait)
 			s.now += wait or 0.7
-			local hit, normal = s.SectionLogic.AimAt(part.CFrame, part.Size, p.root.Position, nil, nil)
+			local cf, size = SectionMetrics.BlockFrame(part)
+			local hit, normal = s.SectionLogic.AimAt(cf, size, p.root.Position, nil, nil)
 			return s.Trees.Chop(p, part, hit, normal)
 		end
 
@@ -523,7 +531,8 @@ return function(t)
 			local lowest = math.huge
 			for _, part in ipairs(piece.model:GetDescendants()) do
 				if part:IsA("BasePart") and part.Name == "Section" then
-					lowest = math.min(lowest, (part.CFrame * CFrame.new(0, -part.Size.Y / 2, 0)).Position.Y)
+					local cf, size = SectionMetrics.BlockFrame(part)
+					lowest = math.min(lowest, (cf * CFrame.new(0, -size.Y / 2, 0)).Position.Y)
 				end
 			end
 			t.ok(math.abs(lowest - result.hit.height) < 0.3, "the trunk starts at the cut point")
@@ -543,7 +552,7 @@ return function(t)
 		end
 		local sections, length = count(piece.parts), 0 -- sections and their total length
 		for _, part in pairs(piece.parts) do
-			length += part.Size.Y
+			length += secLen(part)
 		end
 		for _ = 1, 24 do
 			s.now += 5
@@ -555,7 +564,7 @@ return function(t)
 		t.eq(count(piece.parts), sections, "no section split off by itself")
 		local after = 0
 		for _, part in pairs(piece.parts) do
-			after += part.Size.Y
+			after += secLen(part)
 		end
 		t.ok(math.abs(after - length) < 1e-6, "and none got shorter")
 		local pieces = 0
@@ -570,10 +579,11 @@ return function(t)
 			local s2, _, p2, r2 = felled(3, "oak")
 			local log = r2.freed[1]
 			local trunk = log.root
-			local length2 = trunk.Size.Y
+			local frame, size2 = SectionMetrics.BlockFrame(trunk)
+			local length2 = size2.Y
 			local localY = (fraction - 0.5) * length2
-			local point = (trunk.CFrame * CFrame.new(trunk.Size.X / 2, localY, 0)).Position
-			local normal = trunk.CFrame.XVector
+			local point = (frame * CFrame.new(size2.X / 2, localY, 0)).Position
+			local normal = frame.XVector
 			p2.root.Position = point + normal * 2
 			local freed
 			for _ = 1, 400 do
@@ -600,7 +610,7 @@ return function(t)
 		local def = WoodData.Get("oak")
 		local face = TreeArt.FaceLook(def)
 		local depths = {}
-		local hits = s.SectionLogic.HitsToCut(2, base.Size.X, 0.2)
+		local hits = s.SectionLogic.HitsToCut(2, secSide(base), 0.2)
 		for i = 1, hits - 1 do
 			local ok = s.swing(p, base)
 			t.ok(ok, "swing " .. i)
@@ -679,7 +689,7 @@ return function(t)
 		local mesh = meshes[1]
 		local first = rec.sections[1]
 		t.ok(first ~= nil and first.Parent == rec.model, "the hitbox section is still there to chop")
-		local trunkR = first.Size.X / math.sqrt(math.pi)
+		local trunkR = secSide(first) / math.sqrt(math.pi)
 		t.ok(math.abs(mesh.Size.X / 2 - trunkR) < 1e-4, "the mesh's base radius is the trunk's, exactly")
 		t.ok(math.abs(mesh.Size.Y - result.hit.height) < 1e-4, "and it is as tall as the cut")
 		-- Which model: the taper nearest the trunk's, in the height bucket.
@@ -941,15 +951,16 @@ return function(t)
 		local before = {}
 		local volume = 0
 		for id, part in pairs(rec.sections) do
-			before[id] = part.Size.Y
-			volume += s.SectionLogic.Volume(part.Size.X, part.Size.Y, part.Size.Z)
+			local _, sz = SectionMetrics.BlockFrame(part)
+			before[id] = sz.Y
+			volume += s.SectionLogic.Volume(sz.X, sz.Y, sz.Z)
 		end
 		local p = s.player(1, Vector3.new(6, 15, 0))
 		local _, ok, _, result = s.cutThrough(p, rec.sections[1], 6000)
 		t.ok(ok and result ~= nil and #result.freed == 1, "cut through")
 		t.ok(math.abs(result.hit.height - 15) < 0.01, "cut 15 up: " .. result.hit.height)
 		local hitbox = rec.sections[1]
-		t.ok(math.abs(hitbox.Size.Y - 15) < 1e-3, "the stump is 15 tall, not clamped: " .. hitbox.Size.Y)
+		t.ok(math.abs(secLen(hitbox) - 15) < 1e-3, "the stump is 15 tall, not clamped: " .. secLen(hitbox))
 		local rise, count = 0, 0
 		for _, mesh in ipairs(stumpParts(rec.model, "StumpMesh")) do
 			rise += mesh.Size.Y
@@ -966,16 +977,17 @@ return function(t)
 			if before[id] == nil then
 				cutPart = part
 			else
-				t.ok(math.abs(part.Size.Y - before[id]) < 1e-6, "section " .. id .. " is unchanged")
+				t.ok(math.abs(secLen(part) - before[id]) < 1e-6, "section " .. id .. " is unchanged")
 			end
 		end
 		t.ok(
-			cutPart ~= nil and math.abs(cutPart.Size.Y - (before[1] - 15)) < 1e-3,
+			cutPart ~= nil and math.abs(secLen(cutPart) - (before[1] - 15)) < 1e-3,
 			"the cut section keeps all it had above the cut"
 		)
 		t.ok(
-			math.abs(log.volume - (volume - s.SectionLogic.Volume(rec.sections[1].Size.X, 15, rec.sections[1].Size.Z)))
-				< 1e-3,
+			math.abs(
+				log.volume - (volume - s.SectionLogic.Volume(secSide(rec.sections[1]), 15, secSide(rec.sections[1])))
+			) < 1e-3,
 			"the log's volume is the tree's, less the 15 studs left standing"
 		)
 		t.ok(sections >= 1)
@@ -1145,24 +1157,20 @@ return function(t)
 			for i, seed in ipairs({ 1, 2, 3 }) do
 				local skel = TreeGen.Skeleton(def.id, seed, 1, {})
 				local model = TreeArt.FromSkeleton(def, skel)
-				local v, rounds = 0, 0
+				local v, rounds, sections = 0, 0, 0
 				for _, d in ipairs(model:GetDescendants()) do
 					if d:IsA("BasePart") and d.Name == "Section" then
-						v += SectionLogic.Volume(d.Size.X, d.Size.Y, d.Size.Z)
-						local mesh = d:FindFirstChildOfClass("SpecialMesh")
-						if mesh then
+						sections += 1
+						local _, sz = SectionMetrics.BlockFrame(d)
+						v += SectionLogic.Volume(sz.X, sz.Y, sz.Z)
+						if d:IsA("Part") and d.Shape == Enum.PartType.Cylinder then
 							rounds += 1
-							t.eq(mesh.MeshType, Enum.MeshType.Cylinder, "a cylinder")
-							-- radius = side / sqrt(pi): the same area as the square.
-							local radius = d.Size.X * mesh.Scale.X / 2
+							local radius = math.min(d.Size.Y, d.Size.Z) / 2
 							t.ok(
-								math.abs(radius - d.Size.X / math.sqrt(math.pi)) < 1e-4,
+								math.abs(radius - StumpLogic.RoundRadius(math.min(sz.X, sz.Z))) < 1e-4,
 								"round radius = side / sqrt(pi)"
 							)
-							t.ok(
-								math.abs(math.pi * radius * radius - d.Size.X * d.Size.X) < 1e-3,
-								"same cross-section area"
-							)
+							t.ok(math.abs(math.pi * radius * radius - sz.X * sz.Z) < 1e-3, "same cross-section area")
 						end
 					end
 				end
@@ -1170,7 +1178,7 @@ return function(t)
 					pinned and math.abs(v - pinned[i]) / pinned[i] < 0.01,
 					string.format("%s seed %d volume %.4f vs main %.4f", def.id, seed, v, pinned and pinned[i] or 0)
 				)
-				t.ok(rounds >= 1 and rounds <= skel.trunkSegments, def.id .. ": only trunk sections are round")
+				t.eq(rounds, sections, def.id .. ": every section is round, limbs included")
 				t.ok(#model:GetDescendants() > 0 and TreeGen.PartCount(skel) <= 8 or true)
 				count += 1
 			end
@@ -1211,18 +1219,18 @@ return function(t)
 		local log = result.freed[1]
 		local rounds = 0
 		for _, part in pairs(log.parts) do
-			if part:FindFirstChildOfClass("SpecialMesh") then
+			if part:IsA("Part") and part.Shape == Enum.PartType.Cylinder then
 				rounds += 1
 			end
 		end
-		t.ok(rounds >= 1, "the log's trunk sections are still round")
+		t.ok(rounds >= 1, "the log's sections are still round")
 		for _, d in ipairs(log.model:GetDescendants()) do
 			if d.Name == "CutFace" then
-				t.ok(d:FindFirstChildOfClass("SpecialMesh") ~= nil, "a round cut face")
+				t.ok(d:IsA("Part") and d.Shape == Enum.PartType.Cylinder, "a round cut face")
 			end
 		end
 		for _, part in pairs(log.parts) do
-			t.ok(part.Size.Y >= s.GameConfig.CutEdge - 1e-6, "no piece shorter than the cut edge")
+			t.ok(secLen(part) >= s.GameConfig.CutEdge - 1e-6, "no piece shorter than the cut edge")
 		end
 		t.ok(
 			result.hit.height >= s.GameConfig.CutEdge and result.hit.height <= 4.5 - s.GameConfig.CutEdge + 1e-6,
@@ -1442,7 +1450,7 @@ return function(t)
 		local uid = model:GetAttribute("Uid")
 		local rec = s.Trees.GetTree(uid)
 		local base = rec.sections[1]
-		local p = s.player(1, Vector3.new(base.Size.X / 2 + 3, 3, 0))
+		local p = s.player(1, Vector3.new(secSide(base) / 2 + 3, 3, 0))
 		local _, ok, _, result = s.cutThrough(p, base, 6000)
 		t.ok(ok and result ~= nil, "the Elder was cut through")
 		t.eq(#result.freed, 1, "the log above the cut is made")
@@ -1475,7 +1483,7 @@ return function(t)
 		failing(b, "R22")
 		local big = b.Trees.SpawnTree("oak", CFrame.new(0, 0, 0), { seed = 7, size = TreeLogic.Sizes[3], stage = 1 })
 		local recB = b.Trees.GetTree(big:GetAttribute("Uid"))
-		local radius = recB.sections[1].Size.X / math.sqrt(math.pi)
+		local radius = secSide(recB.sections[1]) / math.sqrt(math.pi)
 		t.ok(math.abs(radius - 1.298) < 0.01, "a large oak: base radius " .. radius)
 		local q = b.player(1, Vector3.new(4, 3, 0))
 		b.cutThrough(q, recB.sections[1], 3000)
@@ -1537,7 +1545,7 @@ return function(t)
 		local step = stumpParts(rec.model, "StumpMesh")[1]
 		local fresh = step.Color
 		local hitbox = rec.sections[1]
-		local h = hitbox.Size.Y
+		local h = secLen(hitbox)
 		t.ok(math.abs(h - result.hit.height) < 0.01, "the stump is as tall as the cut: " .. h)
 		s.now = at + 100
 		s.Trees.StumpStep(s.now)
@@ -1554,10 +1562,10 @@ return function(t)
 		t.ok(not before[log.uid], "a new log")
 		local length = 0
 		for _, part in pairs(log.parts) do
-			length += part.Size.Y
+			length += secLen(part)
 		end
 		t.ok(math.abs(length - 2) < 0.01, "a log exactly 2 long: " .. length)
-		t.ok(math.abs(hitbox.Size.Y - 1.5) < 0.01, "the cut moved down: the stump is 1.5")
+		t.ok(math.abs(secLen(hitbox) - 1.5) < 0.01, "the cut moved down: the stump is 1.5")
 		t.ok(rec.felled and not rec.slot, "what is left still stands")
 		local cap = stumpParts(rec.model, "StumpCap")[1]
 		t.ok(
@@ -1598,12 +1606,12 @@ return function(t)
 			)
 		end
 		-- Time never shortens it.
-		local height = hitbox.Size.Y
+		local height = secLen(hitbox)
 		for _ = 1, 40 do
 			s.now += 3
 			s.Trees.StumpStep(s.now)
 		end
-		t.eq(hitbox.Size.Y, height, "only a swing changes it")
+		t.eq(secLen(hitbox), height, "only a swing changes it")
 		-- A swing is checked like any other.
 		s.allow = false
 		local ok, why = s.swing(p, hitbox)
@@ -1612,7 +1620,7 @@ return function(t)
 		local far = s.player(2, Vector3.new(40, 3, 0))
 		local ok2, why2 = s.swing(far, hitbox)
 		t.ok(not ok2 and why2 == "far", "out of reach")
-		t.eq(hitbox.Size.Y, height, "neither touched it")
+		t.eq(secLen(hitbox), height, "neither touched it")
 		local ok3 = s.swing(p, hitbox)
 		t.ok(ok3, "the handler takes a swing at the stump")
 		t.ok(#s.fxOf("Cut") > 0)
