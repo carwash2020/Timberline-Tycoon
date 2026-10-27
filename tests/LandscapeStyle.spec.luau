@@ -34,7 +34,7 @@ return function(t)
 			Glacier = { 169, 211, 230 },
 			Sand = { 216, 198, 154 },
 			Basalt = { 58, 52, 51 },
-			Slate = { 124, 122, 106 }, -- T402: #7C7A6A (was #5B5650)
+			Slate = { 91, 86, 80 }, -- T409: #5B5650 (T402 was #7C7A6A)
 			CrackedLava = { 255, 106, 30 },
 			Mud = { 90, 74, 62 },
 			Cobblestone = { 156, 149, 138 },
@@ -101,6 +101,7 @@ return function(t)
 	---------------------------------------------------------------------------
 
 	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+	local ValleyGround = t.load("ReplicatedStorage/Shared/World/ValleyGround")
 	local PlotData = t.shared("PlotData")
 	local Vector2 = t.roblox.Vector2
 	local GRAVEL = TerrainGen.GravelMaterial
@@ -158,13 +159,13 @@ return function(t)
 		local c = colors[GRAVEL]
 		t.ok(c ~= nil, "the road has a colour in MaterialColors (MaterialSetup applies it)")
 		local _, s, v = c:ToHSV()
-		-- T402: asphalt #55585A, the colour of the town's road parts too (it was the light #A8A49C gravel).
-		t.eq({ rgb(c) }, { 85, 88, 90 }, "Asphalt #55585A")
+		-- T409: asphalt #A8A49C, the light gravel the art table names (T402 had darkened it to #55585A).
+		t.eq({ rgb(c) }, { 168, 164, 156 }, "Asphalt #A8A49C")
 		t.ok(s < 0.09, "grey: hardly any colour in it")
-		t.ok(v < 0.4, "dark")
-		t.ok(lum(c) < lum(colors.Ground), "darker than dirt")
+		t.ok(v > 0.5, "light")
+		t.ok(lum(c) > lum(colors.Ground), "lighter than dirt")
 		local r, g, b = rgb(c)
-		t.ok(b - r >= 0 and b - r <= 14, string.format("a cool grey (%d, %d, %d)", r, g, b))
+		t.ok(math.abs(b - r) <= 14, string.format("a neutral grey (%d, %d, %d)", r, g, b))
 		t.ok(math.abs(r - g) <= 6, string.format("neither pink nor green (%d, %d, %d)", r, g, b))
 		for name, other in pairs(colors) do
 			if name ~= GRAVEL then
@@ -191,11 +192,14 @@ return function(t)
 							if m ~= "Sand" and m ~= "Mud" then
 								inside += 1
 								if m ~= GRAVEL then
-									t.ok(
-										false,
-										string.format("%s at (%d, %d) is %s, not gravel", road.name, q.X, q.Y, m)
-									)
-									return centre, inside
+									local belt = ValleyGround.DraftClearance(q.X, q.Y)
+									if belt <= 5 or belt >= 8 then
+										t.ok(
+											false,
+											string.format("%s at (%d, %d) is %s, not gravel", road.name, q.X, q.Y, m)
+										)
+										return centre, inside
+									end
 								end
 							end
 						end
@@ -258,7 +262,7 @@ return function(t)
 				for z = -1490, 1490, 37 do
 					if materialAt(x, z) == GRAVEL then
 						local _, edge = nearestRoad(x, z)
-						local explained = edge <= 2 or inRect(lot, x, z, 0)
+						local explained = edge <= 2 or inRect(lot, x, z, 0) or ValleyGround.DraftClearance(x, z) <= 0
 						for _, junction in ipairs(WorldLayout.Junctions) do
 							explained = explained or (Vector2.new(x, z) - junction.at).Magnitude <= junction.radius + 2
 						end

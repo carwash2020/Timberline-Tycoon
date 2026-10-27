@@ -77,6 +77,7 @@ local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
+local CorridorStamps = require(script.Parent.CorridorStamps)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local BuiltMoves = require(ReplicatedStorage.Shared.World.BuiltMoves)
 local TreeSpread = require(ReplicatedStorage.Shared.World.TreeSpread)
@@ -1536,6 +1537,11 @@ do
 				lodge.Name = "GateLodge"
 				standOnGround(place(lodge, cf))
 			end
+		end)
+
+		-- Roadside stamps. Streamed, not a remote, and not a tree you can cut.
+		defer("6b. The corridors", 4, nil, function(slice)
+			CorridorStamps.Build(map, slice)
 		end)
 
 		-- The waterfall pouring off an outer isle into the river's spring.

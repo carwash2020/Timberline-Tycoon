@@ -33,9 +33,11 @@ return function(t)
 		local want = {
 			-- Ring map: re-sampled for the 2000-stud square and its roads, pads and hills.
 			-- T397: re-sampled again on purpose, the ground (hills, banks, plots at y 0) moved.
-			[20] = { 1172, 75595493, 335756024 },
-			[60] = { 1486, 77837932, 217359867 },
-			[85] = { 1839, 98493672, 655951318 },
+			-- T409: re-sampled again on purpose. The valley ground, the wider square
+			-- and the draft beds reject a different set of the same candidates.
+			[20] = { 1248, 196548097, 733674349 },
+			[60] = { 1596, 239609580, 45992076 },
+			[85] = { 1995, 314132878, 347346247 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0

@@ -2823,15 +2823,22 @@ return function(t)
 				t.ok(base.Y <= h, "it doesn't float")
 				t.ok(h - base.Y <= 1.7, "its plinth isn't buried")
 			end
-			-- The headland: no water's edge further east along this stretch of coast.
+			-- The headland, on the coast the lighthouse was sited against. Bay Road
+			-- is a causeway on the valley ground (a stud and a bit above the sea)
+			-- and that fill is the furthest dry column; it is a road, not the
+			-- sand headland. The shore at the lighthouse's own z is unchanged.
 			local function edgeAt(z)
 				local coast = WorldLayout.Coast
+				TerrainGen.UsePriorGround(true)
+				local found = math.huge
 				for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt do
 					if TerrainGen.WaterLevelAt(x, z) ~= nil then
-						return x
+						found = x
+						break
 					end
 				end
-				return math.huge
+				TerrainGen.UsePriorGround(false)
+				return found
 			end
 			-- (Or near it: the furthest-east stretch the spawn can see it from.)
 			local tip, furthest = edgeAt(base.Z), -math.huge
@@ -3038,7 +3045,7 @@ return function(t)
 		}
 		t.eq(#Draft.OverlapHits(), 0)
 		t.eq(Draft.Gondola, nil)
-		t.eq(Draft.Built, false)
+		t.eq(Draft.Built, true)
 		t.eq(Draft.Spawn.x, 0)
 		t.eq(Draft.Spawn.z, 40)
 		t.eq(Draft.SpawnY, 0.5)

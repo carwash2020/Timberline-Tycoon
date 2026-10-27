@@ -23,6 +23,7 @@
 local BiomeData = require(script.Parent.Parent.BiomeData)
 local WorldLayout = require(script.Parent.WorldLayout)
 local UndergroundData = require(script.Parent.UndergroundData)
+local ValleyGround = require(script.Parent.ValleyGround)
 
 local TerrainGen = {}
 
@@ -104,8 +105,23 @@ TerrainGen.RoadShoulder = ROAD_SHOULDER
 
 -- True while the legacy layout is on or the classic road grades are built.
 local classicBuild = false
+-- Placement of rocks, scenery and signs (the overlap lint was cleared on the
+-- pre-valley ground). A depth so a planner can ask while another still holds it.
+-- The player ground stays HeightAt; this only selects the site.
+local priorDepth = 0
 local function classic(): boolean
 	return legacyLayout or classicBuild
+end
+
+function TerrainGen.UsePriorGround(on: boolean)
+	priorDepth += if on then 1 else -1
+	if priorDepth < 0 then
+		priorDepth = 0
+	end
+end
+
+function TerrainGen.PriorGround(): boolean
+	return priorDepth > 0
 end
 
 -- The ground as it was before T397, on today's layout (roads, rims, pools):
@@ -155,7 +171,10 @@ end
 local STARTER, HILLS, SNOW, VOLCANO, GROVE, SKY =
 	area("starter"), area("hills"), area("snow"), area("volcano"), area("grove"), area("sky")
 
-local HALF = WorldLayout.WorldHalf
+-- The ridge the classic ground (and the first trees) was built against.
+-- WorldHalf grew to 1350 so Frostpeak and Lantern Isle fit; the mountain
+-- ramp stays on this denominator so that fingerprint does not move.
+local HALF = 1000
 local CONE = WorldLayout.VolcanoCone
 local RIDGE = WorldLayout.GroveRidge
 local MOUNT = WorldLayout.Mountains
@@ -1049,6 +1068,7 @@ classicBuild = false
 -- True while the strip's own heights are surveyed from the open ground (HeightAt
 -- with the lanes and the toll spur left out: they are cut from these heights).
 local surveying = false
+local legacyHeightAt: (number, number) -> number
 
 local function spurChord(x: number, z: number): number?
 	if surveying then
@@ -1103,7 +1123,7 @@ local function stripShelf(): number
 	end
 	-- (The ground there as HeightAt draws it, banks and all: the probe is clear of the strip.)
 	surveying = true
-	local shelf = TerrainGen.HeightAt(0, WorldLayout.ShelfProbeZ)
+	local shelf = legacyHeightAt(0, WorldLayout.ShelfProbeZ)
 	surveying = false
 	if isClassic then
 		STRIP_SHELF_CLASSIC = shelf
@@ -1131,7 +1151,7 @@ local function spurStartHeight(): number
 	local spur = WorldLayout.TollSpur
 	local p = spur.points[spur.gradeFrom]
 	surveying = true
-	local h = if WorldLayout.InNorthStrip(p.X, p.Y) then groundHeight(p.X, p.Y) else TerrainGen.HeightAt(p.X, p.Y)
+	local h = if WorldLayout.InNorthStrip(p.X, p.Y) then groundHeight(p.X, p.Y) else legacyHeightAt(p.X, p.Y)
 	surveying = false
 	if isClassic then
 		SPUR_H0_CLASSIC = h
@@ -1558,8 +1578,9 @@ WorldLayout.SetClassicGround(false)
 classicBuild = false
 buildHaulGrades(HAUL_LIVE, GRADE_CAP_LIVE, true)
 
--- Ground height at (x, z), in studs.
-function TerrainGen.HeightAt(x: number, z: number): number
+-- Ground height at (x, z), in studs. The classic ground (first trees) is
+-- this body. The live world is ValleyGround, one landform, not a second map.
+legacyHeightAt = function(x: number, z: number): number
 	-- Only past the square, and only inside the strip. The fingerprint
 	-- grid and every road sample stay on the old heights. The spur's
 	-- graded suffix is the one exception, and it misses those samples.
@@ -1642,6 +1663,70 @@ function TerrainGen.HeightAt(x: number, z: number): number
 		return cover(x, z, chord)
 	end
 	return cover(x, z, h)
+end
+
+-- The valley cuts banks and shelves. The mine's hill, a cave's rock roof
+-- and the volcano's cliff wall are not those cuts: they stay at least as
+-- high as the ground that roofed them before.
+local function angApart(a: number, b: number): number
+	local d = math.abs(a - b) % (math.pi * 2)
+	if d > math.pi then
+		d = math.pi * 2 - d
+	end
+	return d
+end
+
+local function volcanoWall(x: number, z: number, h: number): number
+	for _, rim in ipairs(WorldLayout.Rims) do
+		if rim.kind == "volcano" then
+			local dx, dz = x - rim.cx, z - rim.cz
+			local d = sqrt(dx * dx + dz * dz)
+			if d > rim.inner - 6 and d < rim.outer + 6 and angApart(math.atan2(dz, dx), rim.gap) > rim.half + 0.15 then
+				h = math.max(h, legacyHeightAt(x, z))
+			end
+		end
+	end
+	return h
+end
+
+-- FerryDock#2 sits on the east shore. The valley bank lowered that beach
+-- and the deck followed it. The road bed stays the graded causeway; the
+-- beach around the dock holds the old shore, then eases back.
+local FERRY_DOCK_X = 910.54
+local FERRY_DOCK_Z = -25.87
+local function ferryShore(x: number, z: number, h: number): number
+	local dx, dz = x - FERRY_DOCK_X, z - FERRY_DOCK_Z
+	local d = sqrt(dx * dx + dz * dz)
+	if d >= 48 or TerrainGen.RoadClearance(x, z) <= 6 then
+		return h
+	end
+	local prior = legacyHeightAt(x, z)
+	if prior <= h then
+		return h
+	end
+	if d <= 26 then
+		return prior
+	end
+	local t = smoothstep((d - 26) / 22)
+	return prior * (1 - t) + h * t
+end
+
+-- The height a player drives on. Placement code can ask for this while
+-- UsePriorGround is holding HeightAt on the pre-valley ground.
+function TerrainGen.LiveHeightAt(x: number, z: number): number
+	if classic() or not ValleyGround.Ready() then
+		return legacyHeightAt(x, z)
+	end
+	local h = caveRoof(x, z, ValleyGround.HeightAt(x, z))
+	h = volcanoWall(x, z, h)
+	return ferryShore(x, z, h)
+end
+
+function TerrainGen.HeightAt(x: number, z: number): number
+	if classic() or priorDepth > 0 or not ValleyGround.Ready() then
+		return legacyHeightAt(x, z)
+	end
+	return TerrainGen.LiveHeightAt(x, z)
 end
 
 -- Water surface above (x, z) for a column whose ground height `h` is already
@@ -1936,6 +2021,12 @@ end
 -- Grass, and so does the forest floor's LeafyGrass (T402).
 function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: number): string
 	local m = surfaceMaterial(x, z, h, slope)
+	if not classic() and priorDepth == 0 and ValleyGround.Ready() then
+		local painted = ValleyGround.Paint(x, z, h, slope, m)
+		if painted then
+			m = painted
+		end
+	end
 	-- (LeafyGrass too: the town's lawn is one green, so a road part never stands on the forest floor's second one.)
 	if
 		not legacyLayout
@@ -2001,7 +2092,7 @@ TerrainGen.MaterialColors = {
 	Snow = Color3.fromRGB(238, 243, 247), -- #EEF3F7
 	Glacier = Color3.fromRGB(169, 211, 230), -- #A9D3E6
 	Basalt = Color3.fromRGB(58, 52, 51), -- #3A3433
-	Slate = Color3.fromRGB(124, 122, 106), -- #7C7A6A
+	Slate = Color3.fromRGB(91, 86, 80), -- #5B5650 QuarrySlate
 	CrackedLava = Color3.fromRGB(255, 106, 30), -- #FF6A1E
 	Cobblestone = Color3.fromRGB(156, 149, 138), -- #9C958A
 	-- The Bayou's floor, mud discs and channel beds (Builder amendment 1, the
@@ -2009,7 +2100,7 @@ TerrainGen.MaterialColors = {
 	Limestone = Color3.fromRGB(78, 74, 54), -- #4E4A36
 	Sandstone = Color3.fromRGB(200, 105, 62), -- #C8693E
 	-- The country roads, still terrain (GravelMaterial); the town's are parts.
-	Asphalt = Color3.fromRGB(85, 88, 90), -- #55585A
+	Asphalt = Color3.fromRGB(168, 164, 156), -- #A8A49C RoadGravel
 } :: { [string]: Color3 }
 
 -- What lies under a surface material (cliff faces, the voxels below).
@@ -2023,5 +2114,9 @@ function TerrainGen.SubMaterial(surface: string): string
 	end
 	return surface
 end
+
+ValleyGround.Bind(legacyHeightAt, function(x: number, z: number): number?
+	return TerrainGen.WaterLevelFor(x, z, legacyHeightAt(x, z))
+end)
 
 return TerrainGen

@@ -44,7 +44,7 @@ return function(t)
 	-- What origin/main's single-step PointsOfInterest returned (14 October
 	-- 2026): five points, 1026 characters. A change to the planner that moves
 	-- a point moves these numbers: that is a design change, not a refactor.
-	local GOLDEN_COUNT, GOLDEN_LENGTH, GOLDEN_SUM = 5, 1028, 1249355442 -- T397: length re-pinned (the ground moved); hills closer to +18: same length, a point beside the Hills stands at the new ground height (244961358 before)
+	local GOLDEN_COUNT, GOLDEN_LENGTH, GOLDEN_SUM = 5, 1028, 3070203921 -- T397: length re-pinned (the ground moved); hills closer to +18: same length, a point beside the Hills stands at the new ground height (244961358 before). T409: same five points, the valley height (1249355442 before).
 
 	t.test("planned on a time slice, the points are byte for byte the single step's", function()
 		local loader = t.loader({ isolated = true })

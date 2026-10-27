@@ -15,7 +15,13 @@ return function(t)
 	local BiomeData = t.shared("BiomeData")
 	local UndergroundData = t.load("ReplicatedStorage/Shared/World/UndergroundData")
 
+	local ValleyGround = t.load("ReplicatedStorage/Shared/World/ValleyGround")
 	local HeightAt = TerrainGen.HeightAt
+	-- Draft beds have a bank past the gravel. The 15 degree rule is about the
+	-- country, the same way it already ignores the live roads' banks.
+	local function draftShoulder(x, z)
+		return ValleyGround.DraftClearance(x, z) > 16
+	end
 	local function slopeDeg(x, z)
 		local h = HeightAt(x, z)
 		local m = math.max(
@@ -452,7 +458,7 @@ return function(t)
 		local bad, nBad = {}, 0
 		for x = -980, 980, 12 do
 			for z = -980, 980, 12 do
-				if not builtSteep(x, z) and TerrainGen.RoadClearance(x, z) > 12 then
+				if not builtSteep(x, z) and TerrainGen.RoadClearance(x, z) > 12 and draftShoulder(x, z) then
 					total += 1
 					local deg = slopeDeg(x, z)
 					if deg > worst then
@@ -484,7 +490,7 @@ return function(t)
 		local worst, worstAt, total = 0, nil, 0
 		for x = -740, -230, 6 do
 			for z = -150, 440, 6 do
-				if not builtSteep(x, z) and TerrainGen.RoadClearance(x, z) > 12 then
+				if not builtSteep(x, z) and TerrainGen.RoadClearance(x, z) > 12 and draftShoulder(x, z) then
 					total += 1
 					local deg = slopeDeg(x, z)
 					if deg > worst then

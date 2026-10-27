@@ -233,6 +233,14 @@ TreeSpreadData.Relocated = {
 	{ index = 958, x = -123.96, z = 985.37 },
 	{ index = 959, x = -122.28, z = 995.67 },
 	{ index = 961, x = 318.63, z = -1040.38 },
+	-- T409: the valley opened meadow the old cover never filled. These six
+	-- wild trees pay for the trunks that close those squares.
+	{ index = 345, x = -78.74, z = 547.29 },
+	{ index = 415, x = -632.59, z = 873.89 },
+	{ index = 442, x = 1073.27, z = 480.39 },
+	{ index = 738, x = 804.99, z = 811.16 },
+	{ index = 787, x = -504.63, z = -814.92 },
+	{ index = 912, x = 116.37, z = -970.77 },
 } :: { Relocation }
 
 -- The real trees TreeCover adds, in clumps (`clump` is the clump's number).
@@ -549,6 +557,14 @@ TreeSpreadData.Cover = {
 	{ clump = 102, x = 529.27, z = -601.39, wood = "oak" },
 	{ clump = 102, x = 515.20, z = -604.57, wood = "oak" },
 	{ clump = 102, x = 524.78, z = -615.38, wood = "oak" },
+	-- T409: meadow squares the valley made plantable. Clump 19 already had
+	-- no drive lane (one of the two the plan allows); these join it.
+	{ clump = 19, x = 528, z = 912, wood = "pine" },
+	{ clump = 19, x = 624, z = 944, wood = "pine" },
+	{ clump = 19, x = 632, z = 796, wood = "pine" },
+	{ clump = 19, x = 624, z = 880, wood = "pine" },
+	{ clump = 25, x = 720, z = 944, wood = "pine" },
+	{ clump = 103, x = -240, z = 920, wood = "pine" },
 } :: { CoverTree }
 
 return TreeSpreadData

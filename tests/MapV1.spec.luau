@@ -30,7 +30,7 @@ return function(t)
 	end)
 
 	t.test("the skirt and the crust stay thick, and isle bottoms are not a skin", function()
-		t.eq(WorldLayout.WorldHalf, 1000)
+		t.eq(WorldLayout.WorldHalf, 1350)
 		t.eq(WorldLayout.TerrainSkirt, 200)
 		local TerrainBuilder = t.server("TerrainBuilder")
 		t.eq(TerrainBuilder.Crust, 8)

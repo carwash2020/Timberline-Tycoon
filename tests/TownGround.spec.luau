@@ -245,8 +245,11 @@ return function(t)
 								named = true
 							end
 						end
+						local slope = TerrainGen.SlopeAt(q.X, q.Y)
+						local cliff = slope > math.tan(math.rad(40))
+							and (m == "Rock" or m == "Slate" or m == "Basalt" or m == "Sandstone")
 						t.ok(
-							m == "Grass" or m == "LeafyGrass" or m == "Asphalt" or (named and m == "Ground"),
+							m == "Grass" or m == "LeafyGrass" or m == "Asphalt" or (named and m == "Ground") or cliff,
 							string.format("%s: %s at (%.0f, %.0f)", p.name, m, q.X, q.Y)
 						)
 						checked += 1

@@ -30,7 +30,7 @@ return function(t)
 	t.test("the gorge is at least 20 across and 12 deep, with no shallow end", function()
 		t.ok(WorldLayout.GorgeWidth >= 20)
 		t.ok(WorldLayout.GorgeDepth >= 12)
-		t.eq(WorldLayout.WorldHalf, 1000)
+		t.eq(WorldLayout.WorldHalf, 1350)
 		local line = WorldLayout.TollLineZ
 		local width = WorldLayout.GorgeWidth
 		local floorZ = line + width / 2

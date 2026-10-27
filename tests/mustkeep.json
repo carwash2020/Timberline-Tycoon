@@ -290,9 +290,9 @@
       "note": "Skyroot gate lodge door (Gus's charter, SkyQuestService). The bar is beside it.",
       "path": "TimberlineMap/GateLodge/Door",
       "pos": [
-        -17.24,
-        42.38,
-        788.55
+        -48.00,
+        41.21,
+        730.05
       ],
       "tol": 0.5,
       "town": false

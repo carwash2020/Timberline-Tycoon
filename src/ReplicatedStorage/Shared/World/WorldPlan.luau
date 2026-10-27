@@ -181,6 +181,15 @@ function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxS
 	if TerrainGen.RoadClearance(x, z) < (roadClearance or 6) then
 		return false
 	end
+	-- The gate lodge's pad is not a road, so clearance stays open for the
+	-- door test. Trees still stay off the pad. Draft beds are the valley's
+	-- roads; the trees were planned before them and keep their X and Z.
+	if not WorldLayout.ClassicOn() and not TerrainGen.PriorGround() then
+		local lx, lz = x + 40, z - 720
+		if lx * lx + lz * lz < 26 * 26 then
+			return false
+		end
+	end
 	if TerrainGen.WaterLevelAt(x, z) ~= nil then
 		return false
 	end
@@ -331,7 +340,11 @@ function firstTrees(): { TreeSpot }
 		-- nearest biome; each counts toward its wood's grove like any tree.
 		local wildRng = Kit.rng(hashString("wild groves"))
 		local mill = WorldLayout.Sawmill
-		local half = WorldLayout.WorldHalf - 120
+		-- Placed when the square was ±1000. WorldHalf grew to 1350 for the
+		-- Frostpeak rim and Lantern Isle; sampling the new square would
+		-- reshuffle these groves, and the first trees' XZ are what the
+		-- boulders, the scenery and T410's chop plan keep off.
+		local half = 1000 - 120
 		local coast = WorldLayout.Coast
 		local centers: { Vector2 } = {}
 		local tries = 0
@@ -423,24 +436,26 @@ function firstTrees(): { TreeSpot }
 	breathe()
 	pullThroughLanes()
 	breathe()
+	local wasClassic = WorldLayout.ClassicOn()
 	TerrainGen.SetClassicGround(true)
 	local placedOk, placedErr = pcall(build)
 	TerrainGen.SetClassicGround(false)
 	TerrainGen.SetLegacyLayout(false)
 	if not placedOk then
 		firstBuilding = false
+		TerrainGen.SetClassicGround(wasClassic)
 		error(placedErr)
 	end
-	-- The live heights: 322 ground heights, a stretch of tens of milliseconds
-	-- unless it gives the frame back too (firstBuilding still holds a second
-	-- asker off until the plan is whole).
+	-- The valley height. MapBuilder plants this batch before Trees() returns,
+	-- so the Y it plants has to already be the one Trees() keeps.
 	for i, spot in ipairs(out) do
 		if i % 16 == 0 then
 			breathe()
 		end
 		local p = spot.position
-		spot.position = Vector3.new(p.X, TerrainGen.HeightAt(p.X, p.Z) - 0.3, p.Z)
+		spot.position = Vector3.new(p.X, TerrainGen.LiveHeightAt(p.X, p.Z) - 0.3, p.Z)
 	end
+	TerrainGen.SetClassicGround(wasClassic)
 	table.move(discs, 1, #discs, #groveDiscs + 1, groveDiscs)
 	cachedFirst = out
 	firstBuilding = false
@@ -496,6 +511,9 @@ function WorldPlan.CountryStands(): { Stand }
 	if cachedStands then
 		return cachedStands
 	end
+	-- On the pre-valley ground, whether Trees() asked first or a spec did.
+	-- The valley seats each tree afterwards, so the two calls share one plan.
+	TerrainGen.UsePriorGround(true)
 	local stands: { Stand } = {}
 	local rng = Kit.rng(hashString("country stands"))
 	local mill = Vector2.new(WorldLayout.Sawmill.X, WorldLayout.Sawmill.Z)
@@ -739,6 +757,7 @@ function WorldPlan.CountryStands(): { Stand }
 			end
 		end
 	end
+	TerrainGen.UsePriorGround(false)
 	cachedStands = stands
 	return stands
 end
@@ -786,6 +805,12 @@ end
 -- the extra trees (TreeFill.Extra) phase by phase. The server plants each batch
 -- the moment it comes, so the starter area is up while the rest is still being
 -- worked out. A tree emitted is in the returned list too, in its place.
+local function seatTree(spot: TreeSpot): TreeSpot
+	local p = spot.position
+	spot.position = Vector3.new(p.X, TerrainGen.LiveHeightAt(p.X, p.Z) - 0.3, p.Z)
+	return spot
+end
+
 function WorldPlan.Trees(pause: (() -> ())?, emit: (({ TreeSpot }) -> ())?): { TreeSpot }
 	if cachedTrees then
 		return cachedTrees
@@ -804,6 +829,13 @@ function WorldPlan.Trees(pause: (() -> ())?, emit: (({ TreeSpot }) -> ())?): { T
 		end
 	end
 	treesBuilding = true
+	local seating = not WorldLayout.ClassicOn()
+	if seating then
+		-- Sites on the pre-valley ground, so a change of slope does not walk
+		-- the forest. X and Z stay the plan T410 chops against; Y is seated
+		-- on the valley afterwards.
+		TerrainGen.UsePriorGround(true)
+	end
 	local ok, result = pcall(function(): { TreeSpot }
 		return WorldPlan.WithPause(pause, function(): any
 			local out = table.clone(baseTrees())
@@ -816,23 +848,44 @@ function WorldPlan.Trees(pause: (() -> ())?, emit: (({ TreeSpot }) -> ())?): { T
 			local preCount = #out
 			local sentRest = false
 			local announce: (({ TreeSpot }) -> ())? = nil
+			local function seatBatch(batch: { TreeSpot }): { TreeSpot }
+				if seating then
+					for _, spot in ipairs(batch) do
+						seatTree(spot)
+					end
+				end
+				return batch
+			end
 			if emit then
 				announce = function(batch: { TreeSpot })
-					emit(batch)
+					emit(seatBatch(batch))
 					-- The country stands' and the forest's trees are planned by
-					-- now: they follow the town's.
+					-- now: they follow the town's. Seat them before they are
+					-- handed over: the planter uses this position, and the
+					-- list Trees() returns is the same one.
 					if not sentRest then
 						sentRest = true
-						emit(table.move(out, WorldPlan.FirstTreeCount() + 1, preCount, 1, {}))
+						emit(seatBatch(table.move(out, WorldPlan.FirstTreeCount() + 1, preCount, 1, {})))
 					end
 				end
 			end
 			for _, spot in ipairs(TreeFill.Extra(out, pause, announce)) do
 				table.insert(out, spot)
 			end
+			if seating then
+				for i, spot in ipairs(out) do
+					seatTree(spot)
+					if i % 8 == 0 then
+						breathe()
+					end
+				end
+			end
 			return out
 		end)
 	end)
+	if seating then
+		TerrainGen.UsePriorGround(false)
+	end
 	treesBuilding = false
 	if not ok then
 		error(result, 0)
@@ -1276,6 +1329,9 @@ function WorldPlan.Boulders(): { Boulder }
 	if cachedBoulders then
 		return cachedBoulders
 	end
+	-- Sites were cleared against the pre-valley ground (the overlap lint). The
+	-- plan keeps that height: BuiltMoves seats the one rock it relocates.
+	TerrainGen.UsePriorGround(true)
 	local out: { Boulder } = {}
 	local rng = Kit.rng(4242)
 	local trees = firstTrees() -- not the country stands: they keep off the boulders
@@ -1327,6 +1383,13 @@ function WorldPlan.Boulders(): { Boulder }
 		end
 	end
 	cachedBoulders = out
+	TerrainGen.UsePriorGround(false)
+	if not WorldLayout.ClassicOn() then
+		for _, boulder in ipairs(out) do
+			local p = boulder.position
+			boulder.position = Vector3.new(p.X, TerrainGen.LiveHeightAt(p.X, p.Z) - 0.6, p.Z)
+		end
+	end
 	return out
 end
 
@@ -1338,6 +1401,7 @@ function WorldPlan.MeadowBoulders(): { Boulder }
 	if cachedMeadowBoulders then
 		return cachedMeadowBoulders
 	end
+	TerrainGen.UsePriorGround(true)
 	local out: { Boulder } = {}
 	local rng = Kit.rng(hashString("meadow boulders"))
 	local mill = WorldLayout.Sawmill
@@ -1384,6 +1448,7 @@ function WorldPlan.MeadowBoulders(): { Boulder }
 		end
 	end
 	cachedMeadowBoulders = out
+	TerrainGen.UsePriorGround(false)
 	return out
 end
 
@@ -1843,6 +1908,9 @@ function WorldPlan.Scenery(): { ScenerySpot }
 		end
 	end
 
+	-- Sites stay the ones the overlap lint was cleared on. Seated on the valley after.
+	local wasClassic = WorldLayout.ClassicOn()
+	TerrainGen.UsePriorGround(true)
 	-- Along the haul roads, every SCENERY_ROAD_STEP, sides alternating.
 	local mains: { Vector3 } = {}
 	for _, name in ipairs(SCENERY_ROADS) do
@@ -1947,6 +2015,22 @@ function WorldPlan.Scenery(): { ScenerySpot }
 		end
 	end
 	cachedScenery = out
+	TerrainGen.UsePriorGround(false)
+	if not wasClassic then
+		for _, spot in ipairs(out) do
+			breathe()
+			local lowest = math.huge
+			for _, q in ipairs(WorldPlan.SceneryFootprint(spot.center.X, spot.center.Z, spot.radius)) do
+				breatheSome()
+				lowest = math.min(lowest, TerrainGen.LiveHeightAt(q.X, q.Y))
+			end
+			local dy = (lowest - 0.1) - spot.center.Y
+			spot.center = Vector3.new(spot.center.X, lowest - 0.1, spot.center.Z)
+			for _, item in ipairs(spot.items) do
+				item.cframe = item.cframe + Vector3.new(0, dy, 0)
+			end
+		end
+	end
 	return out
 end
 
@@ -2470,6 +2554,10 @@ function WorldPlan.BiomeSignText(biomeId: string): string
 end
 
 function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
+	-- Which spot is level enough was decided on the classic ground, so a sign
+	-- does not walk into a tree or a set piece when the valley lifts under it.
+	local wasClassic = WorldLayout.ClassicOn()
+	TerrainGen.UsePriorGround(true)
 	local out: { Sign } = {}
 	local roadFor = {
 		HillsRoad = "hills",
@@ -2530,6 +2618,17 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 			table.insert(out, { text = text(biomeId), cframe = spot :: CFrame })
 		end
 	end
+	TerrainGen.UsePriorGround(false)
+	if not wasClassic then
+		for _, sign in ipairs(out) do
+			local at = sign.cframe
+			local flat = CFrame.new(at.X, 0, at.Z) * (at - at.Position)
+			local a = flat * Vector3.new(-SIGN_POST, 0, 0)
+			local b = flat * Vector3.new(SIGN_POST, 0, 0)
+			local y = math.min(TerrainGen.LiveHeightAt(a.X, a.Z), TerrainGen.LiveHeightAt(b.X, b.Z))
+			sign.cframe = flat + Vector3.new(0, y, 0)
+		end
+	end
 	return out
 end
 
@@ -2540,6 +2639,8 @@ end
 local RIM_SIGN_REACH = 60
 
 function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
+	local wasClassic = WorldLayout.ClassicOn()
+	TerrainGen.UsePriorGround(true)
 	local out: { Sign } = {}
 	local function setDown(flat: CFrame): (CFrame, boolean)
 		local a, b, m = flat * Vector3.new(-SIGN_POST, 0, 0), flat * Vector3.new(SIGN_POST, 0, 0), flat.Position
@@ -2641,6 +2742,17 @@ function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
 		end
 		if spot then
 			table.insert(out, { text = text("grove"), cframe = spot, gateId = "grove" })
+		end
+	end
+	TerrainGen.UsePriorGround(false)
+	if not wasClassic then
+		for _, sign in ipairs(out) do
+			local at = sign.cframe
+			local flat = CFrame.new(at.X, 0, at.Z) * (at - at.Position)
+			local a = flat * Vector3.new(-SIGN_POST, 0, 0)
+			local b = flat * Vector3.new(SIGN_POST, 0, 0)
+			local y = math.min(TerrainGen.LiveHeightAt(a.X, a.Z), TerrainGen.LiveHeightAt(b.X, b.Z))
+			sign.cframe = flat + Vector3.new(0, y, 0)
 		end
 	end
 	return out
@@ -2770,56 +2882,19 @@ function WorldPlan.ChuteFlume(cf: CFrame): (Vector3, Vector3)
 	return from, from + cf.LookVector * -FLUME_OUT - Vector3.new(0, FLUME_DROP, 0)
 end
 
--- The Skyroot gate lodge, beside the Snow Road's north end (the switchback
--- approach around (-60, 800)). The shell is 28 x 20; its front (-Z) faces
--- the road. Y is the ground there. Nil when this build has no sky biome.
-local LODGE_SEEK = Vector3.new(-30, 0, 790)
+-- The Skyroot gate lodge, on the locked approach (T408 / T409). The shell
+-- is 28 x 20. Its front (-Z, the door) faces north. Y is HeightAt. The
+-- draft road still ends at this pin; the gravel bed stops at the pad, so
+-- the building sits off the bed. Nil when this build has no sky biome.
+local LODGE_PIN = Vector3.new(-40, 0, 720)
 function WorldPlan.GateLodge(): CFrame?
 	if WorldPlan.Sky() == nil then
 		return nil
 	end
-	local bestScore = math.huge
-	local best: CFrame? = nil
-	for z = 775, 805, 5 do
-		for x = -50, -20, 5 do
-			local clear = TerrainGen.RoadClearance(x, z, 200)
-			if clear < 18 or clear > 42 then
-				continue
-			end
-			local slope = TerrainGen.SlopeAt(x, z)
-			if slope > 0.05 or WorldLayout.FlatWeight(x, z) > 0.2 then
-				continue
-			end
-			local y = TerrainGen.HeightAt(x, z)
-			local at = Vector3.new(x, y, z)
-			local away = at + (at - Vector3.new(0, y, 760))
-			local cf = facingZ(at, away)
-			local offRoad = true
-			for _, corner in ipairs({
-				Vector3.new(-14, 0, -10),
-				Vector3.new(14, 0, -10),
-				Vector3.new(-14, 0, 10),
-				Vector3.new(14, 0, 10),
-				Vector3.new(0, 0, -16),
-			}) do
-				local w = (cf :: CFrame) * corner
-				if TerrainGen.RoadClearance(w.X, w.Z, 200) < 6 then
-					offRoad = false
-					break
-				end
-			end
-			if not offRoad then
-				continue
-			end
-			local dx, dz = x - LODGE_SEEK.X, z - LODGE_SEEK.Z
-			local score = slope * 40 + math.sqrt(dx * dx + dz * dz)
-			if score < bestScore then
-				bestScore = score
-				best = cf
-			end
-		end
-	end
-	return best
+	local y = TerrainGen.HeightAt(LODGE_PIN.X, LODGE_PIN.Z)
+	local at = Vector3.new(LODGE_PIN.X, y, LODGE_PIN.Z)
+	-- facingZ aims +Z at the target, so the door (-Z / LookVector) points north.
+	return facingZ(at, at + Vector3.new(0, 0, -1))
 end
 
 -- The point `alpha` (0 to 1) of the way along `path`, by length.
@@ -3306,7 +3381,7 @@ local NEAR_ROW: Row = {
 	depth = { 20, 120 },
 	overlap = { 0.75, 0.95 },
 	width = { 380, 720 },
-	elevation = { 8, 13 },
+	elevation = { 8.8, 13.8 },
 	pitch = { 28, 44 },
 	yaw = 20,
 	colors = BACKDROP_COLORS.moss,
@@ -3316,7 +3391,7 @@ local FAR_ROW: Row = {
 	depth = { 420, 800 },
 	overlap = { 0.5, 0.72 },
 	width = { 600, 1000 },
-	elevation = { 10.5, 16.5 },
+	elevation = { 11.3, 17.3 },
 	pitch = { 28, 40 },
 	yaw = 16,
 	colors = BACKDROP_COLORS.rock,
@@ -4012,6 +4087,8 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 	if cachedClusters then
 		return cachedClusters
 	end
+	local wasClassic = WorldLayout.ClassicOn()
+	TerrainGen.UsePriorGround(true)
 	local out: { BoulderCluster } = {}
 	local rng = Kit.rng(hashString("boulder clusters 3"))
 	local coast = WorldLayout.Coast
@@ -4166,6 +4243,18 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 		end
 	end
 	cachedClusters = out
+	TerrainGen.UsePriorGround(false)
+	if not wasClassic then
+		for _, spot in ipairs(out) do
+			for _, rock in ipairs(spot.rocks) do
+				local p = rock.position
+				rock.position =
+					Vector3.new(p.X, TerrainGen.LiveHeightAt(p.X, p.Z) - WorldPlan.ClusterSink(rock.size), p.Z)
+			end
+			local big = spot.rocks[1]
+			spot.center = Vector3.new(spot.center.X, big.position.Y + WorldPlan.ClusterSink(big.size), spot.center.Z)
+		end
+	end
 	return out
 end
 
@@ -4799,6 +4888,7 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 	if cachedForestTrees then
 		return cachedForestTrees
 	end
+	TerrainGen.UsePriorGround(true)
 	local out: { TreeSpot } = {}
 	local rng = Kit.rng(hashString("forest trees"))
 	local mill = Vector2.new(WorldLayout.Sawmill.X, WorldLayout.Sawmill.Z)
@@ -5051,6 +5141,13 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 		end
 	end
 
+	TerrainGen.UsePriorGround(false)
+	if not WorldLayout.ClassicOn() then
+		for _, spot in ipairs(out) do
+			local p = spot.position
+			spot.position = Vector3.new(p.X, TerrainGen.LiveHeightAt(p.X, p.Z) - 0.3, p.Z)
+		end
+	end
 	cachedForestTrees = out
 	return out
 end

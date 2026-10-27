@@ -47,3 +47,15 @@ views (`bash tools/preview/shoot.sh <scene> <view>`): town 1 and 2, town 1 at 84
 roads 1 and 3, plot 1 and 3, machines 1, pads 1, landmarks 2. `sawmill-lanes` (views 1 to 4) draws the
 lane and door boxes from `Shared/Lint/LaneData` over the sawmill (the "before" side uses the same boxes
 over the old sawmill). These are flat-colour previews, not Studio.
+
+## T409 ground cameras
+
+`bash tools/preview/shoot.sh t409-ground <view>`. The mesh is sampled every 2 studs so the few-stud belt beside a road is in the picture. `preview/t409/before/t409-ground-*.png` is origin/main (`a276c1b`). `preview/t409/after/t409-ground-*.png` is this branch.
+
+| View | File | What it shows |
+|------|------|----------------|
+| 1 | `t409-ground-1.png` | Frostpeak meets Skyroot, top down. The snow edge is a dithered belt. |
+| 2 | `t409-ground-2.png` | Gate lodge on the Skyroot approach. |
+| 3 | `t409-ground-3.png` | Valley Trunk belt, cross section. The bed is warm RoadGravel `#A8A49C`. The same camera on main is the old dark `#55585A`. |
+
+The town, roads, plot and store pairs above are the round-1 set. Several of those afters match their befores: those scenes do not draw this ground.
