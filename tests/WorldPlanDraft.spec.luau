@@ -134,7 +134,7 @@ return function(t)
 		local want = {
 			valley = { 0, 80, 220, "ground" },
 			pine = { -420, 110, 180, "ground" },
-			frost = { -200, 900, 160, "ground" },
+			frost = { -340, 1000, 160, "ground" },
 			caldera = { 700, 900, 160, "ground" },
 			gloam = { -565, -455, 140, "ground" },
 			bayou = { -700, -700, 150, "ground" },
@@ -152,15 +152,30 @@ return function(t)
 			t.eq(regionRow.proposed, true, id)
 		end
 		t.eq(#Draft.OverlapHits(), 0)
-		local report = Draft.OverlapReport()
-		t.eq(#report, 1)
-		t.ok(string.find(report[1], "frost/skyroot", 1, true) ~= nil, report[1])
+		t.eq(#Draft.OverlapReport(), 0)
+		t.eq(Draft.KnownOverlap, nil)
 		local kiss = Draft.DiscGap(Draft.GetRegion("bayou"), Draft.GetRegion("gloam"))
 		t.ok(kiss < 0 and kiss >= -Draft.OverlapSlop, string.format("bayou/gloam kiss %.1f", kiss))
-		local shoulder = Draft.DiscGap(Draft.GetRegion("skyroot"), Draft.GetRegion("frost"))
-		t.ok(shoulder < -100, "locked ground discs overlap; centres stay")
-		t.eq(Draft.KnownOverlap.a, "frost")
-		t.eq(Draft.KnownOverlap.b, "skyroot")
+		local frost = Draft.GetRegion("frost")
+		local sky = Draft.GetRegion("skyroot")
+		local apart = dist(frost, sky)
+		t.ok(apart >= frost.radius + sky.radius + 10, string.format("frost/skyroot centres %.1f", apart))
+		local gap = Draft.DiscGap(sky, frost)
+		t.ok(gap >= 10, string.format("frost/skyroot gap %.1f", gap))
+		t.eq(frost.pastLive, Draft.PastLive)
+		t.eq(region("isle").pastLive, Draft.PastLive)
+		t.eq(Draft.PastLive, "outside-world-half")
+		t.ok(frost.z + frost.radius > WorldLayout.WorldHalf, "frost rim past the live square")
+		t.ok(frost.z <= WorldLayout.WorldHalf, "the centre sits on the north edge")
+		t.ok(region("isle").x > WorldLayout.WorldHalf, "isle centre past the live square")
+		local frostRoad = Draft.GetRoad("Frost Road")
+		t.eq(frostRoad.points[1].x, -178)
+		t.eq(frostRoad.points[1].z, 691)
+		t.eq(frostRoad.points[#frostRoad.points].x, frost.x)
+		t.eq(frostRoad.points[#frostRoad.points].z, frost.z)
+		local skyroad = Draft.GetRoad("Skyroot Road")
+		t.eq(skyroad.points[4].x, -178)
+		t.eq(skyroad.points[4].z, 691)
 		for _, isle in ipairs(Draft.Clouds) do
 			t.eq(isle.built, false)
 		end

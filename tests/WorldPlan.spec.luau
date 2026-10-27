@@ -3320,7 +3320,7 @@ return function(t)
 		local want = {
 			valley = { 0, 80, 220 },
 			pine = { -420, 110, 180 },
-			frost = { -200, 900, 160 },
+			frost = { -340, 1000, 160 },
 			caldera = { 700, 900, 160 },
 			gloam = { -565, -455, 140 },
 			bayou = { -700, -700, 150 },
@@ -3348,7 +3348,8 @@ return function(t)
 		t.eq(Draft.Lodge.z, 720)
 		t.eq(Draft.Lodge.facing, "north")
 		t.eq(#Draft.OverlapHits(), 0)
-		t.eq(#Draft.OverlapReport(), 1)
+		t.eq(#Draft.OverlapReport(), 0)
+		t.eq(Draft.GetRegion("frost").pastLive, Draft.GetRegion("isle").pastLive)
 		t.eq(Draft.TrunkLift.built, false)
 		t.eq(Draft.TrunkLift.x, Draft.Skyroot.x)
 		t.eq(Draft.TrunkLift.z, Draft.Skyroot.z)

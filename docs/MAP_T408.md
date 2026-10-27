@@ -35,13 +35,13 @@ Locked, because the game or the brief already has the number:
 - Odds & Ends stays at the Pine/Gloam cross, (−460, −300).
 - The live ferry dock `(780, 136)` and the live isle centre stay until a build. The picture draws the ferry to the draft isle.
 
-Builder discs, for this picture only. `OverlapHits()` is empty: same-layer discs may kiss by 12 studs (Bayou and Gloam miss a tangent by about 10, and those centres stay). Skyroot is the cloud layer, so it may sit over Frostpeak in plan. Connor can move them before anyone builds terrain:
+Builder discs, for this picture only. `OverlapHits()` is empty: same-layer discs may kiss by 12 studs (Bayou and Gloam miss a tangent by about 10, and those centres stay). Connor can move the rest before anyone builds terrain:
 
 | Region | Centre | r | Layer |
 |---|---|---|---|
 | Timber Valley | (0, 80) | 220 | ground |
 | Pine Ridge | (−420, 110) | 180 | ground |
-| Frostpeak | (−200, 900) | 160 | ground |
+| Frostpeak | (−340, 1000) | 160 | ground |
 | Ember Caldera | (700, 900) | 160 | ground |
 | Gloam Ravine | (−565, −455) | 140 | ground |
 | Bayou | (−700, −700) | 150 | ground |
@@ -51,7 +51,7 @@ Builder discs, for this picture only. `OverlapHits()` is empty: same-layer discs
 
 Skyroot Highlands is the ground summit. Walkable cloud isles are separate `CloudIsle` rows, annotated and not built. The gate lodge is (−40, 720), facing north, on the switchback just south of the summit. Its height is `TerrainGen.HeightAt` when T409 builds it. This plan stores the XZ.
 
-Frostpeak (−200, 900, 160) and Skyroot are both ground, and the locked discs overlap by about 158 studs. The centres stay. `OverlapHits()` is empty apart from that pair, which `KnownOverlap` records for Connor.
+Frostpeak is (−340, 1000), radius 160, layer ground. Skyroot stays (−60, 800), radius 170, layer ground. The centres are about 344 studs apart, so the discs clear by about 14 studs. `OverlapHits()` is empty. There is no `KnownOverlap`. The Frostpeak centre sits on the north edge of the live square. Radius 160 carries the rim to z 1160, past `WorldHalf` 1000. That is the same class as Lantern Isle: drawn on this picture, not built, until T409 grows the map.
 
 - Spawn stays (0, 0.5, 40). The sawmill stays (0, 110).
 - River centre x = 113 (26 studs east of the sell floor's east edge). Channel half-width 18. The west bank stays off the sell floor.
@@ -61,7 +61,7 @@ Frostpeak (−200, 900, 160) and Skyroot are both ground, and the locked discs o
 
 ## The river and the bay
 
-The channel starts east of Frostpeak, runs south on x = 113 past the Weigh House, and opens into the southeast bay (water east of x 960). West of the channel is the timber country: town, Pine Ridge, Frostpeak, the Skyroot, Gloam Ravine, the Bayou. East of it is the shore the Dealership, the plots, the Caldera and Red Mesa sit on, and then the bay. Lantern Isle is in that bay, past the live world edge. The lighthouse mark is on the east headland. The live tower is not moved.
+The channel starts east of Frostpeak, runs south on x = 113 past the Weigh House, and opens into the southeast bay (water east of x 960). West of the channel is the timber country: town, Pine Ridge, Frostpeak, the Skyroot, Gloam Ravine, the Bayou. East of it is the shore the Dealership, the plots, the Caldera and Red Mesa sit on, and then the bay. Lantern Isle is in that bay, past the live world edge. Frostpeak's north rim is past that same edge. The lighthouse mark is on the east headland. The live tower is not moved.
 
 One lift bridge, at (113, 80), where the east road leaves town. Towers on the two banks. $100. The Caldera road branches off on the east bank, so it does not need a second bridge and a second fare. Logs on the river are later. This plan does not float them.
 
@@ -73,7 +73,7 @@ One lift bridge, at (113, 80), where the east road leaves town. Towers on the tw
 | Main Street | 32 | Town street to the one lift bridge |
 | Skyroot Road | 32 | Switchback from the trunk's north end to the gate lodge (−40, 720). Sign: SKY PASS |
 | Pine Road | 24 | Trunk to Pine Ridge |
-| Frost Road | 24 | Switchback to Frostpeak. Coat kiosk at the foot |
+| Frost Road | 24 | From the switchback hairpin (−178, 691) to Frostpeak (−340, 1000). Coat kiosk at the foot. The rest of the road network is unchanged |
 | Bay Road | 24 | Bridge, east bank, mainland dock for the picture ferry |
 | Dealership Spur | 24 | Up from the bay road to the hall door |
 | Caldera Road | 24 | East bank north to the caldera. Heat Boots at the rest stop |
@@ -95,7 +95,7 @@ There is no ring, and no truck tunnel, on this plan. The live ring and the live 
 | 3 | Weigh House (53, 111) | Millie buys logs. Truck back-in. Kept. |
 | 4 | Land Office (153.5, 100) | Old Hank, at the plot edge. |
 | 5 | Dealership (189.25, 100.3) | Trucks, across the first lift bridge. |
-| 6 | Coat kiosk (−152, 713) | Insulated Coat, $500, at the Frostpeak road foot. |
+| 6 | Coat kiosk (−153, 704) | Insulated Coat, $500, at the Frostpeak road foot. |
 | 7 | Heat Boots (728, 700) | Heat Boots, $800, at the caldera rest stop. |
 | 8 | Odds & Ends (−460, −300) | Where the Pine link meets the Gloam road. |
 | 9 | Sparkworks (1115, −700) | On the draft isle harbour. The live shop at (135, 132) stays until a build. |
@@ -157,10 +157,10 @@ This is a picture. Studio has nothing new to walk. Look at `previews/t408/overvi
 3. The draft prices the bridge at `TollFee` $100 and the ferry at `FerryFare` $400. An earlier note said both free for V1. The picture uses the two live keys. Which do you want?
 4. The ground court's keeper, temper spot and four sockets are MustKeep. Move them onto the cloud forge, or keep a court on the ground?
 5. The north toll counter is also MustKeep. Is the town lift bridge that toll moved, or do both crossings stay?
-6. Locked: gate lodge (−40, 720) facing north. Skyroot radius 170, layer ground. Frostpeak and Skyroot overlap by about 158 studs. Shrink one before T409, or keep the shared shoulder?
+6. Locked: gate lodge (−40, 720) facing north. Skyroot (−60, 800), radius 170, layer ground. Frostpeak (−340, 1000), radius 160, layer ground. The discs clear. Frostpeak's north rim passes WorldHalf 1000, the same class as Lantern Isle.
 7. y 800→880 is an 80-stud ride. A haul grade of 0.2 cannot climb to world-height 800 inside this square (that wants about 4,000 studs of road). Is 800 the height up the trunk from the lodge, or the world height of the lodge?
 8. Three cloud isles are drawn and not built. Root bridges are out. Do you still want separate walkable isles, and if so how do you cross?
-9. Lantern Isle at (1200, −700) sits outside the live world (WorldHalf 1000). The picture ferry runs from (920, −640) to (1100, −700). The live dock stays at (780, 136). Grow the map in T409?
+9. Lantern Isle at (1200, −700) sits outside the live world (WorldHalf 1000). Frostpeak's north rim does too (centre on z 1000, rim at z 1160). Same class: the picture shows both, and neither is built. The picture ferry runs from (920, −640) to (1100, −700). The live dock stays at (780, 136). Grow the map in T409?
 10. The secret shop has no name and no stock. What is it, and what does it sell?
 11. Sparkworks moves to the harbour only when this plan is built. The live shop stays at (135, 132). Confirm the move.
 12. The meadow lookout: keep it as a view of town, or remove it with the court?

@@ -46,6 +46,10 @@ export type Region = {
 	tint: string,
 	layer: string,
 	proposed: boolean,
+	-- Set when the disc leaves the live square (WorldHalf 1000). Isle's
+	-- centre is outside. Frostpeak's centre sits on the north edge and the
+	-- rim runs past it. Same class. Neither is built.
+	pastLive: string?,
 }
 export type CloudIsle = { id: string, x: number, z: number, radius: number, y: number, built: boolean }
 export type Marker = {
@@ -255,8 +259,12 @@ local skyroot = xz(-60, 800)
 -- height is TerrainGen.HeightAt when T409 builds it. This plan stores XZ.
 local lodge = xz(-40, 720)
 local cross = xz(-460, -300)
+-- Switchback hairpin. Skyroot Road keeps this vertex. Frost Road still
+-- starts here and ends at the peak, so only the frost approach moves.
 local frostFoot = xz(-178, 691)
-local frostPeak = xz(-200, 900)
+-- Builder lock. Radius stays 160. The north rim (z + radius) passes WorldHalf.
+local FROST_R = 160
+local frostPeak = xz(-340, 1000)
 local calderaRest = xz(700, 700)
 local calderaCone = xz(700, 900)
 
@@ -281,7 +289,7 @@ local pal = WorldPlanDraft.Palette
 WorldPlanDraft.Regions = {
 	disc(1, "valley", "Timber Valley", 0, 80, 220, pal.valley, "ground"),
 	disc(2, "pine", "Pine Ridge", -420, 110, 180, pal.pine, "ground"),
-	disc(3, "frost", "Frostpeak", -200, 900, 160, pal.snow, "ground"),
+	disc(3, "frost", "Frostpeak", frostPeak.x, frostPeak.z, FROST_R, pal.snow, "ground"),
 	disc(4, "caldera", "Ember Caldera", 700, 900, 160, pal.ash, "ground"),
 	disc(5, "gloam", "Gloam Ravine", -565, -455, 140, pal.gloam, "ground"),
 	disc(6, "bayou", "Bayou", -700, -700, 150, pal.bayou, "ground"),
@@ -289,6 +297,16 @@ WorldPlanDraft.Regions = {
 	disc(8, "isle", "Lantern Isle", 1200, -700, 120, pal.sand, "ground"),
 	disc(9, "skyroot", "Skyroot Highlands", skyroot.x, skyroot.z, SKYROOT_R, pal.canopy, "ground"),
 } :: { Region }
+
+-- Picture discs that leave the live square. Same class: drawn, not built.
+-- T409 grows the map before either becomes terrain.
+local PAST_LIVE = "outside-world-half"
+WorldPlanDraft.PastLive = PAST_LIVE
+for _, region in ipairs(WorldPlanDraft.Regions) do
+	if region.id == "frost" or region.id == "isle" then
+		region.pastLive = PAST_LIVE
+	end
+end
 
 WorldPlanDraft.Spawn = xz(spawn.X, spawn.Z)
 WorldPlanDraft.SpawnY = spawn.Y
@@ -977,13 +995,6 @@ end
 
 WorldPlanDraft.Belts = belts
 
--- Locked centres. Both discs are ground, and they overlap. Not moved.
-WorldPlanDraft.KnownOverlap = {
-	a = "frost",
-	b = "skyroot",
-	note = "Frostpeak and Skyroot Highlands are both ground and both locked. Their discs overlap. Connor decides before T409 whether one shrinks or the shoulder is shared.",
-}
-
 function WorldPlanDraft.GetRegion(id: string): Region
 	for _, row in ipairs(WorldPlanDraft.Regions) do
 		if row.id == id then
@@ -1003,17 +1014,16 @@ function WorldPlanDraft.DiscGap(a: Region, b: Region): number
 	return math.sqrt(dx * dx + dz * dz) - a.radius - b.radius
 end
 
-local function overlapRows(includeKnown: boolean): { string }
+-- Same-layer discs closer than OverlapSlop. No pair is left out.
+function WorldPlanDraft.OverlapHits(): { string }
 	local hits: { string } = {}
-	local known = WorldPlanDraft.KnownOverlap
 	local regions = WorldPlanDraft.Regions
 	for i = 1, #regions do
 		for j = i + 1, #regions do
 			local a, b = regions[i], regions[j]
 			if a.layer == b.layer then
 				local gap = WorldPlanDraft.DiscGap(a, b)
-				local named = (a.id == known.a and b.id == known.b) or (a.id == known.b and b.id == known.a)
-				if gap < -WorldPlanDraft.OverlapSlop and (includeKnown or not named) then
+				if gap < -WorldPlanDraft.OverlapSlop then
 					table.insert(hits, string.format("%s/%s overlap by %.0f", a.id, b.id, -gap))
 				end
 			end
@@ -1022,13 +1032,8 @@ local function overlapRows(includeKnown: boolean): { string }
 	return hits
 end
 
--- Unexpected overlaps. The locked Frostpeak/Skyroot pair is reported separately.
-function WorldPlanDraft.OverlapHits(): { string }
-	return overlapRows(false)
-end
-
 function WorldPlanDraft.OverlapReport(): { string }
-	return overlapRows(true)
+	return WorldPlanDraft.OverlapHits()
 end
 
 function WorldPlanDraft.GetShop(id: string): Shop

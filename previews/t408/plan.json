@@ -91,10 +91,10 @@
       "accentDepth": 10,
       "depthStuds": 48,
       "edge": {
-        "x": -183.25091552734375,
-        "z": 740.8836975097656
+        "x": -265.70880126953125,
+        "z": 858.2964172363281
       },
-      "fromRegion": "skyroot",
+      "fromRegion": "corridor",
       "gateClearStuds": 30,
       "id": "Frost Road->frost",
       "materials": [
@@ -103,8 +103,8 @@
         "FreshSnow"
       ],
       "outer": {
-        "x": -178.2260458704777,
-        "z": 693.1474357695381
+        "x": -243.42104446199193,
+        "z": 815.7845848071328
       },
       "roadId": "Frost Road",
       "toRegion": "frost",
@@ -1415,8 +1415,8 @@
       "offset": 22,
       "radius": 6,
       "road": "Frost Road",
-      "x": -165.5425106423529,
-      "z": 782.8085560223235
+      "x": -200.304954150755,
+      "z": 780.9249076748634
     },
     {
       "along": 180,
@@ -1424,8 +1424,17 @@
       "offset": 22,
       "radius": 6,
       "road": "Frost Road",
-      "x": -218.72238117751863,
-      "z": 867.7079162664562
+      "x": -281.0636778916536,
+      "z": 840.2041497393604
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Frost Road",
+      "x": -283.8840421790274,
+      "z": 940.3442792843459
     },
     {
       "along": 32,
@@ -1433,8 +1442,8 @@
       "offset": 30,
       "radius": 3,
       "road": "Frost Road",
-      "x": -151.51474951693518,
-      "z": 725.9647180290262
+      "x": -166.28860927011246,
+      "z": 733.2710696241757
     },
     {
       "along": 64,
@@ -1442,8 +1451,8 @@
       "offset": 30,
       "radius": 3,
       "road": "Frost Road",
-      "x": -214.5349897967969,
-      "z": 751.5078054514287
+      "x": -234.28690434496616,
+      "z": 733.752595234215
     },
     {
       "along": 96,
@@ -1451,8 +1460,8 @@
       "offset": 30,
       "radius": 3,
       "road": "Frost Road",
-      "x": -158.21457572608992,
-      "z": 789.6130670159962
+      "x": -196.00561834683154,
+      "z": 789.9535128631028
     },
     {
       "along": 128,
@@ -1460,8 +1469,8 @@
       "offset": 30,
       "radius": 3,
       "road": "Frost Road",
-      "x": -221.23481600595164,
-      "z": 815.1561544383987
+      "x": -264.00391342168524,
+      "z": 790.4350384731422
     },
     {
       "along": 160,
@@ -1469,8 +1478,8 @@
       "offset": 30,
       "radius": 3,
       "road": "Frost Road",
-      "x": -164.91440193524465,
-      "z": 853.2614160029663
+      "x": -225.7226274235506,
+      "z": 846.6359561020299
     },
     {
       "along": 192,
@@ -1478,8 +1487,44 @@
       "offset": 30,
       "radius": 3,
       "road": "Frost Road",
-      "x": -227.93464221510638,
-      "z": 878.8045034253687
+      "x": -293.7209224984043,
+      "z": 847.1174817120693
+    },
+    {
+      "along": 224,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -255.43963650026967,
+      "z": 903.3183993409571
+    },
+    {
+      "along": 256,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -323.4379315751234,
+      "z": 903.7999249509965
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -285.15664557698875,
+      "z": 960.0008425798842
+    },
+    {
+      "along": 320,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -353.1549406518424,
+      "z": 960.4823681899236
     },
     {
       "along": 64,
@@ -1487,8 +1532,8 @@
       "offset": 18,
       "radius": 4,
       "road": "Frost Road",
-      "x": -166.79872805656942,
-      "z": 756.5326751082947
+      "x": -191.77507191577084,
+      "z": 756.0403520417544
     },
     {
       "along": 128,
@@ -1496,8 +1541,8 @@
       "offset": 18,
       "radius": 4,
       "road": "Frost Road",
-      "x": -209.3007505708948,
-      "z": 816.4123718526153
+      "x": -253.3759553143864,
+      "z": 796.006977675027
     },
     {
       "along": 192,
@@ -1505,8 +1550,35 @@
       "offset": 18,
       "radius": 4,
       "road": "Frost Road",
-      "x": -180.1983804748789,
-      "z": 883.8293730822347
+      "x": -251.209090069209,
+      "z": 869.4052385196087
+    },
+    {
+      "along": 256,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Frost Road",
+      "x": -312.8099734678246,
+      "z": 909.3718641528812
+    },
+    {
+      "along": 320,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Frost Road",
+      "x": -310.6431082226471,
+      "z": 982.770124997463
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Frost Road",
+      "x": -253.1523898525824,
+      "z": 877.419200458122
     },
     {
       "along": 90,
@@ -4307,11 +4379,6 @@
     "x": 1100,
     "z": -700
   },
-  "knownOverlap": {
-    "a": "frost",
-    "b": "skyroot",
-    "note": "Frostpeak and Skyroot Highlands are both ground and both locked. Their discs overlap. Connor decides before T409 whether one shrinks or the shoulder is shared."
-  },
   "liftBridgeFee": 100,
   "liftLogs": 5,
   "liftY0": 800,
@@ -4369,6 +4436,7 @@
     "valley": "6E9F45",
     "water": "4E7E93"
   },
+  "pastLive": "outside-world-half",
   "plume": {
     "x": 736,
     "z": 936
@@ -4533,11 +4601,12 @@
       "layer": "ground",
       "name": "Frostpeak",
       "order": 3,
+      "pastLive": "outside-world-half",
       "proposed": true,
       "radius": 160,
       "tint": "EEF3F7",
-      "x": -200,
-      "z": 900
+      "x": -340,
+      "z": 1000
     },
     {
       "id": "caldera",
@@ -4588,6 +4657,7 @@
       "layer": "ground",
       "name": "Lantern Isle",
       "order": 8,
+      "pastLive": "outside-world-half",
       "proposed": true,
       "radius": 120,
       "tint": "D8C69A",
@@ -4805,8 +4875,8 @@
           "z": 691
         },
         {
-          "x": -200,
-          "z": 900
+          "x": -340,
+          "z": 1000
         }
       ],
       "sign": "FROSTPEAK",
@@ -5041,8 +5111,8 @@
       "label": "COAT KIOSK",
       "n": 6,
       "why": "Insulated Coat, $500. At the Frostpeak road foot, before the cold.",
-      "x": -150.15384731820063,
-      "z": 693.9311739665052
+      "x": -153.20143108296938,
+      "z": 704.0011914710645
     },
     {
       "id": "HeatBoots",

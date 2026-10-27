@@ -23,8 +23,9 @@ OUT = os.path.join(ROOT, "previews", "t408")
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONTB = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-# Plan bounds. The isle sits past the live WorldHalf, so the picture is
-# wider than the current square. North is up. One scale, no stretch.
+# Plan bounds. Lantern Isle and the Frostpeak rim sit past the live
+# WorldHalf (1000), so the picture is wider than the current square.
+# North is up. One scale, no stretch.
 X0 = -1000.0
 Z1 = 1500.0
 SPAN = 2500.0
@@ -320,6 +321,35 @@ def draw_overview(plan: dict) -> Image.Image:
     draw.rectangle((lx - 4, ly, lx + 4, ly + 14), fill=ink)
     halo(draw, (lx, ly + 22), "LIGHTHOUSE", tiny, ink, cream, "mt")
 
+    # Live square. A dashed edge, not a road. Frost's rim and the isle cross it.
+    def dashed(a, b, dash=12, gap=8):
+        ax, ay = a
+        bx, by = b
+        dx, dy = bx - ax, by - ay
+        length = (dx * dx + dy * dy) ** 0.5
+        if length < 1:
+            return
+        ux, uy = dx / length, dy / length
+        t = 0.0
+        while t < length:
+            t2 = min(length, t + dash)
+            draw.line(
+                [(ax + ux * t, ay + uy * t), (ax + ux * t2, ay + uy * t2)],
+                fill=ink,
+                width=2,
+            )
+            t = t2 + gap
+
+    half = 1000.0
+    live = [m.px(x, z) for x, z in ((-half, -half), (half, -half), (half, half), (-half, half), (-half, -half))]
+    for i in range(4):
+        dashed(live[i], live[i + 1])
+    halo(draw, m.px(half - 70, half - 28), "LIVE EDGE", tiny, ink, cream, "mm")
+    for region in plan["regions"]:
+        if region.get("pastLive"):
+            label_at = (region["x"], region["z"] + region["radius"] + 36)
+            halo(draw, m.px(*label_at), "PAST LIVE EDGE", tiny, ink, cream, "mm")
+
     # Region names.
     name_font = load_font(FONTB, 14)
     nudges = {
@@ -437,7 +467,8 @@ def draw_overview(plan: dict) -> Image.Image:
         "Cloud isles and the trunk lift are notes only.",
         "Corridors are dressed. Belts are 48 studs.",
         "Foot belts are 32. Gate apron clears 30.",
-        "Frost and Skyroot discs overlap. Centres stay.",
+        "Frost rim and Lantern Isle sit past WorldHalf 1000.",
+        "Dashed square is the live edge, not a road.",
     ]
     for note in notes:
         draw.text((lx0, y), note, font=small, fill=ink)

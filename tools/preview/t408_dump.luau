@@ -65,7 +65,7 @@ local out = {
 	corridor = Draft.Corridor,
 	belts = Draft.Belts,
 	dressing = Draft.Dressing,
-	knownOverlap = Draft.KnownOverlap,
+	pastLive = Draft.PastLive,
 	buildNotes = Draft.BuildNotes,
 }
 
