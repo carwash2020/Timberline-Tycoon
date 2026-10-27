@@ -65,8 +65,8 @@ return function(t)
 		Ground = "8E6C4A",
 		Mud = "5A4A3E", -- unchanged: the colour it had
 		Rock = "7E766C", -- unchanged: the colour it had
-		Slate = "7C7A6A",
-		Asphalt = "55585A",
+		Slate = "5B5650",
+		Asphalt = "A8A49C",
 		Sand = "D8C69A",
 		Snow = "EEF3F7",
 		Glacier = "A9D3E6",

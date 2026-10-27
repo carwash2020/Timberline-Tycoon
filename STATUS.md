@@ -17,11 +17,17 @@ GrabService spec fix; #147 launch settings; #148 and #149 hardening; #150 client
 first screen fix; #153 startup errors; #154 server audit (staged terrain, save prefetch); #155 client freeze; #156 meshes never
 block the build; #157 client audit; #158 world first look; #159 store interiors: the kit, Tool Shed, Hearth & Home, Sparkworks and Dealership (#160 to #162 squashed in).
 
-**Still open:** only this branch (docs, CI pin, Reduce flashing). All four store interiors (Tool Shed, Hearth & Home, Sparkworks, Dealership; #159 squashed #160 to #162 in) are on main, with `previews/store-interiors/`.
+**Still open:** T409 (this branch) builds the river-valley ground. Older "only this branch" notes below are history.
 
-## T408 map plan (draft, not built)
+## T409 living ground (27 October 2026, branch `cursor/t409-terrain-86a7`)
 
-Connor approved the nine-region picture with notes. It still does not change the live map: `TerrainGen`, `WorldPlan` and `MapBuilder` do not read it. Skyroot Highlands is the ground summit at (−60, 800), radius 170. The gate lodge is (−40, 720), facing north. Cloud isles stay separate notes. Frostpeak is (−340, 1000), radius 160, layer ground, clear of Skyroot. Its north rim passes WorldHalf 1000, the same class as Lantern Isle. `OverlapHits()` is empty. Corridors carry roadside markers and 48-stud blend belts (32 on a foot road) for T409. The picture is `previews/t408/overview.png`. Removals stay cards, not deletions. The cabin card does not name the removed ride script, so the source scan from that removal stays clean. The ring road and the truck tunnel stay a T409 redo. Studio has nothing new to walk.
+The nine T408 regions are the ground you drive. `TerrainGen.HeightAt` is that one landform (`ValleyGround`); the classic ground is still there for the first trees and is unchanged. WorldHalf is 1350, so Frostpeak's north rim and Lantern Isle sit inside the square. Blend belts are 48 studs on a trunk and 32 on a foot road (`gateClear` 30). Roadside stamps (signs, scatter, odd wood lots under the wood-part cap) stream in and do not collide. The gate lodge is at (−40, 720), facing north, on `HeightAt`. Its door moved with it: `tests/mustkeep.json` is now (−48.00, 41.21, 730.05). Country roads stay terrain gravel (`Asphalt` #A8A49C). No cliff meshes were uploaded, so the cliffs are terrain, not parts. Cloud isles, the gondola, shops, fares and saves are untouched.
+
+The live height fingerprint was re-sampled once. Was sum 68494.704463124, wsum 2.750488850, sq 4785571.335868491. Now sum 68174.730151801, wsum 161.629373361, sq 4489556.241387829. `lo` and `hi` and the classic fingerprint did not move. The tree plan kept all 1,052 trees at the same X and Z. The checksum moved 10199207 → 12618450 because each tree's Y is the valley height. Nothing here has been seen in Studio. Cloud tests do not run physics. Studio checks: PHASE2_NOTES.md "T409 living ground".
+
+## T408 map plan (built by T409)
+
+Connor approved the nine-region picture with notes. T409 (above) is that picture as the live ground. The draft note below is how it was approved: `TerrainGen`, `WorldPlan` and `MapBuilder` do not read it. Skyroot Highlands is the ground summit at (−60, 800), radius 170. The gate lodge is (−40, 720), facing north. Cloud isles stay separate notes. Frostpeak is (−340, 1000), radius 160, layer ground, clear of Skyroot. Its north rim passes WorldHalf 1000, the same class as Lantern Isle. `OverlapHits()` is empty. Corridors carry roadside markers and 48-stud blend belts (32 on a foot road) for T409. The picture is `previews/t408/overview.png`. Removals stay cards, not deletions. The cabin card does not name the removed ride script, so the source scan from that removal stays clean. The ring road and the truck tunnel stay a T409 redo. Studio has nothing new to walk.
 
 **Stages:** with #138 on main the `Stage:S1` to `S8` keys are written (`MilestoneService.CheckStages`); the stage (`StageOf`)
 still also comes from the best axe and gear. S8 (Master Timber) is set only by its key: deriving it from a full plot is awaiting

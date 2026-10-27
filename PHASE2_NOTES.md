@@ -1,5 +1,18 @@
 # Phase 2+ build notes
 
+## T409 living ground (27 October 2026, branch `cursor/t409-terrain-86a7`)
+
+Nothing here has been seen in Studio. Cloud tests sample `HeightAt` and materials only; they do not run physics. No cliff MeshIds were uploaded, so there is no part-built cliff. The roadside stamps reuse the prop kit and are not trees you can cut.
+
+Studio checks (five):
+1. Sync Rojo. Drive one trunk road for about 30 seconds at a normal truck pace (about 26 studs/s). The roadside changes as you go: ground colour, a scatter of props, a sign. It is not a bare gravel cut.
+2. The gate lodge is at (−40, 720), facing north, sitting on the ground. The door is on the north face. The bar is across the lane.
+3. Where Frostpeak meets Skyroot, and where the valley trunk leaves town, the materials blend. There is no hard seam.
+4. Frostpeak's north rim (about z 1160) and Lantern Isle are on the map. The old wall at 1000 studs is gone.
+5. The toll bridge still meets its deck. A country road is gravel you can drive. A face steeper than a cliff is rock, not grass.
+
+Live height fingerprint, re-sampled once: was sum 68494.704463124, wsum 2.750488850, sq 4785571.335868491; now sum 68174.730151801, wsum 161.629373361, sq 4489556.241387829. `lo`, `hi` and the classic fingerprint did not move. Tree checksum 10199207 → 12618450 (same X and Z, Y is the valley). Bay Road is a dry causeway, so the ocean sample in Terrain.spec moved from (900, −300) to (1000, −300).
+
 ## Dealership restyle (Studio checks, branch `phase-2/store-restyle-dealership`)
 
 None of this has been seen in Studio. Do each on PC, then phone (667x375), then Xbox where it has a button.

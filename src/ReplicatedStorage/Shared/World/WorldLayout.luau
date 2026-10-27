@@ -33,7 +33,11 @@ function WorldLayout.SetClassicGround(on: boolean)
 	classicGround = on
 end
 
-WorldLayout.WorldHalf = 1000 -- the playable square runs from -1000 to 1000
+function WorldLayout.ClassicOn(): boolean
+	return classicGround or legacyLayout
+end
+
+WorldLayout.WorldHalf = 1350 -- the playable square; Frostpeak's rim and Lantern Isle fit (T409)
 WorldLayout.TerrainSkirt = 200 -- generated past the edge so the camera never sees under the world
 WorldLayout.Sawmill = Vector3.new(0, 0, 110)
 WorldLayout.SeaLevel = -3 -- ocean surface

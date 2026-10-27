@@ -2,9 +2,9 @@
 -- WorldPlanDraft (T408): the river-valley plan for Connor to approve.
 -- docs/MAP_T408.md is the write-up. The picture is previews/t408/overview.png.
 --
--- Nothing live reads this module. TerrainGen, WorldPlan and MapBuilder do
--- not require it, and this file does not require them. Approving the
--- picture is what allows a later terrain build. This PR does not build it.
+-- T409 builds this. TerrainGen (through ValleyGround) and the corridor
+-- stamps read the centres, the roads and the belts. The numbers stay the
+-- contract: do not invent new centres.
 --
 -- Shop pins, toll, ferry fares and the trunk-lift sizes are read from
 -- the live modules or copied from the MustKeep list. The nine region
@@ -298,12 +298,16 @@ WorldPlanDraft.Regions = {
 	disc(9, "skyroot", "Skyroot Highlands", skyroot.x, skyroot.z, SKYROOT_R, pal.canopy, "ground"),
 } :: { Region }
 
--- Picture discs that leave the live square. Same class: drawn, not built.
--- T409 grows the map before either becomes terrain.
+-- A disc is past the live square when its centre or its rim leaves
+-- WorldHalf. At 1350, Frostpeak and Lantern Isle both fit.
 local PAST_LIVE = "outside-world-half"
 WorldPlanDraft.PastLive = PAST_LIVE
 for _, region in ipairs(WorldPlanDraft.Regions) do
-	if region.id == "frost" or region.id == "isle" then
+	local past = math.abs(region.x) > WorldLayout.WorldHalf
+		or math.abs(region.z) > WorldLayout.WorldHalf
+		or math.abs(region.x) + region.radius > WorldLayout.WorldHalf
+		or math.abs(region.z) + region.radius > WorldLayout.WorldHalf
+	if past then
 		region.pastLive = PAST_LIVE
 	end
 end
@@ -994,6 +998,8 @@ if not haveIsle then
 end
 
 WorldPlanDraft.Belts = belts
+WorldPlanDraft.Built = true
+WorldPlanDraft.Corridor.built = true
 
 function WorldPlanDraft.GetRegion(id: string): Region
 	for _, row in ipairs(WorldPlanDraft.Regions) do

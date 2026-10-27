@@ -165,6 +165,11 @@ return function(t)
 				end
 				if flat then
 					local cx, cz = x + step, z + step
+					local surface = TerrainGen.WaterLevelAt(cx, cz)
+					-- A bed under the river or the sea is not a sheet a player drives.
+					if surface ~= nil and h0 < surface - 0.05 then
+						continue
+					end
 					t.ok(onPad(cx, cz), string.format("flat 64 sheet at (%.0f, %.0f) height %.2f", cx, cz, h0))
 				end
 			end
@@ -226,10 +231,19 @@ return function(t)
 		t.eq(counts.mid % 2, 1, "mid " .. tostring(counts.mid))
 		t.eq(counts.small % 2, 1, "small " .. tostring(counts.small))
 		t.ok(Corridor.WoodParts() <= GameConfig.MaxWoodPartsServer, "wood parts")
-		t.ok(Corridor.WoodParts() > 0 and Corridor.WoodParts() % 2 == 1, "wood lots are an odd handful")
+		local lots = Corridor.WoodLots()
+		t.eq(#lots, 4, "four wood lots")
+		for _, parts in ipairs(lots) do
+			t.eq(parts % 2, 1, "each wood lot is an odd handful")
+		end
 		local lodge = Draft.Lodge
 		local function roadOf(name)
-			return Draft.GetRoad(name)
+			for _, road in ipairs(Draft.Roads) do
+				if road.name == name then
+					return road
+				end
+			end
+			return nil
 		end
 		local function distToRoad(x, z, road)
 			local best = math.huge

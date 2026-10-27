@@ -20,11 +20,15 @@ return function(t)
 	-- and once more for the dealership display lot's flat patch (and again when the showroom hall grew: its patch is x 178 to 340, z 64 to 166, and The Climb
 	-- moved 55 studs north, so its lane is a little shorter). The shelves
 	-- are flat at their own height, and each lane is a sample.
+	-- T409 re-sampled the live ground on purpose: the valley landform, the
+	-- lodge pad and the graded draft beds. Was n 7717, sum 68494.704463124,
+	-- wsum 2.750488850, sq 4785571.335868491, lo -41.562571591, hi 161.576039894.
+	-- The classic fingerprint below is the first trees' ground and did not move.
 	local HEIGHT_FINGERPRINT = {
 		n = 7717,
-		sum = 68494.704463123969617,
-		wsum = 2.750488850115767,
-		sq = 4785571.335868490859866,
+		sum = 68174.730151800889871,
+		wsum = 161.629373360876457,
+		sq = 4489556.241387829184532,
 		lo = -41.562571590540983,
 		hi = 161.576039893993112,
 	}
@@ -160,8 +164,9 @@ return function(t)
 		t.ok(TerrainGen.WaterLevelAt(lake.x, lake.z) ~= nil, "lake")
 		local r = WorldLayout.River.points[3]
 		t.ok(TerrainGen.WaterLevelAt(r.X, r.Y) ~= nil, "river")
-		-- Ring map (Oct 10): the square is 2000 across, so the sea is at x 900 (it was 1400).
-		t.ok(TerrainGen.WaterLevelAt(900, -300) ~= nil, "ocean")
+		-- Bay Road is a causeway; x = 900, z = -300 is its dry shoulder.
+		-- The sea itself is east of that shoulder.
+		t.ok(TerrainGen.WaterLevelAt(1000, -300) ~= nil, "ocean")
 	end)
 
 	t.test("the volcano's crater is lava, its slopes rock, never snow", function()

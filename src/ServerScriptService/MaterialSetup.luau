@@ -42,8 +42,8 @@ MaterialSetup.Colors = {
 	Ground = Color3.fromRGB(142, 108, 74), -- #8E6C4A
 	Mud = Color3.fromRGB(90, 74, 62), -- #5A4A3E
 	Rock = Color3.fromRGB(126, 118, 108), -- #7E766C
-	Slate = Color3.fromRGB(124, 122, 106), -- #7C7A6A
-	Asphalt = Color3.fromRGB(85, 88, 90), -- #55585A
+	Slate = Color3.fromRGB(91, 86, 80), -- #5B5650 QuarrySlate
+	Asphalt = Color3.fromRGB(168, 164, 156), -- #A8A49C RoadGravel
 	-- Connor's values (21 October 2026) for every other material the terrain writes.
 	Sand = Color3.fromRGB(216, 198, 154), -- #D8C69A
 	Snow = Color3.fromRGB(238, 243, 247), -- #EEF3F7
