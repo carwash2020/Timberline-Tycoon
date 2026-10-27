@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 27 October 2026. **Main is at `045d53e` (#271, T410 round bark).** This branch restores square Block wood (`cursor/t410-square-block-wood-ee88`).
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 27 October 2026. **Main is at `fd98f20` (#273, T410 square Block wood).** This branch yields while that plan seats the country and forest trees, so ClientFreeze stays under its 100 ms stretch (`cursor/clientfreeze-seat-yield-ee88`).
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
 (#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
@@ -17,7 +17,11 @@ GrabService spec fix; #147 launch settings; #148 and #149 hardening; #150 client
 first screen fix; #153 startup errors; #154 server audit (staged terrain, save prefetch); #155 client freeze; #156 meshes never
 block the build; #157 client audit; #158 world first look; #159 store interiors: the kit, Tool Shed, Hearth & Home, Sparkworks and Dealership (#160 to #162 squashed in).
 
-**Still open:** T410-fix (this branch) puts square Block wood back. The round bark path from #271 is not the live look. T409 is on main. Older "only this branch" notes below are history.
+**Still open:** nothing in this branch changes wood, prices, or which trees exist. #273 is on main. The ClientFreeze stretch it tripped is the seat of the already-planned forest on the town's first batch; this branch yields every 8 trees there. Older "only this branch" notes below are history.
+
+## Client freeze: seat the forest in slices (27 October 2026, branch `cursor/clientfreeze-seat-yield-ee88`)
+
+`WorldPlan.Trees` seats each extra batch on the valley as it is handed over. The town's first batch also seats every country and forest tree already planned, one `LiveHeightAt` per trunk, and that loop did not yield. On this machine that was about 62 ms (54 town trunks plus 219 already planned). The #273 CI runner measured the same plan at 100.6 ms, over ClientFreeze's 100 ms limit. The pause count was unchanged from the green parent (76547), and `WorldPlan` / `TreeFill` did not change in #273. Yielding every 8 trunks, matching the final seating pass, splits that stretch. The Y values do not change. Square Block wood stays. ItemCatalog caps, bonuses and prices stay. Studio checks: PHASE2_NOTES.md "Client freeze: seat the forest in slices".
 
 ## T410-fix square Block wood (27 October 2026, branch `cursor/t410-square-block-wood-ee88`)
 

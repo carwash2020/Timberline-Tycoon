@@ -850,8 +850,16 @@ function WorldPlan.Trees(pause: (() -> ())?, emit: (({ TreeSpot }) -> ())?): { T
 			local announce: (({ TreeSpot }) -> ())? = nil
 			local function seatBatch(batch: { TreeSpot }): { TreeSpot }
 				if seating then
-					for _, spot in ipairs(batch) do
+					for i, spot in ipairs(batch) do
 						seatTree(spot)
+						-- One LiveHeightAt per trunk. The town's handover
+						-- seats the country and the forest here too, hundreds
+						-- of them in one stretch, which ran past a slice on a
+						-- slow machine. Eight at a time, same as the final
+						-- pass; the Y does not change.
+						if i % 8 == 0 then
+							breathe()
+						end
 					end
 				end
 				return batch
