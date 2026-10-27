@@ -1665,13 +1665,61 @@ legacyHeightAt = function(x: number, z: number): number
 	return cover(x, z, h)
 end
 
+-- The valley cuts banks and shelves. The mine's hill, a cave's rock roof
+-- and the volcano's cliff wall are not those cuts: they stay at least as
+-- high as the ground that roofed them before.
+local function angApart(a: number, b: number): number
+	local d = math.abs(a - b) % (math.pi * 2)
+	if d > math.pi then
+		d = math.pi * 2 - d
+	end
+	return d
+end
+
+local function volcanoWall(x: number, z: number, h: number): number
+	for _, rim in ipairs(WorldLayout.Rims) do
+		if rim.kind == "volcano" then
+			local dx, dz = x - rim.cx, z - rim.cz
+			local d = sqrt(dx * dx + dz * dz)
+			if d > rim.inner - 6 and d < rim.outer + 6 and angApart(math.atan2(dz, dx), rim.gap) > rim.half + 0.15 then
+				h = math.max(h, legacyHeightAt(x, z))
+			end
+		end
+	end
+	return h
+end
+
+-- FerryDock#2 sits on the east shore. The valley bank lowered that beach
+-- and the deck followed it. The road bed stays the graded causeway; the
+-- beach around the dock holds the old shore, then eases back.
+local FERRY_DOCK_X = 910.54
+local FERRY_DOCK_Z = -25.87
+local function ferryShore(x: number, z: number, h: number): number
+	local dx, dz = x - FERRY_DOCK_X, z - FERRY_DOCK_Z
+	local d = sqrt(dx * dx + dz * dz)
+	if d >= 48 or TerrainGen.RoadClearance(x, z) <= 6 then
+		return h
+	end
+	local prior = legacyHeightAt(x, z)
+	if prior <= h then
+		return h
+	end
+	if d <= 26 then
+		return prior
+	end
+	local t = smoothstep((d - 26) / 22)
+	return prior * (1 - t) + h * t
+end
+
 -- The height a player drives on. Placement code can ask for this while
 -- UsePriorGround is holding HeightAt on the pre-valley ground.
 function TerrainGen.LiveHeightAt(x: number, z: number): number
 	if classic() or not ValleyGround.Ready() then
 		return legacyHeightAt(x, z)
 	end
-	return ValleyGround.HeightAt(x, z)
+	local h = caveRoof(x, z, ValleyGround.HeightAt(x, z))
+	h = volcanoWall(x, z, h)
+	return ferryShore(x, z, h)
 end
 
 function TerrainGen.HeightAt(x: number, z: number): number

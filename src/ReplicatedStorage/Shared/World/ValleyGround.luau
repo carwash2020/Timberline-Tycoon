@@ -787,12 +787,17 @@ function ValleyGround.HeightAt(x: number, z: number): number
 				-- Meet the shelf at its contour, then ease back up to the
 				-- bank. The run is long enough that the ease stays under
 				-- 15 degrees. Far from the shelf the bank is left alone, so
-				-- a prop on it is not trenched.
+				-- a prop on it is not trenched. The ease used to switch on
+				-- all at once where the bank meets it, and that step was
+				-- too steep for a trunk. It comes in between 8 and 12 studs
+				-- off the gravel, and from there it is the ease it was.
 				local excess = h - cap
 				local out = bestD - bestCut
 				local run = math.max(24, excess / 0.15)
 				local along = math.clamp(out / run, 0, 1)
-				h = cap + excess * along
+				local eased = cap + excess * along
+				local fade = smooth(math.clamp((gap - 8) / 4, 0, 1))
+				h = h * (1 - fade) + eased * fade
 			end
 		end
 	end

@@ -39,10 +39,12 @@ return function(t)
 	-- dense cells, counts unchanged (TreeSpreadData.Moved, 9 trees). 449351915 before.
 	-- T397: re-pinned on purpose: the ground moved (hills, roads, plots, store pads), so the plan is 1,052 trees.
 	-- T409: same 1,052 trees at the same X and Z (the first batch is still placed on the classic
-	-- ground, and the later batches are chosen on the pre-valley ground). Y is the valley. 10199207 before T409; 663906755 was an intermediate bank.
+	-- ground, and the later batches are chosen on the pre-valley ground). Y is the valley.
+	-- 10199207 before T409; 12618450 was the valley before the mine roof, volcano wall,
+	-- ferry shore and shelf ease. Those sit under some trunks, so Y moved again.
 	local PLAN_COUNT = 1052
 	-- Heights only this time. 623119780 was the pre-hills plan; 10199207 was the hills plan.
-	local PLAN_CHECKSUM = 12618450
+	local PLAN_CHECKSUM = 254093984
 	local function checksum(trees)
 		local h = 0
 		for i, s in ipairs(trees) do

@@ -23,12 +23,15 @@ return function(t)
 	-- T409 re-sampled the live ground on purpose: the valley landform, the
 	-- lodge pad and the graded draft beds. Was n 7717, sum 68494.704463124,
 	-- wsum 2.750488850, sq 4785571.335868491, lo -41.562571591, hi 161.576039894.
-	-- The classic fingerprint below is the first trees' ground and did not move.
+	-- A second sample after the mine roof, the volcano wall, the ferry shore
+	-- and the shelf ease: was sum 68174.730151801, wsum 161.629373361,
+	-- sq 4489556.241387829. The classic fingerprint below is the first trees'
+	-- ground and did not move. lo and hi did not move.
 	local HEIGHT_FINGERPRINT = {
 		n = 7717,
-		sum = 68174.730151800889871,
-		wsum = 161.629373360876457,
-		sq = 4489556.241387829184532,
+		sum = 68286.279255775312777,
+		wsum = 163.574182877846340,
+		sq = 4493789.845065589062870,
 		lo = -41.562571590540983,
 		hi = 161.576039893993112,
 	}

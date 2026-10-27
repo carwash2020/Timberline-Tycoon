@@ -3,6 +3,7 @@
 -- tools/tree_cover (which writes TreeSpreadData) and tests/TreeCover.spec
 -- (which checks it). Reads the world plan: never run at boot.
 
+local BiomeData = require(script.Parent.Parent.BiomeData)
 local GrowLogic = require(script.Parent.Parent.GrowLogic)
 local TutorialGrove = require(script.Parent.Parent.TutorialGrove)
 local WoodData = require(script.Parent.Parent.WoodData)
@@ -65,6 +66,14 @@ local function ground(x: number, z: number): boolean
 	end
 	if WorldLayout.RegionBuildBlocked(x, z) then
 		return false
+	end
+	-- The square grew past ±1000 so Frostpeak's rim and Lantern Isle fit.
+	-- That new band is not meadow to plant. A biome or a region that
+	-- already stands there still is.
+	if math.abs(x) > 1000 or math.abs(z) > 1000 then
+		if BiomeData.At(x, z) == nil and BiomeData.RegionAt(x, z) == nil then
+			return false
+		end
 	end
 	return TreeFill.Ground(x, z)
 end
