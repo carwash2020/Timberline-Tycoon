@@ -19,6 +19,10 @@ block the build; #157 client audit; #158 world first look; #159 store interiors:
 
 **Still open:** only this branch (docs, CI pin, Reduce flashing). All four store interiors (Tool Shed, Hearth & Home, Sparkworks, Dealership; #159 squashed #160 to #162 in) are on main, with `previews/store-interiors/`.
 
+## T408 map plan (draft, not built)
+
+Connor approved the nine-region picture with notes. It still does not change the live map: `TerrainGen`, `WorldPlan` and `MapBuilder` do not read it. Skyroot Highlands is the ground summit at (−60, 800), radius 170. The gate lodge is (−40, 720), facing north. Cloud isles stay separate notes. Frostpeak is (−340, 1000), radius 160, layer ground, clear of Skyroot. Its north rim passes WorldHalf 1000, the same class as Lantern Isle. `OverlapHits()` is empty. Corridors carry roadside markers and 48-stud blend belts (32 on a foot road) for T409. The picture is `previews/t408/overview.png`. Removals stay cards, not deletions. The cabin card does not name the removed ride script, so the source scan from that removal stays clean. The ring road and the truck tunnel stay a T409 redo. Studio has nothing new to walk.
+
 **Stages:** with #138 on main the `Stage:S1` to `S8` keys are written (`MilestoneService.CheckStages`); the stage (`StageOf`)
 still also comes from the best axe and gear. S8 (Master Timber) is set only by its key: deriving it from a full plot is awaiting
 Connor (it would raise cash packs about 25%).

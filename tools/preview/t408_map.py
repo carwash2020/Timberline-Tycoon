@@ -1,0 +1,585 @@
+#!/usr/bin/env python3
+"""Top-down T408 draft and one card per removal.
+
+Reads previews/t408/plan.json (lune run tools/preview/t408_dump) and writes:
+
+  previews/t408/overview.png
+  previews/t408/removals/<id>.png
+  previews/t408/removals/contact-sheet.png
+
+North is up. The live terrain is not in this picture.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+
+from PIL import Image, ImageDraw, ImageFont
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PLAN = os.path.join(ROOT, "previews", "t408", "plan.json")
+OUT = os.path.join(ROOT, "previews", "t408")
+FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+FONTB = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+# Plan bounds. Lantern Isle and the Frostpeak rim sit past the live
+# WorldHalf (1000), so the picture is wider than the current square.
+# North is up. One scale, no stretch.
+X0 = -1000.0
+Z1 = 1500.0
+SPAN = 2500.0
+MAP = 1500
+
+
+def rgb(hex6: str) -> tuple[int, int, int]:
+    h = hex6.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def mix(a, b, t: float):
+    return tuple(int(a[i] * (1 - t) + b[i] * t) for i in range(3))
+
+
+def load_font(path: str, size: int) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(path, size)
+
+
+class Map:
+    def __init__(self, ox: int, oy: int):
+        self.ox = ox
+        self.oy = oy
+
+    def px(self, x: float, z: float) -> tuple[float, float]:
+        return (
+            self.ox + (x - X0) / SPAN * MAP,
+            self.oy + (Z1 - z) / SPAN * MAP,
+        )
+
+    def scale(self, studs: float) -> float:
+        return studs / SPAN * MAP
+
+
+def disc(draw: ImageDraw.ImageDraw, m: Map, x, z, r, fill):
+    cx, cy = m.px(x, z)
+    rr = m.scale(r)
+    draw.ellipse((cx - rr, cy - rr, cx + rr, cy + rr), fill=fill)
+
+
+def thick(draw, m: Map, pts, studs, fill):
+    if len(pts) < 2:
+        return
+    xy = [m.px(p["x"], p["z"]) for p in pts]
+    draw.line(xy, fill=fill, width=max(2, int(m.scale(studs))), joint="curve")
+
+
+def halo(draw, xy, text, font, fill, back, anchor="lt"):
+    x, y = xy
+    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1)):
+        draw.text((x + dx, y + dy), text, font=font, fill=back, anchor=anchor)
+    draw.text((x, y), text, font=font, fill=fill, anchor=anchor)
+
+
+def offset_band(pts, half):
+    """A polygon around a polyline, half-width in the same units as pts."""
+
+    def sub(a, b):
+        return (a[0] - b[0], a[1] - b[1])
+
+    def add(a, b):
+        return (a[0] + b[0], a[1] + b[1])
+
+    def mul(a, s):
+        return (a[0] * s, a[1] * s)
+
+    def norm(a):
+        length = (a[0] ** 2 + a[1] ** 2) ** 0.5
+        if length < 1e-6:
+            return (1.0, 0.0)
+        return (a[0] / length, a[1] / length)
+
+    left, right = [], []
+    for i, p in enumerate(pts):
+        if i == 0:
+            d = norm(sub(pts[1], p))
+        elif i == len(pts) - 1:
+            d = norm(sub(p, pts[i - 1]))
+        else:
+            d = norm(add(norm(sub(p, pts[i - 1])), norm(sub(pts[i + 1], p))))
+        n = (-d[1], d[0])
+        left.append(add(p, mul(n, half)))
+        right.append(sub(p, mul(n, half)))
+    return left + list(reversed(right))
+
+
+def draw_overview(plan: dict) -> Image.Image:
+    pal = plan["palette"]
+    ink = rgb(pal["ink"])
+    cream = rgb(pal["cream"])
+    water = rgb(pal["water"])
+    trail = rgb(pal["trail"])
+    cliff = rgb(pal["cliff"])
+    valley = rgb(pal["valley"])
+    canopy = rgb(pal["canopy"])
+    lumen = rgb(pal["lumen"])
+    ember = rgb(pal["ember"])
+    snow = rgb(pal["snow"])
+    W, H = 2460, 1900
+    im = Image.new("RGB", (W, H), mix(cream, trail, 0.35))
+    draw = ImageDraw.Draw(im)
+    title = load_font(FONTB, 28)
+    sub = load_font(FONT, 15)
+    label = load_font(FONTB, 15)
+    small = load_font(FONT, 13)
+    tiny = load_font(FONTB, 11)
+    pin_font = load_font(FONTB, 13)
+
+    draw.rectangle((0, 0, W, 78), fill=ink)
+    draw.text((28, 14), "T408  RIVER VALLEY  —  DRAFT FOR CONNOR", font=title, fill=cream)
+    draw.text(
+        (28, 48),
+        "No gondola.  No ring road.  Trunk lift to the clouds.  Bridge $100.  Ferry $400.  No fast travel.",
+        font=sub,
+        fill=rgb(pal["lumen"]),
+    )
+
+    ox, oy = 24, 96
+    m = Map(ox, oy)
+    # Country, warmer in the valley, rockier at the north and west edges.
+    base = Image.new("RGB", (MAP, MAP), mix(valley, trail, 0.45))
+    bd = ImageDraw.Draw(base)
+    bm = Map(0, 0)
+    for i in range(8):
+        t = i / 7
+        band = mix(cliff, mix(valley, trail, 0.4), 0.35 + 0.5 * (1 - abs(t - 0.15)))
+        z_hi = Z1 - t * SPAN
+        z_lo = Z1 - (t + 1 / 7) * SPAN
+        y0 = bm.px(0, z_hi)[1]
+        y1 = bm.px(0, z_lo)[1]
+        bd.rectangle((0, min(y0, y1), MAP, max(y0, y1)), fill=band)
+    # Edge rock, so the square does not read as a flat baseplate.
+    fringe = bm.scale(80)
+    bd.rectangle((0, 0, MAP, fringe), fill=cliff)
+    bd.rectangle((0, 0, fringe, MAP), fill=cliff)
+    im.paste(base, (ox, oy))
+
+    bay = [m.px(p["x"], p["z"]) for p in plan["bay"]]
+    draw.polygon(bay, fill=water)
+    river_xy = [(p["x"], p["z"]) for p in plan["river"]]
+    band = offset_band(river_xy, plan["riverHalf"])
+    draw.polygon([m.px(x, z) for x, z in band], fill=mix(water, snow, 0.25))
+
+    # Regions. Valley is the starter disc plus the town rectangle.
+    for region in plan["regions"]:
+        if region["id"] == "valley":
+            continue
+        tint = rgb(region["tint"])
+        if region["id"] == "pine":
+            disc(draw, m, region["x"], region["z"], region["radius"] + 28, cliff)
+        if region["id"] == "frost":
+            disc(draw, m, region["x"], region["z"], region["radius"] + 10, rgb(pal["frostGlow"]))
+        disc(draw, m, region["x"], region["z"], region["radius"], tint)
+        if region["id"] == "gloam":
+            disc(draw, m, region["x"], region["z"], region["radius"] * 0.45, rgb(pal["gloamGlow"]))
+        if region["id"] == "skyroot":
+            disc(draw, m, region["x"], region["z"], region["radius"], mix(lumen, canopy, 0.45))
+            for cloud in plan.get("clouds", []):
+                disc(draw, m, cloud["x"], cloud["z"], cloud["radius"], mix(lumen, cream, 0.35))
+
+    valley_r = next(r for r in plan["regions"] if r["id"] == "valley")
+    disc(draw, m, valley_r["x"], valley_r["z"], valley_r["radius"], valley)
+    town = plan["town"]
+    t0 = m.px(town["x0"], town["z1"])
+    t1 = m.px(town["x1"], town["z0"])
+    draw.rectangle((t0[0], t0[1], t1[0], t1[1]), fill=mix(valley, cream, 0.2))
+
+    sell = plan["sellFloor"]
+    s0 = m.px(sell["x0"], sell["z1"])
+    s1 = m.px(sell["x1"], sell["z0"])
+    draw.rectangle((s0[0], s0[1], s1[0], s1[1]), outline=ink, width=2)
+
+    gravel = rgb(pal["gravel"])
+    mat = {
+        "MeadowGrass": rgb(pal["valley"]),
+        "DeepMeadow": rgb(pal["pine"]),
+        "CliffRock": rgb(pal["cliff"]),
+        "TrailDirt": trail,
+        "FreshSnow": rgb(pal["snow"]),
+        "AshBasalt": rgb(pal["ash"]),
+        "QuarrySlate": rgb(pal["slate"]),
+        "WetMud": rgb(pal["gloam"]),
+        "BayouSilt": rgb(pal["bayou"]),
+        "MesaRed": rgb(pal["mesa"]),
+        "ShoreSand": rgb(pal["sand"]),
+        "LumenCream": canopy,
+        "FrostGlow": rgb(pal["frostGlow"]),
+        "EmberGlow": ember,
+        "GloamGlow": rgb(pal["gloamGlow"]),
+        "LumenGlow": lumen,
+    }
+    for belt in plan.get("belts", []):
+        materials = belt["materials"]
+        outer = (belt["outer"]["x"], belt["outer"]["z"])
+        edge = (belt["edge"]["x"], belt["edge"]["z"])
+        mid = ((outer[0] + edge[0]) / 2, (outer[1] + edge[1]) / 2)
+        outer_c = mat.get(materials[0], trail)
+        inner_c = mat.get(materials[-1], outer_c)
+        half = max(36, belt["depthStuds"] * 0.85)
+        draw.polygon([m.px(x, z) for x, z in offset_band([outer, mid], half)], fill=mix(outer_c, cream, 0.35))
+        draw.polygon([m.px(x, z) for x, z in offset_band([mid, edge], half * 0.72)], fill=mix(inner_c, cream, 0.15))
+        if belt.get("accent"):
+            accent = mat.get(belt["accent"], ember)
+            draw.polygon([m.px(x, z) for x, z in offset_band([mid, edge], 10)], fill=mix(accent, inner_c, 0.55))
+
+    road_fill = {
+        "main": gravel,
+        "branch": mix(gravel, trail, 0.3),
+        "foot": mix(trail, cream, 0.35),
+    }
+    for road in plan["roads"]:
+        thick(draw, m, road["points"], road["width"], road_fill[road["kind"]])
+
+    kind_fill = {
+        "tree-belt": rgb(pal["pine"]),
+        "scatter": mix(trail, gravel, 0.4),
+        "medium": rgb(pal["plank"]),
+        "sign": ink,
+        "vista": rgb(pal["honey"]),
+        "camp": rgb(pal["timber"]),
+        "wood-lot": rgb(pal["valley"]),
+        "boom": rgb(pal["timber"]),
+        "overlook": rgb(pal["brass"]),
+    }
+    for mark in plan.get("dressing", []):
+        fill = kind_fill.get(mark["kind"], ink)
+        if mark["kind"] == "wood-lot":
+            for dx, dz in ((-8, 0), (0, 7), (8, -4)):
+                disc(draw, m, mark["x"] + dx, mark["z"] + dz, 5, fill)
+        elif mark["kind"] == "vista":
+            cx, cy = m.px(mark["x"], mark["z"])
+            draw.rectangle((cx - 5, cy - 3, cx + 5, cy + 3), fill=fill, outline=ink)
+        elif mark["kind"] == "sign" and mark.get("label"):
+            cx, cy = m.px(mark["x"], mark["z"])
+            draw.rectangle((cx - 2, cy - 6, cx + 2, cy + 4), fill=ink)
+        else:
+            disc(draw, m, mark["x"], mark["z"], mark.get("radius", 4), fill)
+
+    # Lift bridge towers on the banks.
+    bridge = plan["bridge"]
+    bank = plan["riverHalf"] + 6
+    for side in (-1, 1):
+        cx, cy = m.px(bridge["x"] + side * bank, bridge["z"])
+        draw.rectangle((cx - 5, cy - 9, cx + 5, cy + 9), fill=ink)
+        draw.rectangle((cx - 3, cy - 14, cx + 3, cy - 8), fill=ember)
+    deck0 = m.px(bridge["x"] - bank, bridge["z"])
+    deck1 = m.px(bridge["x"] + bank, bridge["z"])
+    draw.line((deck0, deck1), fill=cream, width=4)
+    halo(draw, m.px(bridge["x"] + 70, bridge["z"] - 28), "LIFT BRIDGE $100", tiny, ink, cream, "mm")
+
+    # Ferry.
+    a = m.px(plan["mainlandDock"]["x"], plan["mainlandDock"]["z"])
+    b = m.px(plan["islandDock"]["x"], plan["islandDock"]["z"])
+    steps = 18
+    for i in range(0, steps, 2):
+        t0, t1 = i / steps, min(1, (i + 1) / steps)
+        draw.line(
+            (
+                (a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0),
+                (a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1),
+            ),
+            fill=cream,
+            width=3,
+        )
+    ferry_at = (
+        (plan["mainlandDock"]["x"] + plan["islandDock"]["x"]) / 2,
+        (plan["mainlandDock"]["z"] + plan["islandDock"]["z"]) / 2 + 50,
+    )
+    halo(draw, m.px(*ferry_at), "CAR FERRY  $400", tiny, ink, cream, "mm")
+
+    # Landmarks from spawn: plume, Skyroot, lighthouse.
+    plume = plan["plume"]
+    for i, rad in enumerate((26, 16, 8)):
+        disc(draw, m, plume["x"] + i * 6, plume["z"] + i * 10, rad, ember if i < 2 else rgb("FFD2A8"))
+    halo(draw, m.px(plume["x"] + 20, plume["z"] + 48), "CALDERA PLUME", tiny, cream, ink, "mm")
+
+    root = plan["skyroot"]
+    disc(draw, m, root["x"], root["z"], 46, canopy)
+    disc(draw, m, root["x"], root["z"], 18, mix(lumen, valley, 0.3))
+    tx, ty = m.px(root["x"], root["z"])
+    draw.rectangle((tx - 4, ty - 16, tx + 4, ty + 10), fill=mix(ink, trail, 0.3))
+    halo(draw, m.px(root["x"] - 90, root["z"] + 20), "TRUNK LIFT", tiny, ink, lumen, "mm")
+    halo(draw, m.px(root["x"] + 70, root["z"] - 70), "CLOUDS NOT BUILT", tiny, ink, lumen, "mm")
+    lodge = plan["lodge"]
+    lx, ly = m.px(lodge["x"], lodge["z"])
+    draw.rectangle((lx - 5, ly - 5, lx + 5, ly + 5), fill=ink)
+    draw.polygon([(lx, ly - 14), (lx - 5, ly - 4), (lx + 5, ly - 4)], fill=ink)
+    halo(draw, m.px(lodge["x"] + 36, lodge["z"]), "GATE LODGE", tiny, ink, cream, "mm")
+
+    light = plan["lighthouse"]
+    lx, ly = m.px(light["x"], light["z"])
+    draw.polygon([(lx, ly - 16), (lx - 7, ly), (lx + 7, ly)], fill=cream)
+    draw.rectangle((lx - 4, ly, lx + 4, ly + 14), fill=ink)
+    halo(draw, (lx, ly + 22), "LIGHTHOUSE", tiny, ink, cream, "mt")
+
+    # Live square. A dashed edge, not a road. Frost's rim and the isle cross it.
+    def dashed(a, b, dash=12, gap=8):
+        ax, ay = a
+        bx, by = b
+        dx, dy = bx - ax, by - ay
+        length = (dx * dx + dy * dy) ** 0.5
+        if length < 1:
+            return
+        ux, uy = dx / length, dy / length
+        t = 0.0
+        while t < length:
+            t2 = min(length, t + dash)
+            draw.line(
+                [(ax + ux * t, ay + uy * t), (ax + ux * t2, ay + uy * t2)],
+                fill=ink,
+                width=2,
+            )
+            t = t2 + gap
+
+    half = 1000.0
+    live = [m.px(x, z) for x, z in ((-half, -half), (half, -half), (half, half), (-half, half), (-half, -half))]
+    for i in range(4):
+        dashed(live[i], live[i + 1])
+    halo(draw, m.px(half - 70, half - 28), "LIVE EDGE", tiny, ink, cream, "mm")
+    for region in plan["regions"]:
+        if region.get("pastLive"):
+            label_at = (region["x"], region["z"] + region["radius"] + 36)
+            halo(draw, m.px(*label_at), "PAST LIVE EDGE", tiny, ink, cream, "mm")
+
+    # Region names.
+    name_font = load_font(FONTB, 14)
+    nudges = {
+        "valley": (0, -50),
+        "pine": (0, 30),
+        "frost": (-20, 30),
+        "caldera": (0, -30),
+        "gloam": (0, 20),
+        "bayou": (0, -20),
+        "mesa": (0, 20),
+        "isle": (0, 20),
+        "skyroot": (0, 50),
+    }
+    light_names = {"frost", "isle", "skyroot", "valley"}
+    for region in plan["regions"]:
+        nudge = nudges.get(region["id"], (0, 0))
+        pos = (region["x"] + nudge[0], region["z"] + nudge[1])
+        fill = ink if region["id"] in light_names else cream
+        back = cream if fill == ink else ink
+        halo(draw, m.px(*pos), region["name"].upper(), name_font, fill, back, "mm")
+
+    # Signed roads: a board at the signed end.
+    for road in plan["roads"]:
+        if not road.get("sign"):
+            continue
+        end = road["points"][-1]
+        ex, ey = m.px(end["x"], end["z"])
+        board = road["sign"]
+        tw = draw.textlength(board, font=tiny)
+        top = ey - 22
+        draw.rounded_rectangle((ex - tw / 2 - 4, top, ex + tw / 2 + 4, top + 14), radius=2, fill=cream, outline=ink)
+        draw.text((ex, top + 7), board, font=tiny, fill=ink, anchor="mm")
+        draw.line((ex, top + 14, ex, ey), fill=ink, width=2)
+
+    # Shop pins.
+    for shop in plan["shops"]:
+        cx, cy = m.px(shop["x"], shop["z"])
+        draw.ellipse((cx - 9, cy - 9, cx + 9, cy + 9), fill=ember if shop.get("y") else ink, outline=cream, width=2)
+        draw.text((cx, cy), str(shop["n"]), font=pin_font, fill=cream, anchor="mm")
+
+    # Frame and north arrow.
+    draw.rectangle((ox, oy, ox + MAP - 1, oy + MAP - 1), outline=ink, width=2)
+    halo(draw, (ox + 28, oy + 18), "N", label, ink, cream, "mm")
+    draw.line((ox + 28, oy + 28, ox + 28, oy + 52), fill=ink, width=2)
+    draw.polygon([(ox + 28, oy + 24), (ox + 23, oy + 34), (ox + 33, oy + 34)], fill=ink)
+    bar0 = m.px(-900, -920)
+    bar1 = m.px(-700, -920)
+    draw.line((bar0, bar1), fill=ink, width=3)
+    halo(draw, (bar0[0], bar0[1] + 6), "200 STUDS", tiny, ink, cream, "lt")
+    halo(draw, (ox + 12, oy + MAP - 36), "DRAFT. The live map is not changed.", tiny, ink, cream, "lt")
+    halo(draw, m.px(plan["weighHouse"]["x"], plan["sellFloor"]["z1"] + 18), "TRUCKS BACK IN", tiny, ink, cream, "mm")
+
+    # Legend.
+    lx0 = ox + MAP + 28
+    y = 96
+    draw.text((lx0, y), "NINE REGIONS", font=label, fill=ink)
+    y += 24
+    for region in plan["regions"]:
+        tint = rgb(region["tint"])
+        draw.rectangle((lx0, y, lx0 + 16, y + 16), fill=tint, outline=ink)
+        mark = "  clouds, not built" if region["id"] == "skyroot" else ""
+        draw.text((lx0 + 22, y - 1), f"{region['order']}. {region['name']}{mark}", font=small, fill=ink)
+        y += 20
+    y += 8
+    draw.text((lx0, y), "SHOPS  (number on the map)", font=label, fill=ink)
+    y += 22
+    for shop in plan["shops"]:
+        draw.ellipse((lx0, y, lx0 + 16, y + 16), fill=ember if shop.get("y") else ink)
+        draw.text((lx0 + 8, y + 8), str(shop["n"]), font=tiny, fill=cream, anchor="mm")
+        draw.text((lx0 + 22, y - 1), shop["label"], font=load_font(FONTB, 12), fill=ink)
+        y += 16
+        why = shop["why"]
+        # Wrap near 52 characters.
+        words, line, lines = why.split(), "", []
+        for word in words:
+            trial = (line + " " + word).strip()
+            if len(trial) > 52:
+                lines.append(line)
+                line = word
+            else:
+                line = trial
+        if line:
+            lines.append(line)
+        for line in lines:
+            draw.text((lx0 + 22, y), line, font=tiny, fill=mix(ink, cliff, 0.25))
+            y += 13
+        y += 4
+
+    y += 4
+    draw.text((lx0, y), "TRUNK LIFT  (not to map scale)", font=label, fill=ink)
+    y += 22
+    box = (lx0, y, lx0 + 210, y + 150)
+    draw.rounded_rectangle(box, radius=6, fill=cream, outline=ink)
+    # Shaft.
+    draw.rectangle((lx0 + 70, y + 18, lx0 + 130, y + 132), outline=ink, width=2)
+    draw.rectangle((lx0 + 82, y + 28, lx0 + 118, y + 58), fill=ember, outline=ink)
+    draw.text((lx0 + 100, y + 40), "CAB", font=tiny, fill=cream, anchor="mm")
+    draw.text((lx0 + 148, y + 22), "y 880 clouds", font=tiny, fill=ink)
+    draw.text((lx0 + 148, y + 118), "y 800 lodge", font=tiny, fill=ink)
+    draw.text((lx0 + 8, y + 64), "shaft 24", font=tiny, fill=ink)
+    draw.text((lx0 + 8, y + 78), "door 10", font=tiny, fill=ink)
+    draw.line((lx0 + 140, y + 36, lx0 + 190, y + 120), fill=trail, width=4)
+    draw.text((lx0 + 150, y + 78), "log chute", font=tiny, fill=ink)
+    y += 162
+    notes = [
+        "Roads: 32 main, 24 branch, 8 foot.",
+        "Sky Pass is checked at the gate lodge.",
+        "No root bridges. No updraft.",
+        "River-float logs are later, not this plan.",
+        "West of the river: timber country.",
+        "East of the river: the shore and the bay.",
+        "Fares are GameConfig until Connor picks.",
+        "Ferry crossing is the live 40s (see the doc).",
+        "Ring and tunnel: redo in T409, not deleted.",
+        "Cloud isles and the trunk lift are notes only.",
+        "Corridors are dressed. Belts are 48 studs.",
+        "Foot belts are 32. Gate apron clears 30.",
+        "Frost rim and Lantern Isle sit past WorldHalf 1000.",
+        "Dashed square is the live edge, not a road.",
+    ]
+    for note in notes:
+        draw.text((lx0, y), note, font=small, fill=ink)
+        y += 18
+
+    return im
+
+
+def card(plan: dict, row: dict) -> Image.Image:
+    pal = plan["palette"]
+    ink = rgb(pal["ink"])
+    cream = rgb(pal["cream"])
+    ember = rgb(pal["ember"])
+    water = rgb(pal["water"])
+    W, H = 1280, 720
+    im = Image.new("RGB", (W, H), cream)
+    draw = ImageDraw.Draw(im)
+    title = load_font(FONTB, 28)
+    body = load_font(FONT, 18)
+    small = load_font(FONT, 15)
+    draw.rectangle((0, 0, W, 64), fill=ink)
+    draw.text((20, 16), row["title"].upper(), font=title, fill=cream)
+    badge = "MUSTKEEP — do not delete" if row["mustKeep"] else "Not on the MustKeep list"
+    draw.text((W - 20, 22), badge, font=small, fill=rgb(pal["lumen"]) if row["mustKeep"] else rgb(pal["sand"]), anchor="rt")
+
+    # Locator: the whole square, this item in ember.
+    ox, oy, side = 36, 100, 520
+    draw.rectangle((ox, oy, ox + side, oy + side), fill=mix(rgb(pal["valley"]), cream, 0.45), outline=ink)
+
+    def lp(x, z):
+        return (
+            ox + (x - X0) / SPAN * side,
+            oy + (Z1 - z) / SPAN * side,
+        )
+
+    # River ghost, so the card still shows the draft the item is leaving.
+    river_xy = [(p["x"], p["z"]) for p in plan["river"]]
+    draw.line([lp(x, z) for x, z in river_xy], fill=water, width=3)
+    if row.get("points"):
+        draw.line([lp(p["x"], p["z"]) for p in row["points"]], fill=ember, width=4)
+        for p in row["points"]:
+            cx, cy = lp(p["x"], p["z"])
+            draw.ellipse((cx - 4, cy - 4, cx + 4, cy + 4), fill=ember)
+    if row.get("x") is not None:
+        cx, cy = lp(row["x"], row["z"])
+        draw.ellipse((cx - 8, cy - 8, cx + 8, cy + 8), fill=ember, outline=ink)
+        draw.line((cx - 14, cy, cx + 14, cy), fill=ink, width=2)
+        draw.line((cx, cy - 14, cx, cy + 14), fill=ink, width=2)
+    draw.text((ox, oy + side + 8), "Orange is this leftover. Blue is the draft river.", font=small, fill=ink)
+
+    # Reason, wrapped.
+    x, y = 590, 96
+    draw.text((x, y), "Waiting on Connor. Nothing is deleted in this PR.", font=load_font(FONTB, 16), fill=ember)
+    y += 36
+    words, line = row["reason"].split(), ""
+    lines = []
+    for word in words:
+        trial = (line + " " + word).strip()
+        if len(trial) > 42:
+            lines.append(line)
+            line = word
+        else:
+            line = trial
+    if line:
+        lines.append(line)
+    for line in lines:
+        draw.text((x, y), line, font=body, fill=ink)
+        y += 26
+    y += 16
+    if row.get("x") is not None:
+        draw.text((x, y), f"Live pin about ({row['x']:.0f}, {row['z']:.0f}). North is +Z.", font=small, fill=ink)
+    elif row.get("points"):
+        draw.text((x, y), "The orange line is the live path.", font=small, fill=ink)
+    else:
+        draw.text((x, y), "No fixed plot. It exists for the gondola ride.", font=small, fill=ink)
+    return im
+
+
+def contact(cards: list[Image.Image]) -> Image.Image:
+    cols = 4
+    thumb_w = 460
+    gap = 12
+    rows = (len(cards) + cols - 1) // cols
+    thumbs = []
+    for card_im in cards:
+        h = int(card_im.height * (thumb_w / card_im.width))
+        thumbs.append(card_im.resize((thumb_w, h), Image.Resampling.LANCZOS))
+    thumb_h = thumbs[0].height
+    sheet = Image.new("RGB", (cols * thumb_w + (cols + 1) * gap, rows * thumb_h + (rows + 1) * gap + 48), rgb("F3E7C9"))
+    d = ImageDraw.Draw(sheet)
+    d.text((gap, 10), "T408 removals — one card each. None of these are deleted.", font=load_font(FONTB, 22), fill=rgb("3C2814"))
+    for i, thumb in enumerate(thumbs):
+        c, r = i % cols, i // cols
+        sheet.paste(thumb, (gap + c * (thumb_w + gap), 48 + gap + r * (thumb_h + gap)))
+    return sheet
+
+
+def main() -> None:
+    with open(PLAN, encoding="utf-8") as f:
+        plan = json.load(f)
+    os.makedirs(os.path.join(OUT, "removals"), exist_ok=True)
+    overview = draw_overview(plan)
+    overview.save(os.path.join(OUT, "overview.png"), optimize=True)
+    cards = []
+    for row in plan["removals"]:
+        image = card(plan, row)
+        image.save(os.path.join(OUT, "removals", row["id"] + ".png"), optimize=True)
+        cards.append(image)
+    contact(cards).save(os.path.join(OUT, "removals", "contact-sheet.png"), optimize=True)
+    print(f"wrote overview and {len(cards)} removal cards")
+
+
+if __name__ == "__main__":
+    main()
