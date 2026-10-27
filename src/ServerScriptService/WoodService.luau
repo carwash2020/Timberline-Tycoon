@@ -511,8 +511,7 @@ end
 function WoodService.MassOf(p: Piece): number
 	local studs = 0
 	for _, part in pairs(p.parts) do
-		-- A cylinder's engine mass is pi*r^2*L, which RoundRadius makes equal
-		-- to the logical t^2*L. The part's box product is larger.
+		-- A block's volume is t^2 * L, the same volume the price uses.
 		local _, size = SectionMetrics.BlockFrame(part)
 		studs += size.X * size.Y * size.Z
 	end
@@ -969,9 +968,7 @@ function WoodService.Adopt(model: Model, info: Info): Piece
 		local dir = Vector3.new(fall.dir.X, 0, fall.dir.Z)
 		if dir.Magnitude > 1e-6 then
 			dir = dir.Unit
-			local half = if SectionMetrics.IsCylinder(root)
-				then SectionMetrics.Radius(root)
-				else math.min(root.Size.X, root.Size.Z) / 2
+			local half = SectionMetrics.Radius(root)
 			local edge = fall.pivot + dir * half
 			local axis = Vector3.new(0, 1, 0):Cross(dir)
 			local turn = CFrame.new(0, FallLogic.LiftGap, 0)
@@ -1274,9 +1271,9 @@ local function copySection(s: BasePart): Part
 		p:SetAttribute(SectionMetrics.SquareSideAttr, side)
 	end
 	CollectionService:AddTag(p, WoodService.SectionTag)
-	-- A round trunk (TreeArt.Roundify, or a real cylinder) stays round when it is cut.
+	-- Dress meshes ride along. A cylinder SpecialMesh would round the block, so it is not copied.
 	for _, child in ipairs(s:GetChildren()) do
-		if child:IsA("SpecialMesh") then
+		if child:IsA("SpecialMesh") and child.MeshType ~= Enum.MeshType.Cylinder then
 			child:Clone().Parent = p
 		end
 	end
@@ -1303,15 +1300,8 @@ function WoodService.SplitPart(s: BasePart, h: number, newId: number): BasePart
 	local bottomCf = cf * CFrame.new(0, -(length - cut) / 2, 0)
 	local topCf = cf * CFrame.new(0, cut / 2, 0)
 	high:SetAttribute("Section", newId)
-	if SectionMetrics.IsCylinder(s) or s:IsA("MeshPart") then
-		SectionMetrics.ApplyBlockFrame(s, bottomCf, bottomSize)
-		SectionMetrics.ApplyBlockFrame(high, topCf, topSize)
-	else
-		s.Size = bottomSize
-		s.CFrame = bottomCf
-		high.Size = topSize
-		high.CFrame = topCf
-	end
+	SectionMetrics.ApplyBlockFrame(s, bottomCf, bottomSize)
+	SectionMetrics.ApplyBlockFrame(high, topCf, topSize)
 	local parent = s.Parent
 	if parent and sid then
 		for _, item in ipairs(parent:GetChildren()) do

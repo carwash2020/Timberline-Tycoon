@@ -379,12 +379,19 @@ return function(t)
 		t.ok((b.Size - Vector3.new(4, 5, 6)).Magnitude < 1e-3)
 	end)
 
-	t.test("a failed mesh is tried once per server, then the part model stays", function()
+	t.test("a failed crown mesh is tried once per server, then the part model stays", function()
 		MeshKit.Reset()
-		local oakMesh = TreeModels.SectionMesh("oak", 1)
-		local calls = 0
+		local crownIds = {}
+		for _, piece in ipairs(TreeModels.Crown("oak")) do
+			crownIds[piece.meshId] = true
+		end
+		local sectionMesh = TreeModels.SectionMesh("oak", 1)
+		local calls, sectionCalls = 0, 0
 		MeshKit.Override = function(id, name, size)
-			if id == oakMesh then
+			if id == sectionMesh then
+				sectionCalls += 1
+			end
+			if crownIds[id] then
 				calls += 1
 				return nil
 			end
@@ -399,11 +406,20 @@ return function(t)
 		local second = TreeArt.FromSkeleton(def, skel)
 		MeshKit.Override = nil
 		MeshKit.Reset()
-		t.eq(calls, 1, "the failed id is not loaded again")
-		t.eq(first:GetAttribute("TreeMesh"), nil, "the first tree keeps its blocks")
-		t.eq(second:GetAttribute("TreeMesh"), nil, "the next tree keeps its blocks too")
+		t.eq(sectionCalls, 0, "a section mesh is not loaded as the section")
+		t.eq(calls, 1, "the failed crown id is not loaded again")
+		t.eq(first:GetAttribute("TreeMesh"), nil, "the first tree keeps its part crown")
+		t.eq(second:GetAttribute("TreeMesh"), nil, "the next tree keeps its part crown too")
 		t.eq(#parts(first), TreeGen.PartCount(skel))
 		t.eq(#parts(second), TreeGen.PartCount(skel))
+		for _, model in ipairs({ first, second }) do
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") and d.Name == "Section" then
+					t.eq(d.ClassName, "Part")
+					t.eq(d.Shape, roblox.Enum.PartType.Block)
+				end
+			end
+		end
 	end)
 
 	t.test("MeshKit.Visual is the shared looks-only helper", function()

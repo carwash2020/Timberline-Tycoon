@@ -1047,13 +1047,13 @@ end
 ---------------------------------------------------------------------------
 -- Contract with SectionTrees / WoodService / WoodFX / CutController (M1.3):
 --   * FromSkeleton returns a Model tagged "Tree" (ModelStreamingMode
---     Atomic) whose PrimaryPart is section 1. Each section is a Cylinder named
---     "Section" (tag "WoodSection", attribute Section = its id). Roblox puts a
---     cylinder's length on local X; SectionMetrics.BlockFrame is the Y-up
---     box (t, L, t) the cut, the price and the save still use. Bark-coloured
---     (Wood, or SmoothPlastic / Concrete
+--     Atomic) whose PrimaryPart is section 1. Each section is a Block named
+--     "Section" (tag "WoodSection", attribute Section = its id), Size (t, L, t),
+--     length on local Y. That box is the cut, the price and the save.
+--     Bark-coloured (Wood, or SmoothPlastic / Concrete
 --     for the pale and glassy woods — TreeArt.BarkMaterial), anchored, colliding,
---     queryable, untouchable, in collision group "Wood".
+--     queryable, untouchable, in collision group "Wood". Bark and canopy meshes,
+--     when they load, are children: they never change the section's shape.
 --   * Everything else is dress: parts named Leaves, Frond or Facet (inside
 --     "Tier" models too: WindSway and CanopyFade find those names), Root,
 --     BarkMark, Crack, Vein, CoreBand, PalmRing, Coconut, Pod, PodStem. Every dress
@@ -1077,23 +1077,9 @@ TreeArt.NotchHeight = 0.35
 TreeArt.NotchMaxDepth = 0.95 -- of the section's width
 TreeArt.NotchShade = -0.25
 
--- Trunks are round (T420). The section stays the square block it always was
--- (its Size is the hitbox, the cut maths and the volume every price reads),
--- and a cylinder SpecialMesh makes it look round: scaled by RoundScale, its
--- radius is t / sqrt(pi), the same cross-section area as the square of side
--- t, so volume and price do not move. Anything that copies a section
--- (WoodService's split) copies the mesh with it.
-TreeArt.RoundScale = 2 / math.sqrt(math.pi)
--- Bark tiles every 4 studs. The attribute is what a mesh or a shader reads.
+-- Bark tiles every 4 studs on the square faces. The attribute is what a
+-- mesh or a shader reads. The section itself stays a Block.
 TreeArt.BarkStuds = 4
-
-function TreeArt.Roundify(section: BasePart): SpecialMesh
-	local mesh = Instance.new("SpecialMesh")
-	mesh.MeshType = Enum.MeshType.Cylinder
-	mesh.Scale = Vector3.new(TreeArt.RoundScale, 1, TreeArt.RoundScale)
-	mesh.Parent = section
-	return mesh
-end
 
 -- Bark on a standing section. Most woods stay Wood (grain reads as bark).
 -- Frostwood and lumenwood are pale enough that Wood's grain muddies them,
@@ -1665,30 +1651,17 @@ function TreeArt.CutFace(def: WoodDef, section: BasePart, top: boolean): Part
 	local id = section:GetAttribute("Section")
 	if home and id ~= nil then
 		for _, d in ipairs(home:GetChildren()) do
-			if d.Name == "CutFace" and d:GetAttribute("Section") == id and d:GetAttribute("End") == end_ then
+			if
+				(d.Name == "CutFace" or d.Name == "CutCrack")
+				and d:GetAttribute("Section") == id
+				and d:GetAttribute("End") == end_
+			then
 				d:Destroy()
 			end
 		end
 	end
 	local at = frame * CFrame.new(0, y, 0)
-	local p: Part
-	if SectionMetrics.IsCylinder(section) then
-		local dia = SectionMetrics.Diameter(side) * TreeArt.CutFaceInset
-		p = Kit.cylinder(
-			section.Parent or section,
-			"CutFace",
-			th,
-			dia,
-			at * CFrame.Angles(0, 0, math.pi / 2),
-			color,
-			material
-		)
-	else
-		p = Kit.part(section.Parent or section, "CutFace", Vector3.new(t, th, t), at, color, material)
-		if section:FindFirstChildOfClass("SpecialMesh") then
-			TreeArt.Roundify(p) -- a round trunk's end is a round plate
-		end
-	end
+	local p = Kit.part(section.Parent or section, "CutFace", Vector3.new(t, th, t), at, color, material)
 	p.CanCollide = false
 	p.CanQuery = false
 	p.CanTouch = false
@@ -1697,6 +1670,18 @@ function TreeArt.CutFace(def: WoodDef, section: BasePart, top: boolean): Part
 	p:SetAttribute("End", end_)
 	p.Massless = true
 	ride(p, section)
+	-- A thin crack across the core, darkened 25%. It rides the same end.
+	local crackW = math.max(0.045, t * 0.05)
+	local crack =
+		Kit.part(p, "CutCrack", Vector3.new(t * 0.72, th + 0.004, crackW), at, Kit.shade(color, -0.25), material)
+	crack.CanCollide = false
+	crack.CanQuery = false
+	crack.CanTouch = false
+	crack.CastShadow = false
+	crack:SetAttribute("Section", section:GetAttribute("Section"))
+	crack:SetAttribute("End", end_)
+	crack.Massless = true
+	ride(crack, section)
 	return p
 end
 
@@ -1731,31 +1716,9 @@ function TreeArt.Notch(
 	local y = math.clamp(height, 0, length) - length / 2
 	local size: Vector3
 	local at: Vector3
-	-- A stump's hitbox is a square box round a round, tapering stump: its
-	-- notch follows the stump (the radius there, a strip as wide as the
-	-- chord it has cut) so it never hangs off the corners.
-	local stumpBase = section:GetAttribute("StumpBase")
-	local stumpTop = section:GetAttribute("StumpTop")
+	-- A wedge on the hit face of the square trunk, across that face.
 	local reach = t / 2
 	local width = t + 0.04
-	local r0: number? = nil
-	local r1: number? = nil
-	if type(stumpBase) == "number" then
-		r0 = stumpBase
-		r1 = if type(stumpTop) == "number" then stumpTop else stumpBase
-	elseif SectionMetrics.IsRound(section) or section:FindFirstChildOfClass("SpecialMesh") then
-		r0 = StumpLogic.RoundRadius(t)
-		r1 = r0
-	end
-	if r0 and r1 then
-		-- A round trunk or stump: the notch follows its surface (the radius
-		-- there, a strip as wide as the chord it has cut), so it never
-		-- hangs off the corners of the square it used to be.
-		local u = if length > 0 then math.clamp(height / length, 0, 1) else 0
-		reach = r0 + (r1 - r0) * u
-		local into = math.clamp(depth, 0, reach)
-		width = math.max(0.15, 2 * math.sqrt(math.max(0, reach * reach - (reach - into) ^ 2)))
-	end
 	if math.abs(lx) >= math.abs(lz) then
 		local side = if lx >= 0 then 1 else -1
 		size = Vector3.new(depth + 0.02, TreeArt.NotchHeight, width)
@@ -1900,83 +1863,72 @@ end
 TreeArt.StumpTag = "StumpDress" -- attribute on every part of the stump's own look
 
 -- The stump's look, stood on `base` (its bottom centre, Y up) inside
--- `parent`: one clone per sleeve of shape.sleeves from `templates` (the
--- uploaded frustum MeshParts, StumpMeshes; a stump over 10.4 studs stacks
--- several), each sized so its base radius is exactly the sleeve's (the first
--- is the trunk's base radius, each next starts where the one below ended) and
--- it stands as tall as the sleeve, so the stack is the real cut height. They
--- are painted with the trunk's own bark (its Material and `bark`, the trunk
--- section's own Color at the cut, so there is no colour step there: the trunk
--- has no SurfaceAppearance, so none is applied and any a template brings is
--- dropped; see StumpLogic.BarkMapping for the day it does); an end-grain cap
--- in the wood's core colour flush at the cut height; and the ring round it
--- (StumpLogic.RingWidth wide, StumpLogic.RingHex). Anchored; the meshes
--- collide (Hull), the cap and ring do not. With a template missing (it did
--- not load) there is no stump look at all, never a stand-in built from
--- parts. Returns every part, bottom up.
+-- `parent`: one square Block, side equal to the trunk's foot thickness,
+-- as tall as the cut. Bark on the four sides (the trunk's Material and
+-- `bark`). A core-coloured square cap sits flush on top, inside a 0.1 stud
+-- border (RingHex). `templates` is ignored: the old frustum meshes are
+-- round and are not the stump. The block collides. The cap, the border
+-- and the crack do not. Returns every part, the block first.
 function TreeArt.StumpDress(
 	def: WoodDef,
 	parent: Instance,
 	base: CFrame,
 	shape: StumpLogic.Shape,
-	templates: { MeshPart? },
+	_templates: { MeshPart? },
 	bark: Color3?
 ): { BasePart }
 	local out: { BasePart } = {}
-	for i = 1, #shape.sleeves do
-		if templates[i] == nil then
-			return out
-		end
-	end
 	local color = bark or paintOf(def).bark
 	local material = TreeArt.BarkMaterial(def)
-	for i, sleeve in ipairs(shape.sleeves) do
-		local mesh = (templates[i] :: MeshPart):Clone()
-		for _, child in ipairs(mesh:GetChildren()) do
-			if child:IsA("SurfaceAppearance") then
-				child:Destroy()
-			end
-		end
-		local height = sleeve.y1 - sleeve.y0
-		mesh.Name = "StumpMesh"
-		mesh.Size = Vector3.new(sleeve.baseRadius * 2, height, sleeve.baseRadius * 2)
-		mesh.CFrame = base * CFrame.new(0, sleeve.y0 + height / 2, 0)
-		mesh.Color = color
-		mesh.Material = material
-		mesh.Anchored = true
-		mesh.CanCollide = true
-		mesh.CanQuery = false
-		mesh.CanTouch = false
-		mesh:SetAttribute("Ratio", sleeve.ratio)
-		mesh:SetAttribute("Sleeve", i)
-		mesh:SetAttribute("Bucket", sleeve.bucket)
-		mesh.Parent = parent
-		table.insert(out, mesh)
-	end
-	local upright = CFrame.Angles(0, 0, math.pi / 2)
+	local height = math.max(shape.height, 0.05)
+	-- Shape.baseRadius is the old sleeve radius (t / sqrt(pi)). The live
+	-- side is the trunk's square thickness.
+	local side = math.max(shape.baseRadius * math.sqrt(math.pi), 0.05)
+	local body = Kit.part(
+		parent,
+		"StumpMesh",
+		Vector3.new(side, height, side),
+		base * CFrame.new(0, height / 2, 0),
+		color,
+		material
+	)
+	body.Anchored = true
+	body.CanCollide = true
+	body.CanQuery = false
+	body.CanTouch = false
+	body:SetAttribute("SquareSide", side)
+	table.insert(out, body)
 	local th = StumpLogic.CapThickness
 	local capColor, faceMaterial = TreeArt.FaceLook(def)
 	local ringColor = Color3.fromHex(StumpLogic.RingHex)
-	-- The ring sits a hair under the cap so the two never fight over a plane.
-	local ring = Kit.cylinder(
+	local inset = StumpLogic.RingWidth
+	-- The border sits a hair under the cap so the two never fight over a plane.
+	local ring = Kit.part(
 		parent,
 		"StumpRing",
-		th,
-		shape.topRadius * 2,
-		base * CFrame.new(0, shape.height - 0.01 - th / 2, 0) * upright,
+		Vector3.new(side, th, side),
+		base * CFrame.new(0, height - 0.01 - th / 2, 0),
 		ringColor,
 		faceMaterial
 	)
-	local cap = Kit.cylinder(
+	local capSide = math.max(0.1, side - inset * 2)
+	local cap = Kit.part(
 		parent,
 		"StumpCap",
-		th,
-		math.max(0.1, (shape.topRadius - StumpLogic.RingWidth) * 2),
-		base * CFrame.new(0, shape.height - th / 2, 0) * upright,
+		Vector3.new(capSide, th, capSide),
+		base * CFrame.new(0, height - th / 2, 0),
 		capColor,
 		faceMaterial
 	)
-	for _, d in ipairs({ ring, cap }) do
+	local crack = Kit.part(
+		parent,
+		"CutCrack",
+		Vector3.new(capSide * 0.72, th + 0.004, math.max(0.045, capSide * 0.05)),
+		base * CFrame.new(0, height - th / 2, 0),
+		Kit.shade(capColor, -0.25),
+		faceMaterial
+	)
+	for _, d in ipairs({ ring, cap, crack }) do
 		Kit.decor(d, false)
 		table.insert(out, d)
 	end
@@ -1984,6 +1936,7 @@ function TreeArt.StumpDress(
 		d:SetAttribute(TreeArt.StumpTag, true)
 		d:SetAttribute("TopRadius", shape.topRadius)
 		d:SetAttribute("BaseRadius", shape.baseRadius)
+		d:SetAttribute("SquareSide", side)
 	end
 	return out
 end

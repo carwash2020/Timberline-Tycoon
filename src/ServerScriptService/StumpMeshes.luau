@@ -1,13 +1,12 @@
 --!strict
 -- StumpMeshes (T420): loads the 96 stump frustum meshes (Shared/StumpMeshIds:
--- radius sets R13 and R22 x 16 tapers x heights 3, 5, 8) on the server with InsertService:LoadAsset,
--- once per row, and hands out the cached MeshPart template (CollisionFidelity
--- Hull) for TreeArt.StumpDress to clone. A template is named by its key
--- (StumpMeshIds.Key). Loads run in the background (Request), never inside a
--- swing; a request for a template that has not arrived waits for it. A load
--- that fails (offline, not approved for this experience) is remembered,
--- warned once, and answered with nil: the stump then has no visual (only its
--- invisible hitbox), never a stand-in built from parts.
+-- radius sets R13 and R22 x 16 tapers x heights 3, 5, 8) on the server with
+-- InsertService:LoadAsset, once per row. The live stump is a square Block
+-- (TreeArt.StumpDress). It does not clone these meshes. The catalogue stays
+-- so Preload and the sleeve maths can still be checked. A template is named
+-- by its key (StumpMeshIds.Key). Loads run in the background (Request), never
+-- inside a swing; a request for a template that has not arrived waits for it.
+-- A load that fails is remembered, warned once, and answered with nil.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -164,11 +163,10 @@ end
 -- Choosing the meshes of a stump, and what to do when some are missing
 ---------------------------------------------------------------------------
 
--- A stump uses the meshes of its OWN radius set only (R13 for base radius up
--- to 1.69, R22 above); there is no cross-set fallback (the other set can
--- never stay inside the 1/1.3 to 1.3 stretch). With a mesh of its own set
--- missing the stump is dropped (SectionTrees: no stump, the spot clears, the
--- log above the cut is made as usual) and the miss is recorded.
+-- A sleeve uses the meshes of its OWN radius set only (R13 for base radius up
+-- to 1.69, R22 above); there is no cross-set fallback. The live stump does
+-- not call this: it is one square Block. Resolve still records a miss when
+-- a caller asks for a frustum that did not load.
 --
 -- stumpMeshesMissing: one line per missing mesh, "<name> (set, taper, height)
 -- model <id>: why", warned ONCE per mesh (not per stump). StumpMeshes.Missing()

@@ -33,7 +33,6 @@
 
 local ForestData = require(script.Parent.Parent.ForestData)
 local SectionMetrics = require(script.Parent.Parent.SectionMetrics)
-local StumpLogic = require(script.Parent.Parent.StumpLogic)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
 local TreeArt = require(script.Parent.TreeArt)
@@ -74,14 +73,13 @@ local function trunkOf(trunk: BasePart, def: WoodDef): Trunk
 		local cf, size = SectionMetrics.BlockFrame(trunk)
 		local height = size.Y
 		local side = math.min(size.X, size.Z)
-		local round = SectionMetrics.IsRound(trunk)
 		return {
 			frame = cf,
 			height = height,
-			radius = if round then StumpLogic.RoundRadius(side) else side / 2,
+			radius = side / 2,
 			low = height * 0.08,
 			high = height * 0.92,
-			square = not round,
+			square = true,
 		}
 	end
 	local height, diameter = trunk.Size.X, trunk.Size.Y

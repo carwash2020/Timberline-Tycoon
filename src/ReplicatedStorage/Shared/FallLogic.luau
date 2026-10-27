@@ -62,12 +62,13 @@ local function flatUnit(dir: Vector3): Vector3
 end
 
 -- Where the trunk's centre rests: axis horizontal along `dir`, butt at
--- `butt`'s XZ, underside touching `groundY` (centre one radius up).
+-- `butt`'s XZ, underside touching `groundY`. `radius` is half the square
+-- side (the block's half-thickness), so the flat face sits on the ground.
 function FallLogic.RestCentre(butt: Vector3, length: number, radius: number, dir: Vector3, groundY: number): Vector3
 	return Vector3.new(butt.X, groundY + radius, butt.Z) + flatUnit(dir) * (length / 2)
 end
 
--- True when the cylinder is not through the ground (touching is clear).
+-- True when the log is not through the ground (touching is clear).
 function FallLogic.ClearsGround(centre: Vector3, radius: number, groundY: number): boolean
 	return centre.Y + 1e-6 >= groundY + radius
 end

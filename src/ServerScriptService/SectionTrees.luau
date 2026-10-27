@@ -1180,14 +1180,14 @@ local function makeStump(rec: TreeRecord, sid: number, now: number, height: numb
 	end
 	local hitbox = rec.sections[rootId]
 	local shape = StumpLogic.Shape(segs, total)
-	-- The hitbox keeps the old square side (the cut maths and the volume);
-	-- the stump itself is round (shape.baseRadius, StumpBase on the hitbox).
+	-- The hitbox is the square trunk below the cut (the chop target). The
+	-- look is one square Block of the same side, not a round frustum.
 	local side = segs[1].thickness
 	SectionMetrics.ApplyBlockFrame(hitbox, bottom * CFrame.new(0, total / 2, 0), Vector3.new(side, total, side))
 	hitbox.Transparency = 1
 	hitbox.CanCollide = false
-	hitbox:SetAttribute("StumpBase", shape.baseRadius)
-	hitbox:SetAttribute("StumpTop", shape.topRadius)
+	hitbox:SetAttribute("StumpBase", nil)
+	hitbox:SetAttribute("StumpTop", nil)
 	rec.parts[hitbox] = { transparency = 1, collide = false, query = true }
 	local state: StumpState = {
 		height = total,
@@ -1207,38 +1207,28 @@ local function makeStump(rec: TreeRecord, sid: number, now: number, height: numb
 	}
 	rec.stumpState = state
 	stumped[rec] = true
-	-- The look is the uploaded frustum meshes (one per sleeve, of the
-	-- stump's own radius set); they may still be loading. If one is missing
-	-- the stump is dropped: no stump at all (despawnStump: the spot clears
-	-- as it does when a stump goes, the log above the cut is made as usual),
-	-- never a stand-in; stumpMeshesMissing and stumpStretchViolations record it.
-	StumpMeshes.Resolve(shape, function(templates: { MeshPart? }?)
-		if rec.stumpState ~= state or rec.model.Parent == nil then
-			return
+	-- Square block, even when the old frustum meshes are missing. Those
+	-- meshes are round and are not the stump.
+	if rec.model.Parent == nil then
+		return
+	end
+	local look = TreeArt.StumpDress(rec.def, rec.model, state.base, shape, {}, state.bark)
+	local colors: { [BasePart]: Color3 } = {}
+	local cfs: { [BasePart]: CFrame } = {}
+	for _, d in ipairs(look) do
+		d.CollisionGroup = hitbox.CollisionGroup
+		colors[d] = d.Color
+		cfs[d] = d.CFrame
+		rec.parts[d] = { transparency = 0, collide = d.CanCollide, query = d.CanQuery }
+		if rec.dormant then
+			d.Transparency = 1
+			d.CanCollide = false
+		elseif rec.ghost then
+			d.CanCollide = false
 		end
-		StumpMeshes.CountStump(shape, templates == nil)
-		if templates == nil then
-			despawnStump(rec, clock())
-			return
-		end
-		local look = TreeArt.StumpDress(rec.def, rec.model, state.base, shape, templates, state.bark)
-		local colors: { [BasePart]: Color3 } = {}
-		local cfs: { [BasePart]: CFrame } = {}
-		for _, d in ipairs(look) do
-			d.CollisionGroup = hitbox.CollisionGroup
-			colors[d] = d.Color
-			cfs[d] = d.CFrame
-			rec.parts[d] = { transparency = 0, collide = d.CanCollide, query = d.CanQuery }
-			if rec.dormant then
-				d.Transparency = 1
-				d.CanCollide = false
-			elseif rec.ghost then
-				d.CanCollide = false
-			end
-		end
-		state.parts, state.colors, state.cfs = look, colors, cfs
-		lookStump(state, clock())
-	end)
+	end
+	state.parts, state.colors, state.cfs = look, colors, cfs
+	lookStump(state, clock())
 end
 
 -- Weathers, fades and sinks one stump to how old it is.
@@ -1500,8 +1490,8 @@ local function split(
 	elseif felled then
 		feller = fall(rec, player, dir, piece.uid)
 		-- The site grows back on its wood's own respawn time (the stump goes
-		-- with it if it is still standing; it decays and goes at 190 s if not;
-		-- a stump with no mesh is dropped at once and the spot waits this long).
+		-- with it if it is still standing; it decays and goes at 190 s). The
+		-- look is a square Block even when the old frustum meshes are missing.
 		if not rec.temporary then
 			rec.regrowAt = clock() + GrowLogic.RespawnDelay(def.respawnSec, unit())
 		end

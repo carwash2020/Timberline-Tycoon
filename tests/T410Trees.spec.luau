@@ -1,8 +1,8 @@
 --!nocheck
--- T410: oak and birch cut where the server ray hits, fall toward the notch,
--- and break into round bark logs. Prices stay on the square side t
--- (pi*r^2*L = t^2*L via StumpLogic.RoundRadius). Live fall and a 200-stud
--- truck drive are playtest: this file pins the pure rules.
+-- T410-fix: oak and birch cut where the server ray hits, fall toward the
+-- notched face, and stay square PartType.Block logs. Prices stay on the
+-- square side t (volume t^2 * L). Live fall and a 200-stud truck drive are
+-- playtest: this file pins the pure rules. No section is a cylinder.
 return function(t)
 	local fs = require("@lune/fs")
 	local serde = require("@lune/serde")
@@ -23,10 +23,7 @@ return function(t)
 	local NearGrove = t.load("ReplicatedStorage/Shared/World/NearGrove")
 	local Geometry = t.load("ReplicatedStorage/Shared/Lint/Geometry")
 	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
-
-	local metricsOk, SectionMetrics = pcall(function()
-		return t.load("ReplicatedStorage/Shared/SectionMetrics")
-	end)
+	local SectionMetrics = t.load("ReplicatedStorage/Shared/SectionMetrics")
 
 	local function build(id, seed)
 		local skel = TreeGen.Skeleton(id, seed or 1, 1)
@@ -43,9 +40,9 @@ return function(t)
 		return out
 	end
 
-	t.test("1 notch is the server ray, not the client's height", function()
+	t.test("1 notch is the server ray, not the client's height; CutWindow is 1.0", function()
 		t.eq(GameConfig.CoreLoop, 2)
-		t.eq(GameConfig.CutWindow, 0.6)
+		t.eq(GameConfig.CutWindow, 1.0, "full band is 1.0; half is 0.5")
 		t.eq(GameConfig.CutEdge, 0.5)
 		t.ok(type(SectionLogic.NotchHeight) == "function", "SectionLogic.NotchHeight")
 		t.ok(type(SectionLogic.RayHit) == "function", "SectionLogic.RayHit")
@@ -59,7 +56,6 @@ return function(t)
 		t.ok(type(h) == "number", "a hit on the box")
 		t.ok(math.abs(h - 14.083333) < 0.02, "ray height " .. tostring(h))
 		t.ok(math.abs(h - 16) > 0.5, "client height is ignored")
-		-- An honest surface point is the ray's own hit, so the height does not move.
 		local from = Vector3.new(4, 3, 0)
 		local hit = SectionLogic.AimAt(cf, size, from, Vector3.new(1, 3, 0), nil)
 		local eye2 = Vector3.new(4, 4.5, 0)
@@ -68,7 +64,7 @@ return function(t)
 		t.ok(math.abs(honest - want) < 0.05, "honest aim stays on the same band")
 	end)
 
-	t.test("3 fall is toward the notch, at least 9 of 10", function()
+	t.test("2 the notch is on the hit face and the fall is toward that face", function()
 		local matched = 0
 		for i = 1, 10 do
 			local a = (i - 1) / 10 * math.pi * 2
@@ -85,28 +81,46 @@ return function(t)
 		t.eq(FallLogic.MaxSpin, 2.2)
 		t.eq(FallLogic.MaxSpeed, 45)
 		t.eq(FallLogic.LiftGap, 0.06)
+		t.eq(TreeArt.NotchShade, -0.25)
+		local model = build("oak", 3)
+		local sec = sectionsOf(model)[1]
+		local side = SectionMetrics.SquareSide(sec)
+		local frame = SectionMetrics.BlockFrame(sec)
+		local notch = TreeArt.Notch(WoodData.Get("oak"), sec, 4, frame.XVector, 1, 1)
+		t.eq(notch.Shape, Enum.PartType.Block, "the notch is a face wedge, not a ring")
+		t.ok(math.abs(notch.Size.Z - (side + 0.04)) < 1e-3, "the wedge spans the hit face")
+		local local_ = frame:PointToObjectSpace(notch.CFrame.Position)
+		t.ok(local_.X > 0, "the wedge sits on the +X face that was hit")
+		t.ok(math.abs(math.abs(local_.X) + notch.Size.X / 2 - (side / 2 + 0.02)) < 1e-3, "outer face proud of the bark")
 	end)
 
-	t.test("4 no WoodSection is a Block; oak and birch are round bark", function()
-		t.ok(metricsOk and SectionMetrics ~= nil, "SectionMetrics")
+	t.test("3 every wood section is a Block; oak and birch keep their colours", function()
 		for _, id in ipairs({ "oak", "birch", "pine", "emberwood" }) do
 			local model = build(id, 3)
 			local n = 0
+			local def = WoodData.Get(id)
 			for _, p in ipairs(sectionsOf(model)) do
 				n += 1
-				t.ok(p.Shape ~= Enum.PartType.Block, id .. " section is not a Block")
-				t.eq(p.Shape, Enum.PartType.Cylinder, id)
-				t.eq(p.Material, TreeArt.BarkMaterial(WoodData.Get(id)))
+				t.eq(p.ClassName, "Part", id .. " section is a Part")
+				t.ok(not p:IsA("MeshPart"), id .. " section is not a MeshPart")
+				t.eq(p.Shape, Enum.PartType.Block, id .. " section is a Block")
+				t.ok(p.Shape ~= Enum.PartType.Cylinder, id .. " is not a cylinder")
+				t.eq(SectionMetrics.IsCylinder(p), false)
+				t.eq(SectionMetrics.IsRound(p), false)
+				t.eq(p.Material, TreeArt.BarkMaterial(def))
 				t.ok(p.Material ~= Enum.Material.Neon, "bark is never Neon")
 				t.ok(p.Material ~= Enum.Material.SmoothPlastic or id == "frostwood" or id == "lumenwood")
-				local side = SectionMetrics.SquareSide(p)
-				local diameter = math.min(p.Size.Y, p.Size.Z)
-				t.ok(math.abs(diameter - 2 * StumpLogic.RoundRadius(side)) < 1e-3, id .. " diameter")
-				t.eq(p:GetAttribute("BarkStuds"), 4)
 				local _, logical = SectionMetrics.BlockFrame(p)
+				local side = SectionMetrics.SquareSide(p)
+				t.ok(math.abs(p.Size.X - side) < 1e-4 and math.abs(p.Size.Z - side) < 1e-4, id .. " square side")
+				t.ok(math.abs(p.Size.Y - logical.Y) < 1e-4, id .. " length on Y")
+				t.ok(math.abs(SectionMetrics.Radius(p) - side / 2) < 1e-6, id .. " rest radius is half the side")
+				t.eq(p:GetAttribute("BarkStuds"), 4)
+				t.eq(TreeArt.BarkStuds, 4)
 				local priced = logical.X * logical.Y * logical.Z
-				local round = math.pi * (diameter / 2) ^ 2 * p.Size.X
-				t.ok(math.abs(priced - round) / priced < 0.01, id .. " priced volume is the round volume")
+				local box = p.Size.X * p.Size.Y * p.Size.Z
+				t.ok(math.abs(priced - box) / priced < 0.01, id .. " priced volume is the Block")
+				t.ok(math.abs(priced - side * side * logical.Y) < 1e-3, id .. " priced volume is t^2 * L")
 			end
 			t.ok(n >= 1, id .. " has sections")
 		end
@@ -117,11 +131,11 @@ return function(t)
 		t.eq(oak.v2.core, "#E2BE84")
 		t.eq(oak.v2.shape.trunkThickness, 2.0)
 		t.eq(birch.v2.shape.bark, "#D8D2C4")
+		t.eq(birch.v2.shape.leafColors[1], "#A6CE5C")
 		t.eq(birch.v2.core, "#F1E3C2")
 		t.eq(birch.v2.shape.trunkThickness, 1.6)
 		t.eq(oak.v2.logPrice, 1.5)
 		t.eq(birch.v2.logPrice, 2.25)
-		-- Planks stay boards.
 		local plank = roblox.Instance.new("Part")
 		plank.Name = "Section"
 		local holder = roblox.Instance.new("Model")
@@ -129,9 +143,14 @@ return function(t)
 		plank.Parent = holder
 		SectionMetrics.ApplyBlockFrame(plank, CFrame.new(0, 1, 0), Vector3.new(1, 2, 0.4))
 		t.eq(plank.Shape, Enum.PartType.Block, "a plank stays a board")
+		t.ok(
+			math.abs(plank.Size.X - 1) < 1e-3
+				and math.abs(plank.Size.Y - 2) < 1e-3
+				and math.abs(plank.Size.Z - 0.4) < 1e-3
+		)
 	end)
 
-	t.test("5 a mid cut keeps the priced volume within 1%", function()
+	t.test("4 a mid cut keeps the priced volume within 1%", function()
 		local node = {
 			id = 1,
 			parent = nil,
@@ -145,12 +164,46 @@ return function(t)
 		local sum = SectionLogic.NodeVolume(low) + SectionLogic.NodeVolume(high)
 		t.ok(math.abs(sum - whole) / whole < 0.01, "volumes sum")
 		t.ok(math.abs(sum - whole) < 1e-6, "the split is exact")
-		-- Oak t = 2: round area equals the square, so the price does not move.
-		local r = StumpLogic.RoundRadius(2)
-		t.ok(math.abs(math.pi * r * r - 4) < 1e-6, "pi r^2 = t^2")
+		t.ok(math.abs(whole - SectionLogic.Volume(2, 20, 2)) < 1e-6, "priced volume is t^2 * L")
+		t.eq(low.thickness, 2)
+		t.eq(high.thickness, 2)
 	end)
 
-	t.test("6 a round log's bed footprint does not change when it rolls", function()
+	t.test("5 a cut under 2.5 clears; at 2.5 the stump is one square Block", function()
+		t.eq(StumpLogic.MinHeight, 2.5)
+		t.eq(StumpLogic.IsBaseCut(2.49), true)
+		t.eq(StumpLogic.IsBaseCut(2.5), false)
+		t.eq(StumpLogic.WeatherStart, 90)
+		t.eq(StumpLogic.WeatherFull, 170)
+		t.eq(StumpLogic.FadeStart, 180)
+		t.eq(StumpLogic.FadeEnd, 190)
+		t.eq(StumpLogic.SinkDepth, 0.3)
+		local shape = StumpLogic.Shape({ { length = 20, thickness = 2 } }, 3)
+		local model = roblox.Instance.new("Model")
+		local parts = TreeArt.StumpDress(WoodData.Get("oak"), model, CFrame.identity, shape, {})
+		local blocks = 0
+		for _, p in ipairs(parts) do
+			if p.Name == "StumpMesh" then
+				blocks += 1
+				t.eq(p.ClassName, "Part")
+				t.eq(p.Shape, Enum.PartType.Block)
+				t.ok(p.Shape ~= Enum.PartType.Cylinder)
+				t.ok(math.abs(p.Size.X - 2) < 1e-3 and math.abs(p.Size.Z - 2) < 1e-3, "side is the trunk thickness")
+				t.ok(math.abs(p.Size.Y - 3) < 1e-3, "as tall as the cut")
+			end
+		end
+		t.eq(blocks, 1, "one square stump")
+		local cap = nil
+		for _, p in ipairs(parts) do
+			if p.Name == "StumpCap" then
+				cap = p
+			end
+		end
+		t.ok(cap ~= nil and cap.Shape == Enum.PartType.Block, "square cap")
+		t.ok(math.abs(cap.CFrame.Position.Y + cap.Size.Y / 2 - 3) < 1e-3, "cap flush on top")
+	end)
+
+	t.test("6 cargo, the mill and a sale read the square side", function()
 		t.eq(CargoLock.SettleSec, 0.2)
 		t.eq(CargoLock.RestSpeed, 0.6)
 		t.eq(CargoLock.MinInside, 0.5)
@@ -158,86 +211,79 @@ return function(t)
 		t.eq(CargoLock.LiveDrive, "playtest")
 		t.eq(CargoLock.DriveStuds, 200)
 		t.eq(CargoLock.DriveTurns, 2)
-		-- Narrower than the rolled box's corners, wider than the true diameter.
-		local diameter = 2.26
-		local bed = Vector3.new(2.5, 0.5, 14)
-		local size = Vector3.new(8, diameter, diameter)
-		local radius = diameter / 2
-		local rel = CFrame.new(0, bed.Y / 2 + radius, 0) * CFrame.Angles(0, math.rad(90), 0)
-		local rolled = rel * CFrame.Angles(math.rad(45), 0, 0)
-		local flat = CargoLock.InsideShare(bed, rel, size, "cylinder")
-		local spin = CargoLock.InsideShare(bed, rolled, size, "cylinder")
-		t.ok(math.abs(flat - spin) < 0.02, string.format("roll-invariant %.3f vs %.3f", flat, spin))
-		t.ok(flat >= CargoLock.MinInside, "the round log is on the bed")
-		t.ok(CargoLock.ContactsBed(bed, rolled, size, nil, "cylinder"), "a rolled log still touches the bed")
-		local sample, settled = CargoLock.NoteRest(nil, Vector3.zero, 0)
-		sample, settled = CargoLock.NoteRest(sample, Vector3.new(0.05, 0, 0), CargoLock.SettleSec)
-		t.eq(settled, true, "still long enough, under RestSpeed")
-		-- A box of the same size still uses corners: the 4th arg is the only cylinder switch.
-		local boxSpin = CargoLock.InsideShare(bed, rolled, size)
-		t.ok(boxSpin < flat - 0.05, "corners overhang; the cylinder does not")
-
-		-- Live oak and birch sections are MeshParts in the Y-up frame (t, L, t).
-		-- CargoPose turns that into the cylinder the bed math already uses.
-		t.ok(TreeModels.UsesMesh(TreeModels.SectionMesh("oak", 1)), "oak sections load as meshes")
-		t.ok(TreeModels.UsesMesh(TreeModels.SectionMesh("birch", 1)), "birch sections load as meshes")
+		local side, length = 2, 8
+		local part = roblox.Instance.new("Part")
+		part.Name = "Section"
+		SectionMetrics.ApplyBlockFrame(part, CFrame.identity, Vector3.new(side, length, side))
+		t.eq(part.Shape, Enum.PartType.Block)
+		t.eq(part.Size, Vector3.new(side, length, side))
+		-- Length along the bed (world Z), square cross-section sitting on the deck.
+		local bed = Vector3.new(side + 0.05, 0.5, length + 2)
+		local rel = CFrame.new(0, bed.Y / 2 + side / 2, 0) * CFrame.Angles(math.pi / 2, 0, 0)
+		part.CFrame = rel
+		local poseCf, poseSize, poseShape = SectionMetrics.CargoPose(part)
+		t.eq(poseShape, nil, "wood is a box, not a cylinder")
+		t.eq(poseSize, part.Size)
+		t.eq(poseCf, part.CFrame)
+		t.eq(SectionMetrics.IsRound(part), false)
+		t.eq(SectionMetrics.IsCylinder(part), false)
+		local share = CargoLock.InsideShare(bed, poseCf, poseSize, poseShape)
+		t.ok(share > 0.99, string.format("a bed of side+0.05 fits the square (%.3f)", share))
+		t.ok(CargoLock.ContactsBed(bed, poseCf, poseSize, nil, poseShape), "the square log touches the bed")
+		-- A roll is a box: corners can leave the bed. The geometry stays the Block.
+		local rolled = rel * CFrame.Angles(0, 0, math.rad(45))
+		local spin = CargoLock.InsideShare(bed, rolled, poseSize, nil)
+		t.ok(spin <= share + 1e-6, "a rolled square is not treated as a round log")
 		local mesh = roblox.Instance.new("MeshPart")
 		mesh.Name = "Section"
-		local side, length = 2, 8
 		mesh.Size = Vector3.new(side, length, side)
 		mesh:SetAttribute(SectionMetrics.SquareSideAttr, side)
-		local meshRadius = SectionMetrics.Diameter(side) / 2
-		local lay = CFrame.new(0, bed.Y / 2 + meshRadius, 0) * CFrame.Angles(math.rad(90), 0, 0)
-		mesh.CFrame = lay
-		t.ok(
-			SectionMetrics.IsRound(mesh) and not SectionMetrics.IsCylinder(mesh),
-			"a mesh section is round, not a Part cylinder"
-		)
-		local flatCf, flatSize, flatShape = SectionMetrics.CargoPose(mesh)
-		local frame, logical = SectionMetrics.BlockFrame(mesh)
-		local d = 2 * StumpLogic.RoundRadius(side)
-		t.eq(mesh.Size, Vector3.new(side, length, side), "the MeshPart stays Y-up (t, L, t)")
-		t.eq(logical, Vector3.new(side, length, side), "BlockFrame stays the priced square")
-		t.eq(flatSize, Vector3.new(length, d, d), "cargo uses (L, d, d), d = 2 * RoundRadius(t)")
-		t.ok(flatCf.XVector:Dot(frame.YVector) > 0.999, "the cylinder's length is the logical Y")
-		t.ok(d > side, "the round diameter is wider than the square side")
-		mesh.CFrame = lay * CFrame.Angles(0, math.rad(45), 0)
-		local spinCf, spinSize, spinShape = SectionMetrics.CargoPose(mesh)
-		t.eq(flatShape, "cylinder")
-		t.eq(spinShape, "cylinder")
-		t.eq(flatSize, spinSize)
-		-- A bed between the square side and the true diameter only fits if the
-		-- support used t, not d.
-		local tight = Vector3.new(side + 0.05, bed.Y, bed.Z)
-		local tightShare = CargoLock.InsideShare(tight, flatCf, flatSize, flatShape)
-		t.ok(tightShare < 1 - 1e-3, string.format("diameter %.3f overhangs a %.2f bed", d, side + 0.05))
-		local meshFlat = CargoLock.InsideShare(bed, flatCf, flatSize, flatShape)
-		local meshSpin = CargoLock.InsideShare(bed, spinCf, spinSize, spinShape)
-		t.ok(
-			math.abs(meshFlat - meshSpin) < 0.02,
-			string.format("mesh roll-invariant %.3f vs %.3f", meshFlat, meshSpin)
-		)
-		t.ok(meshFlat >= CargoLock.MinInside, "the meshed log is on the bed")
-		t.ok(CargoLock.ContactsBed(bed, spinCf, spinSize, nil, spinShape), "a rolled mesh still touches the bed")
-		local rawSpin = CargoLock.InsideShare(bed, mesh.CFrame, mesh.Size)
-		t.ok(rawSpin < meshFlat - 0.05, "the Y-up box corners overhang; the round pose does not")
-	end)
-
-	t.test("7 and 8 the mill toast and the owner of a cut stay", function()
+		local _, meshSize, meshShape = SectionMetrics.CargoPose(mesh)
+		t.eq(meshShape, nil)
+		t.eq(meshSize, mesh.Size, "a MeshPart section is not turned into a round diameter")
+		t.eq(SectionMetrics.IsRound(mesh), false)
 		local mill = { maxWidth = 4, maxLength = 16 }
+		local piece = {
+			kind = "log",
+			sections = {
+				{
+					length = length,
+					sx = side,
+					sz = side,
+					dir = Vector3.yAxis,
+					children = 0,
+					root = true,
+				},
+			},
+		}
+		local accepted, why = SawmillLogic.Accepts(piece, mill)
+		t.eq(accepted, true, "the square side fits the mill: " .. tostring(why))
+		local volume = SawmillLogic.SectionVolume(piece.sections[1])
+		t.ok(math.abs(volume - SectionLogic.Volume(side, length, side)) < 1e-6, "mill volume is t^2 * L")
+		local price = WoodData.Get("oak").v2.logPrice
+		t.ok(math.abs(SectionLogic.Value(volume, price) - volume * price) < 1e-6, "sale is volume times price")
+		local tooWide = {
+			kind = "log",
+			sections = {
+				{
+					length = length,
+					sx = mill.maxWidth * GameConfig.WoodUnit + 0.5,
+					sz = mill.maxWidth * GameConfig.WoodUnit + 0.5,
+					dir = Vector3.yAxis,
+					children = 0,
+					root = true,
+				},
+			},
+		}
+		local wideOk, wideWhy = SawmillLogic.Accepts(tooWide, mill)
+		t.eq(wideOk, false)
+		t.eq(wideWhy, "thick")
 		t.eq(SawmillLogic.Toast("long", mill), "Too big for this mill (max 16.0 u long)")
 		local cut = { height = 3, damage = 4, damageBy = { [7] = 3, [8] = 1 } }
 		t.eq(SectionLogic.Owner(cut, 1), 7)
 	end)
 
-	t.test("9 stump MinHeight stays 2.5", function()
-		t.eq(StumpLogic.MinHeight, 2.5)
-		t.eq(StumpLogic.IsBaseCut(2.49), true)
-		t.eq(StumpLogic.IsBaseCut(2.5), false)
-		t.eq(#StumpLogic.Ratios, 16)
-	end)
-
-	t.test("10 MeshId set leaves no part fallback; split only past 20k tris", function()
+	t.test("MeshId dresses the crown only; the section stays a Block; split only past 20k tris", function()
 		t.eq(TreeModels.TriHardCap, 20000)
 		t.eq(TreeModels.PiecesFor(150), 1)
 		t.eq(TreeModels.PiecesFor(20000), 1)
@@ -247,31 +293,39 @@ return function(t)
 		t.ok(TreeModels.UsesMesh(TreeModels.SectionMesh("birch", 1)))
 		MeshKit.Reset()
 		MeshKit.Override = function(id, name, size)
-			local part = roblox.Instance.new("MeshPart")
-			part.Name = name
-			part.Size = size
-			part:SetAttribute("MeshId", tostring(id))
-			return part
+			local made = roblox.Instance.new("MeshPart")
+			made.Name = name
+			made.Size = size
+			made:SetAttribute("MeshId", tostring(id))
+			return made
 		end
 		local model = build("oak", 4)
 		MeshKit.Override = nil
 		MeshKit.Reset()
 		t.eq(model:GetAttribute("TreeMesh"), true)
+		local crowns = 0
 		for _, d in ipairs(model:GetDescendants()) do
 			if d:IsA("BasePart") and d.Name == "Section" then
-				t.eq(d.ClassName, "MeshPart", "no Part fallback")
+				t.eq(d.ClassName, "Part", "the section stays a Part")
+				t.eq(d.Shape, Enum.PartType.Block, "the section stays a Block")
+				t.ok(d:GetAttribute("MeshId") == nil, "the section mesh is not the section")
+			elseif d.Name == "Leaves" and d:IsA("Part") then
+				t.ok(false, "the part-built leaf stand-in is gone")
+			elseif d.Name == "Leaves" and d:IsA("MeshPart") then
+				crowns += 1
 				t.ok(d:GetAttribute("MeshId") ~= nil and d:GetAttribute("MeshId") ~= "0")
-				t.ok(not d:IsA("Part") or d.Shape ~= Enum.PartType.Block)
+				t.eq(d.CanCollide, false, "a crown mesh does not collide")
 			end
 		end
+		t.ok(crowns >= 1, "a crown mesh landed")
 	end)
 
-	t.test("11 and 12 a resting log touches the ground and the river bed, and does not sink", function()
+	t.test("a resting log uses half the square side and does not sink", function()
 		t.ok(type(FallLogic.RestCentre) == "function", "RestCentre")
 		t.ok(type(FallLogic.ClearsGround) == "function", "ClearsGround")
 		t.ok(type(FallLogic.RestOnPlane) == "function", "RestOnPlane")
 		t.eq(FallLogic.WaterPolicy, "drag")
-		local radius = 1.13
+		local radius = 1
 		local centre = FallLogic.RestCentre(Vector3.new(2, 8, 3), 10, radius, Vector3.new(1, 0.4, 0), 4)
 		t.ok(math.abs(centre.Y - (4 + radius)) < 1e-4, "sits on the ground")
 		t.ok(FallLogic.ClearsGround(centre, radius, 4))
@@ -288,7 +342,7 @@ return function(t)
 		t.ok(bed.Y - radius >= 5 - 1e-4, "does not punch the river bed")
 	end)
 
-	t.test("13 14 15 two players, a re-cut and a standing stump stay server-owned", function()
+	t.test("two players, a re-cut and a standing stump stay server-owned", function()
 		local claim = { userId = 4, at = 10 }
 		local function here(id)
 			return id == 4
@@ -300,7 +354,7 @@ return function(t)
 		t.ok(recut.logLength >= StumpLogic.MinLog - 1e-6, "a real log")
 	end)
 
-	t.test("16 and 17 MustKeep, WorldHalf and the near grove stay", function()
+	t.test("MustKeep, WorldHalf and the near grove stay", function()
 		t.eq(WorldLayout.WorldHalf, 1350)
 		t.eq(NearGrove.Outer, 70)
 		local list = serde.decode("json", fs.readFile("tests/mustkeep.json"))
@@ -325,5 +379,15 @@ return function(t)
 			t.ok(material ~= Enum.Material.Neon)
 		end
 		t.eq(select(2, TreeArt.Core(WoodData.Get("lumenwood"))), Enum.Material.Neon, "Core itself stays")
+		local model = build("oak", 1)
+		local face = TreeArt.CutFace(WoodData.Get("oak"), model.PrimaryPart, true)
+		local crack = nil
+		for _, d in ipairs(face:GetChildren()) do
+			if d.Name == "CutCrack" then
+				crack = d
+			end
+		end
+		t.ok(crack ~= nil and crack:IsA("Part") and crack.Shape == Enum.PartType.Block, "a thin crack on the cut face")
+		t.ok(crack.Size.Z < crack.Size.X, "the crack is a line, not a disc")
 	end)
 end

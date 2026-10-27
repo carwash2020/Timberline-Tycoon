@@ -1,22 +1,16 @@
 --!strict
 -- SectionMetrics: the logical frame of a wood section.
 -- Gameplay, prices and saves use a Y-up box of size (t, L, t): length along
--- local Y, square side t. A round log is a Part whose Shape is Cylinder.
--- Roblox cylinders run along local X, so the part is the logical frame
--- turned 90 degrees about Z, with Size (L, d, d) and d = 2 * RoundRadius(t).
--- The engine's mass is then pi*r^2*L = t^2*L, the same volume the prices use.
--- Planks stay Blocks. MeshParts stay in the logical Y-up frame (uploaded
--- section meshes are authored that way).
-
-local StumpLogic = require(script.Parent.StumpLogic)
+-- local Y, square side t. The part is that box. PartType.Block, Size (t, L, t).
+-- A priced volume is t^2 * L. There is no round radius on this path.
+-- Planks stay Blocks of their own (not necessarily square) size.
+-- A MeshPart named Section, if one is ever parented here, stays in the same
+-- Y-up frame. It is not a cylinder and it is not the shipped section: bark
+-- and canopy are child meshes, and they do not change this part's shape.
 
 local SectionMetrics = {}
 
 SectionMetrics.SquareSideAttr = "SquareSide"
-
--- Cylinder local +X is the logical +Y (the trunk axis).
-local TO_CYLINDER = CFrame.Angles(0, 0, math.pi / 2)
-local FROM_CYLINDER = CFrame.Angles(0, 0, -math.pi / 2)
 
 function SectionMetrics.IsPlank(part: BasePart): boolean
 	if part:GetAttribute("Kind") == "plank" then
@@ -26,38 +20,19 @@ function SectionMetrics.IsPlank(part: BasePart): boolean
 	return model ~= nil and model:GetAttribute("Kind") == "plank"
 end
 
--- A round log (not a plank, not a cut-face disc).
+-- Wood is square. A section is never a cylinder.
 function SectionMetrics.IsCylinder(part: BasePart): boolean
-	return part:IsA("Part")
-		and part.Shape == Enum.PartType.Cylinder
-		and part.Name == "Section"
-		and not SectionMetrics.IsPlank(part)
+	return part.ClassName == "CylinderSection"
 end
 
+-- Wood is square. A section mesh is dress, not a round log.
 function SectionMetrics.IsRound(part: BasePart): boolean
-	if SectionMetrics.IsPlank(part) or part.Name ~= "Section" then
-		return false
-	end
-	if part:IsA("MeshPart") then
-		return true
-	end
 	return SectionMetrics.IsCylinder(part)
 end
 
-function SectionMetrics.Diameter(side: number): number
-	return 2 * StumpLogic.RoundRadius(side)
-end
-
--- Logical centre CFrame (Y along the trunk) and logical size (t, L, t).
+-- Logical centre CFrame (Y along the trunk) and logical size (t, L, t),
+-- or the plank's own size.
 function SectionMetrics.BlockFrame(part: BasePart): (CFrame, Vector3)
-	if SectionMetrics.IsCylinder(part) then
-		local logical = part.CFrame * FROM_CYLINDER
-		local length = part.Size.X
-		local diameter = math.min(part.Size.Y, part.Size.Z)
-		local attr = part:GetAttribute(SectionMetrics.SquareSideAttr)
-		local side = if type(attr) == "number" then attr else diameter * math.sqrt(math.pi) / 2
-		return logical, Vector3.new(side, length, side)
-	end
 	if part:IsA("MeshPart") and part.Name == "Section" and not SectionMetrics.IsPlank(part) then
 		local attr = part:GetAttribute(SectionMetrics.SquareSideAttr)
 		local side = if type(attr) == "number" then attr else math.min(part.Size.X, part.Size.Z)
@@ -76,30 +51,20 @@ function SectionMetrics.SquareSide(part: BasePart): number
 	return math.min(size.X, size.Z)
 end
 
+-- Half the square side: the rest height and the mill's half-width.
+-- Not a round radius.
 function SectionMetrics.Radius(part: BasePart): number
-	if SectionMetrics.IsCylinder(part) then
-		return math.min(part.Size.Y, part.Size.Z) / 2
-	end
-	return StumpLogic.RoundRadius(SectionMetrics.SquareSide(part))
+	return SectionMetrics.SquareSide(part) / 2
 end
 
--- The pose CargoLock reads. The MeshPart itself stays Y-up, size (t, L, t).
--- This pose is a cylinder along local X, size (L, d, d), with
--- d = 2 * RoundRadius(t). A roll does not grow that footprint. Anything
--- else stays its own box.
+-- The pose CargoLock reads. Wood is a box: the part's own CFrame and Size.
+-- The shape is nil, so the lock uses the box, not a cylinder.
 function SectionMetrics.CargoPose(part: BasePart): (CFrame, Vector3, string?)
-	if not SectionMetrics.IsRound(part) then
-		return part.CFrame, part.Size, nil
-	end
-	local logical, logicalSize = SectionMetrics.BlockFrame(part)
-	local side = math.min(logicalSize.X, logicalSize.Z)
-	local length = logicalSize.Y
-	local diameter = SectionMetrics.Diameter(side)
-	return logical * TO_CYLINDER, Vector3.new(length, diameter, diameter), "cylinder"
+	return part.CFrame, part.Size, nil
 end
 
--- Writes the logical frame onto `part`. A plank stays a block. A MeshPart
--- stays Y-up. Any other section becomes a cylinder of the same priced volume.
+-- Writes the logical frame onto `part`. A plank stays a board. Any other
+-- section is a Block of size (t, L, t), Y along the trunk.
 function SectionMetrics.ApplyBlockFrame(part: BasePart, logicalCf: CFrame, logicalSize: Vector3)
 	if SectionMetrics.IsPlank(part) then
 		part.Size = logicalSize
@@ -111,19 +76,12 @@ function SectionMetrics.ApplyBlockFrame(part: BasePart, logicalCf: CFrame, logic
 	end
 	local side = math.min(logicalSize.X, logicalSize.Z)
 	local length = logicalSize.Y
-	if part:IsA("MeshPart") then
-		part.Size = Vector3.new(side, length, side)
-		part.CFrame = logicalCf
-		part:SetAttribute(SectionMetrics.SquareSideAttr, side)
-		return
-	end
+	part.Size = Vector3.new(side, length, side)
+	part.CFrame = logicalCf
 	if part:IsA("Part") then
-		local diameter = SectionMetrics.Diameter(side)
-		part.Shape = Enum.PartType.Cylinder
-		part.Size = Vector3.new(length, diameter, diameter)
-		part.CFrame = logicalCf * TO_CYLINDER
-		part:SetAttribute(SectionMetrics.SquareSideAttr, side)
+		part.Shape = Enum.PartType.Block
 	end
+	part:SetAttribute(SectionMetrics.SquareSideAttr, side)
 end
 
 return SectionMetrics
