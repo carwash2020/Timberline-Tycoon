@@ -1366,9 +1366,19 @@ function BuildingArt.Sawmill(scale: number?): Model
 
 	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
 	fitNameSign(crest)
-	-- Required here, not at module scope: MachineArt requires BuildingArt.
-	local MachineArt = require(script.Parent.MachineArt)
-	MachineArt.AimBelt(model)
+	-- Same assignment as MachineArt.AimBelt. MachineArt requires BuildingArt, and
+	-- luau-lsp rejects that cycle, so the town belt is aimed here. It is not a
+	-- switch and it has no Cross, so the look vector times ConveyorSpeed is the whole aim.
+	local GameConfig = require(script.Parent.Parent.GameConfig)
+	local speed = GameConfig.ConveyorSpeed
+	for _, d in ipairs(model:GetDescendants()) do
+		if d.Name == "Conveyor" and d:IsA("BasePart") and d.CanCollide then
+			local look = d.CFrame.LookVector
+			if look.Magnitude >= 1e-4 then
+				d.AssemblyLinearVelocity = look.Unit * speed
+			end
+		end
+	end
 	-- Authored at 1.5 already: do not scale the meshes again.
 	TownMeshes.Dress(model, "Sawmill")
 	return model
