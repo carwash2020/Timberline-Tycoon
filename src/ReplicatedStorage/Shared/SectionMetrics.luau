@@ -83,6 +83,21 @@ function SectionMetrics.Radius(part: BasePart): number
 	return StumpLogic.RoundRadius(SectionMetrics.SquareSide(part))
 end
 
+-- The pose CargoLock reads. A round section (a Part cylinder, or a Y-up
+-- MeshPart of size (t, L, t)) becomes a cylinder along local X, size
+-- (L, d, d), so a roll does not grow the bed footprint. Anything else
+-- stays its own box.
+function SectionMetrics.CargoPose(part: BasePart): (CFrame, Vector3, string?)
+	if not SectionMetrics.IsRound(part) then
+		return part.CFrame, part.Size, nil
+	end
+	local logical, logicalSize = SectionMetrics.BlockFrame(part)
+	local side = math.min(logicalSize.X, logicalSize.Z)
+	local length = logicalSize.Y
+	local diameter = SectionMetrics.Diameter(side)
+	return logical * TO_CYLINDER, Vector3.new(length, diameter, diameter), "cylinder"
+end
+
 -- Writes the logical frame onto `part`. A plank stays a block. A MeshPart
 -- stays Y-up. Any other section becomes a cylinder of the same priced volume.
 function SectionMetrics.ApplyBlockFrame(part: BasePart, logicalCf: CFrame, logicalSize: Vector3)

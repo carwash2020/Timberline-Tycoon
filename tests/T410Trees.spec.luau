@@ -176,6 +176,39 @@ return function(t)
 		-- A box of the same size still uses corners: the 4th arg is the only cylinder switch.
 		local boxSpin = CargoLock.InsideShare(bed, rolled, size)
 		t.ok(boxSpin < flat - 0.05, "corners overhang; the cylinder does not")
+
+		-- Live oak and birch sections are MeshParts in the Y-up frame (t, L, t).
+		-- CargoPose turns that into the cylinder the bed math already uses.
+		t.ok(TreeModels.UsesMesh(TreeModels.SectionMesh("oak", 1)), "oak sections load as meshes")
+		t.ok(TreeModels.UsesMesh(TreeModels.SectionMesh("birch", 1)), "birch sections load as meshes")
+		local mesh = roblox.Instance.new("MeshPart")
+		mesh.Name = "Section"
+		local side, length = 2, 8
+		mesh.Size = Vector3.new(side, length, side)
+		mesh:SetAttribute(SectionMetrics.SquareSideAttr, side)
+		local meshRadius = SectionMetrics.Diameter(side) / 2
+		local lay = CFrame.new(0, bed.Y / 2 + meshRadius, 0) * CFrame.Angles(math.rad(90), 0, 0)
+		mesh.CFrame = lay
+		t.ok(
+			SectionMetrics.IsRound(mesh) and not SectionMetrics.IsCylinder(mesh),
+			"a mesh section is round, not a Part cylinder"
+		)
+		local flatCf, flatSize, flatShape = SectionMetrics.CargoPose(mesh)
+		mesh.CFrame = lay * CFrame.Angles(0, math.rad(45), 0)
+		local spinCf, spinSize, spinShape = SectionMetrics.CargoPose(mesh)
+		t.eq(flatShape, "cylinder")
+		t.eq(spinShape, "cylinder")
+		t.eq(flatSize, spinSize)
+		local meshFlat = CargoLock.InsideShare(bed, flatCf, flatSize, flatShape)
+		local meshSpin = CargoLock.InsideShare(bed, spinCf, spinSize, spinShape)
+		t.ok(
+			math.abs(meshFlat - meshSpin) < 0.02,
+			string.format("mesh roll-invariant %.3f vs %.3f", meshFlat, meshSpin)
+		)
+		t.ok(meshFlat >= CargoLock.MinInside, "the meshed log is on the bed")
+		t.ok(CargoLock.ContactsBed(bed, spinCf, spinSize, nil, spinShape), "a rolled mesh still touches the bed")
+		local rawSpin = CargoLock.InsideShare(bed, mesh.CFrame, mesh.Size)
+		t.ok(rawSpin < meshFlat - 0.05, "the Y-up box corners overhang; the round pose does not")
 	end)
 
 	t.test("7 and 8 the mill toast and the owner of a cut stay", function()

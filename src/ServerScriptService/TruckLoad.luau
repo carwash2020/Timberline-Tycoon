@@ -595,15 +595,18 @@ local function solids(model: Model): { BasePart }
 	return out
 end
 
-local function lockShape(part: BasePart): string?
-	return if SectionMetrics.IsCylinder(part) then "cylinder" else nil
+-- Round logs, including Y-up MeshParts, are judged as cylinders. The
+-- part itself is not moved.
+local function cargoOf(bed: BasePart, part: BasePart): (CFrame, Vector3, string?)
+	local cf, size, shape = SectionMetrics.CargoPose(part)
+	return bed.CFrame:ToObjectSpace(cf), size, shape
 end
 
 local function footprintShare(bed: BasePart, model: Model): number
 	local best = 0
 	for _, part in ipairs(solids(model)) do
-		local rel = bed.CFrame:ToObjectSpace(part.CFrame)
-		best = math.max(best, CargoLock.InsideShare(bed.Size, rel, part.Size, lockShape(part)))
+		local rel, size, shape = cargoOf(bed, part)
+		best = math.max(best, CargoLock.InsideShare(bed.Size, rel, size, shape))
 	end
 	return best
 end
@@ -611,15 +614,15 @@ end
 local function touching(bed: BasePart, model: Model, locked: { Model }): boolean
 	local parts = solids(model)
 	for _, part in ipairs(parts) do
-		local rel = bed.CFrame:ToObjectSpace(part.CFrame)
-		if CargoLock.ContactsBed(bed.Size, rel, part.Size, CargoLock.ContactGap, lockShape(part)) then
+		local rel, size, shape = cargoOf(bed, part)
+		if CargoLock.ContactsBed(bed.Size, rel, size, CargoLock.ContactGap, shape) then
 			return true
 		end
 		for _, other in ipairs(locked) do
 			if other ~= model then
 				for _, op in ipairs(solids(other)) do
-					local orel = bed.CFrame:ToObjectSpace(op.CFrame)
-					if CargoLock.StackedOn(rel, part.Size, orel, op.Size, CargoLock.ContactGap) then
+					local orel, osize = cargoOf(bed, op)
+					if CargoLock.StackedOn(rel, size, orel, osize, CargoLock.ContactGap) then
 						return true
 					end
 				end
