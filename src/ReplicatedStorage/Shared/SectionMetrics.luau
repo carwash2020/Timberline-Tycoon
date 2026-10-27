@@ -83,10 +83,10 @@ function SectionMetrics.Radius(part: BasePart): number
 	return StumpLogic.RoundRadius(SectionMetrics.SquareSide(part))
 end
 
--- The pose CargoLock reads. A round section (a Part cylinder, or a Y-up
--- MeshPart of size (t, L, t)) becomes a cylinder along local X, size
--- (L, d, d), so a roll does not grow the bed footprint. Anything else
--- stays its own box.
+-- The pose CargoLock reads. The MeshPart itself stays Y-up, size (t, L, t).
+-- This pose is a cylinder along local X, size (L, d, d), with
+-- d = 2 * RoundRadius(t). A roll does not grow that footprint. Anything
+-- else stays its own box.
 function SectionMetrics.CargoPose(part: BasePart): (CFrame, Vector3, string?)
 	if not SectionMetrics.IsRound(part) then
 		return part.CFrame, part.Size, nil

@@ -194,11 +194,23 @@ return function(t)
 			"a mesh section is round, not a Part cylinder"
 		)
 		local flatCf, flatSize, flatShape = SectionMetrics.CargoPose(mesh)
+		local frame, logical = SectionMetrics.BlockFrame(mesh)
+		local d = 2 * StumpLogic.RoundRadius(side)
+		t.eq(mesh.Size, Vector3.new(side, length, side), "the MeshPart stays Y-up (t, L, t)")
+		t.eq(logical, Vector3.new(side, length, side), "BlockFrame stays the priced square")
+		t.eq(flatSize, Vector3.new(length, d, d), "cargo uses (L, d, d), d = 2 * RoundRadius(t)")
+		t.ok(flatCf.XVector:Dot(frame.YVector) > 0.999, "the cylinder's length is the logical Y")
+		t.ok(d > side, "the round diameter is wider than the square side")
 		mesh.CFrame = lay * CFrame.Angles(0, math.rad(45), 0)
 		local spinCf, spinSize, spinShape = SectionMetrics.CargoPose(mesh)
 		t.eq(flatShape, "cylinder")
 		t.eq(spinShape, "cylinder")
 		t.eq(flatSize, spinSize)
+		-- A bed between the square side and the true diameter only fits if the
+		-- support used t, not d.
+		local tight = Vector3.new(side + 0.05, bed.Y, bed.Z)
+		local tightShare = CargoLock.InsideShare(tight, flatCf, flatSize, flatShape)
+		t.ok(tightShare < 1 - 1e-3, string.format("diameter %.3f overhangs a %.2f bed", d, side + 0.05))
 		local meshFlat = CargoLock.InsideShare(bed, flatCf, flatSize, flatShape)
 		local meshSpin = CargoLock.InsideShare(bed, spinCf, spinSize, spinShape)
 		t.ok(
