@@ -1148,7 +1148,8 @@ function BuildingArt.Sawmill(scale: number?): Model
 	gable(model, CF(CX0, CTOP, ccz) * ANG(0, PI / 2, 0), cd, 4.6, 0.6, CABIN[3])
 	gableRoof(model, CF(ccx - 0.5, CTOP, ccz), cw + 1, cd + 0.6, 4.6, 1.2, rng, cabinRoof, -1)
 	door(model, CF(-14.1, FLOOR, CZ0 - 0.3), 3.6, 6.6, DOOR, TIMBER_LIGHT)
-	window(model, CF(-17.6, 5.4, CZ0 - 0.3), 2.5, 2.4, TIMBER_LIGHT, nil, rng)
+	-- Left of the widened door. The frame must not meet the door's jamb (ZFight).
+	window(model, CF(-18.4, 5.4, CZ0 - 0.3), 2.5, 2.4, TIMBER_LIGHT, nil, rng)
 	window(model, CF(CX0 - 0.3, 5.4, 1) * ANG(0, PI / 2, 0), 2.6, 2.4, TIMBER_LIGHT, SHUTTER, nil)
 	wallLantern(model, CF(CX1, 6.6, CZ0 - 0.5), 0.9)
 
@@ -1362,7 +1363,11 @@ function BuildingArt.Sawmill(scale: number?): Model
 	model:SetAttribute("Tunnel", "housing")
 	model:SetAttribute("ExposedBlade", true)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	CollectionService:AddTag(model, "Sawmill")
+	-- A spec that stubs CollectionService as an empty table has no AddTag. The tag still lands
+	-- wherever the service is the real one (or the test stub that forwards to Instance:AddTag).
+	pcall(function()
+		CollectionService:AddTag(model, "Sawmill")
+	end)
 
 	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
 	fitNameSign(crest)
@@ -3028,6 +3033,19 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	dBox(house, "Stool", V3(1.1, 1.4, 1.1), at(1.9, 1.2, 1.4), TIMBER_LIGHT)
 
 	return model
+end
+
+-- The scale tower makes SellArea's bounding-box pivot taller than the one
+-- MustKeep recorded (local y = 6, tests/mustkeep.json). Pin that height on
+-- the area model after the station is parented. Parts do not move.
+-- __pivot is what the Lune harness reads as GetPivot; WorldPivot is what Studio reads.
+function BuildingArt.PinPivotHeight(model: Model, y: number)
+	local pivot = model:GetPivot()
+	local pinned = CFrame.new(pivot.X, y, pivot.Z) * (pivot - pivot.Position)
+	model:SetAttribute("__pivot", pinned)
+	pcall(function()
+		model.WorldPivot = pinned
+	end)
 end
 
 ---------------------------------------------------------------------------
