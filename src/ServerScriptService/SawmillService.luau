@@ -617,7 +617,7 @@ function SawmillService.Set(player: Player, uid: unknown, axis: unknown, dir: un
 	-- OwnerId 0 is the town mill (T411): any nearby player may set the cut, and it is not saved per profile.
 	local mayId = model:GetAttribute("OwnerId")
 	local shared = mayId == 0
-	local mayOwner = if (not shared) and type(mayId) == "number"
+	local mayOwner = if not shared and type(mayId) == "number"
 		then game:GetService("Players"):GetPlayerByUserId(mayId)
 		else nil
 	if not shared and not EditRights.Can(player, mayOwner, "interact") then

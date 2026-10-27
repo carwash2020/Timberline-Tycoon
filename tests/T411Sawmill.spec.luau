@@ -168,7 +168,8 @@ return function(t)
 				selling = nil,
 				dead = nil,
 				shopItem = nil,
-			}, part
+			},
+				part
 		end
 		local notes = {}
 		local spawned = {}
@@ -218,7 +219,11 @@ return function(t)
 		now = Sawmill.Settle
 		Sawmill.Tick()
 		t.eq(current.selling, true, "the town mill takes a legal Block log")
-		local expect = Logic.Cut(current.volume, Logic.DefaultSettings(Catalog.GetSawmill("SawmillRickety")), Catalog.GetSawmill("SawmillRickety"))
+		local expect = Logic.Cut(
+			current.volume,
+			Logic.DefaultSettings(Catalog.GetSawmill("SawmillRickety")),
+			Catalog.GetSawmill("SawmillRickety")
+		)
 		for _ = 1, #expect + 3 do
 			now += Logic.ProcessSeconds(current.volume) + Sawmill.PlankGap
 			Sawmill.Tick()
@@ -241,7 +246,10 @@ return function(t)
 		Sawmill.Tick()
 		t.eq(#spawned, before, "an over-limit log is not cut")
 		t.eq(current.model:GetAttribute("MillNote"), "long")
-		t.ok(#notes > 0 and string.find(notes[#notes], "Too big for this mill", 1, true) ~= nil, notes[#notes] or "no toast")
+		t.ok(
+			#notes > 0 and string.find(notes[#notes], "Too big for this mill", 1, true) ~= nil,
+			notes[#notes] or "no toast"
+		)
 		mill:Destroy()
 		Sawmill._reset()
 	end)
@@ -435,10 +443,7 @@ return function(t)
 			end
 			return nil
 		end
-		local east = apronClear(
-			V3.new(slip.max.X, 0.4, slip.min.Z),
-			V3.new(slip.max.X + 6, slip.max.Y, slip.max.Z)
-		)
+		local east = apronClear(V3.new(slip.max.X, 0.4, slip.min.Z), V3.new(slip.max.X + 6, slip.max.Y, slip.max.Z))
 		t.eq(east, nil, "intake apron: " .. tostring(east))
 		local west = apronClear(
 			V3.new(outfeed.min.X - 6, 0.4, outfeed.min.Z),
@@ -582,7 +587,11 @@ return function(t)
 		t.eq(facts(), nil, "OwnerId 0 takes another player's wood while nobody is 'the owner'")
 		t.eq(facts({ woodId = "lumenwood" }), "rare", "rare wood is still hand-only")
 		t.eq(facts({ looseOutputs = Auto.MaxLooseOutputs }), "full")
-		t.eq(facts({ machineOwnerId = 3, ownerOnline = true }), "notYours", "a plot mill still refuses someone else's wood")
+		t.eq(
+			facts({ machineOwnerId = 3, ownerOnline = true }),
+			"notYours",
+			"a plot mill still refuses someone else's wood"
+		)
 		t.eq(facts({ machineOwnerId = 3, pieceOwnerId = 3, ownerOnline = false }), "offline")
 	end)
 
@@ -727,11 +736,7 @@ return function(t)
 		for _, p in ipairs(parts(station)) do
 			if p.CanCollide then
 				local lo, hi = bounds(p)
-				t.eq(
-					overlaps(lo, hi, bayMin, bayMax, 0.02),
-					false,
-					string.format("%s stands in the truck bay", p.Name)
-				)
+				t.eq(overlaps(lo, hi, bayMin, bayMax, 0.02), false, string.format("%s stands in the truck bay", p.Name))
 			end
 			if p.Name == "RackLog" or p.Name == "Log" then
 				t.eq(p.Shape, Enum.PartType.Block, p.Name .. " is square Block wood")

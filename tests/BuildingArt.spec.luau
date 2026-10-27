@@ -1054,7 +1054,13 @@ return function(t)
 				end)
 				t.ok(not setPosition, model.Name .. " " .. p.Name .. " was placed with .Position")
 				-- Intake and Outfeed are invisible hosts the mill queries (T411), not decoration.
-				if not p.CanCollide and p.Name ~= "SellPad" and p.Name ~= "DoorSensor" and p.Name ~= "Intake" and p.Name ~= "Outfeed" then
+				if
+					not p.CanCollide
+					and p.Name ~= "SellPad"
+					and p.Name ~= "DoorSensor"
+					and p.Name ~= "Intake"
+					and p.Name ~= "Outfeed"
+				then
 					t.ok(not p.CanQuery and not p.CanTouch, model.Name .. " " .. p.Name .. " decoration can be clicked")
 				end
 			end

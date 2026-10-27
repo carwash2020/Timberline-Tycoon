@@ -370,13 +370,7 @@ local function closePanel()
 	if mill and mill.Parent then
 		local prompt = mill:FindFirstChild("CutPrompt", true)
 		local player = Players.LocalPlayer
-		if
-			prompt
-			and prompt:IsA("ProximityPrompt")
-			and prompt.Parent
-			and player
-			and mayCut(mill, player)
-		then
+		if prompt and prompt:IsA("ProximityPrompt") and prompt.Parent and player and mayCut(mill, player) then
 			prompt.Enabled = true
 		end
 	end
