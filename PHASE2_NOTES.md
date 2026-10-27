@@ -1,5 +1,13 @@
 # Phase 2+ build notes
 
+## Client freeze: seat the forest in slices (27 October 2026, branch `cursor/clientfreeze-seat-yield-ee88`)
+
+Square Block wood is unchanged. Nothing here has been seen in Studio.
+
+Studio checks:
+1. Join and walk the starter grove, then out to a country stand and the forest ring. Trunks stand where they did before this branch. X and Z are the plan; Y is still the valley height.
+2. While the rest of the forest fills in, the frame should not hitch for about a tenth of a second. Chopping, the square trunk, and the mill are unchanged.
+
 ## T410 square Block wood (27 October 2026, branch `cursor/t410-square-block-wood-ee88`)
 
 Nothing here has been seen in Studio. Cloud tests do not run physics. The live fall and a CargoLock drive are playtest (`FallLogic.LiveFall`, `CargoLock.LiveDrive`). Before shots are the round bark scene frozen from #271. After shots are the square Block look. Both are in `preview/t410-fix/`.
