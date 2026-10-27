@@ -372,8 +372,10 @@ ItemCatalog.Gear = {
 
 -- Sawmills (V2_PLAN.md §2e). Limits are in timber units: a log longer than
 -- maxLength or thicker than maxWidth won't go in, and the cut (x by y) can't
--- pass maxX / maxY. The Rickety takes an oak trunk (2.0 studs < 2.24) and
--- not a pine base (2.6). width and depth are the plot footprint in studs.
+-- pass maxX / maxY. maxWidth is wood units. Accepts compares stud thickness
+-- to maxWidth * WoodUnit (1.6), so the Rickety (2.0 u) takes an oak Block
+-- (~2.0 studs; the limit is 3.2 studs). width and depth are the plot footprint
+-- in studs.
 export type SawmillDef = {
 	id: string,
 	displayName: string,
@@ -398,7 +400,7 @@ ItemCatalog.Sawmills = {
 		displayName = "Rickety Sawmill",
 		priceCash = 130,
 		maxLength = 10.9,
-		maxWidth = 1.4,
+		maxWidth = 2.0,
 		maxX = 1.8,
 		maxY = 1.2,
 		width = 8,
@@ -415,7 +417,7 @@ ItemCatalog.Sawmills = {
 		displayName = "Sturdy Sawmill",
 		priceCash = 1600,
 		maxLength = 10.9,
-		maxWidth = 1.6,
+		maxWidth = 2.2,
 		maxX = 2.4,
 		maxY = 1.6,
 		width = 8,
@@ -423,7 +425,7 @@ ItemCatalog.Sawmills = {
 		color = "#6B4423",
 		tier = 2,
 		tierName = "Sturdy",
-		plankBonus = 1.10,
+		plankBonus = 1.35,
 		step = 0.2,
 		autoRate = 14,
 	},
@@ -432,7 +434,7 @@ ItemCatalog.Sawmills = {
 		displayName = "Millmaster 100",
 		priceCash = 11000,
 		maxLength = 10.9,
-		maxWidth = 2.0,
+		maxWidth = 2.4,
 		maxX = 3.0,
 		maxY = 2.0,
 		width = 10,
@@ -440,7 +442,7 @@ ItemCatalog.Sawmills = {
 		color = "#A33B32",
 		tier = 3,
 		tierName = "Mill",
-		plankBonus = 1.22,
+		plankBonus = 1.70,
 		step = 0.1,
 		autoRate = 30,
 	},
@@ -457,7 +459,7 @@ ItemCatalog.Sawmills = {
 		color = "#4A4E57",
 		tier = 4,
 		tierName = "Steam",
-		plankBonus = 1.36,
+		plankBonus = 2.15,
 		step = 0.1,
 		autoRate = 60,
 	},
@@ -474,7 +476,7 @@ ItemCatalog.Sawmills = {
 		color = "#3E4A62",
 		tier = 5,
 		tierName = "Industrial",
-		plankBonus = 1.50,
+		plankBonus = 2.50,
 		step = 0.05,
 		autoRate = 110,
 	},
@@ -799,7 +801,7 @@ ItemCatalog.Machines = {
 		boxD = 5,
 		planer = {
 			tier = 1,
-			boardBonus = 1.20,
+			boardBonus = 1.50,
 			maxLength = 10.9,
 			minX = 0.6,
 			maxX = 1.8,
@@ -823,7 +825,7 @@ ItemCatalog.Machines = {
 		boxD = 8,
 		planer = {
 			tier = 2,
-			boardBonus = 1.40,
+			boardBonus = 2.00,
 			maxLength = 10.9,
 			minX = 0.6,
 			maxX = 2.4,
@@ -847,7 +849,7 @@ ItemCatalog.Machines = {
 		boxD = 10,
 		planer = {
 			tier = 3,
-			boardBonus = 1.65,
+			boardBonus = 2.50,
 			maxLength = 10.9,
 			minX = 0.6,
 			maxX = 3.0,
@@ -871,7 +873,7 @@ ItemCatalog.Machines = {
 		boxD = 10,
 		planer = {
 			tier = 4,
-			boardBonus = 1.80,
+			boardBonus = 3.00,
 			maxLength = 18.9,
 			minX = 0.6,
 			maxX = 3.0,

@@ -150,12 +150,12 @@ return function(t)
 		r.advance(Logic.ProcessSeconds(r.piece.volume) + 0.1)
 		t.eq(#r.finished, 1)
 		local f = r.finished[1]
-		t.eq(f.board, 1.4, "the Bench Planer's boardBonus")
+		t.eq(f.board, 2, "the Bench Planer's boardBonus")
 		t.ok(math.abs(f.size.sx - 1.6) < 1e-6 and math.abs(f.size.sz - 0.96) < 1e-6, "planed to 1.0 x 0.6 u")
 		t.eq(f.size.sy, 8, "same length")
 		t.eq(r.piece.selling, nil, "released")
 		t.eq(r.part.Anchored, false)
-		t.eq(r.piece.board, 1.4)
+		t.eq(r.piece.board, 2)
 		-- The same piece: owner, wood, figure, boost, lux and mill bonus carry.
 		t.eq(
 			{ r.piece.ownerId, r.piece.woodId, r.piece.figure, r.piece.boost, r.piece.lux, r.piece.mill },
@@ -177,10 +177,11 @@ return function(t)
 			t.eq(r.finished[1].board, machine.planer.boardBonus, machine.id)
 			done(r)
 		end
-		-- Already stamped at 2.0 (as if from an Industrial) by a Hand planer: stays 2.0. A
-		-- finished board is refused, so this is the stamp rule itself.
+		-- An existing stamp higher than this planer is kept. Hand is 1.50, so 2.0 stays.
+		-- A finished board is refused, so this is the stamp rule itself.
 		local _, hand = Logic.Get("PlanerHand")
 		t.eq(Logic.Stamp(2, hand), 2)
+		t.eq(Logic.Stamp(3, hand), 3, "an Industrial stamp is not lowered")
 	end)
 
 	t.test(
