@@ -178,6 +178,7 @@ return function(t)
 		end
 		s.ItemCatalog = loader:shared("ItemCatalog")
 		s.SectionLogic = loader:shared("SectionLogic")
+		s.SectionMetrics = loader:shared("SectionMetrics")
 		s.TreeLogic = loader:shared("TreeLogic")
 		s.GrowLogic = loader:shared("GrowLogic")
 		s.WoodData = loader:shared("WoodData")
@@ -293,7 +294,8 @@ return function(t)
 		-- moves on by the axe's cooldown first.
 		function s.swing(p, part, wait)
 			s.now += wait or 0.7
-			local hit, normal = s.SectionLogic.AimAt(part.CFrame, part.Size, p.root.Position, nil, nil)
+			local cf, size = s.SectionMetrics.BlockFrame(part)
+			local hit, normal = s.SectionLogic.AimAt(cf, size, p.root.Position, nil, nil)
 			return s.Trees.Chop(p, part, hit, normal)
 		end
 
@@ -404,7 +406,7 @@ return function(t)
 		end
 		local base = rec.sections[1]
 		t.eq(rec.model:GetAttribute("HP"), 1, "a standing tree reads as standing")
-		local hits = s.SectionLogic.HitsToCut(2, base.Size.X, 0.2)
+		local hits = s.SectionLogic.HitsToCut(2, s.SectionMetrics.SquareSide(base), 0.2)
 		t.eq(hits, 16, "the plan's oak: 16 hits with the hatchet")
 		local n, ok, _, result = s.cutThrough(p, base)
 		t.ok(ok, "every swing accepted")
@@ -580,7 +582,7 @@ return function(t)
 		})
 		local rec = s.Trees.GetTree(model:GetAttribute("Uid"))
 		local base = rec.sections[1]
-		local reach = base.Size.X / 2 + 3
+		local reach = s.SectionMetrics.SquareSide(base) / 2 + 3
 		local a = s.player(1, Vector3.new(reach, 3, 0))
 		local b = s.player(2, Vector3.new(reach, 3, 1))
 		t.ok(s.swing(a, base))
@@ -1155,7 +1157,10 @@ return function(t)
 		MeshKit.Override = nil
 		local leaf = rec.sections[leafId]
 		t.ok(leaf:IsA("MeshPart"), "the section is the mesh")
-		t.ok((leaf.Size - plainLeaf.Size).Magnitude < 1e-3, "the mesh keeps the block's size")
+		local _, plainSize = plain.SectionMetrics.BlockFrame(plainLeaf)
+		local _, meshSize = meshed.SectionMetrics.BlockFrame(leaf)
+		t.ok((leaf.Size - meshSize).Magnitude < 1e-3, "the mesh stays in the logical frame")
+		t.ok((meshSize - plainSize).Magnitude < 1e-3, "the mesh keeps the priced size")
 		t.eq(leaf.CanCollide, true)
 		t.eq(leaf.CanQuery, true)
 
@@ -1168,8 +1173,8 @@ return function(t)
 			local on = CargoLock.ContactsBed(bedSize, rel, size)
 			return share, CargoLock.MayLock(share, on, false)
 		end
-		local plainShare, plainLocks = lockOf(plainLeaf.Size)
-		local meshShare, meshLocks = lockOf(leaf.Size)
+		local plainShare, plainLocks = lockOf(plainSize)
+		local meshShare, meshLocks = lockOf(meshSize)
 		t.ok(math.abs(meshShare - plainShare) < 1e-6, "the same share of the bed")
 		t.eq(meshLocks, true, "the mesh section fits TruckLoad's lock")
 		t.eq(plainLocks, true)
@@ -1179,7 +1184,7 @@ return function(t)
 			local volume = meshed.SectionLogic.Volume(size.X, size.Y, size.Z)
 			return SellLogic.PieceValue("oak", "log", volume, nil, 1, false)
 		end
-		t.eq(sell(leaf.Size), sell(plainLeaf.Size))
+		t.eq(sell(meshSize), sell(plainSize))
 
 		local before = 0
 		for _ in pairs(rec.sections) do
@@ -1205,8 +1210,8 @@ return function(t)
 		local plainPlayer = plain.player(1, plainLeaf.CFrame.Position + Vector3.new(2.5, 0, 0))
 		local _, plainOk, _, plainResult = plain.cutThrough(plainPlayer, plainLeaf)
 		t.ok(plainOk)
-		t.eq(result.freed[1].volume, plainResult.freed[1].volume)
-		t.eq(result.freed[1].value, plainResult.freed[1].value)
+		t.ok(math.abs(result.freed[1].volume - plainResult.freed[1].volume) < 1e-4, "the mesh sells the same volume")
+		t.ok(math.abs(result.freed[1].value - plainResult.freed[1].value) < 1e-4, "and the same price")
 		MeshKit.Reset()
 	end)
 
@@ -1540,7 +1545,7 @@ return function(t)
 			local rec = s.tree(def.id)
 			local p = s.player(1)
 			local base = rec.sections[1]
-			local before = base.Size.Y
+			local before = s.SectionMetrics.Length(base)
 			local _, ok, _, result = s.cutThrough(p, base, 3000)
 			t.ok(ok and result ~= nil, def.id .. " cut")
 			if result then
@@ -1548,8 +1553,9 @@ return function(t)
 				t.ok(rec.felled and not rec.slot, def.id .. " felled, site not open")
 				t.ok(rec.sections[1] == base and base.Parent == rec.model, def.id .. " root stays")
 				t.ok(base.Anchored, def.id .. " stump anchored")
-				t.ok(math.abs(base.Size.Y - height) < 0.01, def.id .. " stump is as tall as the cut")
-				t.ok(base.Size.Y < before, def.id .. " the trunk above the cut left")
+				local length = s.SectionMetrics.Length(base)
+				t.ok(math.abs(length - height) < 0.01, def.id .. " stump is as tall as the cut")
+				t.ok(length < before, def.id .. " the trunk above the cut left")
 				local piece = result.freed[1]
 				for _, d in ipairs(piece.model:GetDescendants()) do
 					if d:IsA("BasePart") then
@@ -1703,7 +1709,7 @@ return function(t)
 		})
 		local rec = s.Trees.GetTree(model:GetAttribute("Uid"))
 		local base = rec.sections[1]
-		local reach = base.Size.X / 2 + 3
+		local reach = s.SectionMetrics.SquareSide(base) / 2 + 3
 		local a = s.player(1, Vector3.new(reach, 3, 0))
 		local b = s.player(2, Vector3.new(reach, 3, 1))
 		local result

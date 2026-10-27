@@ -2,7 +2,7 @@
 -- TreeArt.FromSkeleton (Shared/Art): the v2 section tree's model (V2_PLAN.md
 -- §3c, §3e, §3j), and ForestArt's clues on a section.
 --   * Exactly the parts TreeGen counted. Sections are colliding, queryable,
---     untouchable Wood blocks in group "Wood", tagged WoodSection with
+--     untouchable round Wood logs in group "Wood", tagged WoodSection with
 --     their Section id; every other part is dress: never collides or fires
 --     touches, can be queried, in group "Leaves", riding a real section,
 --     named as WindSway and CanopyFade expect.
@@ -20,6 +20,8 @@
 --     world under §16's 31k).
 return function(t)
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
+	local SectionMetrics = t.load("ReplicatedStorage/Shared/SectionMetrics")
+	local StumpLogic = t.shared("StumpLogic")
 	local ForestArt = t.load("ReplicatedStorage/Shared/Art/ForestArt")
 	local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
 	local TreeGen = t.shared("TreeGen")
@@ -42,9 +44,15 @@ return function(t)
 		return out
 	end
 
-	-- A part's world box: lowest and highest corner.
+	-- A part's world box: lowest and highest corner. A round section's
+	-- engine box is the cylinder's square hull (wider than the priced
+	-- side); the height pin uses the logical Y-up frame instead.
 	local function bounds(p)
-		local cf, s = p.CFrame, p.Size / 2
+		local cf, size = p.CFrame, p.Size
+		if p.Name == "Section" and p:IsA("Part") and p.Shape == Enum.PartType.Cylinder then
+			cf, size = SectionMetrics.BlockFrame(p)
+		end
+		local s = size / 2
 		local ext = Vector3.new(
 			math.abs(cf.XVector.X) * s.X + math.abs(cf.YVector.X) * s.Y + math.abs(cf.ZVector.X) * s.Z,
 			math.abs(cf.XVector.Y) * s.X + math.abs(cf.YVector.Y) * s.Y + math.abs(cf.ZVector.Y) * s.Z,
@@ -245,7 +253,7 @@ return function(t)
 					knot = true
 				end
 				if p.Name == "Section" then
-					t.eq(p.Shape, Enum.PartType.Block, "the grove oak is still cut by its sections")
+					t.eq(p.Shape, Enum.PartType.Cylinder, "the grove oak is cut as a round log")
 				end
 			end
 			t.ok(wedges >= 3, "grove oak " .. i .. " has a crown")
@@ -293,15 +301,21 @@ return function(t)
 						t.eq(p.Material, TreeArt.BarkMaterial(def))
 						t.eq(p.CollisionGroup, "Wood")
 						t.ok(p:HasTag("WoodSection"), def.id .. ": tagged WoodSection")
-						t.eq(p.Shape, Enum.PartType.Block, "square sections")
+						t.eq(p.Shape, Enum.PartType.Cylinder, "round sections")
+						local frame, logical = SectionMetrics.BlockFrame(p)
 						t.ok(
-							math.abs(p.Size.X - s.thickness) < 1e-4
-								and math.abs(p.Size.Z - s.thickness) < 1e-4
-								and math.abs(p.Size.Y - s.length) < 1e-4,
-							def.id .. ": the part is the section's size"
+							math.abs(logical.X - s.thickness) < 1e-4
+								and math.abs(logical.Z - s.thickness) < 1e-4
+								and math.abs(logical.Y - s.length) < 1e-4,
+							def.id .. ": the logical size is the section"
+						)
+						local diameter = math.min(p.Size.Y, p.Size.Z)
+						t.ok(
+							math.abs(diameter - 2 * StumpLogic.RoundRadius(s.thickness)) < 1e-3,
+							def.id .. ": round, same area as the square"
 						)
 						-- Its bottom centre is the skeleton's cf.
-						local bottom = p.CFrame * Vector3.new(0, -p.Size.Y / 2, 0)
+						local bottom = (frame * Vector3.new(0, -logical.Y / 2, 0))
 						t.ok(
 							(bottom - s.cf.Position).Magnitude < 1e-3,
 							def.id .. ": the section is where the skeleton says"
@@ -496,19 +510,26 @@ return function(t)
 			for _, top in ipairs({ true, false }) do
 				local face = TreeArt.CutFace(def, s, top)
 				t.eq(face.Name, "CutFace")
-				t.eq(face.Material, Enum.Material.WoodPlanks, "a cut face is plain planks, never glowing")
+				t.eq(face.Material, Enum.Material.Wood, "a cut face is plain wood, never glowing")
 				t.ok(face.Material ~= Enum.Material.Neon, "never Neon")
 				t.eq(face.Color, color, "in the wood's core colour")
-				t.ok(math.abs(face.Size.Y - 0.06) < 1e-3, "0.06 thick")
-				t.ok(math.abs(face.Size.X - s.Size.X * 0.86) < 1e-3, "0.86 of the width")
+				local _, logical = SectionMetrics.BlockFrame(s)
+				local thick = if face.Shape == Enum.PartType.Cylinder then face.Size.X else face.Size.Y
+				t.ok(math.abs(thick - 0.06) < 1e-3, "0.06 thick")
+				local want = if face.Shape == Enum.PartType.Cylinder
+					then SectionMetrics.Diameter(math.min(logical.X, logical.Z)) * 0.86
+					else math.min(logical.X, logical.Z) * 0.86
+				local across = if face.Shape == Enum.PartType.Cylinder then face.Size.Y else face.Size.X
+				t.ok(math.abs(across - want) < 1e-3, "0.86 of the width")
 				t.ok(
 					not face.CanCollide and not face.CanQuery and not face.CanTouch and face.Massless,
 					"a face is looks only"
 				)
 				t.ok(face.Anchored, "anchored on a standing tree")
 				t.eq(face:GetAttribute("Section"), 1)
-				local local_ = s.CFrame:PointToObjectSpace(face.CFrame.Position)
-				local edge = s.Size.Y / 2
+				local frame = SectionMetrics.BlockFrame(s)
+				local local_ = frame:PointToObjectSpace(face.CFrame.Position)
+				local edge = logical.Y / 2
 				if top then
 					t.ok(math.abs(local_.Y + 0.03 - 0.005 - edge) < 1e-4, "outer face 0.005 proud of the top end ")
 				else
@@ -526,12 +547,12 @@ return function(t)
 		t.ok(weld and weld.Part0 == loose and weld.Part1 == face, "welded to its section")
 	end)
 
-	t.test("FaceLook is the core colour on WoodPlanks for every wood, and Core is untouched", function()
+	t.test("FaceLook is the core colour on Wood for every wood, and Core is untouched", function()
 		for _, def in ipairs(WoodData.All()) do
 			local core = TreeArt.Core(def)
 			local color, material = TreeArt.FaceLook(def)
 			t.eq(color, core, def.id .. " keeps its core colour")
-			t.eq(material, Enum.Material.WoodPlanks, def.id)
+			t.eq(material, Enum.Material.Wood, def.id)
 		end
 		t.eq(
 			select(2, TreeArt.Core(WoodData.Get("lumenwood"))),
@@ -544,19 +565,20 @@ return function(t)
 		local def = WoodData.Get("oak")
 		local model = build("oak", 1, 1)
 		local s = model.PrimaryPart
-		local tW = s.Size.X
+		local frame, logical = SectionMetrics.BlockFrame(s)
+		local tW = math.min(logical.X, logical.Z)
 		local color = TreeArt.Core(def)
 		for _, case in ipairs({
-			{ normal = s.CFrame.XVector, axis = "X", sign = 1 },
-			{ normal = -s.CFrame.XVector, axis = "X", sign = -1 },
-			{ normal = s.CFrame.ZVector + s.CFrame.XVector * 0.2, axis = "Z", sign = 1 },
-			{ normal = -s.CFrame.ZVector, axis = "Z", sign = -1 },
+			{ normal = frame.XVector, axis = "X", sign = 1 },
+			{ normal = -frame.XVector, axis = "X", sign = -1 },
+			{ normal = frame.ZVector + frame.XVector * 0.2, axis = "Z", sign = 1 },
+			{ normal = -frame.ZVector, axis = "Z", sign = -1 },
 		}) do
 			for _, frac in ipairs({ 0.1, 0.5, 0.9, 1.4 }) do
 				local n = TreeArt.Notch(def, s, 1.2, case.normal, frac * 10, 10)
 				local depth = tW * math.min(TreeArt.NotchMaxDepth, frac)
 				t.eq(n.Name, "Notch")
-				t.eq(n.Material, Enum.Material.WoodPlanks, "a notch is plain planks too")
+				t.eq(n.Material, Enum.Material.Wood, "a notch is plain wood too")
 				t.ok(n.Material ~= Enum.Material.Neon)
 				t.ok(math.abs(n.Size.Y - 0.35) < 1e-3, "0.35 tall")
 				local along = if case.axis == "X" then n.Size.X else n.Size.Z
@@ -569,11 +591,11 @@ return function(t)
 				local chord = math.max(0.15, 2 * math.sqrt(math.max(0, r * r - (r - into) ^ 2)))
 				t.ok(math.abs(across - chord) < 1e-3, "as wide as the chord it has cut")
 				-- Its outer face is flush with the section's face (a hair proud).
-				local rel = s.CFrame:PointToObjectSpace(n.CFrame.Position)
+				local rel = frame:PointToObjectSpace(n.CFrame.Position)
 				local c = if case.axis == "X" then rel.X else rel.Z
 				local outer = c * case.sign + along / 2
 				t.ok(math.abs(outer - (r + 0.02)) < 1e-3, "flush with the round surface it was hit on")
-				t.ok(math.abs(rel.Y - (1.2 - s.Size.Y / 2)) < 1e-3, "at the height hit")
+				t.ok(math.abs(rel.Y - (1.2 - logical.Y / 2)) < 1e-3, "at the height hit")
 				t.ok(n.Color:Lerp(Kit.shade(color, -0.25), 1) == n.Color, "core, shaded")
 				t.eq(n:GetAttribute("Section"), 1)
 				t.eq(n:GetAttribute("Height"), 1.2)
@@ -618,7 +640,8 @@ return function(t)
 		local model = build("maple", 1, 1)
 		local section = ForestArt.ClueSection(model)
 		t.ok(section and section:GetAttribute("Section") == 2, "the clue goes on the second trunk section")
-		local half = section.Size.X / 2
+		local frame, logical = SectionMetrics.BlockFrame(section)
+		local radius = StumpLogic.RoundRadius(math.min(logical.X, logical.Z))
 		for _, figure in ipairs({ "curly", "birdseye", "quilted", "burl", "starfall", "stormgrain" }) do
 			local clue = ForestArt.SectionClue(model, section, def, figure, 5)
 			t.eq(clue:GetAttribute("Section"), 2)
@@ -629,10 +652,10 @@ return function(t)
 				t.eq(p:GetAttribute("Section"), 2, figure .. ": a clue part rides the section")
 				t.ok(not p.CanCollide and not p.CanQuery, figure .. ": clues are looks only")
 				-- On the bark: within reach of the section's sides, not inside its middle.
-				local rel = section.CFrame:PointToObjectSpace(p.CFrame.Position)
-				local out = math.max(math.abs(rel.X), math.abs(rel.Z))
-				t.ok(out >= half * 0.4 and out <= half * 2.6, figure .. ": on the bark")
-				t.ok(math.abs(rel.Y) <= section.Size.Y / 2 + 1, figure .. ": on its section")
+				local rel = frame:PointToObjectSpace(p.CFrame.Position)
+				local out = Vector3.new(rel.X, 0, rel.Z).Magnitude
+				t.ok(out >= radius * 0.4 and out <= radius * 2.6, figure .. ": on the bark")
+				t.ok(math.abs(rel.Y) <= logical.Y / 2 + 1, figure .. ": on its section")
 			end
 			t.ok(n > 0, figure .. " has parts")
 			clue:Destroy()

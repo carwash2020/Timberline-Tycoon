@@ -62,6 +62,7 @@ local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
+local SectionMetrics = require(ReplicatedStorage.Shared.SectionMetrics)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local SwingLogic = require(ReplicatedStorage.Shared.SwingLogic)
@@ -159,7 +160,8 @@ function CutController.Aim(
 	pointer: Vector3?,
 	pointerNormal: Vector3?
 ): (Vector3, Vector3)
-	return SectionLogic.AimAt(section.CFrame, section.Size, root, pointer, pointerNormal)
+	local cf, size = SectionMetrics.BlockFrame(section)
+	return SectionLogic.AimAt(cf, size, root, pointer, pointerNormal)
 end
 
 -- The axe's damage and cooldown against a wood (v2), its reach.
@@ -380,7 +382,7 @@ function CutController.PickSection(
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and d.Name == "Section" and type(d:GetAttribute("Section")) == "number" then
 			local target = describe(d, model, kind, axe, root, pointer, pointerNormal)
-			local upright = math.abs(d.CFrame.UpVector.Y) >= SectionLogic.Upright
+			local upright = math.abs(SectionMetrics.BlockFrame(d).UpVector.Y) >= SectionLogic.Upright
 			local dist = (target.hit - root).Magnitude
 			if target.problem == nil then
 				local score = dist + (if upright or kind ~= "tree" then 0 else 50)
@@ -856,7 +858,12 @@ end
 local function placeBand(part: BasePart, h: number, hard: boolean, bark: Color3?)
 	local g = guide or makeGuide()
 	guide = g
-	local cf, size = CutController.BandFor(part.CFrame, part.Size, h)
+	local frame, logical = SectionMetrics.BlockFrame(part)
+	local cf, size = CutController.BandFor(frame, logical, h)
+	if SectionMetrics.IsCylinder(part) then
+		local dia = math.min(part.Size.Y, part.Size.Z)
+		size = Vector3.new(dia + CutController.GuideGrow, CutController.GuideThickness, dia + CutController.GuideGrow)
+	end
 	if CutController.BandMoved(bandCF, cf) then
 		g.CFrame = cf
 		bandCF = cf

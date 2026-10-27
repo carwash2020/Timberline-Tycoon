@@ -6,6 +6,7 @@
 -- wood part budget.
 
 local MeshKit = require(script.Parent.MeshKit)
+local SectionMetrics = require(script.Parent.Parent.SectionMetrics)
 local TreeGen = require(script.Parent.Parent.TreeGen)
 local TreeModels = require(script.Parent.TreeModels)
 local WoodData = require(script.Parent.Parent.WoodData)
@@ -56,7 +57,7 @@ local function trunkFoot(model: Model, root: BasePart?): Vector3?
 	local low = math.huge
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and d.Name == "Section" then
-			low = math.min(low, d.CFrame.Position.Y - d.Size.Y / 2)
+			low = math.min(low, d.CFrame.Position.Y - SectionMetrics.Length(d) / 2)
 		end
 	end
 	if low == math.huge then
@@ -94,7 +95,10 @@ local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 	local replacements: { { old: BasePart, mesh: MeshPart } } = {}
 	for _, old in ipairs(sections) do
 		local sid = old:GetAttribute("Section") :: number
-		local mesh = MeshKit.Create(TreeModels.SectionMesh(def.id, sid), "Section", old.Size)
+		-- Uploaded section meshes are Y-up. Place them in the logical frame
+		-- (t, L, t), not the cylinder's X-along-length size.
+		local _, logicalSize = SectionMetrics.BlockFrame(old)
+		local mesh = MeshKit.Create(TreeModels.SectionMesh(def.id, sid), "Section", logicalSize)
 		if not mesh then
 			destroyAll(made)
 			return false
@@ -134,7 +138,13 @@ local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 	local primaryId = if model.PrimaryPart then model.PrimaryPart:GetAttribute("Section") else nil
 	for _, pair in ipairs(replacements) do
 		local old, mesh = pair.old, pair.mesh
-		mesh.CFrame = old.CFrame
+		local logical, logicalSize = SectionMetrics.BlockFrame(old)
+		mesh.CFrame = logical
+		mesh.Size = logicalSize
+		local side = old:GetAttribute(SectionMetrics.SquareSideAttr)
+		if type(side) == "number" then
+			mesh:SetAttribute(SectionMetrics.SquareSideAttr, side)
+		end
 		mesh.Color = old.Color
 		mesh.Material = old.Material
 		mesh.Anchored = old.Anchored

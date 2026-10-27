@@ -373,6 +373,57 @@ function SectionLogic.HeightOn(cf: CFrame, size: Vector3, point: Vector3): numbe
 	return cf:PointToObjectSpace(point).Y + size.Y / 2
 end
 
+-- Where the ray from `origin` through `aim` first meets the oriented box
+-- (`cf` its centre, `size` its size). Nil when the ray misses or starts inside.
+function SectionLogic.RayHit(origin: Vector3, aim: Vector3, cf: CFrame, size: Vector3): Vector3?
+	local delta = aim - origin
+	if delta.Magnitude < 1e-8 then
+		return nil
+	end
+	local o = cf:PointToObjectSpace(origin)
+	local d = cf:VectorToObjectSpace(delta)
+	local half = size / 2
+	local tmin, tmax = -math.huge, math.huge
+	local function slab(o1: number, d1: number, h: number): (number?, number?)
+		if math.abs(d1) < 1e-9 then
+			if math.abs(o1) > h + 1e-6 then
+				return nil, nil
+			end
+			return -math.huge, math.huge
+		end
+		local t1 = (-h - o1) / d1
+		local t2 = (h - o1) / d1
+		return math.min(t1, t2), math.max(t1, t2)
+	end
+	local axes = {
+		{ o.X, d.X, half.X },
+		{ o.Y, d.Y, half.Y },
+		{ o.Z, d.Z, half.Z },
+	}
+	for _, axis in ipairs(axes) do
+		local lo, hi = slab(axis[1], axis[2], axis[3])
+		if lo == nil or hi == nil then
+			return nil
+		end
+		tmin = math.max(tmin, lo)
+		tmax = math.min(tmax, hi)
+	end
+	if tmax < tmin or tmin < 0 or tmin ~= tmin then
+		return nil
+	end
+	return origin + delta * tmin
+end
+
+-- Studs up the section (from its bottom, kept CutEdge inside the ends) where
+-- that ray cuts. The client's own Y is not used. Nil when the ray misses.
+function SectionLogic.NotchHeight(origin: Vector3, aim: Vector3, cf: CFrame, size: Vector3): number?
+	local hit = SectionLogic.RayHit(origin, aim, cf, size)
+	if not hit then
+		return nil
+	end
+	return SectionLogic.ClampHeight(cf:PointToObjectSpace(hit).Y, size.Y)
+end
+
 -- Who is cutting a standing tree: the claim the first cut makes, renewed
 -- by every hit of theirs (`at` = their last hit, on the server's clock).
 export type Claim = { userId: number, at: number }

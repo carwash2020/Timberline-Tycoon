@@ -242,4 +242,15 @@ function TreeModels.UsesMesh(meshId: number): boolean
 	return meshId ~= 0
 end
 
+-- Roblox rejects a MeshPart past this many triangles. A section stays one
+-- piece until it would cross the cap; oak and birch sections are ~150.
+TreeModels.TriHardCap = 20000
+
+function TreeModels.PiecesFor(tris: number): number
+	if tris <= TreeModels.TriHardCap then
+		return 1
+	end
+	return math.ceil(tris / TreeModels.TriHardCap)
+end
+
 return TreeModels

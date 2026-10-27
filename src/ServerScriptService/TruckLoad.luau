@@ -73,6 +73,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CargoLock = require(ReplicatedStorage.Shared.CargoLock)
+local SectionMetrics = require(ReplicatedStorage.Shared.SectionMetrics)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Handling = require(ReplicatedStorage.Shared.Handling)
 local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
@@ -594,11 +595,15 @@ local function solids(model: Model): { BasePart }
 	return out
 end
 
+local function lockShape(part: BasePart): string?
+	return if SectionMetrics.IsCylinder(part) then "cylinder" else nil
+end
+
 local function footprintShare(bed: BasePart, model: Model): number
 	local best = 0
 	for _, part in ipairs(solids(model)) do
 		local rel = bed.CFrame:ToObjectSpace(part.CFrame)
-		best = math.max(best, CargoLock.InsideShare(bed.Size, rel, part.Size))
+		best = math.max(best, CargoLock.InsideShare(bed.Size, rel, part.Size, lockShape(part)))
 	end
 	return best
 end
@@ -607,7 +612,7 @@ local function touching(bed: BasePart, model: Model, locked: { Model }): boolean
 	local parts = solids(model)
 	for _, part in ipairs(parts) do
 		local rel = bed.CFrame:ToObjectSpace(part.CFrame)
-		if CargoLock.ContactsBed(bed.Size, rel, part.Size, CargoLock.ContactGap) then
+		if CargoLock.ContactsBed(bed.Size, rel, part.Size, CargoLock.ContactGap, lockShape(part)) then
 			return true
 		end
 		for _, other in ipairs(locked) do
@@ -832,9 +837,10 @@ end
 -- Which ends of `section` show a cut face (LeftLoad: 1 = +Y, 2 = -Y).
 local function facesOn(section: BasePart, faces: { BasePart }): number
 	local flags = 0
-	local h = section.Size / 2
+	local frame, size = SectionMetrics.BlockFrame(section)
+	local h = size / 2
 	for _, f in ipairs(faces) do
-		local p = section.CFrame:PointToObjectSpace(f.CFrame.Position)
+		local p = frame:PointToObjectSpace(f.CFrame.Position)
 		if math.abs(p.X) <= h.X + 0.01 and math.abs(p.Z) <= h.Z + 0.01 then
 			if p.Y >= h.Y - 0.2 and p.Y <= h.Y + 0.3 then
 				flags = bit32.bor(flags, 1)
@@ -881,7 +887,9 @@ function TruckLoad.SnapshotAt(model: Model, ref: CFrame, bedName: string): Saved
 	end
 	local s: { { number } } = {}
 	for _, part in ipairs(sections) do
-		table.insert(s, LeftLoad.EncodeSection(part.Size, root.CFrame:ToObjectSpace(part.CFrame), facesOn(part, faces)))
+		local partCf, partSize = SectionMetrics.BlockFrame(part)
+		local rootCf = SectionMetrics.BlockFrame(root)
+		table.insert(s, LeftLoad.EncodeSection(partSize, rootCf:ToObjectSpace(partCf), facesOn(part, faces)))
 	end
 	local boost = attrNumber(model, "Boost")
 	local stamp = SellLogic.Temper(attrNumber(model, "t"))
@@ -997,6 +1005,7 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 	model.Name = "Wood_" .. uid
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	local kind: SellLogic.Kind = if saved.k == "plank" then "plank" else "log"
+	model:SetAttribute("Kind", kind)
 	local color, material = barkOf(wood), Enum.Material.Wood
 	if kind == "plank" then
 		color, material = TreeArt.Core(wood)
@@ -1022,6 +1031,9 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 		part:SetAttribute("Section", i)
 		part:AddTag("WoodSection")
 		part.Parent = model
+		if kind ~= "plank" then
+			SectionMetrics.ApplyBlockFrame(part, rel, size)
+		end
 		local first = root
 		if first then
 			local w = Instance.new("WeldConstraint")

@@ -13,6 +13,17 @@ return function(t)
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 	local WoodData = t.shared("WoodData")
 	local TreeLogic = t.shared("TreeLogic")
+	local SectionMetrics = t.shared("SectionMetrics")
+
+	-- A round section's engine size is (length, diameter, diameter). The
+	-- tall-thin test uses the logical Y-up frame, the same box a block had.
+	local function logicalSize(part)
+		if part.Name == "Section" then
+			local _, size = SectionMetrics.BlockFrame(part)
+			return size
+		end
+		return part.Size
+	end
 
 	-- Whether a Model is tree-shaped: a tall thin part with a wider part
 	-- (a canopy) above its middle.
@@ -24,10 +35,12 @@ return function(t)
 			end
 		end
 		for _, trunk in ipairs(parts) do
-			local width = math.max(trunk.Size.X, trunk.Size.Z)
-			if trunk.Size.Y >= 4 and trunk.Size.Y >= width * 2 then
+			local size = logicalSize(trunk)
+			local width = math.max(size.X, size.Z)
+			if size.Y >= 4 and size.Y >= width * 2 then
 				for _, crown in ipairs(parts) do
-					local crownWidth = math.max(crown.Size.X, crown.Size.Z)
+					local crownSize = logicalSize(crown)
+					local crownWidth = math.max(crownSize.X, crownSize.Z)
 					if
 						crown ~= trunk
 						and crownWidth >= width * 2
