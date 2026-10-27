@@ -7,7 +7,9 @@ return {
 		local root = ctx.roblox.Instance.new("Model")
 		return {
 			root = root,
-			terrain = Common.terrain(ctx, -520, -240, 80, 1220, 8),
+			-- Step 2, not 8: the blend beside a road is only a few studs wide, and a
+			-- coarser mesh skips it, so the belt reads as a hard grass edge.
+			terrain = Common.terrain(ctx, -520, -240, 80, 1220, 2),
 			shadowRadius = 40,
 			lighting = { fogNear = 4000, fogFar = 9000 },
 			fov = 40,
