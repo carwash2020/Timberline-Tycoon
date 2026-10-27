@@ -743,6 +743,11 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	model:SetAttribute("MillId", mill.id)
 	model:SetAttribute("Tier", mill.tier)
 	model:SetAttribute("TierName", mill.tierName)
+	-- Plot Rickety stays a closed timber tunnel (Lane K). The town mill is the one with a housed blade.
+	if mill.id == "SawmillRickety" then
+		model:SetAttribute("Tunnel", "closed")
+		model:SetAttribute("ExposedBlade", false)
+	end
 	if skin == nil then
 		wearWhenLoaded(model, mill.id, preview, TIER_DECOR, function()
 			moveSign(model, "TierSign", ridgeSign(mill.id))

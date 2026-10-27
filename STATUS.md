@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 27 October 2026. **Main is at `045d53e` (#271, T410 round bark).** This branch restores square Block wood (`cursor/t410-square-block-wood-ee88`).
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 27 October 2026. **Main is at `fd98f20` (#273, square Block wood).** This branch remakes the town sawmill and the Weigh House (`cursor/t411-sawmill-weigh-1d06`).
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
 (#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
@@ -17,7 +17,15 @@ GrabService spec fix; #147 launch settings; #148 and #149 hardening; #150 client
 first screen fix; #153 startup errors; #154 server audit (staged terrain, save prefetch); #155 client freeze; #156 meshes never
 block the build; #157 client audit; #158 world first look; #159 store interiors: the kit, Tool Shed, Hearth & Home, Sparkworks and Dealership (#160 to #162 squashed in).
 
-**Still open:** T410-fix (this branch) puts square Block wood back. The round bark path from #271 is not the live look. T409 is on main. Older "only this branch" notes below are history.
+**Still open:** T411 (this branch) remakes the town sawmill and the Weigh House. T410-fix (square Block wood) is on main. T409 is on main. Older "only this branch" notes below are history.
+
+## T411 town sawmill and Weigh House (27 October 2026, branch `cursor/t411-sawmill-weigh-1d06`)
+
+The town mill is a shared working mill, not dress only. `BuildingArt.Sawmill` tags the model `Sawmill`, sets `MillId` `SawmillRickety` (no new catalog row), `OwnerId` 0, `Tunnel` `housing`, `ExposedBlade` true, and gives it an Intake, a Conveyor and an Output. Any nearby player can set the cut. The setting is not saved. A shared belt is not refused for `notYours` or offline. Plot mills stay owner-only, and a plot Rickety mill stays a closed tunnel with no exposed blade. Wood on the slip, the deck, the carriage and the sell rack is square Block. Volume stays `SectionMetrics` Block. `ItemCatalog` prices, bonuses and Cap are untouched.
+
+The cabin door is 4 by 7 or wider, the walk in front is at least 6, and the east slip, carriage, west outfeed and both aprons have no stray solid. The Weigh House is barn red with a slate roof, a scale tower whose dial is about 6 studs and whose top is at least 18, and a truck bay at least 14 wide with rails only at the edges. Sell pay-once is unchanged. The mill and the pad stay one cluster; Dealership and Tool Shed did not move.
+
+The new GLBs are `assets/meshes/buildings/Sawmill/Sawmill.glb` and `assets/meshes/buildings/WeighHouse/WeighHouse.glb`. `TownModels` mesh ids, piece sizes and the 9944 triangle pin are unchanged, so Studio still shows the previously uploaded mill until Connor re-uploads. Live collision stays the part twin (no Hull dress). Shots: `preview/t411/`. Studio checks: PHASE2_NOTES.md "T411 town sawmill and Weigh House". Nothing here has been seen in Studio. Cloud has no physics.
 
 ## T410-fix square Block wood (27 October 2026, branch `cursor/t410-square-block-wood-ee88`)
 

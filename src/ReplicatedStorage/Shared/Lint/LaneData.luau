@@ -41,6 +41,8 @@ LaneData.Riders = {
 	SawTooth = true,
 	BladeHub = true,
 	BladeRivet = true,
+	-- The town mill's belt is the carriage (T411). It is the one collider that belongs in that lane.
+	Conveyor = true,
 } :: { [string]: boolean }
 
 -- None: every part in a lane box is a hit (T409: the part build was changed until none was left).

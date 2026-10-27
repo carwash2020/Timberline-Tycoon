@@ -166,9 +166,10 @@ Every other registry row is uploaded and Approved. Status `repo`: the GLB is in
 | `buildings/Dealership` | repo | TownModels | 4,020 | 33.566 x 30.665 x 25.875 | Parts |
 | `buildings/GeneralStore` | repo | TownModels | 8,376 | 51.75 x 31.275 x 47 | Parts |
 | `buildings/GondolaStation` | repo | TownModels | 2,636 | 15.272 x 16.55 x 12.471 | Parts |
-| `buildings/Sawmill` | repo | TownModels | 10,284 | 64.055 x 42.3 x 42.938 | Parts |
+| `buildings/Sawmill` | repo | TownModels | 5,352 | 65.7 x 38.5 x 40.6 | Parts |
 | `buildings/SkyBin` | repo | TownModels | 696 | 4.825 x 10.085 x 7.374 | Parts |
 | `buildings/ToolShed` | repo | TownModels | 5,300 | 32.481 x 32.107 x 27.825 | Parts |
+| `buildings/WeighHouse` | repo | TownModels | 1,632 | 34.4 x 21.2 x 30.9 | Parts |
 | `environment/Barrel` | repo | TownModels | 164 | 1.681 x 2.22 x 1.7 | Box |
 | `environment/Bench` | repo | TownModels | 248 | 5 x 3.412 x 1.773 | Hull |
 | `environment/Bush` | repo | TownModels | 200 | 3.959 x 2.941 x 3.32 | Box |

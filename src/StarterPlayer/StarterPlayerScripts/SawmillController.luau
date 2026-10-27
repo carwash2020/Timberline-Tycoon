@@ -346,6 +346,15 @@ local function readoutText(mill: Model): string
 	return size
 end
 
+-- OwnerId 0 is the shared town mill: anyone at the panel may set the cut.
+local function mayCut(mill: Model, player: Player?): boolean
+	if player == nil then
+		return false
+	end
+	local ownerId = mill:GetAttribute("OwnerId")
+	return ownerId == 0 or ownerId == player.UserId
+end
+
 local function closePanel()
 	local mill = openMill
 	openMill = nil
@@ -366,7 +375,7 @@ local function closePanel()
 			and prompt:IsA("ProximityPrompt")
 			and prompt.Parent
 			and player
-			and mill:GetAttribute("OwnerId") == player.UserId
+			and mayCut(mill, player)
 		then
 			prompt.Enabled = true
 		end
@@ -375,7 +384,7 @@ end
 
 local function openPanel(mill: Model)
 	local player = Players.LocalPlayer
-	if not player or mill:GetAttribute("OwnerId") ~= player.UserId then
+	if not mayCut(mill, player) then
 		return
 	end
 	local panel = built
@@ -429,8 +438,7 @@ local function hook(inst: Instance)
 	local prompt = mill:FindFirstChild("CutPrompt", true)
 	if prompt and prompt:IsA("ProximityPrompt") then
 		local function owned(): boolean
-			local player = Players.LocalPlayer
-			return player ~= nil and mill:GetAttribute("OwnerId") == player.UserId
+			return mayCut(mill, Players.LocalPlayer)
 		end
 		local function syncPrompt()
 			prompt.Enabled = owned() and openMill ~= mill

@@ -101,6 +101,10 @@ local KEEP = {
 	RightLeg = true,
 	BridgeGuard = true,
 	Deck = true,
+	-- Town mill hosts (T411). Dress must not delete them when the mesh lands:
+	-- Intake does not collide and carries no child, so it is not precious on its own.
+	Intake = true,
+	Outfeed = true,
 }
 
 -- Body, Roof, and an NPC Head stay Automatic unless the mesh is tiny.
