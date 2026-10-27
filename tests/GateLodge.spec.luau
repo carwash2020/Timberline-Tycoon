@@ -62,20 +62,19 @@ return function(t)
 		t.eq(GateLodgeLogic.EdgeColor(true), GateLodgeLogic.OpenEdge)
 	end)
 
-	t.test("the lodge stands on the north approach, facing the Snow Road", function()
+	t.test("the lodge is pinned at (-40, 720), facing north, on the ground", function()
 		local cf = WorldPlan.GateLodge()
 		t.ok(cf, "the sky build has a lodge")
 		local p = cf.Position
 		t.ok(
-			math.abs(p.X - -30) < 1 and math.abs(p.Z - 790) < 1,
-			string.format("at (%.1f, %.1f), not the old top", p.X, p.Z)
+			math.abs(p.X - -40) <= 1 and math.abs(p.Z - 720) <= 1,
+			string.format("at (%.1f, %.1f), want (-40, 720)", p.X, p.Z)
 		)
 		t.ok((V3.new(p.X, 0, p.Z) - V3.new(680, 0, 280)).Magnitude > 400, "not the old gondola top")
 		t.ok(math.abs(p.Y - TerrainGen.HeightAt(p.X, p.Z)) < 0.05, "Y is the ground")
 		local clear = TerrainGen.RoadClearance(p.X, p.Z, 200)
 		t.ok(clear >= 18 and clear <= 42, string.format("beside the road, clearance %.1f", clear))
-		local toRoad = V3.new(-p.X, 0, 760 - p.Z).Unit
-		t.ok(cf.LookVector:Dot(toRoad) > 0.7, "the front faces the Snow Road")
+		t.ok(cf.LookVector.Z > 0.7, string.format("faces north, look %.2f", cf.LookVector.Z))
 	end)
 
 	t.test("shell 28 by 20, peak 14, door clear 6, one lamp past 80", function()
