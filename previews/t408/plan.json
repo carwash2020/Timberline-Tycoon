@@ -17,6 +17,216 @@
       "z": -920
     }
   ],
+  "belts": [
+    {
+      "depthStuds": 48,
+      "edge": {
+        "x": -36,
+        "z": -137.03857421875
+      },
+      "fromRegion": "corridor",
+      "gateClearStuds": 30,
+      "id": "Valley Trunk->valley",
+      "materials": [
+        "MeadowGrass",
+        "DeepMeadow",
+        "CliffRock"
+      ],
+      "outer": {
+        "x": -36,
+        "z": -185.03857421875
+      },
+      "roadId": "Valley Trunk",
+      "toRegion": "valley",
+      "width": 32
+    },
+    {
+      "accent": "LumenGlow",
+      "accentDepth": 16,
+      "depthStuds": 48,
+      "edge": {
+        "x": -103.01483154296875,
+        "z": 635.5316162109375
+      },
+      "fromRegion": "corridor",
+      "gateClearStuds": 30,
+      "id": "Skyroot Road->skyroot",
+      "materials": [
+        "DeepMeadow",
+        "CliffRock",
+        "LumenCream"
+      ],
+      "outer": {
+        "x": -146.59688199899043,
+        "z": 615.4168236927736
+      },
+      "roadId": "Skyroot Road",
+      "toRegion": "skyroot",
+      "width": 32
+    },
+    {
+      "depthStuds": 48,
+      "edge": {
+        "x": -239.98828125,
+        "z": 110
+      },
+      "fromRegion": "valley",
+      "gateClearStuds": 30,
+      "id": "Pine Road->pine",
+      "materials": [
+        "MeadowGrass",
+        "DeepMeadow",
+        "CliffRock"
+      ],
+      "outer": {
+        "x": -191.98828125,
+        "z": 110
+      },
+      "roadId": "Pine Road",
+      "toRegion": "pine",
+      "width": 24
+    },
+    {
+      "accent": "FrostGlow",
+      "accentDepth": 10,
+      "depthStuds": 48,
+      "edge": {
+        "x": -183.25091552734375,
+        "z": 740.8836975097656
+      },
+      "fromRegion": "skyroot",
+      "gateClearStuds": 30,
+      "id": "Frost Road->frost",
+      "materials": [
+        "DeepMeadow",
+        "TrailDirt",
+        "FreshSnow"
+      ],
+      "outer": {
+        "x": -178.2260458704777,
+        "z": 693.1474357695381
+      },
+      "roadId": "Frost Road",
+      "toRegion": "frost",
+      "width": 24
+    },
+    {
+      "accent": "EmberGlow",
+      "accentDepth": 15,
+      "depthStuds": 48,
+      "edge": {
+        "x": 700,
+        "z": 739.996337890625
+      },
+      "fromRegion": "corridor",
+      "gateClearStuds": 30,
+      "id": "Caldera Road->caldera",
+      "materials": [
+        "MeadowGrass",
+        "TrailDirt",
+        "AshBasalt",
+        "QuarrySlate"
+      ],
+      "outer": {
+        "x": 700,
+        "z": 691.996337890625
+      },
+      "roadId": "Caldera Road",
+      "toRegion": "caldera",
+      "width": 24
+    },
+    {
+      "depthStuds": 48,
+      "edge": {
+        "x": 700,
+        "z": -349.9908447265625
+      },
+      "fromRegion": "corridor",
+      "gateClearStuds": 30,
+      "id": "Mesa Road->mesa",
+      "materials": [
+        "MeadowGrass",
+        "TrailDirt",
+        "MesaRed"
+      ],
+      "outer": {
+        "x": 700,
+        "z": -301.99084472656244
+      },
+      "roadId": "Mesa Road",
+      "toRegion": "mesa",
+      "width": 24
+    },
+    {
+      "accent": "GloamGlow",
+      "accentDepth": 16,
+      "depthStuds": 48,
+      "edge": {
+        "x": -486.4839172363281,
+        "z": -339.0953063964844
+      },
+      "fromRegion": "corridor",
+      "gateClearStuds": 30,
+      "id": "Gloam Road->gloam",
+      "materials": [
+        "DeepMeadow",
+        "WetMud",
+        "BayouSilt"
+      ],
+      "outer": {
+        "x": -459.2288733393956,
+        "z": -300.1091216972553
+      },
+      "roadId": "Gloam Road",
+      "toRegion": "gloam",
+      "width": 24
+    },
+    {
+      "accent": "GloamGlow",
+      "accentDepth": 16,
+      "depthStuds": 48,
+      "edge": {
+        "x": -622.82470703125,
+        "z": -571.37451171875
+      },
+      "fromRegion": "gloam",
+      "gateClearStuds": 30,
+      "id": "Bayou Road->bayou",
+      "materials": [
+        "DeepMeadow",
+        "WetMud",
+        "BayouSilt"
+      ],
+      "outer": {
+        "x": -598.1289107707287,
+        "z": -530.2148512845479
+      },
+      "roadId": "Bayou Road",
+      "toRegion": "bayou",
+      "width": 24
+    },
+    {
+      "depthStuds": 48,
+      "edge": {
+        "x": 920,
+        "z": -640
+      },
+      "fromRegion": "corridor",
+      "gateClearStuds": 30,
+      "id": "Bay Road->isle",
+      "materials": [
+        "TrailDirt",
+        "ShoreSand"
+      ],
+      "outer": {
+        "x": 880,
+        "z": -632
+      },
+      "roadId": "Bay Road",
+      "toRegion": "isle",
+      "width": 24
+    }
+  ],
   "branchWidth": 24,
   "bridge": {
     "fee": 100,
@@ -24,6 +234,15 @@
     "x": 113,
     "z": 80
   },
+  "buildNotes": [
+    "T409 only. This PR does not spawn props or edit TerrainGen.",
+    "Streamed Models only. No new Remotes. Reuse MeshIds.",
+    "No MapBuilder wait-for-mesh races (markShell pattern).",
+    "Wood lots stay under MaxWoodPartsServer. Counts of big, mid and small props stay odd.",
+    "Props sit at least 2 studs off the road bed. The bed stays RoadGravel through a belt.",
+    "Biome accent is tiny Neon on the apron only. No Neon posts. No Plastic studs.",
+    "No gondola. No ring fill. Camps do not sell."
+  ],
   "built": false,
   "cab": {
     "x": 18,
@@ -64,8 +283,4020 @@
     "northZ": 420,
     "shoreX": 780
   },
+  "corridor": {
+    "accentInner": 16,
+    "bareShoulderMax": 200,
+    "beltFoot": 32,
+    "beltTrunk": 48,
+    "branchMediumEvery": 64,
+    "branchScatterEvery": 32,
+    "branchTreeEvery": 90,
+    "built": false,
+    "gateClear": 30,
+    "maxWoodParts": 2500,
+    "propClearOfBed": 2,
+    "riverEvery": 300,
+    "signEvery": 200,
+    "treeBeltDepth": 16,
+    "trunkMediumEvery": 48,
+    "trunkScatterEvery": 24,
+    "trunkTreeEvery": 45,
+    "trunkVistaEvery": 400,
+    "vistaMax": 450,
+    "vistaMin": 350,
+    "vistaPadX": 24,
+    "vistaPadZ": 16,
+    "woodLots": 4
+  },
   "doc": "docs/MAP_T408.md",
   "doorway": 10,
+  "dressing": [
+    {
+      "along": 45,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -10,
+      "z": -315
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -62,
+      "z": -270
+    },
+    {
+      "along": 135,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -10,
+      "z": -225
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -62,
+      "z": -180
+    },
+    {
+      "along": 225,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -10,
+      "z": -135
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -62,
+      "z": -90
+    },
+    {
+      "along": 315,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -10,
+      "z": -45
+    },
+    {
+      "along": 585,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -10,
+      "z": 225
+    },
+    {
+      "along": 630,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -62,
+      "z": 270
+    },
+    {
+      "along": 675,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -10,
+      "z": 315
+    },
+    {
+      "along": 720,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -62,
+      "z": 360
+    },
+    {
+      "along": 765,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -10,
+      "z": 405
+    },
+    {
+      "along": 810,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -62,
+      "z": 450
+    },
+    {
+      "along": 855,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Valley Trunk",
+      "x": -10,
+      "z": 495
+    },
+    {
+      "along": 24,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": -336
+    },
+    {
+      "along": 48,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": -312
+    },
+    {
+      "along": 72,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": -288
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": -264
+    },
+    {
+      "along": 120,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": -240
+    },
+    {
+      "along": 144,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": -216
+    },
+    {
+      "along": 168,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": -192
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": -168
+    },
+    {
+      "along": 216,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": -144
+    },
+    {
+      "along": 240,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": -120
+    },
+    {
+      "along": 264,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": -96
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": -72
+    },
+    {
+      "along": 312,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": -48
+    },
+    {
+      "along": 576,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": 216
+    },
+    {
+      "along": 600,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": 240
+    },
+    {
+      "along": 624,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": 264
+    },
+    {
+      "along": 648,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": 288
+    },
+    {
+      "along": 672,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": 312
+    },
+    {
+      "along": 696,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": 336
+    },
+    {
+      "along": 720,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": 360
+    },
+    {
+      "along": 744,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": 384
+    },
+    {
+      "along": 768,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": 408
+    },
+    {
+      "along": 792,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": 432
+    },
+    {
+      "along": 816,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -70,
+      "z": 456
+    },
+    {
+      "along": 840,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Valley Trunk",
+      "x": -2,
+      "z": 480
+    },
+    {
+      "along": 48,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -14,
+      "z": -312
+    },
+    {
+      "along": 96,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -58,
+      "z": -264
+    },
+    {
+      "along": 144,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -14,
+      "z": -216
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -58,
+      "z": -168
+    },
+    {
+      "along": 240,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -14,
+      "z": -120
+    },
+    {
+      "along": 288,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -58,
+      "z": -72
+    },
+    {
+      "along": 576,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -58,
+      "z": 216
+    },
+    {
+      "along": 624,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -14,
+      "z": 264
+    },
+    {
+      "along": 672,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -58,
+      "z": 312
+    },
+    {
+      "along": 720,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -14,
+      "z": 360
+    },
+    {
+      "along": 768,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -58,
+      "z": 408
+    },
+    {
+      "along": 816,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -14,
+      "z": 456
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 24,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -12,
+      "z": -160
+    },
+    {
+      "along": 600,
+      "kind": "sign",
+      "offset": 24,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -12,
+      "z": 240
+    },
+    {
+      "along": 800,
+      "kind": "sign",
+      "offset": 24,
+      "radius": 4,
+      "road": "Valley Trunk",
+      "x": -60,
+      "z": 440
+    },
+    {
+      "along": 800,
+      "kind": "vista",
+      "offset": 26,
+      "radius": 12,
+      "road": "Valley Trunk",
+      "x": -62,
+      "z": 440
+    },
+    {
+      "along": 45,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -62.71036121482477,
+      "z": 564.5820210821984
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -127.30087106158282,
+      "z": 540.9797746269169
+    },
+    {
+      "along": 135,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -141.38451606576314,
+      "z": 608.2898848882753
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -177.0310474976018,
+      "z": 630.0059278968903
+    },
+    {
+      "along": 225,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -114.38184996707064,
+      "z": 601.6496578886455
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -95.31470289256116,
+      "z": 667.7211638684475
+    },
+    {
+      "along": 315,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -50.77249952663174,
+      "z": 686.9387370571797
+    },
+    {
+      "along": 360,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -106.74802438444368,
+      "z": 646.9920148275339
+    },
+    {
+      "along": 405,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -138.2437483549,
+      "z": 708.1231801327759
+    },
+    {
+      "along": 450,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -173.1778045815864,
+      "z": 718.5812495863189
+    },
+    {
+      "along": 495,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -118.4457216209962,
+      "z": 676.9471398348775
+    },
+    {
+      "along": 540,
+      "kind": "tree-belt",
+      "offset": 26,
+      "radius": 6,
+      "road": "Skyroot Road",
+      "x": -85.10155809667705,
+      "z": 737.0900260215535
+    },
+    {
+      "along": 24,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -40.467914966843416,
+      "z": 561.3767777364194
+    },
+    {
+      "along": 48,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -94.47140891390731,
+      "z": 513.5895133084421
+    },
+    {
+      "along": 72,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -82.42746422067722,
+      "z": 584.6876384329937
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -136.43095816774112,
+      "z": 536.9003740050165
+    },
+    {
+      "along": 120,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -124.38701347451101,
+      "z": 607.9984991295681
+    },
+    {
+      "along": 144,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -178.39050742157494,
+      "z": 560.2112347015908
+    },
+    {
+      "along": 168,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -162.7830694639024,
+      "z": 570.4996666973223
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -169.4880003032904,
+      "z": 642.298301102435
+    },
+    {
+      "along": 216,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -119.20101900788073,
+      "z": 590.614459215486
+    },
+    {
+      "along": 240,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -125.90594984726869,
+      "z": 662.4130936205988
+    },
+    {
+      "along": 264,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -75.61896855185906,
+      "z": 610.7292517336499
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -82.32389939124701,
+      "z": 682.5278861387627
+    },
+    {
+      "along": 312,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -45.973729625636466,
+      "z": 694.0078110727281
+    },
+    {
+      "along": 336,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -85.30541963695848,
+      "z": 633.5676078893066
+    },
+    {
+      "along": 360,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -92.6250623340462,
+      "z": 705.3061807130462
+    },
+    {
+      "along": 384,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -131.95675234536822,
+      "z": 644.8659775296246
+    },
+    {
+      "along": 408,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -139.27639504245593,
+      "z": 716.6045503533641
+    },
+    {
+      "along": 432,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -178.60808505377798,
+      "z": 656.1643471699425
+    },
+    {
+      "along": 456,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -154.9668705257694,
+      "z": 661.0976703587284
+    },
+    {
+      "along": 480,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -145.46428032530414,
+      "z": 732.5798414189446
+    },
+    {
+      "along": 504,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -107.99287240048442,
+      "z": 670.9690177908534
+    },
+    {
+      "along": 528,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -98.49028220001915,
+      "z": 742.4511888510698
+    },
+    {
+      "along": 552,
+      "kind": "scatter",
+      "offset": 34,
+      "radius": 3,
+      "road": "Skyroot Road",
+      "x": -61.01887427519943,
+      "z": 680.8403652229786
+    },
+    {
+      "along": 48,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -67.27540476790391,
+      "z": 562.5423207712481
+    },
+    {
+      "along": 96,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -130.60324299359752,
+      "z": 547.3902613184749
+    },
+    {
+      "along": 144,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -151.19450327557155,
+      "z": 609.1640421643968
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -164.45930217374942,
+      "z": 631.4027884884295
+    },
+    {
+      "along": 240,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -102.43869190941086,
+      "z": 611.5673680885735
+    },
+    {
+      "along": 288,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -77.29520126170604,
+      "z": 671.6323735247572
+    },
+    {
+      "along": 336,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -72.12398838992083,
+      "z": 687.9941627157847
+    },
+    {
+      "along": 384,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -129.1321599352887,
+      "z": 656.5288107067271
+    },
+    {
+      "along": 432,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -165.42665380674032,
+      "z": 710.5909019964206
+    },
+    {
+      "along": 480,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -142.99644346727285,
+      "z": 720.8363418876233
+    },
+    {
+      "along": 528,
+      "kind": "medium",
+      "offset": 22,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -86.97371019587321,
+      "z": 687.6481910382373
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 24,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -137.9189509345054,
+      "z": 592.9891222211027
+    },
+    {
+      "along": 400,
+      "kind": "sign",
+      "offset": 24,
+      "radius": 4,
+      "road": "Skyroot Road",
+      "x": -145.1533695731052,
+      "z": 658.3511283906494
+    },
+    {
+      "along": 400,
+      "kind": "vista",
+      "offset": 26,
+      "radius": 12,
+      "road": "Skyroot Road",
+      "x": -133.38423453110732,
+      "z": 706.9462666285762
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Pine Road",
+      "x": -126,
+      "z": 132
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Pine Road",
+      "x": -216,
+      "z": 88
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Pine Road",
+      "x": -306,
+      "z": 132
+    },
+    {
+      "along": 360,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Pine Road",
+      "x": -396,
+      "z": 88
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -132,
+      "z": 140
+    },
+    {
+      "along": 128,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -164,
+      "z": 80
+    },
+    {
+      "along": 160,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -196,
+      "z": 140
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -228,
+      "z": 80
+    },
+    {
+      "along": 224,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -260,
+      "z": 140
+    },
+    {
+      "along": 256,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -292,
+      "z": 80
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -324,
+      "z": 140
+    },
+    {
+      "along": 320,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -356,
+      "z": 80
+    },
+    {
+      "along": 352,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Road",
+      "x": -388,
+      "z": 140
+    },
+    {
+      "along": 128,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Road",
+      "x": -164,
+      "z": 92
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Road",
+      "x": -228,
+      "z": 128
+    },
+    {
+      "along": 256,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Road",
+      "x": -292,
+      "z": 92
+    },
+    {
+      "along": 320,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Road",
+      "x": -356,
+      "z": 128
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Pine Road",
+      "x": -236,
+      "z": 130
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Frost Road",
+      "x": -165.5425106423529,
+      "z": 782.8085560223235
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Frost Road",
+      "x": -218.72238117751863,
+      "z": 867.7079162664562
+    },
+    {
+      "along": 32,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -151.51474951693518,
+      "z": 725.9647180290262
+    },
+    {
+      "along": 64,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -214.5349897967969,
+      "z": 751.5078054514287
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -158.21457572608992,
+      "z": 789.6130670159962
+    },
+    {
+      "along": 128,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -221.23481600595164,
+      "z": 815.1561544383987
+    },
+    {
+      "along": 160,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -164.91440193524465,
+      "z": 853.2614160029663
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Frost Road",
+      "x": -227.93464221510638,
+      "z": 878.8045034253687
+    },
+    {
+      "along": 64,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Frost Road",
+      "x": -166.79872805656942,
+      "z": 756.5326751082947
+    },
+    {
+      "along": 128,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Frost Road",
+      "x": -209.3007505708948,
+      "z": 816.4123718526153
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Frost Road",
+      "x": -180.1983804748789,
+      "z": 883.8293730822347
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 203,
+      "z": 58
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 293,
+      "z": 102
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 383,
+      "z": 58
+    },
+    {
+      "along": 360,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 473,
+      "z": 102
+    },
+    {
+      "along": 450,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 563,
+      "z": 58
+    },
+    {
+      "along": 540,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 653,
+      "z": 102
+    },
+    {
+      "along": 630,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 743,
+      "z": 58
+    },
+    {
+      "along": 720,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 833,
+      "z": 102
+    },
+    {
+      "along": 810,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 858,
+      "z": 37
+    },
+    {
+      "along": 900,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 902,
+      "z": -53
+    },
+    {
+      "along": 990,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 858,
+      "z": -143
+    },
+    {
+      "along": 1080,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 902,
+      "z": -233
+    },
+    {
+      "along": 1170,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 858,
+      "z": -323
+    },
+    {
+      "along": 1260,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 902,
+      "z": -413
+    },
+    {
+      "along": 1350,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 858,
+      "z": -503
+    },
+    {
+      "along": 1440,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bay Road",
+      "x": 902,
+      "z": -593
+    },
+    {
+      "along": 32,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 145,
+      "z": 50
+    },
+    {
+      "along": 64,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 177,
+      "z": 110
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 209,
+      "z": 50
+    },
+    {
+      "along": 128,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 241,
+      "z": 110
+    },
+    {
+      "along": 160,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 273,
+      "z": 50
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 305,
+      "z": 110
+    },
+    {
+      "along": 224,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 337,
+      "z": 50
+    },
+    {
+      "along": 256,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 369,
+      "z": 110
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 401,
+      "z": 50
+    },
+    {
+      "along": 320,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 433,
+      "z": 110
+    },
+    {
+      "along": 352,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 465,
+      "z": 50
+    },
+    {
+      "along": 384,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 497,
+      "z": 110
+    },
+    {
+      "along": 416,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 529,
+      "z": 50
+    },
+    {
+      "along": 448,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 561,
+      "z": 110
+    },
+    {
+      "along": 480,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 593,
+      "z": 50
+    },
+    {
+      "along": 512,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 625,
+      "z": 110
+    },
+    {
+      "along": 544,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 657,
+      "z": 50
+    },
+    {
+      "along": 576,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 689,
+      "z": 110
+    },
+    {
+      "along": 608,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 721,
+      "z": 50
+    },
+    {
+      "along": 640,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 753,
+      "z": 110
+    },
+    {
+      "along": 672,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 785,
+      "z": 50
+    },
+    {
+      "along": 704,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 817,
+      "z": 110
+    },
+    {
+      "along": 736,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 849,
+      "z": 50
+    },
+    {
+      "along": 768,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": 79
+    },
+    {
+      "along": 800,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": 47
+    },
+    {
+      "along": 832,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": 15
+    },
+    {
+      "along": 864,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -17
+    },
+    {
+      "along": 896,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -49
+    },
+    {
+      "along": 928,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -81
+    },
+    {
+      "along": 960,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -113
+    },
+    {
+      "along": 992,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -145
+    },
+    {
+      "along": 1024,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -177
+    },
+    {
+      "along": 1056,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -209
+    },
+    {
+      "along": 1088,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -241
+    },
+    {
+      "along": 1120,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -273
+    },
+    {
+      "along": 1152,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -305
+    },
+    {
+      "along": 1184,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -337.00000000000006
+    },
+    {
+      "along": 1216,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -369
+    },
+    {
+      "along": 1248,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -400.99999999999994
+    },
+    {
+      "along": 1280,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -433
+    },
+    {
+      "along": 1312,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -465
+    },
+    {
+      "along": 1344,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -497
+    },
+    {
+      "along": 1376,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -529
+    },
+    {
+      "along": 1408,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -561
+    },
+    {
+      "along": 1440,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 850,
+      "z": -593
+    },
+    {
+      "along": 1472,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 910,
+      "z": -625
+    },
+    {
+      "along": 1504,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bay Road",
+      "x": 897,
+      "z": -670
+    },
+    {
+      "along": 64,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 177,
+      "z": 62
+    },
+    {
+      "along": 128,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 241,
+      "z": 98
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 305,
+      "z": 62
+    },
+    {
+      "along": 256,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 369,
+      "z": 98
+    },
+    {
+      "along": 320,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 433,
+      "z": 62
+    },
+    {
+      "along": 384,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 497,
+      "z": 98
+    },
+    {
+      "along": 448,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 561,
+      "z": 62
+    },
+    {
+      "along": 512,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 625,
+      "z": 98
+    },
+    {
+      "along": 576,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 689,
+      "z": 62
+    },
+    {
+      "along": 640,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 753,
+      "z": 98
+    },
+    {
+      "along": 704,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 817,
+      "z": 62
+    },
+    {
+      "along": 768,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 898,
+      "z": 79
+    },
+    {
+      "along": 832,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 862,
+      "z": 15
+    },
+    {
+      "along": 896,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 898,
+      "z": -49
+    },
+    {
+      "along": 960,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 862,
+      "z": -113
+    },
+    {
+      "along": 1024,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 898,
+      "z": -177
+    },
+    {
+      "along": 1088,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 862,
+      "z": -241
+    },
+    {
+      "along": 1152,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 898,
+      "z": -305
+    },
+    {
+      "along": 1216,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 862,
+      "z": -369
+    },
+    {
+      "along": 1280,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 898,
+      "z": -433
+    },
+    {
+      "along": 1344,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 862,
+      "z": -497
+    },
+    {
+      "along": 1408,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 898,
+      "z": -561
+    },
+    {
+      "along": 1472,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 862,
+      "z": -625
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 313,
+      "z": 60
+    },
+    {
+      "along": 400,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 513,
+      "z": 100
+    },
+    {
+      "along": 600,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 713,
+      "z": 60
+    },
+    {
+      "along": 800,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 900,
+      "z": 47
+    },
+    {
+      "along": 1000,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 860,
+      "z": -153
+    },
+    {
+      "along": 1200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 900,
+      "z": -353
+    },
+    {
+      "along": 1400,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bay Road",
+      "x": 860,
+      "z": -553
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 490,
+      "z": 58
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 580,
+      "z": 102
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 58
+    },
+    {
+      "along": 360,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 678,
+      "z": 140
+    },
+    {
+      "along": 450,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 722,
+      "z": 230
+    },
+    {
+      "along": 540,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 678,
+      "z": 320
+    },
+    {
+      "along": 630,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 722,
+      "z": 410
+    },
+    {
+      "along": 720,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 678,
+      "z": 499.99999999999994
+    },
+    {
+      "along": 810,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 722,
+      "z": 590
+    },
+    {
+      "along": 900,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 678,
+      "z": 680
+    },
+    {
+      "along": 990,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 722,
+      "z": 770
+    },
+    {
+      "along": 1080,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Caldera Road",
+      "x": 678,
+      "z": 860
+    },
+    {
+      "along": 32,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 432,
+      "z": 50
+    },
+    {
+      "along": 64,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 464,
+      "z": 110
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 496,
+      "z": 50
+    },
+    {
+      "along": 128,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 528,
+      "z": 110
+    },
+    {
+      "along": 160,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 560,
+      "z": 50
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 592,
+      "z": 110
+    },
+    {
+      "along": 224,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 624,
+      "z": 50
+    },
+    {
+      "along": 256,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 656,
+      "z": 110
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 688,
+      "z": 50
+    },
+    {
+      "along": 320,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 100
+    },
+    {
+      "along": 352,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 132
+    },
+    {
+      "along": 384,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 164
+    },
+    {
+      "along": 416,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 196
+    },
+    {
+      "along": 448,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 228
+    },
+    {
+      "along": 480,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 260
+    },
+    {
+      "along": 512,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 292
+    },
+    {
+      "along": 544,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 324
+    },
+    {
+      "along": 576,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 356
+    },
+    {
+      "along": 608,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 388
+    },
+    {
+      "along": 640,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 420
+    },
+    {
+      "along": 672,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 452
+    },
+    {
+      "along": 704,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 484
+    },
+    {
+      "along": 736,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 516
+    },
+    {
+      "along": 768,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 548
+    },
+    {
+      "along": 800,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 580
+    },
+    {
+      "along": 832,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 612
+    },
+    {
+      "along": 864,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 644
+    },
+    {
+      "along": 896,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 676
+    },
+    {
+      "along": 928,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 708
+    },
+    {
+      "along": 960,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 740
+    },
+    {
+      "along": 992,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 772
+    },
+    {
+      "along": 1024,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 804
+    },
+    {
+      "along": 1056,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 730,
+      "z": 836
+    },
+    {
+      "along": 1088,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Caldera Road",
+      "x": 670,
+      "z": 868
+    },
+    {
+      "along": 64,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 464,
+      "z": 62
+    },
+    {
+      "along": 128,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 528,
+      "z": 98
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 592,
+      "z": 62
+    },
+    {
+      "along": 256,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 656,
+      "z": 98
+    },
+    {
+      "along": 320,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 718,
+      "z": 100
+    },
+    {
+      "along": 384,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 682,
+      "z": 164
+    },
+    {
+      "along": 448,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 718,
+      "z": 228
+    },
+    {
+      "along": 512,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 682,
+      "z": 292
+    },
+    {
+      "along": 576,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 718,
+      "z": 356
+    },
+    {
+      "along": 640,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 682,
+      "z": 420
+    },
+    {
+      "along": 704,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 718,
+      "z": 484
+    },
+    {
+      "along": 768,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 682,
+      "z": 548
+    },
+    {
+      "along": 832,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 718,
+      "z": 612
+    },
+    {
+      "along": 896,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 682,
+      "z": 676
+    },
+    {
+      "along": 960,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 718,
+      "z": 740
+    },
+    {
+      "along": 1024,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 682,
+      "z": 804
+    },
+    {
+      "along": 1088,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 718,
+      "z": 868
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 600,
+      "z": 60
+    },
+    {
+      "along": 400,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 680,
+      "z": 180
+    },
+    {
+      "along": 600,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 720,
+      "z": 380
+    },
+    {
+      "along": 800,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 680,
+      "z": 580
+    },
+    {
+      "along": 1000,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Caldera Road",
+      "x": 720,
+      "z": 780
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Mesa Road",
+      "x": 678,
+      "z": -10
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Mesa Road",
+      "x": 722,
+      "z": -100
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Mesa Road",
+      "x": 678,
+      "z": -190
+    },
+    {
+      "along": 360,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Mesa Road",
+      "x": 722,
+      "z": -280
+    },
+    {
+      "along": 450,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Mesa Road",
+      "x": 678,
+      "z": -370
+    },
+    {
+      "along": 540,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Mesa Road",
+      "x": 722,
+      "z": -460
+    },
+    {
+      "along": 32,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": 48
+    },
+    {
+      "along": 64,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 730,
+      "z": 16
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": -16
+    },
+    {
+      "along": 128,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 730,
+      "z": -48
+    },
+    {
+      "along": 160,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": -80
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 730,
+      "z": -112
+    },
+    {
+      "along": 224,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": -144
+    },
+    {
+      "along": 256,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 730,
+      "z": -176
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": -208
+    },
+    {
+      "along": 320,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 730,
+      "z": -240
+    },
+    {
+      "along": 352,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": -272
+    },
+    {
+      "along": 384,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 730,
+      "z": -304
+    },
+    {
+      "along": 416,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": -336
+    },
+    {
+      "along": 448,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 730,
+      "z": -368
+    },
+    {
+      "along": 480,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": -400
+    },
+    {
+      "along": 512,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 730,
+      "z": -432
+    },
+    {
+      "along": 544,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Mesa Road",
+      "x": 670,
+      "z": -464
+    },
+    {
+      "along": 64,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 682,
+      "z": 16
+    },
+    {
+      "along": 128,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 718,
+      "z": -48
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 682,
+      "z": -112
+    },
+    {
+      "along": 256,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 718,
+      "z": -176
+    },
+    {
+      "along": 320,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 682,
+      "z": -240
+    },
+    {
+      "along": 384,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 718,
+      "z": -304
+    },
+    {
+      "along": 448,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 682,
+      "z": -368
+    },
+    {
+      "along": 512,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 718,
+      "z": -432
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 680,
+      "z": -120
+    },
+    {
+      "along": 400,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Mesa Road",
+      "x": 720,
+      "z": -320
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Gloam Road",
+      "x": -122.0296931631744,
+      "z": -325.6068045356343
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Gloam Road",
+      "x": -217.30687777385614,
+      "z": -356.5625486336539
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Gloam Road",
+      "x": -300.2540737878614,
+      "z": -300.3863733151597
+    },
+    {
+      "along": 360,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Gloam Road",
+      "x": -395.5312583985432,
+      "z": -331.34211741317927
+    },
+    {
+      "along": 450,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Gloam Road",
+      "x": -490.4271056153837,
+      "z": -305.6898992426446
+    },
+    {
+      "along": 540,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Gloam Road",
+      "x": -504.4750162991535,
+      "z": -404.8798997740531
+    },
+    {
+      "along": 32,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -63.48092912986526,
+      "z": -325.8123043455789
+    },
+    {
+      "along": 64,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -103.57207386996781,
+      "z": -380.7367990035013
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -126.84959779642064,
+      "z": -316.8450399116324
+    },
+    {
+      "along": 128,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -166.94074253652317,
+      "z": -371.76953456955476
+    },
+    {
+      "along": 160,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -190.21826646297603,
+      "z": -307.8777754776859
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -230.30941120307855,
+      "z": -362.80227013560824
+    },
+    {
+      "along": 224,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -253.58693512953144,
+      "z": -298.9105110437394
+    },
+    {
+      "along": 256,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -293.67807986963396,
+      "z": -353.83500570166177
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -316.9556037960868,
+      "z": -289.9432466097929
+    },
+    {
+      "along": 320,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -357.04674853618934,
+      "z": -344.86774126771525
+    },
+    {
+      "along": 352,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -380.32427246264217,
+      "z": -280.97598217584635
+    },
+    {
+      "along": 384,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -420.4154172027447,
+      "z": -335.9004768337687
+    },
+    {
+      "along": 416,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -443.6929411291975,
+      "z": -272.00871774189983
+    },
+    {
+      "along": 448,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -446.2536374196514,
+      "z": -333.19816541048266
+    },
+    {
+      "along": 480,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -513.8758994943759,
+      "z": -326.04067479593846
+    },
+    {
+      "along": 512,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -482.1479187105004,
+      "z": -386.18496160173595
+    },
+    {
+      "along": 544,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -549.7701807852247,
+      "z": -379.0274709871917
+    },
+    {
+      "along": 576,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Gloam Road",
+      "x": -518.0422000013493,
+      "z": -439.1717577929892
+    },
+    {
+      "along": 64,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -96.84662554450792,
+      "z": -333.2102975035848
+    },
+    {
+      "along": 128,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -165.2593804551582,
+      "z": -359.8879091945756
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -223.5839628776187,
+      "z": -315.27576863569175
+    },
+    {
+      "along": 256,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -291.996717788269,
+      "z": -341.95338032668263
+    },
+    {
+      "along": 320,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -350.3213002107294,
+      "z": -297.34123976779875
+    },
+    {
+      "along": 384,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -418.73405512137975,
+      "z": -324.0188514587896
+    },
+    {
+      "along": 448,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -485.9937345630913,
+      "z": -306.27745444234597
+    },
+    {
+      "along": 512,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -492.0829429963604,
+      "z": -379.45478385970176
+    },
+    {
+      "along": 576,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -557.7822971447893,
+      "z": -412.2510468248525
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -231.22481944737726,
+      "z": -312.17458968561857
+    },
+    {
+      "along": 400,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Gloam Road",
+      "x": -434.8564493015794,
+      "z": -323.7573062461329
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Pine Link",
+      "x": -450.6350387320519,
+      "z": 22.561482160973924
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Pine Link",
+      "x": -415.5819516250131,
+      "z": -71.28563332089027
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Pine Link",
+      "x": -468.11303230342855,
+      "z": -156.58795194563697
+    },
+    {
+      "along": 360,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Pine Link",
+      "x": -433.0599451963898,
+      "z": -250.43506742750117
+    },
+    {
+      "along": 32,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -452.96543787490214,
+      "z": 81.06421064294307
+    },
+    {
+      "along": 64,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -396.35615869649877,
+      "z": 43.38942450019779
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -459.1798355891694,
+      "z": 17.366634071703636
+    },
+    {
+      "along": 128,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -402.570556410766,
+      "z": -20.30815207104164
+    },
+    {
+      "along": 160,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -465.39423330343664,
+      "z": -46.33094249953579
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -408.7849541250333,
+      "z": -84.00572864228107
+    },
+    {
+      "along": 224,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -471.6086310177039,
+      "z": -110.02851907077525
+    },
+    {
+      "along": 256,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -414.9993518393006,
+      "z": -147.7033052135205
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -477.82302873197114,
+      "z": -173.72609564201468
+    },
+    {
+      "along": 320,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -421.2137495535678,
+      "z": -211.40088178475992
+    },
+    {
+      "along": 352,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -484.03742644623844,
+      "z": -237.42367221325406
+    },
+    {
+      "along": 384,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Pine Link",
+      "x": -427.4281472678351,
+      "z": -275.09845835599936
+    },
+    {
+      "along": 64,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Link",
+      "x": -444.1293411249283,
+      "z": 48.050222785898235
+    },
+    {
+      "along": 128,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Link",
+      "x": -414.51385201787343,
+      "z": -19.142952499616527
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Link",
+      "x": -456.5581365534629,
+      "z": -79.34493035658062
+    },
+    {
+      "along": 256,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Link",
+      "x": -426.942647446408,
+      "z": -146.5381056420954
+    },
+    {
+      "along": 320,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Link",
+      "x": -468.9869319819974,
+      "z": -206.74008349905947
+    },
+    {
+      "along": 384,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Pine Link",
+      "x": -439.3714428749425,
+      "z": -273.93325878457426
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Pine Link",
+      "x": -459.32548553559747,
+      "z": -87.11292749941468
+    },
+    {
+      "along": 90,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bayou Road",
+      "x": -525.1694623541533,
+      "z": -365.8554566947234
+    },
+    {
+      "along": 180,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bayou Road",
+      "x": -533.7443916112788,
+      "z": -465.66763324766356
+    },
+    {
+      "along": 270,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bayou Road",
+      "x": -617.7786983311081,
+      "z": -520.2041833229814
+    },
+    {
+      "along": 360,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bayou Road",
+      "x": -626.3536275882336,
+      "z": -620.0163598759215
+    },
+    {
+      "along": 450,
+      "kind": "tree-belt",
+      "offset": 22,
+      "radius": 6,
+      "road": "Bayou Road",
+      "x": -710.3879343080629,
+      "z": -674.5529099512394
+    },
+    {
+      "along": 32,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -502.1886519450572,
+      "z": -312.0049009599756
+    },
+    {
+      "along": 64,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -467.2029405759854,
+      "z": -370.31441990842865
+    },
+    {
+      "along": 96,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -535.1163802924189,
+      "z": -366.88444820557845
+    },
+    {
+      "along": 128,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -500.1306689233471,
+      "z": -425.1939671540315
+    },
+    {
+      "along": 160,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -568.0441086397806,
+      "z": -421.76399545118124
+    },
+    {
+      "along": 192,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -533.0583972707087,
+      "z": -480.0735143996343
+    },
+    {
+      "along": 224,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -600.9718369871423,
+      "z": -476.6435426967841
+    },
+    {
+      "along": 256,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -565.9861256180704,
+      "z": -534.9530616452372
+    },
+    {
+      "along": 288,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -633.899565334504,
+      "z": -531.523089942387
+    },
+    {
+      "along": 320,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -598.9138539654322,
+      "z": -589.8326088908399
+    },
+    {
+      "along": 352,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -666.8272936818656,
+      "z": -586.4026371879899
+    },
+    {
+      "along": 384,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -631.8415823127939,
+      "z": -644.7121561364428
+    },
+    {
+      "along": 416,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -699.7550220292273,
+      "z": -641.2821844335925
+    },
+    {
+      "along": 448,
+      "kind": "scatter",
+      "offset": 30,
+      "radius": 3,
+      "road": "Bayou Road",
+      "x": -664.7693106601556,
+      "z": -699.5917033820456
+    },
+    {
+      "along": 64,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -508.3626010101875,
+      "z": -345.6186236479074
+    },
+    {
+      "along": 128,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -510.42058403189765,
+      "z": -419.02001808890117
+    },
+    {
+      "along": 192,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -574.2180577049108,
+      "z": -455.37771813911303
+    },
+    {
+      "along": 256,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -576.276040726621,
+      "z": -528.7791125801069
+    },
+    {
+      "along": 320,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -640.0735143996343,
+      "z": -565.1368126303186
+    },
+    {
+      "along": 384,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -642.1314974213444,
+      "z": -638.5382070713125
+    },
+    {
+      "along": 448,
+      "kind": "medium",
+      "offset": 18,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -705.9289710943577,
+      "z": -674.8959071215243
+    },
+    {
+      "along": 200,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -580.0490095997562,
+      "z": -461.2086700339583
+    },
+    {
+      "along": 400,
+      "kind": "sign",
+      "offset": 20,
+      "radius": 4,
+      "road": "Bayou Road",
+      "x": -648.6484436567597,
+      "z": -653.2870853935682
+    },
+    {
+      "along": 0,
+      "kind": "sign",
+      "label": "PINE RIDGE",
+      "offset": 18,
+      "radius": 5,
+      "road": "Pine Road",
+      "x": -36,
+      "z": 128
+    },
+    {
+      "along": 0,
+      "gate": "Sky Pass",
+      "kind": "sign",
+      "label": "SKYROOT",
+      "offset": 18,
+      "radius": 5,
+      "road": "Skyroot Road",
+      "x": -36,
+      "z": 538
+    },
+    {
+      "along": 0,
+      "kind": "sign",
+      "label": "GLOAM RAVINE",
+      "offset": 18,
+      "radius": 5,
+      "road": "Gloam Road",
+      "x": -36,
+      "z": -342
+    },
+    {
+      "along": 0,
+      "gate": "Heat Boots",
+      "kind": "sign",
+      "label": "EMBER CALDERA",
+      "offset": 18,
+      "radius": 5,
+      "road": "Caldera Road",
+      "x": 400,
+      "z": 98
+    },
+    {
+      "along": 0,
+      "kind": "sign",
+      "label": "DEALERSHIP",
+      "offset": 18,
+      "radius": 5,
+      "road": "Dealership Spur",
+      "x": 189,
+      "z": 98
+    },
+    {
+      "along": 0,
+      "kind": "sign",
+      "label": "CROSSROADS",
+      "offset": 18,
+      "radius": 5,
+      "road": "Gloam Road",
+      "x": -460,
+      "z": -282
+    },
+    {
+      "along": 0,
+      "gate": "Insulated Coat",
+      "kind": "sign",
+      "label": "FROSTPEAK",
+      "offset": 18,
+      "radius": 5,
+      "road": "Frost Road",
+      "x": -178,
+      "z": 709
+    },
+    {
+      "along": 0,
+      "gate": "Ferry fare",
+      "kind": "sign",
+      "label": "LANTERN ISLE",
+      "offset": 18,
+      "radius": 5,
+      "road": "Bay Road",
+      "x": 920,
+      "z": -622
+    },
+    {
+      "along": 0,
+      "kind": "camp",
+      "offset": 28,
+      "radius": 10,
+      "road": "Frost Road",
+      "x": -150,
+      "z": 691
+    },
+    {
+      "along": 0,
+      "kind": "camp",
+      "offset": 28,
+      "radius": 10,
+      "road": "Caldera Road",
+      "x": 728,
+      "z": 700
+    },
+    {
+      "along": 0,
+      "kind": "wood-lot",
+      "offset": 40,
+      "radius": 16,
+      "road": "Pine Road",
+      "wood": "pine",
+      "x": -250,
+      "z": 140
+    },
+    {
+      "along": 0,
+      "kind": "wood-lot",
+      "offset": 40,
+      "radius": 16,
+      "road": "Valley Trunk",
+      "wood": "oak",
+      "x": -80,
+      "z": -280
+    },
+    {
+      "along": 0,
+      "kind": "wood-lot",
+      "offset": 40,
+      "radius": 16,
+      "road": "Gloam Road",
+      "wood": "birch",
+      "x": -520,
+      "z": -380
+    },
+    {
+      "along": 0,
+      "kind": "wood-lot",
+      "offset": 40,
+      "radius": 16,
+      "road": "Mesa Road",
+      "wood": "maple",
+      "x": 760,
+      "z": -200
+    },
+    {
+      "along": 0,
+      "kind": "overlook",
+      "offset": 28,
+      "radius": 10,
+      "road": "Skyroot Road",
+      "x": -208,
+      "z": 600
+    },
+    {
+      "along": 0,
+      "kind": "overlook",
+      "offset": 28,
+      "radius": 10,
+      "road": "Skyroot Road",
+      "x": -206,
+      "z": 691
+    },
+    {
+      "along": 300,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 141,
+      "z": 482.08586379276545
+    },
+    {
+      "along": 300,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 85,
+      "z": 482.08586379276545
+    },
+    {
+      "along": 600,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 141,
+      "z": 182.08586379276545
+    },
+    {
+      "along": 600,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 85,
+      "z": 182.08586379276545
+    },
+    {
+      "along": 900,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 141,
+      "z": -117.9141362072346
+    },
+    {
+      "along": 900,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 85,
+      "z": -117.9141362072346
+    },
+    {
+      "along": 1200,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 249.15270113822345,
+      "z": -315.5914447382128
+    },
+    {
+      "along": 1200,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 224.49306851761884,
+      "z": -365.8696956924456
+    },
+    {
+      "along": 1500,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 518.1645918939126,
+      "z": -446.69122079234046
+    },
+    {
+      "along": 1500,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 494.8319281062927,
+      "z": -497.59885087442035
+    },
+    {
+      "along": 1800,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 790.884038762198,
+      "z": -571.6876339403044
+    },
+    {
+      "along": 1800,
+      "kind": "boom",
+      "offset": 28,
+      "radius": 6,
+      "road": "river",
+      "x": 767.5513749745779,
+      "z": -622.5952640223844
+    }
+  ],
   "fastTravel": false,
   "ferryDeckLength": 22,
   "ferryDeckWidth": 14,
@@ -75,6 +4306,11 @@
   "islandDock": {
     "x": 1100,
     "z": -700
+  },
+  "knownOverlap": {
+    "a": "frost",
+    "b": "skyroot",
+    "note": "Frostpeak and Skyroot Highlands are both ground and both locked. Their discs overlap. Connor decides before T409 whether one shrinks or the shoulder is shared."
   },
   "liftBridgeFee": 100,
   "liftLogs": 5,
@@ -94,8 +4330,10 @@
     "z": 280
   },
   "lodge": {
-    "x": -110,
-    "z": 730
+    "facing": "north",
+    "height": "TerrainGen.HeightAt",
+    "x": -40,
+    "z": 720
   },
   "mainWidth": 32,
   "mainlandDock": {
@@ -105,6 +4343,7 @@
   "palette": {
     "ash": "3A3433",
     "bayou": "4E4A36",
+    "brass": "C9A24A",
     "canopy": "F2E6C8",
     "cliff": "7E766C",
     "cream": "F3E7C9",
@@ -112,12 +4351,20 @@
     "frostGlow": "BFE3F2",
     "gloam": "5A4A3E",
     "gloamGlow": "7A4FD0",
+    "gravel": "A8A49C",
+    "honey": "C49A63",
     "ink": "3C2814",
+    "iron": "2B2B2E",
+    "lava": "FF6A1E",
     "lumen": "FFF4C2",
     "mesa": "C8693E",
     "pine": "5A8A3C",
+    "plank": "9C8466",
     "sand": "D8C69A",
+    "signInk": "2A2420",
+    "slate": "5B5650",
     "snow": "EEF3F7",
+    "timber": "7A5230",
     "trail": "8E6C4A",
     "valley": "6E9F45",
     "water": "4E7E93"
@@ -349,11 +4596,11 @@
     },
     {
       "id": "skyroot",
-      "layer": "cloud",
+      "layer": "ground",
       "name": "Skyroot Highlands",
       "order": 9,
       "proposed": true,
-      "radius": 120,
+      "radius": 170,
       "tint": "F2E6C8",
       "x": -60,
       "z": 800
@@ -522,12 +4769,12 @@
           "z": 660
         },
         {
-          "x": -180,
-          "z": 710
+          "x": -178,
+          "z": 691
         },
         {
-          "x": -110,
-          "z": 730
+          "x": -40,
+          "z": 720
         }
       ],
       "sign": "SKY PASS",
@@ -554,8 +4801,8 @@
       "name": "Frost Road",
       "points": [
         {
-          "x": -180,
-          "z": 710
+          "x": -178,
+          "z": 691
         },
         {
           "x": -200,
@@ -719,8 +4966,8 @@
       "name": "Lodge Path",
       "points": [
         {
-          "x": -110,
-          "z": 730
+          "x": -40,
+          "z": 720
         },
         {
           "x": -60,
@@ -794,8 +5041,8 @@
       "label": "COAT KIOSK",
       "n": 6,
       "why": "Insulated Coat, $500. At the Frostpeak road foot, before the cold.",
-      "x": -152.15384731820063,
-      "z": 712.9311739665052
+      "x": -150.15384731820063,
+      "z": 693.9311739665052
     },
     {
       "id": "HeatBoots",

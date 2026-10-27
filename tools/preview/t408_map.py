@@ -197,13 +197,71 @@ def draw_overview(plan: dict) -> Image.Image:
     s1 = m.px(sell["x1"], sell["z0"])
     draw.rectangle((s0[0], s0[1], s1[0], s1[1]), outline=ink, width=2)
 
+    gravel = rgb(pal["gravel"])
+    mat = {
+        "MeadowGrass": rgb(pal["valley"]),
+        "DeepMeadow": rgb(pal["pine"]),
+        "CliffRock": rgb(pal["cliff"]),
+        "TrailDirt": trail,
+        "FreshSnow": rgb(pal["snow"]),
+        "AshBasalt": rgb(pal["ash"]),
+        "QuarrySlate": rgb(pal["slate"]),
+        "WetMud": rgb(pal["gloam"]),
+        "BayouSilt": rgb(pal["bayou"]),
+        "MesaRed": rgb(pal["mesa"]),
+        "ShoreSand": rgb(pal["sand"]),
+        "LumenCream": canopy,
+        "FrostGlow": rgb(pal["frostGlow"]),
+        "EmberGlow": ember,
+        "GloamGlow": rgb(pal["gloamGlow"]),
+        "LumenGlow": lumen,
+    }
+    for belt in plan.get("belts", []):
+        materials = belt["materials"]
+        outer = (belt["outer"]["x"], belt["outer"]["z"])
+        edge = (belt["edge"]["x"], belt["edge"]["z"])
+        mid = ((outer[0] + edge[0]) / 2, (outer[1] + edge[1]) / 2)
+        outer_c = mat.get(materials[0], trail)
+        inner_c = mat.get(materials[-1], outer_c)
+        half = max(36, belt["depthStuds"] * 0.85)
+        draw.polygon([m.px(x, z) for x, z in offset_band([outer, mid], half)], fill=mix(outer_c, cream, 0.35))
+        draw.polygon([m.px(x, z) for x, z in offset_band([mid, edge], half * 0.72)], fill=mix(inner_c, cream, 0.15))
+        if belt.get("accent"):
+            accent = mat.get(belt["accent"], ember)
+            draw.polygon([m.px(x, z) for x, z in offset_band([mid, edge], 10)], fill=mix(accent, inner_c, 0.55))
+
     road_fill = {
-        "main": mix(trail, ink, 0.15),
-        "branch": mix(trail, cream, 0.25),
-        "foot": mix(cream, trail, 0.35),
+        "main": gravel,
+        "branch": mix(gravel, trail, 0.3),
+        "foot": mix(trail, cream, 0.35),
     }
     for road in plan["roads"]:
         thick(draw, m, road["points"], road["width"], road_fill[road["kind"]])
+
+    kind_fill = {
+        "tree-belt": rgb(pal["pine"]),
+        "scatter": mix(trail, gravel, 0.4),
+        "medium": rgb(pal["plank"]),
+        "sign": ink,
+        "vista": rgb(pal["honey"]),
+        "camp": rgb(pal["timber"]),
+        "wood-lot": rgb(pal["valley"]),
+        "boom": rgb(pal["timber"]),
+        "overlook": rgb(pal["brass"]),
+    }
+    for mark in plan.get("dressing", []):
+        fill = kind_fill.get(mark["kind"], ink)
+        if mark["kind"] == "wood-lot":
+            for dx, dz in ((-8, 0), (0, 7), (8, -4)):
+                disc(draw, m, mark["x"] + dx, mark["z"] + dz, 5, fill)
+        elif mark["kind"] == "vista":
+            cx, cy = m.px(mark["x"], mark["z"])
+            draw.rectangle((cx - 5, cy - 3, cx + 5, cy + 3), fill=fill, outline=ink)
+        elif mark["kind"] == "sign" and mark.get("label"):
+            cx, cy = m.px(mark["x"], mark["z"])
+            draw.rectangle((cx - 2, cy - 6, cx + 2, cy + 4), fill=ink)
+        else:
+            disc(draw, m, mark["x"], mark["z"], mark.get("radius", 4), fill)
 
     # Lift bridge towers on the banks.
     bridge = plan["bridge"]
@@ -253,7 +311,8 @@ def draw_overview(plan: dict) -> Image.Image:
     lodge = plan["lodge"]
     lx, ly = m.px(lodge["x"], lodge["z"])
     draw.rectangle((lx - 5, ly - 5, lx + 5, ly + 5), fill=ink)
-    halo(draw, m.px(lodge["x"] - 20, lodge["z"] - 28), "GATE LODGE", tiny, ink, cream, "mm")
+    draw.polygon([(lx, ly - 14), (lx - 5, ly - 4), (lx + 5, ly - 4)], fill=ink)
+    halo(draw, m.px(lodge["x"] + 36, lodge["z"]), "GATE LODGE", tiny, ink, cream, "mm")
 
     light = plan["lighthouse"]
     lx, ly = m.px(light["x"], light["z"])
@@ -376,6 +435,9 @@ def draw_overview(plan: dict) -> Image.Image:
         "Ferry crossing is the live 40s (see the doc).",
         "Ring and tunnel: redo in T409, not deleted.",
         "Cloud isles and the trunk lift are notes only.",
+        "Corridors are dressed. Belts are 48 studs.",
+        "Foot belts are 32. Gate apron clears 30.",
+        "Frost and Skyroot discs overlap. Centres stay.",
     ]
     for note in notes:
         draw.text((lx0, y), note, font=small, fill=ink)

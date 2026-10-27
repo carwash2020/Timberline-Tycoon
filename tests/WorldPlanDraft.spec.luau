@@ -140,7 +140,7 @@ return function(t)
 			bayou = { -700, -700, 150, "ground" },
 			mesa = { 700, -500, 150, "ground" },
 			isle = { 1200, -700, 120, "ground" },
-			skyroot = { -60, 800, 120, "cloud" },
+			skyroot = { -60, 800, 170, "ground" },
 		}
 		for id, row in pairs(want) do
 			local x, z, r = Draft.Centre(id)
@@ -152,10 +152,18 @@ return function(t)
 			t.eq(regionRow.proposed, true, id)
 		end
 		t.eq(#Draft.OverlapHits(), 0)
+		local report = Draft.OverlapReport()
+		t.eq(#report, 1)
+		t.ok(string.find(report[1], "frost/skyroot", 1, true) ~= nil, report[1])
 		local kiss = Draft.DiscGap(Draft.GetRegion("bayou"), Draft.GetRegion("gloam"))
 		t.ok(kiss < 0 and kiss >= -Draft.OverlapSlop, string.format("bayou/gloam kiss %.1f", kiss))
 		local shoulder = Draft.DiscGap(Draft.GetRegion("skyroot"), Draft.GetRegion("frost"))
-		t.ok(shoulder < 0, "the cloud disc sits over Frostpeak's north shoulder")
+		t.ok(shoulder < -100, "locked ground discs overlap; centres stay")
+		t.eq(Draft.KnownOverlap.a, "frost")
+		t.eq(Draft.KnownOverlap.b, "skyroot")
+		for _, isle in ipairs(Draft.Clouds) do
+			t.eq(isle.built, false)
+		end
 		t.eq(Draft.LiveSky.x, 680)
 		t.eq(Draft.LiveSky.z, 280)
 		t.ok(math.abs(Draft.Skyroot.x - Draft.LiveSky.x) > 400, "not the old gondola top")
@@ -204,10 +212,12 @@ return function(t)
 		t.ok(dist(secret, gloam) < gloam.radius, "the secret shop is in the ravine")
 		t.eq(coat.why:find(tostring(ItemCatalog.Gear.InsulatedCoat.priceCash), 1, true) ~= nil, true)
 		t.eq(heat.why:find(tostring(ItemCatalog.Gear.HeatBoots.priceCash), 1, true) ~= nil, true)
+		t.eq(Draft.Lodge.x, -40)
+		t.eq(Draft.Lodge.z, 720)
+		t.eq(Draft.Lodge.facing, "north")
+		t.eq(Draft.Lodge.height, "TerrainGen.HeightAt")
 		t.ok(dist(Draft.Lodge, Draft.Skyroot) < region("skyroot").radius, "lodge is on the highlands")
-		t.ok(Draft.Lodge.z > 650, "lodge is on the north approach")
-		t.ok(math.abs(Draft.Lodge.x - 650) > 400, "lodge is not the old gondola approach")
-		t.ok(math.abs(Draft.Lodge.z - 300) > 300, "lodge is not toward (650, 300)")
+		t.ok(Draft.Lodge.z < Draft.Skyroot.z, "lodge is south of the summit")
 		local skyroad = Draft.GetRoad("Skyroot Road")
 		local last = skyroad.points[#skyroad.points]
 		t.eq(last.x, Draft.Lodge.x)
@@ -238,6 +248,86 @@ return function(t)
 		t.eq(p.sand, "D8C69A")
 		t.eq(p.lumen, "FFF4C2")
 		t.eq(p.canopy, "F2E6C8")
+		t.eq(p.gravel, "A8A49C")
+		t.eq(p.plank, "9C8466")
+		t.eq(p.timber, "7A5230")
+		t.eq(p.honey, "C49A63")
+		t.eq(p.iron, "2B2B2E")
+		t.eq(p.brass, "C9A24A")
+		t.eq(p.slate, "5B5650")
+		t.eq(p.lava, "FF6A1E")
+		t.eq(p.signInk, "2A2420")
+	end)
+
+	t.test("corridors are dressed and belts are one depth, for T409", function()
+		local c = Draft.Corridor
+		t.eq(c.built, false)
+		t.eq(c.beltTrunk, 48)
+		t.eq(c.beltFoot, 32)
+		t.eq(c.gateClear, 30)
+		t.eq(c.trunkMediumEvery, 48)
+		t.eq(c.branchMediumEvery, 64)
+		t.eq(c.trunkScatterEvery, 24)
+		t.eq(c.branchScatterEvery, 32)
+		t.eq(c.signEvery, 200)
+		t.eq(c.trunkTreeEvery, 45)
+		t.eq(c.treeBeltDepth, 16)
+		t.eq(c.propClearOfBed, 2)
+		t.ok(c.trunkVistaEvery >= c.vistaMin and c.trunkVistaEvery <= c.vistaMax)
+		t.eq(c.vistaPadX, 24)
+		t.eq(c.vistaPadZ, 16)
+		t.eq(c.riverEvery, 300)
+		t.eq(c.maxWoodParts, GameConfig.MaxWoodPartsServer)
+		t.eq(c.maxWoodParts, 2500)
+		t.ok(#Draft.Belts >= 6)
+		local saw = {
+			pine = false,
+			frost = false,
+			caldera = false,
+			gloam = false,
+			bayou = false,
+			mesa = false,
+			isle = false,
+			skyroot = false,
+		}
+		for _, belt in ipairs(Draft.Belts) do
+			local road = Draft.GetRoad(belt.roadId)
+			local depth = if road.kind == "foot" then 32 else 48
+			t.eq(belt.depthStuds, depth, belt.id)
+			t.eq(belt.gateClearStuds, 30, belt.id)
+			t.ok(#belt.materials >= 2, belt.id)
+			saw[belt.toRegion] = true
+		end
+		for id, hit in pairs(saw) do
+			t.eq(hit, true, id)
+		end
+		local kinds = {}
+		local woods = 0
+		for _, mark in ipairs(Draft.Dressing) do
+			kinds[mark.kind] = true
+			if mark.kind == "wood-lot" then
+				woods += 1
+			end
+			if mark.road ~= "river" then
+				local road = Draft.GetRoad(mark.road)
+				t.ok(mark.offset >= road.width / 2 + 2, mark.kind .. " " .. mark.road)
+			end
+		end
+		for _, kind in ipairs({
+			"tree-belt",
+			"scatter",
+			"medium",
+			"sign",
+			"vista",
+			"camp",
+			"wood-lot",
+			"boom",
+			"overlook",
+		}) do
+			t.eq(kinds[kind], true, kind)
+		end
+		t.eq(woods, 4)
+		t.eq(#Draft.BuildNotes >= 4, true)
 	end)
 
 	t.test("removals are a list for Connor, and none are deleted here", function()

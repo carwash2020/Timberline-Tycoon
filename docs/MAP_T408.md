@@ -47,9 +47,11 @@ Builder discs, for this picture only. `OverlapHits()` is empty: same-layer discs
 | Bayou | (−700, −700) | 150 | ground |
 | Red Mesa | (700, −500) | 150 | ground |
 | Lantern Isle | (1200, −700) | 120 | ground |
-| Skyroot Highlands | (−60, 800) | 120 | cloud |
+| Skyroot Highlands | (−60, 800) | 170 | ground |
 
-Skyroot is the north summit on the switchback. It is not `BiomeData.sky` at (680, 280), which was the gondola top. The gate lodge is (−110, 730), at the end of Skyroot Road. The trunk lift and the cloud isles are annotated there and `built = false`.
+Skyroot Highlands is the ground summit. Walkable cloud isles are separate `CloudIsle` rows, annotated and not built. The gate lodge is (−40, 720), facing north, on the switchback just south of the summit. Its height is `TerrainGen.HeightAt` when T409 builds it. This plan stores the XZ.
+
+Frostpeak (−200, 900, 160) and Skyroot are both ground, and the locked discs overlap by about 158 studs. The centres stay. `OverlapHits()` is empty apart from that pair, which `KnownOverlap` records for Connor.
 
 - Spawn stays (0, 0.5, 40). The sawmill stays (0, 110).
 - River centre x = 113 (26 studs east of the sell floor's east edge). Channel half-width 18. The west bank stays off the sell floor.
@@ -69,7 +71,7 @@ One lift bridge, at (113, 80), where the east road leaves town. Towers on the tw
 |---|---|---|
 | Valley Trunk | 32 | North–south on x = −36, from the south country through town to the switchback |
 | Main Street | 32 | Town street to the one lift bridge |
-| Skyroot Road | 32 | Switchback from the trunk's north end to the gate lodge (−110, 730). Sign: SKY PASS |
+| Skyroot Road | 32 | Switchback from the trunk's north end to the gate lodge (−40, 720). Sign: SKY PASS |
 | Pine Road | 24 | Trunk to Pine Ridge |
 | Frost Road | 24 | Switchback to Frostpeak. Coat kiosk at the foot |
 | Bay Road | 24 | Bridge, east bank, mainland dock for the picture ferry |
@@ -101,6 +103,16 @@ There is no ring, and no truck tunnel, on this plan. The live ring and the live 
 | 11 | Sky Market (−90, 784), y 840 | On the clouds only. Not built. |
 | 12 | Secret shop (−543, −479) | In the Gloam caves. No name yet. |
 | 13 | Bait Shack (−720, −660) | Waders. Already there. Not moved. |
+
+## Corridors and belts (annotated, not built)
+
+The space between discs is dressed so the ride feels like country, not a blank. Travel distance does not change. There are no new shortcuts and no new shops.
+
+`WorldPlanDraft.Corridor` is the rhythm. Trunk: tree-belt clumps every 45 studs in a 16-stud band that starts 2 studs off the road bed, small scatter every 24, medium props every 48, mile signs every 200, a vista pull-off (24×16) every 400. Branches are lighter: trees every 90, scatter every 32, medium every 64. River banks and log booms every 300. Four wood lots (pine, oak, birch, maple), under `MaxWoodPartsServer` 2500. Camps at the frost foot and the caldera rest only. They do not sell. An overlook sits on every other Skyroot hairpin.
+
+Blend belts are 48 studs on trunk and branch roads, 32 on a foot road, on the approach into each disc. The inner 30 studs of a belt are tree-clear. The road bed stays RoadGravel. Biome accent (tiny Neon) is only on the inner apron: FrostGlow in the last 10 toward Frostpeak, EmberGlow in the inner 15 toward the Caldera, GloamGlow toward Gloam and the Bayou, LumenGlow at the lodge. Materials: Valley and Pine trade MeadowGrass, DeepMeadow and CliffRock; Frost adds TrailDirt and FreshSnow; Caldera goes to AshBasalt and QuarrySlate; Gloam and Bayou go WetMud to BayouSilt; Mesa goes to MesaRed; the ferry apron goes TrailDirt to ShoreSand.
+
+T409 spawns these as streamed models, reuses mesh ids, and does not add remotes. This PR does not.
 
 ## Trunk lift
 
@@ -145,7 +157,7 @@ This is a picture. Studio has nothing new to walk. Look at `previews/t408/overvi
 3. The draft prices the bridge at `TollFee` $100 and the ferry at `FerryFare` $400. An earlier note said both free for V1. The picture uses the two live keys. Which do you want?
 4. The ground court's keeper, temper spot and four sockets are MustKeep. Move them onto the cloud forge, or keep a court on the ground?
 5. The north toll counter is also MustKeep. Is the town lift bridge that toll moved, or do both crossings stay?
-6. Skyroot is (−60, 800), the north summit, not the gondola disc at (680, 280). Its cloud disc overlaps Frostpeak in plan on purpose. Is the gate lodge at (−110, 730) the right end of the switchback?
+6. Locked: gate lodge (−40, 720) facing north. Skyroot radius 170, layer ground. Frostpeak and Skyroot overlap by about 158 studs. Shrink one before T409, or keep the shared shoulder?
 7. y 800→880 is an 80-stud ride. A haul grade of 0.2 cannot climb to world-height 800 inside this square (that wants about 4,000 studs of road). Is 800 the height up the trunk from the lodge, or the world height of the lodge?
 8. Three cloud isles are drawn and not built. Root bridges are out. Do you still want separate walkable isles, and if so how do you cross?
 9. Lantern Isle at (1200, −700) sits outside the live world (WorldHalf 1000). The picture ferry runs from (920, −640) to (1100, −700). The live dock stays at (780, 136). Grow the map in T409?

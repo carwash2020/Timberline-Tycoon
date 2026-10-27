@@ -3326,7 +3326,7 @@ return function(t)
 			bayou = { -700, -700, 150 },
 			mesa = { 700, -500, 150 },
 			isle = { 1200, -700, 120 },
-			skyroot = { -60, 800, 120 },
+			skyroot = { -60, 800, 170 },
 		}
 		t.eq(#Draft.OverlapHits(), 0)
 		t.eq(Draft.Gondola, nil)
@@ -3342,9 +3342,13 @@ return function(t)
 			t.eq(z, centre[2], id)
 			t.eq(r, centre[3], id)
 		end
-		t.eq(Draft.GetRegion("skyroot").layer, "cloud")
-		t.ok(Draft.Lodge.z > 650, "gate lodge is on the north switchback")
-		t.ok(math.abs(Draft.Lodge.x - 650) > 400, "gate lodge is not the old gondola top")
+		t.eq(Draft.GetRegion("skyroot").layer, "ground")
+		t.eq(#Draft.Clouds >= 2, true)
+		t.eq(Draft.Lodge.x, -40)
+		t.eq(Draft.Lodge.z, 720)
+		t.eq(Draft.Lodge.facing, "north")
+		t.eq(#Draft.OverlapHits(), 0)
+		t.eq(#Draft.OverlapReport(), 1)
 		t.eq(Draft.TrunkLift.built, false)
 		t.eq(Draft.TrunkLift.x, Draft.Skyroot.x)
 		t.eq(Draft.TrunkLift.z, Draft.Skyroot.z)

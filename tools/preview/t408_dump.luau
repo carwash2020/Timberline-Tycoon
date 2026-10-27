@@ -62,6 +62,11 @@ local out = {
 	lighthouse = Draft.Lighthouse,
 	plume = Draft.Plume,
 	removals = Draft.Removals,
+	corridor = Draft.Corridor,
+	belts = Draft.Belts,
+	dressing = Draft.Dressing,
+	knownOverlap = Draft.KnownOverlap,
+	buildNotes = Draft.BuildNotes,
 }
 
 fs.writeDir("previews/t408")

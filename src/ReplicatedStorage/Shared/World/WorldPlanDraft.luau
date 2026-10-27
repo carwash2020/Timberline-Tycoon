@@ -48,6 +48,32 @@ export type Region = {
 	proposed: boolean,
 }
 export type CloudIsle = { id: string, x: number, z: number, radius: number, y: number, built: boolean }
+export type Marker = {
+	kind: string,
+	x: number,
+	z: number,
+	road: string,
+	along: number,
+	radius: number,
+	offset: number,
+	label: string?,
+	gate: string?,
+	wood: string?,
+}
+export type Belt = {
+	id: string,
+	fromRegion: string,
+	toRegion: string,
+	roadId: string,
+	depthStuds: number,
+	gateClearStuds: number,
+	materials: { string },
+	accent: string?,
+	accentDepth: number?,
+	outer: XZ,
+	edge: XZ,
+	width: number,
+}
 export type Redo = { id: string, title: string, note: string, points: { XZ } }
 export type Removal = {
 	id: string,
@@ -164,11 +190,22 @@ WorldPlanDraft.Palette = {
 	ink = "3C2814",
 	cream = "F3E7C9",
 	water = "4E7E93",
+	-- Corridor kit. Region tints above stay the overview colours.
+	gravel = "A8A49C",
+	plank = "9C8466",
+	timber = "7A5230",
+	honey = "C49A63",
+	iron = "2B2B2E",
+	brass = "C9A24A",
+	slate = "5B5650",
+	lava = "FF6A1E",
+	signInk = "2A2420",
 }
 
--- Builder discs. Skyroot is the manager's north summit, about (-60, 800),
--- not the old gondola top at BiomeData.sky (680, 280).
+-- Builder discs. Skyroot is the ground summit at (-60, 800), radius 170.
+-- Walkable cloud isles are CloudIsle rows, not this disc.
 local CLOUD_R = 64
+local SKYROOT_R = 170
 local RIVER_PAST_SELL = 26 -- studs from the sell floor's east edge to the channel centre
 local CHANNEL_HALF = 18
 local SHOULDER = 28 -- studs from a road centre to a kiosk, past a 32-wide road
@@ -214,11 +251,11 @@ local function disc(
 end
 
 local skyroot = xz(-60, 800)
--- On the switchback, inside the highlands disc, south-west of the summit.
--- Not the old gondola approach at (650, 300).
-local lodge = xz(-110, 730)
+-- Switchback, just south of the summit. Facing north (+Z). The ground
+-- height is TerrainGen.HeightAt when T409 builds it. This plan stores XZ.
+local lodge = xz(-40, 720)
 local cross = xz(-460, -300)
-local frostFoot = xz(-180, 710)
+local frostFoot = xz(-178, 691)
 local frostPeak = xz(-200, 900)
 local calderaRest = xz(700, 700)
 local calderaCone = xz(700, 900)
@@ -250,7 +287,7 @@ WorldPlanDraft.Regions = {
 	disc(6, "bayou", "Bayou", -700, -700, 150, pal.bayou, "ground"),
 	disc(7, "mesa", "Red Mesa", 700, -500, 150, pal.mesa, "ground"),
 	disc(8, "isle", "Lantern Isle", 1200, -700, 120, pal.sand, "ground"),
-	disc(9, "skyroot", "Skyroot Highlands", skyroot.x, skyroot.z, 120, pal.canopy, "cloud"),
+	disc(9, "skyroot", "Skyroot Highlands", skyroot.x, skyroot.z, SKYROOT_R, pal.canopy, "ground"),
 } :: { Region }
 
 WorldPlanDraft.Spawn = xz(spawn.X, spawn.Z)
@@ -327,7 +364,7 @@ WorldPlanDraft.Roads = {
 		width = W,
 		kind = "main",
 		sign = "SKY PASS",
-		points = { xz(trunkX, 520), xz(-180, 600), xz(-50, 660), xz(-180, 710), lodge },
+		points = { xz(trunkX, 520), xz(-180, 600), xz(-50, 660), frostFoot, lodge },
 	},
 	{
 		name = "Pine Road",
@@ -408,7 +445,7 @@ WorldPlanDraft.Roads = {
 	},
 } :: { Road }
 
-WorldPlanDraft.Lodge = lodge
+WorldPlanDraft.Lodge = { x = lodge.x, z = lodge.z, facing = "north", height = "TerrainGen.HeightAt" }
 WorldPlanDraft.Skyroot = skyroot
 WorldPlanDraft.CloudRadius = CLOUD_R
 WorldPlanDraft.CloudY = deckY
@@ -630,6 +667,323 @@ WorldPlanDraft.Redo = {
 	},
 } :: { Redo }
 
+-- Corridor fill and biome belts are annotations for T409. Nothing here spawns.
+WorldPlanDraft.Corridor = {
+	built = false,
+	trunkVistaEvery = 400,
+	vistaMin = 350,
+	vistaMax = 450,
+	vistaPadX = 24,
+	vistaPadZ = 16,
+	trunkMediumEvery = 48,
+	branchMediumEvery = 64,
+	bareShoulderMax = 200,
+	signEvery = 200,
+	trunkScatterEvery = 24,
+	branchScatterEvery = 32,
+	trunkTreeEvery = 45,
+	branchTreeEvery = 90,
+	treeBeltDepth = 16,
+	propClearOfBed = 2,
+	riverEvery = 300,
+	beltTrunk = 48,
+	beltFoot = 32,
+	gateClear = 30,
+	accentInner = 16,
+	woodLots = 4,
+	maxWoodParts = GameConfig.MaxWoodPartsServer,
+}
+WorldPlanDraft.BuildNotes = {
+	"T409 only. This PR does not spawn props or edit TerrainGen.",
+	"Streamed Models only. No new Remotes. Reuse MeshIds.",
+	"No MapBuilder wait-for-mesh races (markShell pattern).",
+	"Wood lots stay under MaxWoodPartsServer. Counts of big, mid and small props stay odd.",
+	"Props sit at least 2 studs off the road bed. The bed stays RoadGravel through a belt.",
+	"Biome accent is tiny Neon on the apron only. No Neon posts. No Plastic studs.",
+	"No gondola. No ring fill. Camps do not sell.",
+}
+
+local function inTown(x: number, z: number): boolean
+	local town = WorldPlanDraft.Town
+	return x >= town.x0 and x <= town.x1 and z >= town.z0 and z <= town.z1
+end
+
+local function polyLen(points: { XZ }): number
+	local total = 0
+	for i = 2, #points do
+		local a, b = points[i - 1], points[i]
+		local dx, dz = b.x - a.x, b.z - a.z
+		total += math.sqrt(dx * dx + dz * dz)
+	end
+	return total
+end
+
+local function sample(points: { XZ }, dist: number): (number, number, number, number, boolean)
+	local left = dist
+	for i = 2, #points do
+		local a, b = points[i - 1], points[i]
+		local dx, dz = b.x - a.x, b.z - a.z
+		local len = math.sqrt(dx * dx + dz * dz)
+		if len > 1e-4 and left <= len then
+			local t = left / len
+			return a.x + dx * t, a.z + dz * t, -dz / len, dx / len, true
+		end
+		left -= len
+	end
+	return 0, 0, 0, 0, false
+end
+
+local markers: { Marker } = {}
+
+local function addMarker(
+	kind: string,
+	x: number,
+	z: number,
+	road: string,
+	along: number,
+	radius: number,
+	offset: number,
+	label: string?,
+	gate: string?,
+	wood: string?
+)
+	table.insert(markers, {
+		kind = kind,
+		x = x,
+		z = z,
+		road = road,
+		along = along,
+		radius = radius,
+		offset = offset,
+		label = label,
+		gate = gate,
+		wood = wood,
+	})
+end
+
+local function stamp(road: Road, every: number, kind: string, offset: number, radius: number)
+	local length = polyLen(road.points)
+	local along = every
+	local n = 0
+	while along < length - 16 do
+		n += 1
+		local x, z, nx, nz, ok = sample(road.points, along)
+		if ok then
+			local side = if n % 2 == 0 then 1 else -1
+			local px, pz = x + nx * side * offset, z + nz * side * offset
+			if not inTown(x, z) and not inTown(px, pz) then
+				addMarker(kind, px, pz, road.name, along, radius, offset, nil, nil, nil)
+			end
+		end
+		along += every
+	end
+end
+
+local function dress(road: Road, treeEvery: number, scatterEvery: number, mediumEvery: number)
+	local half = road.width / 2
+	local clear = WorldPlanDraft.Corridor.propClearOfBed
+	local depth = WorldPlanDraft.Corridor.treeBeltDepth
+	stamp(road, treeEvery, "tree-belt", half + clear + depth / 2, 6)
+	stamp(road, scatterEvery, "scatter", half + clear + depth, 3)
+	stamp(road, mediumEvery, "medium", half + clear + 4, 4)
+	stamp(road, WorldPlanDraft.Corridor.signEvery, "sign", half + clear + 6, 4)
+end
+
+for _, road in ipairs(WorldPlanDraft.Roads) do
+	local trunk = road.name == "Valley Trunk" or road.name == "Skyroot Road"
+	local branch = road.kind == "branch" and road.name ~= "Dealership Spur"
+	if trunk then
+		dress(
+			road,
+			WorldPlanDraft.Corridor.trunkTreeEvery,
+			WorldPlanDraft.Corridor.trunkScatterEvery,
+			WorldPlanDraft.Corridor.trunkMediumEvery
+		)
+		local half = road.width / 2
+		local pull = half + WorldPlanDraft.Corridor.propClearOfBed + WorldPlanDraft.Corridor.vistaPadZ / 2
+		stamp(road, WorldPlanDraft.Corridor.trunkVistaEvery, "vista", pull, 12)
+	elseif branch then
+		dress(
+			road,
+			WorldPlanDraft.Corridor.branchTreeEvery,
+			WorldPlanDraft.Corridor.branchScatterEvery,
+			WorldPlanDraft.Corridor.branchMediumEvery
+		)
+	end
+end
+
+local function fork(x: number, z: number, road: string, label: string, gate: string?)
+	addMarker("sign", x, z + 18, road, 0, 5, 18, label, gate, nil)
+end
+
+fork(-36, 110, "Pine Road", "PINE RIDGE", nil)
+fork(-36, 520, "Skyroot Road", "SKYROOT", "Sky Pass")
+fork(-36, -360, "Gloam Road", "GLOAM RAVINE", nil)
+fork(400, 80, "Caldera Road", "EMBER CALDERA", "Heat Boots")
+fork(189, 80, "Dealership Spur", "DEALERSHIP", nil)
+fork(-460, -300, "Gloam Road", "CROSSROADS", nil)
+fork(frostFoot.x, frostFoot.z, "Frost Road", "FROSTPEAK", "Insulated Coat")
+fork(920, -640, "Bay Road", "LANTERN ISLE", "Ferry fare")
+
+-- Rest camps. No stock. Off the road bed.
+addMarker("camp", frostFoot.x + 28, frostFoot.z, "Frost Road", 0, 10, 28, nil, nil, nil)
+addMarker("camp", calderaRest.x + 28, calderaRest.z, "Caldera Road", 0, 10, 28, nil, nil, nil)
+
+-- Four wood lots, starter and mid woods only. Odd clump counts when built.
+addMarker("wood-lot", -250, 140, "Pine Road", 0, 16, 40, nil, nil, "pine")
+addMarker("wood-lot", -80, -280, "Valley Trunk", 0, 16, 40, nil, nil, "oak")
+addMarker("wood-lot", -520, -380, "Gloam Road", 0, 16, 40, nil, nil, "birch")
+addMarker("wood-lot", 760, -200, "Mesa Road", 0, 16, 40, nil, nil, "maple")
+
+-- Switchback overlook on every other hairpin.
+local skyroad: Road = WorldPlanDraft.Roads[1]
+for _, road in ipairs(WorldPlanDraft.Roads) do
+	if road.name == "Skyroot Road" then
+		skyroad = road
+	end
+end
+for _, index in ipairs({ 2, 4 }) do
+	local corner = skyroad.points[index]
+	addMarker("overlook", corner.x - 28, corner.z, skyroad.name, 0, 10, 28, nil, nil, nil)
+end
+
+local riverLen = polyLen(WorldPlanDraft.River)
+local boomAt = WorldPlanDraft.Corridor.riverEvery
+while boomAt < riverLen - 20 do
+	local x, z, nx, nz, ok = sample(WorldPlanDraft.River, boomAt)
+	if ok and x < 800 then
+		local bank = WorldPlanDraft.RiverHalf + WorldPlanDraft.Corridor.propClearOfBed + 8
+		addMarker("boom", x + nx * bank, z + nz * bank, "river", boomAt, 6, bank, nil, nil, nil)
+		addMarker("boom", x - nx * bank, z - nz * bank, "river", boomAt, 6, bank, nil, nil, nil)
+	end
+	boomAt += WorldPlanDraft.Corridor.riverEvery
+end
+
+WorldPlanDraft.Dressing = markers
+
+local function distRegion(p: XZ, region: Region): number
+	local dx, dz = p.x - region.x, p.z - region.z
+	return math.sqrt(dx * dx + dz * dz)
+end
+
+local function closestRegion(x: number, z: number, exceptId: string): string
+	local found = "corridor"
+	local best = math.huge
+	for _, region in ipairs(WorldPlanDraft.Regions) do
+		if region.id ~= exceptId then
+			local dx, dz = x - region.x, z - region.z
+			local d2 = dx * dx + dz * dz
+			if d2 <= region.radius * region.radius and d2 < best then
+				best = d2
+				found = region.id
+			end
+		end
+	end
+	return found
+end
+
+local function beltStyle(toId: string): ({ string }, string?, number?)
+	if toId == "frost" then
+		return { "DeepMeadow", "TrailDirt", "FreshSnow" }, "FrostGlow", 10
+	elseif toId == "caldera" then
+		return { "MeadowGrass", "TrailDirt", "AshBasalt", "QuarrySlate" }, "EmberGlow", 15
+	elseif toId == "gloam" or toId == "bayou" then
+		return { "DeepMeadow", "WetMud", "BayouSilt" }, "GloamGlow", 16
+	elseif toId == "mesa" then
+		return { "MeadowGrass", "TrailDirt", "MesaRed" }, nil, nil
+	elseif toId == "isle" then
+		return { "TrailDirt", "ShoreSand" }, nil, nil
+	elseif toId == "skyroot" then
+		return { "DeepMeadow", "CliffRock", "LumenCream" }, "LumenGlow", 16
+	end
+	return { "MeadowGrass", "DeepMeadow", "CliffRock" }, nil, nil
+end
+
+local belts: { Belt } = {}
+
+local function pushBelt(road: Road, toId: string, along: number, edge: XZ)
+	local depth = if road.kind == "foot" then WorldPlanDraft.Corridor.beltFoot else WorldPlanDraft.Corridor.beltTrunk
+	local back = math.max(0, along - depth)
+	local ox, oz, _, _, ok = sample(road.points, back)
+	if not ok then
+		return
+	end
+	local materials, accent, accentDepth = beltStyle(toId)
+	table.insert(belts, {
+		id = road.name .. "->" .. toId,
+		fromRegion = closestRegion(ox, oz, toId),
+		toRegion = toId,
+		roadId = road.name,
+		depthStuds = along - back,
+		gateClearStuds = WorldPlanDraft.Corridor.gateClear,
+		materials = materials,
+		accent = accent,
+		accentDepth = accentDepth,
+		outer = xz(ox, oz),
+		edge = edge,
+		width = road.width,
+	})
+end
+
+for _, road in ipairs(WorldPlanDraft.Roads) do
+	if road.name == "Main Street" or road.name == "Dealership Spur" then
+		continue
+	end
+	for _, region in ipairs(WorldPlanDraft.Regions) do
+		local along = 0
+		local prev = road.points[1]
+		local prevD = distRegion(prev, region)
+		for i = 2, #road.points do
+			local b = road.points[i]
+			local dx, dz = b.x - prev.x, b.z - prev.z
+			local len = math.sqrt(dx * dx + dz * dz)
+			local nextD = distRegion(b, region)
+			if len > 1e-4 and prevD > region.radius and nextD <= region.radius then
+				local lo, hi = 0, 1
+				for _ = 1, 14 do
+					local mid = (lo + hi) / 2
+					local probe = xz(prev.x + dx * mid, prev.z + dz * mid)
+					if distRegion(probe, region) > region.radius then
+						lo = mid
+					else
+						hi = mid
+					end
+				end
+				local t = (lo + hi) / 2
+				pushBelt(road, region.id, along + len * t, xz(prev.x + dx * t, prev.z + dz * t))
+			end
+			along += len
+			prev = b
+			prevD = nextD
+		end
+	end
+end
+
+local haveIsle = false
+for _, belt in ipairs(belts) do
+	if belt.toRegion == "isle" then
+		haveIsle = true
+	end
+end
+if not haveIsle then
+	local bay = WorldPlanDraft.Roads[1]
+	for _, road in ipairs(WorldPlanDraft.Roads) do
+		if road.name == "Bay Road" then
+			bay = road
+		end
+	end
+	pushBelt(bay, "isle", polyLen(bay.points), WorldPlanDraft.MainlandDock)
+end
+
+WorldPlanDraft.Belts = belts
+
+-- Locked centres. Both discs are ground, and they overlap. Not moved.
+WorldPlanDraft.KnownOverlap = {
+	a = "frost",
+	b = "skyroot",
+	note = "Frostpeak and Skyroot Highlands are both ground and both locked. Their discs overlap. Connor decides before T409 whether one shrinks or the shoulder is shared.",
+}
+
 function WorldPlanDraft.GetRegion(id: string): Region
 	for _, row in ipairs(WorldPlanDraft.Regions) do
 		if row.id == id then
@@ -649,21 +1003,32 @@ function WorldPlanDraft.DiscGap(a: Region, b: Region): number
 	return math.sqrt(dx * dx + dz * dz) - a.radius - b.radius
 end
 
-function WorldPlanDraft.OverlapHits(): { string }
+local function overlapRows(includeKnown: boolean): { string }
 	local hits: { string } = {}
+	local known = WorldPlanDraft.KnownOverlap
 	local regions = WorldPlanDraft.Regions
 	for i = 1, #regions do
 		for j = i + 1, #regions do
 			local a, b = regions[i], regions[j]
 			if a.layer == b.layer then
 				local gap = WorldPlanDraft.DiscGap(a, b)
-				if gap < -WorldPlanDraft.OverlapSlop then
+				local named = (a.id == known.a and b.id == known.b) or (a.id == known.b and b.id == known.a)
+				if gap < -WorldPlanDraft.OverlapSlop and (includeKnown or not named) then
 					table.insert(hits, string.format("%s/%s overlap by %.0f", a.id, b.id, -gap))
 				end
 			end
 		end
 	end
 	return hits
+end
+
+-- Unexpected overlaps. The locked Frostpeak/Skyroot pair is reported separately.
+function WorldPlanDraft.OverlapHits(): { string }
+	return overlapRows(false)
+end
+
+function WorldPlanDraft.OverlapReport(): { string }
+	return overlapRows(true)
 end
 
 function WorldPlanDraft.GetShop(id: string): Shop
