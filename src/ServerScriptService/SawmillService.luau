@@ -206,10 +206,7 @@ end
 local function radiusOf(piece: Piece): number
 	local r = 0.2
 	for _, part in pairs(piece.parts) do
-		local visual = if SectionMetrics.IsRound(part)
-			then SectionMetrics.Radius(part)
-			else math.min(part.Size.X, part.Size.Z) / 2
-		r = math.max(r, visual)
+		r = math.max(r, SectionMetrics.Radius(part))
 	end
 	return r
 end

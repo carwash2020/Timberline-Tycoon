@@ -154,7 +154,7 @@ return function(t)
 		SectionLogic.AddHit(cuts, 2.1, 0.5, 12)
 		t.eq(a.damageBy[11], 2)
 		t.eq(a.damageBy[12], 0.5)
-		t.eq(GameConfig.CutWindow, 0.6)
+		t.eq(GameConfig.CutWindow, 1.0)
 	end)
 
 	t.test("at most two cuts a section; a third replaces the least damaged", function()

@@ -116,7 +116,7 @@ local GameConfig = {
 	-- it while they're in the server and have hit it within this many
 	-- seconds (SectionLogic.ClaimBlocks). Elders are everyone's.
 	TreeClaimSec = 60,
-	CutWindow = 0.6, -- studs: a hit this near an existing cut adds to it
+	CutWindow = 1.0, -- studs: a hit this near an existing cut adds to it (half band is 0.5)
 	CutEdge = 0.5, -- studs: cuts keep this far from a section's ends (no piece shorter)
 	MaxCutsPerSection = 2,
 	MinPieceVolume = 0.05, -- u³: smaller offcuts vanish

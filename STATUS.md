@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 12 October 2026 (branch `phase-2/docs-ci-accessibility`). **Main is at `c62b2c3` (#270, T409).** This branch is T410.
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 27 October 2026. **Main is at `045d53e` (#271, T410 round bark).** This branch restores square Block wood (`cursor/t410-square-block-wood-ee88`).
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
 (#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
@@ -17,9 +17,17 @@ GrabService spec fix; #147 launch settings; #148 and #149 hardening; #150 client
 first screen fix; #153 startup errors; #154 server audit (staged terrain, save prefetch); #155 client freeze; #156 meshes never
 block the build; #157 client audit; #158 world first look; #159 store interiors: the kit, Tool Shed, Hearth & Home, Sparkworks and Dealership (#160 to #162 squashed in).
 
-**Still open:** T410 (this branch) makes oak and birch fall as round bark logs. T409 is on main (#270). Older "only this branch" notes below are history.
+**Still open:** T410-fix (this branch) puts square Block wood back. The round bark path from #271 is not the live look. T409 is on main. Older "only this branch" notes below are history.
 
-## T410 round bark logs (27 October 2026, branch `cursor/t410-round-bark-logs-bc65`)
+## T410-fix square Block wood (27 October 2026, branch `cursor/t410-square-block-wood-ee88`)
+
+This overrides the round path in #271. Standing trunks, logs and stumps are `PartType.Block`, size `(t, L, t)`, length on Y. A priced volume is `t² × L`. `GameConfig.CutWindow` is 1.0 (half band ±0.5). The notch is the server ray on the hit face; the fall is toward that face. A cut under 2.5 studs leaves no stump. A cut at or above 2.5 leaves one square Block stump (bark sides, core cap), not a frustum mesh. Crown meshes still dress the tree and do not replace the section. Uploaded section meshes are not applied. Oak and birch colours, thickness and prices are unchanged. Planks stay boards. Decay timers are unchanged (90 / 170 / 180 / 190, sink 0.3).
+
+`FallLogic.LiveFall` and `CargoLock.LiveDrive` stay `"playtest"`. Cloud has no physics, so the live tumble and a CargoLock drive are Studio checks. `SectionMetrics.CargoPose` returns the part's own CFrame and Size and a nil shape, so the bed uses the box. A 45° roll of that box can change the share; the log is not a cylinder.
+
+MustKeep, `WorldLayout.WorldHalf` (1350), the gate lodge door `(-48, 41.21, 730.05)`, T408 centres and `StoreData.CreatorIds` are untouched. StoreData, pass gates, `plankBonus` / `boardBonus`, mill `maxWidth`, the T411 town mill and plot mill/planer silhouettes are untouched. Near the spawn (70 studs) the grove is still oak only. Shots: `preview/t410-fix/`. Studio checks: PHASE2_NOTES.md "T410 square Block wood". Nothing here has been seen in Studio.
+
+## T410 round bark logs (27 October 2026, branch `cursor/t410-round-bark-logs-bc65`, superseded by T410-fix)
 
 Starter trees cut where the axe hits and fall toward the notch (`StumpLogic.FallDirection`). Every wood section is a round log: a Cylinder along local X, or a MeshPart once its mesh loads. Gameplay, prices and saves stay on the logical Y-up frame `(side, length, side)` in `SectionMetrics`. A priced volume is still `side² × length`. No WoodData size or price changed. Planks stay Blocks. The stump is the existing T420 kit: no stump under `MinHeight` 2.5, and a cut at or above that leaves one stump. Cut faces are the core colour on `Enum.Material.Wood` (lumenwood's `Core` itself stays Neon). Oak and birch bark stay Wood, not SmoothPlastic.
 

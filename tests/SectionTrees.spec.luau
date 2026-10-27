@@ -8,7 +8,8 @@
 -- physics and timers are faked; WoodService and GrabService are real.
 return function(t)
 	local roblox = t.roblox
-	local Vector2, Vector3, CFrame, Instance = roblox.Vector2, roblox.Vector3, roblox.CFrame, roblox.Instance
+	local Vector2, Vector3, CFrame, Instance, Enum =
+		roblox.Vector2, roblox.Vector3, roblox.CFrame, roblox.Instance, roblox.Enum
 
 	local function setup()
 		local s = {
@@ -725,10 +726,11 @@ return function(t)
 		s.swing(p, part)
 		t.eq(#rec.cuts[1], 1, "the same height: one cut")
 		t.eq(rec.cuts[1][1].damage, 0.4)
-		-- Different heights (the root part higher, then lower: knee to chest).
-		p.root.Position = Vector3.new(4, 4.4, 0)
+		-- CutWindow is 1.0, so these have to sit more than a stud off the
+		-- first cut and off each other. The section keeps at most two.
+		p.root.Position = Vector3.new(4, 7, 0)
 		s.swing(p, part)
-		p.root.Position = Vector3.new(4, 2.2, 0)
+		p.root.Position = Vector3.new(4, 0.6, 0)
 		s.swing(p, part)
 		t.eq(#rec.cuts[1], 2, "never more than MaxCutsPerSection")
 		local notches = 0
@@ -1156,11 +1158,12 @@ return function(t)
 		local rec = meshed.tree("oak")
 		MeshKit.Override = nil
 		local leaf = rec.sections[leafId]
-		t.ok(leaf:IsA("MeshPart"), "the section is the mesh")
+		t.ok(leaf:IsA("Part") and leaf.Shape == Enum.PartType.Block, "the section stays a square block")
+		t.ok(not leaf:IsA("MeshPart"), "a crown mesh does not become the section")
 		local _, plainSize = plain.SectionMetrics.BlockFrame(plainLeaf)
 		local _, meshSize = meshed.SectionMetrics.BlockFrame(leaf)
-		t.ok((leaf.Size - meshSize).Magnitude < 1e-3, "the mesh stays in the logical frame")
-		t.ok((meshSize - plainSize).Magnitude < 1e-3, "the mesh keeps the priced size")
+		t.ok((leaf.Size - meshSize).Magnitude < 1e-3, "the block stays in the logical frame")
+		t.ok((meshSize - plainSize).Magnitude < 1e-3, "the block keeps the priced size")
 		t.eq(leaf.CanCollide, true)
 		t.eq(leaf.CanQuery, true)
 
@@ -1216,10 +1219,9 @@ return function(t)
 	end)
 
 	-- Playtest t351: brown standing trees could not be chopped while their grey
-	-- pieces could. A tree registered before its meshes had loaded is part-built;
-	-- when the meshes land TreeMeshes swaps every Section for a MeshPart and
-	-- destroys the old ones, but the record still pointed at the destroyed parts,
-	-- so a chop on the new section was "unknown" (no toast, no count).
+	-- pieces could. A tree registered before its meshes had loaded is part-built.
+	-- Crown meshes land later. The section stays the same Block, so a chop on
+	-- it is still that section.
 	local function lateMeshes(s)
 		local MeshKit = s.loader:load("ReplicatedStorage/Shared/Art/MeshKit")
 		MeshKit.Reset()
@@ -1279,13 +1281,15 @@ return function(t)
 	t.test("a tree whose meshes land late can be chopped on its new sections", function()
 		local s = setup()
 		local _, rec = swapped(s)
-		local trunk = nil
+		local trunk = rec.sections[1]
+		t.ok(trunk and trunk:IsA("Part") and trunk.Shape == Enum.PartType.Block, "the trunk section stays a Block")
+		local crowned = false
 		for _, d in ipairs(rec.model:GetDescendants()) do
-			if d:IsA("MeshPart") and d.Name == "Section" and d:GetAttribute("Section") == 1 then
-				trunk = d
+			if d:IsA("MeshPart") and d.Name == "Leaves" and d:GetAttribute("MeshId") ~= nil then
+				crowned = true
 			end
 		end
-		t.ok(trunk, "a MeshPart trunk section")
+		t.ok(crowned, "the canopy mesh landed")
 		local found, id = s.Trees.FromPart(trunk)
 		t.ok(found == rec and id == 1, "the swapped section is found again")
 		local p = s.player(1, trunk.CFrame.Position + Vector3.new(2.5, 0, 0))

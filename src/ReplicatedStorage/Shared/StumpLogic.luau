@@ -3,18 +3,14 @@
 -- tests/TreeStump.spec pins them and SectionTrees / TreeArt only wire them.
 --   * A cut lower than MinHeight (2.5 studs up the trunk) is a base cut: no
 --     stump, the whole tree drops.
---   * Otherwise the stump is the same trunk below the cut: a tapered
---     segment whose bottom radius is the trunk's base radius and whose top
---     radius is the trunk's radius at the cut height. It is one of 16
---     uploaded frustum meshes (StumpMeshIds: 16 tapers 0.85 ... 1.00, each in
---     3, 5 and 8 stud heights): the taper nearest the trunk's real ratio and
---     the height bucket by stretch (Bucket), scaled so its base radius is the
---     trunk's base radius exactly and it stands as tall as the cut. A stump is
---     never clamped: over SleeveMax it stacks sleeves. The cut is capped flush at its height by an end-grain disc (the
---     wood's core colour) inside a 0.1 stud ring (RingHex).
---   * Trunks are round (T420): a section's square side `t` is the old
---     hitbox and the volume the prices use; its round radius is
---     RoundRadius(t) = t / sqrt(pi), the same cross-section area.
+--   * Otherwise the stump is one square Block: side `t` (the trunk's
+--     thickness at the foot), as tall as the cut, bark on the four sides,
+--     a core-coloured square cap flush on top inside a 0.1 stud border
+--     (RingHex). Shape() still describes the old frustum sleeves (the
+--     catalogue of 16 tapers); the live look does not use those meshes.
+--   * The live stump is a square Block of side `t` (the trunk's thickness)
+--     and height the cut. Prices use t^2 * L. RoundRadius is only the old
+--     frustum-sleeve catalogue (pi r^2 = t^2); nothing prices with it.
 --   * It weathers from WeatherStart (90 s) after the cut, fully by
 --     WeatherFull (170 s): the cut face lerps 40% toward #8A8172 and the bark
 --     darkens 30% (the ring stays #3C2814). From FadeStart (180 s) it fades
@@ -130,8 +126,9 @@ function StumpLogic.Stretch(h: number, bucket: number): number
 	return h / bucket
 end
 
--- The radius of a round trunk whose old square side was `thickness`: the
--- same cross-section area (pi r^2 = t^2), so volume and price don't move.
+-- Old frustum-sleeve radius for a square side `thickness` (pi r^2 = t^2).
+-- The live stump and the price path do not call this: a stump is a Block
+-- of side `thickness`, and a priced volume is thickness^2 * length.
 function StumpLogic.RoundRadius(thickness: number): number
 	return thickness / math.sqrt(math.pi)
 end

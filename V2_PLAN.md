@@ -354,7 +354,7 @@ A top-tier board is worth 1.5 x 2.0 = 3.0 x a plain plank (and a plank is worth 
 ### 3a. Sizes and art spec per wood
 
 - The player is about 5 studs. Heights are mature trees across the size roll (0.85 / 1 / 1.15 at 25/50/25%).
-- Sections are **Blocks** (square cross-section, length on the part's Y axis): LT2's look, exact volumes, logs that stack instead of rolling, planks, and the cheapest collision.
+- Sections are **Blocks** (square cross-section, length on the part's Y axis): LT2's look, exact volumes, logs that stack instead of rolling, planks, and the cheapest collision. Square Block wood with worn bark faces and richer canopy meshes; tapered crown only, not round trunks. A dress mesh never changes the section's shape. Bark and the stump are square Block faces, not cylinder sleeves.
 - What keeps it cozy:
   - Per-section yaw twist.
   - Bark colour varied ±4% per section with `Kit.vary`.

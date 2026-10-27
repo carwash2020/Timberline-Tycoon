@@ -917,8 +917,10 @@ world on generated terrain. REDESIGN.md has the rules and contracts.
 colour, each wood with its own silhouette and canopy palette (oak's broad
 crown, birch's pale trunk, pine's tiers, maple's autumn fire, frostwood's
 snow caps, emberwood's glowing cracks, phantomwood's violet glow,
-lumenwood's light), readable at 50 studs. Buildings stand on stone
-plinths with board-by-board plank walls, shingled roofs and warm windows.
+lumenwood's light), readable at 50 studs. Square Block wood with worn bark
+faces and richer canopy meshes; tapered crown only, not round trunks. Bark
+and the stump are square Block faces, not cylinder sleeves. Buildings stand
+on stone plinths with board-by-board plank walls, shingled roofs and warm windows.
 Trucks tell their story: the Rustbucket is held together by hope (a
 primer-green door, a dented fender, a rope-tied tailgate, heavy smoke),
 the Logging Rig gleams. Decoration never collides; what you bump into

@@ -1,9 +1,9 @@
 --!strict
--- Swaps a section tree's blocks and crown for uploaded meshes when every
--- mesh loads. A miss (or mesh id 0) leaves the part-built tree alone.
--- Section meshes keep the skeleton's size, collision and WoodSection tag.
--- Crown meshes are looks-only (MeshKit.Visual) and do not add to the
--- wood part budget.
+-- Dresses a section tree's crown with uploaded meshes when every crown
+-- mesh loads. A miss (or mesh id 0) leaves the part-built crown alone.
+-- Sections stay PartType.Block. The uploaded section meshes are not square
+-- sleeves, so they are not applied and they never change the section's
+-- shape. Crown meshes are looks-only (MeshKit.Visual, CanCollide false).
 
 local MeshKit = require(script.Parent.MeshKit)
 local SectionMetrics = require(script.Parent.Parent.SectionMetrics)
@@ -91,22 +91,14 @@ local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 		return false
 	end
 
-	local made: { Instance } = {}
-	local replacements: { { old: BasePart, mesh: MeshPart } } = {}
+	-- Sections stay Blocks. Confirm each one is, then dress only the crown.
 	for _, old in ipairs(sections) do
-		local sid = old:GetAttribute("Section") :: number
-		-- Uploaded section meshes are Y-up. Place them in the logical frame
-		-- (t, L, t), not the cylinder's X-along-length size.
-		local _, logicalSize = SectionMetrics.BlockFrame(old)
-		local mesh = MeshKit.Create(TreeModels.SectionMesh(def.id, sid), "Section", logicalSize)
-		if not mesh then
-			destroyAll(made)
+		if old:IsA("Part") and old.Shape ~= Enum.PartType.Block then
 			return false
 		end
-		table.insert(made, mesh)
-		table.insert(replacements, { old = old, mesh = mesh })
 	end
 
+	local made: { Instance } = {}
 	local scale = if type(skel.scale) == "number" and skel.scale > 0 then skel.scale else 1
 	local visuals: { { mesh: MeshPart, section: number?, centre: Vector3? } } = {}
 	for _, piece in ipairs(crown) do
@@ -135,33 +127,6 @@ local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 	end
 
 	local center = crownCenter(model)
-	local primaryId = if model.PrimaryPart then model.PrimaryPart:GetAttribute("Section") else nil
-	for _, pair in ipairs(replacements) do
-		local old, mesh = pair.old, pair.mesh
-		local logical, logicalSize = SectionMetrics.BlockFrame(old)
-		mesh.CFrame = logical
-		mesh.Size = logicalSize
-		local side = old:GetAttribute(SectionMetrics.SquareSideAttr)
-		if type(side) == "number" then
-			mesh:SetAttribute(SectionMetrics.SquareSideAttr, side)
-		end
-		mesh.Color = old.Color
-		mesh.Material = old.Material
-		mesh.Anchored = old.Anchored
-		mesh.CanCollide = true
-		mesh.CanQuery = true
-		mesh.CanTouch = false
-		mesh.CollisionGroup = old.CollisionGroup
-		mesh:SetAttribute("Section", old:GetAttribute("Section"))
-		mesh:AddTag("WoodSection")
-		mesh.Parent = model
-		local wasPrimary = model.PrimaryPart == old
-		old:Destroy()
-		if wasPrimary or mesh:GetAttribute("Section") == primaryId then
-			model.PrimaryPart = mesh
-		end
-	end
-
 	local root = model.PrimaryPart
 	local foot = trunkFoot(model, root)
 	for _, visual in ipairs(visuals) do
@@ -209,7 +174,15 @@ local function applyNow(model: Model, def: WoodDef, skel: Skeleton): boolean
 					light.Parent = keeper
 				end
 			end
-		elseif d:IsA("BasePart") and d.Name ~= "Section" and d:GetAttribute("VisualMesh") ~= true then
+		elseif
+			(
+				d:IsA("BasePart")
+				and d:GetAttribute("VisualMesh") ~= true
+				and (d.Name == "Leaves" or d.Name == "Frond" or d.Name == "Facet" or d.Name == "Knees")
+			) or (d:IsA("Model") and d.Name == "Tier")
+		then
+			-- The part-built crown is the stand-in. It goes once the mesh is on.
+			-- Bark marks, roots, cracks, veins and the Block section stay.
 			table.insert(drop, d)
 		end
 	end

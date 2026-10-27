@@ -1,6 +1,19 @@
 # Phase 2+ build notes
 
-## T410 round bark logs (27 October 2026, branch `cursor/t410-round-bark-logs-bc65`)
+## T410 square Block wood (27 October 2026, branch `cursor/t410-square-block-wood-ee88`)
+
+Nothing here has been seen in Studio. Cloud tests do not run physics. The live fall and a CargoLock drive are playtest (`FallLogic.LiveFall`, `CargoLock.LiveDrive`). Before shots are the round bark scene frozen from #271. After shots are the square Block look. Both are in `preview/t410-fix/`.
+
+Studio checks:
+1. Chop an oak in the starter grove, then a birch. The notch is where the axe hits, within half a stud, not a lied height. `CutWindow` is 1.0. The tree tips toward the notched face. Nine of ten falls match that face.
+2. The standing trunk, the log and the stump are square blocks, not cylinders. Bark reads worn wood. The cut face is the core colour on Wood, with a thin darker crack, and it is not Neon. Oak bark #7A5230, leaf #5DA24A, core #E2BE84, thickness about 2. Birch bark #D8D2C4, leaf #A6CE5C, core #F1E3C2, thickness about 1.6.
+3. Drag the log, set it on the Rustbucket, and drive about 200 studs with two turns on a slope. It stays in the bed. A square log's corners can overhang if it rolls onto an edge; it should not be treated as a round log.
+4. A cut under 2.5 studs leaves no stump. A cut at or above 2.5 leaves one square stump (bark sides, core top), which weathers from 90 s and is gone at 190 s, then a sapling. Cutting the stump again frees a log and leaves a shorter stump until it is gone. The stump cannot be dragged or sold.
+5. Mill the log and sell the wood. Cash moves only through the usual sell. Prices match `t² × L`. The mill's max width is unchanged.
+6. Tool Shed, General Store, Dealership, vehicles, axes, NPCs, the gate lodge door and the T408 centres are unchanged. WorldHalf is still 1350. Plot mill and planer silhouettes are unchanged.
+7. Phone (667×375): the square trunk and the cut face read. The chop still lands where you aim.
+
+## T410 round bark logs (27 October 2026, branch `cursor/t410-round-bark-logs-bc65`, superseded)
 
 Nothing here has been seen in Studio. Cloud tests do not run physics. The live fall and a CargoLock drive are playtest (`FallLogic.LiveFall`, `CargoLock.LiveDrive`). Before and after renders of the part-built fallback are in `preview/t410/before` and `preview/t410/after` (`oak`, `birch`, `oak-end`, `silhouette`, plus `oak-end-phone` in after). In game, oak and birch section meshes replace that fallback when they load.
 
