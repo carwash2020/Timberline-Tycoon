@@ -25,7 +25,7 @@ Starter trees cut where the axe hits and fall toward the notch (`StumpLogic.Fall
 
 `FallLogic.LiveFall` and `CargoLock.LiveDrive` are `"playtest"`. Cloud cannot run the fall or a truck drive. The pure specs cover the notch ray, the Block ban, volume, the stump, MeshId (no part fallback), the 20k triangle cap, and a cylinder's bed share when it rolls. A resting log is kinematic: it sits on the ground or the river bed and does not sink (`FallLogic.WaterPolicy = "drag"`).
 
-MustKeep, `WorldLayout.WorldHalf` (1350), the gate lodge door, T408 centres and `StoreData.CreatorIds` are untouched. Near the spawn (70 studs) the grove is still oak only. Studio checks: PHASE2_NOTES.md "T410 round bark logs". Nothing here has been seen in Studio.
+MustKeep, `WorldLayout.WorldHalf` (1350), the gate lodge door, T408 centres and `StoreData.CreatorIds` are untouched. Near the spawn (70 studs) the grove is still oak only. The part-built before and after shots are `preview/t410/before` and `preview/t410/after`. Studio checks: PHASE2_NOTES.md "T410 round bark logs". Nothing here has been seen in Studio.
 
 ## T409 living ground (27 October 2026, branch `cursor/t409-terrain-86a7`)
 

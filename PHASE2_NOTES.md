@@ -2,7 +2,7 @@
 
 ## T410 round bark logs (27 October 2026, branch `cursor/t410-round-bark-logs-bc65`)
 
-Nothing here has been seen in Studio. Cloud tests do not run physics. The live fall and a CargoLock drive are playtest (`FallLogic.LiveFall`, `CargoLock.LiveDrive`). Before and after renders of the part-built fallback are in the PR (`t410-logs` views 1 to 4, plus the oak end at 667×375). In game, oak and birch section meshes replace that fallback when they load.
+Nothing here has been seen in Studio. Cloud tests do not run physics. The live fall and a CargoLock drive are playtest (`FallLogic.LiveFall`, `CargoLock.LiveDrive`). Before and after renders of the part-built fallback are in `preview/t410/before` and `preview/t410/after` (`oak`, `birch`, `oak-end`, `silhouette`, plus `oak-end-phone` in after). In game, oak and birch section meshes replace that fallback when they load.
 
 Studio checks:
 1. Chop an oak in the starter grove, then a birch. The notch is where the axe hits, not a lied height. The tree tips toward that face and is down in about 1 to 2 seconds. Nine of ten falls match the cut face.
