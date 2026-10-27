@@ -954,16 +954,16 @@ local function townObstacles(): TownObs
 			)
 		end
 	end
-	-- The gondola leaves the town station toward the isles.
+	-- The north yard lane: the old cable's first stretch, same numbers.
 	local sky = BiomeData.Get("sky")
 	local area = if sky then sky.area else nil
 	if area then
-		local from = Vector2.new(TownTreeData.GondolaStation.x, TownTreeData.GondolaStation.z)
+		local from = Vector2.new(TownTreeData.NorthYard.x, TownTreeData.NorthYard.z)
 		local dir = (Vector2.new(area.x, area.z) - from).Unit
-		local to = from + dir * TownTreeData.GondolaLaneLength
+		local to = from + dir * TownTreeData.NorthLaneLength
 		table.insert(
 			lanes,
-			{ name = "gondola", ax = from.X, az = from.Y, bx = to.X, bz = to.Y, half = TownTreeData.GondolaLaneHalf }
+			{ name = "north yard", ax = from.X, az = from.Y, bx = to.X, bz = to.Y, half = TownTreeData.NorthLaneHalf }
 		)
 	end
 	local built: TownObs = { rects = rects, discs = discs, lanes = lanes }

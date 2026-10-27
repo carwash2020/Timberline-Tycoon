@@ -128,9 +128,18 @@ end
 -- What a player owns can carry for a biome: cargo size, travel time per
 -- round trip, walk from tree to vehicle/chute, cost per trip, and a label.
 local function haulFor(b, owned)
-	if b.access == "gondola" then
-		local g = b.gondola
-		return b.skyBinCapacity, 2 * g.rideSec + A.skyBinWalk, b.chuteWalkStuds, 2 * g.fee, "Cloud Chute + Sky Bin"
+	if b.id == "sky" then
+		local truck = best(TRUCKS, owned, function(x)
+			return x.bedCapacity
+		end)
+		if not truck then
+			return 0, 0, 0, 0, ""
+		end
+		return b.skyBinCapacity,
+			2 * (b.haulStuds or 0) / truck.topSpeed + A.driveOverhead,
+			b.chuteWalkStuds,
+			0,
+			"Skyroot road + Sky Bin"
 	elseif b.access == "boat" then
 		local boat = best(BOATS, owned, function(x)
 			return x.hullCapacity
@@ -718,8 +727,8 @@ for _, wood in ipairs(WOODS) do
 			money(wood.pricePerLog),
 			money(perTree),
 			money(perTree / wood.treeHP * 100),
-			if biome(wood.biome).access == "gondola"
-				then "gondola + Cloud Chute"
+			if biome(wood.biome).id == "sky"
+				then "Skyroot road + Sky Bin"
 				else string.format("%d studs by %s", biome(wood.biome).haulStuds, biome(wood.biome).access)
 		)
 	)
@@ -921,10 +930,9 @@ line("- One-way haul to the sawmill in studs, from BiomeData: " .. table.concat(
 local sky = biome("sky")
 line(
 	string.format(
-		"- %s: gondola %d s each way ($%d a ride), logs carried %d studs to the Cloud Chute, Sky Bin holds %d.",
+		"- %s: Skyroot road %d studs each way (no ride fee), logs carried %d studs to the Sky Bin, Sky Bin holds %d.",
 		sky.displayName,
-		sky.gondola.rideSec,
-		sky.gondola.fee,
+		sky.haulStuds,
 		sky.chuteWalkStuds,
 		sky.skyBinCapacity
 	)

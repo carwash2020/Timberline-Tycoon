@@ -312,9 +312,21 @@ end
 
 -- The best vehicle the player owns for wood, and its trip's u³ and seconds.
 local function haulFor(b, owned)
-	if b.access == "gondola" then
-		local g = b.gondola
-		return BiomeData.Get("sky").skyBinVolume, 2 * g.rideSec + 5, 2 * g.fee, "Cloud Chute + Sky Bin", 12
+	if b.id == "sky" then
+		-- Same cargo as the old bin. The road time uses the best truck the
+		-- player owns; the bed stays the bin, and there is no ride fee.
+		local bestTruck, bestCap = nil, 0
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local cap = bedU3(id)
+			if owned[id] and cap > bestCap then
+				bestTruck, bestCap = truck, cap
+			end
+		end
+		if not bestTruck then
+			return 0, 0, 0, "", 0
+		end
+		local secs = 2 * (b.haulStuds or 0) / bestTruck.topSpeed + A.tripOverhead
+		return BiomeData.Get("sky").skyBinVolume, secs, 0, "Skyroot road + Sky Bin", 12
 	elseif b.access == "boat" then
 		return 0, 0, 0, "", 0 -- the Island comes with the ferry (M6)
 	end
@@ -428,6 +440,12 @@ end
 
 local function loadCycle(axe, wood, owned, cash: number?)
 	local b = BiomeData.Get(wood.biome)
+	-- The isles are still at y 650. A road haul cannot be made, so the
+	-- plot path does not earn lumenwood. haulFor still describes the
+	-- trip for when a later map pass opens it.
+	if b.id == "sky" then
+		return nil
+	end
 	if b.requiresGear and not owned[b.requiresGear] then
 		return nil
 	end
@@ -436,17 +454,15 @@ local function loadCycle(axe, wood, owned, cash: number?)
 	if wood.id == "frostwood" and not owned.InsulatedCoat then
 		return nil
 	end
-	-- The Gondola Pass is a $30,000 quest turn-in (GondolaPass), not a shelf price.
-	if b.access == "gondola" and not owned.GondolaPass then
-		return nil
-	end
+	-- The Sky Pass is a $30,000 quest turn-in (gear id GondolaPass), not a shelf price.
+	-- requiresGear already refuses the sky without it.
 	-- The Bayou (S2) and Red Mesa (S4) wait for their stage (BiomeData.needsStage).
 	if b.needsStage and stageOfKit(owned) < b.needsStage then
 		return nil
 	end
 	local cap, tripSec, fee, _, bedLen = haulFor(b, owned)
 	if cap <= 0 or (cash ~= nil and fee > cash) then
-		return nil -- (a trip's fee must be affordable: the gondola's)
+		return nil -- a trip only counts when its fee is affordable
 	end
 	local slow = if b.slowdown and not owned[b.slowdown.removedBy] then 1 / (1 - b.slowdown.amount) else 1
 	local tree = TREES[wood.id].mean
@@ -607,7 +623,7 @@ local function simulate()
 	end
 	table.insert(candidates, {
 		id = "GondolaPass",
-		displayName = "Gondola Pass",
+		displayName = "Sky Pass",
 		priceCash = 30000,
 		v2 = { price = 30000 },
 	})
@@ -787,7 +803,7 @@ line(
 )
 line()
 line(
-	"Modelled: the sawmill `plankBonus` and the planer `boardBonus` the player owns, capped together with temper `t` (SellLogic.Stack; `t` is 1 until Prosperous is a purchase). Gloam earns 10/24 of its night rate. Frostwood waits for the Insulated Coat. The Gondola Pass is a $30,000 turn-in before lumenwood. Conveyor belts are bought only when they raise the rate, which this model does not give them."
+	"Modelled: the sawmill `plankBonus` and the planer `boardBonus` the player owns, capped together with temper `t` (SellLogic.Stack; `t` is 1 until Prosperous is a purchase). Gloam earns 10/24 of its night rate. Frostwood waits for the Insulated Coat. The Sky Pass is a $30,000 turn-in (gear id GondolaPass). The isles are not reachable, so this model does not earn lumenwood. Conveyor belts are bought only when they raise the rate, which this model does not give them."
 )
 line()
 line("## Headline targets (V2_PLAN §17)")

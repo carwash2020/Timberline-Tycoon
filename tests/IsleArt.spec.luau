@@ -7,6 +7,7 @@
 return function(t)
 	local IsleArt = t.load("ReplicatedStorage/Shared/Art/IsleArt")
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+	local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
 	local Vector3 = t.roblox.Vector3
 
 	local sky = WorldPlan.Sky()
@@ -145,10 +146,18 @@ return function(t)
 		end
 	end)
 
-	t.test("nothing of the Skyroot is in the gondola cables' way", function()
-		local base = sky.gondolaBase.Position - sky.root + Vector3.new(0, 8.5, 0)
-		local top = sky.gondolaTop.Position - sky.root + Vector3.new(0, 8.5, 0)
-		local town = WorldPlan.Town().gondola.Position - sky.root + Vector3.new(0, 9.5, 0)
+	t.test("nothing of the Skyroot stands in the sky column", function()
+		local center = sky.main.center
+		local dir = sky.main.dir
+		local topWorld = center + dir * 44
+		local footXZ = center + dir * 62
+		local footWorld = Vector3.new(footXZ.X, TerrainGen.HeightAt(footXZ.X, footXZ.Z), footXZ.Z)
+		local function lift(p, y)
+			return p - sky.root + Vector3.new(0, y, 0)
+		end
+		local base = lift(footWorld, 8.5)
+		local top = lift(topWorld, 8.5)
+		local town = lift(Vector3.new(-40, 0, 150), 9.5)
 		for _, p in ipairs(parts(skyroot)) do
 			local c1 = clearance(p, base, top)
 			t.ok(c1 > 4, string.format("%s %.1f studs from the trunk cable", p.Name, c1))

@@ -213,17 +213,17 @@ function DialogueData.HermitLine(key: string, found: number?, total: number?): s
 end
 
 -- Gus's talk by his charter's step (SkyQuestLogic step ids, plus "none"
--- before the charter is accepted and "done" once the Gondola Pass is
--- earned). Two short sentences each: the job, then where to go. Never a
--- price: the pass is earned, not sold. The prompt on his platform accepts
--- the charter and takes the planks laid there.
+-- before the charter is accepted and "done" once the Sky Pass is earned).
+-- Two short sentences each: the job, then where to go. Never a price: the
+-- pass is earned, not sold. The prompt on the gate lodge door accepts the
+-- charter and takes the planks laid there.
 DialogueData.GusCharter = {
-	none = "Want the sky line? Prove you can work hard wood. Use my charter prompt.",
+	none = "Want the sky road? Prove you can work hard wood. Use my charter prompt.",
 	proven = "Step one: own the Obsidian Axe. Then come back to me.",
-	frost = "Bring 120 Frostwood planks. Lay them here at the station.",
+	frost = "Bring 120 Frostwood planks. Lay them here at the gate.",
 	ember = "Next, 120 Emberwood planks. Lay them here and talk to me.",
 	gloam = "Last, 40 Gloamwood planks. Gloam Hollow, after dark.",
-	done = "Charter signed. The Gondola Pass is yours. Ride up any time.",
+	done = "Charter signed. The Sky Pass is yours. The Skyroot gate is open.",
 } :: { [string]: string }
 
 function DialogueData.GusLine(step: string?): string

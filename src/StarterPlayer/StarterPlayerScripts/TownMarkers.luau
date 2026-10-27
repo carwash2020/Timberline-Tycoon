@@ -37,7 +37,7 @@ export type Marker = {
 	name: string,
 	path: { string }, -- from TimberlineMap down to the part it floats over
 	text: string, -- one line, or two ("\n")
-	icon: string, -- "logs", "axe", "truck", "blueprint", "gondola" or "store"
+	icon: string, -- "logs", "axe", "truck", "blueprint" or "store"
 	chip: Color3, -- the icon chip's fill (a shop's accent)
 	offset: Vector3, -- StudsOffsetWorldSpace: from the part's middle to the marker's bottom edge
 }
@@ -48,7 +48,7 @@ export type Marker = {
 -- SizeOffset), clear of its building's roof whatever its size, over its
 -- own building: nudged east or toward the street (the 1.5x buildings of
 -- TWN-13: over a low part of the roof, and so that from the spawn, on a
--- phone, the three on the right (gondola, Tool Shed, Hearth & Home) stand
+-- phone, the shops on the right (Tool Shed, Hearth & Home) stand
 -- side by side), and SELL LOGS floats over the sell station's pad, east of
 -- the mill, above the Weigh House's roof and the log rack's lanterns
 -- (TownMarkers.spec).
@@ -90,18 +90,7 @@ TownMarkers.Markers = {
 		chip = Color3.fromRGB(122, 90, 60),
 		-- East of the name sign, over the roof's low east edge, so the
 		-- board and its lamps don't eat the chip, and it stays on a phone.
-		-- One stud higher than the roof line so the chip clears GONDOLA
-		-- from the spawn at eye level (they meet by a fraction of a pixel
-		-- at 32).
 		offset = Vector3.new(21, 33, -29.3), -- the counter is at the back wall; over the front roof, east of the name board
-	},
-	{
-		name = "Gondola",
-		path = { "GondolaTown", "Platform" },
-		text = "GONDOLA",
-		icon = "gondola",
-		chip = C.Sky,
-		offset = Vector3.new(4, 17.5, 0),
 	},
 	{
 		-- The Robux store's board and arch (Shared/StoreBoard): over the
@@ -278,15 +267,6 @@ local ICONS: { [string]: (GuiObject) -> () } = {
 		piece(chip, "Counter", 0.5, 0.78, 0.7, 0.16, C.Ink, 0, 0.15)
 		local coin = piece(chip, "Coin", 0.5, 0.6, 0.22, 0.22, C.Amber, 0, 0.5)
 		outline(coin, C.Ink, 1.5)
-	end,
-	-- A cabin hanging from its cable.
-	gondola = function(chip)
-		piece(chip, "Cable", 0.5, 0.27, 0.9, 0.06, C.Ink, -16)
-		piece(chip, "Hanger", 0.5, 0.36, 0.06, 0.16, C.Ink)
-		piece(chip, "Roof", 0.5, 0.45, 0.5, 0.08, C.Ink, 0, 0.3)
-		local cabin = piece(chip, "Cabin", 0.5, 0.63, 0.44, 0.3, C.Bark, 0, 0.15)
-		outline(cabin, C.Ink, 1.5)
-		piece(cabin, "Window", 0.5, 0.4, 0.7, 0.32, C.Cream, 0, 0.2)
 	end,
 }
 

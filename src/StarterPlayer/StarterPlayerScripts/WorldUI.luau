@@ -32,6 +32,7 @@ local RegionLogic = require(ReplicatedStorage.Shared.RegionLogic)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local ClimateHudLogic = require(ReplicatedStorage.Shared.ClimateHudLogic)
 local DayCounterLogic = require(ReplicatedStorage.Shared.DayCounterLogic)
+local GateLodgeLogic = require(ReplicatedStorage.Shared.GateLodgeLogic)
 local GateSignLogic = require(ReplicatedStorage.Shared.GateSignLogic)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
@@ -431,6 +432,18 @@ local function paintGate(sign: Instance)
 	local state = GateSignLogic.State(id, owned)
 	label.Text = state.text
 	label.TextColor3 = Color3.fromRGB(state.color[1], state.color[2], state.color[3])
+	-- The Skyroot lodge: this player's pass opens the bar. The glow stays
+	-- on the thin rim; only the edge changes colour.
+	if id == "sky" then
+		local open = GateLodgeLogic.MayEnter(owned.GondolaPass == true)
+		-- The bar's collision is the server's (SkyQuestService collision
+		-- groups). This client only recolors the thin edge.
+		local edge = sign:FindFirstChild("GateEdge", true)
+		if edge and edge:IsA("BasePart") then
+			local rgb = GateLodgeLogic.EdgeColor(open)
+			edge.Color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+		end
+	end
 end
 
 local function watchGateSigns()

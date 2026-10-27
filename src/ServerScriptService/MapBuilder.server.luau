@@ -6,8 +6,8 @@
 --      and the clients wait for it).
 --   2. Characters wait until there's ground to stand on.
 --   3. Terrain (TerrainBuilder): hills, rivers, the lake, the coast, roads.
---   4. The town: sawmill and sell area, the three shops, the gondola
---      station, Murph's camp, the parking lot, lamps, signs, props, and
+--   4. The town: sawmill and sell area, the three shops, Murph's camp,
+--      the parking lot, lamps, signs, props, and
 --      its greenery (ornamental trees no one can chop, bushes, flowers).
 --   5. The biomes: every wild tree (BiomeData counts) on the terrain
 --      (TreeService's under the v1 loop; SectionTrees' section trees,
@@ -30,7 +30,7 @@
 --
 -- LOAD-02 (7 October 2026): only what a player needs to stand and play is
 -- built before SellArea goes in (terrain, the town's buildings, the shops,
--- the parking lot, the gondola stations, the tutorial grove, the north
+-- the parking lot, the gate lodge, the tutorial grove, the north
 -- strip, the edge walls, the clock). Everything else is a step of the
 -- deferred build (defer / deferCells below, LoadState.Queue): the town's
 -- dressing and the townsfolk first, then the country (boulders, scenery,
@@ -308,13 +308,6 @@ local function ghost(p: BasePart, transparency: number)
 	p.CanTouch = false
 end
 
--- A gondola station (GondolaService rides from its Platform).
-local function station(name: string, cf: CFrame): Model
-	local model = persistent(BuildingArt.GondolaStation())
-	model.Name = name
-	return place(model, cf)
-end
-
 -- Trees spawned (the MapTrees attribute, for GameServer's boot report).
 local treesSpawned = 0
 -- The v2 loop's trees are section trees (V2_PLAN.md M1.3), planted at a
@@ -444,8 +437,6 @@ sellArea.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 -- 4. The town
 ---------------------------------------------------------------------------
 
-local townStation: Model? = nil -- the town's gondola cable starts here (section 6)
-
 -- The town's roads, curbs, footpaths, lot pavement and edge, and the plots'
 -- lawn edges, as parts (T402; Shared/World/TownGround). The terrain under
 -- them is plain Grass. Before the town's buildings and the lot's bays, which
@@ -532,6 +523,14 @@ step("4. The town", function()
 
 	-- Shops: Persistent, with a Counter whose ShopPoint is where the client's
 	-- "Browse" prompt appears and what ShopService measures range from.
+	-- The old station pad stays flat. A sign points up the north road.
+	-- It is not one of WorldPlan.Town().signs, so those rocks do not move.
+	step("4. The Skyroot sign", function()
+		local sign = BuildingArt.Signpost("SKYROOT\nThe north road")
+		sign.Name = "SkyrootSign"
+		place(sign, CFrame.new(-40, 0, 168))
+	end)
+
 	step("4. The shops", function()
 		for _, spot in ipairs(town.shops) do
 			local shop = persistent(BuildingArt.Shop(spot.kind, spot.title, spot.accent))
@@ -555,11 +554,6 @@ step("4. The town", function()
 		local lot = DealershipLot.Build()
 		lot.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 		place(lot, town.displayLot)
-	end)
-
-	-- The gondola station in town.
-	step("4. The gondola station", function()
-		townStation = station("GondolaTown", town.gondola)
 	end)
 
 	-- The sky forge court, the pond dock, the green's campfire and park
@@ -1427,8 +1421,8 @@ end
 -- 6. The Skyroot and the Aether Isles
 ---------------------------------------------------------------------------
 
--- The whole sky is deferred (tier 3: far and high up, and the gondola's
--- stations are only waited for, by GondolaService, never needed at once).
+-- The whole sky is deferred (tier 3: far and high up). The gate lodge
+-- is a ready step so Gus's charter can wait on its door.
 -- It is split into steps of its own so the queue can interleave them with
 -- the rest, and the Lumenwood plants a tree per slice.
 do
@@ -1438,7 +1432,7 @@ do
 		local fromRoot = WorldPlan.IslesFromRoot(sky)
 
 		-- The Skyroot: seen from anywhere, so Persistent. Its limbs reach up
-		-- into each isle, its hollow faces the gondola, it parts round the fall.
+		-- into each isle, its hollow faces town, it parts round the fall.
 		defer("6. The Skyroot", 3, sky.root, function(_slice)
 			place(
 				persistent(IsleArt.Skyroot(sky.trunkHeight, fromRoot, sky.main.dir, fall.top - sky.root)),
@@ -1513,23 +1507,9 @@ do
 				slice()
 			end
 		end)
-		defer("6. The Cloud Chutes", 3, sky.root, function(_slice)
-			for _, cf in ipairs(sky.chutes) do
-				local chute = BuildingArt.CloudChute()
-				local box = chute:FindFirstChild("CloudChute")
-				place(atomic(chute), cf)
-				if box then
-					CollectionService:AddTag(box, "CloudChute")
-				end
-				-- The flume carries on from the chute's lip (its +Z end), out off
-				-- the isle and down into the clouds (WorldPlan.ChuteFlume, which
-				-- the previews draw too).
-				local from, to = WorldPlan.ChuteFlume(cf)
-				Kit.decor(
-					Kit.beam(map, "Flume", from, to, 2.4, 1.2, Color3.fromRGB(90, 62, 38), Enum.Material.WoodPlanks)
-				)
-			end
-		end)
+		-- Cloud Chute hoppers are not built. They only moved cargo for the
+		-- ride. AetherService still accepts a tagged chute, and the Sky Bin
+		-- on a plot is unchanged.
 		defer("6. The Starfall Forge", 3, sky.root, function(_slice)
 			local forge = BuildingArt.StarfallForge()
 			-- The anvil's top, not the uploaded anvil mesh of the same name
@@ -1547,43 +1527,15 @@ do
 			end
 		end)
 
-		-- The gondola: from town and from the Skyroot's foot up to the top
-		-- station on the main isle's town-facing edge. The cable runs 8.5 studs
-		-- above the cabins' route (WorldPlan.GondolaPath), one rod per stretch.
-		-- The two stations GondolaService waits for stay in the ready path (they
-		-- are small); only the cable between them is deferred.
-		local top: Model? = nil
-		local base: Model? = nil
-		step("6. The gondola stations", function()
-			top = station("GondolaTop", sky.gondolaTop)
-			base = station("GondolaBase", sky.gondolaBase)
-		end)
-		defer("6. The gondola", 3, sky.root, function(_slice)
-			local topStation, baseStation = top, base
-			if not topStation or not baseStation then
-				error("the gondola's stations were not built")
+		-- The gate lodge at the Skyroot's foot. Ready with the sky, so Gus's
+		-- charter can wait on its door. No cabin, no cable, no fare.
+		step("6. The gate lodge", function()
+			local cf = WorldPlan.GateLodge()
+			if cf then
+				local lodge = persistent(BuildingArt.GateLodge())
+				lodge.Name = "GateLodge"
+				standOnGround(place(lodge, cf))
 			end
-			local function cableFrom(model: Model)
-				local platform = model.PrimaryPart :: BasePart
-				local to = (topStation.PrimaryPart :: BasePart).Position
-				local path = WorldPlan.GondolaPath(sky, platform.Position, platform.CFrame.ZVector, to)
-				for _, piece in ipairs(WorldPlan.GondolaCable(path, platform.CFrame.ZVector)) do
-					local cable = Kit.rod(
-						map,
-						"GondolaCable",
-						piece[1],
-						piece[2],
-						0.4,
-						Color3.fromRGB(70, 70, 75),
-						Enum.Material.Metal
-					)
-					Kit.decor(cable, false)
-				end
-			end
-			if townStation then
-				cableFrom(townStation)
-			end
-			cableFrom(baseStation)
 		end)
 
 		-- The waterfall pouring off an outer isle into the river's spring.

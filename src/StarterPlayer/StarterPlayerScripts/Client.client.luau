@@ -55,7 +55,6 @@ local MODULES = {
 	"ForestUI",
 	"ForgeUI",
 	"GamepadNav",
-	"GondolaController",
 	"GrassTufts",
 	"HUD",
 	"HammerController",
@@ -313,12 +312,6 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "VehicleFX",
 		get = function()
 			return require(script.Parent.VehicleFX)
-		end,
-	},
-	{
-		name = "GondolaController",
-		get = function()
-			return require(script.Parent.GondolaController)
 		end,
 	},
 	{

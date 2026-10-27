@@ -94,7 +94,7 @@ return function(t)
 	t.test("SpotFor: found parts, fallbacks, fixed spots, walkers' starts", function()
 		local found = {
 			["ToolShed/Counter"] = { CFrame.new(-45, 2.5, 101), Vector3.new(10, 3, 2) },
-			["GondolaTown/Platform"] = { CFrame.new(-40, 0.5, 150), Vector3.new(10, 1, 10) },
+			["GateLodge/Door"] = { CFrame.new(-38, 3.1, 150), Vector3.new(6, 6.2, 0.35) },
 		}
 		local function find(model, part)
 			local hit = found[model .. "/" .. part]
@@ -163,7 +163,7 @@ return function(t)
 			{ name = "sell station", x = pad.X, z = pad.Z, hx = 14 + 2, hz = 16 + 2 },
 			{ name = "sawmill", x = town.sawmill.Position.X, z = town.sawmill.Position.Z, hx = 19, hz = 15 },
 			{ name = "parking", x = 60, z = 25, hx = 48, hz = 40 },
-			{ name = "gondola", x = town.gondola.Position.X, z = town.gondola.Position.Z, hx = 8, hz = 8 },
+			{ name = "north yard", x = -40, z = 150, hx = 8, hz = 8 },
 			{ name = "spawn", x = town.spawn.X, z = town.spawn.Z, hx = 5, hz = 5 },
 		}
 		for _, shop in ipairs(town.shops) do

@@ -45,7 +45,6 @@ return function(t)
 		"CarryController",
 		"DragController",
 		"CutController",
-		"GondolaController",
 		"FerryController",
 	}
 

@@ -294,7 +294,9 @@ function World.build(ctx, opts)
 	for _, spot in ipairs(town.shops) do
 		place(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
 	end
-	local townStation = place(BuildingArt.GondolaStation(), town.gondola)
+	local skySign = BuildingArt.Signpost("SKYROOT\nThe north road")
+	skySign.Name = "SkyrootSign"
+	place(skySign, CF.new(-40, 0, 168))
 	place(BuildingArt.Campsite(), town.campsite)
 	for _, cf in ipairs(town.lamps) do
 		place(BuildingArt.LampPost(), cf)
@@ -391,42 +393,12 @@ function World.build(ctx, opts)
 				place(TreeArt.Build(WoodData.Get("lumenwood"), i, 1), CF.new(pos))
 			end
 		end
-		for _, cf in ipairs(sky.chutes) do
-			place(BuildingArt.CloudChute(), cf)
-			local from, to = WorldPlan.ChuteFlume(cf) -- out off the isle, as MapBuilder draws it
-			Kit.beam(
-				root,
-				"Flume",
-				from,
-				to,
-				2.4,
-				1.2,
-				roblox.Color3.fromRGB(90, 62, 38),
-				roblox.Enum.Material.WoodPlanks
-			)
-		end
 		place(BuildingArt.StarfallForge(), sky.forge)
-		local top = place(BuildingArt.GondolaStation(), sky.gondolaTop)
-		local base = place(BuildingArt.GondolaStation(), sky.gondolaBase)
-		-- The cables, along the cabins' route as MapBuilder draws them.
-		for _, station in ipairs({ townStation, base }) do
-			local platform = station.PrimaryPart
-			local to = top.PrimaryPart.CFrame.Position
-			local path = WorldPlan.GondolaPath(sky, platform.CFrame.Position, platform.CFrame.ZVector, to)
-			for _, piece in ipairs(WorldPlan.GondolaCable(path, platform.CFrame.ZVector)) do
-				Kit.decor(
-					Kit.rod(
-						root,
-						"GondolaCable",
-						piece[1],
-						piece[2],
-						0.4,
-						roblox.Color3.fromRGB(70, 70, 75),
-						roblox.Enum.Material.Metal
-					),
-					false
-				)
-			end
+		-- The checkpoint on the Snow Road's north end. No cabin and no cable.
+		local lodgeCf = WorldPlan.GateLodge()
+		if lodgeCf then
+			local lodge = place(BuildingArt.GateLodge(), lodgeCf)
+			lodge.Name = "GateLodge"
 		end
 	end
 

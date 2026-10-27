@@ -359,7 +359,6 @@ return function(t)
 			ToolShedPath = true,
 			DealershipPath = true,
 			SpawnWalk = true,
-			GondolaPath = true,
 			TruckLotPath = true,
 		}
 		-- The solid street dressing of a shop front (T385) sits beside its door, where the Hearth path

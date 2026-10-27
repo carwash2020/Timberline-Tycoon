@@ -11,7 +11,7 @@
 
 local BiomeData = {}
 
-export type Access = "truck" | "boat" | "gondola"
+export type Access = "truck" | "boat" | "road"
 
 export type BiomeDef = {
 	id: string,
@@ -24,9 +24,9 @@ export type BiomeDef = {
 	-- Gear that removes the biome's slowdown, and how big the slowdown is.
 	slowdown: { amount: number, removedBy: string }?,
 	nightOnly: boolean?,
-	-- Sky biome: gondola up and down, logs sent down the Cloud Chute into
+	-- Sky biome: the Skyroot road and the gate lodge. Logs still go into
 	-- the player's Sky Bin (an item from the Tool Shed, placed on their plot).
-	gondola: { rideSec: number, fee: number }?,
+	-- Cloud Chute hoppers are not built; they only moved gondola cargo.
 	skyBinCapacity: number?, -- logs (the v1 loop)
 	skyBinVolume: number?, -- u³ (the v2 loop, V2_PLAN.md §5)
 	chuteWalkStuds: number?, -- from the trees to the chute
@@ -186,20 +186,21 @@ local biomes: { BiomeDef } = {
 		trees = { ironwood = 38 },
 	},
 	{
-		-- V1 finale, high above the map, reached up the trunk of the Skyroot.
+		-- V1 finale, high above the map. The Sky Pass (saved as gondolaPass)
+		-- opens the gate lodge on the Skyroot road. The isles stay at y = 650
+		-- until a later map pass; this lodge is the check, not a ride.
 		id = "sky",
 		displayName = "Aether Isles",
-		access = "gondola",
-		gondola = { rideSec = 40, fee = 250 },
-		gateWords = "Obsidian Axe + Gondola Pass from Gus",
+		access = "road",
+		haulStuds = 700,
+		requiresGear = "GondolaPass",
+		gateWords = "Obsidian Axe + Sky Pass from Gus",
 		skyBinCapacity = 30,
 		skyBinVolume = 120,
 		chuteWalkStuds = 30,
 		hazards = { "wind gusts", "lightning" },
-		-- Floating above the Skyroot in the far north-west corner. The
-		-- gondola leaves from a station by the sawmill (the model counts the
-		-- Sky Bin as a short walk from it); a second station at the Skyroot's
-		-- foot is the way back up for anyone who falls.
+		-- Floating above the Skyroot. Straight-line from the sawmill is about
+		-- 701 studs, so haulStuds stays inside the 20% band.
 		area = { x = 680, z = 280, radius = 100, y = 650 },
 		trees = { lumenwood = 12 },
 		nodes = { SkyShard = 8 },
@@ -242,9 +243,9 @@ function BiomeData.All(): { BiomeDef }
 end
 
 -- The gate into a biome: `needs` is the id of the gear or pass the player
--- must hold ("GondolaPass" for the sky, the gear for a gear-gated biome, nil
--- for an open one) and `words` is what its gate sign says ("" when it has no
--- sign). An unknown biome is open.
+-- must hold (the Sky Pass gear id for the sky, the gear for a gear-gated
+-- biome, nil for an open one) and `words` is what its gate sign says ("" when
+-- it has no sign). An unknown biome is open.
 export type GateInfo = { needs: string?, words: string }
 
 function BiomeData.Gate(biomeId: string): GateInfo
@@ -253,9 +254,7 @@ function BiomeData.Gate(biomeId: string): GateInfo
 		return { needs = nil, words = "" }
 	end
 	local needs: string? = def.requiresGear
-	if def.access == "gondola" then
-		needs = "GondolaPass"
-	elseif needs == nil and def.exposure ~= nil then
+	if needs == nil and def.exposure ~= nil then
 		needs = def.exposure.gear
 	end
 	return { needs = needs, words = def.gateWords or "" }

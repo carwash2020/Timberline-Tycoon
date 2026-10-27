@@ -73,11 +73,6 @@ local function icon(parent: Instance, kind: string, size: number)
 		mark.Size = UDim2.fromOffset(8, 8)
 		mark.Rotation = 45
 		mark.BackgroundColor3 = C.Amber
-	elseif kind == "gondola" then
-		mark.Size = UDim2.fromOffset(14, 8)
-		mark.Position = UDim2.fromScale(0.5, 0.62)
-		mark.BackgroundColor3 = C.Amber
-		UITheme.corner(mark, 2)
 	else
 		mark.Size = UDim2.fromOffset(14, 10)
 		mark.BackgroundColor3 = C.Cream
@@ -94,15 +89,6 @@ local function icon(parent: Instance, kind: string, size: number)
 		head.BackgroundColor3 = C.Amber
 		head.BorderSizePixel = 0
 		head.Parent = box
-	elseif kind == "gondola" then
-		local cable = Instance.new("Frame")
-		cable.Name = "Cable"
-		cable.AnchorPoint = Vector2.new(0.5, 0)
-		cable.Position = UDim2.fromScale(0.5, 0.22)
-		cable.Size = UDim2.fromOffset(18, 2)
-		cable.BackgroundColor3 = C.Cream
-		cable.BorderSizePixel = 0
-		cable.Parent = box
 	elseif kind == "blueprint" then
 		local rule = Instance.new("Frame")
 		rule.Name = "Rule"

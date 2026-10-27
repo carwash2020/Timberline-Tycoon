@@ -107,6 +107,24 @@ local function facingZ(at: Vector3, toward: Vector3): CFrame
 	return CFrame.new(at) * CFrame.Angles(0, math.atan2(dx, dz), 0)
 end
 
+-- The old cable column, kept so country stands, scenery, clusters and the
+-- forest still stand off the same ground. Not a ride and not exported.
+local SKY_COLUMN = 30
+local TOWN_YARD = Vector3.new(-40, 0, 150)
+local function skyColumnRoutes(): { { Vector2 } }
+	local routes: { { Vector2 } } = {}
+	local sky = WorldPlan.Sky()
+	if sky then
+		local center = sky.main.center
+		local dir = sky.main.dir
+		local top = center + dir * 44
+		local foot = center + dir * 62
+		table.insert(routes, { Vector2.new(TOWN_YARD.X, TOWN_YARD.Z), Vector2.new(top.X, top.Z) })
+		table.insert(routes, { Vector2.new(foot.X, foot.Z), Vector2.new(top.X, top.Z) })
+	end
+	return routes
+end
+
 ---------------------------------------------------------------------------
 -- Trees
 ---------------------------------------------------------------------------
@@ -444,8 +462,8 @@ end
 -- country that has no tree yet. 4-9 trees each, spread like the Starter
 -- Forest (one per 400 sq studs, STAND_SPACING apart). Every tree is on
 -- good ground (dry, flat enough, lowland), out of town, the plots, the
--- beach and every biome (they have their own forests), off the gondola's
--- routes, the boulders, the road signs, the scenery (WLD-01) and every
+-- beach and every biome (they have their own forests), off the sky
+-- column, the boulders, the road signs, the scenery (WLD-01) and every
 -- other tree, and WILD_NEAREST from the sawmill (pine and maple STAND_FAR).
 -- Their woods follow the nearest biome, as the wild groves' do. They come
 -- after the first 322 trees and draw their own rng, so those never move.
@@ -459,7 +477,7 @@ local STAND_LOW = 70 -- lowland only
 local STAND_SET_BACK = 20 -- studs every stand tree keeps off a road's edge
 local STAND_ROADSIDE = 80 -- a roadside stand's trees stand at most this far off its road's edge
 local STAND_SPACING = 12 -- studs between two trees
-local STAND_GONDOLA = 30 -- studs off the gondola's routes (seen from above)
+-- SKY_COLUMN (above) is how far a stand tree keeps off the sky column.
 local STAND_ROCK = 6 -- studs off a boulder's side
 local STAND_SIGN = 12 -- studs off a road sign
 local STAND_FAR = 400 -- pine and maple stand at least this far from the sawmill
@@ -488,15 +506,7 @@ function WorldPlan.CountryStands(): { Stand }
 	local signs = WorldPlan.RoadSigns(function(): string
 		return ""
 	end)
-	local routes: { { Vector2 } } = {}
-	local sky = WorldPlan.Sky()
-	if sky then
-		local top = sky.gondolaTop.Position
-		local town = WorldPlan.TownGondolaSpot
-		local base = sky.gondolaBase.Position
-		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
-		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
-	end
+	local routes = skyColumnRoutes()
 	local discs: { { x: number, z: number, r: number } } = {}
 	for _, biome in ipairs(BiomeData.All()) do
 		local area = biome.area
@@ -553,7 +563,7 @@ function WorldPlan.CountryStands(): { Stand }
 			end
 		end
 		for _, route in ipairs(routes) do
-			if WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) < STAND_GONDOLA then
+			if WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) < SKY_COLUMN then
 				return false
 			end
 		end
@@ -1692,7 +1702,7 @@ local cachedScenery: { ScenerySpot }? = nil
 -- SceneryGrade, its base at the lowest ground under its footprint (so
 -- nothing floats, and its uphill side sinks at most ScenerySink), 4+ studs
 -- off the roads, 8+ off any tree, clear of the boulders, the signs, the
--- gondola's route, the town, the plots and every biome. Looks only:
+-- sky column, the town, the plots and every biome. Looks only:
 -- nothing there is chopped, collides or changes the balance.
 function WorldPlan.Scenery(): { ScenerySpot }
 	if cachedScenery then
@@ -1710,16 +1720,7 @@ function WorldPlan.Scenery(): { ScenerySpot }
 	end)
 	local coast = WorldLayout.Coast
 	local beachX = coast.shoreX - coast.beachWidth - 40
-	-- The gondola's route (from town and from the Skyroot's foot to the top station).
-	local routes: { { Vector2 } } = {}
-	local sky = WorldPlan.Sky()
-	if sky then
-		local top = sky.gondolaTop.Position
-		local town = WorldPlan.Town().gondola.Position
-		local base = sky.gondolaBase.Position
-		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
-		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
-	end
+	local routes = skyColumnRoutes()
 	local discs: { { x: number, z: number, r: number } } = {}
 	for _, biome in ipairs(BiomeData.All()) do
 		local area = biome.area
@@ -1985,7 +1986,6 @@ export type Town = {
 	sellZone: CFrame, -- centre of the sell volume (WorldPlan.SellZoneSize)
 	sellPad: CFrame,
 	shops: { ShopSpot },
-	gondola: CFrame,
 	campsite: CFrame,
 	murph: CFrame, -- where Murph stands, facing the spawn
 	parkingSlots: { CFrame }, -- in claim order (Index 1, 2, ...)
@@ -2042,18 +2042,6 @@ WorldPlan.ParkingSlotSize = WorldPlan.ParkingBays.small
 -- its tail at a bay's tail and its nose out over this lane (VehicleService).
 WorldPlan.ParkingPullOut = 26
 
--- The town's gondola station; it turns its open back (+Z) toward the top
--- station on the isles, along the cable.
-WorldPlan.TownGondolaSpot = Vector3.new(-40, 0, 150)
-local function townGondola(): CFrame
-	local def = BiomeData.Get("sky")
-	local area = if def then def.area else nil
-	if not area then
-		return CFrame.new(WorldPlan.TownGondolaSpot)
-	end
-	return facingZ(WorldPlan.TownGondolaSpot, Vector3.new(area.x, 0, area.z))
-end
-
 -- The TO THE WOODS sign's destination lines, "<name>  <distance>", from
 -- BiomeData.SignDestinations (the same names the region toasts show and the
 -- haul distances the economy model uses), nearest first. Note: the sign's
@@ -2081,7 +2069,7 @@ function WorldPlan.Town(): Town
 
 	-- Lamps (the layout from tools/preview/scenes/town.luau): along the
 	-- main street (z 70 to 84) with their arms over it, at the head of the
-	-- spawn walk, by the gondola path and the mill yard, and by the lot.
+	-- spawn walk, by the north yard and the mill yard, and by the lot.
 	-- None stand where trucks pull out of the parking bays (x 9 to 138),
 	-- and none on a road (like every colliding thing in town: WorldPlan.spec).
 	-- The lot's two lamps stand past its east rail (M1.5: the lot grew east),
@@ -2097,7 +2085,7 @@ function WorldPlan.Town(): Town
 	table.insert(lamps, at(30, 92, 0)) -- north side, set back off the street
 	table.insert(lamps, at(-8, 60, -math.pi / 2))
 	table.insert(lamps, at(8, 60, math.pi / 2))
-	table.insert(lamps, at(-41, 134, -math.pi / 2)) -- west of the gondola path, arm east over it
+	table.insert(lamps, at(-41, 134, -math.pi / 2)) -- west of the north yard, arm east over it
 	table.insert(lamps, at(36, 124, 0)) -- east of the mill's lean-to
 	-- The sell station's four corner lamps, outside its rails (WorldPlan.spec
 	-- keeps them off the pad, its lane and the roads).
@@ -2253,7 +2241,7 @@ function WorldPlan.Town(): Town
 
 	-- Greenery (TWN-01): ornamental trees seated in stone rings, framing the
 	-- town (birch and maple round the edges, a pine band behind the mill
-	-- and the gondola), bushes along the shops' and the station's sides,
+	-- and the north yard), bushes along the shops' sides,
 	-- flower beds by the plaza, the spawn walk and the shop paths' mouths,
 	-- and a few rocks. Looks only, but for the trees' trunks, which collide
 	-- (MapBuilder never tags them Tree or puts them in the Trees folder, so
@@ -2261,13 +2249,13 @@ function WorldPlan.Town(): Town
 	-- a tree you can chop. All of it stays off the paint, the lot, the
 	-- sell pad and the parking pull-outs, 2 studs off the roads, 4 studs
 	-- from the colliding props, off the townsfolk's walks and out of the
-	-- gondola's way (WorldPlan.spec). No trunk stands east of the mill at x
+	-- north yard (WorldPlan.spec). No trunk stands east of the mill at x
 	-- 22 to 42 or between there and the Snow Road's start at (0, 205): room
 	-- for the lane north (TWN-05). Seeds come from the spot.
 	local greenery: { Greenery } = {}
 	local greenSpots: { { any } } = { -- { kind, x, z, size, woodId? }
-		-- The pine band behind the mill and the gondola (z 140 to 200).
-		{ "tree", -12, 170, 1.22, "pine" }, -- ring map: clear of the gondola's east run (the bushes beside the station went)
+		-- The pine band behind the mill and the north yard (z 140 to 200).
+		{ "tree", -12, 170, 1.22, "pine" }, -- ring map: clear of the yard's east run (the bushes beside the yard went)
 		{ "tree", 4, 153, 1, "pine" },
 		{ "tree", -2, 169, 1.22, "pine" },
 		{ "tree", 9, 180, 1, "pine" },
@@ -2412,7 +2400,6 @@ function WorldPlan.Town(): Town
 				cframe = CFrame.new(135, 0, 132),
 			},
 		},
-		gondola = townGondola(),
 		campsite = campsite,
 		murph = campsite * CFrame.new(0, 0, -3),
 		parkingSlots = slots,
@@ -2451,7 +2438,7 @@ local SIGN_CLEAR = 2
 -- What a biome's road sign says (MapBuilder's road signs and the world
 -- preview both use it): the biome's name, its woods (in WoodData's order),
 -- the gear it asks for (the gear it needs, or the gear that takes its
--- slowdown away) and, for the sky, the gondola. An unknown id is shown as
+-- slowdown away) and, for the sky, the sky road. An unknown id is shown as
 -- it is.
 function WorldPlan.BiomeSignText(biomeId: string): string
 	local biome = BiomeData.Get(biomeId)
@@ -2465,13 +2452,16 @@ function WorldPlan.BiomeSignText(biomeId: string): string
 		end
 	end
 	local text = string.upper(biome.displayName) .. "\n" .. table.concat(woods, " · ")
-	local gearId = biome.requiresGear or (if biome.slowdown then biome.slowdown.removedBy else nil)
-	local gear = if gearId then ItemCatalog.GetGear(gearId) else nil
-	if gear then
-		text ..= "\nBring: " .. gear.displayName
-	end
-	if biome.gondola then
-		text ..= "\nGondola to the Aether Isles"
+	-- The sky sign's third line stays 27 characters (the old ride line's
+	-- length) so the signpost's rocks do not move.
+	if biome.id == "sky" then
+		text ..= "\nAether Isles by the Skyroad"
+	else
+		local gearId = biome.requiresGear or (if biome.slowdown then biome.slowdown.removedBy else nil)
+		local gear = if gearId then ItemCatalog.GetGear(gearId) else nil
+		if gear then
+			text ..= "\nBring: " .. gear.displayName
+		end
 	end
 	if biome.needsStage and biome.gateWords then
 		text ..= "\n" .. biome.gateWords
@@ -2671,8 +2661,6 @@ export type Sky = {
 	bridges: { { a: Vector3, b: Vector3 } },
 	chutes: { CFrame }, -- each on an outer isle's edge, its +Z (the flume) outward
 	forge: CFrame,
-	gondolaTop: CFrame,
-	gondolaBase: CFrame,
 	lumenwood: { Vector3 },
 	shards: { Vector3 },
 	waterfall: { top: Vector3, bottom: Vector3, dir: Vector3, isle: number },
@@ -2734,11 +2722,6 @@ function WorldPlan.Sky(): Sky?
 		table.insert(shards, main.center - side * (14 + k * 8) - toTown * 10)
 	end
 	local forgeAt = main.center + side * 16
-	local base = Vector3.new(
-		center.X + toTown.X * 62,
-		TerrainGen.HeightAt(center.X + toTown.X * 62, center.Z + toTown.Z * 62),
-		center.Z + toTown.Z * 62
-	)
 	-- The waterfall pours off the outer isle nearest the river's spring.
 	local spring = WorldLayout.River.points[1]
 	local nearest, nearestIndex = isles[1], 1
@@ -2762,10 +2745,6 @@ function WorldPlan.Sky(): Sky?
 		bridges = bridges,
 		chutes = chutes,
 		forge = CFrame.lookAt(forgeAt, forgeAt - side),
-		-- Stations turn their open back (+Z) along the cable: the top one
-		-- toward town, the foot one up toward the top.
-		gondolaTop = facingZ(main.center + toTown * 44, WorldPlan.TownGondolaSpot),
-		gondolaBase = facingZ(base, main.center + toTown * 44),
 		lumenwood = lumen,
 		shards = shards,
 		waterfall = {
@@ -2791,73 +2770,59 @@ function WorldPlan.ChuteFlume(cf: CFrame): (Vector3, Vector3)
 	return from, from + cf.LookVector * -FLUME_OUT - Vector3.new(0, FLUME_DROP, 0)
 end
 
--- The gondola's route from a station's Platform (its centre `from`, its
--- open back `back` facing along the cable) up to the top station's
--- Platform (`to`, its open back facing out over the main isle's rim):
--- level out of the station's back until the cabin is clear of its roof,
--- then up to a point level with the top platform just past the rim, then
--- level in under the top station's roof. The rides and the drawn cable
--- both follow it, each at its own height above it, so neither cuts through
--- a station's roof or the isle. (The cabin is 5.4 across; a station's roof,
--- its barge boards, reaches 5.2 behind its middle; the isle's grassy rim
--- 1.1 past its radius, and its rim stones' corners about 3.4 past it.)
-
-function WorldPlan.GondolaPath(sky: Sky, from: Vector3, back: Vector3, to: Vector3): { Vector3 }
-	local c = sky.main.center
-	local out = Vector3.new(to.X - c.X, 0, to.Z - c.Z).Unit
-	local rim = Vector3.new(c.X, to.Y, c.Z) + out * (sky.main.radius + 7) -- GONDOLA_RIM = 7
-	return { from, from + Vector3.new(back.X, 0, back.Z).Unit * 9, rim, to } -- GONDOLA_OUT = 9
-end
-
--- The point `alpha` (0 to 1) of the way along `path`, by length (so a
--- cabin moving along it keeps an even speed round the bends).
--- The drawn cable for a gondola route (GondolaPath): CABLE_UP above it,
--- except on a near-vertical stretch (the climb beside the Skyroot). A cable
--- straight above that would run down through the cabin itself, and any
--- piece crossing the column the cabin climbs through would cut it on the
--- way up. So the cable leaves the route CABLE_CLEAR before the climb,
--- steps CABLE_SIDE aside (across `back`, the station's back), runs up
--- beside the climb and comes back over at the top, above the highest
--- cabin. Pairs of points, one rod each.
-local CABLE_UP = 8.5
-local CABLE_SIDE = 4.5 -- the cabin reaches 2.7 from its middle (plus the rod)
-local CABLE_CLEAR = 4
-function WorldPlan.GondolaCable(path: { Vector3 }, back: Vector3): { { Vector3 } }
-	local up = Vector3.new(0, CABLE_UP, 0)
-	local flatBack = Vector3.new(back.X, 0, back.Z)
-	local side = if flatBack.Magnitude > 1e-6
-		then flatBack.Unit:Cross(Vector3.new(0, 1, 0)) * CABLE_SIDE
-		else Vector3.new(CABLE_SIDE, 0, 0)
-	local function steep(i: number): boolean
-		local d = path[i + 1] - path[i]
-		return math.abs(d.Y) > Vector3.new(d.X, 0, d.Z).Magnitude
+-- The Skyroot gate lodge, beside the Snow Road's north end (the switchback
+-- approach around (-60, 800)). The shell is 28 x 20; its front (-Z) faces
+-- the road. Y is the ground there. Nil when this build has no sky biome.
+local LODGE_SEEK = Vector3.new(-30, 0, 790)
+function WorldPlan.GateLodge(): CFrame?
+	if WorldPlan.Sky() == nil then
+		return nil
 	end
-	local out: { { Vector3 } } = {}
-	local start = path[1] + up -- where the next piece starts
-	for i = 1, #path - 1 do
-		local a, b = path[i] + up, path[i + 1] + up
-		if steep(i) then
-			table.insert(out, { start, start + side })
-			table.insert(out, { start + side, a + side })
-			table.insert(out, { a + side, b + side })
-			table.insert(out, { b + side, b })
-			start = b
-		else
-			local finish = b
-			if i + 1 <= #path - 1 and steep(i + 1) then
-				-- Stop short of the climb: the next pieces step aside from here.
-				local d = b - a
-				finish = if d.Magnitude > CABLE_CLEAR then b - d.Unit * CABLE_CLEAR else a
+	local bestScore = math.huge
+	local best: CFrame? = nil
+	for z = 775, 805, 5 do
+		for x = -50, -20, 5 do
+			local clear = TerrainGen.RoadClearance(x, z, 200)
+			if clear < 18 or clear > 42 then
+				continue
 			end
-			if (finish - start).Magnitude > 1e-6 then
-				table.insert(out, { start, finish })
+			local slope = TerrainGen.SlopeAt(x, z)
+			if slope > 0.05 or WorldLayout.FlatWeight(x, z) > 0.2 then
+				continue
 			end
-			start = finish
+			local y = TerrainGen.HeightAt(x, z)
+			local at = Vector3.new(x, y, z)
+			local away = at + (at - Vector3.new(0, y, 760))
+			local cf = facingZ(at, away)
+			local offRoad = true
+			for _, corner in ipairs({
+				Vector3.new(-14, 0, -10),
+				Vector3.new(14, 0, -10),
+				Vector3.new(-14, 0, 10),
+				Vector3.new(14, 0, 10),
+				Vector3.new(0, 0, -16),
+			}) do
+				local w = (cf :: CFrame) * corner
+				if TerrainGen.RoadClearance(w.X, w.Z, 200) < 6 then
+					offRoad = false
+					break
+				end
+			end
+			if not offRoad then
+				continue
+			end
+			local dx, dz = x - LODGE_SEEK.X, z - LODGE_SEEK.Z
+			local score = slope * 40 + math.sqrt(dx * dx + dz * dz)
+			if score < bestScore then
+				bestScore = score
+				best = cf
+			end
 		end
 	end
-	return out
+	return best
 end
 
+-- The point `alpha` (0 to 1) of the way along `path`, by length.
 function WorldPlan.AlongPath(path: { Vector3 }, alpha: number): Vector3
 	local total = 0
 	for i = 1, #path - 1 do
@@ -2875,8 +2840,8 @@ function WorldPlan.AlongPath(path: { Vector3 }, alpha: number): Vector3
 end
 
 -- Points on an isle's top (relative to its centre `center`) that its
--- decoration keeps clear of: bridge ends, Cloud Chutes, the forge and the
--- top gondola station (IsleArt.Isle's `clear` option).
+-- decoration keeps clear of: bridge ends, chute lips, the forge and the
+-- old column head on the main isle (IsleArt.Isle's `clear` option).
 function WorldPlan.IsleClearPoints(sky: Sky, center: Vector3): { Vector3 }
 	local out: { Vector3 } = {}
 	for _, b in ipairs(sky.bridges) do
@@ -2887,7 +2852,7 @@ function WorldPlan.IsleClearPoints(sky: Sky, center: Vector3): { Vector3 }
 		table.insert(out, cf.Position - center)
 	end
 	table.insert(out, sky.forge.Position - center)
-	table.insert(out, sky.gondolaTop.Position - center)
+	table.insert(out, sky.main.center + sky.main.dir * 44 - center)
 	return out
 end
 
@@ -3889,7 +3854,7 @@ end
 -- check looks at its neighbours only: every tree on the ground but the
 -- forest's (baseTrees: those came after and keep off all this), the
 -- boulders, the scenery and the road signs (each a disc: its middle and
--- how far it reaches), and the gondola's two routes seen from above.
+-- how far it reaches), and the sky column seen from above.
 type Disc = { x: number, z: number, r: number }
 type Clutter = { bins: { [number]: { Disc } }, routes: { { Vector2 } }, biomes: { Disc } }
 local CLUTTER_BIN = 64
@@ -3938,18 +3903,10 @@ local function clutter(): Clutter
 		local p = sign.cframe.Position
 		add(p.X, p.Z, SIGN_POST)
 	end
-	local routes: { { Vector2 } } = {}
-	local sky = WorldPlan.Sky()
-	if sky then
-		local top = sky.gondolaTop.Position
-		local town = WorldPlan.TownGondolaSpot
-		local base = sky.gondolaBase.Position
-		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
-		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
-	end
+	local routes = skyColumnRoutes()
 	-- Each biome's own ground (its trees, its Elder): the Gloam Hollow's
 	-- ridge and all, and the Skyroot's foot under the isles (its roots, its
-	-- waterfall's pool, the gondola's foot station), as the scenery keeps.
+	-- waterfall's pool, the sky column's foot), as the scenery keeps.
 	local biomes: { Disc } = {}
 	for _, biome in ipairs(BiomeData.All()) do
 		local area = biome.area
@@ -3964,9 +3921,9 @@ local function clutter(): Clutter
 end
 
 -- Whether a disc of radius `r` at (x, z) keeps `gap` studs off everything
--- in the clutter (trees, boulders, scenery, signs), `gondola` studs off
--- the gondola's routes, and out of every biome's own ground.
-local function clearOfClutter(x: number, z: number, r: number, gap: number, gondola: number): boolean
+-- in the clutter (trees, boulders, scenery, signs), `column` studs off
+-- the sky column, and out of every biome's own ground.
+local function clearOfClutter(x: number, z: number, r: number, gap: number, column: number): boolean
 	local c = clutter()
 	for _, d in ipairs(c.biomes) do
 		local dx, dz = x - d.x, z - d.z
@@ -3975,7 +3932,7 @@ local function clearOfClutter(x: number, z: number, r: number, gap: number, gond
 		end
 	end
 	for _, route in ipairs(c.routes) do
-		if WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) < gondola + r then
+		if WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) < column + r then
 			return false
 		end
 	end
@@ -4004,8 +3961,8 @@ end
 -- ground under its footprint never drops below the rock's buried edge),
 -- out of town, the plots and every biome's own ground, ClusterRoad studs
 -- off the roads, ClusterWater off the water, ClusterGap off every tree,
--- boulder, scenery piece and road sign, ClusterGondola off the gondola's
--- routes. They come after everything else and draw their own rng, so
+-- boulder, scenery piece and road sign, and SKY_COLUMN off the sky
+-- column. They come after everything else and draw their own rng, so
 -- nothing that was already placed moves.
 export type ClusterRock = { position: Vector3, size: number, seed: number, yaw: number, mossy: boolean }
 export type BoulderCluster = { center: Vector3, radius: number, tone: number, rocks: { ClusterRock } }
@@ -4013,7 +3970,7 @@ export type BoulderCluster = { center: Vector3, radius: number, tone: number, ro
 WorldPlan.ClusterRoad = 4 -- studs between a rock's side and a road's edge
 WorldPlan.ClusterWater = 4 -- studs between a rock's side and the water
 WorldPlan.ClusterGap = 6 -- studs between a rock's side and a tree, boulder, scenery piece or sign
-WorldPlan.ClusterGondola = 30 -- studs off the gondola's routes (seen from above)
+local CLUSTER_COLUMN = 30 -- studs off the sky column (seen from above)
 WorldPlan.ClusterSlope = 0.6 -- the lone boulders' rule (SlopeAt)
 WorldPlan.ClusterLow = 70 -- lowland only
 WorldPlan.ClusterEdge = 1150 -- clear of the mountains at the world's edge
@@ -4075,7 +4032,7 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 				return nil
 			end
 		end
-		if not clearOfClutter(x, z, reach, WorldPlan.ClusterGap, WorldPlan.ClusterGondola) then
+		if not clearOfClutter(x, z, reach, WorldPlan.ClusterGap, CLUSTER_COLUMN) then
 			return nil
 		end
 		if TerrainGen.RoadClearance(x, z) < reach + WorldPlan.ClusterRoad then
@@ -4218,7 +4175,7 @@ end
 -- lighthouse on the coast's headland. Each is found by a fixed search
 -- (the same on every server), comes after everything else and keeps
 -- LandmarkGap studs off it: every tree, boulder, scenery piece, road sign
--- and boulder cluster, the gondola's routes and every biome's own ground,
+-- and boulder cluster, the sky column and every biome's own ground,
 -- and LandmarkRoad studs off the roads (none of them is anywhere a truck
 -- drives). Nil when no spot fits (MapBuilder then builds nothing there).
 ---------------------------------------------------------------------------
@@ -4636,7 +4593,7 @@ local function townBlockers(): { Blocker }
 	local town = (WorldPlan :: any).Town()
 	local discs: { Blocker } = {
 		{ at = town.sawmill.Position, r = 45, tall = 45 },
-		{ at = town.gondola.Position, r = 16, tall = 25 },
+		{ at = Vector3.new(-40, 0, 150), r = 16, tall = 25 },
 		{ at = town.campsite.Position, r = 12, tall = 9 },
 	}
 	for _, spot in ipairs(town.shops) do
@@ -4777,7 +4734,7 @@ end
 -- steeper than 0.6, reachable on foot), WILD_NEAREST from the sawmill
 -- (pine and maple STAND_FAR), out of town, the plots, the beach and every
 -- biome's own ground, ForestSpacing off every other tree, and clear of
--- the gondola's routes, the boulders, the road signs, the scenery, the
+-- the sky column, the boulders, the road signs, the scenery, the
 -- boulder clusters, the footbridge, the docks and the lanes (the spawn's
 -- view of the lighthouse). Their woods follow the nearest biome, as the
 -- country stands' do. Like every tree they are built by the server
@@ -4878,15 +4835,7 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 			table.insert(biomes, { area.x, area.z, r })
 		end
 	end
-	local routes: { { Vector2 } } = {}
-	local sky = WorldPlan.Sky()
-	if sky then
-		local top = sky.gondolaTop.Position
-		local town = WorldPlan.TownGondolaSpot
-		local base = sky.gondolaBase.Position
-		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
-		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
-	end
+	local routes = skyColumnRoutes()
 
 	-- Every tree so far, binned by 32-stud squares for the spacing checks.
 	local bins: { [number]: { Vector3 } } = {}
@@ -4940,7 +4889,7 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 			end
 		end
 		for _, route in ipairs(routes) do
-			if WorldLayout.SegmentDistance(p, route[1], route[2]) < STAND_GONDOLA then
+			if WorldLayout.SegmentDistance(p, route[1], route[2]) < SKY_COLUMN then
 				return false
 			end
 		end
@@ -5343,7 +5292,7 @@ WorldPlan.UniqueItemSpawns = {
 	{ id = "redmesa", x = 590, z = -860 },
 } :: { PointAnchor }
 
--- Faces south (-Z) onto MainStreet. Between GondolaPath (x -37.5) and
+-- Faces south (-Z) onto MainStreet. Between the north yard (x -37.5) and
 -- ToolShedFloor (x -62).
 WorldPlan.LeaderboardBoard = CFrame.new(-50, 0, 92)
 

@@ -1,21 +1,28 @@
 --!strict
 -- SkyQuestService: Gus's Charter on the server (rules: Shared/SkyQuestLogic).
 --   * The SkyQuest remote: ("accept" | "turnin"), RateLimiter "SkyQuest",
---     only within STATION_RANGE of the town gondola station, where Gus
---     stands (NPCData: beside GondolaTown's platform).
---   * A "Gus's Charter" prompt on that platform (F / ButtonY, so it never
---     shares a key with "Ride up") does the same: it accepts the charter,
---     or turns in what is ready, and toasts the step and its progress.
---   * Turn-ins use up the player's own planks laid by the station
+--     only within STATION_RANGE of the Skyroot gate lodge door, where Gus
+--     stands (NPCData: beside GateLodge's Door).
+--   * A "Gus's Charter" prompt on that door does the same: it accepts the
+--     charter, or turns in what is ready, and toasts the step and its progress.
+--   * Turn-ins use up the player's own planks laid by the door
 --     (HandInWood). They pay nothing.
---   * The last step grants the Gondola Pass once: profile.gondolaPass (and
+--   * The last step grants the Sky Pass once: profile.gondolaPass (and
 --     skyPass, its old name), and the GondolaPass gear for the inventory.
---     No cash is charged for it.
+--     No cash is charged for it. There is no ride.
 --   * Player attributes SkyQuestStep and GondolaPass mirror the save for
 --     the HUD and Lane E's Gus talk. State(player) is the read API.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- The bar is in SkyGate. A pass holder, and anyone already on the summit
+-- side of it, is in SkyPasser, which does not collide with the bar. The
+-- road side without a pass stays in Default and meets the bar. Leave never
+-- strands: crossing back to the road side without a pass collides again.
+local GATE_GROUP = "SkyGate"
+local PASS_GROUP = "SkyPasser"
+local BAR_LOCAL_Z = -1 -- summit is the model's +Z, past the bar
 
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local SkyQuestLogic = require(ReplicatedStorage.Shared.SkyQuestLogic)
@@ -131,7 +138,7 @@ function SkyQuestService.Act(player: Player, action: unknown): string?
 	local view = SkyQuestLogic.View(nextState, facts(player, profile, nil))
 	local text: string
 	if reward == "GondolaPass" then
-		text = "Gus signs your charter. The Gondola Pass is yours! Ride up any time."
+		text = "Gus signs your charter. The Sky Pass is yours. The Skyroot gate is open."
 	elseif action == "turnin" and next(used) == nil and nextState.step == before then
 		text = view.text .. " " .. view.progress .. "."
 	else
@@ -174,6 +181,69 @@ local function addPrompt(platform: BasePart)
 	prompt.Triggered:Connect(onPrompt)
 end
 
+local function physicsService(): any
+	local ok, svc = pcall(function()
+		return game:GetService("PhysicsService")
+	end)
+	return if ok then svc else nil
+end
+
+local function armGate()
+	local physics = physicsService()
+	if physics == nil then
+		return
+	end
+	pcall(function()
+		physics:RegisterCollisionGroup(GATE_GROUP)
+		physics:RegisterCollisionGroup(PASS_GROUP)
+		physics:CollisionGroupSetCollidable(GATE_GROUP, PASS_GROUP, false)
+		physics:CollisionGroupSetCollidable(GATE_GROUP, "Default", true)
+	end)
+	local lodge = if station then station.Parent else nil
+	local bar = if lodge then lodge:FindFirstChild("GateBar") else nil
+	if bar and bar:IsA("BasePart") then
+		pcall(function()
+			(bar :: BasePart).CollisionGroup = GATE_GROUP
+		end)
+	end
+	local ok, run = pcall(function()
+		return game:GetService("RunService")
+	end)
+	if not ok or run == nil or run.Heartbeat == nil then
+		return
+	end
+	pcall(function()
+		run.Heartbeat:Connect(function()
+			local door = station
+			local home = if door then door.Parent else nil
+			if not home or not home:IsA("Model") then
+				return
+			end
+			local pivot = home:GetPivot()
+			for _, player in ipairs(Players:GetPlayers()) do
+				local root = rootOf(player)
+				local char = player.Character
+				if not root or not char then
+					continue
+				end
+				if (root.Position - pivot.Position).Magnitude > 160 then
+					continue
+				end
+				local profile = ProfileService.GetProfile(player)
+				local pass = profile ~= nil and hasPass(profile)
+				local onSummit = pivot:PointToObjectSpace(root.Position).Z > BAR_LOCAL_Z
+				local direction: "enter" | "leave" = if onSummit then "leave" else "enter"
+				local group = if SkyQuestLogic.MayPass(direction, pass) then PASS_GROUP else "Default"
+				for _, d in ipairs(char:GetDescendants()) do
+					if d:IsA("BasePart") and d.CollisionGroup ~= group then
+						d.CollisionGroup = group
+					end
+				end
+			end
+		end)
+	end)
+end
+
 function SkyQuestService.V1Init(ctx: Ctx?)
 	if started then
 		return
@@ -185,6 +255,7 @@ function SkyQuestService.V1Init(ctx: Ctx?)
 	station = if ctx then ctx.station else nil
 	if station then
 		addPrompt(station :: BasePart)
+		armGate()
 	end
 	local remote = if ctx and ctx.remotes then ctx.remotes.SkyQuest else nil
 	if remote and remote:IsA("RemoteEvent") then

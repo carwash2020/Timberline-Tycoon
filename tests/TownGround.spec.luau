@@ -435,7 +435,7 @@ return function(t)
 				end
 			end
 		end
-		t.ok(facing >= 3, "footpath gaps seen: " .. facing)
+		t.ok(facing >= 2, "footpath gaps seen: " .. facing)
 	end)
 
 	t.test(

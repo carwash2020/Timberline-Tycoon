@@ -113,17 +113,14 @@ return function(t)
 			t.ok(cf.LookVector.Z < -0.9, "the front faces -Z, onto MainStreet")
 			local x0, x1, z0, z1 = TownBoardLogic.Footprint(cf)
 			local street
-			local gondola
 			for _, paint in ipairs(WorldLayout.TownPaint) do
 				if paint.name == "MainStreet" then
 					street = paint
-				elseif paint.name == "GondolaPath" and paint.z0 == 82 then
-					gondola = paint
 				end
 			end
-			t.ok(street and gondola)
+			t.ok(street)
 			t.ok(z0 - street.z1 >= 7, "the street's north edge is 8 studs south of the board's middle")
-			t.ok(x0 > -62 and x1 < gondola.x0, "between the Tool Shed floor and the gondola path")
+			t.ok(x0 > -62 and x1 < -37.5, "between the Tool Shed floor and the north yard")
 			for _, floor in ipairs(WorldLayout.TownFloors) do
 				t.ok(not TownBoardLogic.Overlaps(cf, floor.x0, floor.x1, floor.z0, floor.z1), floor.name)
 			end

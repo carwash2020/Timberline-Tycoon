@@ -129,7 +129,10 @@ return {
 		for _, spot in ipairs(town.shops) do
 			place(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe, spot.kind)
 		end
-		place(BuildingArt.GondolaStation(), town.gondola, "GondolaTown")
+		local lodgeCf = WorldPlan.GateLodge()
+		if lodgeCf then
+			place(BuildingArt.GateLodge(), lodgeCf, "GateLodge")
+		end
 		place(BuildingArt.Campsite(), town.campsite)
 		for _, cf in ipairs(town.lamps) do
 			place(BuildingArt.LampPost(), cf)

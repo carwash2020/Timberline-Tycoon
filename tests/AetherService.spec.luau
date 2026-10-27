@@ -115,14 +115,12 @@ return function(t)
 		}
 	end
 
-	t.test("figured logs go down the chute with their value; the forge leaves them in hand", function()
+	t.test("sending down does nothing; the forge leaves figured logs in hand", function()
 		local s = setup({ hands = { "lumenwood", "lumenwood" }, figures = { "starfall" } })
 		s.A.SendDown(s.player)
-		t.eq(s.profile.skyBin, {
-			{ woodId = "lumenwood", value = 300, figure = "starfall" },
-			{ woodId = "lumenwood", value = 100 },
-		})
-		t.eq(s.hands(), {})
+		t.eq(s.profile.skyBin, {})
+		t.eq(s.hands(), { "lumenwood", "lumenwood" })
+		t.eq(s.toasts, {})
 		local forge = setup({ hands = { "lumenwood", "lumenwood" }, figures = { "curly" } })
 		forge.A.AddToForge(forge.player)
 		t.eq(forge.profile.forgeLogs.lumenwood, 1, "only the plain log went in")
@@ -130,17 +128,12 @@ return function(t)
 		t.ok(string.find(forge.toasts[1], "worth more sold") ~= nil, "the toast says why")
 	end)
 
-	t.test("the chute sends carried logs to the Sky Bin, up to its size", function()
+	t.test("sending down never fills the Sky Bin and never toasts", function()
 		local s = setup({ hands = { "lumenwood", "lumenwood" } })
 		s.A.SendDown(s.player)
-		t.eq(#s.profile.skyBin, 2)
-		t.eq(s.player.attrs.SkyBin, 2)
-		t.eq(s.hands(), {})
-		local bin = table.create(29, { woodId = "lumenwood", value = 100 })
-		local full = setup({ hands = { "lumenwood", "lumenwood" }, skyBin = bin })
-		full.A.SendDown(full.player)
-		t.eq(#full.profile.skyBin, 30)
-		t.eq(#full.hands(), 1, "the one that didn't fit stays in hand")
+		t.eq(#s.profile.skyBin, 0)
+		t.eq(s.hands(), { "lumenwood", "lumenwood" })
+		t.eq(s.toasts, {})
 	end)
 
 	t.test("selling empties the bin", function()

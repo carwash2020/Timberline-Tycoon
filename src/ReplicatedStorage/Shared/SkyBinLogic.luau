@@ -271,7 +271,7 @@ function SkyBinLogic.SellRefusalLine(reason: string?): string
 	return "Walk closer to your Sky Bin."
 end
 
-SkyBinLogic.EmptyLine = "Your Sky Bin is empty. Lay wood in a Cloud Chute on the Aether Isles to fill it."
+SkyBinLogic.EmptyLine = "Your Sky Bin is empty."
 SkyBinLogic.OnlyOwnerLine = "Only the plot's owner can put a Sky Bin down."
 SkyBinLogic.OnePerPlotLine = "You already have a Sky Bin on your plot. There's only room for one."
 SkyBinLogic.OnlyOwnerSellLine = "Only the plot's owner can sell the Sky Bin."

@@ -78,7 +78,7 @@ return function(t)
 		for _, g in ipairs(town.greenery) do
 			open(g.cframe.X, g.cframe.Z, "town " .. g.kind)
 		end
-		open(town.gondola.X, town.gondola.Z, "the gondola station")
+		open(-40, 150, "the north yard")
 		open(town.campsite.X, town.campsite.Z, "Murph's camp")
 		t.ok(#problems == 0, report(problems))
 	end)
@@ -365,10 +365,12 @@ return function(t)
 		local lighthouse = WorldPlan.Lighthouse()
 		table.insert(discs, { lighthouse.cframe.X, lighthouse.cframe.Z, 14, "the lighthouse" })
 		local sky = WorldPlan.Sky()
-		local top = sky.gondolaTop.Position
+		local top = sky.main.center + sky.main.dir * 44
+		local foot = sky.main.center + sky.main.dir * 62
 		local routes = {}
-		for _, from in ipairs({ WorldPlan.TownGondolaSpot, sky.gondolaBase.Position }) do
-			table.insert(routes, { Vector2.new(from.X, from.Z), Vector2.new(top.X, top.Z) })
+		local columnTop = Vector2.new(top.X, top.Z)
+		for _, from in ipairs({ Vector2.new(-40, 150), Vector2.new(foot.X, foot.Z) }) do
+			table.insert(routes, { from, columnTop })
 		end
 		local problems = {}
 		local function check(ok, what)

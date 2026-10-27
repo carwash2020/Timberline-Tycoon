@@ -3,7 +3,7 @@
 -- ground, facing -Z as the town places them, to check every piece sits where
 -- it should (signs on their frames, roofs on walls, nothing floating, sunk,
 -- backwards). 1-3 the Tool Shed (front, from the side, from above), 4-6
--- Hearth & Home, 7-9 the Dealership, 10-11 the sawmill, 12 the station.
+-- Hearth & Home, 7-9 the Dealership, 10-11 the sawmill, 12 the gate lodge.
 local process = require("@lune/process")
 local Common = require("./_common")
 
@@ -27,7 +27,7 @@ return {
 		place(BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", C3.fromRGB(47, 93, 58)), 100)
 		place(BuildingArt.Shop("Dealership", "DEALERSHIP", C3.fromRGB(30, 80, 150)), 200)
 		place(BuildingArt.Sawmill(), 300)
-		place(BuildingArt.GondolaStation(), 400)
+		place(BuildingArt.GateLodge(), 400)
 		local function cams(x, label, dist, h, tz)
 			return {
 				{ pos = { x, h, -dist }, target = { x, h * 0.6, tz }, label = label .. " front" },
@@ -51,7 +51,7 @@ return {
 		end
 		table.insert(cameras, { pos = { 300, 14, -60 }, target = { 300, 10, 0 }, label = "Sawmill front" })
 		table.insert(cameras, { pos = { 340, 12, -30 }, target = { 300, 8, 0 }, label = "Sawmill side" })
-		table.insert(cameras, { pos = { 400, 9, -24 }, target = { 400, 6, 0 }, label = "Station front" })
+		table.insert(cameras, { pos = { 368, 36, -56 }, target = { 400, 22, 0 }, label = "Gate lodge" })
 		return { root = root, shadowRadius = 120, fov = 50, cameras = cameras }
 	end,
 }

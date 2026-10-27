@@ -54,9 +54,6 @@ return function(t)
 
 	t.test("each biome is about its haul distance from the sawmill", function()
 		for _, biome in ipairs(open()) do
-			if biome.access == "gondola" then
-				continue -- the gondola leaves from town; the ride is what's modelled
-			end
 			if biome.id == "ferryisle" then
 				local d = math.sqrt((biome.area.x - SAWMILL_X) ^ 2 + (biome.area.z - SAWMILL_Z) ^ 2)
 				t.eq(biome.haulStuds, nil, "the v1 haul list stays unchanged")
@@ -105,9 +102,11 @@ return function(t)
 		t.eq(BiomeData.At(sky.x, sky.z, 3), nil, "the ground under the isles isn't the isles")
 	end)
 
-	t.test("the sky has its gondola, bin and nodes", function()
+	t.test("the sky is a road, with a bin and nodes", function()
 		local sky = BiomeData.Get("sky")
-		t.ok(sky.gondola.rideSec > 0 and sky.gondola.fee > 0)
+		t.eq(sky.access, "road")
+		t.eq(sky.requiresGear, "GondolaPass")
+		t.eq(sky.haulStuds, 700)
 		t.ok(sky.skyBinCapacity > 0)
 		t.eq(sky.skyBinVolume, 120, "the v2 bin holds (V2_PLAN §5)")
 		for materialId, count in pairs(sky.nodes) do
@@ -157,7 +156,7 @@ return function(t)
 	t.test("Gate names what a biome needs and what its sign says", function()
 		local sky = BiomeData.Gate("sky")
 		t.eq(sky.needs, "GondolaPass")
-		t.eq(sky.words, "Obsidian Axe + Gondola Pass from Gus")
+		t.eq(sky.words, "Obsidian Axe + Sky Pass from Gus")
 		t.ok(string.find(sky.words, "$", 1, true) == nil, "no price on the sign")
 		t.eq(BiomeData.Gate("volcano").needs, "HeatBoots")
 		t.eq(BiomeData.Gate("snow").needs, "InsulatedCoat")

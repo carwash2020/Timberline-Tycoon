@@ -3,10 +3,8 @@
 --   1 forge     The Sky Forge Court (uploaded meshes, preview manifest) with
 --               Old Bram at the anvil, from a player's eye: the backdrop for
 --               the ForgeUI shots (tools/preview/v1_a2_ui.py).
---   2 gate      The town gondola station (GondolaStation mesh), Gus beside
---               its platform where NPCData puts him, and the gate sign
---               GondolaService.GateSign stands (Signpost mesh) with
---               SkyQuestLogic.GateWords.
+--   2 gate      The Skyroot gate lodge, Gus beside its door where NPCData
+--               puts him. The board on the lodge reads Sky Pass.
 --   3 isle      The Starfall Forge on the isle (uploaded meshes).
 --   4 trophies  Relic trophies by a plot's sign (RelicData.Trophies).
 --   5, 6        The court again, framed for the phone and PC ForgeUI shots
@@ -27,7 +25,6 @@ return {
 		local BuildingArt = ctx.art("BuildingArt")
 		local CharacterArt = ctx.art("CharacterArt")
 		local NPCData = ctx.shared("NPCData")
-		local SkyQuestLogic = ctx.shared("SkyQuestLogic")
 		local RelicData = ctx.shared("RelicData")
 		local root = roblox.Instance.new("Model")
 
@@ -95,28 +92,16 @@ return {
 		uploaded("SkyForgeCourt", CF.new(0, 0, 0))
 		npc("Bram", CF.new(-1.5, 0, -6) * CF.Angles(0, math.rad(180), 0))
 
-		-- 2. The town gondola station, 200 studs east, its steps toward -Z.
+		-- 2. The gate lodge, 200 studs east, its front toward -Z.
 		local GX = 200
 		Kit.part(root, "GateGround", V3.new(80, 1, 70), CF.new(GX, -0.5, -10), GRASS, Enum.Material.Grass)
-		local station = BuildingArt.GondolaStation()
-		authored(station)
-		Kit.placeAt(station, CF.new(GX, 0, 0))
-		station.Parent = root
-		local platform = station:FindFirstChild("Platform")
-		-- Gus: NPCData's "beside" spot (offset 1.8, 0, -3, turned 20 degrees).
+		local lodge = BuildingArt.GateLodge()
+		Kit.placeAt(lodge, CF.new(GX, 0, 0))
+		lodge.Name = "GateLodge"
+		lodge.Parent = root
+		local door = lodge:FindFirstChild("Door")
 		local gus = NPCData.Get("Gus").spot
-		npc(
-			"Gus",
-			platform.CFrame
-				* CF.new(0, platform.Size.Y / 2, 0)
-				* CF.new(gus.offset.X, gus.offset.Y, gus.offset.Z)
-				* CF.Angles(0, math.rad(gus.turn), 0)
-		)
-		-- The sign, where GondolaService.GateSign stands it.
-		local sign = BuildingArt.Signpost("SKYROOT GONDOLA\n" .. SkyQuestLogic.GateWords)
-		authored(sign)
-		Kit.placeAt(sign, platform.CFrame * CF.new(-10.5, -0.5, -8.5))
-		sign.Parent = root
+		npc("Gus", NPCData.Beside(door.CFrame, door.Size, gus.offset, gus.turn))
 
 		-- 3. The isle forge, 400 east, on isle stone.
 		local IX = 400
