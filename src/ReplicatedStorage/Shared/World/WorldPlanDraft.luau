@@ -606,7 +606,7 @@ WorldPlanDraft.Removals = {
 	removal(
 		"gondola-cabin",
 		"Gondola cabin",
-		"GondolaService builds a cabin tagged GondolaCabin for the ride. No ride, no cabin. It has no fixed plot.",
+		"The ride script builds a cabin tagged GondolaCabin for the ride. No ride, no cabin. It has no fixed plot.",
 		false,
 		nil,
 		nil

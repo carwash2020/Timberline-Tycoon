@@ -4690,7 +4690,7 @@
       "deleteInThisPr": false,
       "id": "gondola-cabin",
       "mustKeep": false,
-      "reason": "GondolaService builds a cabin tagged GondolaCabin for the ride. No ride, no cabin. It has no fixed plot.",
+      "reason": "The ride script builds a cabin tagged GondolaCabin for the ride. No ride, no cabin. It has no fixed plot.",
       "title": "Gondola cabin"
     },
     {

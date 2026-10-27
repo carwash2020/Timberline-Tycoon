@@ -385,7 +385,13 @@ return function(t)
 		t.eq(string.find(terrain, "WorldPlanDraft", 1, true), nil)
 		t.eq(string.find(plan, "WorldPlanDraft", 1, true), nil)
 		t.eq(string.find(builder, "WorldPlanDraft", 1, true), nil)
-		t.eq(string.find(plan, "WorldPlan.TownGondolaSpot = Vector3.new(-40, 0, 150)", 1, true) ~= nil, true)
+		-- This branch still has the town gondola spot. Main's gondola removal
+		-- replaces that line with the gate lodge. Exactly one marker means
+		-- this file is still the live plan. Restoring the spot string would
+		-- put "Gondola" back into WorldPlan, which the removal scan forbids.
+		local hasSpot = string.find(plan, "WorldPlan.TownGondolaSpot = Vector3.new(-40, 0, 150)", 1, true) ~= nil
+		local hasLodge = string.find(plan, "function WorldPlan.GateLodge(): CFrame?", 1, true) ~= nil
+		t.eq(hasSpot, not hasLodge)
 		t.eq(string.find(plan, "at(-112, -20, math.pi)", 1, true) ~= nil, true)
 		t.eq(string.find(plan, "at(-136, -20, math.pi)", 1, true) ~= nil, true)
 		t.eq(string.find(plan, "local LIGHTHOUSE_Z = { -440, -180 }", 1, true) ~= nil, true)
