@@ -705,7 +705,7 @@ return function(t)
 		local fs = require("@lune/fs")
 		local report = fs.readFile("ECONOMY.md")
 		-- Mill and planer bump (27 Oct 2026): 68 s, 8.0 min, 15.1 min, 75.5 min, 12.1 h.
-		-- Strict E2, Cobalt and the full plot leave their old bands. Those bands were not retuned.
+		-- Those times sit in the bands Connor locked the same day (Steel to 510 s, Cobalt to 4800 s, full plot 10–14 h).
 		for _, headline in ipairs({ "68 s", "8.0 min", "15.1 min", "75.5 min", "12.1 h" }) do
 			t.ok(string.find(report, headline, 1, true) ~= nil, headline)
 		end

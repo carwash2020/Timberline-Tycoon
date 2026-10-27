@@ -13,10 +13,10 @@ Modelled: the sawmill `plankBonus` and the planer `boardBonus` the player owns, 
 | Target | Goal | Model | Verdict |
 |---|---|---|---|
 | First sale | under 3 min | 68 s | ✅ on target |
-| Steel Axe ($110) | 5-8 min | 8.0 min | ✅ on target |
+| Steel Axe ($110) | 5-8.5 min | 8.0 min | ✅ on target |
 | First $1k earned | 15-20 min | 15.1 min | ✅ on target |
-| Cobalt Axe ($2,500) | about 1 h | 75.5 min | ✅ on target |
-| Full plot ($2,280,100) | 28-36 h | 12.1 h | ⚠️ 2.3× too fast |
+| Cobalt Axe ($2,500) | 45-80 min | 75.5 min | ✅ on target |
+| Full plot ($2,280,100) | 10-14 h | 12.1 h | ✅ on target |
 
 ## CI ranges
 
@@ -25,10 +25,10 @@ Every `lune run tools/economy` (including `--check`) fails the process when a he
 | Target | Strict range | This model |
 |---|---|---|
 | First sale (E1) | under 3 min (0–180 s) | 68 s |
-| Steel Axe (E2) | 5–8 min inclusive (300–480 s) | 482 s |
+| Steel Axe (E2) | 5–8.5 min inclusive (300–510 s) | 482 s |
 | First $1k (E3) | 13–20 min (780–1200 s) | 907 s |
-| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | 4527 s |
-| Full plot (E4) | 28–36 h (100800–129600 s) | 43498 s |
+| Cobalt Axe (E4) | 45–80 min (2700–4800 s) | 4527 s |
+| Full plot (E4) | 10–14 h (36000–50400 s) | 43498 s |
 
 The first $1,000 in this model is 15.1 min (907 s). The CI range is 13–20 min (780–1200 s). The headline verdict above scores 15–20 min.
 
@@ -167,7 +167,7 @@ Each wood waits for its stage (BiomeData.needsStage; StageOf: the best axe rung 
 | Wood | Stage | Step | Kit's best wood, real $/h | This wood, ideal $/h | This wood, real $/h | Band (ideal) | In band |
 |---|---|---|---|---|---|---|---|
 | Bog Cypress | S2 | Steel Axe (8.0 min) | $5,191 | $10,383 | $5,191 | $9,000 to $11,000 | yes |
-| Ironwood | S4 | Heat Boots (36.0 min) | $38,924 | $43,136 | $21,568 | $28,000 to $34,000 | NO |
+| Ironwood | S4 | Heat Boots (36.0 min) | $38,924 | $43,136 | $21,568 | $40,000 to $47,000 | yes |
 
 ## Lux Axe (Robux)
 

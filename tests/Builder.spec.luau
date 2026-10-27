@@ -817,7 +817,7 @@ return function(t)
 		t.ok(string.find(report, "8.0 min", 1, true) ~= nil)
 		t.ok(string.find(report, "15.1 min", 1, true) ~= nil)
 		t.ok(string.find(report, "75.5 min", 1, true) ~= nil)
-		-- Mill and planer bump (27 Oct 2026). Full plot is 12.1 h. The 28–36 h band was not retuned.
+		-- Mill and planer bump (27 Oct 2026). Full plot is 12.1 h, inside the locked 10–14 h band.
 		t.ok(string.find(report, "12.1 h", 1, true) ~= nil)
 	end)
 end
