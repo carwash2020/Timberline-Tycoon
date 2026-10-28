@@ -15,7 +15,7 @@
 -- Only what players stand on or bump into collides (floors, walls, posts,
 -- roofs, counters, big props); everything else is Kit.decor, and small
 -- parts cast no shadow. Part budgets (tests/BuildingArt.spec.luau holds
--- them): Sawmill 400, each Shop 227, Campsite 110,
+-- them): Sawmill 430, each Shop 227, Campsite 110,
 -- a TownTree 70. The extra shop part is the hours board.
 -- GateLodge is the Skyroot checkpoint (a steep roof and one tall lamp).
 --
@@ -715,6 +715,37 @@ local function log(
 	return p
 end
 
+-- A square timber (PartType.Block). Length runs along cf's X, the same axis as
+-- log(). Bark on the long faces, a pale cut on each capped end. Wood is a
+-- Block, never a cylinder (T411, #273).
+local function blockLog(
+	parent: Instance,
+	cf: CFrame,
+	length: number,
+	side: number,
+	rng: Rng,
+	caps: number,
+	solid: boolean?
+): Part
+	local p =
+		Kit.part(parent, "Log", V3(side, length, side), cf * ANG(0, 0, PI / 2), Kit.vary(BARK, rng, 0.06), MAT.Wood)
+	if not solid then
+		dec(p)
+	end
+	for i, endSign in ipairs({ 1, -1 }) do
+		if i <= caps then
+			dBox(
+				parent,
+				"LogEnd",
+				V3(side * 0.82, 0.08, side * 0.82),
+				cf * CF(endSign * (length / 2 + 0.04), 0, 0) * ANG(0, 0, PI / 2),
+				Kit.vary(HEART, rng, 0.04)
+			)
+		end
+	end
+	return p
+end
+
 -- A stack of sawn boards on spacer sticks; `cf` = the middle of its base,
 -- boards along its X, `boards` side by side in each layer.
 local function lumberStack(
@@ -970,13 +1001,35 @@ function BuildingArt.Sawmill(scale: number?): Model
 	local X0, X1, Z0, Z1 = -11, 11, -11.5, 13
 	local FLOOR, TOP, RISE = 1, 13, 7
 	local zMid, depth = (Z0 + Z1) / 2, Z1 - Z0
-	plinth(model, CF(0, 0, zMid), 22, depth, FLOOR - 0.2, rng, { front = true, right = true, back = true }, 3.4)
+	-- The outfeed apron (6 studs west of the lane, after the 1.5 scale) is design x -14.8..-10.8,
+	-- z -2..0.8, y up to 3.6. The shed footing stays east of x -10.68 inside that band.
+	local footH = FLOOR - 0.2
+	local function shedFoot(x0: number, x1: number, z0: number, z1: number)
+		Kit.part(
+			model,
+			"Footing",
+			V3(x1 - x0, footH, z1 - z0),
+			CF((x0 + x1) / 2, footH / 2, (z0 + z1) / 2),
+			MORTAR,
+			MAT.Slate
+		)
+	end
+	shedFoot(-10.68, X1, Z0, Z1)
+	shedFoot(-11.35, -10.68, Z0, -2.15)
+	shedFoot(-11.35, -10.68, 0.95, Z1)
+	local shedBase = CF(0, 0, zMid)
+	stones(model, shedBase * CF(0, 0, -depth / 2), 22.4, footH, 0.7, rng, 2.2, 4.25)
+	stones(model, shedBase * CF(0, 0, depth / 2) * ANG(0, PI, 0), 22.4, footH, 0.7, rng, 2.2, 4.25)
+	stones(model, shedBase * CF(X1, 0, 0) * ANG(0, -PI / 2, 0), depth + 0.4, footH, 0.7, rng, 2.2, 4.25)
 	for i = 0, 3 do
+		-- The west board stops at x -10.7 so it does not enter the outfeed apron.
+		local width = if i == 0 then 5.05 else 5.44
+		local x = if i == 0 then -8.17 else X0 + 2.75 + i * 5.5
 		Kit.part(
 			model,
 			"Deck",
-			V3(5.44, 0.2, depth),
-			CF(X0 + 2.75 + i * 5.5, FLOOR - 0.1, zMid),
+			V3(width, 0.2, depth),
+			CF(x, FLOOR - 0.1, zMid),
 			Kit.vary(PLANK[1], rng, 0.05),
 			MAT.WoodPlanks
 		)
@@ -990,12 +1043,27 @@ function BuildingArt.Sawmill(scale: number?): Model
 		for _, z in ipairs({ Z0, 0.75, Z1 }) do
 			if not (x == X1 and z == 0.75) then
 				local px = if x == X0 then x - 0.6 else x
-				Kit.part(model, "Post", V3(1.4, TOP - FLOOR, 1.4), CF(px, (TOP + FLOOR) / 2, z), TIMBER, MAT.Wood)
+				local pz = z
+				local size = V3(1.4, TOP - FLOOR, 1.4)
+				if x == X0 and z == Z0 then
+					-- Thinner, so its west face stays out of the 6-wide walk in front of the cabin door
+					-- and its south face stays out of the sell pad.
+					size = V3(0.75, TOP - FLOOR, 1.2)
+				elseif x == X0 and z == 0.75 then
+					-- North of the outfeed apron (design z -2..0.8).
+					pz = 1.6
+				end
+				Kit.part(model, "Post", size, CF(px, (TOP + FLOOR) / 2, pz), TIMBER, MAT.Wood)
 			end
 		end
 	end
 	panel(model, CF(0, 0, Z1) * ANG(0, PI, 0), X0, X1, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
-	panel(model, CF(X0 - 0.25, 0, 0) * ANG(0, PI / 2, 0), -Z1, -Z0, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
+	-- West wall, local x = -world z. The outfeed apron is local x -0.8..2 below y 3.6, so that
+	-- band is open and planks have six studs of clear ground west of the lane.
+	local west = CF(X0 - 0.25, 0, 0) * ANG(0, PI / 2, 0)
+	panel(model, west, -Z1, -0.8, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
+	panel(model, west, 2, -Z0, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
+	panel(model, west, -0.8, 2, 3.6, TOP, 0.6, rng, PLANK, 1.75)
 	local east = CF(X1, 0, 0) * ANG(0, -PI / 2, 0) -- local x = world z
 	panel(model, east, Z0, -3.6, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
 	panel(model, east, 2.4, Z1, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
@@ -1049,11 +1117,29 @@ function BuildingArt.Sawmill(scale: number?): Model
 	local cw, cd = CX1 - CX0, CZ1 - CZ0
 	local ccx, ccz = (CX0 + CX1) / 2, (CZ0 + CZ1) / 2
 	local cabinRoof: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 2.1, pieceLen = 6.5 }
-	plinth(model, CF(ccx, 0, ccz), cw, cd, FLOOR, rng, { front = true, left = true, back = true }, 2.9)
-	-- (the door is an opening, 3 wide, with a lintel over it: the front lane box in tools/blender/lanes.json)
-	panel(model, CF(0, 0, CZ0), CX0, -15.55, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
-	panel(model, CF(0, 0, CZ0), -12.65, CX1, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
-	panel(model, CF(0, 0, CZ0), -15.55, -12.65, 7.05, CTOP, 0.6, rng, CABIN, 1.9)
+	-- Cabin footing keeps out of the outfeed apron (design x -14.8..-10.8, z -2..0.8).
+	local function cabinFoot(x0: number, x1: number, z0: number, z1: number)
+		Kit.part(
+			model,
+			"Footing",
+			V3(x1 - x0, FLOOR, z1 - z0),
+			CF((x0 + x1) / 2, FLOOR / 2, (z0 + z1) / 2),
+			MORTAR,
+			MAT.Slate
+		)
+	end
+	cabinFoot(CX0, -14.9, CZ0, CZ1)
+	cabinFoot(-14.9, CX1, 0.9, CZ1)
+	cabinFoot(-14.9, CX1, CZ0, -2.1)
+	local cabinBase = CF(ccx, 0, ccz)
+	stones(model, cabinBase * CF(0, 0, -cd / 2), cw + 0.4, FLOOR, 0.7, rng, 1.9, 3.6)
+	stones(model, cabinBase * CF(-cw / 2, 0, 0) * ANG(0, PI / 2, 0), cd + 0.4, FLOOR, 0.7, rng, 1.9, 3.6)
+	stones(model, cabinBase * CF(0, 0, cd / 2) * ANG(0, PI, 0), cw + 0.4, FLOOR, 0.7, rng, 1.9, 3.6)
+	-- The door opening is wide enough that the fixed lane box sits inside it and the
+	-- walk through it is at least 6 studs after the 1.5 scale (design x -16.2..-12.0).
+	panel(model, CF(0, 0, CZ0), CX0, -16.2, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
+	panel(model, CF(0, 0, CZ0), -12.0, CX1, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
+	panel(model, CF(0, 0, CZ0), -16.2, -12.0, 7.05, CTOP, 0.6, rng, CABIN, 1.9)
 	panel(model, CF(CX0, 0, 0) * ANG(0, PI / 2, 0), -CZ1, -CZ0, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
 	panel(model, CF(0, 0, CZ1) * ANG(0, PI, 0), -CX1, -CX0, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
 	for _, c in ipairs({ { CX0, CZ0 }, { CX0, CZ1 }, { CX1, CZ0 } }) do
@@ -1061,8 +1147,9 @@ function BuildingArt.Sawmill(scale: number?): Model
 	end
 	gable(model, CF(CX0, CTOP, ccz) * ANG(0, PI / 2, 0), cd, 4.6, 0.6, CABIN[3])
 	gableRoof(model, CF(ccx - 0.5, CTOP, ccz), cw + 1, cd + 0.6, 4.6, 1.2, rng, cabinRoof, -1)
-	door(model, CF(-14.1, FLOOR, CZ0 - 0.3), 2.8, 6, DOOR, TIMBER_LIGHT)
-	window(model, CF(-17.6, 5.4, CZ0 - 0.3), 2.5, 2.4, TIMBER_LIGHT, nil, rng)
+	door(model, CF(-14.1, FLOOR, CZ0 - 0.3), 3.6, 6.6, DOOR, TIMBER_LIGHT)
+	-- Left of the widened door. The frame must not meet the door's jamb (ZFight).
+	window(model, CF(-18.4, 5.4, CZ0 - 0.3), 2.5, 2.4, TIMBER_LIGHT, nil, rng)
 	window(model, CF(CX0 - 0.3, 5.4, 1) * ANG(0, PI / 2, 0), 2.6, 2.4, TIMBER_LIGHT, SHUTTER, nil)
 	wallLantern(model, CF(CX1, 6.6, CZ0 - 0.5), 0.9)
 
@@ -1106,13 +1193,13 @@ function BuildingArt.Sawmill(scale: number?): Model
 	dBeam(model, "SlipChain", slipA + V3(0, 0.25, 0), slipB + V3(0, 0.25, 0), 0.35, 0.25, IRON, MAT.Metal)
 	local slipDir = (slipB - slipA).Unit
 	local onSlip = slipA:Lerp(slipB, 0.45) + V3(0, 1.45, 0)
-	log(model, lookAt(onSlip, onSlip + slipDir) * ANG(0, PI / 2, 0), 6.5, 2.2, rng, 2, true)
+	blockLog(model, lookAt(onSlip, onSlip + slipDir) * ANG(0, PI / 2, 0), 6.5, 2.2, rng, 2, true)
 	-- The log deck: a pyramid of logs, cut ends to the front (all of it
 	-- solid, inside the bottom row's footprint).
 	for row = 0, 2 do
 		for i = 0, 2 - row do
 			local x = 16.3 + (i - (2 - row) / 2) * 2.1
-			log(model, CF(x, 1.0 + row * 1.75, -6.6) * ANG(0, PI / 2, 0), 6.4, 2.0, rng, 1, true)
+			blockLog(model, CF(x, 1.0 + row * 1.75, -6.6) * ANG(0, PI / 2, 0), 6.4, 2.0, rng, 1, true)
 		end
 	end
 
@@ -1128,7 +1215,7 @@ function BuildingArt.Sawmill(scale: number?): Model
 		end
 		dBox(model, "Knee", V3(0.7, 2.2, 0.6), CF(carX + dx * 0.76, FLOOR + 2.15, -1.75), TIMBER_LIGHT)
 	end
-	log(model, CF(carX, FLOOR + 2.35, -0.1), 6.2, 2.6, rng, 2, true)
+	blockLog(model, CF(carX, FLOOR + 2.35, -0.1), 6.2, 2.6, rng, 2, true)
 
 	local bladeCf = CF(-3.2, 6, 1.35) * ANG(0, PI / 2, 0)
 	local blade = Kit.cylinder(model, "SawBlade", 0.3, 9, bladeCf, hex("#DDE2E6"), MAT.Metal)
@@ -1171,6 +1258,11 @@ function BuildingArt.Sawmill(scale: number?): Model
 			MAT.Metal
 		)
 	)
+	-- IronBlack housing around the disc. Looks only: the SawGuard is the collider, and the housing
+	-- stays out of the door and the walk (the blade is inside the shed, not in a doorway).
+	dBox(model, "BladeHousing", V3(9.6, 0.4, 0.9), CF(-3.2, 10.65, 1.35), IRON, MAT.Metal)
+	dBox(model, "BladeHousing", V3(0.4, 8.8, 0.9), CF(-7.85, 6.15, 1.35), IRON, MAT.Metal)
+	dBox(model, "BladeHousing", V3(0.4, 8.8, 0.9), CF(1.45, 6.15, 1.35), IRON, MAT.Metal)
 	dCyl(model, "Arbor", 3.4, 0.55, CF(-3.2, 6, 3) * ANG(0, PI / 2, 0), STEEL_DARK, MAT.Metal)
 	Kit.part(model, "SawFrame", V3(1.6, 4.6, 1.4), CF(-3.2, FLOOR + 2.3, 3.4), TIMBER, MAT.Wood)
 	dBox(model, "Bearing", V3(1.9, 0.9, 1.6), CF(-3.2, 6, 3.4), IRON, MAT.Metal)
@@ -1245,8 +1337,53 @@ function BuildingArt.Sawmill(scale: number?): Model
 	dBox(model, "JobPost", V3(0.26, 4.1, 0.16), CF(-18.55, 2.15, -13.1), TIMBER)
 	local jobs = dBox(model, "JobBoard", V3(3.96, 1.98, 0.22), CF(-20.66, 2.55, -13.1), Palette.SignInk, MAT.Slate)
 	Kit.signText(jobs, "DAILY JOBS", Palette.SignCream, { Enum.NormalId.Front })
+
+	-- Shared working mill (T411). Hosts are in design studs so scale lands them on the lanes.
+	-- Intake at the east slip mouth, the belt along the carriage (looks west), Output on the west outfeed.
+	local intake = Kit.part(model, "Intake", V3(5, 3.5, 2.4), CF(19.5, 2.0, -0.6), TIMBER, MAT.Wood)
+	intake.Transparency = 1
+	intake.CanCollide = false
+	intake.CanQuery = true
+	intake.CastShadow = false
+	local belt = Kit.part(model, "Conveyor", V3(3, 0.45, 22), CF(0, 1.2, -0.6) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
+	Kit.blocker(belt, "the town mill belt: logs ride this collider along the carriage")
+	local outfeed =
+		Kit.part(model, "Outfeed", V3(1.2, 1.2, 1.2), CF(-10.8, 2.2, -0.6) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
+	outfeed.Transparency = 1
+	outfeed.CanCollide = false
+	outfeed.CanQuery = true
+	outfeed.CastShadow = false
+	local output = Instance.new("Attachment")
+	output.Name = "Output"
+	output.Position = Vector3.zero
+	output.Parent = outfeed
+
+	model:SetAttribute("MillId", "SawmillRickety")
+	model:SetAttribute("OwnerId", 0)
+	model:SetAttribute("Tunnel", "housing")
+	model:SetAttribute("ExposedBlade", true)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	-- A spec that stubs CollectionService as an empty table has no AddTag. The tag still lands
+	-- wherever the service is the real one (or the test stub that forwards to Instance:AddTag).
+	pcall(function()
+		CollectionService:AddTag(model, "Sawmill")
+	end)
+
 	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
 	fitNameSign(crest)
+	-- Same assignment as MachineArt.AimBelt. MachineArt requires BuildingArt, and
+	-- luau-lsp rejects that cycle, so the town belt is aimed here. It is not a
+	-- switch and it has no Cross, so the look vector times ConveyorSpeed is the whole aim.
+	local GameConfig = require(script.Parent.Parent.GameConfig)
+	local speed = GameConfig.ConveyorSpeed
+	for _, d in ipairs(model:GetDescendants()) do
+		if d.Name == "Conveyor" and d:IsA("BasePart") and d.CanCollide then
+			local look = d.CFrame.LookVector
+			if look.Magnitude >= 1e-4 then
+				d.AssemblyLinearVelocity = look.Unit * speed
+			end
+		end
+	end
 	-- Authored at 1.5 already: do not scale the meshes again.
 	TownMeshes.Dress(model, "Sawmill")
 	return model
@@ -2765,6 +2902,7 @@ end
 -- street at -Z.
 function BuildingArt.SellStation(w: number, d: number): Model
 	local model = Kit.model("SellStationArt")
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	local hw, hd = w / 2, d / 2
 	local pad = sellPadBase(model, w, d, { 0 })
 	-- On the big pad the name is painted in the lane's middle, as wide as
@@ -2778,7 +2916,7 @@ function BuildingArt.SellStation(w: number, d: number): Model
 
 	-- The lane the trucks use, between two painted lines.
 	for _, s in ipairs({ -1, 1 }) do
-		dBox(model, "LaneLine", V3(0.3, 0.22, d - 5), CF(s * 5.6, 0.11, 0.5), SIGN_INK, MAT.SmoothPlastic)
+		dBox(model, "LaneLine", V3(0.3, 0.22, d - 5), CF(s * 7.15, 0.11, 0.5), SIGN_INK, MAT.SmoothPlastic)
 	end
 
 	-- Marked slots: a painted box and a label plate each.
@@ -2810,14 +2948,18 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	local sx, sz = 10.2, 5.5
 	dBox(model, "ScaleRim", V3(5.9, 0.2, 5.3), CF(sx, 0.3, sz), IRON, MAT.Metal)
 	dBox(model, "ScalePlate", V3(5.6, 0.12, 5), CF(sx, 0.46, sz), STEEL_DARK, MAT.Metal)
-	Kit.part(model, "ScalePost", V3(0.5, 4.2, 0.5), CF(sx, 2.3, sz + 2.1), STEEL_DARK, MAT.Metal)
-	dCyl(model, "ScaleDial", 0.3, 6, CF(sx, 4.9, sz + 1.85) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
-	dCyl(model, "ScaleFace", 0.1, 5.2, CF(sx, 4.9, sz + 1.68) * ANG(0, PI / 2, 0), PAPER)
-	dBox(model, "ScaleNeedle", V3(0.12, 0.85, 0.08), CF(sx + 0.25, 5.0, sz + 1.6) * ANG(0, 0, -0.55), SOOT)
+	-- Tall enough that the dial still reads from the spawn approach (top past 18, face about 6 across).
+	Kit.part(model, "ScalePost", V3(1.8, 15.2, 1.8), CF(sx, 7.8, sz + 2.1), TIMBER, MAT.Wood)
+	dCyl(model, "ScaleDial", 0.35, 6, CF(sx, 16.4, sz + 1.85) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
+	dCyl(model, "ScaleFace", 0.12, 5.2, CF(sx, 16.4, sz + 1.62) * ANG(0, PI / 2, 0), Palette.SignCream)
+	dBox(model, "ScaleNeedle", V3(0.12, 1.6, 0.08), CF(sx + 0.35, 16.7, sz + 1.45) * ANG(0, 0, -0.7), SOOT)
+	local weigh =
+		dBox(model, "WeighBoard", V3(4.4, 1.15, 0.12), CF(sx, 16.4, sz + 1.2), Palette.SignCream, MAT.SmoothPlastic)
+	Kit.signText(weigh, "WEIGH", Palette.SignInk, { Enum.NormalId.Front })
 
 	-- The log rack across the back: three tiers of logs between stakes,
 	-- stakes lit by lanterns. The logs and stakes collide (it is a wall).
-	local rz, rl = hd - 1.8, 14
+	local rz, rl = hd - 1.35, 14
 	local rack = Kit.rng(2027)
 	for _, x in ipairs({ -1, 1 }) do
 		for _, z in ipairs({ -1, 1 }) do
@@ -2833,9 +2975,9 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	for _, tier in ipairs(tiers) do
 		for _, dz in ipairs(tier.zs) do
 			local tone = Kit.vary(BARK, rack, 0.06)
-			Kit.cylinder(model, "RackLog", rl, 1.5, CF(0, tier.y, rz + dz), tone, MAT.Wood)
+			Kit.part(model, "RackLog", V3(rl, 1.5, 1.5), CF(0, tier.y, rz + dz), tone, MAT.Wood)
 			for _, x in ipairs({ -1, 1 }) do
-				dCyl(model, "RackEnd", 0.1, 1.3, CF(x * (rl / 2 + 0.03), tier.y, rz + dz), HEART)
+				dBox(model, "RackEnd", V3(0.1, 1.2, 1.2), CF(x * (rl / 2 + 0.05), tier.y, rz + dz), HEART)
 			end
 		end
 	end
@@ -2849,6 +2991,10 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	end
 	rail(w + 3, CF(0, 0, hd + 1.7))
 	rail(8, CF(-(hw + 1.7), 0, hd - 2.3) * ANG(0, PI / 2, 0))
+	-- Edge rails only: the 14-stud truck bay between them stays empty.
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(model, "BayRail", V3(0.28, 2.4, d - 10), CF(s * 7.7, 1.3, -1), IRON, MAT.Metal)
+	end
 
 	-- The Weigh House on the east side, its window toward the pad (turned so
 	-- its front faces -X): a counter under a lean-to roof, a name board and
@@ -2860,9 +3006,16 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	end
 	local H0, H1 = 0.5, 6.4
 	Kit.part(house, "HouseFloor", V3(7.6, 0.5, 7.6), at(0, 0.25, 0), STONE[2], MAT.Slate)
-	Kit.part(house, "HouseWall", V3(7, H1 - H0, 0.4), at(0, (H0 + H1) / 2, 3.3), PLANK[1], MAT.WoodPlanks)
-	for i, s in ipairs({ -1, 1 }) do
-		Kit.part(house, "HouseWall", V3(0.4, H1 - H0, 6.2), at(s * 3.3, (H0 + H1) / 2, 0), PLANK[i + 1], MAT.WoodPlanks)
+	Kit.part(house, "HouseWall", V3(7, H1 - H0, 0.4), at(0, (H0 + H1) / 2, 3.3), Palette.BarnRed, MAT.WoodPlanks)
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(
+			house,
+			"HouseWall",
+			V3(0.4, H1 - H0, 6.2),
+			at(s * 3.3, (H0 + H1) / 2, 0),
+			Palette.BarnRed,
+			MAT.WoodPlanks
+		)
 	end
 	Kit.part(house, "HouseCounter", V3(4.4, 2.9, 0.5), at(-1.1, 1.95, -3.3), PLANK[3], MAT.WoodPlanks)
 	dBox(house, "HouseLedge", V3(4.8, 0.25, 1.1), at(-1.1, 3.5, -3.85), TIMBER_LIGHT)
@@ -2870,7 +3023,7 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(house, "HousePost", V3(0.6, 5.9, 0.6), at(s * 3.3, 3.45, -3.3), TIMBER, MAT.Wood)
 	end
-	Kit.wedge(house, "HouseRoof", V3(8.6, 1.5, 8.8), at(0, H1 + 0.75, 0.2), Palette.BarnRed, MAT.Metal)
+	Kit.wedge(house, "HouseRoof", V3(8.6, 1.5, 8.8), at(0, H1 + 0.75, 0.2), Palette.RoofSlate, MAT.Slate)
 	dBox(house, "RoofTrim", V3(8.8, 0.3, 0.4), at(0, H1 + 0.15, -4.25), TIMBER)
 	signBoard(house, "HouseSign", at(0, 5.45, -3.8), 5.6, 0.8, "WEIGH HOUSE", PLANK[2], TIMBER, SIGN_INK, false)
 	for _, s in ipairs({ -1, 1 }) do
@@ -2880,6 +3033,19 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	dBox(house, "Stool", V3(1.1, 1.4, 1.1), at(1.9, 1.2, 1.4), TIMBER_LIGHT)
 
 	return model
+end
+
+-- The scale tower makes SellArea's bounding-box pivot taller than the one
+-- MustKeep recorded (local y = 6, tests/mustkeep.json). Pin that height on
+-- the area model after the station is parented. Parts do not move.
+-- __pivot is what the Lune harness reads as GetPivot; WorldPivot is what Studio reads.
+function BuildingArt.PinPivotHeight(model: Model, y: number)
+	local pivot = model:GetPivot()
+	local pinned = CFrame.new(pivot.X, y, pivot.Z) * (pivot - pivot.Position)
+	model:SetAttribute("__pivot", pinned)
+	pcall(function()
+		model.WorldPivot = pinned
+	end)
 end
 
 ---------------------------------------------------------------------------

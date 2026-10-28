@@ -48,6 +48,7 @@ function TownBuild.Build(): Folder
 	zone.CanQuery = false
 	zone.CanTouch = false
 	place(BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad, sellArea)
+	BuildingArt.PinPivotHeight(sellArea, 6)
 	sellArea.Parent = map
 
 	for _, spot in ipairs(town.shops) do

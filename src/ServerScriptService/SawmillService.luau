@@ -614,9 +614,13 @@ function SawmillService.Set(player: Player, uid: unknown, axis: unknown, dir: un
 		return
 	end
 	-- Lane F: the owner always; a friend needs Interact on the owner's plot.
+	-- OwnerId 0 is the town mill (T411): any nearby player may set the cut, and it is not saved per profile.
 	local mayId = model:GetAttribute("OwnerId")
-	local mayOwner = if type(mayId) == "number" then game:GetService("Players"):GetPlayerByUserId(mayId) else nil
-	if not EditRights.Can(player, mayOwner, "interact") then
+	local shared = mayId == 0
+	local mayOwner = if not shared and type(mayId) == "number"
+		then game:GetService("Players"):GetPlayerByUserId(mayId)
+		else nil
+	if not shared and not EditRights.Can(player, mayOwner, "interact") then
 		return
 	end
 	local millId = model:GetAttribute("MillId")
@@ -628,6 +632,9 @@ function SawmillService.Set(player: Player, uid: unknown, axis: unknown, dir: un
 	model:SetAttribute("CutX", settings.x)
 	model:SetAttribute("CutY", settings.y)
 	MachineArt.SetCut(model, settings.x, settings.y, SawmillLogic.RangeText(mill))
+	if shared then
+		return
+	end
 	local profile = ProfileService.GetProfile(mayOwner :: Player)
 	if profile then
 		for _, item in ipairs(profile.plot.placed) do

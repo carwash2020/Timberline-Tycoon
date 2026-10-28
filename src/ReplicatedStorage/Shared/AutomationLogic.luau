@@ -493,7 +493,9 @@ function AutomationLogic.Refusal(f: Facts): Refusal?
 	if not f.automated then
 		return nil
 	end
-	if not f.ownerOnline then
+	-- OwnerId 0 is the town mill: anyone's wood, whether or not a player is "the owner".
+	local shared = f.machineOwnerId == 0
+	if not shared and not f.ownerOnline then
 		return "offline"
 	end
 	if f.looseOutputs >= AutomationLogic.MaxLooseOutputs then
@@ -502,7 +504,7 @@ function AutomationLogic.Refusal(f: Facts): Refusal?
 	if AutomationLogic.ManualWoods[f.woodId] == true or f.figure ~= nil or f.elder == true or f.lux == true then
 		return "rare"
 	end
-	if f.pieceOwnerId ~= f.machineOwnerId then
+	if not shared and f.pieceOwnerId ~= f.machineOwnerId then
 		return "notYours"
 	end
 	return nil

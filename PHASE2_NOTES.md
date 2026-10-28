@@ -1,5 +1,21 @@
 # Phase 2+ build notes
 
+## T411 town sawmill and Weigh House (27 October 2026, branch `cursor/t411-sawmill-weigh-1d06`)
+
+Nothing here has been seen in Studio. Cloud tests do not run physics, so a live drag and a truck reversing into the bay are Studio checks. Before shots are the previous part yard, frozen before this change. After shots are the remade part yard (`TownMeshes` off in the preview, because the uploaded mill mesh is still the old one). Both are in `preview/t411/`.
+
+Studio checks:
+1. Drag one Block log onto the town slip. It rides the belt and planks come out the west outfeed. A log longer than the mill allows is refused, with a message, and is not cut.
+2. Back the starter truck into the bay. The bay stays empty of posts and racks. Selling that log pays once. Touching the pad again does not pay again. Planks pay more than the log they came from.
+3. Walk the cabin door and the front path. The door is at least 4 wide and 7 tall. Nothing solid stands in the slip, the carriage, the outfeed or that walk.
+4. From the spawn approach, about 100 studs out, the scale tower and the WEIGH dial read. The mill and the Weigh House are still one cluster on the river side. The Dealership and the Tool Shed have not moved.
+5. Upload the new GLBs (steps below) before judging the mesh. Until then the mill you see is the previous upload. With TownMeshes off, the part yard is the remake: honey planks, slate roof, square logs, barn-red Weigh House, and a visible blade inside iron housing, clear of the door and the walk. Plot mills are unchanged and the rickety one is still a closed tunnel.
+
+Mesh upload (Rojo cannot sync MeshId):
+1. Bulk Import `assets/meshes/buildings/Sawmill/Sawmill.glb`. Replace each existing `TownModels` Sawmill piece id (Body, Collision, Roof, Door, Glow, SawBlade, Sign, Smokestack) with the new piece's id. Then set that piece's `size` to the new node's bounds, or the mesh stretches to the old size. Do not zero the ids.
+2. Bulk Import `assets/meshes/buildings/WeighHouse/WeighHouse.glb`. It has no `TownModels` row yet (meshId 0). The live Weigh House stays the part build until a row is wired. Leave it unwired unless you want it dressed.
+3. New Play afterwards. Output should not warn `[TownMeshes] Sawmill`. The part posts are gone and the Intake, belt and outfeed are still there.
+
 ## Economy machine bump (27 October 2026, branch `cursor/economy-machine-bump-a1a4`)
 
 Nothing here has been seen in Studio. Cloud tests cover the catalog, the stamp, the sell stack and the oak cut. They do not run a live mill.

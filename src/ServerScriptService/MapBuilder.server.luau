@@ -520,6 +520,7 @@ step("4. The town", function()
 
 		local padArt = BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth)
 		place(padArt, town.sellPad, sellArea)
+		BuildingArt.PinPivotHeight(sellArea, 6)
 	end)
 
 	-- Shops: Persistent, with a Counter whose ShopPoint is where the client's

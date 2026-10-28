@@ -97,8 +97,8 @@ return function(t)
 		local stack = find(mill, "Smokestack")
 		t.ok(stack and stack:FindFirstChildOfClass("Smoke"), "Smokestack has a Smoke")
 		t.ok(stack.CFrame.Position.Y > 20, "the smoke leaves the top of the stack")
-		-- 408, was 404: T409 opened the office door in the wall (3 panels and a lintel instead of one: +5 boards) and took the east middle post out of the log opening (-1)
-		t.ok(#parts(mill) <= 408, "sawmill parts: " .. #parts(mill))
+		-- 430, was 408: T411 adds the shared-mill hosts, the blade housing, and the notched west wall (the outfeed apron).
+		t.ok(#parts(mill) <= 430, "sawmill parts: " .. #parts(mill))
 		t.ok(texts(mill)["TIMBERLINE SAWMILL"], "the sign")
 		-- The blade stays non-colliding (it spins). SawGuard covers its
 		-- centre, and the rails close the way in from the deck and the east
@@ -1053,7 +1053,14 @@ return function(t)
 					return p.Position
 				end)
 				t.ok(not setPosition, model.Name .. " " .. p.Name .. " was placed with .Position")
-				if not p.CanCollide and p.Name ~= "SellPad" and p.Name ~= "DoorSensor" then
+				-- Intake and Outfeed are invisible hosts the mill queries (T411), not decoration.
+				if
+					not p.CanCollide
+					and p.Name ~= "SellPad"
+					and p.Name ~= "DoorSensor"
+					and p.Name ~= "Intake"
+					and p.Name ~= "Outfeed"
+				then
 					t.ok(not p.CanQuery and not p.CanTouch, model.Name .. " " .. p.Name .. " decoration can be clicked")
 				end
 			end
