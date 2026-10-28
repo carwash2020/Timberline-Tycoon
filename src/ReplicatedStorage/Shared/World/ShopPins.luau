@@ -236,7 +236,8 @@ function ShopPins.Floors(): { { name: string, x0: number, x1: number, z0: number
 		box("HeatBootsFloor", heatAt.x, heatAt.z, 6, 6),
 		box("OddsAndEndsFloor", -460, -292, 12, 10),
 		box("SecretShopFloor", -543, -479, 10, 8),
-		box("LandOfficeFloor", 153.5, 109, 14, 11),
+		-- East edge stays 1.5 off the dealership loading pad (x 160).
+		box("LandOfficeFloor", 151, 109, 6, 8),
 	}
 end
 

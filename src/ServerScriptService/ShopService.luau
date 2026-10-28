@@ -797,6 +797,14 @@ local function deliver(player: Player, profile: any, box: BoxGrant, axe: ItemCat
 		MilestoneService.Mark(player, "First upgrade bought")
 		QuestService.Event(player, "axeBought")
 		QuestService.RefreshNextGoal(player)
+	elseif box.kind == "Charge" then
+		if box.itemId ~= "BlastingCharge" then
+			return nil
+		end
+		local MiningService = require(script.Parent.MiningService)
+		if MiningService.AddBombs(player, 1) then
+			notify(player, "Bought a blasting charge.")
+		end
 	elseif box.kind == "Gear" then
 		local gear = ItemCatalog.GetGear(box.itemId)
 		if gear then
@@ -1092,6 +1100,15 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		end
 		if not hasLand(profile) then
 			return fail("needsPlot")
+		end
+	elseif box.kind == "Charge" then
+		if box.itemId ~= "BlastingCharge" then
+			return fail("locked")
+		end
+		local MiningService = require(script.Parent.MiningService)
+		if not MiningService.CanTakeBombs(player, 1) then
+			notify(player, "You can't carry another blasting charge.")
+			return fail("locked")
 		end
 	elseif box.kind ~= "Cosmetic" then
 		return fail("locked")

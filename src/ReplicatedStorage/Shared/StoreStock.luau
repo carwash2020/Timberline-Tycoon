@@ -606,6 +606,57 @@ local SHOPS: { [string]: Shop } = {
 		},
 		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(24, 1, 24) }, -- design size: 36 x 36 once scaled
 	},
+	-- Counter tops (y 3.6). Wide enough for a max shelf box (3.1) plus the
+	-- edge gap, and deep enough for its depth. One lane, so AisleGap stays 0
+	-- and the booth's own walk is the clearance.
+	CoatKiosk = {
+		lanes = {
+			{
+				name = "Hook",
+				x0 = -2.2,
+				x1 = 2.2,
+				z0 = -4.0,
+				z1 = 1.2,
+				y = 3.6,
+				step = StoreStock.RowStep,
+				maxRise = 0.4,
+				kinds = { "Gear" },
+			},
+		},
+		zone = { center = Vector3.new(0, 3.6, -1.4), size = Vector3.new(8, 8, 8) },
+	},
+	HeatBoots = {
+		lanes = {
+			{
+				name = "Hook",
+				x0 = -2.2,
+				x1 = 2.2,
+				z0 = -4.0,
+				z1 = 1.2,
+				y = 3.6,
+				step = StoreStock.RowStep,
+				maxRise = 0.4,
+				kinds = { "Gear" },
+			},
+		},
+		zone = { center = Vector3.new(0, 3.6, -1.4), size = Vector3.new(8, 8, 8) },
+	},
+	OddsAndEnds = {
+		lanes = {
+			{
+				name = "Counter",
+				x0 = -4.2,
+				x1 = 4.2,
+				z0 = -8.2,
+				z1 = -3.0,
+				y = 3.6,
+				step = StoreStock.RowStep,
+				maxRise = 0.4,
+				kinds = { "Gear", "Charge" },
+			},
+		},
+		zone = { center = Vector3.new(0, 3.6, -5.6), size = Vector3.new(12, 8, 10) },
+	},
 }
 
 -- The boxes a slot puts on a shelf: one, or LimitedStockCount in a row.

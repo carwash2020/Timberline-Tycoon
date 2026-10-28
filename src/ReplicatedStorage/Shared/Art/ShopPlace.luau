@@ -433,6 +433,9 @@ local function ensureCommon(model: Model, kind: string, title: string)
 	if kind == "SecretShop" then
 		model:SetAttribute("Sold", false)
 	end
+	if kind == "CoatKiosk" or kind == "HeatBoots" or kind == "OddsAndEnds" then
+		BuildingArt.PlaceShelfSlots(model, kind)
+	end
 end
 
 function ShopPlace.Build(kind: string, title: string, accent: Color3): Model

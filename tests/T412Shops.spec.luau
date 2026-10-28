@@ -302,6 +302,18 @@ return function(t)
 		t.eq(has("HearthAndHome", "Lantern"), false)
 		t.eq(has("HearthAndHome", "Flashlight"), true)
 		t.eq(StoreStock.UnitPrice("Charge", "BlastingCharge", false, 1), GameConfig.DynamitePrice)
+		for _, id in ipairs({ "CoatKiosk", "HeatBoots", "OddsAndEnds" }) do
+			t.eq(#StoreStock.Overflow(id), 0, id .. " lanes hold the stock")
+			t.eq(#StoreStock.Placements(id), #StoreStock.ForShop(id), id .. " placements")
+			local model = ShopPlace.Build(id, id, roblox.Color3.new(1, 1, 1))
+			local slots = 0
+			for _, d in ipairs(model:GetDescendants()) do
+				if d.Name == "ShelfSlot" then
+					slots += 1
+				end
+			end
+			t.eq(slots, #StoreStock.ForShop(id), id .. " shelf slots")
+		end
 		local secret = ShopPlace.Build("SecretShop", "SECRET SHOP", roblox.Color3.new(1, 1, 1))
 		t.eq(secret:GetAttribute("Sold"), false)
 		for _, d in ipairs(secret:GetDescendants()) do
@@ -408,5 +420,31 @@ return function(t)
 		local millDoor = map.Sawmill:FindFirstChild("Door", true)
 		near(at(millDoor).X, -21.15, 0.5, "mill door")
 		near(at(millDoor).Z, 105.4, 0.5, "mill door z")
+	end)
+
+	t.test("10. outlet pads are town floors, and the old Sparkworks pad stays", function()
+		local old = 0
+		for _, floor in ipairs(ShopPins.Floors()) do
+			local found = false
+			for _, have in ipairs(WorldLayout.TownFloors) do
+				if have.name == floor.name and have.x0 == floor.x0 and have.z0 == floor.z0 and have.x1 == floor.x1 then
+					found = true
+				end
+			end
+			t.ok(found, floor.name .. " is a town floor")
+		end
+		for _, floor in ipairs(WorldLayout.TownFloors) do
+			if floor.name == "SparkworksFloor" and floor.x0 == 115 and floor.z0 == 112 then
+				old += 1
+			end
+		end
+		t.eq(old, 1, "the old town Sparkworks pad stays for HeightAt")
+		local pads = 0
+		for _, zone in ipairs(WorldLayout.StorePads) do
+			if zone.x0 > 1000 or zone.x0 < -400 then
+				pads += 1
+			end
+		end
+		t.eq(pads, 0, "the new pads are not store pads, so HeightAt does not move")
 	end)
 end

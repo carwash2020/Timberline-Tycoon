@@ -727,6 +727,12 @@ local function storePadZones(): { FlatZone }
 	return zones
 end
 WorldLayout.StorePads = storePadZones()
+-- T412 shop pads. Added after StorePads so they do not flatten HeightAt
+-- (that would move the tree plan). The old town SparkworksFloor stays.
+local ShopPins = require(script.Parent.ShopPins)
+for _, floor in ipairs(ShopPins.Floors()) do
+	table.insert(WorldLayout.TownFloors, floor)
+end
 
 -- The river runs from the pool under the Aether Isles' waterfall, south
 -- past the Hills' west side, into Mirror Lake, then out to the west edge.

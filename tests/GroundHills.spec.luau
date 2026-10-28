@@ -250,8 +250,17 @@ return function(t)
 		for _, zone in ipairs(WorldLayout.StorePads) do
 			table.insert(rects, zone)
 		end
+		-- T412 outlet pads are TownFloors for paint and tree keep-out. They
+		-- are not StorePads, so HeightAt is not flattened there.
+		local outlet = {}
+		local ShopPins = t.load("ReplicatedStorage/Shared/World/ShopPins")
+		for _, floor in ipairs(ShopPins.Floors()) do
+			outlet[floor.name .. ":" .. floor.x0 .. ":" .. floor.z0] = true
+		end
 		for _, floor in ipairs(WorldLayout.TownFloors) do
-			table.insert(rects, floor)
+			if not outlet[floor.name .. ":" .. floor.x0 .. ":" .. floor.z0] then
+				table.insert(rects, floor)
+			end
 		end
 		-- The sell pad and its zone (the station's floor holds them) and the lot.
 		table.insert(rects, { x0 = 39, x1 = 67, z0 = 95, z1 = 127 })

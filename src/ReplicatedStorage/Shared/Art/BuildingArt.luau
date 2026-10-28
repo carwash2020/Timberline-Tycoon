@@ -2082,6 +2082,10 @@ local function placeShelfSlots(model: Model, kind: string, scale: number)
 	end
 end
 
+function BuildingArt.PlaceShelfSlots(model: Model, kind: string)
+	placeShelfSlots(model, kind, 1)
+end
+
 -- Colour and transparency only. The leaf's first colour is remembered so an
 -- open door can come back. No parts are added or moved.
 function BuildingArt.PaintDoor(model: Instance, locked: boolean)

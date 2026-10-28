@@ -24,8 +24,14 @@ local fellBack: { [string]: boolean } = {}
 -- Parts that already stood when a dress started. The world build does not wait for
 -- meshes (MapBuilder), so a shop's door, lanterns and facade are added while the
 -- first dress is still waiting. A later swap must not treat those as the shell.
+-- shellParts is weak so a destroyed part does not stay in the table. shellHold
+-- keeps those same parts alive until retire finishes: a collect during Destroy
+-- would drop a weak key before the loop reached it, and the part (a Sky Shard
+-- in the isle forge, which nothing else references) would stay visible inside
+-- the Body mesh.
 local shellParts: { [BasePart]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 local shellMarked: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local shellHold: { [Model]: { BasePart } } = setmetatable({}, { __mode = "k" }) :: any
 
 function TownMeshes.FellBack(assetId: string): boolean
 	return fellBack[assetId] == true
@@ -35,6 +41,7 @@ function TownMeshes.ResetFallbacks()
 	table.clear(fellBack)
 	table.clear(shellParts)
 	table.clear(shellMarked)
+	table.clear(shellHold)
 end
 
 local function noteFallback(target: Instance, assetId: string)
@@ -485,9 +492,12 @@ local function markShell(model: Model)
 		return
 	end
 	shellMarked[model] = true
+	local held: { BasePart } = {}
+	shellHold[model] = held
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and not nestedMesh(d, model) then
 			shellParts[d] = true
+			table.insert(held, d)
 		end
 	end
 end
@@ -503,10 +513,17 @@ local function meshReplaces(name: string): boolean
 end
 
 local function retire(model: Model, fresh: { [BasePart]: boolean })
+	local shell: { [BasePart]: boolean } = {}
+	local held = shellHold[model]
+	if held then
+		for _, part in ipairs(held) do
+			shell[part] = true
+		end
+	end
 	local snapshot = model:GetDescendants()
 	for _, d in ipairs(snapshot) do
 		if d:IsA("BasePart") and not fresh[d] and not nestedMesh(d, model) then
-			if shellParts[d] ~= true then
+			if shell[d] ~= true then
 				-- Added while the mesh was loading: keep the door and the lanterns.
 				-- The part-built porch and door frame still go. They are the second
 				-- roof, and a post that collides would be left invisible.
@@ -520,6 +537,7 @@ local function retire(model: Model, fresh: { [BasePart]: boolean })
 			end
 		end
 	end
+	shellHold[model] = nil
 end
 
 -- Meshes already dressing a child model (a rock at the lighthouse's foot)
