@@ -15,6 +15,7 @@ return function(t)
 	local serde = require("@lune/serde")
 
 	local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
+	local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
 	local MachineArt = t.load("ReplicatedStorage/Shared/Art/MachineArt")
 	local LaneData = t.load("ReplicatedStorage/Shared/Lint/LaneData")
 	local Lanes = t.load("ReplicatedStorage/Shared/Lint/Lanes")
@@ -403,22 +404,22 @@ return function(t)
 		local bLo, bHi = bounds(blade)
 		t.eq(overlaps(bLo, bHi, door.min, door.max, 0), false, "the blade is not in the doorway")
 		t.eq(overlaps(bLo, bHi, walkMin, walkMax, 0), false, "the blade is not in the walk")
-		t.eq(mill:GetAttribute("ExposedBlade"), false, "Rickety keeps the saw inside a closed tunnel")
-		t.eq(mill:GetAttribute("Tunnel"), "closed")
-		t.eq(blade.Transparency, 1, "the town saw is not drawn")
+		t.eq(mill:GetAttribute("ExposedBlade"), true, "the town blade shows inside its iron housing")
+		t.eq(mill:GetAttribute("Tunnel"), "housing")
+		t.eq(blade.Transparency, 0, "the town saw is drawn")
 		t.eq(blade.CanCollide, false)
 		local housed = false
 		for _, p in ipairs(parts(mill)) do
 			if p.Name == "SawTooth" or p.Name == "BladeHub" or p.Name == "BladeRivet" then
-				t.eq(p.Transparency, 1, p.Name .. " is not an exposed saw")
+				t.eq(p.Transparency, 0, p.Name .. " stays visible with the disc")
 			elseif p.Name == "BladeHousing" then
 				housed = true
-				t.eq(p.CanCollide, false, "the tunnel is not a second saw")
-				t.eq(p.Material, Enum.Material.Wood, "the tunnel is timber")
-				t.eq(p.Transparency, 0, "the timber tunnel is what you see")
+				t.eq(p.CanCollide, false, "the housing is not a second saw")
+				t.eq(p.Material, Enum.Material.Metal, "the housing is iron")
+				t.eq(p.Color, Palette.IronBlack, "IronBlack housing")
 			end
 		end
-		t.eq(housed, true, "a closed timber tunnel covers the saw")
+		t.eq(housed, true, "IronBlack housing around the town blade")
 	end)
 
 	-- 2, 4, 5, 13, 16, 18. Lanes, apron, twin, invisible dress.

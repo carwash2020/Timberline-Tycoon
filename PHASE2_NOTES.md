@@ -9,7 +9,7 @@ Studio checks:
 2. Back the starter truck into the bay. The bay stays empty of posts and racks. Selling that log pays once. Touching the pad again does not pay again. Planks pay more than the log they came from.
 3. Walk the cabin door and the front path. The door is at least 4 wide and 7 tall. Nothing solid stands in the slip, the carriage, the outfeed or that walk.
 4. From the spawn approach, about 100 studs out, the scale tower and the WEIGH dial read. The mill and the Weigh House are still one cluster on the river side. The Dealership and the Tool Shed have not moved.
-5. Upload the new GLBs (steps below) before judging the mesh. Until then the mill you see is the previous upload. With TownMeshes off, the part yard is the remake: honey planks, slate roof, square logs, barn-red Weigh House, and a closed timber tunnel where the rickety saw sits. The disc is not drawn. Plot mills are unchanged and the rickety one is still a closed tunnel.
+5. Upload the new GLBs (steps below) before judging the mesh. Until then the mill you see is the previous upload. With TownMeshes off, the part yard is the remake: honey planks, slate roof, square logs, barn-red Weigh House, and a visible blade inside iron housing, clear of the door and the walk. Plot mills are unchanged and the rickety one is still a closed tunnel.
 
 Mesh upload (Rojo cannot sync MeshId):
 1. Bulk Import `assets/meshes/buildings/Sawmill/Sawmill.glb`. Replace each existing `TownModels` Sawmill piece id (Body, Collision, Roof, Door, Glow, SawBlade, Sign, Smokestack) with the new piece's id. Then set that piece's `size` to the new node's bounds, or the mesh stretches to the old size. Do not zero the ids.

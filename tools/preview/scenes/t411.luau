@@ -34,9 +34,30 @@ return {
 
 		local mill = BuildingArt.Sawmill()
 		mill.Parent = root
+		-- The cabin leaf is built in the opening. Swing it out on the west jamb
+		-- so the shot shows the clear 4 by 7, with the leaf beside it.
+		local leaf = nil
+		for _, d in ipairs(mill:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == "Door" then
+				leaf = d
+				break
+			end
+		end
+		if leaf then
+			local hinge = (leaf.CFrame * CF.new(-leaf.Size.X / 2, 0, 0)).Position
+			local spin = CF.new(hinge) * CF.Angles(0, math.rad(75), 0) * CF.new(-hinge)
+			for _, d in ipairs(mill:GetDescendants()) do
+				if d:IsA("BasePart") and (d.Name == "Door" or d.Name == "DoorBrace" or d.Name == "DoorKnob") then
+					d.CFrame = spin * d.CFrame
+				end
+			end
+		end
 		-- The town places the pad east of the mill (WorldPlan sell offset).
 		local sell = BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth)
-		sell:PivotTo(CF.new(53, 0, 1))
+		-- Keep the floor on y = 0. PivotTo(y = 0) would drop the bounding-box
+		-- centre onto the ground and bury the barn under the dial.
+		local sellPivot = sell:GetPivot()
+		sell:PivotTo(CF.new(53, sellPivot.Y, 1))
 		sell.Parent = root
 
 		local overlay = roblox.Instance.new("Model")
@@ -80,30 +101,32 @@ return {
 					fov = 42,
 				},
 				{
-					pos = { -22, 5, -28 },
-					target = { -21, 6, -12 },
+					-- Far enough that the open leaf and the full opening both read.
+					pos = { -24, 6, -38 },
+					target = { -21, 6, -11 },
 					label = "cabin front door open",
+					fov = 38,
+				},
+				{
+					-- Eye height in the west apron, looking east through the outfeed hole (y 1.5 to 5.5, z -3 to 1.2).
+					pos = { -21, 3.2, -0.8 },
+					target = { -12, 3.2, -0.8 },
+					label = "west outfeed clear",
+					fov = 52,
+				},
+				{
+					-- Floor stays at y = 0. Dial near (56, 16, 8), barn body near (72, 4, 10).
+					pos = { 36, 13, -14 },
+					target = { 64, 11, 9 },
+					label = "empty truck bay, edge rails only",
 					fov = 40,
 				},
 				{
-					-- From the cabin door, looking at the shed's west opening. The cabin's
-					-- outer west wall is solid; the clear outfeed is that opening.
-					pos = { -21, 5, -20 },
-					target = { -16, 3, -1 },
-					label = "west outfeed clear",
-					fov = 42,
-				},
-				{
-					pos = { 53, 7, -28 },
-					target = { 53, 3, 2 },
-					label = "empty truck bay, edge rails only",
-					fov = 48,
-				},
-				{
-					pos = { 53, 8, -99 },
-					target = { 64, 16, 6 },
+					-- About 100 studs out, barn body and WEIGH dial in one frame.
+					pos = { 18, 14, -78 },
+					target = { 66, 8, 9 },
 					label = "scale tower from the spawn approach, 100 studs",
-					fov = 32,
+					fov = 22,
 				},
 				{
 					pos = { 10, 18, -48 },

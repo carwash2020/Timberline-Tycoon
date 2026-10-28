@@ -17,6 +17,7 @@ a pending box that nothing enters fails meshlint, so they leave with the mesh.
 from __future__ import annotations
 
 import json
+import math
 import struct
 from pathlib import Path
 
@@ -273,14 +274,17 @@ def sawmill() -> dict[str, Mesh]:
     for lamp in ((-26.2, 8.2, -11.4), (14.5, 12.5, -18.6), (-14.5, 12.5, -18.6), (24, 8.5, -14)):
         glow.box(lamp[0] - 0.35, lamp[1] - 0.35, lamp[2] - 0.35, lamp[0] + 0.35, lamp[1] + 0.35, lamp[2] + 0.35, BRASS)
 
-    # Closed timber tunnel. The saw node is a timber plug, not a toothed disc, and it sits
-    # east of the carriage (the lane ends at z 1.2). Cheeks on Body cover both faces.
-    blade.box(-8.18, 4.287, 2.1, 1.18, 13.783, 2.4, TIMBER)
-    solid(body, (-8.6, 13.4, 1.7, 1.6, 14.1, 2.8), TIMBER)
-    solid(body, (-8.6, 4.0, 1.35, -8.0, 13.9, 2.95), TIMBER)
-    solid(body, (1.0, 4.0, 1.35, 1.6, 13.9, 2.95), TIMBER)
-    solid(body, (-8.3, 4.2, 1.35, 1.3, 13.9, 2.05), TIMBER)
-    solid(body, (-8.3, 4.2, 2.45, 1.3, 13.9, 2.95), TIMBER)
+    # Blade in its own node, east of the carriage's z (the lane ends at z 1.2), inside an iron housing on Body.
+    # A hub plus teeth. The node is not a lane, so the teeth can stick out of the disc.
+    cx, cy, cz = -3.5, 8.9, 2.25
+    blade.box(cx - 0.6, cy - 0.6, cz - 0.15, cx + 0.6, cy + 0.6, cz + 0.15, IRON)
+    for i in range(18):
+        a = i / 18 * math.tau
+        px, py = cx + math.cos(a) * 4.4, cy + math.sin(a) * 4.4
+        blade.box(px - 0.28, py - 0.28, cz - 0.12, px + 0.28, py + 0.55, cz + 0.12, (0.86, 0.88, 0.9))
+    solid(body, (-8.6, 13.4, 1.7, 1.6, 14.1, 2.8), IRON)
+    solid(body, (-8.6, 4.0, 1.7, -8.0, 13.6, 2.8), IRON)
+    solid(body, (1.0, 4.0, 1.7, 1.6, 13.6, 2.8), IRON)
 
     # Crest sign, above the ridge.
     sign.box(-12, 22.4, -16.5, 12, 26.2, -15.9, CREAM)
