@@ -816,20 +816,20 @@ end
 target("First sale", "under 3 min", events.firstSale, 0, 180)
 target(
 	"Steel Axe (" .. money(ItemCatalog.GetAxe("SteelAxe").v2.price) .. ")",
-	"5-8 min",
+	"5-8.5 min",
 	events.SteelAxe or math.huge,
 	300,
-	480
+	510
 )
 target("First $1k earned", "15-20 min", events.thousand, 900, 1200)
 target(
 	"Cobalt Axe (" .. money(ItemCatalog.GetAxe("CobaltAxe").v2.price) .. ")",
-	"about 1 h",
+	"45-80 min",
 	events.CobaltAxe or math.huge,
 	2700,
-	4500
+	4800
 )
-target("Full plot (" .. money(A.plotPrice) .. ")", "28-36 h", events.plot, 28 * 3600, 36 * 3600)
+target("Full plot (" .. money(A.plotPrice) .. ")", "10-14 h", events.plot, 10 * 3600, 14 * 3600)
 line()
 line("## CI ranges")
 line()
@@ -840,10 +840,10 @@ line()
 line("| Target | Strict range | This model |")
 line("|---|---|---|")
 line(string.format("| First sale (E1) | under 3 min (0–180 s) | %.0f s |", events.firstSale))
-line(string.format("| Steel Axe (E2) | 5–8 min inclusive (300–480 s) | %.0f s |", events.SteelAxe or math.huge))
+line(string.format("| Steel Axe (E2) | 5–8.5 min inclusive (300–510 s) | %.0f s |", events.SteelAxe or math.huge))
 line(string.format("| First $1k (E3) | 13–20 min (780–1200 s) | %.0f s |", events.thousand))
-line(string.format("| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | %.0f s |", events.CobaltAxe or math.huge))
-line(string.format("| Full plot (E4) | 28–36 h (100800–129600 s) | %.0f s |", events.plot))
+line(string.format("| Cobalt Axe (E4) | 45–80 min (2700–4800 s) | %.0f s |", events.CobaltAxe or math.huge))
+line(string.format("| Full plot (E4) | 10–14 h (36000–50400 s) | %.0f s |", events.plot))
 line()
 line(
 	string.format(
@@ -1057,11 +1057,13 @@ line()
 -- Region woods (Lane R): Bog Cypress waits for S2, Ironwood for S4. Each
 -- wood's $/h is the ideal model's (before EFFICIENCY) with the kit owned at
 -- the first buying-path step that reaches its stage with a sawmill owned, and has to sit in the
--- Designer's band (13:35 room values). Both bands are the printed model's, so
--- the check below fails the run (and CI's --check) when a number drifts.
+-- band. Bog Cypress stays the Designer's 13:35 room ($9,000–$11,000/h).
+-- Ironwood is Connor's 27 Oct 2026 lock ($40,000–$47,000/h). Both bands are
+-- the printed model's, so the check below fails the run (and CI's --check)
+-- when a number drifts.
 local REGION_BANDS = {
 	bogcypress = { 9000, 11000 },
-	ironwood = { 28000, 34000 },
+	ironwood = { 40000, 47000 },
 }
 local regionFailed = false
 line("## Region woods (Bayou and Red Mesa)")
@@ -1159,13 +1161,14 @@ end
 line()
 
 -- Strict ranges. The headline verdict above still uses 0.75–1.25 slack.
--- Steel's 8.0 min is the top of 300–480, so the high end is inclusive.
+-- Connor locked these on 27 Oct 2026 (~3:03 PM MT). The high end is inclusive.
+-- Steel 300–510 s, Cobalt 2700–4800 s, full plot 10–14 h (36000–50400 s).
 local guards = {
 	{ "First sale", events.firstSale, 0, 180 },
-	{ "Steel Axe", events.SteelAxe or math.huge, 300, 480 },
+	{ "Steel Axe", events.SteelAxe or math.huge, 300, 510 },
 	{ "First $1k", events.thousand, 780, 1200 },
-	{ "Cobalt Axe", events.CobaltAxe or math.huge, 2700, 4500 },
-	{ "Full plot", events.plot, 28 * 3600, 36 * 3600 },
+	{ "Cobalt Axe", events.CobaltAxe or math.huge, 2700, 4800 },
+	{ "Full plot", events.plot, 10 * 3600, 14 * 3600 },
 }
 local guardFailed = false
 for _, row in ipairs(guards) do

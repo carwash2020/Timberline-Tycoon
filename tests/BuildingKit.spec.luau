@@ -413,12 +413,11 @@ return function(t)
 	t.test("H-Economy: kit fees do not move the five headlines", function()
 		local text = fs.readFile("ECONOMY.md")
 		t.ok(string.find(text, "68 s", 1, true) ~= nil)
-		t.ok(string.find(text, "5.5 min", 1, true) ~= nil)
-		t.ok(string.find(text, "15.4 min", 1, true) ~= nil)
-		t.ok(string.find(text, "47.8 min", 1, true) ~= nil)
-		-- Coat gate, modelled mill and planer bonuses, and the $7,600 step.
-		-- Lane R: Bog Cypress (S2) and Ironwood (S4) joined the model: 15.4 min (was 17.8), 48.2 min (was 50.7), 31.4 h (was 31.5), all inside their ranges.
-		t.ok(string.find(text, "31.1 h", 1, true) ~= nil)
+		t.ok(string.find(text, "8.0 min", 1, true) ~= nil)
+		t.ok(string.find(text, "15.1 min", 1, true) ~= nil)
+		t.ok(string.find(text, "75.5 min", 1, true) ~= nil)
+		-- Mill and planer bump (27 Oct 2026). Full plot is 12.1 h, inside the locked 10–14 h band.
+		t.ok(string.find(text, "12.1 h", 1, true) ~= nil)
 	end)
 
 	t.test("kit meshes: fidelity is chosen per mesh, and a shared col loads once", function()

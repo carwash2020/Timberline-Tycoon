@@ -212,8 +212,16 @@ function LeftLoad.CleanPiece(raw: unknown, isWood: (string) -> boolean, beds: { 
 		f = if type(r.f) == "string" and r.f ~= "" then r.f else nil,
 		x = if finite(boost) and (boost :: number) > 1 then math.min(boost :: number, LeftLoad.MaxBoost) else nil,
 		l = if r.l == true then true else nil,
-		m = if r.k == "plank" and finite(r.m) and (r.m :: number) > 1 then math.min(r.m :: number, 3) else nil,
-		d = if r.k == "plank" and finite(r.d) and (r.d :: number) > 1 then math.min(r.d :: number, 3) else nil,
+		m = if r.k == "plank"
+				and finite(r.m)
+				and (r.m :: number) > 1
+			then math.min(r.m :: number, SellLogic.BonusCap)
+			else nil,
+		d = if r.k == "plank"
+				and finite(r.d)
+				and (r.d :: number) > 1
+			then math.min(r.d :: number, SellLogic.BonusCap)
+			else nil,
 		t = if stamp > 1 then stamp else nil,
 		bed = r.bed,
 		at = { at[1], at[2], at[3], at[4], at[5], at[6] },

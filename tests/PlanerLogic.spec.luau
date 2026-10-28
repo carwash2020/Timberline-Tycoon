@@ -23,6 +23,8 @@ return function(t)
 	t.test("four tiers, each dearer, each with a bigger board bonus and a wider, finer range", function()
 		local list = Logic.List()
 		t.eq(#list, 4)
+		local bonuses = { 1.5, 2, 2.5, 3 }
+		local lengths = { 10.9, 10.9, 10.9, 18.9 }
 		local prev = nil
 		for i, machine in ipairs(list) do
 			t.eq(machine.id, IDS[i])
@@ -30,6 +32,8 @@ return function(t)
 			t.eq(machine.placeFromBox, true, "boxed, one-time placement")
 			local def = machine.planer
 			t.eq(def.tier, i)
+			t.eq(def.boardBonus, bonuses[i])
+			t.eq(def.maxLength, lengths[i], "maxLength is unchanged")
 			t.ok(def.boardBonus > 1, "a finished board is worth more than the plank")
 			t.ok(def.boardBonus <= SellLogic.BonusCap)
 			if prev then
@@ -46,7 +50,7 @@ return function(t)
 			{ list[1].priceCash, list[2].priceCash, list[3].priceCash, list[4].priceCash },
 			{ 2500, 9000, 30000, 95000 }
 		)
-		t.eq({ list[1].planer.boardBonus, list[4].planer.boardBonus }, { 1.2, 1.8 })
+		t.eq({ list[1].planer.boardBonus, list[4].planer.boardBonus }, { 1.5, 3 })
 		t.eq(Logic.IsPlaner("SkyBin"), false)
 		t.eq(Logic.IsPlaner("ChopSaw"), false)
 		t.eq(Logic.IsPlaner("SawmillRickety"), false)
@@ -132,14 +136,14 @@ return function(t)
 	t.test("the board bonus is stamped and never lowers an existing stamp", function()
 		local _, hand = Logic.Get("PlanerHand")
 		local _, industrial = Logic.Get("PlanerIndustrial")
-		t.eq(Logic.Stamp(nil, hand), 1.2)
-		t.eq(Logic.Stamp(1, industrial), 1.8)
+		t.eq(Logic.Stamp(nil, hand), 1.5)
+		t.eq(Logic.Stamp(1, industrial), 3)
 		t.eq(Logic.Stamp(2, hand), 2, "a better stamp stays")
-		t.eq(Logic.Stamp(0 / 0, hand), 1.2)
+		t.eq(Logic.Stamp(0 / 0, hand), 1.5)
 		-- And SellLogic applies it on sale: a finished plank pays the bonus, a log never does.
 		local plain = SellLogic.PieceValue("oak", "plank", 10, nil, nil, nil, nil, nil)
-		local board = SellLogic.PieceValue("oak", "plank", 10, nil, nil, nil, nil, 1.2)
-		t.ok(math.abs(board - plain * 1.2) < 1e-9)
+		local board = SellLogic.PieceValue("oak", "plank", 10, nil, nil, nil, nil, 1.5)
+		t.ok(math.abs(board - plain * 1.5) < 1e-9)
 		t.eq(SellLogic.PieceValue("oak", "log", 10, nil, nil, nil, nil, 2), SellLogic.PieceValue("oak", "log", 10))
 	end)
 

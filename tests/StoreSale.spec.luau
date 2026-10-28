@@ -44,11 +44,12 @@ return function(t)
 	end)
 
 	t.test("2x Cash x 2x Wood x Lux pays the full product; BonusCap clamps only free bonuses", function()
-		local free = SellLogic.PieceValue("pine", "plank", 1, nil, 1, false, 2, 2, 1.10)
+		-- 200L × Industrial × Prosperous III = 2.50 × 3.00 × 1.10 = 8.25, clamps once at 7.5.
+		local free = SellLogic.PieceValue("pine", "plank", 1, nil, 1, false, 2.50, 3, 1.10)
 		local base = SellLogic.PieceValue("pine", "plank", 1, nil, 1, false, 1, 1, 1)
-		t.ok(math.abs(free / base - SellLogic.BonusCap) < 1e-9, "free stack clamps to 3.0")
-		local paid = SellLogic.PieceValue("pine", "plank", 1, nil, 2, true, 2, 2, 1.10)
-		t.ok(math.abs(paid / base - 3 * 2 * GameConfig.LuxSellBonus) < 1e-9, "2x Wood and Lux on top")
+		t.ok(math.abs(free / base - SellLogic.BonusCap) < 1e-9, "free stack clamps to 7.5")
+		local paid = SellLogic.PieceValue("pine", "plank", 1, nil, 2, true, 2.50, 3, 1.10)
+		t.ok(math.abs(paid / base - SellLogic.BonusCap * 2 * GameConfig.LuxSellBonus) < 1e-9, "2x Wood and Lux on top")
 		local log = SellLogic.PieceValue("pine", "log", 1, nil, 1, false)
 		local all = SellLogic.PieceValue("pine", "log", 1, nil, 2, true) * 2 -- 2x Cash on the sale total
 		t.ok(math.abs(all / log - 2 * 2 * GameConfig.LuxSellBonus) < 1e-9, "4.4x, never capped")

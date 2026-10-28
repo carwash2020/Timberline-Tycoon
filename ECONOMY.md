@@ -13,10 +13,10 @@ Modelled: the sawmill `plankBonus` and the planer `boardBonus` the player owns, 
 | Target | Goal | Model | Verdict |
 |---|---|---|---|
 | First sale | under 3 min | 68 s | ✅ on target |
-| Steel Axe ($110) | 5-8 min | 5.5 min | ✅ on target |
-| First $1k earned | 15-20 min | 15.4 min | ✅ on target |
-| Cobalt Axe ($2,500) | about 1 h | 47.8 min | ✅ on target |
-| Full plot ($2,280,100) | 28-36 h | 31.1 h | ✅ on target |
+| Steel Axe ($110) | 5-8.5 min | 8.0 min | ✅ on target |
+| First $1k earned | 15-20 min | 15.1 min | ✅ on target |
+| Cobalt Axe ($2,500) | 45-80 min | 75.5 min | ✅ on target |
+| Full plot ($2,280,100) | 10-14 h | 12.1 h | ✅ on target |
 
 ## CI ranges
 
@@ -25,16 +25,16 @@ Every `lune run tools/economy` (including `--check`) fails the process when a he
 | Target | Strict range | This model |
 |---|---|---|
 | First sale (E1) | under 3 min (0–180 s) | 68 s |
-| Steel Axe (E2) | 5–8 min inclusive (300–480 s) | 330 s |
-| First $1k (E3) | 13–20 min (780–1200 s) | 925 s |
-| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | 2866 s |
-| Full plot (E4) | 28–36 h (100800–129600 s) | 112097 s |
+| Steel Axe (E2) | 5–8.5 min inclusive (300–510 s) | 482 s |
+| First $1k (E3) | 13–20 min (780–1200 s) | 907 s |
+| Cobalt Axe (E4) | 45–80 min (2700–4800 s) | 4527 s |
+| Full plot (E4) | 10–14 h (36000–50400 s) | 43498 s |
 
-The first $1,000 in this model is 15.4 min (925 s). The CI range is 13–20 min (780–1200 s). The headline verdict above scores 15–20 min.
+The first $1,000 in this model is 15.1 min (907 s). The CI range is 13–20 min (780–1200 s). The headline verdict above scores 15–20 min.
 
 The first plot ($150 at the Land Office, before the Rustbucket) is bought at 4.4 min on foot, then Murph chips in $175 toward the truck. It has no CI range of its own: it has to leave the rows above where they are, which is what sets $150 and Murph's $175.
 
-End of the buying path: $92,021/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
+End of the buying path: $255,614/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
 
 ## Tree volumes (TreeGen, mean of 50 seeds)
 
@@ -119,29 +119,29 @@ Each step buys what pays for itself fastest (axes in ladder order). $/h is a rea
 | At | Buys | Price | $/h before | $/h after | Then cuts |
 |---|---|---|---|---|---|
 | 4.4 min | Rustbucket | $100 | $0 | $1,826 | Maple (Rusty Axe) |
-| 5.5 min | Steel Axe | $110 | $1,826 | $2,754 | Maple (Steel Axe) |
-| 8.3 min | Rickety Sawmill | $130 | $2,754 | $5,191 | Bog Cypress (Steel Axe) |
-| 14.1 min | Insulated Coat | $500 | $5,191 | $10,558 | Frostwood (Steel Axe) |
-| 16.4 min | Pickup | $400 | $10,558 | $13,750 | Frostwood (Steel Axe) |
-| 18.1 min | Hardened Axe | $400 | $13,750 | $15,492 | Frostwood (Hardened Axe) |
-| 25.1 min | Pony Trailer | $1,800 | $15,492 | $17,925 | Frostwood (Hardened Axe) |
-| 28.8 min | Silver Axe | $1,100 | $17,925 | $19,545 | Frostwood (Silver Axe) |
-| 36.5 min | Hand Planer | $2,500 | $19,545 | $23,454 | Frostwood (Silver Axe) |
-| 40.6 min | Sturdy Sawmill | $1,600 | $23,454 | $25,800 | Frostwood (Silver Axe) |
-| 42.4 min | Heat Boots | $800 | $25,800 | $27,996 | Emberwood (Silver Axe) |
-| 47.8 min | Cobalt Axe | $2,500 | $27,996 | $29,690 | Emberwood (Cobalt Axe) |
-| 57.9 min | Flatbed | $5,000 | $29,690 | $33,509 | Emberwood (Cobalt Axe) |
-| 74.0 min | Bench Planer | $9,000 | $33,509 | $39,093 | Emberwood (Cobalt Axe) |
-| 1.8 h | Millmaster 200 | $22,500 | $39,093 | $48,334 | Emberwood (Cobalt Axe) |
-| 1.9 h | Ranch Trailer | $6,000 | $48,334 | $50,107 | Emberwood (Cobalt Axe) |
-| 2.5 h | Steam Planer | $30,000 | $50,107 | $59,055 | Emberwood (Cobalt Axe) |
-| 2.9 h | Logging Rig | $19,000 | $59,055 | $62,735 | Emberwood (Cobalt Axe) |
-| 3.0 h | Gold Axe | $8,500 | $62,735 | $64,316 | Emberwood (Gold Axe) |
-| 4.3 h | Millmaster 200 Long | $86,500 | $64,316 | $78,824 | Frostwood (Gold Axe) |
-| 4.5 h | Heavy Hauler | $13,000 | $78,824 | $80,307 | Frostwood (Gold Axe) |
-| 5.7 h | Industrial Planer | $95,000 | $80,307 | $87,607 | Frostwood (Gold Axe) |
-| 5.9 h | Obsidian Axe | $22,000 | $87,607 | $88,948 | Frostwood (Obsidian Axe) |
-| 6.4 h | Inferno Axe | $38,000 | $88,948 | $92,021 | Frostwood (Inferno Axe) |
+| 6.2 min | Rickety Sawmill | $130 | $1,826 | $3,533 | Maple (Rusty Axe) |
+| 8.0 min | Steel Axe | $110 | $3,533 | $5,191 | Bog Cypress (Steel Axe) |
+| 13.8 min | Insulated Coat | $500 | $5,191 | $10,558 | Frostwood (Steel Axe) |
+| 16.1 min | Pickup | $400 | $10,558 | $13,750 | Frostwood (Steel Axe) |
+| 17.8 min | Hardened Axe | $400 | $13,750 | $15,492 | Frostwood (Hardened Axe) |
+| 24.0 min | Sturdy Sawmill | $1,600 | $15,492 | $20,914 | Frostwood (Hardened Axe) |
+| 31.2 min | Hand Planer | $2,500 | $20,914 | $31,371 | Frostwood (Hardened Axe) |
+| 34.6 min | Pony Trailer | $1,800 | $31,371 | $36,298 | Frostwood (Hardened Axe) |
+| 36.0 min | Heat Boots | $800 | $36,298 | $38,924 | Emberwood (Hardened Axe) |
+| 37.7 min | Silver Axe | $1,100 | $38,924 | $42,948 | Emberwood (Silver Axe) |
+| 50.2 min | Bench Planer | $9,000 | $42,948 | $57,264 | Emberwood (Silver Axe) |
+| 73.8 min | Millmaster 200 | $22,500 | $57,264 | $91,198 | Emberwood (Silver Axe) |
+| 75.5 min | Cobalt Axe | $2,500 | $91,198 | $96,718 | Emberwood (Cobalt Axe) |
+| 78.6 min | Flatbed | $5,000 | $96,718 | $109,157 | Emberwood (Cobalt Axe) |
+| 1.6 h | Steam Planer | $30,000 | $109,157 | $136,446 | Emberwood (Cobalt Axe) |
+| 1.6 h | Ranch Trailer | $6,000 | $136,446 | $141,453 | Emberwood (Cobalt Axe) |
+| 2.2 h | Millmaster 200 Long | $86,500 | $141,453 | $183,978 | Frostwood (Cobalt Axe) |
+| 2.3 h | Logging Rig | $19,000 | $183,978 | $195,889 | Frostwood (Cobalt Axe) |
+| 2.8 h | Industrial Planer | $95,000 | $195,889 | $235,067 | Frostwood (Cobalt Axe) |
+| 2.9 h | Gold Axe | $8,500 | $235,067 | $238,861 | Frostwood (Gold Axe) |
+| 2.9 h | Heavy Hauler | $13,000 | $238,861 | $243,354 | Frostwood (Gold Axe) |
+| 3.0 h | Obsidian Axe | $22,000 | $243,354 | $247,078 | Frostwood (Obsidian Axe) |
+| 3.2 h | Inferno Axe | $38,000 | $247,078 | $255,614 | Frostwood (Inferno Axe) |
 
 ## Supply: how many players a biome feeds
 
@@ -166,8 +166,8 @@ Each wood waits for its stage (BiomeData.needsStage; StageOf: the best axe rung 
 
 | Wood | Stage | Step | Kit's best wood, real $/h | This wood, ideal $/h | This wood, real $/h | Band (ideal) | In band |
 |---|---|---|---|---|---|---|---|
-| Bog Cypress | S2 | Rickety Sawmill (8.3 min) | $5,191 | $10,383 | $5,191 | $9,000 to $11,000 | yes |
-| Ironwood | S4 | Heat Boots (42.4 min) | $27,996 | $32,450 | $16,225 | $28,000 to $34,000 | yes |
+| Bog Cypress | S2 | Steel Axe (8.0 min) | $5,191 | $10,383 | $5,191 | $9,000 to $11,000 | yes |
+| Ironwood | S4 | Heat Boots (36.0 min) | $38,924 | $43,136 | $21,568 | $40,000 to $47,000 | yes |
 
 ## Lux Axe (Robux)
 
