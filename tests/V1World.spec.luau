@@ -65,7 +65,16 @@ return function(t)
 
 	t.test("every shop is in town, on flat ground, and no two stand in each other", function()
 		local town = WorldPlan.Town()
-		t.ok(#town.shops >= #NPCData.Shops, "every NPC shop exists")
+		local placed = {}
+		for _, shop in ipairs(town.shops) do
+			placed[shop.kind] = true
+		end
+		for _, shop in ipairs(town.outlets) do
+			placed[shop.kind] = true
+		end
+		for _, id in ipairs(NPCData.Shops) do
+			t.ok(placed[id], id .. " is placed")
+		end
 		for i, shop in ipairs(town.shops) do
 			local p = shop.cframe.Position
 			-- Every shop, the Dealership (258, 130) too, is inside the ambient "town" zone.

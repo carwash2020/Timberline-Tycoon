@@ -29,6 +29,7 @@ local FerryLogic = require(script.Parent.FerryLogic)
 local ForemanData = require(script.Parent.ForemanData)
 local PlotSalesmanData = require(script.Parent.PlotSalesmanData)
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
+local ShopPins = require(script.Parent.World.ShopPins)
 local TollLogic = require(script.Parent.TollLogic)
 local WorldLayout = require(script.Parent.World.WorldLayout)
 
@@ -104,6 +105,14 @@ end
 -- frame at scale 1.5.
 -- tests/ForemanSpot.spec checks it against the built mill.
 NPCData.ForemanSpot = Vector3.new(-25.09, 0, 96.74)
+
+local function counterFallback(id: string): Vector3
+	local row = ShopPins.Get(id)
+	if row == nil then
+		return Vector3.zero
+	end
+	return Vector3.new(row.ox, 0, row.oz)
+end
 
 NPCData.List = {
 	{
@@ -376,15 +385,13 @@ NPCData.List = {
 		},
 	},
 	{
-		-- Juno keeps the Sparkworks counter (BuildingArt Sparkworks, east of the
-		-- Mill Road at (135, 132)). The shop has no hours (ShopHoursLogic has no
-		-- span for it), so she never sleeps. Her counter is the box counter like
-		-- the other three keepers': a box on it, Talk to ask, Yes to pay.
+		-- Juno keeps the Sparkworks counter on the Lantern Isle harbour. The
+		-- shop has no hours. Buys stay shut until the ferry (T413).
 		id = "Juno",
 		name = "Juno",
 		role = "Wire keeper",
 		shop = "Sparkworks",
-		spot = { kind = "counter", model = "Sparkworks", fallback = Vector3.new(135, 0, 146) },
+		spot = { kind = "counter", model = "Sparkworks", fallback = Vector3.new(1115, 0, -685.7) },
 		idle = "glasses",
 		promptLift = 80,
 		look = {
@@ -893,6 +900,104 @@ NPCData.List = {
 			rain = { "Rain doesn't stop the mill. Or the jobs." },
 		},
 	},
+	{
+		id = "Nell",
+		name = "Nell",
+		role = "Coat keeper",
+		shop = "CoatKiosk",
+		spot = { kind = "counter", model = "CoatKiosk", fallback = counterFallback("CoatKiosk") },
+		idle = "lookAround",
+		look = {
+			name = "Nell",
+			role = "Coat keeper",
+			seed = 901,
+			skin = hex("#F2CDB0"),
+			shirt = hex("#BFE3F2"),
+			pants = hex("#3A4A62"),
+			boots = hex("#7A4A2A"),
+			hair = hex("#7A4A28"),
+			hairStyle = "ponytail",
+			hat = "none",
+		},
+		greetings = { "Coat's on the hook.", "Cold starts just up the road.", "You'll want this before the snow." },
+		react = {
+			morning = { "Button it before the wind gets up." },
+			night = { "The kiosk is shut. The coat can wait until morning." },
+		},
+		lines = {
+			"The insulated coat is sold here, not back in town.",
+			"Put it on before the snow. The walk back is the long way.",
+			"One coat, yours for good. I don't rent them.",
+			"If you can see the kiosk, you are not in the snow yet.",
+		},
+	},
+	{
+		id = "Soot",
+		name = "Soot",
+		role = "Boot keeper",
+		shop = "HeatBoots",
+		spot = { kind = "counter", model = "HeatBoots", fallback = counterFallback("HeatBoots") },
+		idle = "wipe",
+		look = {
+			name = "Soot",
+			role = "Boot keeper",
+			seed = 902,
+			skin = hex("#C98B66"),
+			shirt = hex("#3A3433"),
+			pants = hex("#5A4030"),
+			boots = hex("#FF7A1A"),
+			hair = hex("#2B2230"),
+			hairStyle = "short",
+			hat = "none",
+		},
+		greetings = { "Boots, before the lava.", "Ash on your cuffs already?", "Rest here. Then the cone." },
+		react = {
+			day = { "The cone is hotter after noon." },
+			night = { "Even the rest stop sleeps. Boots in the morning." },
+		},
+		lines = {
+			"Heat boots are sold at this rest, not in town.",
+			"The lava does not care that you meant to go back.",
+			"One pair. They stay on.",
+			"The cone is that way. Don't start without them.",
+		},
+	},
+	{
+		id = "Nim",
+		name = "Nim",
+		role = "Odds keeper",
+		shop = "OddsAndEnds",
+		spot = { kind = "counter", model = "OddsAndEnds", fallback = counterFallback("OddsAndEnds") },
+		idle = "glasses",
+		look = {
+			name = "Nim",
+			role = "Odds keeper",
+			seed = 903,
+			skin = hex("#E2B898"),
+			shirt = hex("#8E6C4A"),
+			pants = hex("#3F4658"),
+			boots = hex("#3A2B22"),
+			hair = hex("#3A2A20"),
+			hairStyle = "short",
+			hat = "none",
+			glasses = hex("#C9A24A"),
+		},
+		greetings = {
+			"Charges and a lantern.",
+			"Junction's busy. Don't linger in the road.",
+			"Odd stock. Fair prices.",
+		},
+		react = {
+			day = { "The lantern is on the right. Charges on the left." },
+			night = { "The Gloam is darker than this. Buy the lantern first." },
+		},
+		lines = {
+			"A blasting charge is two hundred and twenty. Same as the boulder.",
+			"The lantern is for the Gloam. Buy it before the cave path.",
+			"I don't sell axes. Tink does, back in town.",
+			"The crate is on the counter. The lantern is on the shelf.",
+		},
+	},
 } :: { NPC }
 
 local byId: { [string]: NPC } = {}
@@ -923,7 +1028,7 @@ function NPCData.All(): { NPC }
 end
 
 -- The shops that need a keeper behind their Counter.
-NPCData.Shops = { "ToolShed", "Dealership", "HearthAndHome", "Sparkworks" }
+NPCData.Shops = { "ToolShed", "Dealership", "HearthAndHome", "Sparkworks", "CoatKiosk", "HeatBoots", "OddsAndEnds" }
 
 -- Talk, on every NPC. E and ButtonX, the same Interact key as Buy (InputKit
 -- lets Talk and Buy share it; the door uses Open, F / ButtonY, so a closed

@@ -27,7 +27,7 @@ return function(t)
 
 	local town = WorldPlan.Town()
 	local spot
-	for _, s in ipairs(town.shops) do
+	for _, s in ipairs(town.outlets) do
 		if s.kind == "Sparkworks" then
 			spot = s
 		end
@@ -86,10 +86,13 @@ return function(t)
 	-- The world: where it stands
 	---------------------------------------------------------------------------
 
-	t.test("WorldPlan has the Sparkworks shop, once, east of the Mill Road and north of the East Link", function()
-		t.ok(spot ~= nil, "town.shops lists Sparkworks")
+	t.test("WorldPlan has the Sparkworks shop once, on the Lantern Isle harbour", function()
+		t.ok(spot ~= nil, "town.outlets lists Sparkworks")
 		local count = 0
 		for _, s in ipairs(town.shops) do
+			t.ok(s.kind ~= "Sparkworks", "not on the town square")
+		end
+		for _, s in ipairs(town.outlets) do
 			if s.kind == "Sparkworks" then
 				count += 1
 			end
@@ -97,30 +100,24 @@ return function(t)
 		t.eq(count, 1)
 		t.eq(spot.title, "SPARKWORKS")
 		local at = spot.cframe.Position
-		t.eq(at.Y, 0)
-		t.ok(spot.cframe.LookVector.Z < -0.999, "its front (-Z) faces the East Link and the street")
+		t.eq(at.X, 1115)
+		t.eq(at.Z, -700)
+		t.eq(at.Y, 0, "the plan stores the pin; MapBuilder lifts the deck")
+		t.ok(spot.cframe.LookVector.Z < -0.999, "its front (-Z) faces the harbour apron")
 		t.eq(BuildingArt.Scale.Sparkworks, 1.5)
+		t.eq(spot.ferry, true)
 	end)
 
-	t.test("it stands on dry, level ground, off every road and every plot", function()
+	t.test("the harbour pin is dry and off the roads and the plots; a corner may meet the sea", function()
 		local model = placedShop()
 		local x0, x1, z0, z1 = footprint(model)
-		-- 36 x 36 once scaled; the walls and the counter are all there is to it.
 		t.ok(x1 - x0 >= 35 and x1 - x0 <= 40, "width " .. (x1 - x0))
 		t.ok(z1 - z0 >= 35 and z1 - z0 <= 40, "depth " .. (z1 - z0))
-		local lowest, highest = math.huge, -math.huge
-		for _, x in ipairs({ x0, (x0 + x1) / 2, x1 }) do
-			for _, z in ipairs({ z0, (z0 + z1) / 2, z1 }) do
-				local h = TerrainGen.HeightAt(x, z)
-				lowest, highest = math.min(lowest, h), math.max(highest, h)
-				t.eq(TerrainGen.WaterLevelAt(x, z), nil, string.format("dry at (%.0f, %.0f)", x, z))
-				t.ok(
-					TerrainGen.RoadClearance(x, z) >= 2,
-					string.format("2 studs off the roads at (%.0f, %.0f): %.1f", x, z, TerrainGen.RoadClearance(x, z))
-				)
-			end
-		end
-		t.ok(highest - lowest < 0.5, "level under the floor: " .. (highest - lowest))
+		local pin = spot.cframe.Position
+		local ShopPlace = t.load("ReplicatedStorage/Shared/Art/ShopPlace")
+		-- The live isle is not here yet (T413). The deck sits above the sea.
+		t.ok(ShopPlace.DeckY("Sparkworks") >= WorldLayout.SeaLevel + 1, "the deck is above the sea")
+		t.ok(TerrainGen.RoadClearance(pin.X, pin.Z) >= 2, "the pin is off the roads")
 		local half = PlotData.Tiers[#PlotData.Tiers].size / 2
 		for _, slot in ipairs(PlotData.Slots) do
 			local clear = x1 < slot.X - half or x0 > slot.X + half or z1 < slot.Y - half or z0 > slot.Y + half
@@ -168,57 +165,17 @@ return function(t)
 		t.ok(x1 + pad < lot.x0 or z1 + pad < lot.z0 or z0 - pad > lot.z1, "off the showroom's loading pad")
 	end)
 
-	t.test("a path runs from the East Link to the door, and the town trees leave it alone", function()
-		local door = spot.cframe * Vector3.new(0, 0, -18)
-		local path
-		for _, paint in ipairs(WorldLayout.TownPaint) do
-			if paint.name == "SparkworksPath" then
-				path = paint
-			end
-		end
-		t.ok(path ~= nil, "a SparkworksPath paint")
-		t.ok(door.X > path.x0 and door.X < path.x1, "the path is as wide as the door's front")
-		t.ok(door.Z >= path.z0 and door.Z <= path.z1 + 0.5, "the path reaches the door at z " .. door.Z)
-		-- Its far end meets the road: the East Link's edge is within a stud of the path's end.
-		t.ok(TerrainGen.RoadClearance(door.X, path.z0) <= 1.5, "the path ends at the road")
-		-- Nothing solid on the walk: the path and the strip in front of the door are bare.
-		for _, g in ipairs(town.greenery) do
-			t.ok(
-				not (
-						g.cframe.X > path.x0 - 3
-						and g.cframe.X < path.x1 + 3
-						and g.cframe.Z > path.z0
-						and g.cframe.Z < path.z1
-					),
-				"nothing planted on the path"
-			)
-		end
-		-- A floor of packed dirt under the building, so no grass grows through it.
-		local floor
-		for _, paint in ipairs(WorldLayout.TownFloors) do
-			if paint.name == "SparkworksFloor" then
-				floor = paint
-			end
-		end
-		t.ok(floor ~= nil, "a SparkworksFloor")
+	t.test("the shop left the town square and the harbour tree box covers it", function()
 		local x0, x1, z0, z1 = footprint(placedShop())
-		t.ok(floor.x0 <= x0 and floor.x1 >= x1 and floor.z0 <= z0 and floor.z1 >= z1, "the floor covers the walls")
-		-- The tree planner keeps its building and its door clear.
+		t.ok(x0 > 200, "the shop left the town square")
 		local found = 0
 		for _, b in ipairs(TownTreeData.Buildings) do
-			if b.name == "Sparkworks" then
+			if b.name == "SparkworksHarbour" then
 				found += 1
-				t.ok(b.x0 <= x0 and b.x1 >= x1 and b.z0 <= z0 and b.z1 >= z1, "TownTreeData's box covers the shop")
+				t.ok(b.x0 <= x0 and b.x1 >= x1 and b.z0 <= z0 and b.z1 >= z1, "the harbour box covers the shop")
 			end
 		end
 		t.eq(found, 1)
-		local doorBox
-		for _, r in ipairs(TownTreeData.Empty) do
-			if r.name == "SparkworksDoor" then
-				doorBox = r
-			end
-		end
-		t.ok(doorBox ~= nil and door.X > doorBox.x0 and door.X < doorBox.x1, "no town tree at the door")
 	end)
 
 	---------------------------------------------------------------------------

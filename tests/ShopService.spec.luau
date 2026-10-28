@@ -3,6 +3,14 @@
 return function(t)
 	local Vector3 = t.roblox.Vector3
 	local COUNTER = Vector3.new(-45, 2.5, 99.5)
+	-- Lune's Tool has no Activated. A bought charge still hands the bomb over.
+	pcall(t.roblox.implementProperty, "Tool", "Activated", function()
+		return {
+			Connect = function()
+				return { Disconnect = function() end }
+			end,
+		}
+	end)
 
 	local function node(children, props)
 		local n = props or {}
@@ -24,6 +32,7 @@ return function(t)
 			equippedTruck = options.equippedTruck or "Rustbucket",
 			plot = options.plot or { claimed = options.claimed == true, tier = 1, placed = {}, squares = {} },
 			storage = options.storage or {},
+			mining = options.mining,
 		}
 		local toasts, granted, equipped, quests, switched = {}, {}, {}, {}, {}
 		local plans = {} -- rolled plans handed over (BlueprintService.Grant)
@@ -49,13 +58,33 @@ return function(t)
 				return class == "Attachment"
 			end,
 		}
-		local map = node({
-			ToolShed = node({ Counter = node({ ShopPoint = point }) }),
-			Dealership = node({ Counter = node({ ShopPoint = point }) }), -- same spot: fine for these tests
-			HearthAndHome = node({ Counter = node({ ShopPoint = point }) }),
-		})
+		local children = {}
+		for _, name in
+			ipairs(options.shops or {
+				"ToolShed",
+				"Dealership",
+				"HearthAndHome",
+				"CoatKiosk",
+				"HeatBoots",
+				"OddsAndEnds",
+			})
+		do
+			children[name] = node({ Counter = node({ ShopPoint = point }) })
+		end
+		local map = node(children)
+		if options.pack then
+			local pack = t.roblox.Instance.new("Folder")
+			pack.Name = "Backpack"
+			function player:FindFirstChildOfClass(className)
+				return if className == "Backpack" then pack else nil
+			end
+			function character:GetChildren()
+				return {}
+			end
+		end
 
 		local loader = t.loader({
+			services = { Players = {}, Workspace = {} },
 			mocks = {
 				ProfileService = {
 					GetProfile = function(p)
@@ -653,7 +682,7 @@ return function(t)
 		s.ShopService.Hour = function()
 			return 22
 		end
-		s.buy("Gear", "InsulatedCoat")
+		s.buy("Gear", "Flashlight")
 		t.eq(s.profile.cash, 1000, "hearth is closed at 22:00")
 		t.ok(string.find(s.toasts[1], "7:00", 1, true) ~= nil, s.toasts[1])
 		s.buy("Truck", "Pickup")
@@ -1054,5 +1083,81 @@ return function(t)
 		)
 		t.eq({ ok, why }, { false, "needsLand" })
 		t.eq(landless.profile.cash, 200000)
+	end)
+
+	t.test("coat, boots, lantern and a charge sell at their counters", function()
+		local coat = setup({ cash = 1000 })
+		coat.buy("Gear", "InsulatedCoat")
+		t.eq(coat.profile.cash, 500)
+		t.eq(coat.profile.gear, { "InsulatedCoat" })
+		local boots = setup({ cash = 1000 })
+		boots.buy("Gear", "HeatBoots")
+		t.eq(boots.profile.cash, 200)
+		t.eq(boots.profile.gear, { "HeatBoots" })
+		local lantern = setup({ cash = 500 })
+		lantern.buy("Gear", "Lantern")
+		t.eq(lantern.profile.cash, 380)
+		t.eq(lantern.profile.gear, { "Lantern" })
+		local charge = setup({ cash = 500, pack = true })
+		charge.buy("Charge", "BlastingCharge")
+		t.eq(charge.profile.cash, 280)
+		t.eq(charge.profile.mining.bombs, 1)
+		t.eq(charge.toasts[#charge.toasts], "Bought a blasting charge.")
+		local full = setup({ cash = 500, pack = true, mining = { v = 1, bombs = 99 } })
+		full.buy("Charge", "BlastingCharge")
+		t.eq(full.profile.cash, 500)
+		t.eq(full.toasts, { "You can't carry another blasting charge." })
+	end)
+
+	t.test("the general store does not sell the coat, the boots, the lantern or a charge", function()
+		for _, item in ipairs({ "InsulatedCoat", "HeatBoots", "Lantern" }) do
+			local hearth = setup({ cash = 5000, shops = { "HearthAndHome" } })
+			hearth.buy("Gear", item)
+			t.eq(hearth.profile.gear, {}, item)
+			t.eq(hearth.profile.cash, 5000, item)
+			t.eq(hearth.toasts, { "Walk up to the counter to buy." }, item)
+		end
+		local charge = setup({ cash = 5000, shops = { "HearthAndHome" }, pack = true })
+		charge.buy("Charge", "BlastingCharge")
+		t.eq(charge.profile.cash, 5000)
+		t.eq(charge.profile.mining, nil)
+		t.eq(charge.toasts, { "Walk up to the counter to buy." })
+		local light = setup({ cash = 5000, shops = { "HearthAndHome" } })
+		light.buy("Gear", "Flashlight")
+		t.eq(light.profile.gear, { "Flashlight" })
+		t.eq(light.profile.cash, 4750)
+	end)
+
+	t.test("a charge box spends the dynamite price and grants a bomb", function()
+		local s = setup({ cash = 500, pack = true })
+		local ok, line = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "ch-1",
+			kind = "Charge",
+			itemId = "BlastingCharge",
+			shop = "OddsAndEnds",
+		})
+		t.eq(ok, true)
+		t.eq(line, "thanks")
+		t.eq(s.profile.cash, 280)
+		t.eq(s.profile.mining.bombs, 1)
+		local junk, why = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "ch-2",
+			kind = "Charge",
+			itemId = "Nope",
+			shop = "OddsAndEnds",
+		})
+		t.eq(junk, false)
+		t.eq(why, "locked")
+		t.eq(s.profile.cash, 280)
+		local capped = setup({ cash = 500, pack = true, mining = { v = 1, bombs = 99 } })
+		local no, reason = capped.ShopService.ChargeAndGrant(capped.player, {
+			uid = "ch-3",
+			kind = "Charge",
+			itemId = "BlastingCharge",
+			shop = "OddsAndEnds",
+		})
+		t.eq(no, false)
+		t.eq(reason, "locked")
+		t.eq(capped.profile.cash, 500)
 	end)
 end

@@ -1,6 +1,14 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 28 October 2026. **Main is at `690e9e8` (#272 BonusCap 7.5, which includes #274 ClientFreeze seat yield).** This branch remakes the town sawmill and the Weigh House (`cursor/t411-sawmill-weigh-1d06`).
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 28 October 2026. **Main is at `0c6ca67` (T411).** This branch places the valley shops (`cursor/t412-shops-placed-cbeb`).
+
+## T412 shops placed (28 October 2026, branch `cursor/t412-shops-placed-cbeb`)
+
+Shop pins live in `ShopPins`. `WorldPlan.Town().shops` is still the flat-town three (Tool Shed, Hearth & Home, Dealership). Sparkworks, the coat and boot kiosks, Odds and Ends, the Land Office cottage, the secret cave, and the cloud forge and market are `town.outlets`. The ground Sky Forge court is gone. KeeperSpot, TemperSpot, and the four relic sockets are on `TimberlineMap/SkyForge` at cloud Y 840. The Weigh House and the town mill did not move. Dale's door is still (189.25, 100.3); Origin 207 / 100.2 is the lot corner, not a second site.
+
+Insulated Coat, Heat Boots, and the Lantern are not on Hazel's shelf. Nell, Soot, and Nim sell them at the kiosks and at Odds and Ends. The General Store menu lists only gear whose shop is Hearth & Home. A blasting charge at Odds, from the menu or from its box, spends `DynamitePrice` ($220) and adds a mining bomb. The kiosks and Odds have counter shelf slots, so BoxService stocks them. Sparkworks is on the harbour at (1115, −700) and signed "Ferry required"; buys there fail while that sign is on the model. SecretShop has `Sold = false` and no prompt. MeshId stays 0. Greyboxes are the REDO look until Connor says yes to a GLB. Harbour Sparkworks, the coat and boot kiosks, Odds, the secret cave and the Land Office are town floors for paint and trees. They are not store pads, so HeightAt keeps the old town Sparkworks floor.
+
+Nothing here has been seen in Studio. Cloud tests do not walk or drive. Studio checks are in PHASE2_NOTES.md "T412 shops placed". Shots: `preview/t412/`.
 
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal

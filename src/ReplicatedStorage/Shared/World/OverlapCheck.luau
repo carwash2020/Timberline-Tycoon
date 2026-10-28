@@ -19,6 +19,7 @@
 -- each other (and prop against prop also needs a height overlap).
 
 local BuildingArt = require(script.Parent.Parent.Art.BuildingArt)
+local ShopPlace = require(script.Parent.Parent.Art.ShopPlace)
 local BuiltMoves = require(script.Parent.BuiltMoves)
 local TerrainGen = require(script.Parent.TerrainGen)
 local Clearance = require(script.Parent.Clearance)
@@ -152,6 +153,11 @@ function OverlapCheck.Build(plan: any): (Clearance.Grid, { [string]: number })
 		addParts("sell station", BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad)
 		for _, spot in ipairs(town.shops) do
 			addParts(spot.kind, BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
+		end
+		for _, spot in ipairs(town.outlets) do
+			if not spot.cloud then
+				addParts(spot.kind, ShopPlace.Build(spot.kind, spot.title, spot.accent), spot.cframe)
+			end
 		end
 		for _, spot in ipairs(town.scenes) do
 			local model = if spot.kind == "forge" then BuildingArt.SkyForgeCourt() else PropArt.Scene(spot.kind)

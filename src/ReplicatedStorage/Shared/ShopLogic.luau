@@ -470,4 +470,56 @@ function ShopLogic.TrailerDetailFor(trailer: TrailerDef, loop: number): string
 	return if loop == 2 then ShopLogic.TrailerDetailV2(trailer) else ShopLogic.TrailerDetail(trailer)
 end
 
+-- Which counter sells a gear id. Gate gear is not in the General Store.
+function ShopLogic.GearShop(gearId: string): string
+	if gearId == "InsulatedCoat" then
+		return "CoatKiosk"
+	elseif gearId == "HeatBoots" then
+		return "HeatBoots"
+	elseif gearId == "Lantern" then
+		return "OddsAndEnds"
+	end
+	return "HearthAndHome"
+end
+
+function ShopLogic.ChargeShop(): string
+	return "OddsAndEnds"
+end
+
+-- Sparkworks stands on the harbour before the ferry (T413). Buys fail closed.
+function ShopLogic.FerryClosed(shopId: string): boolean
+	return shopId == "Sparkworks"
+end
+
+function ShopLogic.ShopsFor(category: string, itemId: string): { string }
+	if category == "Gear" then
+		return { ShopLogic.GearShop(itemId) }
+	elseif category == "Charge" then
+		return { ShopLogic.ChargeShop() }
+	elseif category == "Axe" then
+		return { "ToolShed", "HearthAndHome" }
+	elseif category == "Truck" or category == "Trailer" then
+		return { "Dealership" }
+	elseif category == "Sawmill" then
+		return { "ToolShed" }
+	elseif category == "Blueprint" then
+		return { "HearthAndHome" }
+	elseif category == "Machine" or category == "Logic" then
+		return { "Sparkworks" }
+	end
+	return {}
+end
+
+function ShopLogic.MayBuy(shopId: string, category: string, itemId: string): (boolean, string?)
+	if ShopLogic.FerryClosed(shopId) then
+		return false, "Ferry required"
+	end
+	for _, name in ipairs(ShopLogic.ShopsFor(category, itemId)) do
+		if name == shopId then
+			return true, nil
+		end
+	end
+	return false, "wrong shop"
+end
+
 return ShopLogic

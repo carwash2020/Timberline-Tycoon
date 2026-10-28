@@ -402,7 +402,8 @@ local function backDoor(model: Model, frame: Frame, x: number, z: number, onZ: b
 	-- The frame is three bars AROUND the leaf, standing a tenth proud: no
 	-- frame face lies on the leaf's plane, so there is never a second texture
 	-- to fight with the door's (the specs scan for it).
-	local size = if onZ then V3(3.2, 8, 0.3) else V3(0.3, 8, 3.2)
+	local leafW = 4
+	local size = if onZ then V3(leafW, 8, 0.3) else V3(0.3, 8, leafW)
 	local cy = frame.floorTop + 4
 	local at = CF(x, cy, z)
 	dBox(model, "BackRoomDoor", size, at, hex("#6E4A2E"), MAT.Wood)
@@ -415,9 +416,9 @@ local function backDoor(model: Model, frame: Frame, x: number, z: number, onZ: b
 		dBox(model, name, barSize, at * shift * offset, TRIM, MAT.Wood)
 	end
 	for _, s in ipairs({ -1, 1 }) do
-		bar("BackRoomDoorFrame", 0.4, 8, s * 1.8, 0)
+		bar("BackRoomDoorFrame", 0.4, 8, s * (leafW / 2 + 0.2), 0)
 	end
-	bar("BackRoomDoorFrame", 4, 0.6, 0, 4.3)
+	bar("BackRoomDoorFrame", leafW + 0.8, 0.6, 0, 4.3)
 	local knob = if onZ then CF(1.2, -0.2, -0.25) else CF(-side * 0.25, -0.2, 1.2)
 	Kit.decor(Kit.ball(model, "BackRoomKnob", 0.35, at * knob, hex("#C9A24A"), MAT.Metal), false)
 end

@@ -128,6 +128,10 @@ local function gearSlots(): { Slot }
 	end)
 	local out: { Slot } = {}
 	for _, gear in ipairs(list) do
+		-- Coat, boots, and the lantern are sold at their own counters (T412).
+		if gear.id == "InsulatedCoat" or gear.id == "HeatBoots" or gear.id == "Lantern" then
+			continue
+		end
 		table.insert(out, {
 			slotId = "hearth-" .. gear.id,
 			shop = "HearthAndHome",
@@ -140,6 +144,33 @@ local function gearSlots(): { Slot }
 		})
 	end
 	return out
+end
+
+local function gearAt(shop: string, gearId: string): Slot
+	local gear = ItemCatalog.Gear[gearId]
+	return {
+		slotId = shop .. "-" .. gearId,
+		shop = shop,
+		itemKind = "Gear",
+		itemId = gearId,
+		displayName = gear.displayName,
+		respawnSec = GameConfig.BoxRespawnSec,
+		limited = false,
+		color = gear.color,
+	}
+end
+
+local function chargeSlot(): Slot
+	return {
+		slotId = "odds-BlastingCharge",
+		shop = "OddsAndEnds",
+		itemKind = "Charge",
+		itemId = "BlastingCharge",
+		displayName = "Blasting Charge",
+		respawnSec = GameConfig.BoxRespawnSec,
+		limited = false,
+		color = "#C4A574",
+	}
 end
 
 local function blueprintSlots(): { Slot }
@@ -219,6 +250,9 @@ local BY_SHOP: { [string]: { Slot } } = {
 	ToolShed = {},
 	HearthAndHome = {},
 	Sparkworks = {},
+	CoatKiosk = {},
+	HeatBoots = {},
+	OddsAndEnds = {},
 }
 
 local function build()
@@ -241,6 +275,10 @@ local function build()
 	for _, slot in ipairs(sparkworksSlots()) do
 		table.insert(BY_SHOP.Sparkworks, slot)
 	end
+	table.insert(BY_SHOP.CoatKiosk, gearAt("CoatKiosk", "InsulatedCoat"))
+	table.insert(BY_SHOP.HeatBoots, gearAt("HeatBoots", "HeatBoots"))
+	table.insert(BY_SHOP.OddsAndEnds, gearAt("OddsAndEnds", "Lantern"))
+	table.insert(BY_SHOP.OddsAndEnds, chargeSlot())
 end
 
 build()
@@ -281,15 +319,11 @@ function StoreStock.FindInShop(shop: string, itemId: string): Slot?
 end
 
 function StoreStock.Find(kind: string, itemId: string): Slot?
-	for _, slot in ipairs(StoreStock.All()) do
-		if slot.itemKind == kind and slot.itemId == itemId then
-			return slot
-		end
-	end
-	-- The Sparkworks counter's pieces sit outside the interior shops' list.
-	for _, slot in ipairs(BY_SHOP.Sparkworks) do
-		if slot.itemKind == kind and slot.itemId == itemId then
-			return slot
+	for _, list in pairs(BY_SHOP) do
+		for _, slot in ipairs(list) do
+			if slot.itemKind == kind and slot.itemId == itemId then
+				return slot
+			end
 		end
 	end
 	return nil
@@ -318,6 +352,11 @@ function StoreStock.UnitPrice(kind: string, itemId: string, limited: boolean, lo
 		return if machine then machine.priceCash else nil
 	elseif kind == "Logic" then
 		return SparkworksStock.Price(itemId)
+	elseif kind == "Charge" then
+		if itemId == "BlastingCharge" then
+			return GameConfig.DynamitePrice
+		end
+		return nil
 	elseif kind == "Blueprint" then
 		local bp = nil
 		for _, item in ipairs(PlotData.Blueprints) do
@@ -567,6 +606,57 @@ local SHOPS: { [string]: Shop } = {
 		},
 		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(24, 1, 24) }, -- design size: 36 x 36 once scaled
 	},
+	-- Counter tops (y 3.6). Wide enough for a max shelf box (3.1) plus the
+	-- edge gap, and deep enough for its depth. One lane, so AisleGap stays 0
+	-- and the booth's own walk is the clearance.
+	CoatKiosk = {
+		lanes = {
+			{
+				name = "Hook",
+				x0 = -2.2,
+				x1 = 2.2,
+				z0 = -4.0,
+				z1 = 1.2,
+				y = 3.6,
+				step = StoreStock.RowStep,
+				maxRise = 0.4,
+				kinds = { "Gear" },
+			},
+		},
+		zone = { center = Vector3.new(0, 3.6, -1.4), size = Vector3.new(8, 8, 8) },
+	},
+	HeatBoots = {
+		lanes = {
+			{
+				name = "Hook",
+				x0 = -2.2,
+				x1 = 2.2,
+				z0 = -4.0,
+				z1 = 1.2,
+				y = 3.6,
+				step = StoreStock.RowStep,
+				maxRise = 0.4,
+				kinds = { "Gear" },
+			},
+		},
+		zone = { center = Vector3.new(0, 3.6, -1.4), size = Vector3.new(8, 8, 8) },
+	},
+	OddsAndEnds = {
+		lanes = {
+			{
+				name = "Counter",
+				x0 = -4.2,
+				x1 = 4.2,
+				z0 = -8.2,
+				z1 = -3.0,
+				y = 3.6,
+				step = StoreStock.RowStep,
+				maxRise = 0.4,
+				kinds = { "Gear", "Charge" },
+			},
+		},
+		zone = { center = Vector3.new(0, 3.6, -5.6), size = Vector3.new(12, 8, 10) },
+	},
 }
 
 -- The boxes a slot puts on a shelf: one, or LimitedStockCount in a row.
@@ -576,6 +666,9 @@ end
 
 -- The box for a slot's item: its real bounding box plus the margin (BoxSize.Fit).
 function StoreStock.BoxSizeOf(slot: Slot): Vector3
+	if slot.itemKind == "Charge" then
+		return Vector3.new(2, 1.4, 2)
+	end
 	return ItemBox.Size(slot.itemKind, slot.itemId)
 end
 
@@ -709,6 +802,9 @@ end
 -- The parts of one box of a slot: the dark shell (BoxLogic.ShellPartCap at
 -- most) and the display copy of its item (ItemModel.ModelBudget by kind).
 function StoreStock.PartsOf(slot: Slot): number
+	if slot.itemKind == "Charge" then
+		return BoxLogic.ShellPartCap + 4
+	end
 	return BoxLogic.ShellPartCap + ItemBox.For(slot.itemKind, slot.itemId).parts
 end
 

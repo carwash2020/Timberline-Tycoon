@@ -11,6 +11,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
+local ShopPlace = require(ReplicatedStorage.Shared.Art.ShopPlace)
 local BuiltMoves = require(ReplicatedStorage.Shared.World.BuiltMoves)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
@@ -58,6 +59,17 @@ function TownBuild.Build(): Folder
 		assert(counter and counter:IsA("BasePart"), "[TownBuild] " .. spot.kind .. " has no Counter")
 		shop.PrimaryPart = counter
 		place(shop, spot.cframe, map)
+	end
+	for _, spot in ipairs(town.outlets) do
+		local shop = ShopPlace.Build(spot.kind, spot.title, spot.accent)
+		shop.Name = spot.kind
+		local counter = shop:FindFirstChild("Counter")
+		if counter and counter:IsA("BasePart") then
+			shop.PrimaryPart = counter
+		end
+		local pos = spot.cframe.Position
+		local y = if spot.cloud then pos.Y else ShopPlace.DeckY(spot.kind)
+		place(shop, CFrame.new(pos.X, y, pos.Z) * (spot.cframe - pos), map)
 	end
 
 	local scenes = Instance.new("Folder")

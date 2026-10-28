@@ -281,10 +281,7 @@ function DialogueService.Init(remoteEvent: RemoteEvent?)
 		end
 		-- B15: a remote "open" must name a real shop (the keeper's prompt
 		-- is the usual way in), so a made-up id is never stored.
-		if
-			action == "open"
-			and (type(a) ~= "string" or not table.find({ "ToolShed", "HearthAndHome", "Dealership", "Sparkworks" }, a))
-		then
+		if action == "open" and (type(a) ~= "string" or not table.find(DialogueData.Shops(), a)) then
 			return
 		end
 		onDialogue(player, action, a, b)

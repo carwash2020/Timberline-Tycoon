@@ -59,19 +59,24 @@ local SHOP_FOR: { [string]: { string } } = {
 	Axe = { "ToolShed", "HearthAndHome" },
 	Truck = { "Dealership" },
 	Trailer = { "Dealership" },
-	Gear = { "HearthAndHome" },
+	Gear = { "HearthAndHome", "CoatKiosk", "HeatBoots", "OddsAndEnds" },
 	Sawmill = { "ToolShed" },
 	Blueprint = { "HearthAndHome" },
+	Charge = { "OddsAndEnds" },
 }
+
+local function namesFor(category: string, itemId: string?): { string }
+	return ShopLogic.ShopsFor(category, if type(itemId) == "string" then itemId else "")
+end
 
 local map: Instance? = nil
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local loop = 1 -- the core loop that runs (Init)
 
-local function shopPoints(category: string): { Vector3 }
+local function shopPoints(category: string, itemId: string?): { Vector3 }
 	local out: { Vector3 } = {}
 	local folder = map
-	for _, shopName in ipairs(SHOP_FOR[category] or {}) do
+	for _, shopName in ipairs(namesFor(category, itemId)) do
 		local shop = if folder then folder:FindFirstChild(shopName) else nil
 		local counter = if shop then shop:FindFirstChild("Counter") else nil
 		local point = if counter then counter:FindFirstChild("ShopPoint") else nil
@@ -111,7 +116,7 @@ end
 
 -- Shops for this category whose counter the player can reach, and whether
 -- they are also at a display model (the dealership lot).
-local function shopsInReach(player: Player, category: string): ({ string }, boolean)
+local function shopsInReach(player: Player, category: string, itemId: string?): ({ string }, boolean)
 	local names: { string } = {}
 	local char = player.Character
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
@@ -120,7 +125,7 @@ local function shopsInReach(player: Player, category: string): ({ string }, bool
 	end
 	local reach = GameConfig.ShopRange + GameConfig.RangeTolerance
 	local folder = map
-	for _, shopName in ipairs(SHOP_FOR[category] or {}) do
+	for _, shopName in ipairs(namesFor(category, itemId)) do
 		local shop = if folder then folder:FindFirstChild(shopName) else nil
 		local counter = if shop then shop:FindFirstChild("Counter") else nil
 		local point = if counter then counter:FindFirstChild("ShopPoint") else nil
@@ -134,8 +139,8 @@ end
 -- A sale is allowed when any in-range shop for the category is open. The
 -- test map parks every ShopPoint on one spot, so a night axe still sells
 -- at the Tool Shed while Hearth & Home, also "in range", is closed.
-local function closedShop(player: Player, category: string, hour: number): string?
-	local names, display = shopsInReach(player, category)
+local function closedShop(player: Player, category: string, itemId: string?, hour: number): string?
+	local names, display = shopsInReach(player, category, itemId)
 	local closedName: string? = nil
 	local anyOpen = false
 	for _, shopName in ipairs(names) do
@@ -158,14 +163,14 @@ local function closedShop(player: Player, category: string, hour: number): strin
 	return closedName or "HearthAndHome"
 end
 
-local function inRange(player: Player, category: string): boolean
+local function inRange(player: Player, category: string, itemId: string?): boolean
 	local char = player.Character
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 	if not hrp then
 		return false
 	end
 	local reach = GameConfig.ShopRange + GameConfig.RangeTolerance
-	for _, point in ipairs(shopPoints(category)) do
+	for _, point in ipairs(shopPoints(category, itemId)) do
 		if (hrp.Position - point).Magnitude <= reach then
 			return true
 		end
@@ -606,6 +611,31 @@ local function buyBlueprint(player: Player, blueprintId: string)
 	)
 end
 
+local function buyCharge(player: Player, itemId: string)
+	if itemId ~= "BlastingCharge" then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	local price = GameConfig.DynamitePrice
+	local MiningService = require(script.Parent.MiningService)
+	if not MiningService.CanTakeBombs(player, 1) then
+		notify(player, "You can't carry another blasting charge.")
+		return
+	end
+	if profile.cash < price then
+		notify(player, string.format("You need %s more for a blasting charge.", Util.formatCash(price - profile.cash)))
+		return
+	end
+	if not EconomyService.SpendCash(player, price, "blasting charge", "BlastingCharge") then
+		return
+	end
+	MiningService.AddBombs(player, 1)
+	notify(player, "Bought a blasting charge.")
+end
+
 local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 	if type(category) ~= "string" or type(itemId) ~= "string" or not RateLimiter.Allow(player, "BuyItem") then
 		return
@@ -613,14 +643,21 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 	if not SHOP_FOR[category] then
 		return
 	end
-	if not inRange(player, category) then
+	if not inRange(player, category, itemId) then
 		notify(player, "Walk up to the counter to buy.")
 		return
 	end
-	local shut = closedShop(player, category, ShopService.Hour())
+	local shut = closedShop(player, category, itemId, ShopService.Hour())
 	if shut then
 		notify(player, DialogueData.Sleepy(shut, ShopService.Hour()))
 		return
+	end
+	local here = shopsInReach(player, category, itemId)
+	for _, name in ipairs(here) do
+		if ShopLogic.FerryClosed(name) then
+			notify(player, "Ferry required. Sparkworks is shut until the boat runs.")
+			return
+		end
 	end
 	if category == "Axe" then
 		buyAxe(player, itemId)
@@ -634,6 +671,8 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 		buySawmill(player, itemId)
 	elseif category == "Blueprint" then
 		buyBlueprint(player, itemId)
+	elseif category == "Charge" then
+		buyCharge(player, itemId)
 	end
 end
 
@@ -758,6 +797,14 @@ local function deliver(player: Player, profile: any, box: BoxGrant, axe: ItemCat
 		MilestoneService.Mark(player, "First upgrade bought")
 		QuestService.Event(player, "axeBought")
 		QuestService.RefreshNextGoal(player)
+	elseif box.kind == "Charge" then
+		if box.itemId ~= "BlastingCharge" then
+			return nil
+		end
+		local MiningService = require(script.Parent.MiningService)
+		if MiningService.AddBombs(player, 1) then
+			notify(player, "Bought a blasting charge.")
+		end
 	elseif box.kind == "Gear" then
 		local gear = ItemCatalog.GetGear(box.itemId)
 		if gear then
@@ -926,6 +973,14 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 	if not free and type(shopId) == "string" and not ShopHoursLogic.IsOpen(shopId, ShopService.Hour()) then
 		return fail("sleepy")
 	end
+	-- The harbour model carries FerryRequired. A unit test with no world
+	-- still exercises the price. The live map refuses the sale.
+	if type(shopId) == "string" and ShopLogic.FerryClosed(shopId) and map ~= nil then
+		local shopModel = map:FindFirstChild(shopId)
+		if shopModel ~= nil and shopModel:GetAttribute("FerryRequired") == true then
+			return fail("ferry")
+		end
+	end
 	local limited = not free and (box.limited == true or (box.kind == "Cosmetic" and box.itemId == "LampPost"))
 	local price = if eventPrice ~= nil then eventPrice else StoreStock.UnitPrice(box.kind, box.itemId, limited, loop)
 	if free then
@@ -1045,6 +1100,15 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		end
 		if not hasLand(profile) then
 			return fail("needsPlot")
+		end
+	elseif box.kind == "Charge" then
+		if box.itemId ~= "BlastingCharge" then
+			return fail("locked")
+		end
+		local MiningService = require(script.Parent.MiningService)
+		if not MiningService.CanTakeBombs(player, 1) then
+			notify(player, "You can't carry another blasting charge.")
+			return fail("locked")
 		end
 	elseif box.kind ~= "Cosmetic" then
 		return fail("locked")

@@ -391,7 +391,7 @@ return function(t)
 		local hasSpot = string.find(plan, "WorldPlan.TownGondolaSpot = Vector3.new(-40, 0, 150)", 1, true) ~= nil
 		local hasLodge = string.find(plan, "function WorldPlan.GateLodge(): CFrame?", 1, true) ~= nil
 		t.eq(hasSpot, not hasLodge)
-		t.eq(string.find(plan, "at(-112, -20, math.pi)", 1, true) ~= nil, true)
+		t.eq(string.find(plan, "at(-112, -20, math.pi)", 1, true), nil)
 		t.eq(string.find(plan, "at(-136, -20, math.pi)", 1, true) ~= nil, true)
 		t.eq(string.find(plan, "local LIGHTHOUSE_Z = { -440, -180 }", 1, true) ~= nil, true)
 		t.eq(string.find(plan, "CFrame.new(-84, 0, 117.7)", 1, true) ~= nil, true)
@@ -401,7 +401,7 @@ return function(t)
 		for _, entry in ipairs(keep.world) do
 			paths[entry.path] = entry
 		end
-		t.ok(paths["TimberlineMap/TownScenes/SkyForgeCourt/Floor/KeeperSpot"] ~= nil)
+		t.ok(paths["TimberlineMap/SkyForge/Floor/KeeperSpot"] ~= nil)
 		t.ok(paths["TimberlineMap/Dealership/ShopDoor/DoorBlock"] ~= nil)
 		t.eq(paths["TimberlineMap/Dealership/ShopDoor/DoorBlock"].pos[1], 189.25)
 		t.ok(paths["TimberlineMap/TollBooth/Counter"] ~= nil)

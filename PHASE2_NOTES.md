@@ -1,5 +1,16 @@
 # Phase 2+ build notes
 
+## T412 shops placed (28 October 2026, branch `cursor/t412-shops-placed-cbeb`)
+
+Nothing here has been seen in Studio. Cloud tests build the world and check pins, doors, aisles, stock, and the find-chain. They do not walk a character or take a toll.
+
+Studio checks:
+1. Spawn, walk to the Tool Shed and the Weigh House, and buy an axe. No toll.
+2. Cross the lift bridge, pay $100 once, and test-drive on Dale's lot. The lot is the same bank as before.
+3. Buy a coat at the Frost Road kiosk and boots at the Caldera rest. Buy a lantern and a blasting charge at Odds and Ends. Those three are not in the General Store.
+4. The old town Sparkworks spot and the ground Sky Forge are gone. The cloud forge shows the Keeper and the four sockets. Sparkworks on the harbour reads "Ferry required" and will not sell.
+5. Walk each store: counter by the door on the new ones, a wide aisle, a lit hero, nothing floating. Yes or no on the greyboxes (Land Office, harbour Sparkworks, Sky Forge, Sky Market, secret cave).
+
 ## T411 town sawmill and Weigh House (27 October 2026, branch `cursor/t411-sawmill-weigh-1d06`)
 
 Nothing here has been seen in Studio. Cloud tests do not run physics, so a live drag and a truck reversing into the bay are Studio checks. Before shots are the previous part yard, frozen before this change. After shots are the remade part yard (`TownMeshes` off in the preview, because the uploaded mill mesh is still the old one). Both are in `preview/t411/`.

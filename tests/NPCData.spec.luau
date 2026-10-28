@@ -132,7 +132,13 @@ return function(t)
 			local p = npc.spot.position or npc.spot.fallback
 			-- The Hermit lives in the Secret Cave; Old Tolly and Cap'n Moss
 			-- keep the toll booth and the ferry dock, out in the world.
-			if p and npc.id ~= "Hermit" and npc.spot.ground == nil then
+			-- Juno, Nell, Soot and Nim keep counters outside the town square (T412).
+			local outOfTown = npc.id == "Hermit"
+				or npc.id == "Juno"
+				or npc.id == "Nell"
+				or npc.id == "Soot"
+				or npc.id == "Nim"
+			if p and not outOfTown and npc.spot.ground == nil then
 				-- (The Dealership's keeper stands in the showroom hall, on the hall's own
 				-- flat zone east of the town's.)
 				t.ok(

@@ -929,7 +929,7 @@ function BoxService.StockLot(lot: Model, counter: BasePart?)
 end
 
 function BoxService.StockMap(map: Instance)
-	for _, name in ipairs({ "ToolShed", "HearthAndHome", "Sparkworks" }) do
+	for _, name in ipairs({ "ToolShed", "HearthAndHome", "Sparkworks", "CoatKiosk", "HeatBoots", "OddsAndEnds" }) do
 		local model = map:FindFirstChild(name)
 		if model and model:IsA("Model") then
 			BoxService.StockShop(model)

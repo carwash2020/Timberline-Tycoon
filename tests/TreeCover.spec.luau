@@ -202,7 +202,7 @@ return function(t)
 		t.ok(#bad.old <= LEGACY_ROAD, report(bad.old))
 	end)
 
-	local LEGACY_KEEPOUT = 67 -- measured (the plot rings and the first trees are fixed)
+	local LEGACY_KEEPOUT = 68 -- measured. 67 were the plot rings and the first trees. The Heat Boots floor's skirt holds one more fixed trunk.
 
 	t.test(
 		"keep-outs and footpaths: no cover trunk in a point of interest's room or within 4 studs of a footpath",

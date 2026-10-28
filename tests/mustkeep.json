@@ -96,9 +96,9 @@
       "note": "Sparkworks front door",
       "path": "TimberlineMap/Sparkworks/ShopDoor/DoorBlock",
       "pos": [
-        135,
-        5.93,
-        113.77
+        1115,
+        3.93,
+        -718.22
       ],
       "tol": 0.5
     },
@@ -167,9 +167,9 @@
       "note": "Sparkworks counter",
       "path": "TimberlineMap/Sparkworks/Counter",
       "pos": [
-        135,
-        1.3,
-        143.5
+        1115,
+        -0.7,
+        -688.5
       ],
       "tol": 0.5
     },
@@ -185,61 +185,61 @@
     },
     {
       "note": "Sky Forge keeper spot",
-      "path": "TimberlineMap/TownScenes/SkyForgeCourt/Floor/KeeperSpot",
+      "path": "TimberlineMap/SkyForge/Floor/KeeperSpot",
       "pos": [
-        -112,
-        1.4,
-        -14
+        -32,
+        841.4,
+        812
       ],
       "tol": 0.5
     },
     {
       "note": "Sky Forge temper spot",
-      "path": "TimberlineMap/TownScenes/SkyForgeCourt/Anvil/TemperSpot",
+      "path": "TimberlineMap/SkyForge/Anvil/TemperSpot",
       "pos": [
-        -112,
-        3.5,
-        -22
+        -32,
+        843.5,
+        820
       ],
       "tol": 0.5
     },
     {
       "note": "relic socket",
-      "path": "TimberlineMap/TownScenes/SkyForgeCourt/RelicGem#1/Socket_FrostRelic",
+      "path": "TimberlineMap/SkyForge/RelicGem#1/Socket_FrostRelic",
       "pos": [
-        -118.8,
-        4,
-        -26
+        -25.2,
+        844,
+        824
       ],
       "tol": 0.5
     },
     {
       "note": "relic socket",
-      "path": "TimberlineMap/TownScenes/SkyForgeCourt/RelicGem#2/Socket_EmberRelic",
+      "path": "TimberlineMap/SkyForge/RelicGem#2/Socket_EmberRelic",
       "pos": [
-        -119.6,
-        4,
-        -26
+        -24.4,
+        844,
+        824
       ],
       "tol": 0.5
     },
     {
       "note": "relic socket",
-      "path": "TimberlineMap/TownScenes/SkyForgeCourt/RelicGem#3/Socket_GloamRelic",
+      "path": "TimberlineMap/SkyForge/RelicGem#3/Socket_GloamRelic",
       "pos": [
-        -120.4,
-        4,
-        -26
+        -23.6,
+        844,
+        824
       ],
       "tol": 0.5
     },
     {
       "note": "relic socket",
-      "path": "TimberlineMap/TownScenes/SkyForgeCourt/RelicGem#4/Socket_LumenRelic",
+      "path": "TimberlineMap/SkyForge/RelicGem#4/Socket_LumenRelic",
       "pos": [
-        -121.2,
-        4,
-        -26
+        -22.8,
+        844,
+        824
       ],
       "tol": 0.5
     },

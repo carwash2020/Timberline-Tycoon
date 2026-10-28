@@ -17,6 +17,7 @@ local LandmarkArt = require(script.Parent.Parent.Art.LandmarkArt)
 local RegionLogic = require(script.Parent.Parent.RegionLogic)
 local BayouData = require(script.Parent.Parent.Regions.BayouData)
 local MesaData = require(script.Parent.Parent.Regions.MesaData)
+local ShopPins = require(script.Parent.ShopPins)
 local TerrainGen = require(script.Parent.TerrainGen)
 local TownTreeData = require(script.Parent.Parent.TownTreeData)
 local UndergroundData = require(script.Parent.UndergroundData)
@@ -2058,7 +2059,16 @@ end
 -- The town
 ---------------------------------------------------------------------------
 
-export type ShopSpot = { kind: string, title: string, accent: Color3, cframe: CFrame }
+export type ShopSpot = {
+	kind: string,
+	title: string,
+	accent: Color3,
+	cframe: CFrame,
+	sells: boolean?,
+	ferry: boolean?,
+	cloud: boolean?,
+	preload: boolean?,
+}
 
 -- A piece of the town's greenery (BuildingArt.Greenery builds it): kind
 -- "tree" (`woodId` at scale `size`, in a stone ring), "bush" or "rock"
@@ -2078,6 +2088,7 @@ export type Town = {
 	sellZone: CFrame, -- centre of the sell volume (WorldPlan.SellZoneSize)
 	sellPad: CFrame,
 	shops: { ShopSpot },
+	outlets: { ShopSpot },
 	campsite: CFrame,
 	murph: CFrame, -- where Murph stands, facing the spawn
 	parkingSlots: { CFrame }, -- in claim order (Index 1, 2, ...)
@@ -2427,8 +2438,9 @@ function WorldPlan.Town(): Town
 	local bankX, bankZ = pond.x, pond.z + pond.radius + 3
 	local bankY = TerrainGen.HeightAt(bankX, bankZ)
 	local DECK_BOTTOM = 1.06
+	-- The ground Sky Forge court is gone (T412). The forge stands on the
+	-- cloud outlet. The lookout stays on the meadow.
 	local scenes: { SceneSpot } = {
-		{ kind = "forge", cframe = at(-112, -20, math.pi) },
 		{ kind = "lookout", cframe = at(-136, -20, math.pi) },
 		{ kind = "bench", cframe = at(-84, 56, math.pi) },
 		{ kind = "campfire", cframe = at(-72, 56, math.pi) },
@@ -2478,20 +2490,57 @@ function WorldPlan.Town(): Town
 				title = "GENERAL STORE",
 				accent = Color3.fromRGB(122, 90, 60),
 				cframe = CFrame.new(-100, 0, 187.5), -- 43.5 deep, behind the Tool Shed with a 20-stud lane between (its path runs up the lane west of the shed)
-			},
-			{
-				-- The automation shop (36 x 36 built, 1.5x of 24 x 24; its roof reaches
-				-- x 115.5 to 154.5): east of the Mill Road (its edge is x 113) and
-				-- north of the East Link (z 94),
-				-- west of the showroom's loading pad (x 160), on the flat ground. Its
-				-- front (-Z) faces the link; SparkworksPath runs from the link's edge
-				-- to the door (WorldLayout.TownPaint).
-				kind = "Sparkworks",
-				title = "SPARKWORKS",
-				accent = Color3.fromRGB(46, 139, 139),
-				cframe = CFrame.new(135, 0, 132),
+				sells = true,
+				preload = true,
 			},
 		},
+		-- Shops that are not on the flat town square. Sparkworks included:
+		-- it left (135, 132) for the Lantern Isle harbour.
+		outlets = (function(): { ShopSpot }
+			local function accent(id: string): Color3
+				if id == "CoatKiosk" then
+					return Color3.fromRGB(191, 227, 242)
+				elseif id == "HeatBoots" then
+					return Color3.fromRGB(255, 122, 26)
+				elseif id == "OddsAndEnds" then
+					return Color3.fromRGB(142, 108, 74)
+				elseif id == "Sparkworks" then
+					return Color3.fromRGB(255, 196, 92)
+				elseif id == "SkyForge" then
+					return Color3.fromRGB(191, 216, 255)
+				elseif id == "SkyMarket" then
+					return Color3.fromRGB(255, 244, 194)
+				elseif id == "SecretShop" then
+					return Color3.fromRGB(122, 79, 208)
+				elseif id == "LandOffice" then
+					return Color3.fromRGB(201, 162, 74)
+				end
+				return Color3.fromRGB(196, 154, 99)
+			end
+			local list: { ShopSpot } = {}
+			for _, row in ipairs(ShopPins.All()) do
+				if
+					row.id ~= "ToolShed"
+					and row.id ~= "HearthAndHome"
+					and row.id ~= "Dealership"
+					and row.id ~= "WeighHouse"
+					and row.id ~= "BaitShack"
+				then
+					local y = row.y or 0
+					table.insert(list, {
+						kind = row.id,
+						title = row.title,
+						accent = accent(row.id),
+						cframe = CFrame.new(row.ox, y, row.oz) * CFrame.Angles(0, row.yaw, 0),
+						sells = row.sells,
+						ferry = row.ferry,
+						cloud = row.cloud,
+						preload = row.preload,
+					})
+				end
+			end
+			return list
+		end)(),
 		campsite = campsite,
 		murph = campsite * CFrame.new(0, 0, -3),
 		parkingSlots = slots,

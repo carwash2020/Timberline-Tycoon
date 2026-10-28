@@ -445,7 +445,10 @@ local GEAR: Shop = {
 			table.insert(ids, "Axe:" .. id)
 		end
 		for _, gear in ipairs(ItemCatalog.GearList()) do
-			table.insert(ids, gear.id)
+			-- Coat, boots and the lantern are sold at their own counters.
+			if ShopLogic.GearShop(gear.id) == "HearthAndHome" then
+				table.insert(ids, gear.id)
+			end
 		end
 		return ids
 	end,
@@ -499,7 +502,84 @@ local SAWS: Shop = {
 	end,
 }
 
-local SHOPS: { Shop } = { AXES, TRUCKS, GEAR, SAWS }
+local function gearIdsAt(shopId: string): { string }
+	local ids = {}
+	for _, gear in ipairs(ItemCatalog.GearList()) do
+		if ShopLogic.GearShop(gear.id) == shopId then
+			table.insert(ids, gear.id)
+		end
+	end
+	return ids
+end
+
+local function chargeView(id: string): RowView
+	local cash = (player:GetAttribute("Cash") :: number?) or 0
+	local price = GameConfig.DynamitePrice
+	local button, state = priceButton(price, cash)
+	return {
+		name = "Blasting Charge",
+		detail = "One charge for a boulder. Same price as at the rock.",
+		color = C.AmberDeep,
+		dim = false,
+		button = button,
+		state = state,
+		onClick = function()
+			if cash < price then
+				needMore(price, cash, "Blasting Charge")
+				return
+			end
+			Net.Remote("BuyItem"):FireServer("Charge", id)
+		end,
+	}
+end
+
+-- Gate gear. shelf = false so the counter prompt opens even while boxed
+-- shelves hide the town shop screens.
+local COAT: Shop = {
+	building = "CoatKiosk",
+	shelf = false,
+	promptText = "Buy a coat",
+	title = "Coat",
+	subtitle = "Before the snow.",
+	ids = function()
+		return gearIdsAt("CoatKiosk")
+	end,
+	view = gearView,
+}
+
+local BOOTS: Shop = {
+	building = "HeatBoots",
+	shelf = false,
+	promptText = "Buy boots",
+	title = "Heat Boots",
+	subtitle = "Before the lava.",
+	ids = function()
+		return gearIdsAt("HeatBoots")
+	end,
+	view = gearView,
+}
+
+local ODDS: Shop = {
+	building = "OddsAndEnds",
+	shelf = false,
+	promptText = "Browse odds and ends",
+	title = "Odds and Ends",
+	subtitle = "Charges and a lantern.",
+	ids = function()
+		local ids = gearIdsAt("OddsAndEnds")
+		table.insert(ids, "Charge:BlastingCharge")
+		return ids
+	end,
+	view = function(id: string): RowView
+		local chargeId = string.match(id, "^Charge:(.+)$")
+		if chargeId then
+			return chargeView(chargeId)
+		end
+		return gearView(id)
+	end,
+}
+
+local SHOPS: { Shop } = { AXES, TRUCKS, GEAR, SAWS, COAT, BOOTS, ODDS }
 
 ---------------------------------------------------------------------------
 -- The panel

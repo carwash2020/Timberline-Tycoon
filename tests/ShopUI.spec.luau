@@ -25,7 +25,7 @@ return function(t)
 			found += 1
 			t.ok(utf8.len(text) <= MAX, string.format("StoreCopy: %q is %d long", text, utf8.len(text)))
 		end
-		t.eq(found, 5, "the Tool Shed, the Dealership, Hearth & Home, the saws and the Store")
+		t.eq(found, 8, "the four town screens, the coat, the boots, odds and ends, and the Store")
 	end)
 
 	-- M1.8b: under the v2 core loop the shops show what ShopService charges
@@ -52,22 +52,35 @@ return function(t)
 		t.ok(string.find(daily, "DailyData.Bonus(bestAxeTier(), nextStreak, if loop == 2 then 2 else nil)", 1, true))
 	end)
 
-	t.test("no shop opens a buy window while boxed stores are on", function()
+	t.test("boxed town screens stay hidden, and the three counters stay open", function()
 		local shop = fs.readFile(dir .. "ShopUI.luau")
-		-- Every shop screen tied to a building is a shelf menu: the three
-		-- shops' windows hide when GameConfig.BoxedStores is on (ShopLogic).
-		local screens, shelves = 0, 0
+		-- The four town screens are shelf menus: their windows hide when
+		-- GameConfig.BoxedStores is on. Coat, boots and odds are shelf = false
+		-- so the counter prompt still opens.
+		local screens, shelves, open = 0, 0, 0
 		for body in string.gmatch(shop, "\nlocal [A-Z]+: Shop = (%b{})") do
 			if string.find(body, "building = ", 1, true) then
 				screens += 1
 				if string.find(body, "shelf = true", 1, true) then
 					shelves += 1
 				end
+				if string.find(body, "shelf = false", 1, true) then
+					open += 1
+				end
 			end
 		end
-		t.eq(screens, 4, "the Tool Shed, the Dealership, Hearth & Home and the saws")
-		t.eq(shelves, 4, "every one of them is a shelf menu")
+		t.eq(screens, 7, "four town screens plus coat, boots and odds")
+		t.eq(shelves, 4, "the Tool Shed, the Dealership, Hearth & Home and the saws")
+		t.eq(open, 3, "coat, boots and odds open from the counter")
 		t.ok(string.find(shop, "shop.shelf == true and ShopLogic.ShelfMenusHidden()", 1, true))
+		t.ok(string.find(shop, 'building = "CoatKiosk"', 1, true))
+		t.ok(string.find(shop, 'building = "HeatBoots"', 1, true))
+		t.ok(string.find(shop, 'building = "OddsAndEnds"', 1, true))
+		t.ok(
+			string.find(shop, 'ShopLogic.GearShop(gear.id) == "HearthAndHome"', 1, true),
+			"the general store lists only its own gear"
+		)
+		t.ok(string.find(shop, 'FireServer("Charge", id)', 1, true), "a charge sends BuyItem Charge")
 		local plot = fs.readFile(dir .. "PlotUI.luau")
 		t.eq(string.find(plot, "PLOT_ROW", 1, true), nil, "the list has no grow-the-plot row")
 		t.ok(string.find(plot, "BlueprintBook.Allowed(", 1, true), "the list asks the server's own rule")
