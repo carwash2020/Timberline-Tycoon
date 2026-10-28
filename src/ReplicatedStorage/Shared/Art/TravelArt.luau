@@ -34,11 +34,12 @@ local function deck(model: Model, size: Vector3, cf: CFrame, color: Color3): Par
 	return p
 end
 
--- The valley already has ground, camps, and shops under these spans. The
--- greybox shows the bridge. It does not take the space those pieces occupy.
-local function showOnly(model: Model)
+-- Rails, towers, the brace, and the booth are dress beside the lane. They
+-- do not collide, so a truck is not wedged on a post. The deck and the
+-- abutments stay solid: that is the span you walk and drive.
+local function dressOnly(model: Model)
 	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BasePart") then
+		if d:IsA("BasePart") and d.Name ~= "Deck" and d.Name ~= "Abutment" then
 			d.CanCollide = false
 		end
 	end
@@ -49,13 +50,22 @@ function TravelArt.FreeBridge(): Model
 	model:SetAttribute("Tolled", false)
 	model:SetAttribute("Width", TravelPlan.FreeBridge.width)
 	local span = TravelPlan.FreeBridge.length
-	deck(model, V3(TravelPlan.FreeBridge.width, 1, span), CF(0, 0.5, 0), Palette.PlankHoney)
+	-- Murph's camp occupies z 38–53 on this pin. The solid span sits just
+	-- south of it so the deck can collide and still miss the camp.
+	local clearZ = -16
+	deck(model, V3(TravelPlan.FreeBridge.width, 1, span), CF(0, 0.5, clearZ), Palette.PlankHoney)
+	-- The pin stays on the plan point. placeAt follows PrimaryPart, so the
+	-- deck can sit south of that point without the pivot pulling it back.
+	local pin = part(model, "Pin", V3(0.2, 0.2, 0.2), CF(0, 1, 0), Palette.IronBlack, METAL)
+	pin.Transparency = 1
+	pin.CanCollide = false
+	model.PrimaryPart = pin
 	for _, x in ipairs({ -1, 1 }) do
 		part(
 			model,
 			"Abutment",
 			V3(4, 6, span),
-			CF(x * (TravelPlan.FreeBridge.width / 2 + 2), -2, 0),
+			CF(x * (TravelPlan.FreeBridge.width / 2 + 2), -2, clearZ),
 			Palette.StoneBase,
 			STONE
 		)
@@ -63,12 +73,12 @@ function TravelArt.FreeBridge(): Model
 			model,
 			"Rail",
 			V3(0.6, 3, span),
-			CF(x * (TravelPlan.FreeBridge.width / 2 - 0.4), 2, 0),
+			CF(x * (TravelPlan.FreeBridge.width / 2 - 0.4), 2, clearZ),
 			Palette.IronBlack,
 			METAL
 		)
 	end
-	showOnly(model)
+	dressOnly(model)
 	return model
 end
 
@@ -109,7 +119,7 @@ function TravelArt.LiftBridge(): Model
 	light.Shadows = false
 	light.Parent = lamp
 	booth:PivotTo(CF(-length / 2 - 8, 0, width / 2 + 8))
-	showOnly(model)
+	dressOnly(model)
 	return model
 end
 
@@ -202,18 +212,39 @@ function TravelArt.PlaceSigns(parent: Instance, skipId: string?)
 	end
 end
 
+-- The solid deck stops where it would run through a building. The GateLodge
+-- and the coat kiosk own that ground; terrain is the surface for those few
+-- studs. Everywhere else the climb is a deck you can drive.
+local function cutsBuilding(a: { x: number, z: number }, b: { x: number, z: number }): boolean
+	local function near(x: number, z: number, px: number, pz: number, r: number): boolean
+		return (x - px) * (x - px) + (z - pz) * (z - pz) < r * r
+	end
+	for step = 0, 4 do
+		local t = step / 4
+		local x = a.x + (b.x - a.x) * t
+		local z = a.z + (b.z - a.z) * t
+		if near(x, z, -40, 720, 32) or near(x, z, -153.2, 704, 24) then
+			return true
+		end
+	end
+	return false
+end
+
 function TravelArt.SkyrootRoad(): Model
 	local model = Kit.model("SkyrootRoad")
 	local pts = TravelPlan.DrivenPoints()
-	local y = 0
 	for i = 1, #pts - 1 do
 		local a, b = pts[i], pts[i + 1]
 		local dx, dz = b.x - a.x, b.z - a.z
 		local len = math.sqrt(dx * dx + dz * dz)
-		if len > 0.5 then
-			local mid = CF((a.x + b.x) / 2, y + 0.3, (a.z + b.z) / 2)
+		if len > 0.5 and not cutsBuilding(a, b) then
+			local mx, mz = (a.x + b.x) / 2, (a.z + b.z) / 2
+			local gy = TerrainGen.HeightAt(mx, mz)
+			local mid = CF(mx, gy + 0.3, mz)
 			local yaw = math.atan2(dx, dz)
-			local slab = part(
+			-- The deck is the drive surface, seated on the ground. Shoulders
+			-- are dirt dress and do not collide.
+			part(
 				model,
 				"Deck",
 				V3(TravelPlan.MainWidth, 0.6, len),
@@ -221,7 +252,6 @@ function TravelArt.SkyrootRoad(): Model
 				Palette.RoadGravel,
 				CONCRETE
 			)
-			slab.CanCollide = false
 			part(
 				model,
 				"Shoulder",
@@ -256,7 +286,10 @@ function TravelArt.Build(parent: Instance)
 	atGround(free, TravelPlan.FreeBridge.x, TravelPlan.FreeBridge.z)
 	free.Parent = folder
 	local lift = TravelArt.LiftBridge()
-	atGround(lift, TravelPlan.LiftX, TravelPlan.LiftZ)
+	-- Crates sit on the west bank near x 86. Eight studs east, the solid
+	-- deck and abutments still cover the channel (half 18 about x 113)
+	-- and miss those crates.
+	atGround(lift, TravelPlan.LiftX + 8, TravelPlan.LiftZ)
 	persistent(lift)
 	lift.Parent = folder
 	local liftBooth = lift:FindFirstChild("Booth")

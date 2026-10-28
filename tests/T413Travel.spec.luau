@@ -89,6 +89,15 @@ return function(t)
 		t.eq(free:GetAttribute("Width"), 32)
 		t.eq(free:FindFirstChild("Booth", true), nil)
 		t.eq(free:FindFirstChild("StopRed", true), nil)
+		t.eq(free:FindFirstChild("Deck").CanCollide, true, "the town bridge deck is solid")
+		local freeAbut = 0
+		for _, d in ipairs(free:GetDescendants()) do
+			if d.Name == "Abutment" and d:IsA("BasePart") then
+				t.eq(d.CanCollide, true)
+				freeAbut += 1
+			end
+		end
+		t.eq(freeAbut, 2, "both town-bridge abutments are drive-on")
 	end)
 
 	t.test("2 and 14. the lift charges $100 once per window and pushes an unpaid crossing", function()
@@ -171,6 +180,15 @@ return function(t)
 		local deck = lift:FindFirstChild("Deck")
 		t.eq(deck.Size.X, 56)
 		t.eq(deck.Size.Z, 32)
+		t.eq(deck.CanCollide, true, "the lift deck is solid")
+		local liftAbut = 0
+		for _, d in ipairs(lift:GetDescendants()) do
+			if d.Name == "Abutment" and d:IsA("BasePart") then
+				t.eq(d.CanCollide, true)
+				liftAbut += 1
+			end
+		end
+		t.eq(liftAbut, 2, "both lift abutments are drive-on")
 		t.eq(lift:GetAttribute("Tolled"), true)
 		t.ok(lift:FindFirstChild("Booth", true) ~= nil)
 		t.ok(lift:FindFirstChild("StopRed", true) ~= nil)
@@ -666,6 +684,9 @@ return function(t)
 		t.eq(board:GetAttribute("Text"), FerryLogic.TimetableText())
 		local stone = TravelArt.StoneBridge()
 		t.eq(stone:FindFirstChild("Deck").Size.X, 24)
+		local sky = TravelArt.SkyrootRoad()
+		local skyDeck = sky:FindFirstChild("Deck")
+		t.ok(skyDeck ~= nil and skyDeck.CanCollide == true, "the Skyroot drive surface is solid")
 		local foot = TravelArt.FootBridge()
 		t.eq(foot:FindFirstChild("Deck").Size.X, 8)
 		local kept = BuildingArt.Bridge(Vector3.new(0, 0, 0), Vector3.new(0, 0, 12), 8)
