@@ -1370,6 +1370,30 @@ function MiningService.TrackRubble(id: string, model: Model, exit: Vector3, seal
 	})
 end
 
+function MiningService.BombCount(player: Player): number
+	local mining = miningOf(player)
+	return if mining then mining.bombs else 0
+end
+
+function MiningService.CanTakeBombs(player: Player, n: number): boolean
+	local mining = miningOf(player)
+	return mining ~= nil and n >= 1 and mining.bombs + n <= MiningLogic.ChargeCap
+end
+
+function MiningService.AddBombs(player: Player, n: number): boolean
+	if not MiningService.CanTakeBombs(player, n) then
+		return false
+	end
+	local mining = miningOf(player)
+	if mining == nil then
+		return false
+	end
+	mining.bombs += n
+	publishGear(player, mining)
+	giveBomb(player)
+	return true
+end
+
 function MiningService.Init()
 	if started then
 		return

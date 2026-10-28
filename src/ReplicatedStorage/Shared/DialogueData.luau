@@ -231,7 +231,7 @@ function DialogueData.GusLine(step: string?): string
 end
 
 function DialogueData.Shops(): { string }
-	return { "ToolShed", "HearthAndHome", "Dealership", "Sparkworks" }
+	return { "ToolShed", "HearthAndHome", "Dealership", "Sparkworks", "CoatKiosk", "HeatBoots", "OddsAndEnds" }
 end
 
 export type Card = { choice: boolean, noLabel: string }

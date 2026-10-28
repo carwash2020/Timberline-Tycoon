@@ -158,7 +158,7 @@ return function(t)
 		t.eq(chip:GetAttribute("StandRole"), "chip")
 		t.ok(plinth:HasTag("StoreStand"), "tagged for the client")
 		-- gear for a later stage is locked too; a plain sawmill is not
-		local gearModel = stand("hearth-HeatBoots", 1)
+		local gearModel = stand("HeatBoots-HeatBoots", 1)
 		t.ok(named(gearModel, "LockChip")[1] ~= nil, "boots are for stage 4")
 		local millModel, millPlinth = stand("toolshed-SawmillSturdy", 1)
 		t.eq(named(millModel, "LockChip")[1], nil, "a sawmill has no lock")

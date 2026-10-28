@@ -407,7 +407,8 @@ return function(t)
 		-- The shelf has one slot; the plan fits it.
 		local slot = StoreStock.FindInShop("HearthAndHome", "PictureWall8")
 		t.ok(slot ~= nil and slot.itemKind == "Blueprint", "the plan is on the General Store shelf")
-		t.eq(#StoreStock.ForShop("HearthAndHome"), 20)
+		-- Coat, Heat Boots, and the Lantern moved to their own counters (T412).
+		t.eq(#StoreStock.ForShop("HearthAndHome"), 17)
 		t.eq(StoreStock.UnitPrice("Blueprint", "PictureWall8", false, 2), 500)
 		for _, other in ipairs({ "PictureWall12", "ShopFront12" }) do
 			t.eq(StoreStock.FindInShop("HearthAndHome", other), nil, other .. " is not a separate box")

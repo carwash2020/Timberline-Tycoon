@@ -66,14 +66,24 @@ ShopHoursLogic.PollSeconds = 15
 
 export type Span = { open: number, close: number }
 
+-- Gate kiosks keep the Tool Shed's day. Odds and Ends keeps Hearth's day.
+-- Sparkworks has no span (the ferry sign is the shut, not the clock).
+ShopHoursLogic.KioskOpen = 6
+ShopHoursLogic.KioskClose = 20
+ShopHoursLogic.OddsOpen = 7
+ShopHoursLogic.OddsClose = 21
+
 local SPANS: { [string]: Span } = {
 	ToolShed = { open = ShopHoursLogic.ToolShedOpen, close = ShopHoursLogic.ToolShedClose },
 	HearthAndHome = { open = ShopHoursLogic.HearthOpen, close = ShopHoursLogic.HearthClose },
 	Dealership = { open = ShopHoursLogic.DealerOpen, close = ShopHoursLogic.DealerClose },
+	CoatKiosk = { open = ShopHoursLogic.KioskOpen, close = ShopHoursLogic.KioskClose },
+	HeatBoots = { open = ShopHoursLogic.KioskOpen, close = ShopHoursLogic.KioskClose },
+	OddsAndEnds = { open = ShopHoursLogic.OddsOpen, close = ShopHoursLogic.OddsClose },
 }
 
 function ShopHoursLogic.Shops(): { string }
-	return { "ToolShed", "HearthAndHome", "Dealership" }
+	return { "ToolShed", "HearthAndHome", "Dealership", "CoatKiosk", "HeatBoots", "OddsAndEnds" }
 end
 
 function ShopHoursLogic.Span(shopId: string): Span?

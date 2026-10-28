@@ -24,7 +24,16 @@ return function(t)
 		local map = Instance.new("Folder")
 		map.Name = "TimberlineMap"
 		local counters = {}
-		for i, kind in ipairs({ "ToolShed", "Dealership", "HearthAndHome", "LandOffice", "Sparkworks" }) do
+		for i, kind in ipairs({
+			"ToolShed",
+			"Dealership",
+			"HearthAndHome",
+			"LandOffice",
+			"Sparkworks",
+			"CoatKiosk",
+			"HeatBoots",
+			"OddsAndEnds",
+		}) do
 			if kind ~= skip then
 				local shop = Instance.new("Model")
 				shop.Name = kind

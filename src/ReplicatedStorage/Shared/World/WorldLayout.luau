@@ -693,10 +693,9 @@ WorldLayout.TownFloors = {
 	-- MillYard stops at x 33, so without this the grass grew over the pad.
 	-- Gravel like the yard beside it: a truck yard, not a shop floor.
 	{ name = "SellStationFloor", x0 = 31, x1 = 87, z0 = 84, z1 = 139, material = ROAD },
-	-- Sparkworks (36 x 36 at (135, 132), roof 39 x 39), a stud or two past its walls.
+	-- The old Sparkworks pad and the ground forge pad stay so the town's
+	-- heights and trees do not move. The buildings are gone (T412).
 	{ name = "SparkworksFloor", x0 = 115, x1 = 156, z0 = 112, z1 = 153, material = "Ground" },
-	-- The sky forge court on the south-west meadow (WorldPlan.Town().scenes).
-	-- A stud past the walls so grass does not grow through the floor.
 	{ name = "SkyForgeFloor", x0 = -130, x1 = -94, z0 = -36, z1 = -4, material = "Ground" },
 } :: { Paint }
 

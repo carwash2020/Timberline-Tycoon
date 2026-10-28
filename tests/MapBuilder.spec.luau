@@ -364,17 +364,20 @@ return function(t)
 		end
 	end)
 
-	t.test("T420: the built town has no Land Office: no model, no counter, no prompt named for it", function()
+	t.test("T420: the Land Office is Hank's cottage, not a shop prompt", function()
 		local s = build()
 		lastStepsRan(s)
+		local office = s.map:FindFirstChild("LandOffice")
+		t.ok(office ~= nil, "the cottage is built")
+		t.eq(office:FindFirstChild("ShopPoint", true), nil, "Hank is not a ShopService counter")
 		local count = 0
 		for _, d in ipairs(s.map:GetDescendants()) do
 			count += 1
-			local name = string.lower(d.Name)
-			t.ok(not string.find(name, "landoffice", 1, true), "a LandOffice piece is built: " .. d:GetFullName())
+			if d:IsA("ProximityPrompt") then
+				t.ok(not string.find(string.lower(d.Name), "landoffice", 1, true), d:GetFullName())
+			end
 		end
 		t.ok(count > 500, "the whole town was scanned (" .. count .. " instances)")
-		t.eq(s.map:FindFirstChild("LandOffice"), nil)
 		-- Old Hank stands where PlotSalesmanData says, with no model of his own to stand behind.
 		local hank = t.shared("NPCData").Get(t.shared("PlotSalesmanData").Id)
 		t.eq(hank.spot.kind, "fixed")
@@ -1479,13 +1482,13 @@ return function(t)
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local town = WorldPlan.Town()
 		local names = {
-			forge = "SkyForgeCourt",
 			fishing = "fishing",
 			campfire = "campfire",
 			lookout = "lookout",
 			bench = "bench",
 		}
-		t.eq(#folder:GetChildren(), 5, "the five scenes")
+		t.eq(#folder:GetChildren(), 4, "the meadow scenes; the forge left the ground")
+		t.eq(folder:FindFirstChild("SkyForgeCourt"), nil)
 		for _, spot in ipairs(town.scenes) do
 			local model = folder:FindFirstChild(names[spot.kind])
 			t.ok(model and model:IsA("Model"), names[spot.kind] .. " is built")
@@ -1508,11 +1511,14 @@ return function(t)
 			dock:FindFirstChild("Deck", true) and dock:FindFirstChild("Pile", true) and dock:FindFirstChild("Rod", true)
 		)
 		t.eq(dock:FindFirstChild("Water"), nil, "the pond is the water under the dock")
-		local forge = folder:FindFirstChild("SkyForgeCourt")
+		local forge = s.map:FindFirstChild("SkyForge")
+		t.ok(forge ~= nil, "the forge stands on the cloud")
+		t.ok(forge:GetPivot().Position.Y > 800, "cloud deck")
 		t.ok(
 			forge:FindFirstChild("Anvil", true)
 				and forge:FindFirstChild("OrderBoard", true)
 				and forge:FindFirstChild("RelicGem", true)
+				and forge:FindFirstChild("KeeperSpot", true)
 		)
 		t.ok(folder:FindFirstChild("lookout"):FindFirstChild("Telescope", true), "the lookout's telescope")
 		t.ok(folder:FindFirstChild("bench"):FindFirstChild("Back", true), "the bench's back")

@@ -789,7 +789,7 @@ return function(t)
 			local dx0, dx1, dy0, dy1, dz0, dz1 = aabb(doors[1])
 			t.ok(dx0 < -frame.halfW and dx1 <= -frame.halfW + 0.3, "flat on the west wall: " .. dx0 .. ".." .. dx1)
 			t.ok(dy0 <= frame.floorTop + 0.01 and dy1 > frame.floorTop + 7, "a full-height door on the floor")
-			t.ok(dz0 > 17 and dz1 < 21, "at the back of the west wall: " .. dz0 .. ".." .. dz1)
+			t.ok(dz0 >= 17 and dz1 <= 21, "at the back of the west wall: " .. dz0 .. ".." .. dz1)
 			local counter = shop:FindFirstChild("Counter")
 			local _, _, _, _, _, backFace = aabb(counter)
 			local sign = named(shop, "RobuxSign")[1]

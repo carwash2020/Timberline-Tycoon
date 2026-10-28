@@ -59,6 +59,8 @@ local RunService = game:GetService("RunService")
 Players.CharacterAutoLoads = false
 
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
+local ShopPlace = require(ReplicatedStorage.Shared.Art.ShopPlace)
+local ShopPins = require(ReplicatedStorage.Shared.World.ShopPins)
 local ColorMapGuard = require(ReplicatedStorage.Shared.ColorMapGuard)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -533,19 +535,47 @@ step("4. The town", function()
 		place(sign, CFrame.new(-40, 0, 168))
 	end)
 
-	step("4. The shops", function()
-		for _, spot in ipairs(town.shops) do
-			local shop = persistent(BuildingArt.Shop(spot.kind, spot.title, spot.accent))
-			shop.Name = spot.kind
-			CollectionService:AddTag(shop, "ShopDoorModel") -- ShopDoorAnim tweens its leaves
-			local counter = shop:FindFirstChild("Counter")
-			assert(counter and counter:IsA("BasePart"), "[MapBuilder] " .. spot.kind .. " has no Counter")
+	local function finishShop(shop: Model, kind: string, sells: boolean)
+		shop.Name = kind
+		local row = ShopPins.Get(kind)
+		-- Town markers stay Persistent so they are in on join. The rest stream as one model.
+		shop.ModelStreamingMode = if row and row.preload
+			then Enum.ModelStreamingMode.Persistent
+			else Enum.ModelStreamingMode.Atomic
+		shop:SetAttribute("StreamPolicy", if row and row.preload then "preload" else "ahead")
+		local counter = shop:FindFirstChild("Counter")
+		if counter and counter:IsA("BasePart") then
+			-- Same pivot as TownBuild, selling or not, so placeAt lands the origin.
+			shop.PrimaryPart = counter
+		end
+		if not sells then
+			return
+		end
+		CollectionService:AddTag(shop, "ShopDoorModel")
+		assert(counter and counter:IsA("BasePart"), "[MapBuilder] " .. kind .. " has no Counter")
+		if counter:FindFirstChild("ShopPoint") == nil then
 			local point = Instance.new("Attachment")
 			point.Name = "ShopPoint"
 			point.Position = Vector3.new(0, 0, -(counter.Size.Z / 2 + 0.5)) -- the customer's side
 			point.Parent = counter
-			shop.PrimaryPart = counter
+		end
+		shop.PrimaryPart = counter
+	end
+
+	step("4. The shops", function()
+		for _, spot in ipairs(town.shops) do
+			local shop = BuildingArt.Shop(spot.kind, spot.title, spot.accent)
+			finishShop(shop, spot.kind, true)
 			standOnGround(place(shop, spot.cframe))
+		end
+		for _, spot in ipairs(town.outlets) do
+			-- SkyForge is BuildingArt.SkyForgeCourt(), dressed in ShopPlace.
+			local shop = ShopPlace.Build(spot.kind, spot.title, spot.accent)
+			finishShop(shop, spot.kind, spot.sells == true)
+			local pos = spot.cframe.Position
+			local y = if spot.cloud then pos.Y else ShopPlace.DeckY(spot.kind)
+			local cf = CFrame.new(pos.X, y, pos.Z) * (spot.cframe - pos)
+			place(shop, cf)
 		end
 	end)
 

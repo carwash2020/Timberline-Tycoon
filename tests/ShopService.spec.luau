@@ -53,6 +53,9 @@ return function(t)
 			ToolShed = node({ Counter = node({ ShopPoint = point }) }),
 			Dealership = node({ Counter = node({ ShopPoint = point }) }), -- same spot: fine for these tests
 			HearthAndHome = node({ Counter = node({ ShopPoint = point }) }),
+			CoatKiosk = node({ Counter = node({ ShopPoint = point }) }),
+			HeatBoots = node({ Counter = node({ ShopPoint = point }) }),
+			OddsAndEnds = node({ Counter = node({ ShopPoint = point }) }),
 		})
 
 		local loader = t.loader({
@@ -653,7 +656,7 @@ return function(t)
 		s.ShopService.Hour = function()
 			return 22
 		end
-		s.buy("Gear", "InsulatedCoat")
+		s.buy("Gear", "Flashlight")
 		t.eq(s.profile.cash, 1000, "hearth is closed at 22:00")
 		t.ok(string.find(s.toasts[1], "7:00", 1, true) ~= nil, s.toasts[1])
 		s.buy("Truck", "Pickup")

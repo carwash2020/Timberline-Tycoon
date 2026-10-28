@@ -1,0 +1,13 @@
+Tool Shed: axes and mill tools.
+General Store (Hearth & Home): food, lamps, flashlight, and plans. Not the coat, the boots, or the lantern.
+Weigh House: Millie buys logs. Not moved.
+Land Office: Old Hank sells plots. The cottage is a look, not a shop id.
+Dealership: trucks and trailers. The door stayed at (189.25, 100.3).
+Coat kiosk: Insulated Coat, at the Frost Road foot.
+Heat Boots kiosk: Heat Boots, at the Caldera rest.
+Odds and Ends: blasting charges ($220) and the Lantern, at the Pine/Gloam crossroads.
+Sparkworks: logic and machines. Signed shut until the ferry.
+Sky Forge: the anvil court on the clouds. No live sales.
+Sky Market: relics on the clouds. No live sales.
+Secret shop: nothing. Cave stub, sold = false.
+Bait Shack: waders. Not moved.

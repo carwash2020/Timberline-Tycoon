@@ -186,7 +186,7 @@ return function(t)
 			end
 		end
 		t.eq(#named(model, "LockChip"), locks, "a lock card only for an item that can be locked")
-		t.ok(locks >= 1, "some Hearth & Home items are gated: " .. locks)
+		t.eq(locks, 0, "the coat, boots and lantern moved to their own counters: " .. locks)
 	end)
 
 	t.test("a warm spot hangs over every table or pair of tables, within the light caps", function()
