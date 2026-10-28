@@ -743,7 +743,7 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	model:SetAttribute("MillId", mill.id)
 	model:SetAttribute("Tier", mill.tier)
 	model:SetAttribute("TierName", mill.tierName)
-	-- Plot Rickety stays a closed timber tunnel (Lane K). The town mill is the one with a housed blade.
+	-- Rickety, on a plot or in town, is a closed timber tunnel. The saw is not exposed.
 	if mill.id == "SawmillRickety" then
 		model:SetAttribute("Tunnel", "closed")
 		model:SetAttribute("ExposedBlade", false)

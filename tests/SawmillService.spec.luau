@@ -272,51 +272,56 @@ return function(t)
 		return notes
 	end
 
-	t.test("a pine base is refused with the blockage board and a toast that names the width", function()
-		local mill = MachineArt.Build("SawmillRickety", false)
-		mill.Parent = Instance.new("Folder")
-		local intake = mill:FindFirstChild("Intake")
-		local size = V3.new(2.6, 9, 2.6)
-		local model, part = logPart(size, intake.CFrame)
-		model.Parent = Instance.new("Folder")
-		local piece = {
-			model = model,
-			root = part,
-			kind = "log",
-			woodId = "pine",
-			parts = { [1] = part },
-			nodes = { [1] = { parent = nil, children = {} } },
-			volume = Sell.VolumeU3(size.X, size.Y, size.Z),
-			ownerId = 7,
-			boost = 1,
-			verdictOk = true,
-			selling = nil,
-			dead = nil,
-			shopItem = nil,
-		}
-		toastPlayer = { UserId = 7 }
-		local now = 0
-		local notes = useMill(mill, piece, part, function()
-			return now
-		end)
-		local sign = mill:FindFirstChild("Blockage", true)
-		t.eq(sign.Transparency, 1, "the board starts hidden")
-		Sawmill.Tick()
-		t.eq(piece.selling, nil, "a pine base is not taken")
-		t.eq(sign.Transparency, 0, "BLOCKAGE shows")
-		t.eq(sign:FindFirstChildWhichIsA("SurfaceGui").Enabled, true)
-		t.eq(sign:FindFirstChildWhichIsA("TextLabel", true).Text, "BLOCKAGE")
-		t.eq(notes, { "Too big for this mill (max 1.4 u wide)" })
-		now = 5
-		Sawmill.Tick()
-		t.eq(#notes, 1, "the toast is once")
-		part.Parent = nil
-		Sawmill.Tick()
-		t.eq(sign.Transparency, 1, "the board drops when the log leaves")
-		mill:Destroy()
-		toastPlayer = nil
-		Sawmill._reset()
-	end)
+	t.test(
+		"a log past the Rickety stud limit is refused with the blockage board and a toast that names the width",
+		function()
+			local mill = MachineArt.Build("SawmillRickety", false)
+			mill.Parent = Instance.new("Folder")
+			local intake = mill:FindFirstChild("Intake")
+			local limit = Catalog.GetSawmill("SawmillRickety").maxWidth * Config.WoodUnit
+			local thick = limit + 0.05
+			local size = V3.new(thick, 9, thick)
+			local model, part = logPart(size, intake.CFrame)
+			model.Parent = Instance.new("Folder")
+			local piece = {
+				model = model,
+				root = part,
+				kind = "log",
+				woodId = "pine",
+				parts = { [1] = part },
+				nodes = { [1] = { parent = nil, children = {} } },
+				volume = Sell.VolumeU3(size.X, size.Y, size.Z),
+				ownerId = 7,
+				boost = 1,
+				verdictOk = true,
+				selling = nil,
+				dead = nil,
+				shopItem = nil,
+			}
+			toastPlayer = { UserId = 7 }
+			local now = 0
+			local notes = useMill(mill, piece, part, function()
+				return now
+			end)
+			local sign = mill:FindFirstChild("Blockage", true)
+			t.eq(sign.Transparency, 1, "the board starts hidden")
+			Sawmill.Tick()
+			t.eq(piece.selling, nil, "thicker than maxWidth times WoodUnit is not taken")
+			t.eq(sign.Transparency, 0, "BLOCKAGE shows")
+			t.eq(sign:FindFirstChildWhichIsA("SurfaceGui").Enabled, true)
+			t.eq(sign:FindFirstChildWhichIsA("TextLabel", true).Text, "BLOCKAGE")
+			t.eq(notes, { "Too big for this mill (max 2.0 u wide)" })
+			now = 5
+			Sawmill.Tick()
+			t.eq(#notes, 1, "the toast is once")
+			part.Parent = nil
+			Sawmill.Tick()
+			t.eq(sign.Transparency, 1, "the board drops when the log leaves")
+			mill:Destroy()
+			toastPlayer = nil
+			Sawmill._reset()
+		end
+	)
 
 	t.test("a teleported log and a flung log are refused", function()
 		local mill = MachineArt.Build("SawmillRickety", false)
@@ -871,5 +876,37 @@ return function(t)
 		t.eq(#spawned, #expect, "the same planks as an unbroken cut")
 		mill:Destroy()
 		Sawmill._reset()
+	end)
+
+	t.test("the same oak log sells higher from the 200 Long than from the Rickety, under BonusCap 7.5", function()
+		local function worth(millId)
+			local r = run(millId, { woodId = "oak" })
+			r.tick(0)
+			r.tick(Sawmill.Settle)
+			r.finish()
+			local total, volume, stamp = 0, 0, nil
+			for _, info in ipairs(r.spawned) do
+				stamp = info.mill
+				local v = Sell.VolumeU3(info.size.X, info.size.Y, info.size.Z)
+				volume += v
+				total += Sell.PieceValue("oak", "plank", v, nil, 1, false, info.mill, nil, 1)
+			end
+			local n = #r.spawned
+			r.mill:Destroy()
+			Sawmill._reset()
+			return total, stamp, n, volume
+		end
+		local rickety, rStamp, rCount, rVol = worth("SawmillRickety")
+		local long, lStamp, lCount, lVol = worth("Millmaster200L")
+		t.ok(rCount > 0 and lCount > 0, "both mills cut the oak")
+		t.eq(rStamp, 1)
+		t.eq(lStamp, 2.5)
+		t.ok(math.abs(lVol - rVol) < 1e-3, string.format("same volume out %s vs %s", lVol, rVol))
+		t.ok(math.abs(long / rickety - 2.5) < 1e-4, string.format("sell delta %s / %s", long, rickety))
+		t.eq(Sell.BonusCap, 7.5)
+		t.ok(math.abs(Sell.Stack(lStamp, 3, 1) - 7.5) < 1e-9, "200L x Industrial pays the cap")
+		t.ok(math.abs(Sell.Stack(rStamp, 3, 1) - 3) < 1e-9, "Rickety x Industrial is the board alone")
+		t.ok(math.abs(Sell.Stack(2.15, 2.5, 1) - 5.375) < 1e-9, "Mill200 x Steam is 5.375")
+		t.ok(math.abs(Sell.Stack(2.5, 3, 1.10) - 7.5) < 1e-9, "temper clamps the top stack once")
 	end)
 end

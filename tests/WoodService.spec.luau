@@ -761,7 +761,7 @@ return function(t)
 				mill = 0 / 0,
 				board = 99,
 			})
-			t.eq({ junk.mill, junk.board }, { 1, 3 })
+			t.eq({ junk.mill, junk.board }, { 1, 7.5 })
 		end
 	)
 

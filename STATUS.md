@@ -1,6 +1,7 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 27 October 2026. **Main is at `fd98f20` (#273, square Block wood).** This branch remakes the town sawmill and the Weigh House (`cursor/t411-sawmill-weigh-1d06`).
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 28 October 2026. **Main is at `690e9e8` (#272 BonusCap 7.5, which includes #274 ClientFreeze seat yield).** This branch remakes the town sawmill and the Weigh House (`cursor/t411-sawmill-weigh-1d06`).
+
 Every branch section below is merged to main (some headings still say "draft PR": that is how they were written); the only open work is this branch. #135 (machine meshes), #136 (backlog
 meshes) and #138 (NPCs, tutorial, goals) are all on main, and so are the Sparkworks shop in town (#144), the ButtonR2 removal
 (#143) and the right-trigger grab (#151), the load and freeze fixes (#150, #153 to #158) and the four store interiors
@@ -17,15 +18,23 @@ GrabService spec fix; #147 launch settings; #148 and #149 hardening; #150 client
 first screen fix; #153 startup errors; #154 server audit (staged terrain, save prefetch); #155 client freeze; #156 meshes never
 block the build; #157 client audit; #158 world first look; #159 store interiors: the kit, Tool Shed, Hearth & Home, Sparkworks and Dealership (#160 to #162 squashed in).
 
-**Still open:** T411 (this branch) remakes the town sawmill and the Weigh House. T410-fix (square Block wood) is on main. T409 is on main. Older "only this branch" notes below are history.
+**Still open:** T411 (this branch) remakes the town sawmill and the Weigh House. The mill and planer economy bump is on main (`690e9e8`, #272, BonusCap 7.5). The ClientFreeze seat yield is on main (`852d247`, #274). Square Block wood is on main (`fd98f20`, #273). T409 is on main (#270). Older "only this branch" notes below are history.
 
 ## T411 town sawmill and Weigh House (27 October 2026, branch `cursor/t411-sawmill-weigh-1d06`)
 
-The town mill is a shared working mill, not dress only. `BuildingArt.Sawmill` tags the model `Sawmill`, sets `MillId` `SawmillRickety` (no new catalog row), `OwnerId` 0, `Tunnel` `housing`, `ExposedBlade` true, and gives it an Intake, a Conveyor and an Output. Any nearby player can set the cut. The setting is not saved. A shared belt is not refused for `notYours` or offline. Plot mills stay owner-only, and a plot Rickety mill stays a closed tunnel with no exposed blade. Wood on the slip, the deck, the carriage and the sell rack is square Block. Volume stays `SectionMetrics` Block. `ItemCatalog` prices, bonuses and Cap are untouched.
+The town mill is a shared working mill, not dress only. `BuildingArt.Sawmill` tags the model `Sawmill`, sets `MillId` `SawmillRickety` (no new catalog row), `OwnerId` 0, `Tunnel` `closed`, `ExposedBlade` false, and gives it an Intake, a Conveyor and an Output. The saw is the same rickety tier as a plot mill: a closed timber tunnel, and the disc is not drawn. Any nearby player can set the cut. The setting is not saved. A shared belt is not refused for `notYours` or offline. Plot mills stay owner-only, and a plot Rickety mill stays a closed tunnel with no exposed blade. Wood on the slip, the deck, the carriage and the sell rack is square Block. Volume stays `SectionMetrics` Block. `ItemCatalog` prices, bonuses and Cap are the #272 values and are not edited here.
 
 The cabin door is 4 by 7 or wider, the walk in front is at least 6, and the east slip, carriage, west outfeed and both aprons have no stray solid. The Weigh House is barn red with a slate roof, a scale tower whose dial is about 6 studs and whose top is at least 18, and a truck bay at least 14 wide with rails only at the edges. Sell pay-once is unchanged. The mill and the pad stay one cluster; Dealership and Tool Shed did not move.
 
 The new GLBs are `assets/meshes/buildings/Sawmill/Sawmill.glb` and `assets/meshes/buildings/WeighHouse/WeighHouse.glb`. `TownModels` mesh ids, piece sizes and the 9944 triangle pin are unchanged, so Studio still shows the previously uploaded mill until Connor re-uploads. Live collision stays the part twin (no Hull dress). Shots: `preview/t411/`. Studio checks: PHASE2_NOTES.md "T411 town sawmill and Weigh House". Nothing here has been seen in Studio. Cloud has no physics.
+
+## Economy machine bump (27 October 2026, branch `cursor/economy-machine-bump-a1a4`, on main as #272)
+
+Connor's cash ladder (11:40 MT table, BonusCap 7.5 at 11:57 MT). Mill `plankBonus` is 1.00 / 1.35 / 1.70 / 2.15 / 2.50 and `maxWidth` is 2.0 / 2.2 / 2.4 / 2.6 / 2.6. Planer `boardBonus` is 1.50 / 2.00 / 2.50 / 3.00. `SellLogic.BonusCap` is 7.5 (was 3), so Millmaster 200 Long × Industrial (2.50 × 3.00) pays 7.5 and Millmaster 200 × Steam (2.15 × 2.50) pays 5.375. Prices, maxLength, StoreData, paint, passes and ProfileSchema are unchanged. Fit is still `Accepts` against `maxWidth × WoodUnit` (1.6): a Rickety takes an oak Block at about 2.0 studs (limit 3.2). The v2 model is now 68 s / 8.0 min / 15.1 min / 75.5 min / 12.1 h. Connor locked the CI bands the same day (~3:03 PM MT): Steel 300–510 s, Cobalt 2700–4800 s, full plot 10–14 h (36000–50400 s), Ironwood ideal $40,000–$47,000/h. E1 (0–180 s), the first $1k (780–1200 s) and Bog Cypress ($9,000–$11,000/h) stayed. Measured times did not move: Steel 482 s, Cobalt 4527 s, full plot 12.1 h, Ironwood $43,136/h, all inside. Nothing here has been seen in Studio. Studio checks: PHASE2_NOTES.md "Economy machine bump".
+
+## Client freeze: seat the forest in slices (27 October 2026, branch `cursor/clientfreeze-seat-yield-ee88`, on main as #274)
+
+`WorldPlan.Trees` seats each extra batch on the valley as it is handed over. The town's first batch also seats every country and forest tree already planned, one `LiveHeightAt` per trunk, and that loop did not yield. On this machine that was about 62 ms (54 town trunks plus 219 already planned). The #273 CI runner measured the same plan at 100.6 ms, over ClientFreeze's 100 ms limit. The pause count was unchanged from the green parent (76547), and `WorldPlan` / `TreeFill` did not change in #273. Yielding every 8 trunks, matching the final seating pass, splits that stretch. The Y values do not change. Square Block wood stays. ItemCatalog caps, bonuses and prices stay. Studio checks: PHASE2_NOTES.md "Client freeze: seat the forest in slices".
 
 ## T410-fix square Block wood (27 October 2026, branch `cursor/t410-square-block-wood-ee88`)
 

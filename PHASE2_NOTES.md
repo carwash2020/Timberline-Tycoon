@@ -9,12 +9,34 @@ Studio checks:
 2. Back the starter truck into the bay. The bay stays empty of posts and racks. Selling that log pays once. Touching the pad again does not pay again. Planks pay more than the log they came from.
 3. Walk the cabin door and the front path. The door is at least 4 wide and 7 tall. Nothing solid stands in the slip, the carriage, the outfeed or that walk.
 4. From the spawn approach, about 100 studs out, the scale tower and the WEIGH dial read. The mill and the Weigh House are still one cluster on the river side. The Dealership and the Tool Shed have not moved.
-5. Upload the new GLBs (steps below) before judging the mesh. Until then the mill you see is the previous upload. With TownMeshes off, the part yard is the remake: honey planks, slate roof, square logs, barn-red Weigh House, iron blade housing. Plot mills are unchanged and the rickety one is still a closed tunnel.
+5. Upload the new GLBs (steps below) before judging the mesh. Until then the mill you see is the previous upload. With TownMeshes off, the part yard is the remake: honey planks, slate roof, square logs, barn-red Weigh House, and a closed timber tunnel where the rickety saw sits. The disc is not drawn. Plot mills are unchanged and the rickety one is still a closed tunnel.
 
 Mesh upload (Rojo cannot sync MeshId):
 1. Bulk Import `assets/meshes/buildings/Sawmill/Sawmill.glb`. Replace each existing `TownModels` Sawmill piece id (Body, Collision, Roof, Door, Glow, SawBlade, Sign, Smokestack) with the new piece's id. Then set that piece's `size` to the new node's bounds, or the mesh stretches to the old size. Do not zero the ids.
 2. Bulk Import `assets/meshes/buildings/WeighHouse/WeighHouse.glb`. It has no `TownModels` row yet (meshId 0). The live Weigh House stays the part build until a row is wired. Leave it unwired unless you want it dressed.
 3. New Play afterwards. Output should not warn `[TownMeshes] Sawmill`. The part posts are gone and the Intake, belt and outfeed are still there.
+
+## Economy machine bump (27 October 2026, branch `cursor/economy-machine-bump-a1a4`)
+
+Nothing here has been seen in Studio. Cloud tests cover the catalog, the stamp, the sell stack and the oak cut. They do not run a live mill.
+
+Studio checks:
+1. Place a Rickety Sawmill. Feed it an oak log about 2 studs thick. It takes the log. A log thicker than 3.2 studs is refused, and the toast says "max 2.0 u wide".
+2. Mill the same oak on a Rickety and on a Millmaster 200 Long. The 200 Long planks sell for 2.5× the Rickety planks (stamps 1.00 and 2.50). The shelf prices are still $130 and $86,500.
+3. Plane a plank on the Industrial planer. The board stamp is 3.00. A 200 Long plank finished on that planer sells at 7.5× a plain plank.
+4. A Millmaster 200 plank (stamp 2.15) finished on the Steam planer (stamp 2.50) sells at 5.375×, not clamped at 3.
+5. Tool Shed prices for the five mills and four planers are unchanged. The 200 Long and the Industrial planer still take a plank up to 18.9 u.
+
+The v2 model (`ECONOMY.md`) is 68 s / 8.0 min / 15.1 min / 75.5 min / 12.1 h. Connor locked the CI bands the same day (~3:03 PM MT): Steel 300–510 s (model 482 s), Cobalt 2700–4800 s (model 4527 s), full plot 10–14 h (model 12.1 h), Ironwood ideal $40,000–$47,000/h (model $43,136). E1, the first $1k and Bog Cypress ($9,000–$11,000/h) were already inside and did not move. `lune run tools/economy --check` passes on those guards.
+
+## Client freeze: seat the forest in slices (27 October 2026, branch `cursor/clientfreeze-seat-yield-ee88`)
+
+Square Block wood is unchanged. Nothing here has been seen in Studio.
+
+Studio checks:
+1. Join and walk the starter grove, then out to a country stand and the forest ring. Trunks stand where they did before this branch. X and Z are the plan; Y is still the valley height.
+2. While the rest of the forest fills in, the frame should not hitch for about a tenth of a second. Chopping, the square trunk, and the mill are unchanged.
+
 
 ## T410 square Block wood (27 October 2026, branch `cursor/t410-square-block-wood-ee88`)
 

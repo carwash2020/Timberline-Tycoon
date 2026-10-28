@@ -10,13 +10,14 @@
 --     while it was cut). 2x Cash is applied once per sale, on the total.
 --   * A plank also carries two multipliers it was stamped with when it was
 --     made (V2_PLAN.md §2h): `mill`, the plankBonus of the sawmill that cut
---     it (1.0 to 1.5), and `board`, the boardBonus of the planer that
---     finished it (1.2 to 2.0; absent on an unplaned plank). A piece keeps
+--     it (1.00 to 2.50), and `board`, the boardBonus of the planer that
+--     finished it (1.50 to 3.00; absent on an unplaned plank). A piece keeps
 --     them for life, like figure and boost; a piece without them is 1.0.
 --   * `t` is the Prosperous temper stamped when the tree was felled
 --     (1, 1.04, 1.07 or 1.10). A log sells for price × t. A plank sells
---     for price × min(BonusCap, plankBonus × boardBonus × t). The cap is
---     on the product, so mill 2 and board 1.8 cannot pass 3.
+--     for price × min(BonusCap, mill × board × t). BonusCap is 7.5, so
+--     200L × Industrial (2.50 × 3.00) pays through. Mill200 × Steam
+--     (2.15 × 2.50) is 5.375. Temper on that top stack clamps once.
 --   * Wood pays its owner, not whoever pushed it onto the pad; an owner
 --     who has left passes it to the last player who held it; nobody
 --     online gets nothing (the wood still goes).
@@ -77,8 +78,9 @@ function SellLogic.PieceValue(
 end
 
 -- A stamped bonus, as it counts: never under 1 (an old piece has none),
--- never above BonusCap (a save is data), and NaN is 1.
-SellLogic.BonusCap = 3
+-- never above BonusCap (a save is data), and NaN is 1. 7.5 lets
+-- 200L (2.50) × Industrial (3.00) pay through.
+SellLogic.BonusCap = 7.5
 
 function SellLogic.Bonus(value: number?): number
 	if type(value) ~= "number" or value ~= value then
@@ -103,7 +105,8 @@ function SellLogic.Temper(value: number?): number
 end
 
 -- The plank multiplier: each stamp counts as Bonus does, then the product
--- is capped once. mill 2 and board 1.8 land on BonusCap, not on 3.6.
+-- is capped once. 200L × Industrial (2.50 × 3.00) lands on BonusCap.
+-- Mill200 × Steam (2.15 × 2.50) is 5.375, under the cap.
 function SellLogic.Stack(mill: number?, board: number?, temper: number?): number
 	local product = SellLogic.Bonus(mill) * SellLogic.Bonus(board) * SellLogic.Temper(temper)
 	return math.min(SellLogic.BonusCap, product)

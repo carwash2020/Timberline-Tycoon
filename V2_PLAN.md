@@ -255,15 +255,15 @@ PonyTrailer = { v2 = { price = 1800 } }, RanchTrailer = { v2 = { price = 6000 } 
 Limits are in u.
 
 ```lua
-SawmillRickety = { displayName = "Rickety Sawmill",     priceCash = 130,   maxLength = 10.9, maxWidth = 1.4, maxX = 1.8, maxY = 1.2 },
-SawmillSturdy  = { displayName = "Sturdy Sawmill",      priceCash = 1600,  maxLength = 10.9, maxWidth = 1.6, maxX = 2.4, maxY = 1.6 },
-Millmaster100  = { displayName = "Millmaster 100",      priceCash = 11000, maxLength = 10.9, maxWidth = 2.0, maxX = 3.0, maxY = 2.0 },
+SawmillRickety = { displayName = "Rickety Sawmill",     priceCash = 130,   maxLength = 10.9, maxWidth = 2.0, maxX = 1.8, maxY = 1.2 },
+SawmillSturdy  = { displayName = "Sturdy Sawmill",      priceCash = 1600,  maxLength = 10.9, maxWidth = 2.2, maxX = 2.4, maxY = 1.6 },
+Millmaster100  = { displayName = "Millmaster 100",      priceCash = 11000, maxLength = 10.9, maxWidth = 2.4, maxX = 3.0, maxY = 2.0 },
 Millmaster200  = { displayName = "Millmaster 200",      priceCash = 22500, maxLength = 10.9, maxWidth = 2.6, maxX = 3.0, maxY = 2.6 },
 Millmaster200L = { displayName = "Millmaster 200 Long", priceCash = 86500, maxLength = 18.9, maxWidth = 2.6, maxX = 3.0, maxY = 2.6 },
 -- GameConfig: PlankStep 0.2, PlankMinX 0.6, PlankMinY 0.4 (u)
 ```
 
-In studs, the Rickety takes an oak trunk (2.0 < 2.24) but not a pine base (2.6). Elders need a Millmaster 200 (4.16 studs).
+In studs, Accepts compares thickness to maxWidth × WoodUnit (1.6). The Rickety (2.0 u = 3.2 studs) takes an oak Block (~2.0) and a pine base (2.6). Millmaster 200 and 200 Long still stop at 2.6 u (4.16 studs).
 
 ### 2f. GameConfig additions (M1.0)
 
@@ -320,32 +320,32 @@ ConveyorSpeed = 4, LogicEvalsPerTick = 200, LogicTickSec = 0.1, MaxConveyorsPerP
 
 Connor: "create different versions of the sawmill ... they progress in cost but also upgrade how much you get from the sold items", then planers, conveyors, and "an object in a box: you buy the box, open it, and the object is placed down as a one-time use".
 
-**Sawmills** (`ItemCatalog.Sawmills`, the ids and prices are unchanged). A mill stamps its `plankBonus` on every plank it cuts (`Piece.mill`, attribute `MillBonus`); `SellLogic.PieceValue` multiplies a plank's value by it, server-side only. A plank cut again keeps the higher of the old and the new stamp. A piece with no stamp (a log, an old plank, an old Sky Bin entry or truck-load piece) is 1.0. Stamps are clamped to 1 to `SellLogic.BonusCap` (3), so a hand-edited save can't print money.
+**Sawmills** (`ItemCatalog.Sawmills`, the ids and prices are unchanged). A mill stamps its `plankBonus` on every plank it cuts (`Piece.mill`, attribute `MillBonus`); `SellLogic.PieceValue` multiplies a plank's value by it, server-side only. A plank cut again keeps the higher of the old and the new stamp. A piece with no stamp (a log, an old plank, an old Sky Bin entry or truck-load piece) is 1.0. Stamps are clamped to 1 to `SellLogic.BonusCap` (7.5), so a hand-edited save can't print money.
 
-| Tier | id | Label | Price | plankBonus | Cut step (u) | Max cut X by Y (u) | Belt feed (u³/min) |
-|---|---|---|---|---|---|---|---|
-| 1 | SawmillRickety | Rickety | $130 | 1.00 | 0.2 | 1.8 x 1.2 | 6 |
-| 2 | SawmillSturdy | Sturdy | $1,600 | 1.10 | 0.2 | 2.4 x 1.6 | 14 |
-| 3 | Millmaster100 | Mill | $11,000 | 1.22 | 0.1 | 3.0 x 2.0 | 30 |
-| 4 | Millmaster200 | Steam | $22,500 | 1.36 | 0.1 | 3.0 x 2.6 | 60 |
-| 5 | Millmaster200L | Industrial | $86,500 | 1.50 | 0.05 | 3.0 x 2.6 (18.9 u long) | 110 |
+| Tier | id | Label | Price | plankBonus | maxWidth (u) | Cut step (u) | Max cut X by Y (u) | Belt feed (u³/min) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | SawmillRickety | Rickety | $130 | 1.00 | 2.0 | 0.2 | 1.8 x 1.2 | 6 |
+| 2 | SawmillSturdy | Sturdy | $1,600 | 1.35 | 2.2 | 0.2 | 2.4 x 1.6 | 14 |
+| 3 | Millmaster100 | Mill | $11,000 | 1.70 | 2.4 | 0.1 | 3.0 x 2.0 | 30 |
+| 4 | Millmaster200 | Steam | $22,500 | 2.15 | 2.6 | 0.1 | 3.0 x 2.6 | 60 |
+| 5 | Millmaster200L | Industrial | $86,500 | 2.50 | 2.6 | 0.05 | 3.0 x 2.6 (18.9 u long) | 110 |
 
-**Planers** (`ItemCatalog.Machines`, `Shared/PlanerLogic`, `PlanerService`). A plank in, a finished board out: the SAME piece, planed down to the setting and stamped with `boardBonus` (`Piece.board`, attributes `BoardBonus` and `Finished`). A plank bigger than the setting is planed down (the shavings are lost, so the board is smaller); one smaller than the setting is refused, never grown. A finished board is refused (the bonus never stacks). Sale value = volume x plank price x figure x boost x Lux x `mill` x `board`.
+**Planers** (`ItemCatalog.Machines`, `Shared/PlanerLogic`, `PlanerService`). A plank in, a finished board out: the SAME piece, planed down to the setting and stamped with `boardBonus` (`Piece.board`, attributes `BoardBonus` and `Finished`). A plank bigger than the setting is planed down (the shavings are lost, so the board is smaller); one smaller than the setting is refused, never grown. A finished board is refused (the bonus never stacks). Sale value = volume x plank price x figure x boost x Lux x min(BonusCap, `mill` x `board` x `t`).
 
 | Tier | id | Label | Price | boardBonus | Step (u) | Setting range X by Y (u) | Longest plank (u) | Belt feed (u³/min) |
 |---|---|---|---|---|---|---|---|---|
-| 1 | PlanerHand | Hand | $2,500 | 1.20 | 0.2 | 0.6-1.8 by 0.4-1.2 | 10.9 | 8 |
-| 2 | PlanerBench | Bench | $9,000 | 1.40 | 0.2 | 0.6-2.4 by 0.4-1.6 | 10.9 | 18 |
-| 3 | PlanerSteam | Steam | $30,000 | 1.65 | 0.1 | 0.6-3.0 by 0.4-2.0 | 10.9 | 40 |
-| 4 | PlanerIndustrial | Industrial | $95,000 | 2.00 | 0.05 | 0.6-3.0 by 0.4-2.6 | 18.9 | 80 |
+| 1 | PlanerHand | Hand | $2,500 | 1.50 | 0.2 | 0.6-1.8 by 0.4-1.2 | 10.9 | 8 |
+| 2 | PlanerBench | Bench | $9,000 | 2.00 | 0.2 | 0.6-2.4 by 0.4-1.6 | 10.9 | 18 |
+| 3 | PlanerSteam | Steam | $30,000 | 2.50 | 0.1 | 0.6-3.0 by 0.4-2.0 | 10.9 | 40 |
+| 4 | PlanerIndustrial | Industrial | $95,000 | 3.00 | 0.05 | 0.6-3.0 by 0.4-2.6 | 18.9 | 80 |
 
-A top-tier board is worth 1.5 x 2.0 = 3.0 x a plain plank (and a plank is worth 2.5 x the log). Limits per plot: **2 planers**, the owner's only (a plot with more is a factory, not a plot you tend; the shop refuses a box past the cap and the placer refuses a placing past it, whichever comes first) and **150 belt pieces** (`GameConfig.MaxConveyorsPerPlot`).
+A top-tier board is worth 2.50 × 3.00 = 7.50 × a plain plank, which is `SellLogic.BonusCap` (Connor, 27 Oct 2026). A plank is still worth at least 2.5 × the log. Mill200 × Steam (2.15 × 2.50) is 5.375, under the cap. Prices and maxLength are unchanged. Limits per plot: **2 planers**, the owner's only (a plot with more is a factory, not a plot you tend; the shop refuses a box past the cap and the placer refuses a placing past it, whichever comes first) and **150 belt pieces** (`GameConfig.MaxConveyorsPerPlot`).
 
 **Adjustable output size.** Every mill and planer has an X by Y setting in steps of its own tier's step (finer on the higher tiers) and inside its own limits (wider on the higher tiers); the panel (board on the machine and the screen panel) shows the size and the limit ("up to 1.8 x 1.2 u, steps of 0.2"). `SawmillSet` / `PlanerSet` are one step per press, owner only, standing at the machine, rate limited (RateLimiter), clamped on the server and saved in `PlacedItem.data = { x, y }`; a saved setting is clamped again on every load, and a cut saved on the old 0.2 grid is a legal cut on every finer grid. Plank LENGTH is not adjustable: it is the log's, up to the mill's `maxLength` (no design for it yet). A plank's value follows its volume x the tier bonus, so a bigger or smaller cut changes how many planks a log makes, never the price per u³.
 
 **Boxes, one use.** Sawmills, planers and belt pieces are bought as a box at the Tool Shed. Opening the box starts a placement ghost on your plot (`BoxUnpack` mode "place", `BoxService.OnPlace`, WorldFX "PlaceBox"); confirming sends `PlaceBlueprint(id, x, z, rot, y, boxUid)` and `PlotService.Place` checks the box (`BoxService.ReadyForPlacement`: paid, unopened, yours, the right item), runs the usual placing checks, and only then spends it (`SpendForPlacement`: owed no more, gone from `profile.storage`, folded away). Cancelling or a refused placing keeps the box. There is no hammer stock, no blueprint-book entry and no re-boxing. The hammer can still **move and turn** a placed one, and **sell it back for half** (the item is gone, not boxed). Old saves with a sawmill in `sawmillStock` keep working: the stock path is still read by `PlotService.Place` (nothing is migrated or lost). The Sky Bin and the chop saw keep their hammer flow.
 
-**Economy (V2_PLAN §17).** This is a late-game sink and the early ladder is untouched: no price, reward or wood number moved. `tools/economy` does not buy planers or belts and prices every plank at the plain plan price, so the strict ranges hold (first sale 68 s, Steel Axe 7.9 min, first $1k 13.7 min, Cobalt 51.4 min, full plot 30.5 h). I tried modelling the bonus (the best mill owned multiplies plank prices): at 1.0 to 1.5 the full plot falls to 20.8 h (outside 28-36 h), at 1.0 to 1.25 to 24.6 h, at 1.0 to 1.15 to 26.4 h, and only a top bonus of about 1.05 stays in range. So the bonus is NOT modelled and the real endgame is faster than the model says for a player who mills everything on the top mill; whether to lower the bonuses is Connor's call (they are one column in `ItemCatalog.Sawmills` and `.Machines`).
+**Economy (V2_PLAN §17).** This is a late-game sink and the early ladder is untouched: no price, reward or wood number moved. `tools/economy` does not buy planers or belts and prices every plank at the plain plan price, so the strict ranges hold (first sale 68 s, Steel Axe 7.9 min, first $1k 13.7 min, Cobalt 51.4 min, full plot 30.5 h). I tried modelling the bonus (the best mill owned multiplies plank prices): at 1.0 to 1.5 the full plot falls to 20.8 h (outside 28-36 h), at 1.0 to 1.25 to 24.6 h, at 1.0 to 1.15 to 26.4 h, and only a top bonus of about 1.05 stays in range. So the bonus is NOT modelled and the real endgame is faster than the model says for a player who mills everything on the top mill; whether to lower the bonuses is Connor's call (they are one column in `ItemCatalog.Sawmills` and `.Machines`). That paragraph is the 6 Oct experiment. The live model does include `plankBonus` and `boardBonus` (`tools/economy` calls `SellLogic.Stack`). On 27 Oct 2026 Connor set the ladders above and `SellLogic.BonusCap` to 7.5. The hours in this paragraph are not the live report.
 
 **Automation (what is built).** See §10.
 

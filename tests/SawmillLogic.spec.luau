@@ -37,13 +37,30 @@ return function(t)
 		return { kind = kind or "log", sections = sections }
 	end
 
-	t.test("a straight oak trunk fits the Rickety; a pine base and a branch do not", function()
+	t.test("an oak Block fits the Rickety; past maxWidth times WoodUnit does not", function()
 		local oak = piece("log", { section(9, 2) })
 		t.eq({ Logic.Accepts(oak, rickety) }, { true, nil })
+		t.eq(rickety.maxWidth, 2)
+		t.ok(math.abs(rickety.maxWidth * u - 3.2) < 1e-9, "2.0 u is 3.2 studs, not 2.0 studs")
+		-- A pine base (2.6 studs) is inside 3.2, so the widened Rickety takes it.
 		local pine = piece("log", { section(9, 2.6) })
-		t.eq({ Logic.Accepts(pine, rickety) }, { false, "thick" })
+		t.eq({ Logic.Accepts(pine, rickety) }, { true, nil })
+		local over = piece("log", { section(9, rickety.maxWidth * u + 0.05) })
+		t.eq({ Logic.Accepts(over, rickety) }, { false, "thick" })
 		local branched = piece("log", { section(9, 2, V3.yAxis, 2, true) })
 		t.eq({ Logic.Accepts(branched, rickety) }, { false, "branch" })
+		local sturdy = Catalog.GetSawmill("SawmillSturdy")
+		local mill100 = Catalog.GetSawmill("Millmaster100")
+		local mill200 = Catalog.GetSawmill("Millmaster200")
+		local long = Catalog.GetSawmill("Millmaster200L")
+		t.ok(math.abs(sturdy.maxWidth * u - 3.52) < 1e-9, "Sturdy 2.2 u")
+		t.ok(math.abs(mill100.maxWidth * u - 3.84) < 1e-9, "Mill100 2.4 u")
+		t.ok(
+			math.abs(mill200.maxWidth * u - 4.16) < 1e-9 and math.abs(long.maxWidth * u - 4.16) < 1e-9,
+			"200 and 200L stay 2.6 u"
+		)
+		t.eq(Logic.Accepts(piece("log", { section(9, sturdy.maxWidth * u) }), sturdy), true)
+		t.eq({ Logic.Accepts(piece("log", { section(9, sturdy.maxWidth * u + 0.05) }), sturdy) }, { false, "thick" })
 	end)
 
 	t.test("a crooked log is refused, a plank is taken, and a tiny scrap is too small", function()
@@ -123,7 +140,7 @@ return function(t)
 		t.eq({ Logic.Accepts(log, short) }, { false, "long" })
 		t.eq(Logic.Accepts(log, long), true)
 		t.eq(Logic.Toast("long", short), "Too big for this mill (max 10.9 u long)")
-		t.eq(Logic.Toast("thick", rickety), "Too big for this mill (max 1.4 u wide)")
+		t.eq(Logic.Toast("thick", rickety), "Too big for this mill (max 2.0 u wide)")
 		t.eq(Logic.ShowsBlockage("thick"), true)
 		t.eq(Logic.ShowsBlockage("long"), true)
 		t.eq(Logic.ShowsBlockage("branch"), false)
@@ -225,11 +242,15 @@ return function(t)
 			local labels = { "Rickety", "Sturdy", "Mill", "Steam", "Industrial" }
 			local ids = { "SawmillRickety", "SawmillSturdy", "Millmaster100", "Millmaster200", "Millmaster200L" }
 			local prices = { 130, 1600, 11000, 22500, 86500 }
-			local bonuses = { 1.0, 1.1, 1.22, 1.36, 1.5 }
+			local bonuses = { 1.0, 1.35, 1.70, 2.15, 2.50 }
+			local widths = { 2.0, 2.2, 2.4, 2.6, 2.6 }
+			local lengths = { 10.9, 10.9, 10.9, 10.9, 18.9 }
 			local prev = nil
 			for i, mill in ipairs(list) do
 				t.eq(mill.id, ids[i], "the old ids keep their place")
 				t.eq(mill.priceCash, prices[i], "the old prices are unchanged")
+				t.eq(mill.maxWidth, widths[i])
+				t.eq(mill.maxLength, lengths[i], "maxLength is unchanged")
 				t.eq(mill.tier, i)
 				t.eq(mill.tierName, labels[i])
 				t.eq(mill.plankBonus, bonuses[i])
@@ -246,7 +267,8 @@ return function(t)
 				prev = mill
 			end
 			t.eq(list[1].plankBonus, 1, "the cheapest mill adds nothing: the early economy is unchanged")
-			t.ok(list[5].plankBonus <= Sell.BonusCap and list[5].plankBonus <= 1.5)
+			t.eq(list[5].plankBonus, 2.5)
+			t.ok(list[5].plankBonus <= Sell.BonusCap)
 		end
 	)
 
@@ -276,7 +298,7 @@ return function(t)
 	t.test("the size and its limit read on the board and the shelf", function()
 		t.eq(Logic.SizeText({ x = 1, y = 0.6 }), "1.00 × 0.60 u")
 		t.eq(Logic.RangeText(rickety), "up to 1.8 × 1.2 u, steps of 0.2")
-		t.eq(Logic.BonusText(Catalog.GetSawmill("Millmaster100")), "+22%")
+		t.eq(Logic.BonusText(Catalog.GetSawmill("Millmaster100")), "+70%")
 		t.ok(string.find(Logic.TierText(Catalog.GetSawmill("Millmaster200")), "Steam", 1, true) ~= nil)
 		t.ok(string.find(Logic.TierText(Catalog.GetSawmill("Millmaster200")), "tier 4 of 5", 1, true) ~= nil)
 		for _, mill in ipairs(Catalog.SawmillList()) do

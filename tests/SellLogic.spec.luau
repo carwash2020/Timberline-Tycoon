@@ -132,12 +132,28 @@ return function(t)
 
 	t.test("a plank's mill bonus and a board's planer bonus multiply its sale value (planks only)", function()
 		local plain = SellLogic.PieceValue("oak", "plank", 10, nil, 1)
-		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.22), plain * 1.22, 1e-9, "mill bonus")
-		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, nil, 1.4), plain * 1.4, 1e-9, "board bonus")
-		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.22, 1.4), plain * 1.22 * 1.4, 1e-9, "both")
+		t.eq(SellLogic.BonusCap, 7.5)
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.70), plain * 1.70, 1e-9, "mill bonus")
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, nil, 2), plain * 2, 1e-9, "board bonus")
+		-- Mill100 × Bench (1.70 × 2.00 = 3.40) pays through the cap.
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.70, 2), plain * 3.40, 1e-9, "both")
+		-- Industrial board alone is 3.0. Mill200 × Steam is 5.375, under 7.5.
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1, 3), plain * 3, 1e-9, "Industrial board")
+		near(
+			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 2.15, 2.50),
+			plain * 5.375,
+			1e-6,
+			"Mill200 x Steam"
+		)
+		near(
+			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 2.50, 3),
+			plain * SellLogic.BonusCap,
+			1e-9,
+			"200L x Industrial is the cap"
+		)
 		-- It stacks with figure, boost and Lux like the rest.
 		local lux = SellLogic.PieceValue("oak", "plank", 10, "curly", 2, true)
-		near(SellLogic.PieceValue("oak", "plank", 10, "curly", 2, true, 1.5, 2), lux * 3, 1e-9, "stacks")
+		near(SellLogic.PieceValue("oak", "plank", 10, "curly", 2, true, 2.15, 2.50), lux * 5.375, 1e-6, "stacks")
 		-- A log has no bonus whatever is written on it.
 		near(
 			SellLogic.PieceValue("oak", "log", 10, nil, 1, false, 1.5, 2),
@@ -191,27 +207,27 @@ return function(t)
 		end
 	)
 
-	t.test("temper t is the last argument: a log is price times t, a plank caps the product at 3", function()
+	t.test("temper t is the last argument: a log is price times t, a plank caps the product at 7.5", function()
 		local plain = SellLogic.PieceValue("oak", "plank", 10)
 		local log = SellLogic.PieceValue("oak", "log", 10)
 		near(SellLogic.PieceValue("oak", "log", 10, nil, 1, false, nil, nil, 1.10), log * 1.10, 1e-9, "log times t")
 		near(
-			SellLogic.PieceValue("oak", "log", 10, nil, 1, false, 2, 1.8, 1.10),
+			SellLogic.PieceValue("oak", "log", 10, nil, 1, false, 2.50, 3, 1.10),
 			log * 1.10,
 			1e-9,
 			"a log ignores mill and board"
 		)
 		near(
-			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 2, 1.8, 1),
-			plain * SellLogic.BonusCap,
-			1e-9,
-			"mill 2 and board 1.8 cap at 3"
+			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 2.15, 2.50, 1),
+			plain * 5.375,
+			1e-6,
+			"Mill200 x Steam is 5.375"
 		)
 		near(
-			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.5, 1.8, 1.10),
-			plain * math.min(3, 1.5 * 1.8 * 1.10),
+			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 2.50, 3, 1.10),
+			plain * SellLogic.BonusCap,
 			1e-9,
-			"under the cap"
+			"temper on the top stack clamps once at 7.5"
 		)
 		t.eq(SellLogic.Temper(1.04), 1.04)
 		t.eq(SellLogic.Temper(1.07), 1.07)
@@ -228,15 +244,16 @@ return function(t)
 			"the bin pays t"
 		)
 	end)
-	t.test("P6: the free stack clamps to 3.0; Lux 1.1 and 2x Cash apply after; all three 6.6x", function()
+	t.test("P6: the free stack clamps to 7.5; Lux 1.1 and 2x Cash apply after", function()
 		local plain = SellLogic.PieceValue("oak", "plank", 100)
-		-- Full free stack: mill 2 x board 1.8 x Prosperous III 1.10 = 3.96 -> 3.0.
-		local free = SellLogic.PieceValue("oak", "plank", 100, nil, 1, false, 2, 1.8, 1.10)
-		t.ok(math.abs(free / plain - 3.0) < 1e-9, "free only = 3.0x")
-		local withLux = SellLogic.PieceValue("oak", "plank", 100, nil, 1, true, 2, 1.8, 1.10)
-		t.ok(math.abs(withLux / plain - 3.3) < 1e-9, "Lux 1.1 is not clamped")
+		-- Top free stack: 200L 2.50 x Industrial 3.00 x Prosperous III 1.10 = 8.25 -> 7.5.
+		local free = SellLogic.PieceValue("oak", "plank", 100, nil, 1, false, 2.50, 3, 1.10)
+		t.ok(math.abs(free / plain - 7.5) < 1e-9, "free only = 7.5x")
+		local withLux = SellLogic.PieceValue("oak", "plank", 100, nil, 1, true, 2.50, 3, 1.10)
+		t.ok(math.abs(withLux / plain - 7.5 * GameConfig.LuxSellBonus) < 1e-9, "Lux 1.1 is not clamped")
 		local pay = SellLogic.Payout(withLux, 2)
-		t.ok(math.abs(pay - math.floor(plain * 6.6 + 0.5)) <= 1, "all three = 6.6x: " .. pay)
+		local stacked = 7.5 * GameConfig.LuxSellBonus * 2
+		t.ok(math.abs(pay - math.floor(plain * stacked + 0.5)) <= 1, "2x Cash after the clamp: " .. pay)
 		t.eq(SellLogic.Payout(free, 2), SellLogic.Payout(free * 2, 1), "2x Cash on the sale total, after the clamp")
 	end)
 end

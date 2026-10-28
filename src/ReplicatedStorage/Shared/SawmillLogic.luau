@@ -403,7 +403,7 @@ function SawmillLogic.LimitText(mill: Mill): string
 	return string.format("Logs up to %.0f studs long and %.1f thick", mill.maxLength * u, mill.maxWidth * u)
 end
 
--- "+22%": what this mill adds to a plank's sale value.
+-- "+70%": what this mill adds to a plank's sale value.
 function SawmillLogic.BonusText(mill: Mill): string
 	return string.format("+%d%%", math.floor((SellLogic.Bonus(mill.plankBonus) - 1) * 100 + 0.5))
 end

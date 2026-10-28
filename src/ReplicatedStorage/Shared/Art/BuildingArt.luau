@@ -1220,8 +1220,15 @@ function BuildingArt.Sawmill(scale: number?): Model
 	local bladeCf = CF(-3.2, 6, 1.35) * ANG(0, PI / 2, 0)
 	local blade = Kit.cylinder(model, "SawBlade", 0.3, 9, bladeCf, hex("#DDE2E6"), MAT.Metal)
 	Kit.decor(blade)
+	-- Rickety is a closed timber tunnel. The disc stays for the spin weld, and it is not drawn.
+	local function hideSaw(p: BasePart)
+		p.Transparency = 1
+		p.CastShadow = false
+	end
+	hideSaw(blade)
 	local function onBlade(p: BasePart)
 		dec(p)
+		hideSaw(p)
 		p.Anchored = false
 		p.Massless = true
 		local weld = Instance.new("WeldConstraint")
@@ -1258,11 +1265,12 @@ function BuildingArt.Sawmill(scale: number?): Model
 			MAT.Metal
 		)
 	)
-	-- IronBlack housing around the disc. Looks only: the SawGuard is the collider, and the housing
-	-- stays out of the door and the walk (the blade is inside the shed, not in a doorway).
-	dBox(model, "BladeHousing", V3(9.6, 0.4, 0.9), CF(-3.2, 10.65, 1.35), IRON, MAT.Metal)
-	dBox(model, "BladeHousing", V3(0.4, 8.8, 0.9), CF(-7.85, 6.15, 1.35), IRON, MAT.Metal)
-	dBox(model, "BladeHousing", V3(0.4, 8.8, 0.9), CF(1.45, 6.15, 1.35), IRON, MAT.Metal)
+	-- Closed timber tunnel over the disc. Cheeks cover both faces and the cap closes the top,
+	-- so the saw is not an open blade. Looks only: the SawGuard is the collider. The log still
+	-- passes on X, and these boards stay out of the door and the walk.
+	dBox(model, "BladeHousing", V3(9.4, 9.2, 0.35), CF(-3.2, 6.0, 0.95), TIMBER, MAT.Wood)
+	dBox(model, "BladeHousing", V3(9.4, 9.2, 0.35), CF(-3.2, 6.0, 1.85), TIMBER, MAT.Wood)
+	dBox(model, "BladeHousing", V3(9.6, 0.4, 1.3), CF(-3.2, 10.9, 1.4), TIMBER, MAT.Wood)
 	dCyl(model, "Arbor", 3.4, 0.55, CF(-3.2, 6, 3) * ANG(0, PI / 2, 0), STEEL_DARK, MAT.Metal)
 	Kit.part(model, "SawFrame", V3(1.6, 4.6, 1.4), CF(-3.2, FLOOR + 2.3, 3.4), TIMBER, MAT.Wood)
 	dBox(model, "Bearing", V3(1.9, 0.9, 1.6), CF(-3.2, 6, 3.4), IRON, MAT.Metal)
@@ -1360,8 +1368,8 @@ function BuildingArt.Sawmill(scale: number?): Model
 
 	model:SetAttribute("MillId", "SawmillRickety")
 	model:SetAttribute("OwnerId", 0)
-	model:SetAttribute("Tunnel", "housing")
-	model:SetAttribute("ExposedBlade", true)
+	model:SetAttribute("Tunnel", "closed")
+	model:SetAttribute("ExposedBlade", false)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	-- A spec that stubs CollectionService as an empty table has no AddTag. The tag still lands
 	-- wherever the service is the real one (or the test stub that forwards to Instance:AddTag).

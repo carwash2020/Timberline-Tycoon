@@ -257,7 +257,7 @@ return function(t)
 		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 1 }), isWood).m, nil, "1.0 is not kept")
 		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 0.2, d = -4 }), isWood).m, nil)
 		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 0 / 0 }), isWood).m, nil)
-		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 99 }), isWood).m, 3, "capped like SellLogic.Bonus")
+		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 99 }), isWood).m, 7.5, "capped like SellLogic.Bonus")
 		t.eq(LeftLoad.CleanPiece(piece(1, { k = "log", m = 1.5, d = 2 }), isWood).m, nil, "a log has no bonus")
 		-- Cleaning twice changes nothing.
 		local again = LeftLoad.CleanPiece(stamped, isWood)
