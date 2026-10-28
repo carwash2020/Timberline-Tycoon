@@ -743,16 +743,16 @@ NPCData.List = {
 		},
 	},
 	{
-		-- Cap'n Moss captains the ferry from the mainland dock (WorldLayout
-		-- FerryDock), at the dock's west end, off the boarding edge, facing
-		-- the water. Fare and timetable talk is built from FerryLogic.
+		-- Cap'n Moss captains the car ferry from the mainland harbour
+		-- (WorldLayout.CarFerryMainland), off the boarding edge, facing the
+		-- water. Fare and timetable talk is built from FerryLogic.
 		id = "CapnMoss",
 		name = "Cap'n Moss",
 		role = "Ferry captain",
 		spot = {
 			kind = "fixed",
-			position = Vector3.new(WorldLayout.FerryDockX - 3, 0, WorldLayout.FerryDockZ + 3),
-			lookAt = Vector3.new(WorldLayout.FerryDockX + 80, 0, WorldLayout.FerryDockZ + 3),
+			position = Vector3.new(WorldLayout.CarFerryMainlandX - 3, 0, WorldLayout.CarFerryMainlandZ + 3),
+			lookAt = Vector3.new(WorldLayout.CarFerryMainlandX + 80, 0, WorldLayout.CarFerryMainlandZ + 3),
 			ground = 1, -- the dock deck's thickness
 		},
 		idle = "lookAround",
@@ -782,7 +782,7 @@ NPCData.List = {
 			FerryLogic.TalkLines()[1],
 			FerryLogic.TalkLines()[2],
 			FerryLogic.TalkLines()[3],
-			"No trucks on deck. She's a boat, not a barge.",
+			"Drive the truck on. She takes a trailer too. One fare for the driver.",
 			"Stand on the planks and hold on. The island doesn't move.",
 			"Forty years on this water. Never lost a passenger. Misplaced a plank or two.",
 		},

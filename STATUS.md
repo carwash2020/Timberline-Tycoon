@@ -1,6 +1,10 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 28 October 2026. **Main is at `0c6ca67` (T411).** This branch places the valley shops (`cursor/t412-shops-placed-cbeb`).
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 28 October 2026. **Main is at `a66c562` (T412).** This branch is T413 travel (`cursor/t413-travel-cd9f`).
+
+## T413 roads, the car ferry, and the Skyroot climb (28 October 2026)
+
+The town bridge at (−36, 40) is free. The Dealership lift at (113, 80) is the only cash toll: $100 for 180 seconds, westbound free, unpaid crossings pushed to the west approach. The north-strip gorge and its old booth stay where they are and no longer charge. The ferry fare is $350. The deck is 18×84. Trucks and trailers ride; a seated driver is one fare, taken at cast-off. Mainland dock (920, −640), island dock (1100, −700). Sparkworks stays shut until the ferry binds. The Skyroot road runs to the GateLodge at (−40, 720), grade capped at 12%, hairpin radius 32, no road toll. Junction signs use the Designer copy. MeshId 0 greybox. Shots: `preview/t413/`. Studio checks: PHASE2_NOTES.md "T413 travel". Nothing here has been seen in Studio. Cloud has no physics.
 
 ## T412 shops placed (28 October 2026, branch `cursor/t412-shops-placed-cbeb`)
 

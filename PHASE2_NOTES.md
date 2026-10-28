@@ -1,5 +1,16 @@
 # Phase 2+ build notes
 
+## T413 travel (28 October 2026, branch `cursor/t413-travel-cd9f`)
+
+Nothing here has been seen in Studio. Cloud tests build the pins, the fare, the weld rules, and the signs. They do not drive a truck or stand on the moving deck.
+
+Studio checks:
+1. Cross the town bridge with $0. There is no booth and no cash prompt. Pay $100 once at the lift booth. A second tap while the bridge is open does not charge. An unpaid crossing pushes you back to the west approach.
+2. At the mainland dock the board reads LANTERN FERRY and $350, every 6 minutes, about 40 seconds. Step on and step off before it leaves: $0. Stay aboard: $350 once. Walk the deck. Arrive at the Sparkworks harbour.
+3. Drive a truck, with or without a trailer, onto the deck. It sails and you drive off the far dock. One fare for the driver.
+4. Sparkworks refuses a buy until the ferry has bound. After that, the same buy works.
+5. Drive the Skyroot switchback to the GateLodge. No cash toll and no gondola. Read the signs: DEALERSHIP, FERRY / LANTERN ISLE, SKYROOT, TOWN (free bridge). Say yes or no to the greybox bridge and ferry.
+
 ## T412 shops placed (28 October 2026, branch `cursor/t412-shops-placed-cbeb`)
 
 Nothing here has been seen in Studio. Cloud tests build the world and check pins, doors, aisles, stock, and the find-chain. They do not walk a character or take a toll.

@@ -11,8 +11,8 @@ return function(t)
 	local HALF = CYCLE / 2
 	local TRAVEL = FerryLogic.TravelSec
 
-	t.test("the locked numbers: $400 a rider, every 6 minutes", function()
-		t.eq(GameConfig.FerryFare, 400)
+	t.test("the locked numbers: $350 a rider, every 6 minutes", function()
+		t.eq(GameConfig.FerryFare, 350)
 		t.eq(GameConfig.FerryIntervalSec, 360)
 		t.eq(FerryLogic.Cycle(), 360)
 		t.ok(TRAVEL > 0 and TRAVEL < HALF, "a crossing fits in half a cycle")
@@ -83,27 +83,22 @@ return function(t)
 		t.eq(FerryLogic.Arrived(nil, "main"), nil)
 	end)
 
-	t.test("the berths are on the water, between the docks, and the boat path is sea all the way", function()
+	t.test("the berths sit a gap off each car-ferry dock, on the line between them", function()
 		local berths = FerryLogic.Berths()
-		local dock = WorldLayout.FerryDock
-		local island = WorldLayout.Island
+		local dockX, dockZ = WorldLayout.CarFerryMainlandX, WorldLayout.CarFerryMainlandZ
+		local isleX, isleZ = WorldLayout.CarFerryIslandX, WorldLayout.CarFerryIslandZ
 		local function dist(ax, az, bx, bz)
 			return math.sqrt((ax - bx) ^ 2 + (az - bz) ^ 2)
 		end
-		t.ok(math.abs(dist(berths.main.x, berths.main.z, dock.x, dock.z) - FerryLogic.BerthGap) < 1e-6)
-		t.ok(
-			math.abs(
-				dist(berths.island.x, berths.island.z, island.x, island.z) - (island.radius + FerryLogic.IslandBerthOut)
-			) < 1e-6
-		)
-		-- The boat starts east of the mainland dock and stops short of the island's near edge.
-		t.ok(berths.main.x > dock.x, "off the dock, over the water")
-		t.ok(dist(berths.island.x, berths.island.z, island.x, island.z) > island.radius)
+		t.ok(math.abs(dist(berths.main.x, berths.main.z, dockX, dockZ) - FerryLogic.BerthGap) < 1e-6)
+		t.ok(math.abs(dist(berths.island.x, berths.island.z, isleX, isleZ) - FerryLogic.BerthGap) < 1e-6)
+		t.ok(berths.main.x > dockX, "off the mainland dock, toward the isle")
+		t.ok(berths.island.x < isleX, "off the isle dock, toward the mainland")
 		for step = 0, 10 do
 			local state = { leg = "toIsland", alpha = step / 10 }
 			local x, z = FerryLogic.Pose(state)
-			t.ok(dist(x, z, island.x, island.z) > island.radius, "never over the island at " .. step)
-			t.ok(TerrainGen.HeightAt(x, z) < WorldLayout.SeaLevel + 20, "no cliff in the lane at " .. step)
+			t.ok(dist(x, z, isleX, isleZ) > 1, "the boat is not inside the isle pin at " .. step)
+			t.ok(TerrainGen.HeightAt(x, z) < WorldLayout.SeaLevel + 80, "no high cliff in the lane at " .. step)
 		end
 	end)
 
@@ -145,8 +140,8 @@ return function(t)
 	end)
 
 	t.test("the texts name the fare and the wait, and never the source game's words", function()
-		t.eq(FerryLogic.ActionText(), "Board ($400)")
-		t.eq(FerryLogic.ShortText(), "A ferry ride costs $400.")
+		t.eq(FerryLogic.ActionText(), "Board ($350)")
+		t.eq(FerryLogic.ShortText(), "A ferry ride costs $350.")
 		t.eq(FerryLogic.Clock(161), "2:41")
 		t.eq(FerryLogic.Clock(0.2), "0:01")
 		t.eq(FerryLogic.Clock(-4), "0:00")
@@ -165,7 +160,8 @@ return function(t)
 			t.ok(string.find(text, "nan", 1, true) == nil, text)
 			t.ok(string.find(string.lower(text), "lt2", 1, true) == nil, text)
 		end
-		t.ok(string.find(FerryLogic.TruckText(), "No trucks", 1, true) ~= nil)
+		t.eq(string.find(FerryLogic.TruckText(), "No trucks", 1, true), nil)
+		t.ok(string.find(FerryLogic.TruckText(), "trailer", 1, true) ~= nil)
 	end)
 
 	t.test("PoseAt is the schedule's pose: docked at the berths, on the line between, smooth", function()

@@ -640,8 +640,8 @@ end
 function LandmarkArt.FerryBoat(): Model
 	local model = Kit.model("FerryBoat")
 	local w, l = FerryLogic.DeckWidth, FerryLogic.DeckLength
-	local deck = solid(model, "Deck", V3(w, 1, l), CF(0, 0, 0), DOCK_PLANK, MAT.WoodPlanks)
-	local hull = solid(model, "Hull", V3(w - 1, 2, l - 1), CF(0, -1.5, 0), BOAT_PAINT[1], MAT.Wood)
+	local deck = solid(model, "Deck", V3(w, 1, l), CF(0, 0, 0), hex("#9C8466"), MAT.WoodPlanks)
+	local hull = solid(model, "Hull", V3(w - 1, 2, l - 1), CF(0, -1.5, 0), hex("#2B2B2E"), MAT.Metal)
 	hull.CanCollide = false
 	for _, side in ipairs({ -1, 1 }) do
 		solid(model, "Rail", V3(0.6, 2, l - 6), CF(side * (w / 2 - 0.3), 1.5, 2), TOLL_TIMBER, MAT.Wood)
@@ -652,9 +652,15 @@ function LandmarkArt.FerryBoat(): Model
 		solid(model, "CabinPost", V3(0.6, 5, 0.6), CF(side * (w / 2 - 1.5), 3.5, l / 2 - 3), TOLL_TIMBER, MAT.Wood)
 	end
 	solid(model, "CabinRoof", V3(w - 1, 0.6, 5), CF(0, 6.3, l / 2 - 3), ROOF[1], MAT.Wood)
-	solid(model, "Mast", V3(0.8, 9, 0.8), CF(0, 5, -l / 2 + 4), TOLL_TIMBER, MAT.Wood)
-	local lamp = ghost(model, "Lantern", V3(1.2, 1.2, 1.2), CF(0, 9.8, -l / 2 + 4), LANTERN, MAT.Neon)
+	-- The lamp sits on the cabin, aft. Nothing stands in the drive lane.
+	local lamp = ghost(model, "Lantern", V3(1.2, 1.2, 1.2), CF(0, 7.6, l / 2 - 3), LANTERN, MAT.Neon)
 	lamp.Name = "LanternGlow"
+	local light = Instance.new("PointLight")
+	light.Color = LANTERN
+	light.Range = 14
+	light.Brightness = 0.6
+	light.Shadows = false
+	light.Parent = lamp
 	model.PrimaryPart = deck
 	return model
 end

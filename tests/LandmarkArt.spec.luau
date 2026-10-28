@@ -294,8 +294,8 @@ return function(t)
 		t.ok(deck, "a Deck")
 		t.eq(model.PrimaryPart, deck)
 		t.ok(deck.Anchored and deck.CanCollide, "anchored, solid")
-		t.eq(deck.Size.X, 14)
-		t.eq(deck.Size.Z, 22)
+		t.eq(deck.Size.X, 18)
+		t.eq(deck.Size.Z, 84)
 		for _, p in ipairs(all) do
 			t.ok(p.Anchored, p.Name .. " anchored (the server moves the whole model)")
 		end

@@ -368,11 +368,10 @@ return function(t)
 		t.ok(tolly.spot.ground and tolly.spot.ground > 0, "on the booth floor, not the bare ground")
 		local m = moss.spot.position
 		t.ok(
-			math.abs(m.X - WorldLayout.FerryDockX) <= 8 and math.abs(m.Z - WorldLayout.FerryDockZ) <= 5,
-			"on the dock deck"
+			math.abs(m.X - WorldLayout.CarFerryMainlandX) <= 8 and math.abs(m.Z - WorldLayout.CarFerryMainlandZ) <= 8,
+			"on the car-ferry dock"
 		)
-		-- Clear of the berthed boat (the boat's near end is the deck's east edge).
-		t.ok(m.X < WorldLayout.FerryDockX + 8, "off the boarding edge")
+		t.ok(m.X < WorldLayout.CarFerryMainlandX + 8, "off the boarding edge")
 		t.ok(moss.spot.ground and moss.spot.ground > 0, "on the deck, not the shore")
 		t.eq(tolly.route, nil)
 		t.eq(moss.route, nil)

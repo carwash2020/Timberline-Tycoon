@@ -832,6 +832,13 @@ WorldLayout.StripClumps = {
 WorldLayout.FerryDockX = 780 -- mainland dock on the shore (ring map: the water starts near x 790)
 WorldLayout.FerryDockZ = 136
 WorldLayout.FerryDock = { x = WorldLayout.FerryDockX, z = WorldLayout.FerryDockZ }
+-- T413 car ferry. The legacy dock above stays the W2 shore so mustkeep
+-- FerryDock#1/#2 and the tree clear do not move. The boat the player rides
+-- uses these pins (mainland harbour, Lantern Isle berth).
+WorldLayout.CarFerryMainlandX = 920
+WorldLayout.CarFerryMainlandZ = -640
+WorldLayout.CarFerryIslandX = 1100
+WorldLayout.CarFerryIslandZ = -700
 WorldLayout.FerryLandingInset = 24 -- dock sits on the dry crown, not the shoal
 WorldLayout.FerryPathLength = 20
 WorldLayout.FerryPathHalf = 4

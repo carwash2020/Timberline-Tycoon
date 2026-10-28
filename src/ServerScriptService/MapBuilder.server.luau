@@ -76,6 +76,7 @@ local BuildTimings = require(ReplicatedStorage.Shared.BuildTimings)
 local LoadState = require(script.Parent.LoadState)
 local TownMeshes = require(ReplicatedStorage.Shared.Art.TownMeshes)
 local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
+local TravelArt = require(ReplicatedStorage.Shared.Art.TravelArt)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
@@ -1277,6 +1278,7 @@ end
 -- heat column. Palms and strip trees are planted with the other sites.
 step("5. The north strip and ferry", function()
 	LandmarkArt.BuildW2(map)
+	TravelArt.Build(map)
 end)
 
 -- Signposts where the roads arrive: the biome, its woods, the gear it needs

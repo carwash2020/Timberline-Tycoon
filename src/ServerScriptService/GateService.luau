@@ -123,7 +123,9 @@ end
 -- still be building the booth, so this waits for it.
 function GateService.SetupWorld(map: Instance)
 	task.spawn(function()
-		local booth = map:WaitForChild("TollBooth", 30)
+		-- The paid booth is the lift. The gorge TollBooth stays for the cut
+		-- and does not take the fee.
+		local booth = map:FindFirstChild("LiftBooth") or map:WaitForChild("TollBooth", 30)
 		local counter = if booth then booth:WaitForChild("Counter", 30) else nil
 		if not (counter and counter:IsA("BasePart")) then
 			warn("[GateService] No toll booth counter; the toll cannot be paid")
@@ -167,10 +169,9 @@ local function zeroAssembly(inst: Instance)
 	end
 end
 
--- Move `inst` so the point we measured (a pivot, or a part's position)
--- lands on the south bank, then kill the velocity PivotTo left behind.
-local function placeAtLanding(inst: Instance, from: Vector3)
-	local land = TollLogic.Landing()
+-- Move `inst` so the point we measured lands on `land`, then kill the
+-- velocity PivotTo left behind.
+local function placeAt(inst: Instance, from: Vector3, land: Vector3)
 	local delta = land - from
 	if inst:IsA("Model") then
 		inst:PivotTo(inst:GetPivot() + delta)
@@ -178,6 +179,14 @@ local function placeAtLanding(inst: Instance, from: Vector3)
 		inst.CFrame = inst.CFrame + delta
 	end
 	zeroAssembly(inst)
+end
+
+local function placeAtLanding(inst: Instance, from: Vector3)
+	placeAt(inst, from, TollLogic.Landing())
+end
+
+local function placeAtLift(inst: Instance, from: Vector3)
+	placeAt(inst, from, TollLogic.LiftLanding())
 end
 
 local function hasSeat(model: Model): boolean
@@ -303,11 +312,18 @@ function GateService.Step(now: number?)
 			local vprev = vehicleSample[vehicle]
 			vehicleSample[vehicle] = vpos
 			local inCut = WorldLayout.InGorge(vpos.X, vpos.Z) or WorldLayout.InGorge(pos.X, pos.Z)
-			if inCut or (vprev and TollLogic.Crossed(vprev.Z, vpos.Z, vpos.X) and not driverPaid(vehicle, clock)) then
+			local unpaidLift = vprev
+				and TollLogic.LiftCrossed(vprev.X, vpos.X, vpos.Z)
+				and not driverPaid(vehicle, clock)
+			if inCut or unpaidLift then
 				if not inCut then
 					toast(player, TollLogic.PushText())
 				end
-				placeAtLanding(vehicle, vpos)
+				if inCut then
+					placeAtLanding(vehicle, vpos)
+				else
+					placeAtLift(vehicle, vpos)
+				end
 				local landed = vehicle:GetPivot().Position
 				vehicleSample[vehicle] = landed
 				-- Seated, the driver is welded into the truck, so the
@@ -323,8 +339,8 @@ function GateService.Step(now: number?)
 			if WorldLayout.InGorge(pos.X, pos.Z) then
 				placeAtLanding(char, pos)
 				charSample[player.UserId] = root.CFrame.Position
-			elseif prev and TollLogic.Crossed(prev.Z, pos.Z, pos.X) and not paid(player.UserId, clock) then
-				placeAtLanding(char, pos)
+			elseif prev and TollLogic.LiftCrossed(prev.X, pos.X, pos.Z) and not paid(player.UserId, clock) then
+				placeAtLift(char, pos)
 				charSample[player.UserId] = root.CFrame.Position
 				toast(player, TollLogic.PushText())
 			end

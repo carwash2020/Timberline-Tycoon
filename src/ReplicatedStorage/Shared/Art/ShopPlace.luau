@@ -8,6 +8,7 @@
 local BuildingArt = require(script.Parent.BuildingArt)
 local Kit = require(script.Parent.Kit)
 local Palette = require(script.Parent.Palette)
+local ShopLogic = require(script.Parent.Parent.ShopLogic)
 local ShopPins = require(script.Parent.Parent.World.ShopPins)
 local TerrainGen = require(script.Parent.Parent.World.TerrainGen)
 local WorldLayout = require(script.Parent.Parent.World.WorldLayout)
@@ -412,19 +413,21 @@ local function ensureCommon(model: Model, kind: string, title: string)
 		end
 	end
 	if kind == "Sparkworks" then
-		model:SetAttribute("FerryRequired", true)
-		local board = dress(
-			Kit.part(
-				model,
-				"FerrySign",
-				Vector3.new(6, 1.4, 0.16),
-				CFrame.new(0, 6.5, -2),
-				Palette.SignCream,
-				Enum.Material.SmoothPlastic
+		if ShopLogic.FerryClosed("Sparkworks") then
+			model:SetAttribute("FerryRequired", true)
+			local board = dress(
+				Kit.part(
+					model,
+					"FerrySign",
+					Vector3.new(6, 1.4, 0.16),
+					CFrame.new(0, 6.5, -2),
+					Palette.SignCream,
+					Enum.Material.SmoothPlastic
+				)
 			)
-		)
-		board:SetAttribute("Text", "Ferry required")
-		Kit.signText(board, "FERRY REQUIRED", Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.GothamBold, 0.16)
+			board:SetAttribute("Text", "Ferry required")
+			Kit.signText(board, "FERRY REQUIRED", Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.GothamBold, 0.16)
+		end
 		if model:FindFirstChild("BackRoomDoor", true) == nil then
 			local frame = BuildingArt.InteriorFrame("Sparkworks", BuildingArt.Scale.Sparkworks or 1)
 			backDoor(model, 0, frame.frame.halfD - 0.5)
