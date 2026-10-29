@@ -193,7 +193,8 @@ return function(t)
 			local a, b = points[i], points[i + 1]
 			best = math.min(best, segmentRectGap(a.X, a.Y, b.X, b.Y, rect))
 		end
-		return best - road.width / 2
+		-- The keep-out is the plan bed. road.width is the wider drive width.
+		return best - WorldLayout.PlanWidth(road) / 2
 	end
 
 	t.test("loading pads stay 1.5 studs off floors, paths, streets, plazas and yards, and 8 off roads", function()

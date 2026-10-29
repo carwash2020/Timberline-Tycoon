@@ -34,8 +34,8 @@ FerryLogic.PromptRange = 12
 FerryLogic.BoardRange = 18
 -- The boat's deck, studs (width across the boat, length along it), and the
 -- water gap between a dock's deck centre and the boat's centre.
-FerryLogic.DeckWidth = 14
-FerryLogic.DeckLength = 22
+FerryLogic.DeckWidth = 18
+FerryLogic.DeckLength = 84
 FerryLogic.BerthGap = 20
 -- The island berth sits this far past the island's edge, out in the water.
 FerryLogic.IslandBerthOut = 16
@@ -57,15 +57,16 @@ end
 -- the dock toward the island, the island one IslandBerthOut past the
 -- island's shore on the mainland side.
 function FerryLogic.Berths(): { main: { x: number, z: number }, island: { x: number, z: number } }
-	local dock = WorldLayout.FerryDock
-	local island = WorldLayout.Island
-	local dx, dz = island.x - dock.x, island.z - dock.z
+	-- The car ferry sails between the harbour pins, not the old W2 shore.
+	local dockX, dockZ = WorldLayout.CarFerryMainlandX, WorldLayout.CarFerryMainlandZ
+	local isleX, isleZ = WorldLayout.CarFerryIslandX, WorldLayout.CarFerryIslandZ
+	local dx, dz = isleX - dockX, isleZ - dockZ
 	local len = math.sqrt(dx * dx + dz * dz)
-	local fx, fz = WorldLayout.FerryFacing()
-	local reach = island.radius + FerryLogic.IslandBerthOut
+	local ux, uz = dx / len, dz / len
+	local gap = FerryLogic.BerthGap
 	return {
-		main = { x = dock.x + dx / len * FerryLogic.BerthGap, z = dock.z + dz / len * FerryLogic.BerthGap },
-		island = { x = island.x + fx * reach, z = island.z + fz * reach },
+		main = { x = dockX + ux * gap, z = dockZ + uz * gap },
+		island = { x = isleX - ux * gap, z = isleZ - uz * gap },
 	}
 end
 
@@ -270,7 +271,29 @@ function FerryLogic.ShortText(): string
 end
 
 function FerryLogic.TruckText(): string
-	return "No trucks on the ferry. Hop out and board on foot."
+	return "Trucks and trailers ride. Drive onto the deck."
+end
+
+function FerryLogic.DriveText(): string
+	return FerryLogic.TruckText()
+end
+
+function FerryLogic.ClosedText(): string
+	return "The ferry isn't running yet."
+end
+
+function FerryLogic.BoardTitle(): string
+	return "LANTERN FERRY"
+end
+
+function FerryLogic.TimetableText(): string
+	local minutes = math.floor(GameConfig.FerryIntervalSec / 60 + 0.5)
+	return string.format(
+		"FERRY %s · every %d min · ~%d s",
+		Util.formatCash(GameConfig.FerryFare),
+		minutes,
+		FerryLogic.TravelSec
+	)
 end
 
 function FerryLogic.AwayText(now: number, dock: Dock): string

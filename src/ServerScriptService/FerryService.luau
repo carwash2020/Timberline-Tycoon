@@ -13,8 +13,9 @@
 --     EconomyService from each player on the deck, and welds them to it.
 --     Someone short is stood back on the dock, uncharged. Loose cargo on
 --     the deck (planks, logs, anything unanchored that is not a person or
---     a vehicle) is welded too. Trucks are refused: any vehicle on the deck
---     is moved back to the dock.
+--     a vehicle) is welded too. A truck and its trailer stay on the deck:
+--     their primary part is welded, the server owns them for the crossing,
+--     and the weld drops at the far dock. A seated driver is one rider.
 --   * On arrival the welds drop and riders and cargo are set down on the
 --     dock. A rider who leaves or resets mid-crossing loses nothing but
 --     themselves: the cargo stays welded until the boat ties up.
@@ -30,6 +31,7 @@ local FerryLogic = require(ReplicatedStorage.Shared.FerryLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
+local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local EconomyService = require(script.Parent.EconomyService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -54,7 +56,10 @@ local moveClock = -math.huge -- the server clock when the boat's copy was last m
 local bound = false
 local riders: { [Player]: boolean } = {}
 local cargo: { { part: BasePart, rel: CFrame } } = {}
+type Carried = { model: Model, primary: BasePart, rel: CFrame }
+local carried: { Carried } = {}
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
+FerryService.Ready = false
 
 -- The server's clock. A spec swaps it.
 FerryService.Now = function(): number
@@ -113,6 +118,8 @@ local function stand(player: Player, point: Vector3)
 	end
 end
 
+local followVehicles: () -> ()
+
 local function moveBoat(state: FerryLogic.State)
 	local model = boat
 	if not model then
@@ -121,37 +128,71 @@ local function moveBoat(state: FerryLogic.State)
 	local x, z, yaw = FerryLogic.Pose(state)
 	local y = FerryLogic.DeckY()
 	model:PivotTo(CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0))
+	followVehicles()
 end
 
--- The players on the deck right now (on foot).
+-- The players on the deck right now. A seated driver counts once, with the truck.
+local function onTheDock(position: Vector3): boolean
+	local dockSide = nearestSide(position)
+	if not dockSide then
+		return false
+	end
+	local dockAt = dockSide.deck.CFrame.Position
+	local flat = Vector3.new(position.X - dockAt.X, 0, position.Z - dockAt.Z)
+	return flat.Magnitude <= 12
+end
+
 local function ridersOnDeck(): { Player }
 	local out: { Player } = {}
 	for _, player in ipairs(Players:GetPlayers()) do
 		local root, humanoid = rootOf(player)
-		if root and humanoid and humanoid.SeatPart == nil and onDeck(root.CFrame.Position) then
-			table.insert(out, player)
+		if root and humanoid then
+			local aboard = onDeck(root.CFrame.Position)
+			if not aboard and humanoid.SeatPart ~= nil then
+				local model = humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+				aboard = model ~= nil and onDeck(model:GetPivot().Position)
+			end
+			-- The long deck covers the dock while berthed. Standing on the
+			-- dock is not aboard; a slot up the deck is.
+			if aboard and not onTheDock(root.CFrame.Position) then
+				table.insert(out, player)
+			end
 		end
 	end
 	return out
 end
 
--- A vehicle model on the deck goes back to the dock: no trucks aboard.
-local function clearVehicles(side: Side)
-	local frame = deckFrame()
-	if not frame then
+local function vehicleModelsOnDeck(): { Model }
+	local out: { Model } = {}
+	local seen: { [Model]: boolean } = {}
+	for _, tag in ipairs({ "Truck", "Trailer" }) do
+		for _, model in ipairs(CollectionService:GetTagged(tag)) do
+			if model:IsA("Model") and not seen[model] and onDeck(model:GetPivot().Position) then
+				seen[model] = true
+				table.insert(out, model)
+			end
+		end
+	end
+	return out
+end
+
+local function serverOwn(part: BasePart)
+	pcall(function()
+		local can = (part :: any).CanSetNetworkOwnership
+		if can == nil or can(part) then
+			part:SetNetworkOwner(nil)
+		end
+	end)
+end
+
+followVehicles = function()
+	local deck = deckPart
+	if not deck then
 		return
 	end
-	for _, model in ipairs(CollectionService:GetTagged("Truck")) do
-		if model:IsA("Model") and onDeck(model:GetPivot().Position) then
-			model:PivotTo(
-				CFrame.new(standPoint(side) + Vector3.new(0, 4, 0)) * (model:GetPivot() - model:GetPivot().Position)
-			)
-			for _, d in ipairs(model:GetDescendants()) do
-				if d:IsA("BasePart") then
-					d.AssemblyLinearVelocity = Vector3.zero
-					d.AssemblyAngularVelocity = Vector3.zero
-				end
-			end
+	for _, item in ipairs(carried) do
+		if item.model.Parent then
+			item.model:PivotTo(deck.CFrame * item.rel)
 		end
 	end
 end
@@ -179,7 +220,10 @@ local function loosePartsOnDeck(): { BasePart }
 			continue
 		end
 		local holder = part:FindFirstAncestorOfClass("Model")
-		if holder and (holder:FindFirstChildOfClass("Humanoid") or CollectionService:HasTag(holder, "Truck")) then
+		if holder and holder:FindFirstChildOfClass("Humanoid") then
+			continue
+		end
+		if holder and (CollectionService:HasTag(holder, "Truck") or CollectionService:HasTag(holder, "Trailer")) then
 			continue
 		end
 		table.insert(out, part)
@@ -194,6 +238,26 @@ local function weld(a: BasePart, b: BasePart)
 	joint.Parent = weldFolder or a
 end
 
+-- Weld every truck and trailer already on the deck. They follow the boat.
+local function carryVehicles(deck: BasePart)
+	carried = {}
+	for _, model in ipairs(vehicleModelsOnDeck()) do
+		local primary = model.PrimaryPart
+		if not primary then
+			local any = model:FindFirstChildWhichIsA("BasePart")
+			if any and any:IsA("BasePart") then
+				primary = any
+			end
+		end
+		if primary then
+			local rel = deck.CFrame:ToObjectSpace(model:GetPivot())
+			weld(deck, primary)
+			serverOwn(primary)
+			table.insert(carried, { model = model, primary = primary, rel = rel })
+		end
+	end
+end
+
 -- The boat has just left `dock`: charge and weld whoever is aboard.
 local function depart(dock: FerryLogic.Dock)
 	local deck = deckPart
@@ -201,7 +265,7 @@ local function depart(dock: FerryLogic.Dock)
 	if not deck or not side then
 		return
 	end
-	clearVehicles(side)
+	carryVehicles(deck)
 	riders = {}
 	for _, player in ipairs(ridersOnDeck()) do
 		local root = rootOf(player)
@@ -242,10 +306,14 @@ local function arrive(dock: FerryLogic.Dock)
 		if player.Parent then
 			index += 1
 			local sx, sz = FerryLogic.Slot(index)
-			stand(player, point + Vector3.new(sx / 2, 0, sz / 2))
+			-- The deck is truck-length. The dock is not. Keep the landing on the planks.
+			local ox = math.clamp(sx / 2, -6, 6)
+			local oz = math.clamp(sz / 2, -6, 6)
+			stand(player, point + Vector3.new(ox, 0, oz))
 		end
 	end
 	riders = {}
+	carried = {}
 	local landing = CFrame.new(side.deck.CFrame.Position + Vector3.new(0, side.deck.Size.Y / 2 + deck.Size.Y / 2, 0))
 	for _, item in ipairs(cargo) do
 		local part = item.part
@@ -299,28 +367,44 @@ end
 -- Stands `player` on the boat. Returns "boarded", "aboard" (already on the
 -- deck), "gone", "far", "truck", "away" or "short"; nothing is charged yet.
 function FerryService.Board(player: Player, now: number?): string
+	if not FerryService.Ready then
+		notify(player, FerryLogic.ClosedText())
+		return "closed"
+	end
 	local root, humanoid = rootOf(player)
 	if not root or not humanoid then
 		return "gone"
 	end
 	local clock = now or FerryService.Now()
-	-- Already on the deck: nothing to do (and they are no longer within
-	-- reach of a dock, so this comes before the dock check).
-	if onDeck(root.CFrame.Position) then
+	local side = nearestSide(root.CFrame.Position)
+	local deck = deckPart
+	-- The 84-stud deck covers the dock while the boat is tied up. Someone
+	-- still in reach of a dock that is boarding is placed in a slot. Anyone
+	-- else already on the deck is riding.
+	local boarding = side ~= nil and deck ~= nil and FerryLogic.CanBoard(clock, side.name)
+	if onDeck(root.CFrame.Position) and not boarding then
 		local docked = FerryLogic.State(clock).docked
 		if docked then
 			notify(player, FerryLogic.AboardText(clock, docked))
 		end
 		return "aboard"
 	end
-	local side = nearestSide(root.CFrame.Position)
-	local deck = deckPart
 	if not side or not deck then
 		return "far"
 	end
 	if humanoid.SeatPart ~= nil then
-		notify(player, FerryLogic.TruckText())
-		return "truck"
+		local seatModel = humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+		local riding = (onDeck(root.CFrame.Position) or (seatModel ~= nil and onDeck(seatModel:GetPivot().Position)))
+			and not onTheDock(root.CFrame.Position)
+		if riding then
+			local docked = FerryLogic.State(clock).docked
+			if docked then
+				notify(player, FerryLogic.AboardText(clock, docked))
+			end
+			return "aboard"
+		end
+		notify(player, FerryLogic.DriveText())
+		return "drive"
 	end
 	if not FerryLogic.CanBoard(clock, side.name) then
 		notify(player, FerryLogic.AwayText(clock, side.name))
@@ -397,6 +481,12 @@ function FerryService.Bind(mainDeck: BasePart, islandDeck: BasePart, parent: Ins
 	model:SetAttribute(FerryLogic.DrivenAttribute, FerryLogic.ClientDriven)
 	moveBoat(FerryLogic.State(FerryService.Now()))
 	model.Parent = parent
+	FerryService.Ready = true
+	ShopLogic.SetFerryReady(true)
+	local spark = parent:FindFirstChild("Sparkworks")
+	if spark then
+		spark:SetAttribute("FerryRequired", false)
+	end
 	for _, side in pairs(sides) do
 		addPrompt(side)
 	end
@@ -428,7 +518,7 @@ function FerryService.SetupWorld(map: Instance, notifyFn: (Player, string) -> ()
 			warn("[FerryService] The ferry docks are missing; no ferry")
 			return
 		end
-		local dock = WorldLayout.FerryDock
+		local dock = { x = WorldLayout.CarFerryMainlandX, z = WorldLayout.CarFerryMainlandZ }
 		table.sort(decks, function(a: BasePart, b: BasePart): boolean
 			local da = (a.CFrame.Position.X - dock.x) ^ 2 + (a.CFrame.Position.Z - dock.z) ^ 2
 			local db = (b.CFrame.Position.X - dock.x) ^ 2 + (b.CFrame.Position.Z - dock.z) ^ 2

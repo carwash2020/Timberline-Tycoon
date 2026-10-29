@@ -457,12 +457,15 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 			for i = 1, #road.points - 1 do
 				local sa, sb = clipToZone(road.points[i], road.points[i + 1])
 				if sa and sb and (sb - sa).Magnitude >= 3 then
-					local def: RoadDef = { name = road.name, class = class, a = sa, b = sb, width = road.width }
+					-- The slab stays on the plan bed. The drive width is wider,
+					-- and a slab that wide leaves the flat grade.
+					local bed = WorldLayout.PlanWidth(road)
+					local def: RoadDef = { name = road.name, class = class, a = sa, b = sb, width = bed }
 					if prev and (prev.b - sa).Magnitude < 0.01 then
 						local d1, d2 = (prev.b - prev.a).Unit, (sb - sa).Unit
 						local cosTurn = math.clamp(d1:Dot(d2), -1, 1)
 						if cosTurn < 0.9995 then
-							local reach = road.width / 2 * math.tan(math.acos(cosTurn) / 2)
+							local reach = bed / 2 * math.tan(math.acos(cosTurn) / 2)
 							prev.b = prev.b + d1 * reach
 							def.a = sa - d2 * reach
 						end

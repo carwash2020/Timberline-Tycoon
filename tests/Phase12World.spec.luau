@@ -21,10 +21,10 @@ return function(t)
 	t.test("haul roads, the skyroot road, the forest path and the plot road are the wider widths", function()
 		local want = {
 			ForestPath = 16,
-			HillsRoad = 28,
-			SnowRoad = 28,
-			VolcanoRoad = 28,
-			SkyrootRoad = 28, -- ring map (Oct 8): every link is 28 wide (MAP_V1)
+			HillsRoad = 32,
+			SnowRoad = 32,
+			VolcanoRoad = 24,
+			SkyrootRoad = 32, -- T413: two-way haul is 32; this east polyline stays soft terrain
 			MillRoad = 22,
 			LotLoop = 16,
 		}

@@ -168,9 +168,10 @@ local function ringPoints(): { Vector2 }
 end
 
 WorldLayout.Roads = {
-	-- The 28-wide ring about (0, 80), radius 600 (RingBends: in under the
-	-- north rims). Closed: the last point repeats the first.
-	{ name = "RingRoad", points = ringPoints(), width = 28 },
+	-- T413: two-way haul is 32, a spur off it is 24. The ring about (0, 80),
+	-- radius 600 (RingBends: in under the north rims). Closed: the last
+	-- point repeats the first.
+	{ name = "RingRoad", points = ringPoints(), width = 32 },
 	-- Town to the Starter Forest (south, a short walk). Wide enough for the
 	-- Logging Rig (phase 12). Kept: the sell station backs in off MainStreet,
 	-- not off this path.
@@ -179,40 +180,41 @@ WorldLayout.Roads = {
 	{
 		name = "HillsRoad",
 		points = { Vector2.new(-125, 80), Vector2.new(-600, 80), Vector2.new(-560, 200) },
-		width = 28,
+		width = 32,
 	},
 	-- North from behind the sawmill to the folded toll. The last span crosses
 	-- TollSpurJoinZ so the spur can meet it.
 	{
 		name = "SnowRoad",
 		points = { Vector2.new(0, 205), Vector2.new(0, 480), Vector2.new(0, 760) },
-		width = 28,
+		width = 32,
 	},
-	-- The short road from the ring into the volcano disc.
+	-- The short spur from the ring into the volcano disc.
 	{
 		name = "VolcanoRoad",
 		points = { Vector2.new(276, 356), Vector2.new(410, 460) },
-		width = 28,
+		width = 24,
 	},
-	-- East link, then under the isles.
+	-- The old east polyline under the isles. Soft terrain only. The solid
+	-- climb is TravelArt.SkyrootRoad (width 32), not this polyline.
 	{
 		name = "SkyrootRoad",
 		points = { Vector2.new(600, 80), Vector2.new(800, 200), Vector2.new(700, 320) },
-		width = 28,
+		width = 32,
 	},
 	{
 		name = "HillsCross",
 		points = { Vector2.new(-460, -300), Vector2.new(-560, -40), Vector2.new(-520, 220), Vector2.new(-460, 460) },
-		width = 28,
+		width = 32,
 	},
-	{ name = "SouthLink", points = { Vector2.new(0, -32), Vector2.new(0, -520) }, width = 28 },
-	{ name = "EastLink", points = { Vector2.new(140, 80), Vector2.new(600, 80) }, width = 28 },
+	{ name = "SouthLink", points = { Vector2.new(0, -32), Vector2.new(0, -520) }, width = 32 },
+	{ name = "EastLink", points = { Vector2.new(140, 80), Vector2.new(600, 80) }, width = 32 },
 	-- Ends at the ferry dock on the shore (ring map: the water starts near x 790 here).
-	{ name = "DockRoad", points = { Vector2.new(600, 80), Vector2.new(772, 133) }, width = 28 },
+	{ name = "DockRoad", points = { Vector2.new(600, 80), Vector2.new(772, 133) }, width = 24 },
 	{
 		name = "RavineRoad",
 		points = { Vector2.new(0, -520), Vector2.new(-90, -560), Vector2.new(-90, -780) },
-		width = 28,
+		width = 24,
 	},
 	-- East of the Dealership, then north to the Snow Road's start. The mill
 	-- yard and the shop fill x 22 to 70, so the way stays east of them.
@@ -245,14 +247,37 @@ WorldLayout.Roads = {
 	-- Builder's spur into the Bayou. The start is the ring vertex at -135
 	-- degrees (600 * cos(-135), 80 + 600 * sin(-135)), written as the
 	-- rounded (-424, -344) he locked.
-	{ name = "BayouRoad", points = { Vector2.new(-424, -344), Vector2.new(-692, -612) }, width = 28 },
+	{ name = "BayouRoad", points = { Vector2.new(-424, -344), Vector2.new(-692, -612) }, width = 24 },
 	-- Builder's spur into Red Mesa, from the ring vertex at -45 degrees.
 	{
 		name = "MesaRoad",
 		points = { Vector2.new(424, -344), Vector2.new(540, -470), Vector2.new(585, -700) },
-		width = 28,
+		width = 24,
 	},
 } :: { Road }
+
+-- The bed the world was planned on. T413 sets road.width to the drive width
+-- (main 32, branch 24). Height, gravel, the town slabs, the tree plan and
+-- the building keep-out still read this bed. Painting or paving the drive
+-- width put gravel off the flat grade and moved rocks into cabins.
+local PLAN_BED: { [string]: number } = {
+	RingRoad = 28,
+	HillsRoad = 28,
+	SnowRoad = 28,
+	VolcanoRoad = 28,
+	SkyrootRoad = 28,
+	HillsCross = 28,
+	SouthLink = 28,
+	EastLink = 28,
+	DockRoad = 28,
+	RavineRoad = 28,
+	BayouRoad = 28,
+	MesaRoad = 28,
+}
+
+function WorldLayout.PlanWidth(road: Road): number
+	return PLAN_BED[road.name] or road.width
+end
 
 -- Flared turns where a haul road splits, wide enough for the Logging Rig.
 -- Discs, not extra roads: a short segment would fail the "runs through the
@@ -832,6 +857,13 @@ WorldLayout.StripClumps = {
 WorldLayout.FerryDockX = 780 -- mainland dock on the shore (ring map: the water starts near x 790)
 WorldLayout.FerryDockZ = 136
 WorldLayout.FerryDock = { x = WorldLayout.FerryDockX, z = WorldLayout.FerryDockZ }
+-- T413 car ferry. The legacy dock above stays the W2 shore so mustkeep
+-- FerryDock#1/#2 and the tree clear do not move. The boat the player rides
+-- uses these pins (mainland harbour, Lantern Isle berth).
+WorldLayout.CarFerryMainlandX = 920
+WorldLayout.CarFerryMainlandZ = -640
+WorldLayout.CarFerryIslandX = 1100
+WorldLayout.CarFerryIslandZ = -700
 WorldLayout.FerryLandingInset = 24 -- dock sits on the dry crown, not the shoal
 WorldLayout.FerryPathLength = 20
 WorldLayout.FerryPathHalf = 4

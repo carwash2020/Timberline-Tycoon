@@ -7,6 +7,7 @@
 
 local GameConfig = require(script.Parent.GameConfig)
 local TerrainGen = require(script.Parent.World.TerrainGen)
+local TravelPlan = require(script.Parent.TravelPlan)
 local Util = require(script.Parent.Util)
 local WorldLayout = require(script.Parent.World.WorldLayout)
 
@@ -28,9 +29,31 @@ function TollLogic.Landing(): Vector3
 	return Vector3.new(WorldLayout.TollPushX, y, WorldLayout.TollPushZ)
 end
 
--- True only when a move goes from south of the line to on or past it,
+-- The live toll. Eastbound across the lift (increasing X) inside the deck's
+-- width. Westbound, back to town, is free. The gorge line below is the cut,
+-- not this charge.
+function TollLogic.LiftCrossed(prevX: number, newX: number, z: number): boolean
+	if newX < prevX then
+		return false
+	end
+	local line = TravelPlan.LiftX
+	if prevX >= line or newX < line then
+		return false
+	end
+	local half = TravelPlan.LiftWidth / 2
+	return z >= TravelPlan.LiftZ - half and z <= TravelPlan.LiftZ + half
+end
+
+-- The west approach, on the ground, where an unpaid truck is set back.
+function TollLogic.LiftLanding(): Vector3
+	local y = TerrainGen.HeightAt(TravelPlan.PushX, TravelPlan.PushZ) + WorldLayout.TollClearance
+	y = math.round(y * 1024) / 1024
+	return Vector3.new(TravelPlan.PushX, y, TravelPlan.PushZ)
+end
+
+-- True only when a move goes from south of the gorge line to on or past it,
 -- inside the strip's x range. Southbound (newZ < prevZ) is always free.
--- One sample per tick, so a 40-stud jump still counts.
+-- The gorge rescue still uses this. The paid bridge is LiftCrossed.
 function TollLogic.Crossed(prevZ: number, newZ: number, x: number): boolean
 	if newZ < prevZ then
 		return false

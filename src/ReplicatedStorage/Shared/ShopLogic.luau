@@ -486,9 +486,16 @@ function ShopLogic.ChargeShop(): string
 	return "OddsAndEnds"
 end
 
--- Sparkworks stands on the harbour before the ferry (T413). Buys fail closed.
+-- Sparkworks stands on the harbour. Buys fail closed until FerryService.Bind
+-- has a boat and both docks (T413). Fail closed is the default.
+ShopLogic.FerryReady = false
+
+function ShopLogic.SetFerryReady(ready: boolean)
+	ShopLogic.FerryReady = ready == true
+end
+
 function ShopLogic.FerryClosed(shopId: string): boolean
-	return shopId == "Sparkworks"
+	return shopId == "Sparkworks" and ShopLogic.FerryReady ~= true
 end
 
 function ShopLogic.ShopsFor(category: string, itemId: string): { string }

@@ -49,7 +49,7 @@ local function roadLines(): ({ { Vector2 } }, { number })
 	for _, road in ipairs(WorldLayout.Roads) do
 		if road.name ~= "PlotSpur" then
 			table.insert(lines, road.points)
-			table.insert(halves, road.width / 2)
+			table.insert(halves, WorldLayout.PlanWidth(road) / 2)
 		end
 	end
 	return lines, halves

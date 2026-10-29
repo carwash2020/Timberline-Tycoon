@@ -69,7 +69,11 @@ return function(t)
 				local side = Vector2.new(a.Y - b.Y, b.X - a.X) / math.max(len, 1e-6)
 				for s = 0, len, 19 do
 					local p = a:Lerp(b, s / math.max(len, 1e-6))
-					for _, off in ipairs({ 0, road.width * 0.4, -road.width * 0.4, road.width + 9, -(road.width + 21) }) do
+					-- Shoulders follow the plan bed. The drive width (road.width) is
+					-- wider; sampling that would move this fingerprint without
+					-- the ground moving.
+					local bed = WorldLayout.PlanWidth(road)
+					for _, off in ipairs({ 0, bed * 0.4, -bed * 0.4, bed + 9, -(bed + 21) }) do
 						local q = p + side * off
 						add(q.X, q.Y)
 					end

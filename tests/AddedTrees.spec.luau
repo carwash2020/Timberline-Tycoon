@@ -175,7 +175,11 @@ return function(t)
 					local f = math.clamp((p - a):Dot(ab) / ab:Dot(ab), 0, 1)
 					local q = a + ab * f
 					local d = dist(p.X, p.Y, q.X, q.Y)
-					t.ok(d >= road.width / 2 + 8 - 0.01, string.format("%s %.1f off %s", spot.zone.id, d, road.name))
+					-- The corridor is the plan bed. road.width is the wider drive width.
+					t.ok(
+						d >= WorldLayout.PlanWidth(road) / 2 + 8 - 0.01,
+						string.format("%s %.1f off %s", spot.zone.id, d, road.name)
+					)
 				end
 			end
 		end
