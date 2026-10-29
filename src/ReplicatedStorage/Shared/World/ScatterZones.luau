@@ -35,7 +35,7 @@ local ROADS: { WorldLayout.FastLine } = {}
 local ROAD_HALF: { number } = {}
 for _, road in ipairs(WorldLayout.Roads) do
 	table.insert(ROADS, WorldLayout.FastLine(road.points))
-	table.insert(ROAD_HALF, road.width / 2 + 4)
+	table.insert(ROAD_HALF, WorldLayout.PlanWidth(road) / 2 + 4)
 end
 local TUNNEL = WorldLayout.FastLine(WorldLayout.TunnelPoints)
 

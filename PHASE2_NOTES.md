@@ -9,7 +9,7 @@ Studio checks:
 2. At the mainland dock the board reads LANTERN FERRY and $350, every 6 minutes, about 40 seconds. Step on and step off before it leaves: $0. Stay aboard: $350 once. Walk the deck. Arrive at the Sparkworks harbour.
 3. Drive a truck, with or without a trailer, onto the deck. It sails and you drive off the far dock. One fare for the driver.
 4. Sparkworks refuses a buy until the ferry has bound. After that, the same buy works.
-5. Drive the Skyroot switchback to the GateLodge. No cash toll and no gondola. Read the signs: DEALERSHIP, FERRY / LANTERN ISLE, SKYROOT, TOWN (free bridge). Say yes or no to the greybox bridge and ferry.
+5. Drive the Skyroot switchback to the GateLodge. No cash toll and no gondola. Read the signs: DEALERSHIP, FERRY / LANTERN ISLE, SKYROOT, TOWN (free bridge). Say yes or no to the greybox bridge and ferry. The haul roads record main 32 and branch 24. The gravel you drive is still the 28-stud bed, so two rigs on a country grade are the old width until that bed is widened.
 
 ## T412 shops placed (28 October 2026, branch `cursor/t412-shops-placed-cbeb`)
 

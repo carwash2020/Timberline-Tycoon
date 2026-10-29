@@ -416,7 +416,7 @@ end
 local function buildRoads()
 	table.clear(buckets)
 	for _, road in ipairs(WorldLayout.Roads) do
-		table.insert(liveLines, { line = WorldLayout.FastLine(road.points), half = road.width / 2 })
+		table.insert(liveLines, { line = WorldLayout.FastLine(road.points), half = WorldLayout.PlanWidth(road) / 2 })
 	end
 	local groups: { { Sample } } = {}
 	local all: { Sample } = {}

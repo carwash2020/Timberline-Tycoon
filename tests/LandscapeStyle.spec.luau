@@ -139,7 +139,7 @@ return function(t)
 	local function nearestRoad(x, z)
 		local best, bestRoad = math.huge, nil
 		for _, road in ipairs(WorldLayout.Roads) do
-			local d = fromCentre(road, x, z) - road.width / 2
+			local d = fromCentre(road, x, z) - WorldLayout.PlanWidth(road) / 2
 			if d < best then
 				best, bestRoad = d, road
 			end
@@ -177,7 +177,8 @@ return function(t)
 
 	t.test("STY-02: out in the country every road, lane and path is gravel its whole width, never dirt", function()
 		local function country(road)
-			local half = road.width / 2
+			-- The gravel bed is PlanWidth. road.width is the drive width.
+			local half = WorldLayout.PlanWidth(road) / 2
 			local centre, inside = 0, 0
 			for _, s in ipairs(along(road, 9)) do
 				local p = s.p
@@ -235,7 +236,7 @@ return function(t)
 			local seen = 0
 			-- Across every road, from edge to edge and a little past.
 			for _, road in ipairs(WorldLayout.Roads) do
-				local half = road.width / 2
+				local half = WorldLayout.PlanWidth(road) / 2
 				for _, s in ipairs(along(road, 6)) do
 					for off = -half - 2, half + 2, 1.5 do
 						local q = s.p + s.side * off

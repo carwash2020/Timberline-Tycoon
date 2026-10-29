@@ -647,7 +647,8 @@ function WorldPlan.CountryStands(): { Stand }
 			local x, z = flat.X, flat.Z
 			local ok = ground(x, z) and not crowded(x, z, STAND_SPACING)
 			if ok and road then -- a roadside stand stays beside its road
-				ok = WorldLayout.PolylineDistance(Vector2.new(x, z), road.points) - road.width / 2 <= STAND_ROADSIDE
+				ok = WorldLayout.PolylineDistance(Vector2.new(x, z), road.points) - WorldLayout.PlanWidth(road) / 2
+					<= STAND_ROADSIDE
 			end
 			if ok then
 				for _, q in ipairs(trees) do
@@ -706,7 +707,7 @@ function WorldPlan.CountryStands(): { Stand }
 									-- Its far edge STAND_ROADSIDE off the road's edge.
 									return along
 										+ dir * shift
-										+ normal * (s * (road.width / 2 + STAND_ROADSIDE - radius))
+										+ normal * (s * (WorldLayout.PlanWidth(road) / 2 + STAND_ROADSIDE - radius))
 								end
 								if plant(at, road, 9) then
 									done = true
@@ -1942,7 +1943,9 @@ function WorldPlan.Scenery(): { ScenerySpot }
 						for _, s in ipairs({ side, -side }) do
 							for _, shift in ipairs({ 0, 25, -25, 50, -50 }) do
 								for _, off in ipairs({ 18, 26, 36, 48, 60 }) do
-									local at = along + dir * shift + normal * (s * (road.width / 2 + off))
+									local at = along
+										+ dir * shift
+										+ normal * (s * (WorldLayout.PlanWidth(road) / 2 + off))
 									-- Its front (-Z) toward the road.
 									local yaw = math.atan2(normal.X * s, normal.Y * s)
 									placed = try(kind, at.X, at.Y, yaw)
@@ -2652,7 +2655,7 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 					for extra = 0, 18, 6 do
 						local at = last
 							- dir * back
-							+ side * (s * (road.width / 2 + SIGN_POST + SIGN_CLEAR + 0.5 + extra))
+							+ side * (s * (WorldLayout.PlanWidth(road) / 2 + SIGN_POST + SIGN_CLEAR + 0.5 + extra))
 						local cf, level = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), toward))
 						if level then
 							spot = cf
@@ -2668,7 +2671,7 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 				end
 			end
 			if not spot then
-				local at = last - dir * 6 + side * (road.width / 2 + 0.35 + SIGN_CLEAR + 0.5)
+				local at = last - dir * 6 + side * (WorldLayout.PlanWidth(road) / 2 + 0.35 + SIGN_CLEAR + 0.5)
 				local roadSide = Vector3.new(at.X - side.X, 0, at.Y - side.Y) -- its face toward the road
 				spot = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), roadSide))
 			end
@@ -2752,7 +2755,7 @@ function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
 		for _, stop in ipairs(stops) do
 			local side = Vector2.new(-stop.dir.Y, stop.dir.X)
 			for _, s in ipairs({ 1, -1 }) do
-				local at = stop.p + side * (s * (road.width / 2 + SIGN_POST + SIGN_CLEAR + 1))
+				local at = stop.p + side * (s * (WorldLayout.PlanWidth(road) / 2 + SIGN_POST + SIGN_CLEAR + 1))
 				local from = Vector3.new(at.X, 0, at.Y)
 				-- Facing the road, or (on a climb, where only the ground
 				-- across the road is level) facing the drivers coming up it.
@@ -5088,7 +5091,8 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 						local along = a + dir * (nextAt - walked)
 						for _, s in ipairs({ 1, -1 }) do
 							-- The same draws each side, planted or not.
-							local off = road.width / 2 + rng:range(WorldPlan.ForestVerge[1], WorldPlan.ForestVerge[2])
+							local off = WorldLayout.PlanWidth(road) / 2
+								+ rng:range(WorldPlan.ForestVerge[1], WorldPlan.ForestVerge[2])
 							local at = along + dir * rng:range(-8, 8) + normal * (s * off)
 							if verge < most.verge then
 								local _, ring = WorldLayout.ForestCover(at.X, at.Y)

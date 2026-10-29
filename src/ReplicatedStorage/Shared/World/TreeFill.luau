@@ -388,7 +388,7 @@ local function haulSegments(): { HaulSeg }
 				table.insert(built, {
 					a = a,
 					b = b,
-					half = road.width / 2,
+					half = WorldLayout.PlanWidth(road) / 2,
 					minX = math.min(a.X, b.X),
 					maxX = math.max(a.X, b.X),
 					minZ = math.min(a.Y, b.Y),

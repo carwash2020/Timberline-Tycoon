@@ -738,9 +738,12 @@ end
 -- How near (0..1) the nearest road is: 1 on it, fading over its shoulder;
 -- and 1 if (x, z) is on the road surface itself.
 type FastRoad = { line: WorldLayout.FastLine, half: number }
+-- Clearance, the grade and the gravel use the plan bed. road.width is the
+-- drive width (T413). A crown painted at that width leaves the flat grade
+-- and the town slabs no longer sit on grass.
 local ROADS: { FastRoad } = {}
 for _, road in ipairs(WorldLayout.Roads) do
-	table.insert(ROADS, { line = WorldLayout.FastLine(road.points), half = road.width / 2 })
+	table.insert(ROADS, { line = WorldLayout.FastLine(road.points), half = WorldLayout.PlanWidth(road) / 2 })
 end
 
 -- Widths from before phase 12's roads. The mill road, the lot loop and the
@@ -1296,6 +1299,7 @@ local function buildHaulGrades(grades: { GradedRoad }, cap: number, pinJoins: bo
 		-- always did (10 degrees, the classic grade). At 5 degrees it would
 		-- end 27 studs over the ravine's floor.
 		local roadCap = if road.name == "RavineRoad" then GRADE_CAP else cap
+		local planHalf = WorldLayout.PlanWidth(road) / 2
 		local pts = road.points
 		local xs: { number } = {}
 		local zs: { number } = {}
@@ -1320,7 +1324,7 @@ local function buildHaulGrades(grades: { GradedRoad }, cap: number, pinJoins: bo
 				onHaul = (haulHeight(grades, x, z, 0))
 			elseif pinJoins and roadIndex > 1 then
 				-- (the earlier road may only touch this one's edge)
-				onHaul = (haulHeight(grades, x, z, road.width / 2))
+				onHaul = (haulHeight(grades, x, z, planHalf))
 			end
 			local height = if onHaul then onHaul else groundHeight(x, z)
 			local bore = WorldLayout.TunnelWidth / 2
@@ -1346,7 +1350,7 @@ local function buildHaulGrades(grades: { GradedRoad }, cap: number, pinJoins: bo
 			if pinJoins and roadIndex > 1 and not pin then
 				local near, edge = haulHeight(grades, x, z, CLOSE_REACH)
 				if near then
-					local allow = CLOSE_GRADE * math.max(edge - road.width / 2, 0)
+					local allow = CLOSE_GRADE * math.max(edge - planHalf, 0)
 					loBound, hiBound = near - allow, near + allow
 					height = clamp(height, loBound, hiBound)
 				end
@@ -1430,7 +1434,7 @@ local function buildHaulGrades(grades: { GradedRoad }, cap: number, pinJoins: bo
 			zs = zs,
 			hs = hs,
 			along = along,
-			half = road.width / 2,
+			half = planHalf,
 			minX = minX,
 			maxX = maxX,
 			minZ = minZ,

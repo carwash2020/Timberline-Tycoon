@@ -1,6 +1,7 @@
 --!nocheck
 -- T413 travel greyboxes: the free town bridge, the paid lift, the car ferry
 -- and its docks, the Skyroot hairpin, and one junction sign.
+-- Views 1, 5, 6, 7 and 8 are the five shots under preview/t413/.
 
 return {
 	build = function(ctx)
@@ -8,8 +9,10 @@ return {
 		local V3, CF, C3 = roblox.Vector3, roblox.CFrame, roblox.Color3
 		local Kit = ctx.art("Kit")
 		local TravelArt = ctx.art("TravelArt")
+		local TravelPlan = ctx.shared("TravelPlan")
 		local LandmarkArt = ctx.art("LandmarkArt")
 		local FerryLogic = ctx.shared("FerryLogic")
+		local ShopPins = ctx.load("ReplicatedStorage/Shared/World/ShopPins")
 		local root = roblox.Instance.new("Model")
 		local function pad(x, z, w)
 			local p = roblox.Instance.new("Part")
@@ -31,38 +34,123 @@ return {
 		Kit.placeAt(boat, CF.new(berth.x, FerryLogic.DeckY(), berth.z))
 		boat.Parent = root
 		-- A LoggingRig plus trailer ghost, 75 studs, on the deck.
-		local ghost = roblox.Instance.new("Part")
-		ghost.Name = "RigGhost"
-		ghost.Anchored = true
-		ghost.CanCollide = false
-		ghost.Transparency = 0.45
-		ghost.Size = V3.new(10, 4, 75)
-		ghost.Color = C3.fromRGB(196, 154, 99)
-		ghost.CFrame = boat:GetPivot() * CF.new(0, 3, 0)
-		ghost.Parent = boat
+		local function rigGhost(parent, at)
+			local ghost = roblox.Instance.new("Part")
+			ghost.Name = "RigGhost"
+			ghost.Anchored = true
+			ghost.CanCollide = false
+			ghost.Transparency = 0.35
+			ghost.Size = V3.new(10, 4, 75)
+			ghost.Color = C3.fromRGB(196, 154, 99)
+			ghost.CFrame = at
+			ghost.Parent = parent
+			return ghost
+		end
+		rigGhost(boat, boat:GetPivot() * CF.new(0, 3, 0))
+
+		-- Studio set, west of the map, so a world sign cannot sit in the shot.
+		local studio = -2400
+		pad(studio, 0, 160)
+		local lift = TravelArt.LiftBridge()
+		Kit.placeAt(lift, CF.new(studio, 0, 0))
+		lift.Parent = root
+
+		pad(studio, 180, 90)
+		local free = TravelArt.FreeBridge()
+		Kit.placeAt(free, CF.new(studio, 0, 180))
+		free.Parent = root
+
+		pad(studio, 360, 140)
+		local ferry = LandmarkArt.FerryBoat()
+		Kit.placeAt(ferry, CF.new(studio, 4, 360))
+		ferry.Parent = root
+		rigGhost(ferry, ferry:GetPivot() * CF.new(0, 3, 0))
+
+		pad(studio, 540, 90)
+		local stone = TravelArt.StoneBridge()
+		Kit.placeAt(stone, CF.new(studio - 20, 0, 540))
+		stone.Parent = root
+		local foot = TravelArt.FootBridge()
+		Kit.placeAt(foot, CF.new(studio + 18, 0, 540))
+		foot.Parent = root
+
+		-- Travel pins and the T411/T412 shops. No gondola marker.
+		local map = Kit.model("TravelPins")
+		map.Parent = root
+		local SCALE = 0.05
+		local function pinAt(name, x, z, color, wide)
+			local px, pz = x * SCALE + 2000, z * SCALE + 1100
+			local marker = Kit.part(
+				map,
+				name,
+				V3.new(if wide then 14 else 8, 0.4, 4),
+				CF.new(px, 0.4, pz),
+				color,
+				roblox.Enum.Material.SmoothPlastic
+			)
+			Kit.signText(
+				marker,
+				name,
+				C3.fromRGB(42, 36, 32),
+				{ roblox.Enum.NormalId.Top },
+				roblox.Enum.Font.GothamBold
+			)
+		end
+		local travelColor = C3.fromRGB(201, 162, 74)
+		local shopColor = C3.fromRGB(196, 122, 74)
+		pinAt("TOWN", TravelPlan.FreeBridge.x, TravelPlan.FreeBridge.z, travelColor, false)
+		pinAt("LIFT $100", TravelPlan.LiftX, TravelPlan.LiftZ, travelColor, true)
+		pinAt("DOCK", TravelPlan.Mainland.x, TravelPlan.Mainland.z, travelColor, false)
+		pinAt("ISLE", TravelPlan.IslandDock.x, TravelPlan.IslandDock.z, travelColor, false)
+		local sky = TravelPlan.SkyrootPoints()
+		for i = 1, #sky - 1 do
+			local a, b = sky[i], sky[i + 1]
+			local mx, mz = (a.x + b.x) / 2 * SCALE + 2000, (a.z + b.z) / 2 * SCALE + 1100
+			local dx, dz = (b.x - a.x) * SCALE, (b.z - a.z) * SCALE
+			local len = math.sqrt(dx * dx + dz * dz)
+			Kit.part(
+				map,
+				"SkyLeg",
+				V3.new(1.2, 0.2, len),
+				CF.new(mx, 0.15, mz) * roblox.CFrame.Angles(0, math.atan2(dx, dz), 0),
+				travelColor,
+				roblox.Enum.Material.SmoothPlastic
+			)
+		end
+		local lodge = sky[#sky]
+		pinAt("SKYROOT", lodge.x, lodge.z, travelColor, true)
+		for _, row in ipairs(ShopPins.All()) do
+			pinAt(row.id, row.x, row.z, shopColor, false)
+		end
+
 		return {
 			root = root,
 			shadowRadius = 40,
 			fov = 40,
 			lighting = {
-				sunDir = { -0.45, 0.72, -0.4 },
+				sunDir = { -0.35, 0.55, -0.45 },
 				sunColor = "#ffd2a0",
-				sunIntensity = 2.1,
+				sunIntensity = 2.2,
 				skyTop = "#8eb4d8",
 				skyBottom = "#f3d7b0",
 				ground = "#6e7a68",
-				hemiIntensity = 1.05,
-				ambient = 0.45,
+				hemiIntensity = 1.1,
+				ambient = 0.55,
 				fog = "#d5e2ea",
 				fogNear = 80,
-				fogFar = 420,
-				bloom = 0.25,
+				fogFar = 520,
+				bloom = 0.2,
 			},
 			cameras = {
-				{ pos = { 113, 160, 80 }, target = { 113, 4, 80 }, label = "lift top" },
+				-- Booth face toward -Z. Camera sits south of the sign.
+				{ pos = { -2490, 36, -70 }, target = { -2408, 10, 12 }, label = "lift top", fov = 34 },
 				{ pos = { 860, 36, -590 }, target = { 960, 4, -650 }, label = "ferry docks" },
 				{ pos = { -90, 70, 620 }, target = { -178, 2, 691 }, label = "skyroot hairpin" },
 				{ pos = { -48, 7, 28 }, target = { -60, 5, 40 }, label = "junction sign" },
+				{ pos = { -2348, 22, 132 }, target = { -2400, 2, 164 }, label = "free town bridge", fov = 38 },
+				{ pos = { -2364, 70, 280 }, target = { -2400, 3, 360 }, label = "ferry truck", fov = 42 },
+				{ pos = { -2400, 48, 470 }, target = { -2402, 1, 540 }, label = "bridges contrast", fov = 42 },
+				{ pos = { 2012, 95, 1100 }, target = { 2012, 0, 1100 }, label = "travel pins", fov = 48 },
 			},
 		}
 	end,

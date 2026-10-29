@@ -6,7 +6,7 @@ return function(t)
 	local fs = require("@lune/fs")
 	local process = require("@lune/process")
 	local roblox = t.roblox
-	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
+	local Instance, Vector3, Vector2, CFrame = roblox.Instance, roblox.Vector3, roblox.Vector2, roblox.CFrame
 
 	-- Lune's ProximityPrompt has no Triggered signal. The live game does.
 	local triggered = _G.__promptTriggered or setmetatable({}, { __mode = "k" })
@@ -712,6 +712,72 @@ return function(t)
 		t.eq(boat:FindFirstChild("Mast", true), nil)
 	end)
 
+	-- Live WorldLayout.Roads, not a mock and not TravelPlan. Mains are the
+	-- two-way haul (a pair of rigs needs 32). Spurs off that haul are
+	-- branches at 24. The old Skyroot east polyline stays the soft terrain
+	-- road; TravelArt.SkyrootRoad is the solid climb.
+	t.test("live haul roads are main 32 and branch 24", function()
+		local main = {
+			RingRoad = true,
+			HillsRoad = true,
+			SnowRoad = true,
+			EastLink = true,
+			SouthLink = true,
+			HillsCross = true,
+			SkyrootRoad = true,
+		}
+		local branch = {
+			VolcanoRoad = true,
+			DockRoad = true,
+			RavineRoad = true,
+			BayouRoad = true,
+			MesaRoad = true,
+		}
+		local seen = {}
+		for _, road in ipairs(WorldLayout.Roads) do
+			seen[road.name] = true
+			if main[road.name] then
+				t.eq(road.width, TravelPlan.MainWidth, road.name)
+				t.eq(road.width, 32, road.name)
+			elseif branch[road.name] then
+				t.eq(road.width, TravelPlan.BranchWidth, road.name)
+				t.eq(road.width, 24, road.name)
+			end
+			t.ok(road.width ~= 28, road.name .. " is still hard-coded 28")
+		end
+		for name in pairs(main) do
+			t.eq(seen[name], true, name .. " is missing from WorldLayout.Roads")
+		end
+		for name in pairs(branch) do
+			t.eq(seen[name], true, name .. " is missing from WorldLayout.Roads")
+		end
+		-- The plan bed stays 28. The drive width above is what a truck needs.
+		-- Grading at the drive width moves the first trees and the overlap lint.
+		for _, road in ipairs(WorldLayout.Roads) do
+			if main[road.name] or branch[road.name] then
+				t.eq(WorldLayout.PlanWidth(road), 28, road.name .. " plan bed")
+			end
+		end
+		local east = nil
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == "SkyrootRoad" then
+				east = road
+			end
+		end
+		t.eq(east.points[1], Vector2.new(600, 80))
+		t.eq(east.points[2], Vector2.new(800, 200))
+		t.eq(east.points[3], Vector2.new(700, 320))
+		local decks = 0
+		for _, d in ipairs(TravelArt.SkyrootRoad():GetDescendants()) do
+			if d.Name == "Deck" and d:IsA("BasePart") then
+				t.eq(d.Size.X, 32, "Skyroot climb deck width")
+				t.eq(d.CanCollide, true, "Skyroot climb deck is solid")
+				decks += 1
+			end
+		end
+		t.ok(decks >= 1, "the Skyroot climb has a solid deck")
+	end)
+
 	t.test("12. prices, paint, passes, and Block wood are untouched", function()
 		local result = process.exec("git", {
 			"diff",
@@ -733,6 +799,10 @@ return function(t)
 		t.ok(fs.isFile("tools/preview/scenes/t413.luau"))
 		for _, name in ipairs({
 			"preview/t413/lift-top.png",
+			"preview/t413/free-town-bridge.png",
+			"preview/t413/ferry-truck.png",
+			"preview/t413/bridges-contrast.png",
+			"preview/t413/travel-pins.png",
 			"preview/t413/ferry-docks.png",
 			"preview/t413/skyroot.png",
 			"preview/t413/junction-sign.png",
