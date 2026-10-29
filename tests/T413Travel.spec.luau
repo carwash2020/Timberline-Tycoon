@@ -806,8 +806,140 @@ return function(t)
 			"preview/t413/ferry-docks.png",
 			"preview/t413/skyroot.png",
 			"preview/t413/junction-sign.png",
+			"preview/t413/eastlink-shoulder.png",
+			"preview/t413/ferry-cabin.png",
 		}) do
 			t.ok(fs.isFile(name), name)
 		end
+	end)
+
+	local function overlaps(a, b)
+		local ap, bp = a.CFrame.Position, b.CFrame.Position
+		local function sep(ac, bc, ae, be)
+			return math.abs(ac - bc) < (ae + be) / 2 - 0.001
+		end
+		return sep(ap.X, bp.X, a.Size.X, b.Size.X)
+			and sep(ap.Y, bp.Y, a.Size.Y, b.Size.Y)
+			and sep(ap.Z, bp.Z, a.Size.Z, b.Size.Z)
+	end
+
+	local function postsClear(model)
+		local solids = {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and (d.Name == "Deck" or d.Name == "Abutment") then
+				table.insert(solids, d)
+			end
+		end
+		for _, d in ipairs(model:GetDescendants()) do
+			if
+				d:IsA("BasePart") and (d.Name == "Post" or d.Name == "TopRail" or d.Name == "Rope" or d.Name == "Face")
+			then
+				for _, solid in ipairs(solids) do
+					t.ok(not overlaps(d, solid), model.Name .. " " .. d.Name .. " overlaps " .. solid.Name)
+				end
+			end
+		end
+	end
+
+	t.test("the greyboxes read as boards, posts, a barrier arm, and a ferry cabin", function()
+		local Kit = t.shared("Art/Kit")
+		local Palette = t.shared("Art/Palette")
+		local free = TravelArt.FreeBridge()
+		local decks = {}
+		local honey, weathered = 0, 0
+		for _, d in ipairs(free:GetDescendants()) do
+			if d.Name == "Deck" and d:IsA("BasePart") then
+				table.insert(decks, d)
+				t.eq(d.Material, roblox.Enum.Material.WoodPlanks)
+				t.eq(d.CanCollide, true)
+				t.eq(d.Size.Z, 2)
+				if d.Color == Palette.PlankHoney then
+					honey += 1
+				elseif d.Color == Palette.WeatheredPlank then
+					weathered += 1
+				end
+			end
+		end
+		t.ok(#decks >= 8, "deck boards across the span")
+		t.ok(honey >= 1 and weathered >= 1, "boards alternate honey and weathered")
+		local posts = 0
+		for _, d in ipairs(free:GetDescendants()) do
+			if d.Name == "Post" and d:IsA("BasePart") then
+				posts += 1
+				t.eq(d.Color, Palette.IronBlack)
+				t.ok(math.abs(d.Size.Y - 3.2) < 0.02, "post is 3.2 tall")
+			end
+		end
+		t.ok(posts >= 8, "iron posts along both rails")
+		postsClear(free)
+
+		local lift = TravelArt.LiftBridge()
+		local arm = lift:FindFirstChild("StopRed", true)
+		t.ok(
+			math.abs(arm.Size.X - 14) < 0.02 and math.abs(arm.Size.Y - 0.6) < 0.02 and math.abs(arm.Size.Z - 0.6) < 0.02,
+			"arm is about 0.6 x 0.6 x 14"
+		)
+		t.eq(arm.CanCollide, false)
+		t.eq(arm.Color, Kit.hex("#B83A2E"))
+		t.eq(lift:FindFirstChild("CreamBand", true).Color, Palette.SignCream)
+		t.eq(lift:FindFirstChild("Post", true).Color, Palette.TimberBrown)
+		local armAt = arm.CFrame.Position
+		t.ok(math.abs(armAt.Z) - arm.Size.Z / 2 > TravelPlan.LiftWidth / 2, "the arm is clear of the lane")
+		t.eq(lift:FindFirstChild("Deck").Color, Palette.RoadGravel)
+		postsClear(lift)
+
+		local stone = TravelArt.StoneBridge()
+		local face = stone:FindFirstChild("Face")
+		t.eq(face.Material, roblox.Enum.Material.Cobblestone)
+		t.eq(face.Color, Palette.StoneBase)
+		t.eq(face.Size.Y, 2)
+		postsClear(stone)
+
+		local foot = TravelArt.FootBridge()
+		t.eq(foot:FindFirstChild("Deck").Size.X, 8)
+		local ropes = 0
+		for _, d in ipairs(foot:GetDescendants()) do
+			if d.Name == "Rope" and d:IsA("BasePart") then
+				ropes += 1
+				t.eq(d.Material, roblox.Enum.Material.Fabric)
+				t.eq(d.Color, Kit.hex("#C2B280"))
+				t.ok(d.Size.X <= 0.35 and d.Size.Y <= 0.35, "rope is about 0.3 thick")
+			end
+			if d.Name == "Post" and d:IsA("BasePart") then
+				t.eq(d.Color, Palette.TimberBrown)
+				t.ok(math.abs(d.Size.Y - 3.2) < 0.02, "post is 3.2 tall")
+			end
+		end
+		t.ok(ropes >= 2, "rope rails")
+		postsClear(foot)
+
+		local boat = LandmarkArt.FerryBoat()
+		t.eq(boat:FindFirstChild("Stern"), nil)
+		local cabin = boat:FindFirstChild("Cabin")
+		t.eq(cabin.Size, Vector3.new(8, 5, 6))
+		t.eq(cabin.Color, Palette.WeatheredPlank)
+		t.eq(boat:FindFirstChild("CabinRoof").Color, Palette.RoofSlate)
+		local lamp = boat:FindFirstChild("LanternGlow", true)
+		t.eq(lamp.Color, Palette.Brass)
+		local lines = 0
+		for _, d in ipairs(boat:GetDescendants()) do
+			if d.Name == "Waterline" and d:IsA("BasePart") then
+				lines += 1
+				t.eq(d.Size.Y, 1.5)
+				t.eq(d.Color, Palette.IronBlack)
+			end
+		end
+		t.eq(lines, 4, "a waterline all round")
+		local footp = boat:FindFirstChild("TruckFootprint")
+		t.ok(math.abs(footp.Transparency - 0.6) < 0.02, "footprint is transparency 0.6")
+		t.eq(footp.CanCollide, false)
+		t.eq(footp.CanQuery, false)
+		t.eq(footp.CanTouch, false)
+		local tagged = false
+		pcall(function()
+			local service = game:GetService("CollectionService")
+			tagged = service:HasTag(footp, "Truck") or service:HasTag(footp, "Trailer") or service:HasTag(boat, "Truck")
+		end)
+		t.eq(tagged, false, "the footprint is not a vehicle")
 	end)
 end

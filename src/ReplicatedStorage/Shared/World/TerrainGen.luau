@@ -737,13 +737,20 @@ end
 
 -- How near (0..1) the nearest road is: 1 on it, fading over its shoulder;
 -- and 1 if (x, z) is on the road surface itself.
-type FastRoad = { line: WorldLayout.FastLine, half: number }
--- Clearance, the grade and the gravel use the plan bed. road.width is the
--- drive width (T413). A crown painted at that width leaves the flat grade
--- and the town slabs no longer sit on grass.
+type FastRoad = { line: WorldLayout.FastLine, half: number, gradeHalf: number }
+-- Clearance, the gravel and the tree plan use the plan bed (half). The live
+-- grade flattens to gradeHalf (DriveHalf): 16 on a main, so the outer 2
+-- studs of the 32-wide drive are level. Gravel stays on the 28-stud bed.
+-- road.width is the drive width (T413). Painting that width put gravel off
+-- the old flat grade and moved rocks into cabins.
 local ROADS: { FastRoad } = {}
 for _, road in ipairs(WorldLayout.Roads) do
-	table.insert(ROADS, { line = WorldLayout.FastLine(road.points), half = WorldLayout.PlanWidth(road) / 2 })
+	local half = WorldLayout.PlanWidth(road) / 2
+	table.insert(ROADS, {
+		line = WorldLayout.FastLine(road.points),
+		half = half,
+		gradeHalf = WorldLayout.DriveHalf(road),
+	})
 end
 
 -- Widths from before phase 12's roads. The mill road, the lot loop and the
@@ -763,11 +770,17 @@ for _, road in ipairs(WorldLayout.Roads) do
 	-- Plot roads moved with the 3×4 district. The first trees still see the
 	-- old polylines (WorldLayout.LegacyPlotRoads), not these.
 	if width and road.name ~= "PlotRoad" and road.name ~= "PlotLane" then
-		table.insert(LEGACY_ROADS, { line = WorldLayout.FastLine(road.points), half = width / 2 })
+		table.insert(
+			LEGACY_ROADS,
+			{ line = WorldLayout.FastLine(road.points), half = width / 2, gradeHalf = width / 2 }
+		)
 	end
 end
 for _, road in ipairs(WorldLayout.LegacyPlotRoads) do
-	table.insert(LEGACY_ROADS, { line = WorldLayout.FastLine(road.points), half = road.width / 2 })
+	table.insert(
+		LEGACY_ROADS,
+		{ line = WorldLayout.FastLine(road.points), half = road.width / 2, gradeHalf = road.width / 2 }
+	)
 end
 
 local function roadsNow(): { FastRoad }
@@ -790,6 +803,35 @@ local function considerRoad(
 		end
 	end
 	return best, onRoad
+end
+
+-- True when (x, z) is on the flat drive but outside the gravel bed: the
+-- TrailDirt shoulder. A point on any plan bed, or inside a junction flare,
+-- stays gravel.
+local function onShoulder(x: number, z: number): boolean
+	if legacyLayout then
+		return false
+	end
+	local onPlan = false
+	local pastPlan = false
+	for _, road in ipairs(ROADS) do
+		local d = WorldLayout.FastDistance(road.line, x, z, road.gradeHalf + 1)
+		if d <= road.half then
+			onPlan = true
+		elseif road.gradeHalf > road.half and d <= road.gradeHalf then
+			pastPlan = true
+		end
+	end
+	if onPlan or not pastPlan then
+		return false
+	end
+	for _, junction in ipairs(WorldLayout.Junctions) do
+		local dx, dz = x - junction.at.X, z - junction.at.Y
+		if dx * dx + dz * dz <= junction.radius * junction.radius then
+			return false
+		end
+	end
+	return true
 end
 
 local function roadWeight(x: number, z: number): (number, number)
@@ -1283,6 +1325,7 @@ type GradedRoad = {
 	hs: { number },
 	along: { number },
 	half: number,
+	plan: number,
 	minX: number,
 	maxX: number,
 	minZ: number,
@@ -1300,6 +1343,9 @@ local function buildHaulGrades(grades: { GradedRoad }, cap: number, pinJoins: bo
 		-- end 27 studs over the ravine's floor.
 		local roadCap = if road.name == "RavineRoad" then GRADE_CAP else cap
 		local planHalf = WorldLayout.PlanWidth(road) / 2
+		-- Classic grades stay on the plan bed (the first trees). The live
+		-- ribbon is the drive width, so a main is flat out to 16.
+		local gradeHalf = if classicBuild then planHalf else WorldLayout.DriveHalf(road)
 		local pts = road.points
 		local xs: { number } = {}
 		local zs: { number } = {}
@@ -1434,7 +1480,8 @@ local function buildHaulGrades(grades: { GradedRoad }, cap: number, pinJoins: bo
 			zs = zs,
 			hs = hs,
 			along = along,
-			half = planHalf,
+			half = gradeHalf,
+			plan = planHalf,
 			minX = minX,
 			maxX = maxX,
 			minZ = minZ,
@@ -1541,13 +1588,20 @@ local function haulField(x: number, z: number): (number?, number?, number)
 					break
 				end
 			end
-			local edge = math.sqrt(dist) - half
-			if edge <= 0 then
+			local distN = math.sqrt(dist)
+			local driveEdge = distN - half
+			-- The bank still starts at the plan edge, so ground past the
+			-- drive (and every tree standing there) keeps its old height.
+			-- Only the band between the plan bed and the drive goes flat.
+			local planEdge = distN - g.plan
+			local holdFlat = planEdge > 0 and WorldLayout.FlatWeight(x, z) > 0.85
+			if driveEdge <= 0 and not holdFlat then
 				if dist < onD then
 					onD = dist
 					onH = hAt
 				end
 			else
+				local edge = math.max(planEdge, 0)
 				local pull = 1 - smoothstep(edge / ROAD_SHOULDER)
 				local w = pull / ((edge + 1) * (edge + 1))
 				sumW += w
@@ -1850,9 +1904,14 @@ local function meadow(x: number, z: number, flat: number, bank: number): string
 	return swath
 end
 
+-- Set when this column is the drive's dirt shoulder, so SurfaceMaterial can
+-- put Ground back after the valley paint (it would otherwise grow grass there).
+local shoulderHere = false
+
 -- The surface material (an Enum.Material name) for a column of height h
 -- and slope (rise over run), before the town zone's rules (below).
 local function surfaceMaterial(x: number, z: number, h: number, slope: number): string
+	shoulderHere = false
 	local _, surface, bank = water(x, z)
 	if surface and h < surface then
 		return if bank > 0.5 then "Sand" else "Mud"
@@ -1894,6 +1953,23 @@ local function surfaceMaterial(x: number, z: number, h: number, slope: number): 
 			return "Grass"
 		end
 	end
+	-- Outside the 28-stud gravel, inside the flat drive: TrailDirt on Ground.
+	-- Checked before the gravel crown so the shoulder noise does not paint
+	-- Asphalt onto those outer studs. Town, the lot and a plot's lawn keep
+	-- the grass they already had.
+	local lot = WorldLayout.ParkingLot
+	local lotDx = math.max(lot.x0 - x, 0, x - lot.x1)
+	local lotDz = math.max(lot.z0 - z, 0, z - lot.z1)
+	local byLot = lotDx * lotDx + lotDz * lotDz < 12 * 12
+	if
+		onShoulder(x, z)
+		and not WorldLayout.InTownZone(x, z)
+		and not WorldLayout.NearPlotPad(x, z, 40)
+		and not byLot
+	then
+		shoulderHere = true
+		return "Ground"
+	end
 	if onRoad > 0 then
 		return TerrainGen.GravelMaterial
 	end
@@ -1912,7 +1988,6 @@ local function surfaceMaterial(x: number, z: number, h: number, slope: number): 
 		end
 		return if noise(x / 18, z / 18, 6.1) > 0.35 then "Ground" else "Sandstone"
 	end
-	local lot = WorldLayout.ParkingLot
 	if x > lot.x0 and x < lot.x1 and z > lot.z0 and z < lot.z1 then
 		return TerrainGen.GravelMaterial
 	end
@@ -2037,7 +2112,10 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 		and (m == "Asphalt" or m == "Rock" or m == "Slate" or m == "LeafyGrass")
 		and WorldLayout.InTownZone(x, z)
 	then
-		return "Grass"
+		m = "Grass"
+	end
+	if shoulderHere and TerrainGen.WaterLevelFor(x, z, h) == nil then
+		return "Ground"
 	end
 	return m
 end

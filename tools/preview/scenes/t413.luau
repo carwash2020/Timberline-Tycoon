@@ -2,6 +2,8 @@
 -- T413 travel greyboxes: the free town bridge, the paid lift, the car ferry
 -- and its docks, the Skyroot hairpin, and one junction sign.
 -- Views 1, 5, 6, 7 and 8 are the five shots under preview/t413/.
+-- View 9 is the EastLink shoulder (preview/t413/eastlink-shoulder.png).
+local Common = require("./_common")
 
 return {
 	build = function(ctx)
@@ -33,20 +35,6 @@ return {
 		local berth = FerryLogic.Berths().main
 		Kit.placeAt(boat, CF.new(berth.x, FerryLogic.DeckY(), berth.z))
 		boat.Parent = root
-		-- A LoggingRig plus trailer ghost, 75 studs, on the deck.
-		local function rigGhost(parent, at)
-			local ghost = roblox.Instance.new("Part")
-			ghost.Name = "RigGhost"
-			ghost.Anchored = true
-			ghost.CanCollide = false
-			ghost.Transparency = 0.35
-			ghost.Size = V3.new(10, 4, 75)
-			ghost.Color = C3.fromRGB(196, 154, 99)
-			ghost.CFrame = at
-			ghost.Parent = parent
-			return ghost
-		end
-		rigGhost(boat, boat:GetPivot() * CF.new(0, 3, 0))
 
 		-- Studio set, west of the map, so a world sign cannot sit in the shot.
 		local studio = -2400
@@ -64,7 +52,6 @@ return {
 		local ferry = LandmarkArt.FerryBoat()
 		Kit.placeAt(ferry, CF.new(studio, 4, 360))
 		ferry.Parent = root
-		rigGhost(ferry, ferry:GetPivot() * CF.new(0, 3, 0))
 
 		pad(studio, 540, 90)
 		local stone = TravelArt.StoneBridge()
@@ -78,8 +65,14 @@ return {
 		local map = Kit.model("TravelPins")
 		map.Parent = root
 		local SCALE = 0.05
-		local function pinAt(name, x, z, color, wide)
+		-- Travel labels sit at least 6 map-studs clear of each other and of
+		-- the shop labels. Nudge is in that same map space (screen studs).
+		local function pinAt(name, x, z, color, wide, nudge)
 			local px, pz = x * SCALE + 2000, z * SCALE + 1100
+			if nudge then
+				px += nudge[1]
+				pz += nudge[2]
+			end
 			local marker = Kit.part(
 				map,
 				name,
@@ -98,10 +91,10 @@ return {
 		end
 		local travelColor = C3.fromRGB(201, 162, 74)
 		local shopColor = C3.fromRGB(196, 122, 74)
-		pinAt("TOWN", TravelPlan.FreeBridge.x, TravelPlan.FreeBridge.z, travelColor, false)
-		pinAt("LIFT $100", TravelPlan.LiftX, TravelPlan.LiftZ, travelColor, true)
-		pinAt("DOCK", TravelPlan.Mainland.x, TravelPlan.Mainland.z, travelColor, false)
-		pinAt("ISLE", TravelPlan.IslandDock.x, TravelPlan.IslandDock.z, travelColor, false)
+		pinAt("TOWN", TravelPlan.FreeBridge.x, TravelPlan.FreeBridge.z, travelColor, false, { 0, -16 })
+		pinAt("LIFT $100", TravelPlan.LiftX, TravelPlan.LiftZ, travelColor, true, { 20.35, -18 })
+		pinAt("DOCK", TravelPlan.Mainland.x, TravelPlan.Mainland.z, travelColor, false, { -10, 0 })
+		pinAt("ISLE", TravelPlan.IslandDock.x, TravelPlan.IslandDock.z, travelColor, false, { 0, 17 })
 		local sky = TravelPlan.SkyrootPoints()
 		for i = 1, #sky - 1 do
 			local a, b = sky[i], sky[i + 1]
@@ -118,13 +111,16 @@ return {
 			)
 		end
 		local lodge = sky[#sky]
-		pinAt("SKYROOT", lodge.x, lodge.z, travelColor, true)
+		pinAt("SKYROOT", lodge.x, lodge.z, travelColor, true, { 0, -16 })
 		for _, row in ipairs(ShopPins.All()) do
 			pinAt(row.id, row.x, row.z, shopColor, false)
 		end
 
+		local TerrainGen = ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
+		local shoulderY = TerrainGen.HeightAt(420, 80)
 		return {
 			root = root,
+			terrain = Common.terrain(ctx, 340, 40, 520, 130, 2),
 			shadowRadius = 40,
 			fov = 40,
 			lighting = {
@@ -151,6 +147,21 @@ return {
 				{ pos = { -2364, 70, 280 }, target = { -2400, 3, 360 }, label = "ferry truck", fov = 42 },
 				{ pos = { -2400, 48, 470 }, target = { -2402, 1, 540 }, label = "bridges contrast", fov = 42 },
 				{ pos = { 2012, 95, 1100 }, target = { 2012, 0, 1100 }, label = "travel pins", fov = 48 },
+				-- Eye level on the south edge of EastLink, looking along the flat shoulder.
+				{
+					pos = { 390, shoulderY + 6, 104 },
+					target = { 460, shoulderY + 1, 84 },
+					label = "eastlink shoulder",
+					fov = 42,
+				},
+				-- Three-quarter from the stern: cabin, lamp, and the ghost truck
+				-- on the 18×84 deck. The studio boat sits at (-2400, 4, 360).
+				{
+					pos = { -2332, 34, 458 },
+					target = { -2400, 6, 365 },
+					label = "ferry cabin",
+					fov = 32,
+				},
 			},
 		}
 	end,

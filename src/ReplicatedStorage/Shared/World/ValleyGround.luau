@@ -88,7 +88,7 @@ local SPUR_GRADE = 0.19
 local JUNCTION = 3
 
 local buckets: { [number]: { Seg } } = {}
-local liveLines: { { line: any, half: number } } = {}
+local liveLines: { { line: any, half: number, drive: number } } = {}
 
 local function bucketKey(ix: number, iz: number): number
 	return (ix + 80) * 400 + (iz + 80)
@@ -124,6 +124,22 @@ end
 local function liveClear(x: number, z: number): number
 	local clear = liveNear(x, z)
 	return clear
+end
+
+-- Distance to the edge of the flat drive (negative on it). Wider than the
+-- plan bed on mains, so HeightAt stays level out to DriveHalf. Paint and
+-- the tree plan keep using liveClear / PlanWidth.
+local function driveClear(x: number, z: number): number
+	local best = 1e6
+	for _, road in ipairs(liveLines) do
+		local reach = road.drive + 2
+		local d = WorldLayout.FastDistance(road.line, x, z, reach)
+		local clear = d - road.drive
+		if clear < best then
+			best = clear
+		end
+	end
+	return best
 end
 
 local AMP: { [string]: number } = {
@@ -416,7 +432,11 @@ end
 local function buildRoads()
 	table.clear(buckets)
 	for _, road in ipairs(WorldLayout.Roads) do
-		table.insert(liveLines, { line = WorldLayout.FastLine(road.points), half = WorldLayout.PlanWidth(road) / 2 })
+		table.insert(liveLines, {
+			line = WorldLayout.FastLine(road.points),
+			half = WorldLayout.PlanWidth(road) / 2,
+			drive = WorldLayout.DriveHalf(road),
+		})
 	end
 	local groups: { { Sample } } = {}
 	local all: { Sample } = {}
@@ -725,9 +745,10 @@ function ValleyGround.HeightAt(x: number, z: number): number
 	if approach then
 		return approach
 	end
-	-- The live bed, the whole width. A draft centreline that crosses it has
+	-- The live drive, out to DriveHalf. A draft centreline that crosses it has
 	-- already been graded down to this height, so the truck's road stays level.
-	if liveClear(x, z) <= 0 then
+	-- The plan bed is narrower; the extra studs are the flat shoulder.
+	if driveClear(x, z) <= 0 then
 		return legacy(x, z)
 	end
 	if held(x, z) or onTollSpur(x, z) then

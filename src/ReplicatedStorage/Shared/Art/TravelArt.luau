@@ -20,9 +20,11 @@ local METAL = Enum.Material.Metal
 local STONE = Enum.Material.Cobblestone
 local CONCRETE = Enum.Material.Concrete
 local PLASTIC = Enum.Material.SmoothPlastic
-local NEON = Enum.Material.Neon
 local GROUND = Enum.Material.Ground
 local SAND = Enum.Material.Sand
+local FABRIC = Enum.Material.Fabric
+local ROPE = Kit.hex("#C2B280")
+local STOP = Kit.hex("#B83A2E")
 
 local function part(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material): Part
 	return Kit.part(model, name, size, cf, color, mat)
@@ -45,15 +47,59 @@ local function dressOnly(model: Model)
 	end
 end
 
+-- Posts along a span (Z), clear of the deck and of any abutment that sits
+-- outside the deck edge. `outside` puts them past the walk (the footbridge).
+-- The top piece is one rail, not a panel. A 0.05 gap keeps the post off the
+-- deck's top face.
+local function sidePosts(
+	model: Model,
+	halfX: number,
+	spanZ: number,
+	centerZ: number,
+	deckTop: number,
+	postColor: Color3,
+	postMat: Enum.Material,
+	railColor: Color3,
+	railMat: Enum.Material,
+	outside: boolean
+)
+	local postT = 0.4
+	local postH = 3.2
+	local gap = 0.05
+	local xOff = if outside then halfX + 0.35 else halfX - 0.35
+	local n = math.floor(spanZ / 4)
+	for _, s in ipairs({ -1, 1 }) do
+		local x = s * xOff
+		for i = 0, n do
+			local z = centerZ - spanZ / 2 + i * 4
+			local post =
+				part(model, "Post", V3(postT, postH, postT), CF(x, deckTop + gap + postH / 2, z), postColor, postMat)
+			post.CanCollide = false
+		end
+		local rail =
+			part(model, "TopRail", V3(postT, postT, spanZ), CF(x, deckTop + gap + postH, centerZ), railColor, railMat)
+		rail.CanCollide = false
+	end
+end
+
 function TravelArt.FreeBridge(): Model
 	local model = Kit.model("FreeTownBridge")
 	model:SetAttribute("Tolled", false)
 	model:SetAttribute("Width", TravelPlan.FreeBridge.width)
 	local span = TravelPlan.FreeBridge.length
+	local width = TravelPlan.FreeBridge.width
 	-- Murph's camp occupies z 38–53 on this pin. The solid span sits just
 	-- south of it so the deck can collide and still miss the camp.
 	local clearZ = -16
-	deck(model, V3(TravelPlan.FreeBridge.width, 1, span), CF(0, 0.5, clearZ), Palette.PlankHoney)
+	local boards = math.floor(span / 2)
+	for i = 0, boards - 1 do
+		local z = clearZ - span / 2 + 2 * (i + 0.5)
+		local color = if i % 2 == 0 then Palette.PlankHoney else Palette.WeatheredPlank
+		local board = part(model, "Deck", V3(width, 1, 2), CF(0, 0.5, z), color, PLANKS)
+		if i == 0 then
+			model.PrimaryPart = board
+		end
+	end
 	-- The pin stays on the plan point. placeAt follows PrimaryPart, so the
 	-- deck can sit south of that point without the pivot pulling it back.
 	local pin = part(model, "Pin", V3(0.2, 0.2, 0.2), CF(0, 1, 0), Palette.IronBlack, METAL)
@@ -61,23 +107,9 @@ function TravelArt.FreeBridge(): Model
 	pin.CanCollide = false
 	model.PrimaryPart = pin
 	for _, x in ipairs({ -1, 1 }) do
-		part(
-			model,
-			"Abutment",
-			V3(4, 6, span),
-			CF(x * (TravelPlan.FreeBridge.width / 2 + 2), -2, clearZ),
-			Palette.StoneBase,
-			STONE
-		)
-		part(
-			model,
-			"Rail",
-			V3(0.6, 3, span),
-			CF(x * (TravelPlan.FreeBridge.width / 2 - 0.4), 2, clearZ),
-			Palette.IronBlack,
-			METAL
-		)
+		part(model, "Abutment", V3(4, 6, span), CF(x * (width / 2 + 2), -2, clearZ), Palette.StoneBase, STONE)
 	end
+	sidePosts(model, width / 2, span, clearZ, 1, Palette.IronBlack, METAL, Palette.IronBlack, METAL, false)
 	dressOnly(model)
 	return model
 end
@@ -99,8 +131,16 @@ function TravelArt.LiftBridge(): Model
 		part(model, "Rail", V3(length, 3, 0.6), CF(0, 2.2, x * (width / 2 - 0.4)), Palette.IronBlack, METAL)
 	end
 	part(model, "Brace", V3(length - 10, 1.2, 1.2), CF(0, 26, 0), Palette.IronBlack, METAL)
-	local arm = part(model, "StopRed", V3(width, 0.6, 0.6), CF(-length / 2 + 6, 3.2, 0), Palette.StopRed, NEON)
+	-- Barrier arm, swung open beside the booth: off the 32-wide lane.
+	-- StopRed #B83A2E with a SignCream band, on a timber post.
+	local px = -length / 2 - 2
+	local pz = width / 2 + 6
+	local post = part(model, "Post", V3(0.6, 3.2, 0.6), CF(px, 1.65, pz), Palette.TimberBrown, WOOD)
+	post.CanCollide = false
+	local arm = part(model, "StopRed", V3(14, 0.6, 0.6), CF(px + 7, 3.2, pz), STOP, PLASTIC)
 	arm.CanCollide = false
+	local band = part(model, "CreamBand", V3(2.2, 0.7, 0.7), CF(px + 7, 3.2, pz), Palette.SignCream, PLASTIC)
+	band.CanCollide = false
 	-- Booth on the south side of the west approach, not in the lane.
 	local booth = Kit.model("Booth")
 	booth.Parent = model
@@ -126,28 +166,38 @@ end
 function TravelArt.StoneBridge(): Model
 	local model = Kit.model("StoneBranch")
 	model:SetAttribute("Width", TravelPlan.BranchWidth)
-	deck(model, V3(TravelPlan.BranchWidth, 1, 20), CF(0, 0.5, 0), Palette.RoadGravel)
+	local width = TravelPlan.BranchWidth
+	deck(model, V3(width, 1, 20), CF(0, 0.5, 0), Palette.RoadGravel)
 	local deckPart = model.PrimaryPart :: BasePart
 	deckPart.Material = CONCRETE
+	deckPart.Color = Palette.RoadGravel
+	-- Stone side, 2 deep under the deck, not through it.
 	for _, x in ipairs({ -1, 1 }) do
-		part(model, "Face", V3(2, 5, 20), CF(x * (TravelPlan.BranchWidth / 2 + 1), -1.5, 0), Palette.StoneBase, STONE)
+		part(model, "Face", V3(2, 2, 20), CF(x * (width / 2 + 1.05), -1.05, 0), Palette.StoneBase, STONE)
 	end
+	sidePosts(model, width / 2, 20, 0, 1, Palette.IronBlack, METAL, Palette.IronBlack, METAL, false)
 	return model
 end
 
 function TravelArt.FootBridge(): Model
 	local model = Kit.model("GloamFoot")
 	model:SetAttribute("Width", TravelPlan.FootWidth)
-	deck(model, V3(TravelPlan.FootWidth, 0.4, 16), CF(0, 0.4, 0), Palette.PlankHoney)
-	for _, x in ipairs({ -1, 1 }) do
-		part(
-			model,
-			"Rope",
-			V3(0.3, 3.2, 16),
-			CF(x * (TravelPlan.FootWidth / 2 - 0.2), 1.8, 0),
-			Palette.TimberBrown,
-			WOOD
-		)
+	local width = TravelPlan.FootWidth
+	local span = 16
+	deck(model, V3(width, 0.4, span), CF(0, 0.4, 0), Palette.PlankHoney)
+	local postH = 3.2
+	local n = math.floor(span / 4)
+	for _, s in ipairs({ -1, 1 }) do
+		local x = s * (width / 2 + 0.35)
+		for i = 0, n do
+			local z = -span / 2 + i * 4
+			local post = part(model, "Post", V3(0.4, postH, 0.4), CF(x, postH / 2, z), Palette.TimberBrown, WOOD)
+			post.CanCollide = false
+		end
+		local top = part(model, "Rope", V3(0.3, 0.3, span), CF(x, postH, 0), ROPE, FABRIC)
+		top.CanCollide = false
+		local mid = part(model, "Rope", V3(0.3, 0.3, span), CF(x, postH * 0.55, 0), ROPE, FABRIC)
+		mid.CanCollide = false
 	end
 	return model
 end

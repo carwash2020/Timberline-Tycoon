@@ -1,5 +1,9 @@
 # Phase 2+ build notes
 
+## T413 travel fixes (29 October 2026, branch `cursor/t413-fixes`)
+
+The haul, the fare, and the Skyroot climb are on main (`16cd31a`, #277). This branch flattens the main-road shoulder out to the 32-stud drive and dresses the travel greyboxes. Studio checks below are for that dressing and for the EastLink edge.
+
 ## T413 travel (28 October 2026, branch `cursor/t413-travel-cd9f`)
 
 Nothing here has been seen in Studio. Cloud tests build the pins, the fare, the weld rules, and the signs. They do not drive a truck or stand on the moving deck.
@@ -9,7 +13,7 @@ Studio checks:
 2. At the mainland dock the board reads LANTERN FERRY and $350, every 6 minutes, about 40 seconds. Step on and step off before it leaves: $0. Stay aboard: $350 once. Walk the deck. Arrive at the Sparkworks harbour.
 3. Drive a truck, with or without a trailer, onto the deck. It sails and you drive off the far dock. One fare for the driver.
 4. Sparkworks refuses a buy until the ferry has bound. After that, the same buy works.
-5. Drive the Skyroot switchback to the GateLodge. No cash toll and no gondola. Read the signs: DEALERSHIP, FERRY / LANTERN ISLE, SKYROOT, TOWN (free bridge). Say yes or no to the greybox bridge and ferry. The haul roads record main 32 and branch 24. The gravel you drive is still the 28-stud bed, so two rigs on a country grade are the old width until that bed is widened.
+5. Drive the Skyroot switchback to the GateLodge. No cash toll and no gondola. Read the signs: DEALERSHIP, FERRY / LANTERN ISLE, SKYROOT, TOWN (free bridge). Say yes or no to the greybox bridge and ferry. The haul roads record main 32 and branch 24. Gravel is still the 28-stud bed. On a main, the outer 2 studs each side are flat dirt (TrailDirt), level with the crown, so a truck at the edge does not tip. Park on the EastLink edge and check that. The lift arm is a red bar with a cream band on a timber post beside the booth, clear of the lane. The town bridge is alternating planks with iron posts and one top rail. The ferry shows a ghost truck, a black waterline, and a low weathered cabin with a slate roof and a brass lamp. The stone span has cobble sides and iron posts. The footbridge keeps width 8 with rope rails on timber posts.
 
 ## T412 shops placed (28 October 2026, branch `cursor/t412-shops-placed-cbeb`)
 
