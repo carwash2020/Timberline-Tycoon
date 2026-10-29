@@ -171,9 +171,13 @@ function TravelArt.StoneBridge(): Model
 	local deckPart = model.PrimaryPart :: BasePart
 	deckPart.Material = CONCRETE
 	deckPart.Color = Palette.RoadGravel
-	-- Stone side, 2 deep under the deck, not through it.
+	-- Cobblestone StoneBase on the deck edges and the end abutments, 2 studs
+	-- deep under the deck, not through it.
 	for _, x in ipairs({ -1, 1 }) do
 		part(model, "Face", V3(2, 2, 20), CF(x * (width / 2 + 1.05), -1.05, 0), Palette.StoneBase, STONE)
+	end
+	for _, z in ipairs({ -1, 1 }) do
+		part(model, "Abutment", V3(width, 2, 2), CF(0, -1.05, z * (10 + 1.05)), Palette.StoneBase, STONE)
 	end
 	sidePosts(model, width / 2, 20, 0, 1, Palette.IronBlack, METAL, Palette.IronBlack, METAL, false)
 	return model

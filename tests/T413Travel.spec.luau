@@ -915,10 +915,10 @@ return function(t)
 
 		local boat = LandmarkArt.FerryBoat()
 		t.eq(boat:FindFirstChild("Stern"), nil)
-		local cabin = boat:FindFirstChild("Cabin")
+		local cabin = boat:FindFirstChild("Cabin", true)
 		t.eq(cabin.Size, Vector3.new(8, 5, 6))
 		t.eq(cabin.Color, Palette.WeatheredPlank)
-		t.eq(boat:FindFirstChild("CabinRoof").Color, Palette.RoofSlate)
+		t.eq(boat:FindFirstChild("CabinRoof", true).Color, Palette.RoofSlate)
 		local lamp = boat:FindFirstChild("LanternGlow", true)
 		t.eq(lamp.Color, Palette.Brass)
 		local lines = 0
@@ -930,16 +930,13 @@ return function(t)
 			end
 		end
 		t.eq(lines, 4, "a waterline all round")
-		local footp = boat:FindFirstChild("TruckFootprint")
+		local footp = boat:FindFirstChild("TruckFootprint", true)
 		t.ok(math.abs(footp.Transparency - 0.6) < 0.02, "footprint is transparency 0.6")
 		t.eq(footp.CanCollide, false)
 		t.eq(footp.CanQuery, false)
 		t.eq(footp.CanTouch, false)
-		local tagged = false
-		pcall(function()
-			local service = game:GetService("CollectionService")
-			tagged = service:HasTag(footp, "Truck") or service:HasTag(footp, "Trailer") or service:HasTag(boat, "Truck")
-		end)
-		t.eq(tagged, false, "the footprint is not a vehicle")
+		t.eq(footp:HasTag("Truck"), false)
+		t.eq(footp:HasTag("Trailer"), false)
+		t.eq(boat:HasTag("Truck"), false)
 	end)
 end

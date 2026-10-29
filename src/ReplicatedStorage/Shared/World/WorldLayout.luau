@@ -287,6 +287,15 @@ function WorldLayout.DriveHalf(road: Road): number
 	return math.max(WorldLayout.PlanWidth(road), road.width) / 2
 end
 
+-- TrailDirt band on a main. Voxels are 4 studs, so the dirt runs from the
+-- 14-stud gravel edge out to 18 (one voxel), not only to the 16-stud grade.
+function WorldLayout.DirtHalf(road: Road): number
+	if road.width > WorldLayout.PlanWidth(road) then
+		return 18
+	end
+	return WorldLayout.PlanWidth(road) / 2
+end
+
 -- Flared turns where a haul road splits, wide enough for the Logging Rig.
 -- Discs, not extra roads: a short segment would fail the "runs through the
 -- country" sample. TerrainGen paints and grades them with the haul roads.

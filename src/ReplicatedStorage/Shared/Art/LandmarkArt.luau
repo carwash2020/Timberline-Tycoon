@@ -649,21 +649,25 @@ function LandmarkArt.FerryBoat(): Model
 		solid(model, "Rail", V3(0.6, 2, l - 6), CF(side * (w / 2 - 0.3), 1.5, 2), TOLL_TIMBER, MAT.Wood)
 		solid(model, "Rail", V3(0.6, 2, 3), CF(side * (w / 2 - 0.3), 1.5, -l / 2 + 1.5), TOLL_TIMBER, MAT.Wood)
 	end
+	-- Dress that must not block a truck: cabin, waterline, and the ghost
+	-- footprint. The Deck stays solid on the boat.
+	local dress = Kit.model("GhostTruck")
+	dress.Parent = model
 	-- IronBlack waterline, 1.5 tall, just under the deck, all round the hull.
 	local bandH = 1.5
 	local bandTop = -0.55
 	local bandY = bandTop - bandH / 2
 	local t = 0.4
-	ghost(model, "Waterline", V3(t, bandH, l + t), CF(w / 2 + t / 2, bandY, 0), Palette.IronBlack, MAT.Metal)
-	ghost(model, "Waterline", V3(t, bandH, l + t), CF(-w / 2 - t / 2, bandY, 0), Palette.IronBlack, MAT.Metal)
-	ghost(model, "Waterline", V3(w + t * 2, bandH, t), CF(0, bandY, l / 2 + t / 2), Palette.IronBlack, MAT.Metal)
-	ghost(model, "Waterline", V3(w + t * 2, bandH, t), CF(0, bandY, -l / 2 - t / 2), Palette.IronBlack, MAT.Metal)
+	ghost(dress, "Waterline", V3(t, bandH, l + t), CF(w / 2 + t / 2, bandY, 0), Palette.IronBlack, MAT.Metal)
+	ghost(dress, "Waterline", V3(t, bandH, l + t), CF(-w / 2 - t / 2, bandY, 0), Palette.IronBlack, MAT.Metal)
+	ghost(dress, "Waterline", V3(w + t * 2, bandH, t), CF(0, bandY, l / 2 + t / 2), Palette.IronBlack, MAT.Metal)
+	ghost(dress, "Waterline", V3(w + t * 2, bandH, t), CF(0, bandY, -l / 2 - t / 2), Palette.IronBlack, MAT.Metal)
 	-- Low cabin aft, in place of the stern board. 8 wide, 5 tall, 6 long,
 	-- so the rig footprint still fits on the deck ahead of it.
 	local cabinZ = l / 2 - 4
-	solid(model, "Cabin", V3(8, 5, 6), CF(0, 0.5 + 2.5, cabinZ), Palette.WeatheredPlank, MAT.WoodPlanks)
-	solid(model, "CabinRoof", V3(9, 0.4, 7), CF(0, 0.5 + 5 + 0.2, cabinZ), Palette.RoofSlate, MAT.Slate)
-	local lamp = ghost(model, "Lantern", V3(0.8, 0.8, 0.8), CF(0, 0.5 + 5 + 0.85, cabinZ), Palette.Brass, MAT.Metal)
+	ghost(dress, "Cabin", V3(8, 5, 6), CF(0, 0.5 + 2.5, cabinZ), Palette.WeatheredPlank, MAT.WoodPlanks)
+	ghost(dress, "CabinRoof", V3(9, 0.4, 7), CF(0, 0.5 + 5 + 0.2, cabinZ), Palette.RoofSlate, MAT.Slate)
+	local lamp = ghost(dress, "Lantern", V3(0.8, 0.8, 0.8), CF(0, 0.5 + 5 + 0.85, cabinZ), Palette.Brass, MAT.Metal)
 	lamp.Name = "LanternGlow"
 	local light = Instance.new("PointLight")
 	light.Color = Palette.Brass
@@ -674,7 +678,7 @@ function LandmarkArt.FerryBoat(): Model
 	-- Ghost truck, the rig's volume on the deck, ahead of the cabin. Not a
 	-- vehicle: it does not collide, query, or touch.
 	local foot = ghost(
-		model,
+		dress,
 		"TruckFootprint",
 		V3(TravelPlan.RigWidth, 4, TravelPlan.RigLength),
 		CF(0, 0.5 + 2, -4),
