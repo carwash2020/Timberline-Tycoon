@@ -107,36 +107,49 @@ return function(t)
 			seen[p.kind] = (seen[p.kind] or 0) + 1
 			t.ok(p.material ~= "Neon" and p.material ~= "Glass", p.name .. " is not Neon or Glass")
 			if p.kind == "Road" or p.kind == "Yard" then
-				t.eq(p.material, "Asphalt")
-				t.eq(p.color:ToHex(), "55585A", p.name)
+				local lane = string.find(p.name, "MainStreet", 1, true) ~= nil
+					or p.name == "ForestPath"
+					or p.name == "MillRoad"
+					or p.name == "LotLoop"
+					or p.name == "Lot"
+				if lane then
+					t.eq(p.material, "Cobblestone")
+					t.eq(p.color:ToHex(), "9C958A", p.name)
+				else
+					t.eq(p.material, "Asphalt")
+					t.eq(p.color:ToHex(), "A8A49C", p.name)
+				end
 				t.ok(math.abs(p.thick - 0.2) < 1e-9, p.name .. " is 0.2 tall")
-				t.ok(p.collide, p.name .. " collides")
+				t.ok(not p.collide, p.name .. " is terrain, not a slab")
 				if p.kind == "Road" then
 					t.ok(runLength(p) <= 64 + 1e-6, p.name .. " run " .. runLength(p))
 				end
-				-- The top is 0.05 over the graded ground at both ends of the run.
-				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.05)) < 1e-6, p.name .. " top at a")
-				t.ok(math.abs(p.yb - (ground(p.b.X, p.b.Y) + 0.05)) < 1e-6, p.name .. " top at b")
+				-- Flush with the graded ground: the terrain is the surface.
+				t.ok(math.abs(p.ya - ground(p.a.X, p.a.Y)) < 1e-6, p.name .. " top at a")
+				t.ok(math.abs(p.yb - ground(p.b.X, p.b.Y)) < 1e-6, p.name .. " top at b")
 			elseif p.kind == "Curb" then
-				t.eq(p.material, "Concrete")
-				t.eq(p.color:ToHex(), "9A968C", "CurbConcrete")
+				t.eq(p.material, "Slate")
+				t.eq(p.color:ToHex(), "8C877E", "StoneBase")
 				t.ok(
-					math.abs(p.width - 0.3) < 1e-9 and math.abs(p.thick - 0.15) < 1e-9,
-					"road curbs are 0.3 wide, 0.15 tall"
+					math.abs(p.width - 0.3) < 1e-9 and math.abs(p.thick - 0.6) < 1e-9,
+					"road curbs are 0.3 wide, 0.6 tall"
 				)
+				t.ok(not p.collide, p.name)
 				t.ok(runLength(p) <= 64 + 1e-6)
 			elseif p.kind == "LotCurb" then
-				t.eq(p.color:ToHex(), "9A968C", "CurbConcrete")
-				t.ok(math.abs(p.thick - 0.4) < 1e-9, "the lot edge is a 0.4 tall curb")
-				-- Its top stands 0.4 over the ground.
-				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.4)) < 1e-6)
+				t.eq(p.color:ToHex(), "8C877E", "StoneBase")
+				t.eq(p.material, "Slate")
+				t.ok(math.abs(p.thick - 0.6) < 1e-9, "the lot edge is a 0.6 tall curb")
+				t.ok(not p.collide, p.name)
+				-- Its top stands 0.6 over the ground.
+				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.6)) < 1e-6)
 			elseif p.kind == "Path" then
 				t.eq(p.color:ToHex(), "8E6C4A", "TrailDirt")
 				t.eq(p.material, "Ground")
 				t.ok(p.material ~= "Pebble", "a footpath is a dirt look, not Pebble")
-				t.eq(p.width, 6)
-				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.1)) < 1e-6, "0.1 proud")
-				t.ok(p.collide)
+				t.eq(p.width, 8)
+				t.ok(math.abs(p.ya - ground(p.a.X, p.a.Y)) < 1e-6, "flush")
+				t.ok(not p.collide)
 			elseif p.kind == "Line" then
 				t.eq(p.color:ToHex(), "E8E2D0", "line paint")
 				t.ok(math.abs(p.width - 0.3) < 1e-9)
@@ -182,7 +195,10 @@ return function(t)
 					for _, z in ipairs({ lot.z0 - d, lot.z1 + d }) do
 						local m = surface(x, z)
 						t.ok(
-							(m ~= "Ground" and m ~= "Mud") or named(x, z) or inMainDirt(x, z),
+							(m ~= "Ground" and m ~= "Mud")
+								or named(x, z)
+								or inMainDirt(x, z)
+								or TownGround.Covers(x, z, { Path = true }, 0.5),
 							string.format("%s at (%d, %d) beside the lot", m, x, z)
 						)
 					end
@@ -191,7 +207,10 @@ return function(t)
 					for _, x in ipairs({ lot.x0 - d, lot.x1 + d }) do
 						local m = surface(x, z)
 						t.ok(
-							(m ~= "Ground" and m ~= "Mud") or named(x, z) or inMainDirt(x, z),
+							(m ~= "Ground" and m ~= "Mud")
+								or named(x, z)
+								or inMainDirt(x, z)
+								or TownGround.Covers(x, z, { Path = true }, 0.5),
 							string.format("%s at (%d, %d) beside the lot", m, x, z)
 						)
 					end
@@ -214,7 +233,13 @@ return function(t)
 						local c = if p.shape == "Block" then p.a + dir * (len * i / n) else p.a
 						-- Under it.
 						local under = surface(c.X, c.Y)
-						local okUnder = under == "Grass" or (under == "Ground" and inMainDirt(c.X, c.Y))
+						-- T414a: the piece is paint, so the centreline is that material. Grass remains where the edge feathers.
+						-- T413: a main's TrailDirt shoulder is Ground outside the gravel bed.
+						local okUnder = under == "Grass"
+							or under == "Asphalt"
+							or under == "Cobblestone"
+							or under == "Ground"
+							or inMainDirt(c.X, c.Y)
 						if p.kind == "Path" then
 							okUnder = okUnder or under == "Ground" or under == "Cobblestone" -- a shop floor's earth, or the plaza's cobbles (their edge wanders), under a path's last studs
 						end
@@ -228,8 +253,10 @@ return function(t)
 								local q = c + normal * (side * lateral)
 								-- (past the zone's edge the country road is terrain again)
 								local m = if WorldLayout.InTownZone(q.X, q.Y) then surface(q.X, q.Y) else "Grass"
+								local onPaint =
+									TownGround.Covers(q.X, q.Y, { Road = true, Yard = true, Path = true }, 0)
 								t.ok(
-									m ~= "Asphalt" and m ~= "Rock" and m ~= "Slate",
+									onPaint or (m ~= "Asphalt" and m ~= "Rock" and m ~= "Slate"),
 									string.format("%s: %s at (%.0f, %.0f) beside the %s", p.name, m, q.X, q.Y, p.kind)
 								)
 							end
@@ -308,8 +335,8 @@ return function(t)
 				end
 			end
 		end
-		-- (top 0.05 over the ground at the ends, within 0.2 along: both hold)
-		t.ok(worst > 0.04, "the 0.05 lift is there: " .. worst)
+		-- The ends are flush. Across a wide run the grade can wander, and 0.2 is the cap.
+		t.ok(worst <= 0.2, "within 0.2 of the grade: " .. worst)
 	end)
 
 	t.test("touching road parts and the part-to-terrain joins step at most 0.05", function()
@@ -638,11 +665,10 @@ return function(t)
 			local cf = part.CFrame
 			local hx, hz = part.Size.X / 2 * 0.98, part.Size.Z / 2 * 0.98
 			local out = {}
-			for _, sx in ipairs({ -1, 1 }) do
-				for _, sz in ipairs({ -1, 1 }) do
-					local w = cf * Vector3.new(sx * hx, 0, sz * hz)
-					table.insert(out, Vector2.new(w.X, w.Z))
-				end
+			-- Around the footprint, not a bowtie, so a shared edge is not an overlap.
+			for _, s in ipairs({ { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }) do
+				local w = cf * Vector3.new(s[1] * hx, 0, s[2] * hz)
+				table.insert(out, Vector2.new(w.X, w.Z))
 			end
 			return out
 		end

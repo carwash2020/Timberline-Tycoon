@@ -1,6 +1,10 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 29 October 2026. **Main is at `16cd31a` (T413, #277).** This branch is the T413 fixes (`cursor/t413-fixes`): graded shoulders and the travel art.
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `1a9e158` (T413 fixes, #279).** This branch is T414a town ground (`cursor/t414a-town-ground-1e4c`), rebased onto that main. Outside town the graded TrailDirt shoulder stays. Inside town the streets are paint.
+
+## T414a town ground (30 October 2026, branch `cursor/t414a-town-ground-1e4c`)
+
+Town roads, lanes, the lot and the footpaths are terrain paint (`TownGround.MaterialAt`, drawn by `TerrainGen.SurfaceMaterial`). The flat strips are gone. Kerbs are a 0.6-stud StoneBase slate bar, `CanCollide` false, `TownGroundArt.KerbMeshId` 0 until Connor uploads a mesh. Town lanes and the lot are cobble `#9C958A`. East Link, South Link and the yards are asphalt-gravel `#A8A49C`. Footpaths are TrailDirt, 8 wide, and the edge feathers into grass. The graded bed stays 28 (`WorldLayout.PlanWidth`): widening it moves trees and puts rocks in cabins, so paint does not pass that bed. Drive widths stay 32 and 24. The T413 shoulder (14 to 18 on a main) still paints Ground outside town; a town piece wins only where `TownGround.MaterialAt` returns a material. Shop pins, the mill, the Weigh House, bridges and docks did not move. Shots: `preview/t414a/`. Studio checks: PHASE2_NOTES.md "T414a town ground". Nothing here has been seen in Studio. Cloud has no physics.
 
 ## T413 roads, the car ferry, and the Skyroot climb (28 October 2026)
 

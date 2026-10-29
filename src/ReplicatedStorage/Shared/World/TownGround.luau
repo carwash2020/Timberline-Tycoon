@@ -25,8 +25,8 @@
 --   * The lot's edge: a 0.5 wide, 0.4 tall CurbConcrete curb on the lot's
 --     perimeter except across every bay's mouth and wherever a road meets
 --     it (gaps widened to 20 the same way), grass right up to it.
---   * Footpaths: TrailDirt #8E6C4A, Material Ground, 6 wide, 0.1 proud, no
---     curb.
+--   * Footpaths: TrailDirt #8E6C4A, Material Ground, 8 wide, flush, no
+--     curb. Terrain paint (T414a), not a part.
 --   * Line paint #E8E2D0, 0.3 wide: a centre line down the main roads, cut
 --     where anything crosses.
 --   * Plot borders: a 1 wide Grass strip (#5A8A3C) round each homestead pad,
@@ -35,26 +35,31 @@
 -- The terrain under every road part is Grass (TerrainGen paints no Asphalt
 -- in the zone). Country roads stay terrain.
 
+local Kit = require(script.Parent.Parent.Art.Kit)
 local PlotData = require(script.Parent.Parent.PlotData)
 local TerrainGen = require(script.Parent.TerrainGen)
 local WorldLayout = require(script.Parent.WorldLayout)
 
 local TownGround = {}
 
-TownGround.RoadColor = Color3.fromRGB(85, 88, 90) -- #55585A
-TownGround.CurbColor = Color3.fromRGB(154, 150, 140) -- #9A968C (CurbConcrete)
-TownGround.PathColor = Color3.fromRGB(142, 108, 74) -- #8E6C4A (TrailDirt)
-TownGround.LineColor = Color3.fromRGB(232, 226, 208) -- #E8E2D0
-TownGround.EdgeColor = Color3.fromRGB(90, 138, 60) -- #5A8A3C (the lawn's edge)
+-- T414a palette. Kit.hex only. Roads are RoadGravel, town lanes and the lot
+-- are TownCobble (terrain has no WoodPlanks), kerbs are StoneBase, paths are
+-- TrailDirt, and the lawn edge is DeepMeadow.
+TownGround.RoadColor = Kit.hex("#A8A49C")
+TownGround.LaneColor = Kit.hex("#9C958A")
+TownGround.CurbColor = Kit.hex("#8C877E")
+TownGround.PathColor = Kit.hex("#8E6C4A")
+TownGround.LineColor = Kit.hex("#E8E2D0")
+TownGround.EdgeColor = Kit.hex("#5A8A3C")
 
 TownGround.RoadThick = 0.2
-TownGround.RoadProud = 0.05 -- a road's top over the graded ground
+TownGround.RoadProud = 0 -- flush: the terrain is the surface, not a slab on top of it
 TownGround.CurbWidth = 0.3
-TownGround.CurbHeight = 0.15 -- over the road
+TownGround.CurbHeight = 0.6 -- visible lip; at most 1, and the part does not collide
 TownGround.LotCurbWidth = 0.5
-TownGround.LotCurbHeight = 0.4
-TownGround.PathWidth = 6
-TownGround.PathProud = 0.1
+TownGround.LotCurbHeight = 0.6
+TownGround.PathWidth = 8
+TownGround.PathProud = 0
 TownGround.LineWidth = 0.3
 TownGround.EdgeWidth = 1
 TownGround.EdgeProud = 0.05
@@ -592,9 +597,21 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 		addStrip(d.name, d.a, d.b, d.width, true)
 	end
 
-	-- Roads, yards and the lot's pavement.
+	-- Roads, yards and the lot. Terrain paint, not a slab: flush, and it does
+	-- not collide (the ground does). Town lanes and the lot are cobble.
 	local proud = TownGround.RoadProud
+	local function laneLook(name: string): boolean
+		return string.find(name, "MainStreet", 1, true) ~= nil
+			or name == "ForestPath"
+			or name == "MillRoad"
+			or name == "LotLoop"
+			or name == "Lot"
+	end
 	for _, d in ipairs(defs) do
+		local material, color = "Asphalt", RC
+		if laneLook(d.name) then
+			material, color = "Cobblestone", TownGround.LaneColor
+		end
 		for _, run in ipairs(fitRuns(d.a, d.b, proud, TownGround.MaxRun)) do
 			table.insert(
 				pieces,
@@ -602,15 +619,15 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 					d.name,
 					if d.class == "Yard" or d.class == "Lot" then "Yard" else "Road",
 					"TownRoads",
-					"Asphalt",
-					RC,
+					material,
+					color,
 					run.a,
 					run.b,
 					d.width,
 					TownGround.RoadThick,
 					run.ya,
 					run.yb,
-					true
+					false
 				)
 			)
 		end
@@ -647,7 +664,7 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 								d.name .. " curb",
 								"Curb",
 								"TownCurbs",
-								"Concrete",
+								"Slate",
 								CC,
 								run.a,
 								run.b,
@@ -655,7 +672,7 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 								TownGround.CurbHeight,
 								run.ya,
 								run.yb,
-								true
+								false
 							)
 						)
 					end
@@ -709,7 +726,7 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 		for _, run in ipairs(fitRuns(d.a, d.b, TownGround.PathProud, TownGround.MaxRun)) do
 			table.insert(
 				pieces,
-				newPiece(d.name, "Path", "TownPaths", "Ground", PC, run.a, run.b, d.width, 0.2, run.ya, run.yb, true)
+				newPiece(d.name, "Path", "TownPaths", "Ground", PC, run.a, run.b, d.width, 0.2, run.ya, run.yb, false)
 			)
 		end
 	end
@@ -780,7 +797,7 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 							"Lot curb",
 							"LotCurb",
 							"TownCurbs",
-							"Concrete",
+							"Slate",
 							CC,
 							run.a,
 							run.b,
@@ -788,7 +805,7 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 							TownGround.LotCurbHeight,
 							run.ya,
 							run.yb,
-							true
+							false
 						)
 					)
 				end
@@ -990,6 +1007,77 @@ function TownGround.Counts(): (number, number)
 		end
 	end
 	return zoneCount, plotCount
+end
+
+-- How far (x, z) sits inside a piece, or nil when it is outside. The feather
+-- uses this so a painted edge breaks into grass instead of ending in a line.
+local FEATHER = 1.6
+local function insetOf(p: Piece, x: number, z: number): number?
+	if p.shape == "Cylinder" then
+		local dx, dz = x - p.a.X, z - p.a.Y
+		local dist = math.sqrt(dx * dx + dz * dz)
+		local radius = p.width / 2
+		if dist <= radius then
+			return radius - dist
+		end
+		return nil
+	end
+	local d = p.b - p.a
+	local len = d.Magnitude
+	if len < 1e-9 then
+		return nil
+	end
+	local ux, uz = d.X / len, d.Y / len
+	local px, pz = x - p.a.X, z - p.a.Y
+	local along = px * ux + pz * uz
+	local across = math.abs(px * -uz + pz * ux)
+	if along < 0 or along > len or across > p.width / 2 then
+		return nil
+	end
+	return p.width / 2 - across
+end
+
+-- Terrain material for a town road, lane, yard, lot or footpath, or nil
+-- (grass). Haul pieces are already PlanWidth wide, so this does not paint
+-- past the graded bed. The outer FEATHER studs dither into the grass.
+function TownGround.MaterialAt(x: number, z: number): string?
+	if not WorldLayout.InTownZone(x, z) then
+		return nil
+	end
+	local best: string? = nil
+	local rank = 0
+	for _, p in ipairs(built().pieces) do
+		local mat: string? = nil
+		local r = 0
+		if p.kind == "Path" then
+			mat = "Ground"
+			r = 3
+		elseif p.kind == "Road" or p.kind == "Yard" then
+			mat = p.material
+			r = 2
+		end
+		if mat and r >= rank then
+			local inset = insetOf(p, x, z)
+			if inset then
+				local keep = true
+				if inset < FEATHER then
+					local h = math.noise(x / 4.5, z / 4.5, 2.2) * 0.5 + 0.5
+					keep = inset / FEATHER >= h
+				end
+				if keep then
+					best = mat
+					rank = r
+				end
+			end
+		end
+	end
+	return best
+end
+
+-- TerrainGen calls this. Registered here so TerrainGen does not require
+-- TownGround (TownGround already requires TerrainGen).
+TerrainGen.TownSurface = function(x: number, z: number): string?
+	return TownGround.MaterialAt(x, z)
 end
 
 return TownGround

@@ -1,7 +1,7 @@
 --!nocheck
 -- NoGreyStrips (T406): no thin grey bar lies on the grass round the plots and
--- the lot. The only grey allowed there is CurbConcrete #9A968C (TownGround's
--- curbs: 0.3 x 0.15, or 0.5 x 0.4 on the lot's edge). Before: each parking
+-- the lot. The only grey allowed there is StoneBase #8C877E (TownGround's
+-- curbs: 0.3 x 0.6, or 0.5 x 0.6 on the lot's edge). Before: each parking
 -- stall had a StoneBase "Curb" block (4 x 0.45 x 0.8, #8C877E) across its
 -- tail, and the Graphite plot's claimed rail was #525458 (a 0.35 x 0.4 bar
 -- round the yard).
@@ -15,7 +15,7 @@ return function(t)
 	local TownGround = t.load("ReplicatedStorage/Shared/World/TownGround")
 	local PlotData = t.shared("PlotData")
 
-	local CURB = "9A968C"
+	local CURB = "8C877E"
 	local GREY_SPREAD = 16 -- channels within this of each other read grey
 
 	local function isGrey(c)
@@ -42,9 +42,9 @@ return function(t)
 		return out
 	end
 
-	t.test("the checker: an old stall curb and a grey rail are caught, a CurbConcrete bar is not", function()
+	t.test("the checker: an old stall curb and a grey rail are caught, a StoneBase kerb is not", function()
 		local f = roblox.Instance.new("Folder")
-		Kit.part(f, "Curb", roblox.Vector3.new(4, 0.45, 0.8), roblox.CFrame.new(), roblox.Color3.fromRGB(140, 135, 126))
+		Kit.part(f, "Curb", roblox.Vector3.new(4, 0.45, 0.8), roblox.CFrame.new(), roblox.Color3.fromRGB(154, 150, 140))
 		Kit.part(f, "Rail", roblox.Vector3.new(80, 0.35, 0.4), roblox.CFrame.new(), roblox.Color3.fromRGB(82, 84, 88))
 		local ok = roblox.Instance.new("Folder")
 		Kit.part(ok, "LotCurb", roblox.Vector3.new(60, 0.4, 0.5), roblox.CFrame.new(), TownGround.CurbColor)
@@ -76,7 +76,7 @@ return function(t)
 		t.ok(not isGrey(roblox.Color3.fromRGB(196, 168, 120)), "the free rail is tan")
 	end)
 
-	t.test("the town's curbs are CurbConcrete and nothing else grey is a bar in TownGround's curb group", function()
+	t.test("the town's curbs are StoneBase and nothing else grey is a bar in TownGround's curb group", function()
 		for _, p in ipairs(TownGround.Pieces()) do
 			if p.kind == "Curb" or p.kind == "LotCurb" then
 				t.eq(p.color:ToHex(), CURB, p.name)

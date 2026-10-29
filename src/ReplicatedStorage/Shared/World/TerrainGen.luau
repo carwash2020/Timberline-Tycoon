@@ -2088,10 +2088,13 @@ local function surfaceMaterial(x: number, z: number, h: number, slope: number): 
 	return meadow(x, z, flat, bank)
 end
 
+-- TownGround registers this. A town road, lane, lot or footpath, or nil.
+-- Nil keeps the grass rule below, so paint never runs past the graded bed.
+TerrainGen.TownSurface = nil :: ((number, number) -> string?)?
+
 -- The surface material for a column of height h and slope (rise over run).
--- Inside the town zone (WorldLayout.TownZone) the roads are parts, not paint,
--- and the top layers are never grey: Asphalt, Rock and Slate there read as
--- Grass, and so does the forest floor's LeafyGrass (T402).
+-- T414a: town roads and paths are this paint. Anything else grey inside the
+-- town zone (a rock smear, the forest floor) still reads as Grass (T402).
 function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: number): string
 	local m = surfaceMaterial(x, z, h, slope)
 	if not classic() and priorDepth == 0 and ValleyGround.Ready() then
@@ -2100,7 +2103,14 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 			m = painted
 		end
 	end
-	-- (LeafyGrass too: the town's lawn is one green, so a road part never stands on the forest floor's second one.)
+	local townOf = TerrainGen.TownSurface
+	if townOf then
+		local town = townOf(x, z)
+		if town then
+			return town
+		end
+	end
+	-- (LeafyGrass too: the town's lawn is one green.)
 	if
 		not legacyLayout
 		and (m == "Asphalt" or m == "Rock" or m == "Slate" or m == "LeafyGrass")

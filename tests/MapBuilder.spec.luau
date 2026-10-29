@@ -314,54 +314,38 @@ return function(t)
 		t.eq(string.find(found, "OFF", 1, true), nil)
 	end)
 
-	t.test("T406: a footpath the drawn terrain would bury is raised onto it; one that shows stays", function()
+	t.test("T406: footpaths are terrain, so nothing is raised onto the drawn ground", function()
 		local function count(s)
 			local paths = s.map:FindFirstChild("TownGround"):FindFirstChild("TownPaths")
-			local n, tops = 0, {}
+			local n = 0
 			for _, p in ipairs(paths:GetChildren()) do
-				n += 1
-				table.insert(tops, p.CFrame.Position.Y + p.Size.Y / 2)
+				if p:IsA("BasePart") then
+					n += 1
+				end
 			end
-			return n, tops
+			return n
+		end
+		local function lineOf(s)
+			for _, l in ipairs(s.prints) do
+				if string.find(l, "town footpaths", 1, true) then
+					return l
+				end
+			end
+			return nil
 		end
 		local ground = t.shared("Art/TownGroundArt")
 		local plain = build({ townGroundArt = ground })
-		local n, tops = count(plain)
-		t.eq(n, 6, "the six footpaths left after the north-yard path went with the station")
-		local line
-		for _, l in ipairs(plain.prints) do
-			if string.find(l, "town footpaths", 1, true) then
-				line = l
-			end
-		end
-		t.eq(
-			line,
-			"[MapBuilder] town footpaths: 0 parts, 0 raised onto the drawn terrain",
-			"no terrain probe in this world"
-		)
-		-- The drawn terrain is 0.3 over every path's planned top.
+		t.eq(count(plain), 0, "a footpath is paint, not a part")
+		t.eq(lineOf(plain), "[MapBuilder] town footpaths: 0 parts, 0 raised onto the drawn terrain")
+		-- A probe that used to bury the strips still finds nothing to lift.
 		local buried = build({
 			townGroundArt = ground,
 			surfaceNear = function(_x, y, _z)
 				return y + 0.3
 			end,
 		})
-		local m, raised = count(buried)
-		t.eq(m, 6)
-		for i = 1, 6 do
-			t.ok(raised[i] > tops[i] + 0.3, "path " .. i .. " is lifted over the terrain")
-		end
-		-- Terrain that sits well under the paths changes nothing.
-		local fine = build({
-			townGroundArt = ground,
-			surfaceNear = function(_x, y, _z)
-				return y - 0.1
-			end,
-		})
-		local _, same = count(fine)
-		for i = 1, 6 do
-			t.ok(math.abs(same[i] - tops[i]) < 1e-6, "path " .. i .. " stays where it was planned")
-		end
+		t.eq(count(buried), 0)
+		t.eq(lineOf(buried), "[MapBuilder] town footpaths: 0 parts, 0 raised onto the drawn terrain")
 	end)
 
 	t.test("T420: the Land Office is Hank's cottage, not a shop prompt", function()
@@ -588,186 +572,32 @@ return function(t)
 		end
 	end)
 
-	-- T402: the town's roads, curbs, footpaths and lot are parts (Shared/World/TownGround, built by
-	-- Art/TownGroundArt). Here the real builder runs inside MapBuilder and the PARTS are read.
-	t.test(
-		"the town's ground parts (T402): anchored, solid, on the graded ground, seams under 0.05, gaps of 20, under 150",
-		function()
-			local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
-			local TownGround = t.load("ReplicatedStorage/Shared/World/TownGround")
-			local V3 = roblox.Vector3
-			local s = build({ townGroundArt = t.shared("Art/TownGroundArt") })
-			t.eq(#s.warnings, 0, table.concat(s.warnings, "\n"))
-			local ground = s.map:FindFirstChild("TownGround")
-			t.ok(ground and ground:IsA("Model"), "a TownGround model under the map")
-			local parts = {}
-			for _, d in ipairs(ground:GetDescendants()) do
-				if d:IsA("BasePart") then
-					table.insert(parts, d)
-				end
+	-- T414a: roads and paths are terrain paint. MapBuilder still builds TownGround,
+	-- and the only parts are the kerbs.
+	t.test("the town's ground (T414a): kerb parts only, anchored, not solid, under 80", function()
+		local s = build({ townGroundArt = t.shared("Art/TownGroundArt") })
+		t.eq(#s.warnings, 0, table.concat(s.warnings, "\n"))
+		local ground = s.map:FindFirstChild("TownGround")
+		t.ok(ground and ground:IsA("Model"), "a TownGround model under the map")
+		t.ok(ground:FindFirstChild("TownPaths"), "TownPaths stays for the footpath lift")
+		local parts = {}
+		for _, d in ipairs(ground:GetDescendants()) do
+			if d:IsA("BasePart") then
+				table.insert(parts, d)
 			end
-			-- The budget, and one Model a material group.
-			t.ok(#parts <= 150, "town ground parts: " .. #parts)
-			t.eq(#parts, #TownGround.Pieces(), "a part per piece")
-			t.ok(#ground:GetChildren() <= 5, "same-material runs share a Model")
-			for _, group in ipairs(ground:GetChildren()) do
-				local material
-				for _, part in ipairs(group:GetChildren()) do
-					if group.Name == "TownRoads" or group.Name == "TownCurbs" or group.Name == "TownPaths" then
-						material = material or part.Material
-						t.eq(part.Material, material, group.Name .. " holds one material")
-					end
-				end
-			end
-			-- The top surface of a part over (x, z): its plane, or nil when (x, z) is off the part.
-			local function topAt(part, x, z)
-				local cf = part.CFrame
-				local up = cf.UpVector
-				local top = cf.Position + up * (part.Size.Y / 2) -- (part.Position is unreadable in Lune)
-				local y = top.Y - (up.X * (x - top.X) + up.Z * (z - top.Z)) / up.Y
-				local l = cf:PointToObjectSpace(V3.new(x, y, z))
-				if math.abs(l.X) <= part.Size.X / 2 and math.abs(l.Z) <= part.Size.Z / 2 then
-					return y
-				end
-				return nil
-			end
-			local roads, curbs, paths = {}, {}, {}
-			for _, part in ipairs(parts) do
-				if part.Material == roblox.Enum.Material.Asphalt then
-					table.insert(roads, part)
-				elseif part.Material == roblox.Enum.Material.Concrete then
-					table.insert(curbs, part)
-				elseif part.Material == roblox.Enum.Material.Ground then
-					table.insert(paths, part)
-				end
-			end
-			t.ok(
-				#roads > 20 and #curbs > 10 and #paths > 5,
-				string.format("%d road, %d curb, %d path parts", #roads, #curbs, #paths)
-			)
-			for _, part in ipairs(parts) do
-				t.ok(part.Anchored, part.Name .. " is anchored")
-				t.ok(not part.CastShadow, part.Name .. " casts no shadow")
-			end
-			for _, part in ipairs(roads) do
-				t.ok(part.CanCollide, part.Name .. " collides")
-				t.eq(part.Color:ToHex(), "55585A")
-				-- Within 0.2 studs of the graded ground over its whole footprint (top 0.05 over it at the ends).
-				local c = part.CFrame
-				for u = -1, 1, 0.5 do
-					for v = -1, 1, 0.5 do
-						local w = c * V3.new(u * part.Size.X / 2 * 0.98, part.Size.Y / 2, v * part.Size.Z / 2 * 0.98)
-						local y = topAt(part, w.X, w.Z)
-						t.ok(y ~= nil)
-						local off = math.abs(y - TerrainGen.HeightAt(w.X, w.Z))
-						t.ok(
-							off <= 0.2,
-							string.format("%s is %.3f off the ground at (%.0f, %.0f)", part.Name, off, w.X, w.Z)
-						)
-					end
-				end
-				-- Its ends: 0.05 over the ground.
-				for _, v in ipairs({ -1, 1 }) do
-					local w = c * V3.new(0, part.Size.Y / 2, v * part.Size.Z / 2 * 0.999)
-					t.ok(
-						math.abs(w.Y - TerrainGen.HeightAt(w.X, w.Z) - 0.05) <= 0.05 + 0.02,
-						part.Name .. " end lift " .. (w.Y - TerrainGen.HeightAt(w.X, w.Z))
-					)
-				end
-			end
-			for _, part in ipairs(paths) do
-				t.ok(part.CanCollide, part.Name .. " collides")
-				t.eq(part.Size.X, 6)
-				t.eq(part.Color:ToHex(), "8E6C4A")
-			end
-			-- Touching road parts: tops within 0.05 where they overlap.
-			local joins = 0
-			for i = 1, #roads do
-				local a = roads[i]
-				for j = i + 1, #roads do
-					local b = roads[j]
-					if
-						(a.CFrame.Position - b.CFrame.Position).Magnitude
-						< (a.Size.Magnitude + b.Size.Magnitude) / 2
-					then
-						for u = -0.9, 0.9, 0.3 do
-							for v = -0.9, 0.9, 0.3 do
-								local w = a.CFrame * V3.new(u * a.Size.X / 2, 0, v * a.Size.Z / 2)
-								local ya, yb = topAt(a, w.X, w.Z), topAt(b, w.X, w.Z)
-								if ya and yb then
-									joins += 1
-									t.ok(
-										math.abs(ya - yb) <= 0.05 + 1e-6,
-										string.format(
-											"%s / %s step %.3f at (%.0f, %.0f)",
-											a.Name,
-											b.Name,
-											math.abs(ya - yb),
-											w.X,
-											w.Z
-										)
-									)
-								end
-							end
-						end
-					end
-				end
-			end
-			t.ok(joins > 50, "road overlaps compared: " .. joins)
-			-- Curb gaps: the curb parts on one line, in order, are 20 or more studs apart unless a footpath is there.
-			local lines = {}
-			for _, c in ipairs(curbs) do
-				local d = c.CFrame.LookVector
-				d = V3.new(d.X, 0, d.Z).Unit
-				if d.X < -1e-6 or (math.abs(d.X) <= 1e-6 and d.Z < 0) then
-					d = d * -1
-				end
-				local n = V3.new(-d.Z, 0, d.X)
-				local key = string.format(
-					"%d,%d,%d",
-					math.floor(d.X * 100 + 0.5),
-					math.floor(d.Z * 100 + 0.5),
-					math.floor(c.CFrame.Position:Dot(n) * 20 + 0.5)
-				)
-				local mid = c.CFrame.Position:Dot(d)
-				local half = c.Size.Z / 2 * math.sqrt(1 - c.CFrame.LookVector.Y ^ 2)
-				lines[key] = lines[key] or { dir = d, list = {} }
-				table.insert(lines[key].list, { s0 = mid - half, s1 = mid + half, at = c.CFrame.Position })
-			end
-			local seen = 0
-			for _, line in pairs(lines) do
-				table.sort(line.list, function(x, y)
-					return x.s0 < y.s0
-				end)
-				for i = 2, #line.list do
-					local gap = line.list[i].s0 - line.list[i - 1].s1
-					if gap > 0.5 and gap < 20 - 1e-6 then
-						local midpoint = line.list[i - 1].at
-							+ line.dir
-								* ((line.list[i].s0 + line.list[i - 1].s1) / 2 - line.list[i - 1].at:Dot(line.dir))
-						local onPath = false
-						for _, p in ipairs(paths) do
-							local l = p.CFrame:PointToObjectSpace(midpoint)
-							if math.abs(l.X) <= p.Size.X / 2 + 1 and math.abs(l.Z) <= p.Size.Z / 2 + 1 then
-								onPath = true
-							end
-						end
-						seen += 1
-						t.ok(
-							onPath,
-							string.format(
-								"a %.1f stud curb gap at (%.0f, %.0f) is no footpath",
-								gap,
-								midpoint.X,
-								midpoint.Z
-							)
-						)
-					end
-				end
-			end
-			t.ok(seen >= 2, "footpath gaps seen: " .. seen)
 		end
-	)
+		t.ok(#parts > 0 and #parts < 80, "town ground parts: " .. #parts)
+		t.ok(#ground:GetChildren() <= 5, "same-material runs share a Model")
+		for _, part in ipairs(parts) do
+			t.ok(part.Anchored, part.Name .. " is anchored")
+			t.ok(not part.CastShadow, part.Name .. " casts no shadow")
+			t.ok(not part.CanCollide, part.Name .. " does not snag")
+			t.eq(part.Material, roblox.Enum.Material.Slate, part.Name)
+			t.eq(part.Color:ToHex(), "8C877E", part.Name)
+			t.ok(part.Size.Y <= 1, part.Name)
+			t.eq(part:GetAttribute("MeshId"), "0", part.Name)
+		end
+	end)
 
 	t.test("a broken parking-bay builder costs no slot: every ParkingSlot is still built and tagged", function()
 		local s = build({
