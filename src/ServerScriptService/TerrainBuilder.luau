@@ -562,6 +562,7 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 	local terrain = workspace.Terrain
 	setLook(terrain)
 	if terrain:GetAttribute("Prebuilt") == true then
+		TerrainBuilder.PaintRoadShoulders(terrain)
 		reportTown(terrain)
 		return 0, nil
 	end
@@ -658,6 +659,7 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 	)
 	if #later == 0 then
 		TerrainBuilder.Carve(terrain, shift)
+		TerrainBuilder.PaintRoadShoulders(terrain)
 		reportTown(terrain)
 		return clock() - started, nil
 	end
@@ -714,6 +716,7 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 		local longest = slice.longest()
 		recordStep("background blocks", carveStart - finishStarted, longest, written)
 		recordStep("caves", clock() - carveStart, longest, 0)
+		TerrainBuilder.PaintRoadShoulders(terrain)
 		print(
 			string.format(
 				"[Perf] stage terrain background: total %.2fs, longest step %.0f ms (%d blocks)",
@@ -725,6 +728,42 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 		return clock() - finishStarted
 	end
 	return nearSeconds, finish
+end
+
+-- Mains: a Ground band (TrailDirt) half-width 18, then the gravel bed
+-- half-width 14 on top. Voxels are 4 studs, so 14 to 18 is one straight
+-- voxel of dirt. The grade itself stays at DriveHalf (16).
+function TerrainBuilder.PaintRoadShoulders(terrain: Terrain)
+	local ground = material("Ground")
+	local gravel = material(TerrainGen.GravelMaterial)
+	for _, road in ipairs(WorldLayout.Roads) do
+		local dirtHalf = WorldLayout.DirtHalf(road)
+		local planHalf = WorldLayout.PlanWidth(road) / 2
+		if dirtHalf <= planHalf then
+			continue
+		end
+		local pts = road.points
+		for i = 1, #pts - 1 do
+			local a, b = pts[i], pts[i + 1]
+			local dx, dz = b.X - a.X, b.Y - a.Y
+			local len = math.sqrt(dx * dx + dz * dz)
+			if len < 1 then
+				continue
+			end
+			local mx, mz = (a.X + b.X) / 2, (a.Y + b.Y) / 2
+			local y = TerrainGen.HeightAt(mx, mz)
+			local yaw = math.atan2(dx, dz)
+			local cf = CFrame.new(mx, y, mz) * CFrame.Angles(0, yaw, 0)
+			local function fill(width: number, mat: Enum.Material)
+				pcall(function()
+					-- A stud of overlap at the joints, so the voxel band does not gap.
+					terrain:FillBlock(cf, Vector3.new(width, 4, len + 4), mat)
+				end)
+			end
+			fill(dirtHalf * 2, ground)
+			fill(planHalf * 2, gravel)
+		end
+	end
 end
 
 -- Second pass: air out the caves, the passages and the truck tunnel.

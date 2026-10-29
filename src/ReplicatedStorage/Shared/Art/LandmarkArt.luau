@@ -17,6 +17,8 @@
 
 local FerryLogic = require(script.Parent.Parent.FerryLogic)
 local Kit = require(script.Parent.Kit)
+local Palette = require(script.Parent.Palette)
+local TravelPlan = require(script.Parent.Parent.TravelPlan)
 local PropArt = require(script.Parent.PropArt)
 local TerrainGen = require(script.Parent.Parent.World.TerrainGen)
 local TownMeshes = require(script.Parent.TownMeshes)
@@ -647,20 +649,43 @@ function LandmarkArt.FerryBoat(): Model
 		solid(model, "Rail", V3(0.6, 2, l - 6), CF(side * (w / 2 - 0.3), 1.5, 2), TOLL_TIMBER, MAT.Wood)
 		solid(model, "Rail", V3(0.6, 2, 3), CF(side * (w / 2 - 0.3), 1.5, -l / 2 + 1.5), TOLL_TIMBER, MAT.Wood)
 	end
-	solid(model, "Stern", V3(w, 2, 0.6), CF(0, 1.5, l / 2 - 0.3), TOLL_TIMBER, MAT.Wood)
-	for _, side in ipairs({ -1, 1 }) do
-		solid(model, "CabinPost", V3(0.6, 5, 0.6), CF(side * (w / 2 - 1.5), 3.5, l / 2 - 3), TOLL_TIMBER, MAT.Wood)
-	end
-	solid(model, "CabinRoof", V3(w - 1, 0.6, 5), CF(0, 6.3, l / 2 - 3), ROOF[1], MAT.Wood)
-	-- The lamp sits on the cabin, aft. Nothing stands in the drive lane.
-	local lamp = ghost(model, "Lantern", V3(1.2, 1.2, 1.2), CF(0, 7.6, l / 2 - 3), LANTERN, MAT.Neon)
+	-- Dress that must not block a truck: cabin, waterline, and the ghost
+	-- footprint. The Deck stays solid on the boat.
+	local dress = Kit.model("GhostTruck")
+	dress.Parent = model
+	-- IronBlack waterline, 1.5 tall, just under the deck, all round the hull.
+	local bandH = 1.5
+	local bandTop = -0.55
+	local bandY = bandTop - bandH / 2
+	local t = 0.4
+	ghost(dress, "Waterline", V3(t, bandH, l + t), CF(w / 2 + t / 2, bandY, 0), Palette.IronBlack, MAT.Metal)
+	ghost(dress, "Waterline", V3(t, bandH, l + t), CF(-w / 2 - t / 2, bandY, 0), Palette.IronBlack, MAT.Metal)
+	ghost(dress, "Waterline", V3(w + t * 2, bandH, t), CF(0, bandY, l / 2 + t / 2), Palette.IronBlack, MAT.Metal)
+	ghost(dress, "Waterline", V3(w + t * 2, bandH, t), CF(0, bandY, -l / 2 - t / 2), Palette.IronBlack, MAT.Metal)
+	-- Low cabin aft, in place of the stern board. 8 wide, 5 tall, 6 long,
+	-- so the rig footprint still fits on the deck ahead of it.
+	local cabinZ = l / 2 - 4
+	ghost(dress, "Cabin", V3(8, 5, 6), CF(0, 0.5 + 2.5, cabinZ), Palette.WeatheredPlank, MAT.WoodPlanks)
+	ghost(dress, "CabinRoof", V3(9, 0.4, 7), CF(0, 0.5 + 5 + 0.2, cabinZ), Palette.RoofSlate, MAT.Slate)
+	local lamp = ghost(dress, "Lantern", V3(0.8, 0.8, 0.8), CF(0, 0.5 + 5 + 0.85, cabinZ), Palette.Brass, MAT.Metal)
 	lamp.Name = "LanternGlow"
 	local light = Instance.new("PointLight")
-	light.Color = LANTERN
+	light.Color = Palette.Brass
 	light.Range = 14
 	light.Brightness = 0.6
 	light.Shadows = false
 	light.Parent = lamp
+	-- Ghost truck, the rig's volume on the deck, ahead of the cabin. Not a
+	-- vehicle: it does not collide, query, or touch.
+	local foot = ghost(
+		dress,
+		"TruckFootprint",
+		V3(TravelPlan.RigWidth, 4, TravelPlan.RigLength),
+		CF(0, 0.5 + 2, -4),
+		Palette.PlankHoney,
+		MAT.SmoothPlastic
+	)
+	foot.Transparency = 0.6
 	model.PrimaryPart = deck
 	return model
 end

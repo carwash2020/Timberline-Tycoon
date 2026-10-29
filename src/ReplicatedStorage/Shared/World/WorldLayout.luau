@@ -257,9 +257,11 @@ WorldLayout.Roads = {
 } :: { Road }
 
 -- The bed the world was planned on. T413 sets road.width to the drive width
--- (main 32, branch 24). Height, gravel, the town slabs, the tree plan and
--- the building keep-out still read this bed. Painting or paving the drive
--- width put gravel off the flat grade and moved rocks into cabins.
+-- (main 32, branch 24). Gravel, the town slabs, the tree plan and the
+-- building keep-out still read this bed. Painting the drive width put
+-- gravel off the flat grade and moved rocks into cabins. Live height
+-- flattens to DriveHalf instead, so the outer studs of a main are level
+-- ground (Ground / TrailDirt), not a second strip of gravel.
 local PLAN_BED: { [string]: number } = {
 	RingRoad = 28,
 	HillsRoad = 28,
@@ -277,6 +279,21 @@ local PLAN_BED: { [string]: number } = {
 
 function WorldLayout.PlanWidth(road: Road): number
 	return PLAN_BED[road.name] or road.width
+end
+
+-- Half-width of the flat grade. Mains are max(28, 32) / 2 = 16. Branches
+-- are already inside the 28-stud bed, so they stay 14.
+function WorldLayout.DriveHalf(road: Road): number
+	return math.max(WorldLayout.PlanWidth(road), road.width) / 2
+end
+
+-- TrailDirt band on a main. Voxels are 4 studs, so the dirt runs from the
+-- 14-stud gravel edge out to 18 (one voxel), not only to the 16-stud grade.
+function WorldLayout.DirtHalf(road: Road): number
+	if road.width > WorldLayout.PlanWidth(road) then
+		return 18
+	end
+	return WorldLayout.PlanWidth(road) / 2
 end
 
 -- Flared turns where a haul road splits, wide enough for the Logging Rig.

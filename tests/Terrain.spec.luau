@@ -27,11 +27,15 @@ return function(t)
 	-- and the shelf ease: was sum 68174.730151801, wsum 161.629373361,
 	-- sq 4489556.241387829. The classic fingerprint below is the first trees'
 	-- ground and did not move. lo and hi did not move.
+	-- T413: live mains flatten to DriveHalf (16). Only the band between the
+	-- plan edge and the drive moves; past the drive the bank is the old one,
+	-- so the tree plan's ground does not. A declared flat keeps its floor.
+	-- Was sum 68286.279255775, wsum 163.574182878, sq 4493789.845065589.
 	local HEIGHT_FINGERPRINT = {
 		n = 7717,
-		sum = 68286.279255775312777,
-		wsum = 163.574182877846340,
-		sq = 4493789.845065589062870,
+		sum = 68269.253746528193005,
+		wsum = 166.084573852010919,
+		sq = 4493803.359696732833982,
 		lo = -41.562571590540983,
 		hi = 161.576039893993112,
 	}

@@ -44,7 +44,9 @@ return function(t)
 	-- ferry shore and shelf ease. Those sit under some trunks, so Y moved again.
 	local PLAN_COUNT = 1052
 	-- Heights only this time. 623119780 was the pre-hills plan; 10199207 was the hills plan.
-	local PLAN_CHECKSUM = 254093984
+	-- T413: X and Z stay (the plan bed and the tree clearance do). A few trunks
+	-- in the new flat shoulder took the drive's height. 254093984 before.
+	local PLAN_CHECKSUM = 205735288
 	local function checksum(trees)
 		local h = 0
 		for i, s in ipairs(trees) do

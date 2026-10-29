@@ -32,6 +32,28 @@ return function(t)
 		local _, m = TerrainGen.Sample(x, z)
 		return m
 	end
+	-- T413: mains carry TrailDirt from the 14-stud gravel edge out to 18.
+	local function inMainDirt(x, z)
+		local mains = {
+			RingRoad = true,
+			HillsRoad = true,
+			SnowRoad = true,
+			EastLink = true,
+			SouthLink = true,
+			HillsCross = true,
+			SkyrootRoad = true,
+		}
+		for _, road in ipairs(WorldLayout.Roads) do
+			if mains[road.name] then
+				local d = WorldLayout.PolylineDistance(Vector2.new(x, z), road.points)
+				local plan = WorldLayout.PlanWidth(road) / 2
+				if d > plan and d <= WorldLayout.DirtHalf(road) then
+					return true
+				end
+			end
+		end
+		return false
+	end
 	local function runLength(p)
 		return (p.b - p.a).Magnitude
 	end
@@ -160,7 +182,7 @@ return function(t)
 					for _, z in ipairs({ lot.z0 - d, lot.z1 + d }) do
 						local m = surface(x, z)
 						t.ok(
-							(m ~= "Ground" and m ~= "Mud") or named(x, z),
+							(m ~= "Ground" and m ~= "Mud") or named(x, z) or inMainDirt(x, z),
 							string.format("%s at (%d, %d) beside the lot", m, x, z)
 						)
 					end
@@ -169,7 +191,7 @@ return function(t)
 					for _, x in ipairs({ lot.x0 - d, lot.x1 + d }) do
 						local m = surface(x, z)
 						t.ok(
-							(m ~= "Ground" and m ~= "Mud") or named(x, z),
+							(m ~= "Ground" and m ~= "Mud") or named(x, z) or inMainDirt(x, z),
 							string.format("%s at (%d, %d) beside the lot", m, x, z)
 						)
 					end
@@ -192,7 +214,7 @@ return function(t)
 						local c = if p.shape == "Block" then p.a + dir * (len * i / n) else p.a
 						-- Under it.
 						local under = surface(c.X, c.Y)
-						local okUnder = under == "Grass"
+						local okUnder = under == "Grass" or (under == "Ground" and inMainDirt(c.X, c.Y))
 						if p.kind == "Path" then
 							okUnder = okUnder or under == "Ground" or under == "Cobblestone" -- a shop floor's earth, or the plaza's cobbles (their edge wanders), under a path's last studs
 						end
@@ -249,7 +271,12 @@ return function(t)
 						local cliff = slope > math.tan(math.rad(40))
 							and (m == "Rock" or m == "Slate" or m == "Basalt" or m == "Sandstone")
 						t.ok(
-							m == "Grass" or m == "LeafyGrass" or m == "Asphalt" or (named and m == "Ground") or cliff,
+							m == "Grass"
+								or m == "LeafyGrass"
+								or m == "Asphalt"
+								or (named and m == "Ground")
+								or (m == "Ground" and inMainDirt(q.X, q.Y))
+								or cliff,
 							string.format("%s: %s at (%.0f, %.0f)", p.name, m, q.X, q.Y)
 						)
 						checked += 1
