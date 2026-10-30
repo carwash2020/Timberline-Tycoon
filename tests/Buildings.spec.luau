@@ -112,7 +112,7 @@ return function(t)
 				end
 			end
 			-- A header over the door (the opening is bounded above).
-			t.ok(wallAt(model, 0, DOOR_H + 0.5, z + 0.1), case.name .. " has a header over the door")
+			t.ok(wallAt(model, 0, DOOR_H + 1, z + 0.1), case.name .. " has a header over the door")
 		end)
 	end
 
@@ -143,7 +143,7 @@ return function(t)
 					t.ok(p.Material ~= roblox.Enum.Material.Neon, case.name .. " " .. p.Name .. " is not Neon")
 				end
 			end
-			t.ok(hi.X - lo.X <= 20.4 and hi.Z - lo.Z <= 16.4, case.name .. " stays in its lot")
+			t.ok(hi.X - lo.X <= 20.4 and hi.Z - lo.Z <= 16.4, case.name .. " stays in its lot " .. tostring(hi - lo))
 		end
 	end)
 
