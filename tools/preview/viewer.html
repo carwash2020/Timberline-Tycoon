@@ -220,7 +220,7 @@ function terrainPattern(name) {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const n = Math.abs(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
       const blot = Math.abs(Math.sin(x * 0.31 + y * 0.47));
-      put(x, y, Math.floor(200 + n * 30 - blot * 45));
+      put(x, y, Math.floor(244 + n * 10 - blot * 24));
     }
   } else if (name === "Grass" || name === "LeafyGrass") {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {

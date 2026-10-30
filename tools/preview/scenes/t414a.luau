@@ -20,6 +20,13 @@ return {
 				{ pos = { 2, 5.5, 40 }, target = { 0, 1, 78 }, fov = 55, label = "midday street, spawn walk" },
 				{ pos = { -70, 6, 42 }, target = { -80, 0.5, 57 }, fov = 35, label = "midday kerb" },
 				{ pos = { 20, 260, 30 }, target = { 20, 0, 30 }, fov = 45, label = "midday overlap" },
+				{ pos = { -20, 1.8, 66 }, target = { -50, 1.2, 80 }, fov = 70, label = "midday eye level, plaza" },
+				{
+					pos = { 138, 4, 50 },
+					target = { 162, 0.4, 66 },
+					fov = 45,
+					label = "midday East Link kerb, outside the drive edge",
+				},
 			},
 		}
 	end,
