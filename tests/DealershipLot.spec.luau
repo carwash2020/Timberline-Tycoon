@@ -404,4 +404,81 @@ return function(t)
 			end
 		end
 	end)
+
+	-- T414b: the lot shows the whole fleet with room around each bay, trailers reachable at the hitch, and nothing
+	-- invisible. Door and origin are the T412 pins.
+	t.test("T414b: each bay is at least its vehicle's width + 4 deep and wide", function()
+		for _, bay in ipairs(DealershipLot.Layout().bays) do
+			t.ok(bay.depth >= bay.span + 4, bay.id .. " plinth depth " .. bay.depth .. " for width " .. bay.span)
+			t.ok(bay.width >= bay.span + 4, bay.id .. " plinth width " .. bay.width .. " for width " .. bay.span)
+		end
+	end)
+
+	t.test("T414b: the Dealership door and the lot origin have not moved", function()
+		local ShopPins = t.load("ReplicatedStorage/Shared/World/ShopPins")
+		t.eq(ShopPins.Get("Dealership").x, 189.25)
+		t.eq(ShopPins.Get("Dealership").z, 100.3)
+		t.eq(DealershipLot.OriginX, 207)
+		t.eq(DealershipLot.OriginZ, 100.2)
+	end)
+
+	t.test("T414b: no vehicle is invisible; a trailer's hitch is on its plinth and can be walked up to", function()
+		local lot = DealershipLot.Build()
+		local models, slabs = {}, {}
+		for _, d in ipairs(lot:GetChildren()) do
+			if d:IsA("Model") and d:GetAttribute("ItemId") then
+				models[d:GetAttribute("ItemId")] = d
+			elseif d.Name == "Plinth" then
+				slabs[d:GetAttribute("ItemId")] = d
+			end
+		end
+		for _, bay in ipairs(DealershipLot.Layout().bays) do
+			local model = models[bay.id]
+			t.ok(model ~= nil, bay.id .. " is on the lot")
+			local visible = 0
+			for _, p in ipairs(parts(model)) do
+				if p.Name ~= "NameSign" and p.Transparency < 1 then
+					visible += 1
+				end
+				if p:IsA("MeshPart") then
+					local ok, id = pcall(function()
+						return p.MeshId
+					end)
+					t.ok(
+						not (ok and (id == "" or id == "rbxassetid://0") and p.Transparency == 1),
+						bay.id .. " " .. p.Name .. " is not an invisible greybox"
+					)
+				end
+			end
+			t.ok(visible >= 20, bay.id .. " shows " .. visible .. " parts")
+			if bay.kind == "Trailer" then
+				local coupler = nil
+				for _, p in ipairs(parts(model)) do
+					if p.Name == "Coupler" then
+						coupler = p
+					end
+				end
+				t.ok(coupler ~= nil, bay.id .. " has a coupler")
+				local slab = slabs[bay.id]
+				local c, sp, ss = coupler.Position, slab.Position, slab.Size
+				t.ok(
+					math.abs(c.X - sp.X) <= ss.X / 2 and math.abs(c.Z - sp.Z) <= ss.Z / 2,
+					bay.id .. " hitch is over its plinth"
+				)
+				t.ok(c.Y - (sp.Y + ss.Y / 2) <= 4, bay.id .. " hitch within arm's reach of the plinth top")
+				for _, p in ipairs(parts(lot)) do
+					if p ~= slab and p.CanCollide then
+						local x0, x1, y0, y1, z0, z1 = aabb(p)
+						local dx = math.max(x0 - c.X, 0, c.X - x1)
+						local dy = math.max(y0 - c.Y, 0, c.Y - y1)
+						local dz = math.max(z0 - c.Z, 0, c.Z - z1)
+						t.ok(
+							dx * dx + dy * dy + dz * dz > 16,
+							bay.id .. " nothing solid within 4 studs of the hitch: " .. p.Name
+						)
+					end
+				end
+			end
+		end
+	end)
 end
