@@ -36,29 +36,32 @@ return function(t)
 		t.eq(seen, EXPECTED)
 	end)
 
-	t.test("each footpath piece: TrailDirt, Ground, 6 wide, 0.1 over the graded ground at both ends", function()
+	t.test("each footpath piece: TrailDirt, Ground, 8 wide, flush with the graded ground at both ends", function()
 		for _, p in ipairs(paths()) do
 			t.eq(p.color:ToHex(), "8E6C4A", p.name)
 			t.eq(p.material, "Ground", p.name)
-			t.eq(p.width, 6, p.name)
-			t.ok(p.collide, p.name)
-			t.ok(math.abs(p.ya - (TerrainGen.HeightAt(p.a.X, p.a.Y) + 0.1)) < 1e-6, p.name .. " start on the ground")
-			t.ok(math.abs(p.yb - (TerrainGen.HeightAt(p.b.X, p.b.Y) + 0.1)) < 1e-6, p.name .. " end on the ground")
+			t.eq(p.width, 8, p.name)
+			t.ok(not p.collide, p.name)
+			t.ok(math.abs(p.ya - TerrainGen.HeightAt(p.a.X, p.a.Y)) < 1e-6, p.name .. " start on the ground")
+			t.ok(math.abs(p.yb - TerrainGen.HeightAt(p.b.X, p.b.Y)) < 1e-6, p.name .. " end on the ground")
 		end
 	end)
 
-	t.test("built: six visible parts, Transparency 0, 6 wide, TrailDirt, in TownPaths", function()
+	t.test("built: TownPaths exists and the walk is terrain, not a flat strip", function()
 		local root = TownGroundArt.Build()
 		local group = root:FindFirstChild("TownPaths")
 		t.ok(group, "the TownPaths model exists")
-		local parts = group:GetChildren()
-		t.eq(#parts, 6)
-		for _, part in ipairs(parts) do
-			t.eq(part.Transparency, 0, part.Name)
-			t.eq(part.Color:ToHex(), "8E6C4A", part.Name)
-			t.eq(part.Size.X, 6, part.Name .. " is 6 wide")
-			t.eq(part.Material, t.roblox.Enum.Material.Ground, part.Name)
-			t.ok(part.Size.Z >= 3, part.Name .. " has length")
+		local parts = 0
+		for _, child in ipairs(group:GetChildren()) do
+			if child:IsA("BasePart") then
+				parts += 1
+			end
+		end
+		t.eq(parts, 0, "a footpath is paint")
+		for _, p in ipairs(paths()) do
+			local x, z = (p.a.X + p.b.X) / 2, (p.a.Y + p.b.Y) / 2
+			local _, material = TerrainGen.Sample(x, z)
+			t.eq(material, "Ground", p.name)
 		end
 	end)
 

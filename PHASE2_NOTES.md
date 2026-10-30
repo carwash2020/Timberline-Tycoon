@@ -1,8 +1,25 @@
 # Phase 2+ build notes
 
-## T413 travel fixes (29 October 2026, branch `cursor/t413-fixes`)
+## T414a town ground (30 October 2026, branch `cursor/t414a-town-ground-1e4c`)
 
-The haul, the fare, and the Skyroot climb are on main (`16cd31a`, #277). This branch flattens the main-road shoulder out to the 32-stud drive and dresses the travel greyboxes. Studio checks below are for that dressing and for the EastLink edge.
+Nothing here has been seen in Studio. Cloud tests paint the street and check that kerbs do not collide. They do not walk or drive. Outside town, the T413 TrailDirt shoulder (below) is unchanged.
+
+Studio checks:
+1. Spawn on the plaza and walk to Hearth & Home. The street is cobble, the path is dirt, and neither flickers.
+2. Drive the starter truck across a kerb into the sell yard. The kerb does not bump the truck.
+3. The lot is cobble up to the grass, with a low stone edge you can drive through.
+4. Kerbs stay the slate bar until the mesh upload below.
+5. The Tool Shed, the mill, the Weigh House, the bridges, the ferry docks and the shop doors have not moved.
+6. Park on the EastLink edge outside town. The outer 2 studs each side are still flat TrailDirt, level with the crown.
+
+Mesh upload (`TownGroundArt.KerbMeshId` is 0):
+1. Model one kerb strip about 0.6 studs tall and Bulk Import it.
+2. Paste the MeshPart id into `TownGroundArt.KerbMeshId`.
+3. New Play. The slate bar swaps for the mesh. Until then the bar is the look.
+
+## T413 travel fixes (29 October 2026, on main via #279)
+
+The haul, the fare, and the Skyroot climb are on main (`16cd31a`, #277). The T413 fixes (`1a9e158`, #279) flatten the main-road shoulder out to the 32-stud drive and dress the travel greyboxes. Studio checks below are for that dressing and for the EastLink edge. Town paint does not replace that shoulder outside town.
 
 ## T413 travel (28 October 2026, branch `cursor/t413-travel-cd9f`)
 

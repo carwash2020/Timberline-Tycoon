@@ -302,9 +302,14 @@ return function(t)
 					end
 				end
 				if first == paint then
-					-- T402: inside the town zone the roads are parts (TownGround) and the ground under them is Grass.
+					-- T414a: inside the town zone the street, paths and lot are terrain paint.
+					-- A cell the paint does not claim stays grass, as T402 left it.
+					local TownGround = t.load("ReplicatedStorage/Shared/World/TownGround")
 					local want = paint.material
-					if want == GRAVEL and WorldLayout.InTownZone(cx, cz) then
+					local painted = TownGround.MaterialAt(cx, cz)
+					if painted then
+						want = painted
+					elseif want == GRAVEL and WorldLayout.InTownZone(cx, cz) then
 						want = "Grass"
 					end
 					t.eq(materialAt(cx, cz), want, paint.name)
@@ -323,13 +328,9 @@ return function(t)
 			end
 			t.ok(earth >= 4, "the shop floors stay as they were")
 			t.eq(materialAt(0, 80), "Cobblestone", "the plaza's centre")
-			t.eq(materialAt(-60, 72), "Grass", "the main street: a road part now, grass under it")
+			t.eq(materialAt(-60, 72), "Cobblestone", "the main street is cobble")
 			local lot = WorldLayout.ParkingLot
-			t.eq(
-				materialAt((lot.x0 + lot.x1) / 2, (lot.z0 + lot.z1) / 2),
-				"Grass",
-				"the parking lot: a part, grass under it"
-			)
+			t.eq(materialAt((lot.x0 + lot.x1) / 2, (lot.z0 + lot.z1) / 2), "Cobblestone", "the parking lot is cobble")
 			-- The dealership strip is outside the zone: its painted roads are as they were.
 			t.eq(materialAt(250, 67), GRAVEL, "the dealership forecourt road")
 		end

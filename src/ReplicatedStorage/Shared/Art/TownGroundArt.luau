@@ -1,17 +1,22 @@
 --!strict
--- TownGroundArt (T402): builds the town's ground parts from the pieces
--- Shared/World/TownGround computes (roads, yards, curbs, footpaths, lines and
--- the plots' lawn edges). One Model per material group (same-material runs
--- share a Model), every part anchored; roads, curbs and paths collide, the
--- paint and the lawn edge do not. Nothing casts a shadow (they are flat).
--- MapBuilder parents the result under the map; tools/preview builds the same.
+-- TownGroundArt (T402, T414a): the roads, yards, paths, lines and lawn edges
+-- are terrain paint (TownGround.MaterialAt). This builds only the kerbs, as
+-- an on-style slate bar until KerbMeshId is a real mesh. One Model per
+-- material group stays, so MapBuilder can still find TownPaths. Kerbs do
+-- not collide and cast no shadow. Pure decor, so streaming stays Default.
 
 local Kit = require(script.Parent.Kit)
+local MeshKit = require(script.Parent.MeshKit)
 local TownGround = require(script.Parent.Parent.World.TownGround)
 
 local TownGroundArt = {}
 
+-- 0 until Connor uploads the kerb strip. MeshKit.Create refuses 0, and the
+-- slate bar below is the look until then.
+TownGroundArt.KerbMeshId = 0
+
 local MODEL_ORDER = { "TownRoads", "TownCurbs", "TownPaths", "TownLines", "PlotEdges" }
+local PAINTED = { Road = true, Yard = true, Path = true, Line = true, PlotEdge = true }
 
 -- The CFrame of a block piece: its centre line at the top surface, the part
 -- hung `thick` under it, tilted along the slope of its run.
@@ -30,6 +35,14 @@ function TownGroundArt.PartFor(piece: TownGround.Piece, parent: Instance): BaseP
 		part = Kit.cylinder(parent, piece.name, piece.thick, piece.width, cf, piece.color, material)
 	else
 		local cf, size = blockCFrame(piece)
+		-- Pull each end back by the kerb's own width so a sloped joint or a
+		-- corner does not lay two bars on the same patch of ground.
+		if piece.kind == "Curb" or piece.kind == "LotCurb" then
+			local pull = piece.width * 2
+			if size.Z > pull + 0.5 then
+				size = Vector3.new(size.X, size.Y, size.Z - pull)
+			end
+		end
 		part = Kit.part(parent, piece.name, size, cf, piece.color, material)
 	end
 	part.CastShadow = false
@@ -38,10 +51,42 @@ function TownGroundArt.PartFor(piece: TownGround.Piece, parent: Instance): BaseP
 		part.CanQuery = false
 		part.CanTouch = false
 	end
+	part:SetAttribute("MeshId", tostring(TownGroundArt.KerbMeshId))
+	-- Id 0 keeps the slate bar. A real id swaps in through Attempt, so a mesh
+	-- that is still loading does not leave the bar behind for good.
+	local meshId = TownGroundArt.KerbMeshId
+	if meshId ~= 0 then
+		local pieceName = piece.name
+		local size = part.Size
+		local cf = part.CFrame
+		local color = part.Color
+		local barMaterial = part.Material
+		MeshKit.Attempt(parent, function(): boolean
+			if part.Parent == nil then
+				return true
+			end
+			local mesh = MeshKit.Create(meshId, pieceName, size)
+			if not mesh then
+				return false
+			end
+			mesh.CFrame = cf
+			mesh.Color = color
+			mesh.Material = barMaterial
+			mesh.Anchored = true
+			mesh.CanCollide = false
+			mesh.CanQuery = false
+			mesh.CanTouch = false
+			mesh.CastShadow = false
+			mesh:SetAttribute("MeshId", tostring(meshId))
+			mesh.Parent = parent
+			part:Destroy()
+			return true
+		end)
+	end
 	return part
 end
 
--- All the ground parts. `pieces` defaults to TownGround.Pieces().
+-- Kerbs only. Roads, paths, lines and lawn edges are terrain paint.
 function TownGroundArt.Build(pieces: { TownGround.Piece }?): Model
 	local root = Kit.model("TownGround")
 	local groups: { [string]: Model? } = {}
@@ -49,12 +94,14 @@ function TownGroundArt.Build(pieces: { TownGround.Piece }?): Model
 		groups[name] = Kit.model(name, root)
 	end
 	for _, piece in ipairs(pieces or TownGround.Pieces()) do
-		local group = groups[piece.group]
-		if group == nil then
-			group = Kit.model(piece.group, root)
-			groups[piece.group] = group
+		if not PAINTED[piece.kind] then
+			local group = groups[piece.group]
+			if group == nil then
+				group = Kit.model(piece.group, root)
+				groups[piece.group] = group
+			end
+			TownGroundArt.PartFor(piece, group :: Model)
 		end
-		TownGroundArt.PartFor(piece, group :: Model)
 	end
 	return root
 end

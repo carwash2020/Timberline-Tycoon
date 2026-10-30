@@ -304,6 +304,8 @@ return function(t)
 			end
 		end
 		-- Paint overlaps, and the first patch listed wins.
+		-- T414a: loading TownGround registers the paint the live server uses.
+		local TownGround = t.load("ReplicatedStorage/Shared/World/TownGround")
 		for _, paint in ipairs(WorldLayout.TownPaint) do
 			local x, z = (paint.x0 + paint.x1) / 2, (paint.z0 + paint.z1) / 2
 			local want
@@ -312,8 +314,11 @@ return function(t)
 					want = p.material
 				end
 			end
-			-- T402: the town's roads are parts, so their paint (Asphalt) reads Grass under them.
-			if want == WorldLayout.RoadMaterial and WorldLayout.InTownZone(x, z) then
+			-- A cell the paint does not claim stays grass (T402).
+			local painted = TownGround.MaterialAt(x, z)
+			if painted then
+				want = painted
+			elseif want == WorldLayout.RoadMaterial and WorldLayout.InTownZone(x, z) then
 				want = "Grass"
 			end
 			t.eq(materialAt(x, z), want)

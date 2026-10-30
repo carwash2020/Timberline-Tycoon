@@ -107,36 +107,49 @@ return function(t)
 			seen[p.kind] = (seen[p.kind] or 0) + 1
 			t.ok(p.material ~= "Neon" and p.material ~= "Glass", p.name .. " is not Neon or Glass")
 			if p.kind == "Road" or p.kind == "Yard" then
-				t.eq(p.material, "Asphalt")
-				t.eq(p.color:ToHex(), "55585A", p.name)
+				local lane = string.find(p.name, "MainStreet", 1, true) ~= nil
+					or p.name == "ForestPath"
+					or p.name == "MillRoad"
+					or p.name == "LotLoop"
+					or p.name == "Lot"
+				if lane then
+					t.eq(p.material, "Cobblestone")
+					t.eq(p.color:ToHex(), "9C958A", p.name)
+				else
+					t.eq(p.material, "Asphalt")
+					t.eq(p.color:ToHex(), "A8A49C", p.name)
+				end
 				t.ok(math.abs(p.thick - 0.2) < 1e-9, p.name .. " is 0.2 tall")
-				t.ok(p.collide, p.name .. " collides")
+				t.ok(not p.collide, p.name .. " is terrain, not a slab")
 				if p.kind == "Road" then
 					t.ok(runLength(p) <= 64 + 1e-6, p.name .. " run " .. runLength(p))
 				end
-				-- The top is 0.05 over the graded ground at both ends of the run.
-				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.05)) < 1e-6, p.name .. " top at a")
-				t.ok(math.abs(p.yb - (ground(p.b.X, p.b.Y) + 0.05)) < 1e-6, p.name .. " top at b")
+				-- Flush with the graded ground: the terrain is the surface.
+				t.ok(math.abs(p.ya - ground(p.a.X, p.a.Y)) < 1e-6, p.name .. " top at a")
+				t.ok(math.abs(p.yb - ground(p.b.X, p.b.Y)) < 1e-6, p.name .. " top at b")
 			elseif p.kind == "Curb" then
-				t.eq(p.material, "Concrete")
-				t.eq(p.color:ToHex(), "9A968C", "CurbConcrete")
+				t.eq(p.material, "Slate")
+				t.eq(p.color:ToHex(), "8C877E", "StoneBase")
 				t.ok(
-					math.abs(p.width - 0.3) < 1e-9 and math.abs(p.thick - 0.15) < 1e-9,
-					"road curbs are 0.3 wide, 0.15 tall"
+					math.abs(p.width - 0.3) < 1e-9 and math.abs(p.thick - 0.6) < 1e-9,
+					"road curbs are 0.3 wide, 0.6 tall"
 				)
+				t.ok(not p.collide, p.name)
 				t.ok(runLength(p) <= 64 + 1e-6)
 			elseif p.kind == "LotCurb" then
-				t.eq(p.color:ToHex(), "9A968C", "CurbConcrete")
-				t.ok(math.abs(p.thick - 0.4) < 1e-9, "the lot edge is a 0.4 tall curb")
-				-- Its top stands 0.4 over the ground.
-				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.4)) < 1e-6)
+				t.eq(p.color:ToHex(), "8C877E", "StoneBase")
+				t.eq(p.material, "Slate")
+				t.ok(math.abs(p.thick - 0.6) < 1e-9, "the lot edge is a 0.6 tall curb")
+				t.ok(not p.collide, p.name)
+				-- Its top stands 0.6 over the ground.
+				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.6)) < 1e-6)
 			elseif p.kind == "Path" then
 				t.eq(p.color:ToHex(), "8E6C4A", "TrailDirt")
 				t.eq(p.material, "Ground")
 				t.ok(p.material ~= "Pebble", "a footpath is a dirt look, not Pebble")
-				t.eq(p.width, 6)
-				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.1)) < 1e-6, "0.1 proud")
-				t.ok(p.collide)
+				t.eq(p.width, 8)
+				t.ok(math.abs(p.ya - ground(p.a.X, p.a.Y)) < 1e-6, "flush")
+				t.ok(not p.collide)
 			elseif p.kind == "Line" then
 				t.eq(p.color:ToHex(), "E8E2D0", "line paint")
 				t.ok(math.abs(p.width - 0.3) < 1e-9)
@@ -182,7 +195,10 @@ return function(t)
 					for _, z in ipairs({ lot.z0 - d, lot.z1 + d }) do
 						local m = surface(x, z)
 						t.ok(
-							(m ~= "Ground" and m ~= "Mud") or named(x, z) or inMainDirt(x, z),
+							(m ~= "Ground" and m ~= "Mud")
+								or named(x, z)
+								or inMainDirt(x, z)
+								or TownGround.Covers(x, z, { Path = true }, 0.5),
 							string.format("%s at (%d, %d) beside the lot", m, x, z)
 						)
 					end
@@ -191,7 +207,10 @@ return function(t)
 					for _, x in ipairs({ lot.x0 - d, lot.x1 + d }) do
 						local m = surface(x, z)
 						t.ok(
-							(m ~= "Ground" and m ~= "Mud") or named(x, z) or inMainDirt(x, z),
+							(m ~= "Ground" and m ~= "Mud")
+								or named(x, z)
+								or inMainDirt(x, z)
+								or TownGround.Covers(x, z, { Path = true }, 0.5),
 							string.format("%s at (%d, %d) beside the lot", m, x, z)
 						)
 					end
@@ -214,7 +233,13 @@ return function(t)
 						local c = if p.shape == "Block" then p.a + dir * (len * i / n) else p.a
 						-- Under it.
 						local under = surface(c.X, c.Y)
-						local okUnder = under == "Grass" or (under == "Ground" and inMainDirt(c.X, c.Y))
+						-- T414a: the piece is paint, so the centreline is that material. Grass remains where the edge feathers.
+						-- T413: a main's TrailDirt shoulder is Ground outside the gravel bed.
+						local okUnder = under == "Grass"
+							or under == "Asphalt"
+							or under == "Cobblestone"
+							or under == "Ground"
+							or inMainDirt(c.X, c.Y)
 						if p.kind == "Path" then
 							okUnder = okUnder or under == "Ground" or under == "Cobblestone" -- a shop floor's earth, or the plaza's cobbles (their edge wanders), under a path's last studs
 						end
@@ -228,8 +253,10 @@ return function(t)
 								local q = c + normal * (side * lateral)
 								-- (past the zone's edge the country road is terrain again)
 								local m = if WorldLayout.InTownZone(q.X, q.Y) then surface(q.X, q.Y) else "Grass"
+								local onPaint =
+									TownGround.Covers(q.X, q.Y, { Road = true, Yard = true, Path = true }, 0)
 								t.ok(
-									m ~= "Asphalt" and m ~= "Rock" and m ~= "Slate",
+									onPaint or (m ~= "Asphalt" and m ~= "Rock" and m ~= "Slate"),
 									string.format("%s: %s at (%.0f, %.0f) beside the %s", p.name, m, q.X, q.Y, p.kind)
 								)
 							end
@@ -308,8 +335,8 @@ return function(t)
 				end
 			end
 		end
-		-- (top 0.05 over the ground at the ends, within 0.2 along: both hold)
-		t.ok(worst > 0.04, "the 0.05 lift is there: " .. worst)
+		-- The ends are flush. Across a wide run the grade can wander, and 0.2 is the cap.
+		t.ok(worst <= 0.2, "within 0.2 of the grade: " .. worst)
 	end)
 
 	t.test("touching road parts and the part-to-terrain joins step at most 0.05", function()
@@ -607,4 +634,239 @@ return function(t)
 			t.eq(surface(0, 80), "Cobblestone")
 		end
 	)
+
+	---------------------------------------------------------------------------
+	-- T414a acceptance. Written before the build. Do not weaken these to pass.
+	---------------------------------------------------------------------------
+
+	local function pieceHex(p)
+		return p.color:ToHex()
+	end
+
+	local function townLane(name)
+		return string.find(name, "MainStreet", 1, true) ~= nil
+			or name == "ForestPath"
+			or name == "MillRoad"
+			or name == "LotLoop"
+			or name == "Lot"
+	end
+
+	t.test("T414a: built ground parts do not overlap on one plane", function()
+		local TownGroundArt = t.load("ReplicatedStorage/Shared/Art/TownGroundArt")
+		local Vector3 = t.roblox.Vector3
+		local root = TownGroundArt.Build()
+		local parts = {}
+		for _, d in ipairs(root:GetDescendants()) do
+			if d:IsA("BasePart") and d.Transparency < 1 then
+				table.insert(parts, d)
+			end
+		end
+		local function corners(part)
+			local cf = part.CFrame
+			local hx, hz = part.Size.X / 2 * 0.98, part.Size.Z / 2 * 0.98
+			local out = {}
+			-- Around the footprint, not a bowtie, so a shared edge is not an overlap.
+			for _, s in ipairs({ { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }) do
+				local w = cf * Vector3.new(s[1] * hx, 0, s[2] * hz)
+				table.insert(out, Vector2.new(w.X, w.Z))
+			end
+			return out
+		end
+		local function separated(a, b)
+			for _, poly in ipairs({ a, b }) do
+				for i = 1, 4 do
+					local e = poly[i % 4 + 1] - poly[i]
+					local axis = Vector2.new(-e.Y, e.X)
+					local len = axis.Magnitude
+					if len > 1e-9 then
+						axis = axis / len
+						local min1, max1, min2, max2 = math.huge, -math.huge, math.huge, -math.huge
+						for _, p in ipairs(a) do
+							local v = axis:Dot(p)
+							min1, max1 = math.min(min1, v), math.max(max1, v)
+						end
+						for _, p in ipairs(b) do
+							local v = axis:Dot(p)
+							min2, max2 = math.min(min2, v), math.max(max2, v)
+						end
+						if math.min(max1, max2) - math.max(min1, min2) <= 0.05 then
+							return true
+						end
+					end
+				end
+			end
+			return false
+		end
+		local hits = 0
+		for i = 1, #parts do
+			local a = parts[i]
+			local ay = a.CFrame.Position.Y
+			local ah = a.Size.Y / 2
+			for j = i + 1, #parts do
+				local b = parts[j]
+				local by = b.CFrame.Position.Y
+				local bh = b.Size.Y / 2
+				local yOverlap = math.min(ay + ah, by + bh) - math.max(ay - ah, by - bh)
+				if yOverlap > 0.05 and not separated(corners(a), corners(b)) then
+					hits += 1
+				end
+			end
+		end
+		t.eq(hits, 0, "coplanar ground overlaps: " .. hits)
+	end)
+
+	t.test(
+		"T414a: foot paths are 8 wide, kerbs are low stone and cannot snag, lanes and roads use the palette",
+		function()
+			t.eq(TownGround.PathWidth, 8)
+			local banned = { ["55585A"] = true, ["64B838"] = true, ["9C5E40"] = true }
+			for _, p in ipairs(pieces) do
+				t.ok(not banned[pieceHex(p)], p.name .. " " .. pieceHex(p))
+				if p.kind == "Path" then
+					t.eq(p.width, 8, p.name)
+					t.eq(pieceHex(p), "8E6C4A", p.name)
+					t.eq(p.material, "Ground", p.name)
+					t.ok(not p.collide, p.name)
+					t.ok(math.abs(p.ya - ground(p.a.X, p.a.Y)) < 1e-6, p.name .. " flush")
+					t.ok(math.abs(p.yb - ground(p.b.X, p.b.Y)) < 1e-6, p.name .. " end flush")
+				elseif p.kind == "Curb" or p.kind == "LotCurb" then
+					t.eq(pieceHex(p), "8C877E", p.name)
+					t.eq(p.material, "Slate", p.name)
+					t.eq(p.thick, 0.6, p.name)
+					t.ok(p.thick <= 1, p.name)
+					t.ok(not p.collide, p.name)
+					t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.6)) < 1e-6, p.name .. " top")
+				elseif p.kind == "Road" or p.kind == "Yard" then
+					t.ok(not p.collide, p.name .. " is terrain, not a slab")
+					t.ok(math.abs(p.ya - ground(p.a.X, p.a.Y)) < 1e-6, p.name .. " flush")
+					if townLane(p.name) then
+						t.eq(pieceHex(p), "9C958A", p.name)
+						t.eq(p.material, "Cobblestone", p.name)
+					else
+						t.eq(pieceHex(p), "A8A49C", p.name)
+						t.eq(p.material, "Asphalt", p.name)
+					end
+				end
+			end
+			local mains = {
+				RingRoad = true,
+				HillsRoad = true,
+				SnowRoad = true,
+				EastLink = true,
+				SouthLink = true,
+				HillsCross = true,
+				SkyrootRoad = true,
+			}
+			local branches = {
+				VolcanoRoad = true,
+				DockRoad = true,
+				RavineRoad = true,
+				BayouRoad = true,
+				MesaRoad = true,
+			}
+			for _, road in ipairs(WorldLayout.Roads) do
+				if mains[road.name] then
+					t.eq(road.width, 32, road.name)
+					t.eq(WorldLayout.PlanWidth(road), 28, road.name .. " bed stays 28")
+				elseif branches[road.name] then
+					t.eq(road.width, 24, road.name)
+					t.eq(WorldLayout.PlanWidth(road), 28, road.name .. " bed stays 28")
+				end
+			end
+			for _, p in ipairs(pieces) do
+				if p.name == "EastLink" or p.name == "SouthLink" then
+					t.eq(p.width, 28, p.name .. " paint stays on the graded bed")
+				end
+			end
+		end
+	)
+
+	t.test("T414a: terrain paints the street, the walk and the lot, and not past the graded bed", function()
+		t.eq(surface(0, 80), "Cobblestone", "plaza")
+		t.eq(surface(-60, 73), "Cobblestone", "main street")
+		t.eq(surface(0, 50), "Ground", "spawn walk")
+		t.eq(surface(6, 50), "Grass", "the walk blends into grass")
+		local lot = WorldLayout.ParkingLot
+		t.eq(surface((lot.x0 + lot.x1) / 2, (lot.z0 + lot.z1) / 2), "Cobblestone", "lot")
+		t.eq(surface(160, 80), "Asphalt", "East Link on the bed")
+		t.ok(surface(160, 96) ~= "Asphalt", "16 studs off the East Link is past the 28-stud bed")
+	end)
+
+	t.test("T414a: the ground model keeps the names other code reads, and only kerb parts are built", function()
+		local TownGroundArt = t.load("ReplicatedStorage/Shared/Art/TownGroundArt")
+		local root = TownGroundArt.Build()
+		t.eq(root.Name, "TownGround")
+		for _, name in ipairs({ "TownRoads", "TownCurbs", "TownPaths", "TownLines", "PlotEdges" }) do
+			t.ok(root:FindFirstChild(name) ~= nil, name)
+		end
+		local want = { SpawnWalk = true, HearthAndHomePath = true, ToolShedPath = true, SparkworksPath = true }
+		local seen = {}
+		for _, p in ipairs(pieces) do
+			if want[p.name] then
+				seen[p.name] = true
+			end
+		end
+		for name in pairs(want) do
+			t.eq(seen[name], true, name)
+		end
+		local parts = 0
+		for _, d in ipairs(root:GetDescendants()) do
+			if d:IsA("BasePart") and d.Transparency < 1 then
+				parts += 1
+				t.eq(d.Material, t.roblox.Enum.Material.Slate, d.Name)
+				t.eq(d.Color:ToHex(), "8C877E", d.Name)
+				t.ok(not d.CanCollide, d.Name)
+				t.ok(d.Size.Y <= 1, d.Name)
+				t.eq(d:GetAttribute("MeshId"), "0", d.Name)
+			end
+		end
+		t.ok(parts > 0 and parts < 80, "kerb parts: " .. parts)
+	end)
+
+	t.test("T414a: palette colours come from Kit.hex, with no new raw Color3", function()
+		local fs = require("@lune/fs")
+		for _, path in ipairs({
+			"src/ReplicatedStorage/Shared/World/TownGround.luau",
+			"src/ReplicatedStorage/Shared/Art/TownGroundArt.luau",
+		}) do
+			local src = fs.readFile(path)
+			t.ok(string.find(src, "Color3.fromRGB", 1, true) == nil, path)
+		end
+		local src = fs.readFile("src/ReplicatedStorage/Shared/World/TownGround.luau")
+		t.ok(string.find(src, "Kit.hex", 1, true) ~= nil, "TownGround asks Kit.hex")
+	end)
+
+	t.test("T414a: shop doors, the lot edge and a plot driveway stay reachable without a step", function()
+		local TownGroundArt = t.load("ReplicatedStorage/Shared/Art/TownGroundArt")
+		local ShopPins = t.load("ReplicatedStorage/Shared/World/ShopPins")
+		local root = TownGroundArt.Build()
+		local solids = {}
+		for _, d in ipairs(root:GetDescendants()) do
+			if d:IsA("BasePart") and d.CanCollide then
+				table.insert(solids, d)
+			end
+		end
+		for _, pin in ipairs(ShopPins.All()) do
+			if not pin.cloud then
+				for _, part in ipairs(solids) do
+					local at = part.CFrame.Position
+					local dx, dz = at.X - pin.x, at.Z - pin.z
+					t.ok(dx * dx + dz * dz >= 64, pin.id .. " has a solid ground part within 8 studs")
+				end
+			end
+		end
+		local lot = WorldLayout.ParkingLot
+		t.ok(math.abs(ground(lot.x1 - 1, 40) - ground(lot.x1 + 0.5, 40)) <= 1, "lot edge step")
+		t.ok(TownGround.Covers(lot.x1 - 0.25, 40, { Yard = true, Road = true }, 0), "lot paving reaches its edge")
+		local drives = 0
+		for _, g in ipairs(TownGround.Gaps()) do
+			if string.find(g.name, "driveway", 1, true) then
+				drives += 1
+				local y0 = ground(g.centre.X, g.centre.Y)
+				local y1 = ground(g.centre.X + g.normal.X * 2, g.centre.Y + g.normal.Y * 2)
+				t.ok(math.abs(y0 - y1) <= 1, g.name .. " step")
+			end
+		end
+		t.ok(drives >= 1, "a plot driveway")
+	end)
 end

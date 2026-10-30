@@ -441,10 +441,9 @@ sellArea.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 -- 4. The town
 ---------------------------------------------------------------------------
 
--- The town's roads, curbs, footpaths, lot pavement and edge, and the plots'
--- lawn edges, as parts (T402; Shared/World/TownGround). The terrain under
--- them is plain Grass. Before the town's buildings and the lot's bays, which
--- stand on and over them.
+-- The town's kerbs (T414a; Shared/World/TownGround). Roads, paths and the
+-- lot are terrain paint. TownPaths stays so a buried path part can still be
+-- lifted; there are none until a path is a part again. Before the buildings.
 step("4. The town's ground parts", function()
 	local ground = TownGroundArt.Build()
 	ground.Parent = map
