@@ -27,6 +27,7 @@ return {
 			{ "ToolShed", "TOOL SHED", { 184, 53, 40 }, 90 },
 			{ "Dealership", "DEALERSHIP", { 30, 80, 150 }, 280 },
 			{ "CoatKiosk", "COAT KIOSK", { 120, 170, 200 }, 470 },
+			{ "HeatBoots", "HEAT BOOTS", { 255, 122, 26 }, 590 },
 			{ "OddsAndEnds", "ODDS AND ENDS", { 140, 100, 60 }, 510 },
 			{ "SecretShop", "SECRET SHOP", { 90, 80, 70 }, 550 },
 		}
