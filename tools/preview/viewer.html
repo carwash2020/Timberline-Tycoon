@@ -184,6 +184,68 @@ for (const p of scene.parts) {
   if (glow) addTo(nightGroups, shape + "|" + transparency.toFixed(2), () => ({ shape, material: "Neon", transparency, night: true }), p);
 }
 const metalMaterials = [], dayGlowMeshes = [], nightGlowMeshes = [];
+// A repeating grey pattern, multiplied by the part or terrain colour.
+// Asphalt is a fine gravel speckle. Cobble is stones and mortar. Dirt is
+// clumps. Grass is short blades. Flat colour cannot show which is which.
+function terrainPattern(name) {
+  const size = 128;
+  const c = document.createElement("canvas");
+  c.width = size; c.height = size;
+  const g = c.getContext("2d");
+  const px = g.createImageData(size, size);
+  const d = px.data;
+  const put = (x, y, v) => {
+    const i = (y * size + x) * 4;
+    d[i] = d[i + 1] = d[i + 2] = v;
+    d[i + 3] = 255;
+  };
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) put(x, y, 235);
+  if (name === "Cobblestone") {
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) put(x, y, 150);
+    for (let row = 0; row < 4; row++) for (let col = 0; col < 4; col++) {
+      const ox = (row % 2) * 16;
+      const cx = ox + col * 32 + 16, cy = row * 32 + 16;
+      for (let yy = cy - 12; yy <= cy + 12; yy++) for (let xx = cx - 14; xx <= cx + 14; xx++) {
+        if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
+        const dx = (xx - cx) / 14, dy = (yy - cy) / 12;
+        if (dx * dx + dy * dy <= 1) put(xx, yy, 210 + ((row + col) % 3) * 12);
+      }
+    }
+  } else if (name === "Asphalt") {
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const n = Math.abs(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
+      put(x, y, Math.floor(188 + n * 55));
+    }
+  } else if (name === "Ground" || name === "Sand" || name === "Mud") {
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const n = Math.abs(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
+      const blot = Math.abs(Math.sin(x * 0.31 + y * 0.47));
+      put(x, y, Math.floor(200 + n * 30 - blot * 45));
+    }
+  } else if (name === "Grass" || name === "LeafyGrass") {
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const blade = Math.abs(Math.sin(x * 0.85 + y * 2.7)) > 0.75 ? 48 : 0;
+      const n = Math.abs(Math.sin(x * 4.1 + y * 9.2) * 43758.5453) % 1;
+      put(x, y, Math.floor(205 + n * 28 - blade));
+    }
+  } else if (name === "Slate" || name === "Rock") {
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      put(x, y, 214 - ((y % 18) < 2 ? 36 : 0));
+    }
+  }
+  g.putImageData(px, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+const terrainTextures = new Map();
+function terrainTex(name) {
+  let t = terrainTextures.get(name);
+  if (!t) { t = terrainPattern(name); terrainTextures.set(name, t); }
+  return t;
+}
 function buildMesh(g) {
   const [rough, metal] = MAT[g.material] || [0.85, 0.0];
   let mat;
@@ -193,6 +255,9 @@ function buildMesh(g) {
     // Boxes and wedges already have one normal per face; flatShading would
     // flip double-sided faces wound the other way.
     mat = new THREE.MeshStandardMaterial({ roughness: rough, metalness: metal });
+    if (terrainTextures.has(g.material) || g.material === "Slate" || g.material === "Cobblestone" || g.material === "Asphalt" || g.material === "Ground" || g.material === "Grass") {
+      mat.map = terrainTex(g.material);
+    }
     if (METALS.has(g.material)) { mat.envMap = ENV; mat.envMapIntensity = ENV_INTENSITY; metalMaterials.push(mat); }
   }
   if (g.transparency > 0 || g.material === "Glass") {
@@ -315,24 +380,74 @@ for (const t of (scene.texts || [])) {
   world.add(mesh);
 }
 
+
 // Terrain heightfield (+ water) when the scene has one.
+// When the export names each column's material, each quad is one material
+// with that material's texture. Vertex colours are not blended across a
+// material change, which is what drew the grey feather and the stair edge.
 if (scene.terrain) {
   const T = scene.terrain;
-  const g = new THREE.PlaneGeometry((T.nx - 1) * T.step, (T.nz - 1) * T.step, T.nx - 1, T.nz - 1);
-  g.rotateX(-Math.PI / 2);
-  const pos = g.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  for (let iz = 0; iz < T.nz; iz++) for (let ix = 0; ix < T.nx; ix++) {
-    const i = iz * T.nx + ix;
-    pos.setXYZ(i, T.x0 + ix * T.step, T.h[i], T.z0 + iz * T.step);
-    col.set("#" + T.palette[T.m[i]]);
-    colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+  if (T.mat && T.matNames) {
+    const buckets = new Map();
+    const push = (name, hex, ax, ay, az, bx, by, bz, cx, cy, cz) => {
+      let b = buckets.get(name);
+      if (!b) { b = { name, hex, pos: [], uv: [] }; buckets.set(name, b); }
+      const tile = 3.2;
+      b.pos.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+      b.uv.push(ax / tile, az / tile, bx / tile, bz / tile, cx / tile, cz / tile);
+    };
+    const at = (ix, iz) => {
+      const i = iz * T.nx + ix;
+      return [T.x0 + ix * T.step, T.h[i], T.z0 + iz * T.step, T.mat[i], T.palette[T.m[i]]];
+    };
+    for (let iz = 0; iz < T.nz - 1; iz++) for (let ix = 0; ix < T.nx - 1; ix++) {
+      const a = at(ix, iz), b = at(ix + 1, iz), c = at(ix + 1, iz + 1), d = at(ix, iz + 1);
+      const corners = [a, b, c, d];
+      const count = new Map();
+      for (const p of corners) count.set(p[3], (count.get(p[3]) || 0) + 1);
+      let best = a[3], nBest = 0;
+      for (const [id, k] of count) if (k > nBest) { best = id; nBest = k; }
+      let useHex = a[4];
+      for (const p of corners) if (p[3] === best) { useHex = p[4]; break; }
+      const name = T.matNames[best];
+      // Wound so the normal points up. The other way is culled and the shot is empty.
+      push(name, useHex, a[0], a[1], a[2], c[0], c[1], c[2], b[0], b[1], b[2]);
+      push(name, useHex, a[0], a[1], a[2], d[0], d[1], d[2], c[0], c[1], c[2]);
+    }
+    for (const b of buckets.values()) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(b.pos, 3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(b.uv, 2));
+      g.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({
+        color: "#" + b.hex,
+        map: terrainTex(b.name),
+        roughness: b.name === "Asphalt" ? 0.92 : 0.86,
+        metalness: 0,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(g, mat);
+      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      world.add(mesh);
+    }
+  } else {
+    const g = new THREE.PlaneGeometry((T.nx - 1) * T.step, (T.nz - 1) * T.step, T.nx - 1, T.nz - 1);
+    g.rotateX(-Math.PI / 2);
+    const pos = g.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    for (let iz = 0; iz < T.nz; iz++) for (let ix = 0; ix < T.nx; ix++) {
+      const i = iz * T.nx + ix;
+      pos.setXYZ(i, T.x0 + ix * T.step, T.h[i], T.z0 + iz * T.step);
+      col.set("#" + T.palette[T.m[i]]);
+      colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+    }
+    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    g.computeVertexNormals();
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
+    mesh.receiveShadow = true;
+    world.add(mesh);
   }
-  g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  g.computeVertexNormals();
-  const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
-  mesh.receiveShadow = true;
-  world.add(mesh);
   bounds.expandByPoint(new THREE.Vector3(T.x0, 0, T.z0));
   bounds.expandByPoint(new THREE.Vector3(T.x0 + (T.nx - 1) * T.step, 0, T.z0 + (T.nz - 1) * T.step));
   if (T.wet) {

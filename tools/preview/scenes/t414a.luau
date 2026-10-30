@@ -11,7 +11,8 @@ return {
 		TownGroundArt.Build().Parent = root
 		return {
 			root = root,
-			terrain = Common.terrain(ctx, -140, -80, 180, 210, 4),
+			-- Step 1, not 4: a 4-stud sample draws the paving edge as stairs.
+			terrain = Common.terrain(ctx, -140, -80, 180, 210, 1),
 			shadowRadius = 160,
 			fov = 50,
 			cameras = {

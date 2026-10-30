@@ -1214,7 +1214,7 @@ do
 	local folder = Instance.new("Folder")
 	folder.Name = "Trails"
 	folder.Parent = map
-	local dirt = Color3.fromRGB(156, 94, 64) -- TerrainGen.MaterialColors.Ground, so a trail matches the earth round it
+	local dirt = TerrainGen.MaterialColors.Ground -- TrailDirt #8E6C4A, not the old orange-red #9C5E40
 	deferPlanned(
 		"5. The trails",
 		2,

@@ -965,7 +965,8 @@ return function(t)
 		-- asphalt. MainStreet is cobble. 15.9 is inside the flat bed.
 		local streets = {
 			{ name = "EastLink", at = Vector2.new(160, 80), axis = Vector2.new(0, 1), material = "Asphalt" },
-			{ name = "SouthLink", at = Vector2.new(0, -50), axis = Vector2.new(1, 0), material = "Asphalt" },
+			-- z = -70 stays off LotLoop (that lane is cobble at z = -58).
+			{ name = "SouthLink", at = Vector2.new(0, -70), axis = Vector2.new(1, 0), material = "Asphalt" },
 			{ name = "MainStreet west", at = Vector2.new(-60, 73), axis = Vector2.new(0, 1), material = "Cobblestone" },
 		}
 		for _, street in ipairs(streets) do
@@ -978,6 +979,9 @@ return function(t)
 					string.format("%s side %d height %.3f, crown %.3f", street.name, side, h, crown)
 				)
 				t.eq(surface(q.X, q.Y), street.material, street.name .. " paving at 15.9")
+				t.ok(surface(q.X, q.Y) ~= "Grass", street.name .. " no grass inside 16")
+				local past = street.at + street.axis * (16.5 * side)
+				t.eq(surface(past.X, past.Y), "Grass", street.name .. " paving stops at 16")
 				local blend = street.at + street.axis * (18 * side)
 				t.eq(surface(blend.X, blend.Y), "Grass", street.name .. " MeadowGrass at 18")
 			end
@@ -992,15 +996,16 @@ return function(t)
 			for _, p in ipairs(pieces) do
 				if p.kind == "Curb" or p.kind == "LotCurb" then
 					kerbs += 1
+					-- Both ends of the run: p.a and p.b. The bottom is the top minus the thickness.
 					local bottomA = p.ya - p.thick
 					local bottomB = p.yb - p.thick
 					t.ok(
 						math.abs(bottomA - ground(p.a.X, p.a.Y)) <= 0.05,
-						string.format("%s start bottom off by %.3f", p.name, bottomA - ground(p.a.X, p.a.Y))
+						string.format("%s p.a bottom off by %.3f", p.name, bottomA - ground(p.a.X, p.a.Y))
 					)
 					t.ok(
 						math.abs(bottomB - ground(p.b.X, p.b.Y)) <= 0.05,
-						string.format("%s end bottom off by %.3f", p.name, bottomB - ground(p.b.X, p.b.Y))
+						string.format("%s p.b bottom off by %.3f", p.name, bottomB - ground(p.b.X, p.b.Y))
 					)
 				end
 				if p.kind == "Curb" then
@@ -1079,5 +1084,17 @@ return function(t)
 		for name in pairs(mains) do
 			t.ok(seen[name] >= 1, name .. " was sampled outside town, got " .. tostring(seen[name]))
 		end
+	end)
+
+	t.test("T414a: a kerb gap with no path or drive cut fails", function()
+		local cuts = 0
+		for _, g in ipairs(TownGround.Gaps()) do
+			if string.find(g.name, "curb", 1, true) == nil then
+				continue
+			end
+			cuts += 1
+			t.ok(TownGround.IsCut(g.centre.X, g.centre.Y), string.format("%s gap has no cut", g.name))
+		end
+		t.ok(cuts >= 1, "the town streets do have real cuts")
 	end)
 end

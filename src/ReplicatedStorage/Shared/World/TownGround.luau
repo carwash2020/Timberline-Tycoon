@@ -652,7 +652,8 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 				local testOff = d.width / 2 + 1
 				local exposed, byVehicle =
 					exposure(covers, d.name, from, to, d.a + normal * (side * testOff), d.b + normal * (side * testOff))
-				local runs, gapSpans = runsAndGaps(exposed, byVehicle, len, 3, TownGround.MinGap)
+				-- minRun 0: a short bar stays. Dropping it opened a gap that was not a path or a drive.
+				local runs, gapSpans = runsAndGaps(exposed, byVehicle, len, 0, TownGround.MinGap)
 				for _, r in ipairs(runs) do
 					for _, run in
 						ipairs(
@@ -792,7 +793,7 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 			local from, to = side.a - side.out * inset, side.b - side.out * inset
 			local exposed, byVehicle =
 				exposure(lotCovers, "Lot", from, to, side.a + side.out * 1, side.b + side.out * 1)
-			local runs, gapSpans = runsAndGaps(exposed, byVehicle, len, 3, TownGround.MinGap)
+			local runs, gapSpans = runsAndGaps(exposed, byVehicle, len, 0, TownGround.MinGap)
 			for _, r in ipairs(runs) do
 				for _, run in
 					ipairs(fitRuns(from + dir * r[1], from + dir * r[2], TownGround.LotCurbHeight, TownGround.MaxRun))
@@ -975,6 +976,17 @@ function TownGround.TopAt(p: Piece, x: number, z: number): number?
 	return p.ya + (p.yb - p.ya) * along / len
 end
 
+-- True when a road, yard, path, plaza or lot cover crosses this point.
+-- A kerb gap that is not one of these is a hole, not a cut.
+function TownGround.IsCut(x: number, z: number): boolean
+	for _, s in ipairs(built().covers) do
+		if inside(s, x, z, 1) then
+			return true
+		end
+	end
+	return false
+end
+
 -- Whether (x, z) is on a road, yard, bend, path, curb... piece of `kinds`
 -- (a set), with `grow` studs of slack.
 function TownGround.Covers(x: number, z: number, kinds: { [string]: boolean }, grow: number?): boolean
@@ -1015,9 +1027,7 @@ function TownGround.Counts(): (number, number)
 	return zoneCount, plotCount
 end
 
--- How far (x, z) sits inside a piece, or nil when it is outside. The feather
--- uses this so a painted edge breaks into grass instead of ending in a line.
-local FEATHER = 1.6
+-- How far (x, z) sits inside a piece, or nil when it is outside.
 local function insetOf(p: Piece, x: number, z: number): number?
 	if p.shape == "Cylinder" then
 		local dx, dz = x - p.a.X, z - p.a.Y
@@ -1066,10 +1076,10 @@ local function curbedStreet(name: string): boolean
 end
 
 -- Terrain material for a town road, lane, yard, lot or footpath, or nil
--- (grass). Curbed streets pave solid through BedHalf. From BedHalf to
--- BlendOuter the band is meadow grass (terrain Grass), outward only: the
--- street material does not dither back into that band. Other pieces still
--- feather the last FEATHER studs of their own footprint.
+-- (grass). Curbed streets pave solid out to PaveHalf (16) and no further:
+-- nothing grey feathers past the kerb. From there out to BlendOuter the
+-- band is meadow grass (terrain Grass), outward only. Other pieces are
+-- solid to their own edge, so grass does not speckle inside the paving.
 function TownGround.MaterialAt(x: number, z: number): string?
 	if not WorldLayout.InTownZone(x, z) then
 		return nil
@@ -1090,23 +1100,17 @@ function TownGround.MaterialAt(x: number, z: number): string?
 			if p.kind == "Road" and curbedStreet(p.name) and not WorldLayout.OnStorePad(x, z) then
 				local across = acrossOf(p, x, z)
 				if across and across <= TownGround.BlendOuter and r >= rank then
-					-- Meadow grass fills the outward band. The paving stays
-					-- the street material through the flat bed.
-					best = if across > TownGround.BedHalf then "Grass" else mat
+					-- Paving stops at 16. Past that, through the kerb and out
+					-- to 20.3, the ground is meadow grass. No street colour
+					-- spills past the kerb.
+					best = if across > TownGround.PaveHalf then "Grass" else mat
 					rank = r
 				end
 			else
 				local inset = insetOf(p, x, z)
-				if inset then
-					local keep = true
-					if inset < FEATHER then
-						local h = math.noise(x / 4.5, z / 4.5, 2.2) * 0.5 + 0.5
-						keep = inset / FEATHER >= h
-					end
-					if keep then
-						best = mat
-						rank = r
-					end
+				if inset and r >= rank then
+					best = mat
+					rank = r
 				end
 			end
 		end
