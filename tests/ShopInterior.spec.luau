@@ -65,10 +65,19 @@ return function(t)
 			t.ok(walk.size.X >= ShopBounds.AisleMin, kind .. " aisle width " .. walk.size.X)
 			t.ok(walk.size.Z >= ShopBounds.WalkMin, kind .. " aisle length " .. walk.size.Z)
 			local blocked = ShopBounds.Hits(model, walk, FRAME)
-			t.eq(#blocked, 0, kind .. " solid in the aisle: " .. (blocked[1] and blocked[1].Name or ""))
+			local names = {}
+			for _, part in ipairs(blocked) do
+				table.insert(names, part.Name)
+			end
+			t.eq(#blocked, 0, kind .. " solid in the aisle: " .. table.concat(names, ", "))
 			local counter = model:FindFirstChild("Counter")
 			t.ok(counter and counter:IsA("BasePart"), kind .. " counter")
-			for _, shoulder in ipairs(ShopBounds.Shoulders(door, counter.CFrame.Position.Z, ShopBounds.Shoulder)) do
+			local aisle = findPart(model, "AisleClear")
+			if aisle then
+				t.eq(aisle.CanCollide, false, kind .. " aisle collides")
+				t.ok(ShopBounds.Marked(model) ~= nil, kind .. " aisle misses the door or the counter")
+			end
+			for _, shoulder in ipairs(ShopBounds.Shoulders(door, counter.CFrame.Position, ShopBounds.Shoulder)) do
 				t.ok(shoulder.size.X >= ShopBounds.Shoulder, kind .. " shoulder")
 				local snag = ShopBounds.Hits(model, shoulder, FRAME)
 				t.eq(#snag, 0, kind .. " solid beside the door: " .. (snag[1] and snag[1].Name or ""))
@@ -154,6 +163,50 @@ return function(t)
 			t.eq(inside(feet), false, kind .. " keeper feet in the door")
 			t.eq(inside(body), false, kind .. " keeper in the door")
 		end
+	end)
+
+	t.test("a turned, moved shop still measures the door, and a crate in the aisle fails", function()
+		local model = build("HearthAndHome")
+		local opening = findPart(model, "DoorBlock") or findPart(model, "DoorOpening")
+		local counter = model:FindFirstChild("Counter")
+		local into = opening.CFrame:PointToObjectSpace(counter.CFrame.Position).Z
+		local sign = if into >= 0 then 1 else -1
+		local crate = roblox.Instance.new("Part")
+		crate.Name = "AisleCrate"
+		crate.Size = roblox.Vector3.new(2, 2, 2)
+		crate.Anchored = true
+		crate.CanCollide = true
+		crate.CFrame = opening.CFrame * roblox.CFrame.new(0, 0, sign * (opening.Size.Z / 2 + 7))
+		crate.Parent = model
+		model:PivotTo(roblox.CFrame.new(500, 20, -300) * roblox.CFrame.Angles(0, math.rad(90), 0))
+		local door = ShopBounds.Door(model)
+		local walk = ShopBounds.Walk(model)
+		t.ok(door.size.X >= ShopBounds.DoorMinW and door.size.Y >= ShopBounds.DoorMinH, "the moved door")
+		t.ok(walk.size.X >= ShopBounds.AisleMin and walk.size.Z >= ShopBounds.WalkMin, "the moved walk")
+		local atDoor = door.cf:PointToObjectSpace(walk.cf.Position)
+		t.ok(math.abs(atDoor.X) < 0.2, "the walk stays on the door's centre line")
+		local blocked = ShopBounds.Hits(model, walk, FRAME)
+		local crateHit = false
+		local others = {}
+		for _, part in ipairs(blocked) do
+			if part == crate then
+				crateHit = true
+			else
+				table.insert(others, part.Name)
+			end
+		end
+		t.eq(crateHit, true, "the aisle check fails on the crate")
+		t.eq(#others, 0, "only the crate ends the walk: " .. table.concat(others, ", "))
+		for _, shoulder in ipairs(ShopBounds.Shoulders(door, counter.CFrame.Position, ShopBounds.Shoulder)) do
+			local snag = ShopBounds.Hits(model, shoulder, FRAME)
+			local snagNames = {}
+			for _, part in ipairs(snag) do
+				table.insert(snagNames, part.Name)
+			end
+			t.eq(#snag, 0, "shoulder after the move: " .. table.concat(snagNames, ", "))
+		end
+		local doorHits = ShopBounds.Hits(model, door, FRAME)
+		t.eq(#doorHits, 0, "the moved door stays clear")
 	end)
 
 	t.test("the names other code reads are still there", function()

@@ -499,13 +499,16 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 		end
 	end
 	-- (the rug's edge board is its highest skin: what stands on the rug stands on that, so no leg or chair is sunk in it)
+	-- East of the door's 8-wide walk (the door sits near the west wall, so the
+	-- old west corner stood in that walk).
 	local onRug = fy + LAYER3 + 0.035
 	local recvZ = zb - 24
-	rug(model, fy, west + 4.6, recvZ, 8.6, 12.0, BLUE_DEEP, RUNNER_EDGE)
-	woodTable(model, "Reception", west + 4, recvZ, onRug, 4.4, 2.4, 2.0)
+	local recvX = west + 17.5
+	rug(model, fy, recvX + 0.6, recvZ, 8.6, 12.0, BLUE_DEEP, RUNNER_EDGE)
+	woodTable(model, "Reception", recvX, recvZ, onRug, 4.4, 2.4, 2.0)
 	for _, z in ipairs({ zb - 28, zb - 20 }) do
-		dBox(model, "ReceptionChair", V3(2, 1.2, 2), CF(west + 4, onRug + 0.6, z), BLUE, MAT.Fabric)
-		dBox(model, "ReceptionChairBack", V3(0.4, 1.8, 2), CF(west + 2.8, onRug + 1.5, z), BLUE, MAT.Fabric)
+		dBox(model, "ReceptionChair", V3(2, 1.2, 2), CF(recvX, onRug + 0.6, z), BLUE, MAT.Fabric)
+		dBox(model, "ReceptionChairBack", V3(0.4, 1.8, 2), CF(recvX - 1.2, onRug + 1.5, z), BLUE, MAT.Fabric)
 	end
 	-- the finance table, east of the runner, with a rug under it and a few brochures on it
 	local finX, finZ = west + 20.4, zb - 18
@@ -540,12 +543,12 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 	stockProp(model, "Crate", west + 1.8, fy, zb - 12.6, -0.15)
 	stockProp(model, "Barrel", west + 4.6, fy, zb - 13, 0)
 
-	-- The event expansion room (EVENTS.md, ShopEventKit): a roped-off 16 x 9 area against the west wall, turned so its
-	-- open front faces east toward the runner, between the door's end of the lobby and the reception corner (clear of the
+	-- The event expansion room (EVENTS.md, ShopEventKit): a roped-off 16 x 9 area east of the door's walk, turned so its
+	-- open front faces east toward the showroom, between the door's end of the lobby and the reception corner (clear of the
 	-- doorway aisle and every bay), with its three tables on the pads; and the event banner in the front corner east of the
 	-- door, just outside the door's width (so the door's sensor, the runner and the walk in stay clear), facing into the
 	-- lobby with the front wall behind it (in the east it stood in front of the first truck from the door).
-	local zoneAnchor = CF(west + 4.6, fy, zf + 21.7) * CFrame.Angles(0, -math.pi / 2, 0)
+	local zoneAnchor = CF(west + 19.7, fy, zf + 21.7) * CFrame.Angles(0, -math.pi / 2, 0)
 	local zone = ShopEventKit.BuildZone(model, "Dealership", zoneAnchor, V3(16, 0, 9))
 	eventTables(model, zone, zoneAnchor)
 	-- The cards show until an event is on (StoreEventData.Events holds one for this store); the server

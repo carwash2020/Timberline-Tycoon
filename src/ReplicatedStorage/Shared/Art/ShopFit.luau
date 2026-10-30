@@ -107,27 +107,30 @@ local function ensureCounter(model: Model, counter: BasePart)
 	ShopCounter.Add(model, counter)
 end
 
--- A visible-nothing aisle the booth specs can measure. The town stores
--- use ShopBounds.Walk instead, so they grow no invisible part.
+-- AisleClear runs in the door's frame from the inside face to the counter's
+-- near face. It does not collide. The town stores have no marker; their
+-- walk is ShopBounds.Walk.
 local function ensureAisle(model: Model, door: BasePart, counter: BasePart)
-	if ShopBounds.Marked(model) then
+	if model:FindFirstChild("AisleClear", true) then
 		return
 	end
-	local doorAt, counterAt = door.CFrame.Position, counter.CFrame.Position
-	local dir = if counterAt.Z >= doorAt.Z then 1 else -1
-	local z0 = doorAt.Z + dir * (door.Size.Z / 2 + 0.01)
-	local beside = math.abs(counterAt.X - doorAt.X) > door.Size.X * 0.5
-	local z1 = if beside then z0 + dir * 10 else counterAt.Z - dir * (counter.Size.Z / 2 + 0.01)
-	local length = (z1 - z0) * dir
-	if length < ShopBounds.WalkMin then
-		length = ShopBounds.WalkMin
-		z1 = z0 + dir * length
-	end
+	local rel = door.CFrame:ToObjectSpace(counter.CFrame)
+	local sign = if rel.Position.Z >= 0 then 1 else -1
+	local zHat = -rel.LookVector
+	local half = math.abs(rel.RightVector.Z) * counter.Size.X / 2
+		+ math.abs(rel.UpVector.Z) * counter.Size.Y / 2
+		+ math.abs(zHat.Z) * counter.Size.Z / 2
+	local inside = sign * (door.Size.Z / 2)
+	local farZ = rel.Position.Z - sign * half
+	local zMid = (inside + farZ) / 2
+	local length = math.abs(farZ - inside)
+	local y0 = -door.Size.Y / 2 + 0.05
+	local y1 = door.Size.Y / 2
 	local aisle = Kit.part(
 		model,
 		"AisleClear",
-		Vector3.new(ShopBounds.AisleMin, 3.2, length),
-		CFrame.new(doorAt.X, 3.6, (z0 + z1) / 2),
+		Vector3.new(ShopBounds.AisleMin, y1 - y0, length),
+		door.CFrame * CFrame.new(0, (y0 + y1) / 2, zMid),
 		Palette.SignCream,
 		Enum.Material.SmoothPlastic
 	)
