@@ -1931,9 +1931,14 @@ local shoulderHere = false
 -- and slope (rise over run), before the town zone's rules (below).
 local function surfaceMaterial(x: number, z: number, h: number, slope: number): string
 	shoulderHere = false
-	-- The dirt band (14 to 18 on a main) wins over grass and sand. A
-	-- homestead shelf, the town, and the lot stay the flat they already are.
-	if onShoulder(x, z) and WorldLayout.FlatWeight(x, z) < 0.5 and not WorldLayout.OnPlotPad(x, z) then
+	-- The dirt band (14 to 18 on a main) wins over grass, sand and snow. A
+	-- homestead pad, a store pad and the town keep the floor they already have.
+	if
+		onShoulder(x, z)
+		and not WorldLayout.OnPlotPad(x, z)
+		and not WorldLayout.OnStorePad(x, z)
+		and not WorldLayout.InTownZone(x, z)
+	then
 		shoulderHere = true
 		return "Ground"
 	end

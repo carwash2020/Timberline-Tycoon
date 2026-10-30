@@ -945,4 +945,139 @@ return function(t)
 		}, 1)
 		t.ok(string.find(line, "town ground 0.4s", 1, true) ~= nil, line)
 	end)
+
+	-- Distance from p to the centre line of the nearest piece named `roadName`.
+	local function distToNamedRoad(p, roadName)
+		local best = 1e9
+		for _, road in ipairs(pieces) do
+			if road.kind == "Road" and road.name == roadName then
+				local ab = road.b - road.a
+				local len2 = ab:Dot(ab)
+				local u = if len2 > 1e-8 then math.clamp((p - road.a):Dot(ab) / len2, 0, 1) else 0
+				best = math.min(best, (p - (road.a + ab * u)).Magnitude)
+			end
+		end
+		return best
+	end
+
+	t.test("T414a: town streets are flat and paved at 15.9, and the blend at 18 is MeadowGrass", function()
+		-- (x along the run, centre z or x, axis). East Link and South Link are
+		-- asphalt. MainStreet is cobble. 15.9 is inside the flat bed.
+		local streets = {
+			{ name = "EastLink", at = Vector2.new(160, 80), axis = Vector2.new(0, 1), material = "Asphalt" },
+			{ name = "SouthLink", at = Vector2.new(0, -50), axis = Vector2.new(1, 0), material = "Asphalt" },
+			{ name = "MainStreet west", at = Vector2.new(-60, 73), axis = Vector2.new(0, 1), material = "Cobblestone" },
+		}
+		for _, street in ipairs(streets) do
+			local crown = ground(street.at.X, street.at.Y)
+			for _, side in ipairs({ 1, -1 }) do
+				local q = street.at + street.axis * (15.9 * side)
+				local h = ground(q.X, q.Y)
+				t.ok(
+					math.abs(h - crown) <= 0.1,
+					string.format("%s side %d height %.3f, crown %.3f", street.name, side, h, crown)
+				)
+				t.eq(surface(q.X, q.Y), street.material, street.name .. " paving at 15.9")
+				local blend = street.at + street.axis * (18 * side)
+				t.eq(surface(blend.X, blend.Y), "Grass", street.name .. " MeadowGrass at 18")
+			end
+		end
+	end)
+
+	t.test(
+		"T414a: every kerb bottom meets the terrain at both ends, and every curb is at least 16 from its road",
+		function()
+			local kerbs = 0
+			local curbs = 0
+			for _, p in ipairs(pieces) do
+				if p.kind == "Curb" or p.kind == "LotCurb" then
+					kerbs += 1
+					local bottomA = p.ya - p.thick
+					local bottomB = p.yb - p.thick
+					t.ok(
+						math.abs(bottomA - ground(p.a.X, p.a.Y)) <= 0.05,
+						string.format("%s start bottom off by %.3f", p.name, bottomA - ground(p.a.X, p.a.Y))
+					)
+					t.ok(
+						math.abs(bottomB - ground(p.b.X, p.b.Y)) <= 0.05,
+						string.format("%s end bottom off by %.3f", p.name, bottomB - ground(p.b.X, p.b.Y))
+					)
+				end
+				if p.kind == "Curb" then
+					curbs += 1
+					local roadName = string.gsub(p.name, " curb$", "")
+					for _, endAt in ipairs({ p.a, p.a:Lerp(p.b, 0.5), p.b }) do
+						local d = distToNamedRoad(endAt, roadName)
+						t.ok(d >= 16 - 1e-3, string.format("%s is %.2f from %s", p.name, d, roadName))
+					end
+				end
+			end
+			t.ok(kerbs >= 4, "kerb runs: " .. kerbs)
+			t.ok(curbs >= 4, "road curbs: " .. curbs)
+		end
+	)
+
+	t.test("T414a: main roads outside town are Ground at offset 17", function()
+		local mains = {
+			RingRoad = true,
+			HillsRoad = true,
+			SnowRoad = true,
+			EastLink = true,
+			SouthLink = true,
+			HillsCross = true,
+			SkyrootRoad = true,
+		}
+		local function nearest(x, z)
+			local best, bestD = nil, 1e9
+			for _, road in ipairs(WorldLayout.Roads) do
+				local d = WorldLayout.PolylineDistance(Vector2.new(x, z), road.points)
+				if d < bestD then
+					best, bestD = road, d
+				end
+			end
+			return best, bestD
+		end
+		local seen = {}
+		for _, road in ipairs(WorldLayout.Roads) do
+			if not mains[road.name] then
+				continue
+			end
+			seen[road.name] = 0
+			local pts = road.points
+			for i = 1, #pts - 1 do
+				local a, b = pts[i], pts[i + 1]
+				if (b - a).Magnitude < 40 then
+					continue
+				end
+				local mid = a:Lerp(b, 0.5)
+				local dir = (b - a).Unit
+				local side = Vector2.new(-dir.Y, dir.X)
+				for _, s in ipairs({ -1, 1 }) do
+					local q = mid + side * (17 * s)
+					if WorldLayout.InTownZone(q.X, q.Y) then
+						continue
+					end
+					-- A bend can put this normal inside the plan bed. Only a
+					-- point whose real centreline distance is the shoulder counts.
+					local centre = WorldLayout.PolylineDistance(Vector2.new(q.X, q.Y), road.points)
+					if centre < 16.2 or centre > 17.8 then
+						continue
+					end
+					local owner = nearest(q.X, q.Y)
+					if owner ~= road then
+						continue
+					end
+					seen[road.name] += 1
+					t.eq(
+						surface(q.X, q.Y),
+						"Ground",
+						string.format("%s offset 17 at (%.0f, %.0f) is %s", road.name, q.X, q.Y, surface(q.X, q.Y))
+					)
+				end
+			end
+		end
+		for name in pairs(mains) do
+			t.ok(seen[name] >= 1, name .. " was sampled outside town, got " .. tostring(seen[name]))
+		end
+	end)
 end

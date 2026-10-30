@@ -1066,9 +1066,10 @@ local function curbedStreet(name: string): boolean
 end
 
 -- Terrain material for a town road, lane, yard, lot or footpath, or nil
--- (grass). Curbed streets pave to PaveHalf and stay solid through BedHalf.
--- From BedHalf to BlendOuter the street breaks into grass, outward only.
--- Other pieces still feather the last FEATHER studs of their own footprint.
+-- (grass). Curbed streets pave solid through BedHalf. From BedHalf to
+-- BlendOuter the band is meadow grass (terrain Grass), outward only: the
+-- street material does not dither back into that band. Other pieces still
+-- feather the last FEATHER studs of their own footprint.
 function TownGround.MaterialAt(x: number, z: number): string?
 	if not WorldLayout.InTownZone(x, z) then
 		return nil
@@ -1088,18 +1089,11 @@ function TownGround.MaterialAt(x: number, z: number): string?
 		if mat and r >= rank then
 			if p.kind == "Road" and curbedStreet(p.name) and not WorldLayout.OnStorePad(x, z) then
 				local across = acrossOf(p, x, z)
-				if across and across <= TownGround.BlendOuter then
-					local keep = true
-					if across > TownGround.BedHalf then
-						local span = TownGround.BlendOuter - TownGround.BedHalf
-						local t = (across - TownGround.BedHalf) / span
-						local h = math.noise(x / 4.5, z / 4.5, 2.2) * 0.5 + 0.5
-						keep = h >= t
-					end
-					if keep then
-						best = mat
-						rank = r
-					end
+				if across and across <= TownGround.BlendOuter and r >= rank then
+					-- Meadow grass fills the outward band. The paving stays
+					-- the street material through the flat bed.
+					best = if across > TownGround.BedHalf then "Grass" else mat
+					rank = r
 				end
 			else
 				local inset = insetOf(p, x, z)
