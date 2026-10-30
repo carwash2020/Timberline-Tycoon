@@ -1,5 +1,21 @@
 # Phase 2+ build notes
 
+## T414d-1 shops (30 October 2026, branch `cursor/t414d-shops-living-world`)
+
+Nothing here has been seen in Studio. Cloud tests build the shops and measure the aisles. They do not walk.
+
+Studio checks:
+1. Walk in the Tool Shed, Hearth & Home and the Dealership doors. The center aisle is open, a honey shelf holds two pieces with cream tags, and one gold hero is lit warm.
+2. At the Coat Kiosk and Heat Boots booth the door is wide and the counter is at the back of the walk.
+3. Odds and Ends and the Secret Shop: the middle aisle is open and the counter is to the side.
+4. Land Office and Sparkworks look as they did. Chop a tree: the log still reaches the mill. Bushes, stumps and critters are unchanged (T414d-2).
+5. The shelf and counter meshes are still the part fallback until the upload below.
+
+Mesh upload (`ShopShelf` and `ShopCounter` attribute MeshId is 0; registry rows `shopfit/ShopShelf` and `shopfit/ShopCounter` stay planned):
+1. Model the honey shelf and the timber counter with its honey nosing. Keep each MeshPart under 20k triangles.
+2. Bulk Import them and paste the MeshPart ids into those two registry rows, and set `wiredBy` to `ShopFit`.
+3. New Play. Until then the part-built shelf and nosing are the look.
+
 ## T414a town ground (30 October 2026, branch `cursor/t414a-town-ground-1e4c`)
 
 Nothing here has been seen in Studio. Cloud tests paint the street and check that kerbs do not collide. They do not walk or drive. Outside town, the T413 TrailDirt shoulder (below) is unchanged.

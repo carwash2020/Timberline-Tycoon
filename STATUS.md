@@ -1,6 +1,13 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `1a9e158` (T413 fixes, #279).** This branch is T414a town ground (`cursor/t414a-town-ground-1e4c`), rebased onto that main. Outside town the graded TrailDirt shoulder stays. Inside town the streets are paint.
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `9b2a43f` (T414a town ground, #278).** This branch is T414d shops (`cursor/t414d-shops-living-world`).
+
+## T414d-1 shop aisles and seated stock (30 October 2026)
+
+The walk into every dressed shop is at least 8 studs wide and 6 long, and the door is at least 8 wide by 10 tall. A honey shelf (`ShopShelf`) holds two pieces of stock flush on the board, each with a cream tag and a gold price. One hero carries a warm light. The counter keeps its direct-child `Counter` part; `ShopCounter` is the honey nosing. Mesh ids stay 0.
+
+Dressed: Tool Shed, Hearth & Home, Dealership, Coat Kiosk, Heat Boots, Odds and Ends, Secret Shop. Land Office and Sparkworks were not touched. Hearth's 3.2-stud side gaps stay (pinned by `ShelfLayout`). The measured walk is the center run. Greenery, stumps, the living forest and critters are T414d-2. Shots: `preview/t414d/`. Studio checks: PHASE2_NOTES.md "T414d-1 shops". Nothing here has been seen in Studio. Cloud has no physics.
+
 
 ## T414a town ground (30 October 2026, branch `cursor/t414a-town-ground-1e4c`)
 

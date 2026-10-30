@@ -609,21 +609,23 @@ local SHOPS: { [string]: Shop } = {
 	-- Counter tops (y 3.6). Wide enough for a max shelf box (3.1) plus the
 	-- edge gap, and deep enough for its depth. One lane, so AisleGap stays 0
 	-- and the booth's own walk is the clearance.
+	-- The hook sits on the counter at the back of the booth, clear of the
+	-- 8-wide aisle from the door. One gear box, one row.
 	CoatKiosk = {
 		lanes = {
 			{
 				name = "Hook",
 				x0 = -2.2,
 				x1 = 2.2,
-				z0 = -4.0,
-				z1 = 1.2,
+				z0 = 2.32,
+				z1 = 5.92,
 				y = 3.6,
 				step = StoreStock.RowStep,
 				maxRise = 0.4,
 				kinds = { "Gear" },
 			},
 		},
-		zone = { center = Vector3.new(0, 3.6, -1.4), size = Vector3.new(8, 8, 8) },
+		zone = { center = Vector3.new(0, 3.6, 4.1), size = Vector3.new(8, 8, 8) },
 	},
 	HeatBoots = {
 		lanes = {
@@ -631,31 +633,32 @@ local SHOPS: { [string]: Shop } = {
 				name = "Hook",
 				x0 = -2.2,
 				x1 = 2.2,
-				z0 = -4.0,
-				z1 = 1.2,
+				z0 = 2.32,
+				z1 = 5.92,
 				y = 3.6,
 				step = StoreStock.RowStep,
 				maxRise = 0.4,
 				kinds = { "Gear" },
 			},
 		},
-		zone = { center = Vector3.new(0, 3.6, -1.4), size = Vector3.new(8, 8, 8) },
+		zone = { center = Vector3.new(0, 3.6, 4.1), size = Vector3.new(8, 8, 8) },
 	},
+	-- West of the centre aisle, on the side counter. Two boxes, one per row.
 	OddsAndEnds = {
 		lanes = {
 			{
 				name = "Counter",
-				x0 = -4.2,
-				x1 = 4.2,
-				z0 = -8.2,
-				z1 = -3.0,
+				x0 = 4.8,
+				x1 = 9.2,
+				z0 = -4.6,
+				z1 = 4.3,
 				y = 3.6,
 				step = StoreStock.RowStep,
 				maxRise = 0.4,
 				kinds = { "Gear", "Charge" },
 			},
 		},
-		zone = { center = Vector3.new(0, 3.6, -5.6), size = Vector3.new(12, 8, 10) },
+		zone = { center = Vector3.new(7, 3.6, -1), size = Vector3.new(8, 8, 10) },
 	},
 }
 

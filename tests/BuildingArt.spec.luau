@@ -297,7 +297,8 @@ return function(t)
 			-- shop is about 450 parts (the tier stands' flags, posts and chips are gone, the porch posts too); cap 400 to 460.
 			-- Dealership restyle (wooden tables, wall shelving, pictures, rugs, door frame, striped awning, the event room and its
 			-- banner, 55 parts with its tables): the whole hall is 408 parts; cap 400 to 420.
-			local budget = ({ ToolShed = 460, HearthAndHome = 460, Dealership = 420 })[shop.kind]
+			-- T414d adds the honey shelf, two seated items, their tags, the nosing and the hero (7 parts).
+			local budget = ({ ToolShed = 460, HearthAndHome = 460, Dealership = 430 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do

@@ -25,6 +25,8 @@ globalTypes.d.luau
 !/preview/t413/**
 !/preview/t414a/
 !/preview/t414a/**
+!/preview/t414d/
+!/preview/t414d/**
 __pycache__/
 tools/blender/__pycache__/
 globalTypes.d.luau.pin

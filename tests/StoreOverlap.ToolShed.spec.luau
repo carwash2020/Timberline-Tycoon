@@ -204,6 +204,11 @@ return function(t)
 	-- Part names that are the objects' own detail, tested through their group (a part with no family and no entry
 	-- above fails the guard). Handle and Knob and Frame are the axe models' and the shell's small fittings.
 	local DETAIL = {
+		ShelfBoard = "the honey shelf stock sits on",
+		ShopItem = "a piece of stock on that shelf",
+		ShelfPrice = "the cream price tag",
+		Hero = "the one warm display",
+		CounterNosing = "the honey edge on the counter",
 		Handle = "an axe haft or a drawer pull (AxeArt, the counter)",
 		Knob = "an axe model's knob",
 		Frame = "a sign's frame (the shell's name board)",

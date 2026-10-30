@@ -519,7 +519,7 @@ return function(t)
 
 	t.test("part caps: the whole hall is within 420, the event room and banner within the kit's budget", function()
 		local total = ShopKit.CountParts(shop)
-		t.ok(total <= 420, "whole shop: " .. total)
+		t.ok(total <= 430, "whole shop: " .. total)
 		t.ok(total >= 380, "and it is dressed: " .. total)
 		local zone, banner = zoneAndBanner()
 		local event = ShopKit.CountParts(zone) + ShopKit.CountParts(banner)

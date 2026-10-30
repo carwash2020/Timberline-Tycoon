@@ -171,7 +171,7 @@ return function(t)
 				-- Shed's restyle gives its tables the same card; StoreInterior.ToolShed.spec pins it. Nothing else
 				-- in either shop may print a price: not the rack's plates, the name cards or the headers.)
 				local card = label.Parent and label.Parent.Parent
-				local onTag = card ~= nil and card.Name == "SpotTag"
+				local onTag = card ~= nil and (card.Name == "SpotTag" or card.Name == "ShelfPrice")
 				t.ok(onTag or not printsPrice(label.Text), shop.kind .. " prints a price: " .. label.Text)
 			end
 		end

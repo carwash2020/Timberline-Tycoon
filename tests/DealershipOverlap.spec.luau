@@ -331,6 +331,12 @@ return function(t)
 		"ComingSoonBoardLeg",
 		"StanchionPost",
 		"StanchionRope",
+		-- T414d shop fit, seated on the counter, clear of the aisle
+		"ShelfBoard",
+		"ShopItem",
+		"ShelfPrice",
+		"Hero",
+		"CounterNosing",
 	}) do
 		LOOKS_ONLY[name] = true
 	end
