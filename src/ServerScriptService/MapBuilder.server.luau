@@ -91,6 +91,9 @@ local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local StoreBoard = require(ReplicatedStorage.Shared.StoreBoard)
 local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
+-- TownGround (not only the art) has to load before the terrain fill. The
+-- module registers TerrainGen.TownSurface; without it the streets stay grass.
+local TownGround = require(ReplicatedStorage.Shared.World.TownGround)
 local TownGroundArt = require(ReplicatedStorage.Shared.Art.TownGroundArt)
 local GroundLift = require(ReplicatedStorage.Shared.World.GroundLift)
 local MaterialSetup = require(script.Parent.MaterialSetup)
@@ -240,6 +243,13 @@ step("3. Ground materials", function()
 	task.spawn(ColorMapGuard.Run, materialService)
 end)
 step("3. Terrain", function()
+	-- TownGround is required above, so TerrainGen.TownSurface is registered
+	-- before this fill. Build is what times the paint plan. Reading the
+	-- paving width does not build the pieces: a town that fails to plan
+	-- must fail the town step, not the terrain step.
+	if TownGround.PaveHalf ~= 16 then
+		warn("[MapBuilder] town paving is not half-width 16")
+	end
 	local seconds, finish = TerrainBuilder.Build(function(done: number, total: number)
 		if done % 24 == 0 or done == total then
 			print(string.format("[MapBuilder] Terrain %d/%d", done, total))
@@ -1673,6 +1683,10 @@ end)
 local builtSeconds = os.clock() - started
 workspace:SetAttribute("MapBuildSeconds", builtSeconds)
 workspace:SetAttribute("MapTerrainSeconds", terrainSeconds)
+workspace:SetAttribute(
+	"TownGroundSeconds",
+	(TerrainBuilder.TownPlanSeconds or 0) + (TerrainBuilder.TownFillSeconds or 0)
+)
 workspace:SetAttribute("MapTrees", treesSpawned)
 workspace:SetAttribute("MapBuildFailures", failedSteps)
 

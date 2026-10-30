@@ -11,9 +11,11 @@ Player story: a new player spawns on the plaza, walks to Hearth & Home, then dri
 - Palette: roads `#A8A49C` Asphalt, town lanes and the lot `#9C958A` Cobblestone (terrain has no WoodPlanks), kerbs `#8C877E` Slate, footpaths `#8E6C4A` Ground, grass stays the terrain colours `#6E9F45` / `#5A8A3C`. No new `Color3.fromRGB`.
 - Foot paths are 8 wide. Drive widths stay Main 32 / Branch 24.
 
-## Graded bed stays 28
+## Graded bed stays 28 outside town
 
-`WorldLayout.PlanWidth` stays 28. Widening the grade changes haul height, the tree keep-out, scatter and roadside pins, which is the T413 gap (gravel off the flat grade, rocks into cabins). This PR does not paint past that bed. The drive width on `WorldLayout.Roads` stays 32 / 24.
+`WorldLayout.PlanWidth` stays 28. That bed is what the country stretch uses. Inside town the East Link and South Link are flat to half-width 16.3, paved to 16, with the kerb at 16.15 and a grass blend outward from 16.3 to 20.3. Widening the country grade still moves trees and puts rocks in cabins, so the plan bed did not move. The drive width on `WorldLayout.Roads` stays 32 / 24.
+
+Known gap: `TownGroundArt.KerbMeshId` is 0. The slate bar is the look until the mesh is uploaded.
 
 ## Specs written first (red, then left alone)
 

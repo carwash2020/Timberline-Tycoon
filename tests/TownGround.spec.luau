@@ -253,8 +253,12 @@ return function(t)
 								local q = c + normal * (side * lateral)
 								-- (past the zone's edge the country road is terrain again)
 								local m = if WorldLayout.InTownZone(q.X, q.Y) then surface(q.X, q.Y) else "Grass"
-								local onPaint =
-									TownGround.Covers(q.X, q.Y, { Road = true, Yard = true, Path = true }, 0)
+								local onPaint = TownGround.Covers(
+									q.X,
+									q.Y,
+									{ Road = true, Yard = true, Path = true },
+									0
+								) or TownGround.MaterialAt(q.X, q.Y) ~= nil
 								t.ok(
 									onPaint or (m ~= "Asphalt" and m ~= "Rock" and m ~= "Slate"),
 									string.format("%s: %s at (%.0f, %.0f) beside the %s", p.name, m, q.X, q.Y, p.kind)
@@ -719,7 +723,7 @@ return function(t)
 		"T414a: foot paths are 8 wide, kerbs are low stone and cannot snag, lanes and roads use the palette",
 		function()
 			t.eq(TownGround.PathWidth, 8)
-			local banned = { ["55585A"] = true, ["64B838"] = true, ["9C5E40"] = true }
+			local banned = { ["55585A"] = true, ["64B838"] = true, ["9C5E40"] = true, ["C8693E"] = true }
 			for _, p in ipairs(pieces) do
 				t.ok(not banned[pieceHex(p)], p.name .. " " .. pieceHex(p))
 				if p.kind == "Path" then
@@ -774,8 +778,10 @@ return function(t)
 				end
 			end
 			for _, p in ipairs(pieces) do
-				if p.name == "EastLink" or p.name == "SouthLink" then
-					t.eq(p.width, 28, p.name .. " paint stays on the graded bed")
+				if p.name == "EastLink" or p.name == "SouthLink" or string.find(p.name, "MainStreet", 1, true) then
+					if p.kind == "Road" then
+						t.eq(p.width, 32, p.name .. " paving is half-width 16")
+					end
 				end
 			end
 		end
@@ -789,7 +795,11 @@ return function(t)
 		local lot = WorldLayout.ParkingLot
 		t.eq(surface((lot.x0 + lot.x1) / 2, (lot.z0 + lot.z1) / 2), "Cobblestone", "lot")
 		t.eq(surface(160, 80), "Asphalt", "East Link on the bed")
-		t.ok(surface(160, 96) ~= "Asphalt", "16 studs off the East Link is past the 28-stud bed")
+		t.eq(surface(160, 96), "Asphalt", "inside town the paving reaches half-width 16")
+		-- The 28-stud bed stays on the country stretch. 16 studs off that
+		-- centreline is the TrailDirt shoulder, not town paint.
+		t.eq(surface(400, 80), "Asphalt", "East Link outside town, on the 28-stud bed")
+		t.eq(surface(400, 96), "Ground", "outside town, 16 studs off East Link is past the 28-stud bed")
 	end)
 
 	t.test("T414a: the ground model keeps the names other code reads, and only kerb parts are built", function()
@@ -868,5 +878,71 @@ return function(t)
 			end
 		end
 		t.ok(drives >= 1, "a plot driveway")
+	end)
+
+	t.test("T414a: the town bed is flat to 16.3, the kerb sits at 16.15, and grass blends outward only", function()
+		local function east(z)
+			return 160, z
+		end
+		local cx, cz = east(80)
+		local crown = ground(cx, cz)
+		local kerbZ = 80 + TownGround.KerbOffset
+		t.ok(
+			math.abs(ground(cx, kerbZ) - crown) <= 0.5,
+			string.format("kerb height %.3f, crown %.3f", ground(cx, kerbZ), crown)
+		)
+		t.ok(math.abs(ground(cx, 80 + TownGround.BedHalf) - crown) <= 0.5, "flat out to the bed")
+		t.eq(surface(cx, 80 + TownGround.PaveHalf), "Asphalt", "paving reaches 16")
+		t.eq(surface(cx, 80 + 12), "Asphalt", "no grass dither inside the paving")
+		-- Past the blend the country rules return. 22 is outside 20.3.
+		t.ok(surface(cx, 80 + 22) ~= "Asphalt", "the blend stops at 20.3")
+		local kerbs = 0
+		for _, p in ipairs(pieces) do
+			if p.kind == "Curb" and p.name == "EastLink curb" then
+				kerbs += 1
+				local mid = p.a:Lerp(p.b, 0.5)
+				t.ok(
+					math.abs(math.abs(mid.Y - 80) - TownGround.KerbOffset) < 0.05,
+					string.format("kerb at %.2f", mid.Y)
+				)
+				t.ok(math.abs(p.ya - (ground(p.a.X, p.a.Y) + 0.6)) < 1e-6, "Y is HeightAt at the kerb")
+				t.eq(p.material, "Slate")
+				t.eq(p.color:ToHex(), "8C877E")
+				t.ok(not p.collide)
+				t.eq(p.thick, 0.6)
+			end
+		end
+		t.ok(kerbs >= 1, "an East Link kerb")
+		local src = require("@lune/fs").readFile("src/ReplicatedStorage/Shared/World/TownGround.luau")
+		t.ok(string.find(src, "6 wide", 1, true) == nil, "the footpath comment says 8, not 6")
+		t.ok(string.find(src, "8 wide", 1, true) ~= nil, "the footpath comment says 8 wide")
+	end)
+
+	t.test("T414a: the live fill requires TownGround before it writes, and BootReport logs the fill", function()
+		local fs = require("@lune/fs")
+		local BootReport = t.server("BootReport")
+		local map = fs.readFile("src/ServerScriptService/MapBuilder.server.luau")
+		local fill = fs.readFile("src/ServerScriptService/TerrainBuilder.luau")
+		local function at(src, needle)
+			local i = string.find(src, needle, 1, true)
+			t.ok(i ~= nil, needle)
+			return i or 0
+		end
+		t.ok(
+			at(map, "require(ReplicatedStorage.Shared.World.TownGround)") < at(map, "TerrainBuilder.Build"),
+			"MapBuilder requires TownGround before the fill"
+		)
+		t.ok(
+			at(fill, 'require(game:GetService("ReplicatedStorage").Shared.World.TownGround)')
+				< at(fill, "function TerrainBuilder.PaintRoadShoulders"),
+			"TerrainBuilder requires TownGround before the shoulder fill"
+		)
+		local line = BootReport.Line({
+			GetAttribute = function(_, name)
+				local values = { MapBuildSeconds = 4, MapTerrainSeconds = 1, MapTrees = 10, TownGroundSeconds = 0.42 }
+				return values[name]
+			end,
+		}, 1)
+		t.ok(string.find(line, "town ground 0.4s", 1, true) ~= nil, line)
 	end)
 end

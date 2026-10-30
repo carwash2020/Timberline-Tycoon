@@ -1,5 +1,5 @@
--- T414a town ground. The plaza, the street and one kerb, on the real terrain.
--- Before: flat strips. After: terrain paint and a low stone kerb.
+-- T414a town ground, midday. The plaza, the street and one kerb, on the real terrain.
+-- Before: flat strips. After: cobble and asphalt paint, a slate kerb, dirt paths.
 
 local Common = require("./_common")
 
@@ -15,10 +15,10 @@ return {
 			shadowRadius = 160,
 			fov = 50,
 			cameras = {
-				{ pos = { 0, 220, 80 }, target = { 0, 0, 80 }, fov = 40, label = "spawn plaza, top down" },
-				{ pos = { 2, 5.5, 40 }, target = { 0, 1, 78 }, fov = 55, label = "street level, spawn walk" },
-				{ pos = { -80, 2.4, 54 }, target = { -80, 0.4, 63 }, fov = 40, label = "kerb close-up" },
-				{ pos = { 20, 260, 30 }, target = { 20, 0, 30 }, fov = 45, label = "overlap map, top down" },
+				{ pos = { 0, 220, 80 }, target = { 0, 0, 80 }, fov = 40, label = "midday plaza, top down" },
+				{ pos = { 2, 5.5, 40 }, target = { 0, 1, 78 }, fov = 55, label = "midday street, spawn walk" },
+				{ pos = { -70, 6, 42 }, target = { -80, 0.5, 57 }, fov = 35, label = "midday kerb" },
+				{ pos = { 20, 260, 30 }, target = { 20, 0, 30 }, fov = 45, label = "midday overlap" },
 			},
 		}
 	end,

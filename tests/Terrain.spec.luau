@@ -31,11 +31,15 @@ return function(t)
 	-- plan edge and the drive moves; past the drive the bank is the old one,
 	-- so the tree plan's ground does not. A declared flat keeps its floor.
 	-- Was sum 68286.279255775, wsum 163.574182878, sq 4493789.845065589.
+	-- T414a: inside town the East Link and South Link are flat out to 16.3
+	-- (the kerb). Outside town the 28-stud bed and the shoulder did not move.
+	-- Was sum 68269.253746528, wsum 166.084573852, sq 4493803.359696733.
+	-- lo and hi did not move.
 	local HEIGHT_FINGERPRINT = {
 		n = 7717,
-		sum = 68269.253746528193005,
-		wsum = 166.084573852010919,
-		sq = 4493803.359696732833982,
+		sum = 68269.264206512350938,
+		wsum = 166.073295312554478,
+		sq = 4493803.359328731894493,
 		lo = -41.562571590540983,
 		hi = 161.576039893993112,
 	}

@@ -22,6 +22,10 @@
 
 local WorldLayout = require(game:GetService("ReplicatedStorage").Shared.World.WorldLayout)
 local TerrainGen = require(game:GetService("ReplicatedStorage").Shared.World.TerrainGen)
+-- The fill paints town streets only when this module has run. It registers
+-- TerrainGen.TownSurface. Loading it here, before Build writes a voxel, is
+-- the live path.
+local TownGround = require(game:GetService("ReplicatedStorage").Shared.World.TownGround)
 local TerrainFit = require(game:GetService("ReplicatedStorage").Shared.World.TerrainFit)
 local UndergroundData = require(game:GetService("ReplicatedStorage").Shared.World.UndergroundData)
 local NearFirst = require(game:GetService("ReplicatedStorage").Shared.NearFirst)
@@ -33,6 +37,10 @@ local VOXEL = 4
 local CHUNK = 64 -- voxel columns per chunk side
 local CRUST = 8 -- 32 studs of solid ground under the surface
 TerrainBuilder.Crust = CRUST
+-- Seconds to build the town paint plan, and seconds in the country shoulder fill.
+-- MapBuilder adds them into TownGroundSeconds for the boot line.
+TerrainBuilder.TownPlanSeconds = 0
+TerrainBuilder.TownFillSeconds = 0
 -- How many voxels at the top of a column take the surface material (T402:
 -- 3, was 2; a thicker top layer keeps the grass colour where the ground
 -- slopes and the under-layer would otherwise blend up through it).
@@ -559,6 +567,14 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 	local clock = (options and options.clock) or os.clock
 	local started = clock()
 	table.clear(TerrainBuilder.StepTimes)
+	TerrainBuilder.TownFillSeconds = 0
+	local planStarted = clock()
+	-- Builds the street pieces and leaves the paint hook on before any voxel.
+	local street = TownGround.MaterialAt(-60, 73)
+	TerrainBuilder.TownPlanSeconds = clock() - planStarted
+	if street == nil then
+		warn("[TerrainBuilder] MainStreet has no town paint")
+	end
 	local terrain = workspace.Terrain
 	setLook(terrain)
 	if terrain:GetAttribute("Prebuilt") == true then
@@ -730,10 +746,53 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?, options: Op
 	return nearSeconds, finish
 end
 
+-- Parameter spans of a segment that sit outside the town rectangle.
+-- An empty list means the whole segment is inside town (no country fill).
+local function outsideTown(ax: number, az: number, bx: number, bz: number): { { number } }
+	local zone = WorldLayout.TownZone
+	local dx, dz = bx - ax, bz - az
+	local t0, t1 = 0, 1
+	local function clip(p: number, q: number): boolean
+		if p == 0 then
+			return q >= 0
+		end
+		local r = q / p
+		if p < 0 then
+			if r > t1 then
+				return false
+			end
+			t0 = math.max(t0, r)
+		else
+			if r < t0 then
+				return false
+			end
+			t1 = math.min(t1, r)
+		end
+		return true
+	end
+	local hits = clip(-dx, ax - zone.x0)
+		and clip(dx, zone.x1 - ax)
+		and clip(-dz, az - zone.z0)
+		and clip(dz, zone.z1 - az)
+	if not hits or t1 - t0 < 1e-4 then
+		return { { 0, 1 } }
+	end
+	local spans: { { number } } = {}
+	if t0 > 0.002 then
+		table.insert(spans, { 0, t0 })
+	end
+	if t1 < 0.998 then
+		table.insert(spans, { t1, 1 })
+	end
+	return spans
+end
+
 -- Mains: a Ground band (TrailDirt) half-width 18, then the gravel bed
 -- half-width 14 on top. Voxels are 4 studs, so 14 to 18 is one straight
--- voxel of dirt. The grade itself stays at DriveHalf (16).
+-- voxel of dirt. The grade itself stays at DriveHalf (16). The stretch
+-- inside town is left to TownGround paint: this fill does not run there.
 function TerrainBuilder.PaintRoadShoulders(terrain: Terrain)
+	local started = os.clock()
 	local ground = material("Ground")
 	local gravel = material(TerrainGen.GravelMaterial)
 	for _, road in ipairs(WorldLayout.Roads) do
@@ -750,20 +809,35 @@ function TerrainBuilder.PaintRoadShoulders(terrain: Terrain)
 			if len < 1 then
 				continue
 			end
-			local mx, mz = (a.X + b.X) / 2, (a.Y + b.Y) / 2
-			local y = TerrainGen.HeightAt(mx, mz)
-			local yaw = math.atan2(dx, dz)
-			local cf = CFrame.new(mx, y, mz) * CFrame.Angles(0, yaw, 0)
-			local function fill(width: number, mat: Enum.Material)
-				pcall(function()
-					-- A stud of overlap at the joints, so the voxel band does not gap.
-					terrain:FillBlock(cf, Vector3.new(width, 4, len + 4), mat)
-				end)
+			for _, span in ipairs(outsideTown(a.X, a.Y, b.X, b.Y)) do
+				local tA, tB = span[1], span[2]
+				local pax, paz = a.X + dx * tA, a.Y + dz * tA
+				local pbx, pbz = a.X + dx * tB, a.Y + dz * tB
+				local spanLen = math.sqrt((pbx - pax) ^ 2 + (pbz - paz) ^ 2)
+				if spanLen >= 1 then
+					local extra = 0
+					if tA <= 1e-6 then
+						extra += 2
+					end
+					if tB >= 1 - 1e-6 then
+						extra += 2
+					end
+					local mx, mz = (pax + pbx) / 2, (paz + pbz) / 2
+					local y = TerrainGen.HeightAt(mx, mz)
+					local yaw = math.atan2(pbx - pax, pbz - paz)
+					local cf = CFrame.new(mx, y, mz) * CFrame.Angles(0, yaw, 0)
+					local function fill(width: number, mat: Enum.Material)
+						pcall(function()
+							terrain:FillBlock(cf, Vector3.new(width, 4, spanLen + extra), mat)
+						end)
+					end
+					fill(dirtHalf * 2, ground)
+					fill(planHalf * 2, gravel)
+				end
 			end
-			fill(dirtHalf * 2, ground)
-			fill(planHalf * 2, gravel)
 		end
 	end
+	TerrainBuilder.TownFillSeconds = (TerrainBuilder.TownFillSeconds or 0) + (os.clock() - started)
 end
 
 -- Second pass: air out the caves, the passages and the truck tunnel.

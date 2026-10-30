@@ -296,6 +296,17 @@ function WorldLayout.DirtHalf(road: Road): number
 	return WorldLayout.PlanWidth(road) / 2
 end
 
+-- T414a town streets, half-widths from the centreline. Inside the town zone
+-- the East Link and the South Link stay flat out to TownBedHalf, so the
+-- paving and the kerb sit on one plane. Grass blends outward from that bed
+-- to TownBlendOuter. PlanWidth stays 28 on every road, including these two
+-- once they leave town.
+WorldLayout.TownPaveHalf = 16
+WorldLayout.TownBedHalf = 16.3
+WorldLayout.TownKerbOffset = 16.15
+WorldLayout.TownBlendOuter = 20.3
+WorldLayout.TownBedRoads = { EastLink = true, SouthLink = true } :: { [string]: boolean }
+
 -- Flared turns where a haul road splits, wide enough for the Logging Rig.
 -- Discs, not extra roads: a short segment would fail the "runs through the
 -- country" sample. TerrainGen paints and grades them with the haul roads.
@@ -769,6 +780,17 @@ local function storePadZones(): { FlatZone }
 	return zones
 end
 WorldLayout.StorePads = storePadZones()
+
+-- True on a shop floor, the lot, or a loading pad. The town street's wider
+-- bed must not lift these: they stay at y = 0.
+function WorldLayout.OnStorePad(x: number, z: number): boolean
+	for _, zone in ipairs(WorldLayout.StorePads) do
+		if x >= zone.x0 and x <= zone.x1 and z >= zone.z0 and z <= zone.z1 then
+			return true
+		end
+	end
+	return false
+end
 -- T412 shop pads. Added after StorePads so they do not flatten HeightAt
 -- (that would move the tree plan). The old town SparkworksFloor stays.
 local ShopPins = require(script.Parent.ShopPins)
