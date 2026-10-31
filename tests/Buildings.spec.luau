@@ -310,7 +310,7 @@ return function(t)
 				-- front wall (outside the opening, below the header), back wall, both side walls
 				local x = -c.hx + 0.3
 				while x < c.hx - 0.3 do
-					if not (math.abs(x) < c.door and y < 10.3) then
+					if not (math.abs(x) < c.door and y < 10.6) then
 						if not covered(x, y, c.front) then
 							gaps += 1
 						end
