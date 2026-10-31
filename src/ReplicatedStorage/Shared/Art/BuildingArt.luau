@@ -4062,7 +4062,17 @@ function BuildingArt.Sparkworks(): Model
 	local glow = dBox(model, "GlowStrip", V3(4, 0.12, 0.1), CF(0, 8.2, 5.55), lantern, MAT.Glass)
 	glow.CastShadow = false
 	light(glow, 12, 1, lantern)
-	local board = Kit.part(model, "DemoBoard", V3(6, 4, 0.2), CF(0, 5, 5.5), Palette.SignInk, MAT.SmoothPlastic)
+	local board = Kit.part(model, "DemoBoard", V3(6, 4, 0.2), CF(0, 5, 5.5), Palette.TimberBrown, MAT.WoodPlanks)
+	-- A brass frame round the board, lit by two small lantern lights.
+	for _, y in ipairs({ 2.85, 7.15 }) do
+		dBox(model, "DemoFrame", V3(6.6, 0.3, 0.3), CF(0, y, 5.42), Palette.Brass, MAT.Metal)
+	end
+	for _, x in ipairs({ -3.15, 3.15 }) do
+		dBox(model, "DemoFrame", V3(0.3, 4.6, 0.3), CF(x, 5, 5.42), Palette.Brass, MAT.Metal)
+	end
+	for _, x in ipairs({ -2.2, 2.2 }) do
+		light(dBox(model, "DemoLamp", V3(0.4, 0.4, 0.4), CF(x, 7.7, 5.0), lantern, MAT.Glass), 10, 1, lantern)
+	end
 	board.CanCollide = false
 	board.CanQuery = false
 	board.CanTouch = false

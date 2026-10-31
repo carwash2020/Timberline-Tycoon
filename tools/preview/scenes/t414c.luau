@@ -19,22 +19,6 @@ return {
 		end
 		place(BuildingArt.LandOffice(), 0)
 		place(BuildingArt.Sparkworks(), 40)
-		-- The door clearance overlay: the 8 wide x 10 tall opening and a 6 deep apron.
-		local function overlay(x, frontZ, floorY)
-			local box = Kit.part(
-				root,
-				"DoorOverlay",
-				V3.new(8, 10, 6),
-				CF.new(x, floorY + 5, frontZ - 3),
-				C3.fromRGB(60, 200, 90),
-				roblox.Enum.Material.SmoothPlastic
-			)
-			box.Transparency = 0.55
-			Kit.decor(box, false)
-		end
-		overlay(0, -7, 0.4)
-		overlay(40, -6, 0.5)
-
 		return {
 			root = root,
 			shadowRadius = 90,
@@ -45,10 +29,9 @@ return {
 				{ pos = { 0, 70, 1 }, target = { 0, 0, 0 }, fov = 40, label = "Land Office top down" },
 				{ pos = { 0, 5.5, -30 }, target = { 0, 5, 0 }, fov = 45, label = "Land Office eye level" },
 				{ pos = { 20, 10, -22 }, target = { 40, 5, 0 }, label = "Sparkworks front 3/4" },
-				{ pos = { 40, 4, 2 }, target = { 40, 4.5, 14 }, fov = 70, label = "Sparkworks inside" },
+				{ pos = { 41, 6, -4 }, target = { 40, 5, 14 }, fov = 75, label = "Sparkworks inside" },
 				{ pos = { 40, 70, 1 }, target = { 40, 0, 0 }, fov = 40, label = "Sparkworks top down" },
 				{ pos = { 40, 5.5, -28 }, target = { 40, 5, 0 }, fov = 45, label = "Sparkworks eye level" },
-				{ pos = { 20, 16, -34 }, target = { 20, 4, 0 }, fov = 55, label = "door clearance overlay, both" },
 				{ pos = { 20, 1.5, -46 }, target = { 20, 16, 0 }, fov = 60, label = "silhouette against sky" },
 			},
 		}
