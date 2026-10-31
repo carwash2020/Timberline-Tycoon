@@ -23,14 +23,6 @@ NodeArt.Height = 4.5
 NodeArt.Veins = { "Amber", "Garnet" }
 NodeArt.VeinHex = { Amber = "#D98A1E", Garnet = "#7A2038" } -- ore hex (style guide 15)
 
-local function orient(at: Vector3, normal: Vector3): CFrame
-	-- A part whose Y runs along the surface and up the boulder, X across it.
-	local up = if math.abs(normal.Y) > 0.9 then Vector3.xAxis else Vector3.yAxis
-	local side = up:Cross(normal).Unit
-	local along = normal:Cross(side).Unit
-	return CFrame.fromMatrix(at, side, along, normal)
-end
-
 -- A vein on the ellipsoid (centre `c`, radii `r`): a chain of four short ore bars laid up the skin
 -- from yaw `theta` and elevation `phi`, wandering a little, half sunk, so it reads as a seam of ore
 -- running through the stone and not as one stuck-on disc.
