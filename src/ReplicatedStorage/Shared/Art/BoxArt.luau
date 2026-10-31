@@ -1,37 +1,39 @@
 --!strict
--- BoxArt: the look of a shop box, after Lumber Tycoon 2: a dark, near-black
--- solid box with a big glass window on its front and top, and the REAL item
--- seen through it. Pure code (Instance.new and datatypes only), so the game
--- and the previews build the same box.
+-- BoxArt: the look of a shop box: a taped kraft cardboard box (T414e; it was a
+-- dark box with glass windows after Lumber Tycoon 2). Pure code (Instance.new
+-- and datatypes only), so the game and the previews build the same box.
 --
 -- The box (front faces -Z), in at most BoxLogic.BoxPartCap parts:
 --   Box         the body BoxService makes: the collision, the hover and
 --               grab target, the carried assembly. Invisible (Transparency 1):
---               the dark walls below are what you see, so the window can show
---               what is inside.
+--               the cardboard below is what you see
 --   Base        the floor, in the item's ACCENT colour, a hair wider than the
 --               box all round (the coloured edge), with the tier line on its
 --               front when the item has tiers (a sawmill, a planer)
---   Back, Left, Right   the dark charcoal walls
---   Window      the glass on the front, and WindowTop the glass on the top
---               (Material Glass, see-through, collides like the box)
---   SideWindow  a third window on the side that faces the aisle, in place of
+--   Back, Left, Right   the walls: KraftTan Cardboard
+--   Window      the front face and WindowTop the lid, KraftTan Cardboard
+--               (the names are the old window names: BoxArt.Open, BoxWindows
+--               and the specs find them), solid, collide like the box
+--   SideWindow  a kraft panel on the side that faces the aisle, in place of
 --               that side's wall, when the box stands on a shelf
---   Strip       the name band across the top of the front, in the accent
---               colour
+--   Tape        a SignCream strip along the lid
+--   Strip       the name label across the top of the front: a SignCream
+--               label in SignInk print (the accent band in the wood look)
 --   PriceTag    the cream plate under the strip, opposite the brass plate,
 --               printing the item's real price (Spec.price, the one the shop
 --               charges) in a SurfaceGui. The server builds the text; the
 --               client recolours it per player (CoinGold or StopRed, the
 --               client's BoxPriceState). The hover tag still shows it too.
 --   Contents    a Model of the item itself, scaled to fit with a margin
---               (ItemModel: low-detail copy, at most ModelBudget parts)
+--               (ItemModel: low-detail copy, at most ModelBudget parts). It
+--               stands inside the closed cardboard, out of sight, until the
+--               box is opened.
 -- Everything but the body is welded to it, never more massive than the box
--- (Massless), and only the walls and windows can be touched; the contents
+-- (Massless), and only the walls and faces can be touched; the contents
 -- are decor that collides with nothing, answers no raycast and weighs
 -- nothing, so a carried, dropped or loaded box behaves exactly as before.
--- No two visible faces share a plane: the windows stand WindowProud off the
--- walls and the box.
+-- No two visible faces share a plane: the faces stand `proud` off the walls
+-- and the box, the tape stands `proud` over the lid.
 
 local BoxLook = require(script.Parent.Parent.BoxLook)
 local BoxSize = require(script.Parent.Parent.BoxSize)
@@ -79,14 +81,13 @@ BoxArt.DefaultCategory = BoxLook.Default
 BoxArt.Layout = {
 	wall = 0.18, -- thickness of the dark walls
 	edge = 0.1, -- the base's flange past the box: the accent band, all round
-	pane = 0.05, -- thickness of a glass pane
-	proud = 0.03, -- how far a window stands off the walls (and the box): no coplanar faces
+	pane = 0.05, -- thickness of a face panel
+	proud = 0.03, -- how far a face stands off the walls (and the box), and the tape off the lid: no coplanar faces
 	stripH = 0.5, -- height of the name strip (it sits in the top margin)
 	stripProud = 0.1, -- the accent band, 0.1 deep off the front
 	tierH = 0.3, -- height of the tier line on the base's front
-	glassTransparency = 0.5,
-	glassColor = Color3.fromRGB(150, 192, 212),
-	rim = 0.1, -- the charcoal bars round the top edge, and the aisle pane's upright
+	tape = 0.18, -- the tape's width, as a share of the box's width (at most this)
+	tapeMax = 1.1, -- ...and never wider than this, in studs
 	tag = Vector3.new(1.2, 0.6, 0.05), -- the price tag plate, under the strip, opposite the brass plate
 	tagInset = 0.15, -- from the right edge of the box
 	tagMinText = 8, -- the price's smallest text size, in pixels, so it stays legible
@@ -123,17 +124,16 @@ local function plate(
 	return p
 end
 
--- Glass: collides like the box (so it cannot be walked through), can be aimed
--- at and grabbed through, never touched.
-local function glassify(p: Part)
-	p.Material = Enum.Material.Glass
-	p.Color = BoxArt.Layout.glassColor
-	p.Transparency = BoxArt.Layout.glassTransparency
+-- A kraft face: collides like the box (so it cannot be walked through), can
+-- be aimed at and grabbed, never touched.
+local function kraft(p: Part)
+	p.Material = Enum.Material.Cardboard
+	p.Color = Palette.KraftTan
+	p.Transparency = 0
 	p.Reflectance = 0
 	p.CanCollide = true
 	p.CanQuery = true
 	p.CanTouch = false
-	p.CastShadow = false
 end
 
 local function write(part: BasePart, face: Enum.NormalId, text: string, ink: Color3, font: Enum.Font)
@@ -226,8 +226,8 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	if spec.itemId == nil and not gold and not BoxLook.Known(spec.kind) and spec.color then
 		accent = spec.color
 	end
-	local wallColor = if gold then BoxLook.CharcoalGold else BoxLook.Charcoal
-	local ink = BoxLook.InkOn(accent)
+	local wallColor = Palette.KraftTan
+	local ink = BoxLook.InkOn(accent) -- the tier line, on the accent foot
 	local t, floor = L.wall, BoxSize.Floor
 	local wood = spec.wood == true
 	local stripH = if wood then BoxArt.Wood.stripH else L.stripH
@@ -271,7 +271,7 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 					Vector3.new(t, wallH, D),
 					Vector3.new(sign * (W / 2 - t / 2), wallY, 0),
 					wallColor,
-					Enum.Material.SmoothPlastic
+					Enum.Material.Cardboard
 				)
 			)
 		end
@@ -284,12 +284,12 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 			Vector3.new(W - 2 * t, wallH, t),
 			Vector3.new(0, wallY, D / 2 - t / 2),
 			wallColor,
-			Enum.Material.SmoothPlastic
+			Enum.Material.Cardboard
 		)
 	)
 
-	-- The front window: between the walls, from the floor to the name strip,
-	-- its inner face proud of the walls' front edge by `proud`.
+	-- The front face: between the walls, from the floor to the name strip,
+	-- its outer face proud of the walls' front edge by `proud`.
 	local openW = W - 2 * t
 	local frontH = wallH - stripH
 	local frontY = -H / 2 + floor + frontH / 2
@@ -304,15 +304,14 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 				frontY,
 				-(D / 2 + L.proud + L.pane / 2)
 			),
-			BoxLook.Light,
-			Enum.Material.Glass
+			wallColor,
+			Enum.Material.Cardboard
 		)
 	)
-	glassify(front)
+	kraft(front)
 
-	-- The top window: over the whole opening, from the front edge to the back wall. On the
-	-- aisle side it stops at the rim bar that stands on that edge.
-	local topW = if windowSide == nil then openW else W - t - L.rim
+	-- The lid: over the whole opening, from the front edge to the back wall.
+	local topW = if windowSide == nil then openW else W - t
 	local top = add(
 		plate(
 			parent,
@@ -320,15 +319,27 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 			"WindowTop",
 			Vector3.new(topW, L.pane, D - t),
 			Vector3.new(
-				if windowSide == "Left" then -(t - L.rim) / 2 elseif windowSide == "Right" then (t - L.rim) / 2 else 0,
+				if windowSide == "Left" then -t / 2 elseif windowSide == "Right" then t / 2 else 0,
 				H / 2 + L.proud + L.pane / 2,
 				-t / 2
 			),
-			BoxLook.Light,
-			Enum.Material.Glass
+			wallColor,
+			Enum.Material.Cardboard
 		)
 	)
-	glassify(top)
+	kraft(top)
+	-- The tape: a cream strip along the lid, front to back.
+	add(
+		plate(
+			parent,
+			body,
+			"Tape",
+			Vector3.new(math.min(W * L.tape, L.tapeMax), L.pane / 2, D - t),
+			Vector3.new(0, H / 2 + L.proud + L.pane + L.proud + L.pane / 4, -t / 2),
+			Palette.SignCream,
+			Enum.Material.SmoothPlastic
+		)
+	)
 
 	if windowSide == "Left" or windowSide == "Right" then
 		local sign = if windowSide == "Right" then 1 else -1
@@ -339,11 +350,11 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 				"SideWindow",
 				Vector3.new(L.pane, frontH, D - t),
 				Vector3.new(sign * (W / 2 + L.proud + L.pane / 2), frontY, -t / 2),
-				BoxLook.Light,
-				Enum.Material.Glass
+				wallColor,
+				Enum.Material.Cardboard
 			)
 		)
-		glassify(side)
+		kraft(side)
 	end
 
 	-- The name strip: the accent band across the top of the front.
@@ -354,11 +365,17 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 			"Strip",
 			Vector3.new(if wood then W * BoxArt.Wood.cardShare else W, stripH, L.stripProud),
 			Vector3.new(0, H / 2 - stripH / 2, -(D / 2 + L.stripProud / 2)),
-			if wood then (spec.cardColor or BoxArt.Wood.card) else accent,
+			if wood then (spec.cardColor or BoxArt.Wood.card) else Palette.SignCream,
 			if wood then Enum.Material.Wood else Enum.Material.SmoothPlastic
 		)
 	)
-	write(strip, Enum.NormalId.Front, spec.name, if wood then BoxArt.Wood.ink else ink, Enum.Font.FredokaOne)
+	write(
+		strip,
+		Enum.NormalId.Front,
+		spec.name,
+		if wood then BoxArt.Wood.ink else Palette.SignInk,
+		Enum.Font.FredokaOne
+	)
 
 	-- A brass plate under the name band, on the left. It used to sit on
 	-- the band and covered the name.
@@ -398,42 +415,6 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	)
 	if spec.price ~= nil then
 		printPrice(priceTag, spec.price)
-	end
-
-	-- The rim: four 0.1 charcoal bars round the top edge, each standing on a wall, so the
-	-- glass top reads as a closed lid from above (the bare glass read as a gap).
-	local r = L.rim
-	local bars: { { name: string, size: Vector3, at: Vector3 } } = {
-		{ name = "RimFront", size = Vector3.new(W, r, r), at = Vector3.new(0, H / 2 + r / 2, -(D / 2 + r / 2)) },
-		{ name = "RimBack", size = Vector3.new(W, r, r), at = Vector3.new(0, H / 2 + r / 2, D / 2 - r / 2) },
-		{
-			name = "RimLeft",
-			size = Vector3.new(r, r, D - 2 * r),
-			at = Vector3.new(-(W / 2 - r / 2), H / 2 + r / 2, 0),
-		},
-		{
-			name = "RimRight",
-			size = Vector3.new(r, r, D - 2 * r),
-			at = Vector3.new(W / 2 - r / 2, H / 2 + r / 2, 0),
-		},
-	}
-	for _, bar in ipairs(bars) do
-		add(plate(parent, body, bar.name, bar.size, bar.at, wallColor, Enum.Material.SmoothPlastic))
-	end
-	-- And one upright bar on the front corner of the aisle pane, the pane's only edge.
-	if windowSide == "Left" or windowSide == "Right" then
-		local sign = if windowSide == "Right" then 1 else -1
-		add(
-			plate(
-				parent,
-				body,
-				"SideEdge",
-				Vector3.new(r, frontH, r),
-				Vector3.new(sign * (W / 2 + r / 2), frontY, -(D / 2 + r / 2)),
-				wallColor,
-				Enum.Material.SmoothPlastic
-			)
-		)
 	end
 
 	-- The item itself, scaled to fit with the margin, standing on the floor.
@@ -507,7 +488,7 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { BasePart 
 	return added
 end
 
--- Opens a box: its item and its windows are gone, the dark walls, floor and
+-- Opens a box: its item, faces and tape are gone, the walls, floor and
 -- strip stay (an open box). Safe to call twice. The body stays too, so the
 -- box still collides, is still aimed at and carried.
 function BoxArt.Open(model: Instance)
@@ -515,7 +496,7 @@ function BoxArt.Open(model: Instance)
 	if contents then
 		contents:Destroy()
 	end
-	for _, name in ipairs({ "Window", "WindowTop", "SideWindow" }) do
+	for _, name in ipairs({ "Window", "WindowTop", "SideWindow", "Tape" }) do
 		local window = model:FindFirstChild(name)
 		if window then
 			window:Destroy()

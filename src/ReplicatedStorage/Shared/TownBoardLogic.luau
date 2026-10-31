@@ -43,7 +43,7 @@ TownBoardLogic.PlaqueSize = Vector3.new(14.6, 1.2, 0.3)
 TownBoardLogic.PlaqueY = 1.0 -- plaque centre over the ground
 TownBoardLogic.PostOver = 0.5 -- posts stand this far over the frame's top
 TownBoardLogic.PostSink = 1.0 -- and this far into the ground
-TownBoardLogic.PartCap = 12
+TownBoardLogic.PartCap = 14 -- T414e: four brass corners on the frame
 TownBoardLogic.MaxDistance = 120 -- SurfaceGui.MaxDistance, studs
 
 -- The face's pixels: 100 per stud.

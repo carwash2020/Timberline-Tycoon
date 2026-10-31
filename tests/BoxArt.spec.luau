@@ -52,11 +52,7 @@ return function(t)
 		Strip = true,
 		Logo = true,
 		PriceTag = true,
-		RimFront = true,
-		RimBack = true,
-		RimLeft = true,
-		RimRight = true,
-		SideEdge = true,
+		Tape = true,
 	}
 
 	local function luma(c)
@@ -64,14 +60,14 @@ return function(t)
 	end
 
 	t.test(
-		"a box is a dark body, a floor, walls, front and top windows and a name strip, with the item inside",
+		"a box is a cardboard body: a floor, walls, front and top faces, tape and a name label, with the item inside",
 		function()
 			local model = dressed("Axe", "CobaltAxe", { name = "Cobalt Axe" })
 			local names = {}
 			for _, p in ipairs(parts(model)) do
 				names[p.Name] = (names[p.Name] or 0) + 1
 			end
-			for _, n in ipairs({ "Box", "Base", "Left", "Right", "Back", "Window", "WindowTop", "Strip" }) do
+			for _, n in ipairs({ "Box", "Base", "Left", "Right", "Back", "Window", "WindowTop", "Strip", "Tape" }) do
 				t.ok(names[n] == 1, n)
 			end
 			t.eq(names.SideWindow, nil, "no side window unless a side faces an aisle")
@@ -93,58 +89,82 @@ return function(t)
 	)
 
 	t.test(
-		"the body is near-black, the edge and the name strip are the accent, the box itself is see-through",
+		"T414e: the box is kraft cardboard: KraftTan walls, SignCream tape, SignInk print, the accent on the foot",
 		function()
+			local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
 			local model, body = dressed("Sawmill", "Millmaster100", { name = "Millmaster 100" })
-			t.eq(body.Transparency, 1, "the collider is invisible: the walls and windows are what you see")
-			for _, n in ipairs({ "Left", "Right", "Back" }) do
+			t.eq(body.Transparency, 1, "the collider is invisible: the cardboard is what you see")
+			for _, n in ipairs({ "Left", "Right", "Back", "Window", "WindowTop" }) do
 				local wall = model:FindFirstChild(n)
-				t.ok(luma(wall.Color) < 0.2, n .. " is near-black")
+				t.eq(wall.Color, Palette.KraftTan, n .. " is kraft")
+				t.eq(wall.Material, Enum.Material.Cardboard, n .. " is cardboard")
 				t.eq(wall.Transparency, 0, n .. " is solid")
 			end
+			local tape = model:FindFirstChild("Tape")
+			t.eq(tape.Color, Palette.SignCream, "the tape")
+			t.eq(tape.CanCollide, false)
+			local weld = tape:FindFirstChildWhichIsA("WeldConstraint")
+			t.ok(weld and weld.Part0 == body and weld.Part1 == tape, "taped on: welded to the body")
+			local strip = model:FindFirstChild("Strip")
+			t.eq(strip.Color, Palette.SignCream, "the name is on a cream label")
+			local gui = strip:FindFirstChildWhichIsA("SurfaceGui")
+			t.eq(gui:FindFirstChildWhichIsA("TextLabel").TextColor3, Palette.SignInk, "in SignInk print")
 			local accent = BoxLook.Accent("Sawmill", "Millmaster100")
-			t.eq(model:FindFirstChild("Strip").Color, accent, "the name strip is the sawmill accent")
-			t.eq(model:FindFirstChild("Base").Color, accent, "and so is the edge round the foot")
-			t.ok(model:FindFirstChild("Base").Size.X > body.Size.X, "a hair wider than the box: a coloured edge")
-			-- Text is readable on the band.
-			local gui = model:FindFirstChild("Strip"):FindFirstChildWhichIsA("SurfaceGui")
-			local ink = gui:FindFirstChildWhichIsA("TextLabel").TextColor3
-			t.ok(math.abs(luma(ink) - luma(accent)) > 0.35, "the name reads on the band")
+			t.eq(model:FindFirstChild("Base").Color, accent, "the edge round the foot is still the item's accent")
+			t.ok(model:FindFirstChild("Base").Size.X > body.Size.X, "a hair wider than the box")
 		end
 	)
 
-	t.test(
-		"the windows are glass that collides like the box, stand off the walls, and sit on the front and the top",
-		function()
-			local model, body = dressed("Truck", "Pickup", { name = "Pickup" })
-			local size = body.Size
-			for _, n in ipairs({ "Window", "WindowTop" }) do
-				local w = model:FindFirstChild(n)
-				t.eq(w.Material, Enum.Material.Glass, n .. " is Glass")
-				t.ok(w.Transparency >= 0.4 and w.Transparency <= 0.5, n .. " is see-through, " .. w.Transparency)
-				t.eq(w.CanCollide, body.CanCollide, n .. " collides as the box does")
-				t.eq(w.CanQuery, true, n .. " can be aimed at and grabbed through")
-				t.eq(w.CanTouch, false)
-				t.eq(w.Massless, true)
-				local weld = w:FindFirstChildWhichIsA("WeldConstraint")
-				t.ok(weld and weld.Part0 == body and weld.Part1 == w, n .. " welded to the body")
+	t.test("T414e: no Glass, ForceField or Neon on any box, and nothing see-through but the collider", function()
+		local cases = {
+			{ "Axe", "SteelAxe", nil },
+			{ "Sawmill", "Millmaster200L", "Right" },
+			{ "Truck", "Rustbucket", "Left" },
+			{ "Gear", "Lantern", nil },
+			{ "Machine", "ChopSaw", nil },
+		}
+		for _, case in ipairs(cases) do
+			local model, body = dressed(case[1], case[2], { side = case[3], price = 120 })
+			for _, p in ipairs(parts(model)) do
+				if p ~= body and p.Parent == model then
+					t.ok(p.Material ~= Enum.Material.Glass, case[2] .. " " .. p.Name .. " is not glass")
+					t.ok(p.Material ~= Enum.Material.ForceField, case[2] .. " " .. p.Name .. " is not a forcefield")
+					t.ok(p.Material ~= Enum.Material.Neon, case[2] .. " " .. p.Name .. " is not neon")
+					t.eq(p.Transparency, 0, case[2] .. " " .. p.Name .. " is opaque")
+				end
 			end
-			local front = model:FindFirstChild("Window")
-			local rel = body.CFrame:PointToObjectSpace(front.CFrame.Position)
-			t.ok(
-				-rel.Z - front.Size.Z / 2 - size.Z / 2 >= 0.03 - 1e-4,
-				"the front window stands 0.03 stud or more off the box"
-			)
-			t.ok(front.Size.X > size.X * 0.8 and front.Size.Y > size.Y * 0.6, "and is a large window")
-			local top = model:FindFirstChild("WindowTop")
-			local up = body.CFrame:PointToObjectSpace(top.CFrame.Position)
-			t.ok(
-				up.Y - top.Size.Y / 2 - size.Y / 2 >= 0.03 - 1e-4,
-				"the top window stands 0.03 stud or more off the box"
-			)
-			t.ok(top.Size.X > size.X * 0.8 and top.Size.Z > size.Z * 0.8, "and is a large window")
 		end
-	)
+	end)
+
+	t.test("the box's faces are kraft panels that collide like the box, stand off the walls, front and top", function()
+		local model, body = dressed("Truck", "Pickup", { name = "Pickup" })
+		local size = body.Size
+		for _, n in ipairs({ "Window", "WindowTop" }) do
+			local w = model:FindFirstChild(n)
+			t.eq(w.CanCollide, body.CanCollide, n .. " collides as the box does")
+			t.eq(w.CanQuery, true, n .. " can be aimed at and grabbed")
+			t.eq(w.CanTouch, false)
+			t.eq(w.Massless, true)
+			local weld = w:FindFirstChildWhichIsA("WeldConstraint")
+			t.ok(weld and weld.Part0 == body and weld.Part1 == w, n .. " welded to the body")
+		end
+		local front = model:FindFirstChild("Window")
+		local rel = body.CFrame:PointToObjectSpace(front.CFrame.Position)
+		t.ok(
+			-rel.Z - front.Size.Z / 2 - size.Z / 2 >= 0.03 - 1e-4,
+			"the front panel stands 0.03 stud or more off the box"
+		)
+		t.ok(front.Size.X > size.X * 0.8 and front.Size.Y > size.Y * 0.6, "and is most of the face")
+		local top = model:FindFirstChild("WindowTop")
+		local up = body.CFrame:PointToObjectSpace(top.CFrame.Position)
+		t.ok(up.Y - top.Size.Y / 2 - size.Y / 2 >= 0.03 - 1e-4, "the lid stands 0.03 stud or more off the box")
+		t.ok(top.Size.X > size.X * 0.8 and top.Size.Z > size.Z * 0.8, "and is most of the top")
+		-- The tape runs front to back over the lid, a hair above it, not wider than a fifth of the box.
+		local tape = model:FindFirstChild("Tape")
+		local over = body.CFrame:PointToObjectSpace(tape.CFrame.Position)
+		t.ok(over.Y - tape.Size.Y / 2 >= up.Y + top.Size.Y / 2 + 0.02 - 1e-4, "the tape stands above the lid")
+		t.ok(tape.Size.X <= size.X * 0.25 and tape.Size.Z >= top.Size.Z * 0.9, "a strip along the lid")
+	end)
 
 	t.test("no two visible faces of the shell share a plane over the same patch (no z-fighting)", function()
 		local function faces(p)
@@ -324,12 +344,12 @@ return function(t)
 		end
 	end)
 
-	t.test("opening a box takes the item and the windows out and leaves the dark box, twice over", function()
+	t.test("opening a box takes the item, the faces and the tape out and leaves the box, twice over", function()
 		local model, body = dressed("Axe", "SteelAxe", { side = "Right" })
 		t.ok(model:FindFirstChild("Contents") ~= nil and model:FindFirstChild("Window") ~= nil)
 		BoxArt.Open(model)
 		t.eq(model:FindFirstChild("Contents"), nil)
-		for _, n in ipairs({ "Window", "WindowTop", "SideWindow" }) do
+		for _, n in ipairs({ "Window", "WindowTop", "SideWindow", "Tape" }) do
 			t.eq(model:FindFirstChild(n), nil, n .. " is gone")
 		end
 		for _, n in ipairs({ "Box", "Base", "Back", "Left", "Strip" }) do

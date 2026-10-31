@@ -115,7 +115,7 @@ return function(t)
 		Logo = true,
 	}
 
-	t.test("a fresh box has a floor, a far wall or pane, glass front and top, name strip and price tag", function()
+	t.test("a fresh box has a floor, a far wall or pane, kraft front and top, name label and price tag", function()
 		local n = 0
 		for _, slot in ipairs(allSlots()) do
 			for _, side in ipairs({ "none", "Left", "Right" }) do
@@ -138,56 +138,39 @@ return function(t)
 		t.ok(n >= 60, "every item was checked, " .. n)
 	end)
 
-	t.test(
-		"the shell: a 0.1 charcoal rim, the glass as before, a cream price tag, no shadows from glass or decor",
-		function()
-			local Layout = env.BoxArt.Layout
-			t.eq(Layout.glassColor, Color3.fromRGB(150, 192, 212))
-			t.eq(Layout.glassTransparency, 0.5)
-			for _, side in ipairs({ "none", "Right" }) do
-				local model, body = dress(env, "Axe", "SteelAxe", if side == "none" then nil else side)
-				local W, H, D = body.Size.X, body.Size.Y, body.Size.Z
-				for _, name in ipairs({ "RimFront", "RimBack", "RimLeft", "RimRight" }) do
-					local bar = model:FindFirstChild(name)
-					t.ok(bar ~= nil, name)
-					t.eq(bar.Color, env.BoxArt.Charcoal, name .. " is charcoal")
-					local thin = math.min(bar.Size.X, bar.Size.Y, bar.Size.Z)
-					t.ok(math.abs(thin - 0.1) < 1e-4 and math.abs(bar.Size.Y - 0.1) < 1e-4, name .. " is 0.1 thick")
-					t.ok(math.abs(bar.CFrame.Position.Y - (H + 0.05)) < 1e-3, name .. " rides the top edge")
-					t.ok(
-						bar.CFrame.Position.X >= -W / 2 - 1e-3 and bar.CFrame.Position.X <= W / 2 + 1e-3,
-						name .. " inside the width"
-					)
-					t.ok(math.abs(bar.CFrame.Position.Z) <= D / 2 + 0.06, name .. " inside the depth")
-				end
-				t.eq(
-					model:FindFirstChild("SideEdge") ~= nil,
-					side ~= "none",
-					"the aisle pane's edge bar only with a pane"
-				)
-				local tag = model:FindFirstChild("PriceTag")
-				t.ok(
-					math.abs(tag.Size.X - 1.2) < 1e-4
-						and math.abs(tag.Size.Y - 0.6) < 1e-4
-						and math.abs(tag.Size.Z - 0.05) < 1e-4,
-					"the tag is 1.2 x 0.6 x 0.05"
-				)
-				t.eq(tag.Material, Enum.Material.SmoothPlastic)
-				t.eq(tag.Color, Color3.fromHex("#F3E7C9"), "SignCream")
-				t.ok(tag.CFrame.Position.Z < -D / 2, "on the front")
-				for _, p in ipairs(model:GetChildren()) do
-					if p:IsA("BasePart") and p ~= body then
-						t.eq(p.CastShadow, false, p.Name .. " casts no shadow")
-					end
-				end
-				for _, name in ipairs({ "Window", "WindowTop" }) do
-					local glass = model:FindFirstChild(name)
-					t.eq(glass.Color, Layout.glassColor)
-					t.eq(glass.Transparency, 0.5)
+	t.test("the shell (T414e): kraft cardboard, a cream tape, a cream price tag, no shadows from decor", function()
+		local Layout = env.BoxArt.Layout
+		t.eq(Layout.glassColor, nil, "no glass left in the layout")
+		t.eq(Layout.glassTransparency, nil)
+		for _, side in ipairs({ "none", "Right" }) do
+			local model, body = dress(env, "Axe", "SteelAxe", if side == "none" then nil else side)
+			local D = body.Size.Z
+			for _, name in ipairs({ "RimFront", "RimBack", "RimLeft", "RimRight", "SideEdge" }) do
+				t.eq(model:FindFirstChild(name), nil, name .. " went with the glass lid")
+			end
+			local tag = model:FindFirstChild("PriceTag")
+			t.ok(
+				math.abs(tag.Size.X - 1.2) < 1e-4
+					and math.abs(tag.Size.Y - 0.6) < 1e-4
+					and math.abs(tag.Size.Z - 0.05) < 1e-4,
+				"the tag is 1.2 x 0.6 x 0.05"
+			)
+			t.eq(tag.Material, Enum.Material.SmoothPlastic)
+			t.eq(tag.Color, Color3.fromHex("#F3E7C9"), "SignCream")
+			t.ok(tag.CFrame.Position.Z < -D / 2, "on the front")
+			for _, p in ipairs(model:GetChildren()) do
+				if p:IsA("BasePart") and p ~= body then
+					t.eq(p.CastShadow, false, p.Name .. " casts no shadow")
 				end
 			end
+			for _, name in ipairs({ "Window", "WindowTop" }) do
+				local face = model:FindFirstChild(name)
+				t.eq(face.Color, Color3.fromHex("#B8925F"), "KraftTan")
+				t.eq(face.Transparency, 0)
+			end
+			t.eq(model:FindFirstChild("Tape").Color, Color3.fromHex("#F3E7C9"), "SignCream tape")
 		end
-	)
+	end)
 
 	t.test("a box adds at most 6 parts to the plain shell, and the whole shell stays under its cap", function()
 		for _, slot in ipairs(allSlots()) do
