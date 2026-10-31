@@ -4000,24 +4000,102 @@ end
 
 function BuildingArt.Sparkworks(): Model
 	local model = Kit.model("Sparkworks")
+	local rng = Kit.rng(4071)
+	-- Each plank panel gets a thin backing layer, so the seams between planks show wood, not daylight.
+	local function wallPanel(
+		parent: Instance,
+		frame: CFrame,
+		x0: number,
+		x1: number,
+		y0: number,
+		y1: number,
+		thick: number,
+		r: Rng,
+		colors: { Color3 },
+		boardH: number
+	)
+		panel(parent, frame, x0, x1, y0, y1, thick, r, colors, boardH)
+		Kit.part(
+			parent,
+			"WallBacking",
+			V3(x1 - x0, y1 - y0, thick * 0.7),
+			frame * CF((x0 + x1) / 2, (y0 + y1) / 2, 0),
+			Kit.shade(colors[1], -0.25),
+			MAT.WoodPlanks
+		)
+	end
+	local lantern = hex("#FFC45C")
+	local brassDark = Kit.shade(Palette.Brass, -0.25)
+	local TOP = 12.5 -- wall tops; the door is 10 tall above the 0.5 floor
+	-- Shell: 14 x 12 inside a 20 x 16 cobble pad, TimberBrown board walls.
 	Kit.part(model, "Pad", V3(20, 0.2, 16), CF(0, 0.1, 0), Palette.TownCobble, MAT.Cobblestone)
 	Kit.part(model, "Floor", V3(14, 0.3, 12), CF(0, 0.35, 0), Palette.PlankHoney, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(14, 9, 0.4), CF(0, 5, 5.8), Palette.WeatheredPlank, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(0.4, 9, 12), CF(-6.8, 5, 0), Palette.PlankHoney, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(0.4, 9, 12), CF(6.8, 5, 0), Palette.PlankHoney, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(6, 9, 0.4), CF(-4, 5, -5.8), Palette.WeatheredPlank, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(6, 9, 0.4), CF(4, 5, -5.8), Palette.WeatheredPlank, MAT.WoodPlanks)
-	Kit.part(model, "Roof", V3(15, 0.25, 13), CF(0, 9.8, 0), Palette.RoofSlate, MAT.Metal)
+	-- Stone sill under the walls (0.6 tall, below the door's clear height; none across the door).
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "Foundation", V3(3.2, 0.6, 12.6), CF(s * 7.0, 0.3, 0), Palette.StoneBase, MAT.Cobblestone)
+		dBox(model, "Foundation", V3(3.2, 0.6, 0.8), CF(s * 5.5, 0.3, -6.2), Palette.StoneBase, MAT.Cobblestone)
+	end
+	dBox(model, "Foundation", V3(14.6, 0.6, 0.8), CF(0, 0.3, 6.2), Palette.StoneBase, MAT.Cobblestone)
+	local front = CF(0, 0, -5.8)
+	-- The front: an 8 wide opening, 3 studs of wall each side, a header over it.
+	wallPanel(model, front, -7, -4, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, front, 4, 7, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, front, -4, 4, 10.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, CF(0, 0, 5.8) * ANG(0, PI, 0), -7, 7, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, CF(-6.8, 0, 0) * ANG(0, PI / 2, 0), -5.6, 5.6, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, CF(6.8, 0, 0) * ANG(0, -PI / 2, 0), -5.6, 5.6, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	-- Gable ends with battens, a slate roof, a brass ridge band.
+	local frontTop = CF(0, TOP, -5.8)
+	gable(model, frontTop, 14, 3.5, 0.4, PLANK_DARK[2])
+	battens(model, frontTop, 14, 3.5, 0.4, 1.6, PLANK_DARK[3])
+	gable(model, CF(0, TOP, 5.8) * ANG(0, PI, 0), 14, 3.5, 0.4, PLANK_DARK[2])
+	local roofStyle: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 2.2, pieceLen = 5 }
+	gableRoof(model, CF(0, TOP, 0) * ANG(0, PI / 2, 0), 12.8, 14, 3.5, 1.0, rng, roofStyle)
+	-- Door frame, brass band, posts: all clear of the 8 x 10 opening.
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "DoorJamb", V3(0.5, 10, 0.6), CF(s * 4.26, 5.5, -6.1), TIMBER, MAT.Wood)
+		dBox(model, "CornerPost", V3(0.8, TOP, 0.8), CF(s * 6.8, TOP / 2, -5.8), TIMBER, MAT.Wood)
+		dBox(model, "CornerPost", V3(0.8, TOP, 0.8), CF(s * 6.8, TOP / 2, 5.8), TIMBER, MAT.Wood)
+		dBox(model, "BrassCap", V3(1, 0.3, 1), CF(s * 6.8, TOP + 0.15, -5.8), Palette.Brass, MAT.Metal)
+	end
+	dBox(model, "DoorHead", V3(9, 0.5, 0.6), CF(0, 10.75, -6.1), TIMBER, MAT.Wood)
+	dBox(model, "BrassBand", V3(14.4, 0.3, 0.2), CF(0, 10.4, -6.12), Palette.Brass, MAT.Metal)
+	-- Wear: a patch board and a dull streak (style guide 15).
+	dBox(model, "Patch", V3(1.5, 2.4, 0.08), CF(-5.4, 4.6, -6.03), Kit.shade(Palette.TimberBrown, 0.16), MAT.WoodPlanks)
+	dBox(model, "Patch", V3(1.1, 1.8, 0.08), CF(5.6, 3.2, -6.03), Kit.shade(Palette.TimberBrown, -0.14), MAT.WoodPlanks)
+	-- The name board, brass with ink text, on the header.
+	local sign = dBox(model, "Sign", V3(6, 1.3, 0.2), CF(0, 11.5, -6.12), Palette.Brass, MAT.Wood)
+	Kit.signText(sign, "SPARKWORKS", Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	-- Two wall lanterns flank the door; small warm lights, no glowing walls.
+	for _, s in ipairs({ -1, 1 }) do
+		light(wallLantern(model, CF(s * 5.6, 7, -6.0), 1), 16, 1.4, lantern)
+		Kit.window(model, CF(s * 6.62, 6.2, 0) * ANG(0, -s * PI / 2, 0) * CF(0, 0, 0.05), 2.4, 2.6, TIMBER, false)
+	end
+	-- Inside: the counter, the lamp rack, the wire drum, the empty demo board.
 	Kit.part(model, "Counter", V3(8, 2.6, 3.6), CF(-2, 1.3, 3.2), Palette.TimberBrown, MAT.Wood)
+	dBox(model, "CounterTop", V3(8.4, 0.2, 3.9), CF(-2, 2.7, 3.2), Kit.shade(Palette.TimberBrown, 0.14), MAT.Wood)
+	dBox(model, "CounterBand", V3(8.1, 0.3, 3.7), CF(-2, 0.5, 3.2), Palette.Brass, MAT.Metal)
 	for i = 1, 4 do
-		local lampBit = dBox(model, "Lamp", V3(0.5, 0.7, 0.3), CF(5.4, 3 + i * 1.1, 2), Palette.LumenGlow, MAT.Neon)
-		dBox(model, "Switch", V3(0.35, 0.45, 0.15), CF(5.4, 3 + i * 1.1, 0.4), Palette.IronBlack, MAT.Metal)
+		local lampBit = dBox(model, "Lamp", V3(0.5, 0.7, 0.3), CF(6.4, 3 + i * 1.1, 2), lantern, MAT.Glass)
 		lampBit.CastShadow = false
+		light(lampBit, 9, 0.9, lantern)
+		dBox(model, "Switch", V3(0.35, 0.45, 0.15), CF(6.4, 3 + i * 1.1, 0.4), brassDark, MAT.Metal)
 	end
 	dCyl(model, "Wire", 2.4, 0.35, CF(4.2, 2.2, 3.4) * ANG(0, 0, PI / 2), Palette.IronBlack, MAT.Metal)
-	local glow = dBox(model, "GlowStrip", V3(4, 0.12, 0.1), CF(0, 8.6, -5.5), Palette.SparkTeal, MAT.Neon)
+	local glow = dBox(model, "GlowStrip", V3(4, 0.12, 0.1), CF(0, 8.2, 5.55), lantern, MAT.Glass)
 	glow.CastShadow = false
-	local board = Kit.part(model, "DemoBoard", V3(6, 4, 0.2), CF(0, 5, 5.5), Palette.SignInk, MAT.SmoothPlastic)
+	light(glow, 12, 1, lantern)
+	local board = Kit.part(model, "DemoBoard", V3(6, 4, 0.2), CF(0, 5, 5.5), Palette.TimberBrown, MAT.WoodPlanks)
+	-- A brass frame round the board, lit by two small lantern lights.
+	for _, y in ipairs({ 2.85, 7.15 }) do
+		dBox(model, "DemoFrame", V3(6.6, 0.3, 0.3), CF(0, y, 5.42), Palette.Brass, MAT.Metal)
+	end
+	for _, x in ipairs({ -3.15, 3.15 }) do
+		dBox(model, "DemoFrame", V3(0.3, 4.6, 0.3), CF(x, 5, 5.42), Palette.Brass, MAT.Metal)
+	end
+	for _, x in ipairs({ -2.2, 2.2 }) do
+		light(dBox(model, "DemoLamp", V3(0.4, 0.4, 0.4), CF(x, 7.7, 5.0), lantern, MAT.Glass), 10, 1, lantern)
+	end
 	board.CanCollide = false
 	board.CanQuery = false
 	board.CanTouch = false
@@ -4067,15 +4145,106 @@ end
 
 function BuildingArt.LandOffice(): Model
 	local model = Kit.model("LandOffice")
+	local rng = Kit.rng(4004)
+	-- Each plank panel gets a thin backing layer, so the seams between planks show wood, not daylight.
+	local function wallPanel(
+		parent: Instance,
+		frame: CFrame,
+		x0: number,
+		x1: number,
+		y0: number,
+		y1: number,
+		thick: number,
+		r: Rng,
+		colors: { Color3 },
+		boardH: number
+	)
+		panel(parent, frame, x0, x1, y0, y1, thick, r, colors, boardH)
+		Kit.part(
+			parent,
+			"WallBacking",
+			V3(x1 - x0, y1 - y0, thick * 0.7),
+			frame * CF((x0 + x1) / 2, (y0 + y1) / 2, 0),
+			Kit.shade(colors[1], -0.25),
+			MAT.WoodPlanks
+		)
+	end
+	local lantern = hex("#FFC45C")
+	local TOP = 12.4 -- wall tops; the door is 10 tall above the 0.4 floor
+	-- Shell: 18 x 14 board-and-batten cottage on a stone foundation.
 	Kit.part(model, "Floor", V3(18, 0.4, 14), CF(0, 0.2, 0), Palette.StoneBase, MAT.Cobblestone)
-	Kit.part(model, "Wall", V3(18, 8, 0.5), CF(0, 4.4, 6.75), Palette.PlankHoney, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(0.5, 8, 14), CF(-8.75, 4.4, 0), Palette.WeatheredPlank, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(0.5, 8, 14), CF(8.75, 4.4, 0), Palette.WeatheredPlank, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(6, 8, 0.5), CF(-6, 4.4, -6.75), Palette.PlankHoney, MAT.WoodPlanks)
-	Kit.part(model, "Wall", V3(6, 8, 0.5), CF(6, 4.4, -6.75), Palette.PlankHoney, MAT.WoodPlanks)
-	Kit.part(model, "Roof", V3(19, 0.4, 15), CF(0, 8.8, 0), Palette.RoofSlate, MAT.Slate)
-	local sign = dBox(model, "Sign", V3(8, 1.6, 0.2), CF(0, 6.4, -7.1), Palette.Brass, MAT.Wood)
+	dBox(model, "FloorBoards", V3(17, 0.12, 13), CF(0, 0.44, 0), Kit.shade(Palette.PlankHoney, -0.1), MAT.WoodPlanks)
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "Foundation", V3(0.9, 0.6, 14.6), CF(s * 9.05, 0.3, 0), Palette.StoneBase, MAT.Cobblestone)
+		dBox(model, "Foundation", V3(4.6, 0.6, 0.9), CF(s * 6.7, 0.3, -7.05), Palette.StoneBase, MAT.Cobblestone)
+	end
+	dBox(model, "Foundation", V3(19, 0.6, 0.9), CF(0, 0.3, 7.05), Palette.StoneBase, MAT.Cobblestone)
+	local front = CF(0, 0, -6.75)
+	-- The front: an 8 wide opening, 5 studs of wall each side, a header over it.
+	wallPanel(model, front, -9, -4, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, front, 4, 9, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, front, -4, 4, 10.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, CF(0, 0, 6.75) * ANG(0, PI, 0), -9, 9, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, CF(-8.75, 0, 0) * ANG(0, PI / 2, 0), -6.5, 6.5, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, CF(8.75, 0, 0) * ANG(0, -PI / 2, 0), -6.5, 6.5, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	-- Battens over the front shoulders and the gable (board-and-batten).
+	local batten = Kit.shade(Palette.PlankHoney, -0.22)
+	for _, x in ipairs({ -8.4, -7, -5.6, 5.6, 7, 8.4 }) do
+		dBox(model, "Batten", V3(0.3, 11.6, 0.14), CF(x, 6.2, -7.06), batten, MAT.WoodPlanks)
+	end
+	local frontTop = CF(0, TOP, -6.75)
+	gable(model, frontTop, 18, 4, 0.5, PLANK[1])
+	battens(model, frontTop, 18, 4, 0.5, 1.4, batten)
+	gable(model, CF(0, TOP, 6.75) * ANG(0, PI, 0), 18, 4, 0.5, PLANK[1])
+	local roofStyle: RoofStyle =
+		{ colors = SHINGLE, deck = ROOF_DECK, trim = Palette.PineTrim, rowLen = 2.2, pieceLen = 5 }
+	gableRoof(model, CF(0, TOP, 0) * ANG(0, PI / 2, 0), 15.2, 18, 4, 0.6, rng, roofStyle)
+	-- PineTrim: corner posts, door jambs and the head over the opening.
+	local pine = Palette.PineTrim
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "CornerPost", V3(0.8, TOP, 0.8), CF(s * 8.9, TOP / 2, -6.9), pine, MAT.Wood)
+		dBox(model, "CornerPost", V3(0.8, TOP, 0.8), CF(s * 8.9, TOP / 2, 6.9), pine, MAT.Wood)
+		dBox(model, "DoorJamb", V3(0.5, 10, 0.7), CF(s * 4.26, 5.4, -7.1), pine, MAT.Wood)
+	end
+	dBox(model, "DoorHead", V3(9, 0.5, 0.7), CF(0, 10.65, -7.1), pine, MAT.Wood)
+	-- The porch: a low deck, a short awning on two posts (one a hair out of true), a hanging lantern.
+	Kit.part(model, "Porch", V3(11, 0.5, 1.2), CF(0, 0.25, -7.6), Palette.WeatheredPlank, MAT.WoodPlanks)
+	dBox(model, "PorchRoof", V3(12.4, 0.3, 1.2), CF(0, 10.9, -7.75) * ANG(-0.14, 0, 0), Palette.RoofSlate, MAT.Slate)
+	dBox(model, "PorchPost", V3(0.5, 10.4, 0.5), CF(-6.4, 5.3, -7.9), pine, MAT.Wood)
+	dBox(model, "PorchPost", V3(0.5, 10.4, 0.5), CF(6.4, 5.3, -7.9) * ANG(0, 0, 0.02), pine, MAT.Wood)
+	light(hangingLantern(model, Vector3.new(5.0, 10.7, -7.75), 1.2, 1), 16, 1.4, lantern)
+	-- Wear: patch boards, a dull streak (style guide 15).
+	dBox(model, "Patch", V3(1.6, 2.4, 0.08), CF(-6.6, 4.8, -7.03), Kit.shade(Palette.PlankHoney, -0.16), MAT.WoodPlanks)
+	dBox(model, "Patch", V3(1.2, 1.6, 0.08), CF(7, 3, -7.03), Kit.shade(Palette.PlankHoney, 0.1), MAT.WoodPlanks)
+	-- The name board: SignCream with SignInk text, on the header's face.
+	local sign = dBox(model, "Sign", V3(7, 1.4, 0.2), CF(0, 11.4, -7.12), Palette.SignCream, MAT.Wood)
 	Kit.signText(sign, "LAND OFFICE", Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	-- Windows in the side walls, shuttered.
+	for _, s in ipairs({ -1, 1 }) do
+		for _, z in ipairs({ -3.4, 3.4 }) do
+			local wall = CF(s * 9.0, 0, 0) * ANG(0, -s * PI / 2, 0)
+			local at = wall * CF(z, 6.2, 0)
+			Kit.window(model, at, 2.6, 3, pine, false)
+			for _, side in ipairs({ -1, 1 }) do
+				dBox(model, "Shutter", V3(1.1, 3.2, 0.16), at * CF(side * 2.0, 0, -0.1), pine, MAT.Wood)
+			end
+		end
+	end
+	-- Inside: the clerk's counter across the room from the door, the deed map behind it.
+	Kit.part(model, "Counter", V3(9, 3, 2.4), CF(0, 1.9, 1.5), Palette.TimberBrown, MAT.Wood)
+	dBox(model, "CounterTop", V3(9.4, 0.22, 2.8), CF(0, 3.5, 1.5), Kit.shade(Palette.TimberBrown, 0.16), MAT.Wood)
+	dBox(model, "Ledger", V3(1.6, 0.18, 1.1), CF(2.4, 3.7, 1.2) * ANG(0, 0.2, 0), Palette.SignCream, MAT.Wood)
+	dBox(model, "DeedMapFrame", V3(8, 5, 0.2), CF(0, 6.4, 6.4), Palette.TimberBrown, MAT.Wood)
+	local map = dBox(model, "DeedMap", V3(7.2, 4.2, 0.12), CF(0, 6.4, 6.3), hex("#F4ECD8"), MAT.Fabric)
+	map.CanCollide = false
+	for _, x in ipairs({ -2.4, 0, 2.4 }) do
+		dBox(model, "DeedLine", V3(0.08, 3.8, 0.04), CF(x, 6.4, 6.22), Palette.SignInk, MAT.Fabric)
+	end
+	for _, y in ipairs({ 5.4, 6.4, 7.4 }) do
+		dBox(model, "DeedLine", V3(6.8, 0.08, 0.04), CF(0, y, 6.22), Palette.SignInk, MAT.Fabric)
+	end
+	local lamp = dBox(model, "OfficeLamp", V3(0.6, 0.8, 0.6), CF(-3.6, 4.4, 1.5), lantern, MAT.Glass)
+	light(lamp, 14, 1.2, lantern)
 	-- The uploaded LandOffice meshes (backlog); a missing mesh keeps the parts.
 	TownMeshes.Dress(model, "LandOffice")
 	return model
