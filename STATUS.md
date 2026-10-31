@@ -2,6 +2,13 @@
 
 Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `80fd596` (T414b, #285).** This branch is the T414a fixes (`cursor/t414a-fixes`). Outside town the graded TrailDirt shoulder stays. Inside town the street is flat to half-width 16.3.
 
+## T414d-1 shop aisles and seated stock (30 October 2026)
+
+The walk into every dressed shop is at least 8 studs wide and 6 long, and the door is at least 8 wide by 10 tall. A honey shelf (`ShopShelf`) holds two pieces of stock flush on the board, each with a cream tag and a gold price. One hero carries a warm light. The counter keeps its direct-child `Counter` part; `ShopCounter` is the honey nosing. Mesh ids stay 0.
+
+Dressed: Tool Shed, Hearth & Home, Dealership, Coat Kiosk, Heat Boots, Odds and Ends, Secret Shop. Land Office and Sparkworks were not touched. Hearth's 3.2-stud side gaps stay (pinned by `ShelfLayout`). The measured walk is the center run. Greenery, stumps, the living forest and critters are T414d-2. Finish pass (31 October 2026): every shop has a `#C49A63` WoodPlanks ceiling (`ShopCeiling`, Hearth's `CeilingBoards`), at least 10 studs of headroom over the walk, runners in `#8A3B2E` Fabric (painted `LobbyStripe`/`AisleStripe` in the Dealership), a Slate `#8C877E` `DoorThreshold` and WoodPlanks door frames. The four booths (Coat Kiosk, Heat Boots, Odds and Ends, Secret Shop) were bare: `ShopFinish` gives them a hanging sign (`ShopHangSign`), wall shelves with stock, peg boards and a runner, all looks only. `ShopBounds` no longer shrinks the walk: it runs door to counter in the door's frame, and the shoulders are 3 studs. Specs: `ShopFinish.spec`, `ShopInterior.spec`. Shots: `preview/t414d/` (three.js previews, not Studio lighting). Studio checks: PHASE2_NOTES.md "T414d-1 shops". Nothing here has been seen in Studio. Cloud has no physics.
+
+
 ## T414b Dealership fleet look (31 October 2026, branch `cursor/t414b-dealership-fleet`)
 
 The style-guide 12 colours are on the part-built vehicle parts and the kept hull parts of a meshed one (mesh colours stay baked in the GLBs). Glass is one #9CCBE0 at 0.4. The lot's bays are at least vehicle width + 4 wide. The Rustbucket part budget is 58. No prices, stats, MeshIds or services changed. Details and Studio checks: PHASE2_NOTES.md "T414b Dealership fleet look". Shots: `preview/t414b/`. Nothing here has been seen in Studio.

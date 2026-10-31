@@ -308,6 +308,8 @@ return function(t)
 		"AisleRunner",
 		"AisleRunnerEdge",
 		"AisleStripe",
+		"LobbyStripe",
+		"ShopCeiling", -- the plank ceiling, looks only, above the beams
 		"LobbyRunner",
 		"LobbyRunnerEdge",
 		"KeeperMat",
@@ -331,6 +333,12 @@ return function(t)
 		"ComingSoonBoardLeg",
 		"StanchionPost",
 		"StanchionRope",
+		-- T414d shop fit, seated on the counter, clear of the aisle
+		"ShelfBoard",
+		"ShopItem",
+		"ShelfPrice",
+		"Hero",
+		"CounterNosing",
 	}) do
 		LOOKS_ONLY[name] = true
 	end

@@ -8,6 +8,7 @@
 local BuildingArt = require(script.Parent.BuildingArt)
 local Kit = require(script.Parent.Kit)
 local Palette = require(script.Parent.Palette)
+local ShopFit = require(script.Parent.ShopFit)
 local ShopLogic = require(script.Parent.Parent.ShopLogic)
 local ShopPins = require(script.Parent.Parent.World.ShopPins)
 local TerrainGen = require(script.Parent.Parent.World.TerrainGen)
@@ -210,59 +211,71 @@ end
 
 local function kiosk(title: string, accent: Color3, hook: string): Model
 	local model = Kit.model("Kiosk")
-	marker(model, "Floor", Vector3.new(8, 0.4, 6), CFrame.new(0, 0.2, 0), Palette.StoneBase, Enum.Material.Cobblestone)
-	marker(model, "Wall", Vector3.new(8, 8, 0.4), CFrame.new(0, 4, 2.8), Palette.PlankHoney, PLANKS)
-	marker(model, "Wall", Vector3.new(0.4, 8, 5.2), CFrame.new(-3.8, 4, 0.2), Palette.PlankHoney, PLANKS)
-	marker(model, "Wall", Vector3.new(0.4, 8, 5.2), CFrame.new(3.8, 4, 0.2), Palette.PlankHoney, PLANKS)
-	marker(model, "Roof", Vector3.new(8.6, 0.3, 6.6), CFrame.new(0, 8.15, 0), Palette.RoofSlate, Enum.Material.Slate)
-	front(model, 4, 8, 4, 7.5, -2.8, Palette.PlankHoney, 0.4)
-	local counter = counterAt(model, -1.4, 0.4)
-	approach(model, -7.2)
+	-- Door at z -3.9, counter at z 4.1 (centres 8 apart). Depth 3.66 holds the
+	-- heat-boots box and still leaves a 6-stud walk.
+	marker(
+		model,
+		"Floor",
+		Vector3.new(9.2, 0.4, 11.2),
+		CFrame.new(0, 0.2, 1.3),
+		Palette.StoneBase,
+		Enum.Material.Cobblestone
+	)
+	marker(model, "Wall", Vector3.new(9.2, 12, 0.4), CFrame.new(0, 6, 6.7), Palette.PlankHoney, PLANKS)
+	marker(model, "Wall", Vector3.new(0.4, 12, 10.2), CFrame.new(-4.4, 6, 1.5), Palette.PlankHoney, PLANKS)
+	marker(model, "Wall", Vector3.new(0.4, 12, 10.2), CFrame.new(4.4, 6, 1.5), Palette.PlankHoney, PLANKS)
+	marker(
+		model,
+		"Roof",
+		Vector3.new(9.8, 0.28, 11.8),
+		CFrame.new(0, 12.15, 1.3),
+		Palette.RoofSlate,
+		Enum.Material.Slate
+	)
+	front(model, 4.6, 12, 8, 10, -3.9, Palette.PlankHoney, 0.4)
+	local counter =
+		Kit.part(model, "Counter", Vector3.new(5.2, 3.2, 3.66), CFrame.new(0, 2, 4.1), Palette.TimberBrown, WOOD)
+	approach(model, -8.2)
 	local top = onCounter(counter, 0, 0)
-	hero(model, top * CFrame.new(-1.1, 0.9, 0), Vector3.new(0.7, 1.6, 0.25), accent)
-	kraft(model, top * CFrame.new(1.15, 0.4, 0), Vector3.new(1.1, 0.8, 0.8), hook)
-	zoneSign(model, hook, CFrame.new(0, 6.4, -3.15))
+	hero(model, top * CFrame.new(-1.05, 0.55, -0.2), Vector3.new(0.5, 1.05, 0.26), accent)
+	kraft(model, top * CFrame.new(1.15, 0.4, -0.15), Vector3.new(1.05, 0.8, 0.7), hook)
+	zoneSign(model, hook, CFrame.new(0, 7.2, -4.05))
 	local sign = marker(
 		model,
 		"Sign",
-		Vector3.new(5, 1.2, 0.16),
-		CFrame.new(0, 7.2, -3.2),
+		Vector3.new(6, 1.2, 0.16),
+		CFrame.new(0, 11.1, -4.15),
 		Palette.SignCream,
 		Enum.Material.SmoothPlastic
 	)
 	sign.CanCollide = false
 	Kit.signText(sign, title, Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.18)
-	local strip = dress(
-		Kit.part(model, "GlowStrip", Vector3.new(6, 0.12, 0.08), CFrame.new(0, 7.6, -3.05), accent, Enum.Material.Neon)
-	)
-	strip.CastShadow = false
 	return model
 end
 
 local function shack(title: string): Model
 	local model = Kit.model("OddsAndEnds")
 	marker(model, "Floor", Vector3.new(20, 0.4, 16), CFrame.new(0, 0.2, 0), Palette.TrailDirt, Enum.Material.Ground)
-	marker(model, "Wall", Vector3.new(20, 9, 0.45), CFrame.new(0, 4.5, 7.8), Palette.WeatheredPlank, PLANKS)
-	marker(model, "Wall", Vector3.new(0.45, 9, 15), CFrame.new(-9.8, 4.5, 0), Palette.PlankHoney, PLANKS)
-	marker(model, "Wall", Vector3.new(0.45, 9, 15), CFrame.new(9.8, 4.5, 0), Palette.PlankHoney, PLANKS)
+	marker(model, "Wall", Vector3.new(20, 12, 0.45), CFrame.new(0, 6, 7.8), Palette.WeatheredPlank, PLANKS)
+	marker(model, "Wall", Vector3.new(0.45, 12, 15), CFrame.new(-9.8, 6, 0), Palette.PlankHoney, PLANKS)
+	marker(model, "Wall", Vector3.new(0.45, 12, 15), CFrame.new(9.8, 6, 0), Palette.PlankHoney, PLANKS)
 	-- Tin roof, a little crooked, still clear of the door.
 	local roof = marker(
 		model,
 		"Roof",
 		Vector3.new(21, 0.28, 17),
-		CFrame.new(0.2, 9.2, 0.2) * CFrame.Angles(0.04, 0.03, -0.03),
+		CFrame.new(0.2, 12.2, 0.2) * CFrame.Angles(0.04, 0.03, -0.03),
 		Palette.RoofSlate,
 		Enum.Material.Metal
 	)
 	roof.Name = "Roof"
-	front(model, 10, 9, 4.5, 7.5, -7.8, Palette.WeatheredPlank, 0.4)
-	marker(model, "Shelf", Vector3.new(2.2, 4, 8), CFrame.new(-8.2, 2.2, 1), Palette.TimberBrown, WOOD)
-	marker(model, "Shelf", Vector3.new(2.2, 4, 8), CFrame.new(8.2, 2.2, 1), Palette.TimberBrown, WOOD)
-	aisle(model, Vector3.new(8, 4, 8), CFrame.new(0, 3.2, 1))
-	local counter = counterAt(model, -5.6, 0.4)
+	front(model, 10, 12, 8, 10, -7.8, Palette.WeatheredPlank, 0.4)
+	-- Side counter, west of the centre aisle, under the stock lane.
+	local counter =
+		Kit.part(model, "Counter", Vector3.new(4.6, 3.2, 9.2), CFrame.new(7, 2, -0.15), Palette.TimberBrown, WOOD)
 	local top = onCounter(counter, 0, 0)
-	hero(model, top * CFrame.new(-1, 0.7, 0), Vector3.new(0.5, 1.2, 0.5), Palette.CoinGold)
-	kraft(model, top * CFrame.new(1.2, 0.45, 0), Vector3.new(1.2, 0.9, 0.9), "CHARGE")
+	hero(model, top * CFrame.new(-0.8, 0.55, -0.4), Vector3.new(0.5, 1.05, 0.26), Palette.CoinGold)
+	kraft(model, top * CFrame.new(0.9, 0.4, -0.3), Vector3.new(1.05, 0.8, 0.7), "CHARGE")
 	backDoor(model, -6, 7.5)
 	zoneSign(model, "CHARGES", CFrame.new(-8.2, 5.2, 1))
 	zoneSign(model, "LANTERN", CFrame.new(8.2, 5.2, 1))
@@ -310,19 +323,19 @@ end
 local function cave(): Model
 	local model = Kit.model("SecretShop")
 	model:SetAttribute("Sold", false)
-	marker(model, "Mouth", Vector3.new(10, 8, 2), CFrame.new(0, 4, -7), Palette.StoneBase, Enum.Material.Slate)
+	-- A stone lintel over the opening. The old block sat in the approach.
+	marker(model, "Mouth", Vector3.new(12, 1.6, 1.4), CFrame.new(0, 11.6, -6.1), Palette.StoneBase, Enum.Material.Slate)
 	marker(model, "Floor", Vector3.new(16, 0.4, 12), CFrame.new(0, 0.2, 0), Palette.StoneBase, Enum.Material.Slate)
-	marker(model, "Wall", Vector3.new(16, 8, 0.45), CFrame.new(0, 4, 5.8), Palette.PlankHoney, PLANKS)
-	marker(model, "Wall", Vector3.new(0.45, 8, 11), CFrame.new(-7.8, 4, 0), Palette.WeatheredPlank, PLANKS)
-	marker(model, "Wall", Vector3.new(0.45, 8, 11), CFrame.new(7.8, 4, 0), Palette.WeatheredPlank, PLANKS)
-	marker(model, "Roof", Vector3.new(16.4, 0.4, 12.4), CFrame.new(0, 8.2, 0), Palette.StoneBase, Enum.Material.Slate)
-	front(model, 8, 8, 4.5, 7.5, -5.8, Palette.StoneBase, 0.4)
-	marker(model, "Shelf", Vector3.new(1.6, 3.5, 6), CFrame.new(-6.4, 2, 0), Palette.TimberBrown, WOOD)
-	marker(model, "Shelf", Vector3.new(1.6, 3.5, 6), CFrame.new(6.4, 2, 0), Palette.TimberBrown, WOOD)
-	aisle(model, Vector3.new(8, 3.5, 6), CFrame.new(0, 2.8, 0))
-	local counter = counterAt(model, -3.6, 0.4)
-	hero(model, CFrame.new(4.5, 3.2, 4.2), Vector3.new(1.4, 2.2, 0.8), Kit.hex("#7A4FD0"))
-	kraft(model, onCounter(counter, 1, 0.35), Vector3.new(1, 0.7, 0.7), "STUDY")
+	marker(model, "Wall", Vector3.new(16, 12, 0.45), CFrame.new(0, 6, 5.8), Palette.PlankHoney, PLANKS)
+	marker(model, "Wall", Vector3.new(0.45, 12, 11), CFrame.new(-7.8, 6, 0), Palette.WeatheredPlank, PLANKS)
+	marker(model, "Wall", Vector3.new(0.45, 12, 11), CFrame.new(7.8, 6, 0), Palette.WeatheredPlank, PLANKS)
+	marker(model, "Roof", Vector3.new(16.4, 0.4, 12.4), CFrame.new(0, 12.2, 0), Palette.StoneBase, Enum.Material.Slate)
+	front(model, 8, 12, 8, 10, -5.8, Palette.StoneBase, 0.4)
+	local counter =
+		Kit.part(model, "Counter", Vector3.new(3.2, 3.2, 4.4), CFrame.new(5.8, 2, 0), Palette.TimberBrown, WOOD)
+	local top = onCounter(counter, 0, 0)
+	hero(model, top * CFrame.new(0, 0.55, -0.3), Vector3.new(0.5, 1.05, 0.26), Palette.CoinGold)
+	kraft(model, top * CFrame.new(0, 0.35, 0.5), Vector3.new(0.9, 0.7, 0.6), "STUDY")
 	backDoor(model, -5, 5.4)
 	zoneSign(model, "PAINTINGS", CFrame.new(0, 5.5, 4.6))
 	approach(model, -10.2)
@@ -463,6 +476,7 @@ function ShopPlace.Build(kind: string, title: string, accent: Color3): Model
 	model.Name = kind
 	pilings(model, kind)
 	ensureCommon(model, kind, title)
+	ShopFit.Dress(model, kind)
 	return model
 end
 

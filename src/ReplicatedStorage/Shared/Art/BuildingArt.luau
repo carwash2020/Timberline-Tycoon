@@ -38,6 +38,7 @@ local ModelSlots = require(script.Parent.ModelSlots)
 local ShopFacade = require(script.Parent.ShopFacade)
 local PropArt = require(script.Parent.PropArt)
 local ShopDoor = require(script.Parent.ShopDoor)
+local ShopFit = require(script.Parent.ShopFit)
 local ShopInterior = require(script.Parent.ShopInterior)
 local TownMeshes = require(script.Parent.TownMeshes)
 local TownModels = require(script.Parent.TownModels)
@@ -1537,8 +1538,9 @@ local function toolShed(model: Model, title: string, accent: Color3, scale: numb
 
 	-- Out front: the grindstone and the chopping block; firewood stacked by
 	-- the west wall (all of it solid; it was the east wall until the shed grew wider).
-	grindstone(model, CF(-8.2, 0, -HZ - 2.2)) -- (0.6 further west: its leg stood in the awning post)
-	choppingBlock(model, CF(7.6, 0, -HZ - 2.2), rng)
+	-- Clear of the 3-stud shoulder beside the 10-stud door (the trough is 2.6 wide before the 1.5 scale).
+	grindstone(model, CF(-9.4, 0, -HZ - 2.2))
+	choppingBlock(model, CF(8.8, 0, -HZ - 2.2), rng)
 	for row = 0, 1 do
 		for i = 0, 1 - row do
 			local z = -2 + (i - (1 - row) / 2) * 1.55
@@ -2335,7 +2337,7 @@ function BuildingArt.DoorSpec(kind: string, s: number, accent: Color3): ShopDoor
 			x0 = -5 * s,
 			x1 = 5 * s,
 			y0 = 0.5 * s,
-			y1 = 7.1 * s,
+			y1 = 0.5 * s + 10,
 			z = -(BuildingArt.ToolShedHalfDepth + 0.5) * s,
 			color = Kit.shade(accent, -0.2),
 			trim = TRIM,
@@ -2497,6 +2499,9 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 	)
 	ShopDoor.Add(model, BuildingArt.DoorSpec(kind, s, accent))
 	ShopFacade.Add(model, BuildingArt.FacadeSpec(kind, s, accent))
+	if kind == "ToolShed" or kind == "HearthAndHome" or kind == "Dealership" then
+		ShopFit.Dress(model, kind)
+	end
 	return model
 end
 

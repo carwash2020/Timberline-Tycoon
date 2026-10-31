@@ -62,7 +62,7 @@ local TIMBER = hex("#5A3E26")
 local IRON = hex("#3B3634")
 local PAPER = hex("#F4ECD8")
 local TRIM = hex("#F2E7CF")
-local RUNNER = hex("#9A3D2E")
+local RUNNER = hex("#8A3B2E")
 local RUNNER_EDGE = hex("#E3C98A")
 
 local function decor(p: Part): Part
@@ -1158,6 +1158,23 @@ function ShopKit.Rafter(parent: Instance, frame: Frame, x: number, y: number?)
 		CF(x, (y or frame.ceilY - 0.45) + 0.1, 0),
 		TIMBER
 	)
+end
+
+-- The plank ceiling: warm boards across the whole room, 0.4 thick, its
+-- underside 0.5 under the ceiling line so the timber beams stand proud of it.
+-- Looks only. It casts no shadow, so a roofless preview is still lit.
+ShopKit.CeilingColor = hex("#C49A63")
+function ShopKit.Ceiling(parent: Instance, frame: Frame, cx: number?, cz: number?): Part
+	local board = dBox(
+		parent,
+		"ShopCeiling",
+		V3(2 * frame.halfW, 0.4, 2 * frame.halfD),
+		CF(cx or 0, frame.ceilY - 0.3, cz or 0),
+		ShopKit.CeilingColor,
+		MAT.WoodPlanks
+	)
+	board.CastShadow = false
+	return board
 end
 
 ---------------------------------------------------------------------------

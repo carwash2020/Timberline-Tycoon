@@ -231,14 +231,15 @@ function Hearth.Build(model: Model, frame: Frame)
 	backDoor(model, frame, -frame.halfW + 0.3, 18.5, false, -1)
 
 	-- The plank ceiling (looks only), from the beams' top to the roof's underside.
-	dBox(
+	local boards = dBox(
 		model,
 		"CeilingBoards",
 		V3(2 * frame.halfW - 0.2, Hearth.RoofUnder - ceil, 2 * frame.halfD - 0.2),
 		CF(0, (ceil + Hearth.RoofUnder) / 2, 0),
-		hex("#6B4A2E"),
+		ShopKit.CeilingColor,
 		MAT.WoodPlanks
 	)
+	boards.CastShadow = false
 
 	-- Floor: warm boards, a green border, the long runner down the middle.
 	plankFloor(model, frame, hex("#C8995F"), { hex("#B3874F"), hex("#D8AB72"), hex("#A57A47") }, 2.8, rng)
