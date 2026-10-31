@@ -81,7 +81,7 @@ function PerfPolicy.CheckWorld(root: Instance): { string }
 			if not PerfPolicy.Persistent[d.Name] then
 				table.insert(lines, string.format("[PerfPolicy] %s is Persistent and not in the list", d:GetFullName()))
 			end
-		elseif d:IsA("MeshPart") and d.RenderFidelity == Enum.RenderFidelity.Precise then
+		elseif d:IsA("MeshPart") and d.RenderFidelity.Name == "Precise" then
 			table.insert(lines, string.format("[PerfPolicy] %s is Precise", d:GetFullName()))
 		end
 	end
