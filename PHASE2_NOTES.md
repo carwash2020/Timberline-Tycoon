@@ -10,6 +10,7 @@ Studio checks:
 3. Odds and Ends and the Secret Shop: the middle aisle is open and the counter is to the side.
 4. Land Office and Sparkworks look as they did. Chop a tree: the log still reaches the mill. Bushes, stumps and critters are unchanged (T414d-2).
 5. The shelf and counter meshes are still the part fallback until the upload below.
+6. Look up in each shop: a honey plank ceiling, and in the four booths a hanging sign over the counter, shelves with stock on the back wall and a red runner. The doors have a slate sill and plank frames.
 
 Mesh upload (`ShopShelf` and `ShopCounter` attribute MeshId is 0; registry rows `shopfit/ShopShelf` and `shopfit/ShopCounter` stay planned):
 1. Model the honey shelf and the timber counter with its honey nosing. Keep each MeshPart under 20k triangles.

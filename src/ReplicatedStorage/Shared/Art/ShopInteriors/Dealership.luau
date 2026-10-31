@@ -44,7 +44,8 @@ local LAYER2 = ShopKit.Layer[2]
 local LAYER3 = ShopKit.Layer[3]
 
 local BLUE = hex("#2F6DB5") -- the Dealership's accent (its sign, its paint)
-local BLUE_DEEP = hex("#285A96") -- the runner
+local BLUE_DEEP = hex("#285A96") -- the rugs
+local RUNNER = ShopKit.Table.runner -- the runners, #8A3B2E fabric
 local BRASS_STRIPE = hex("#E3B73C")
 
 local Dealership = {}
@@ -356,7 +357,7 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 	local acx = (ax0 + ax1) / 2
 	if aisleLo < aisleHi then
 		local acz = (aisleLo + aisleHi) / 2
-		dBox(model, "AisleRunner", V3(ax1 - ax0, 0.06, 5), CF(acx, fy + LAYER2, acz), BLUE_DEEP, MAT.Fabric)
+		dBox(model, "AisleRunner", V3(ax1 - ax0, 0.06, 5), CF(acx, fy + LAYER2, acz), RUNNER, MAT.Fabric)
 		for _, s in ipairs({ -1, 1 }) do
 			dBox(
 				model,
@@ -379,7 +380,7 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 		end
 	end
 	-- A runner down the lobby from the door to the counter.
-	dBox(model, "LobbyRunner", V3(5, 0.06, depth - 8), CF(lobbyCx, fy + LAYER2, midZ), BLUE_DEEP, MAT.Fabric)
+	dBox(model, "LobbyRunner", V3(5, 0.06, depth - 8), CF(lobbyCx, fy + LAYER2, midZ), RUNNER, MAT.Fabric)
 	for _, s in ipairs({ -1, 1 }) do
 		dBox(
 			model,
@@ -390,6 +391,19 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 			MAT.Fabric
 		)
 	end
+
+	-- Painted stripes along the lobby runner's edges, like the aisle's.
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(
+			model,
+			"LobbyStripe",
+			V3(0.4, 0.07, depth - 8),
+			CF(lobbyCx + s * 3.0, fy + LAYER3, midZ),
+			BRASS_STRIPE,
+			MAT.SmoothPlastic
+		)
+	end
+	ShopKit.Ceiling(model, frame)
 
 	-- Warm timber beams across the hall and rafters along it. None over the
 	-- logging rig's crane (it stands tall at the back row, x 11 to 29).

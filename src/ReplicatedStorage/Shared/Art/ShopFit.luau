@@ -8,6 +8,7 @@ local Kit = require(script.Parent.Kit)
 local Palette = require(script.Parent.Palette)
 local ShopBounds = require(script.Parent.Parent.World.ShopBounds)
 local ShopCounter = require(script.Parent.ShopCounter)
+local ShopFinish = require(script.Parent.ShopFinish)
 local ShopShelf = require(script.Parent.ShopShelf)
 
 local ShopFit = {}
@@ -158,6 +159,7 @@ function ShopFit.Dress(model: Model, kind: string)
 			ensureAisle(model, door, counter)
 		end
 	end
+	ShopFinish.Apply(model, kind)
 end
 
 return ShopFit

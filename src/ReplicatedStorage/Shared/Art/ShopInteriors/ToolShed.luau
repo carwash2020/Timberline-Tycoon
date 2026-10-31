@@ -355,6 +355,7 @@ function ToolShed.Build(model: Model, frame: Frame)
 		dBox(model, "CeilingBeam", V3(2 * (frame.halfW + WALL_IN) + 0.1, 0.9, 0.9), CF(0, ceil - 0.45, z), TIMBER)
 	end
 	ShopKit.Rafter(model, frame, 0)
+	ShopKit.Ceiling(model, frame)
 	ToolShed.SpotLamps(model, frame)
 	-- (staggered either side of the middle so, from the door, they do not stack in one line on the screen)
 	for _, at in ipairs({ { 1.8, -13.6 }, { -2.6, 2.4 }, { 3.9, 8.8 } }) do
