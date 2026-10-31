@@ -37,13 +37,14 @@ type Stash = {
 local stashes: { [Instance]: Stash } = setmetatable({}, { __mode = "k" }) :: any
 
 local function accentOf(box: Instance): Color3
-	local strip = box:FindFirstChild("Strip")
-	if strip and strip:IsA("BasePart") then
-		return strip.Color
-	end
+	-- The foot flange is the item's accent (T414e: the name label is cream now).
 	local base = box:FindFirstChild("Base")
 	if base and base:IsA("BasePart") then
 		return base.Color
+	end
+	local strip = box:FindFirstChild("Strip")
+	if strip and strip:IsA("BasePart") then
+		return strip.Color
 	end
 	return Color3.fromRGB(150, 192, 212)
 end
@@ -111,7 +112,8 @@ function BoxWindows.Apply(box: Instance, showItems: boolean): boolean
 	local accent = accentOf(box)
 	for _, name in ipairs(BoxWindows.WindowNames) do
 		local pane = box:FindFirstChild(name)
-		if pane ~= nil and pane:IsA("BasePart") then
+		-- T414e: the faces are kraft cardboard now; only a pane that is still glass takes the tint.
+		if pane ~= nil and pane:IsA("BasePart") and pane.Material == Enum.Material.Glass then
 			if stash.glass[pane] == nil then
 				stash.glass[pane] = { color = pane.Color, transparency = pane.Transparency }
 			end

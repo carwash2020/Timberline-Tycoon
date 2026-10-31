@@ -1,35 +1,40 @@
 --!strict
--- TownBoardArt: the town leaderboard board (Lane X). A walnut field in a
--- brass frame on two timber posts, its front (-Z) turned to the street, with
+-- TownBoardArt: the town leaderboard board (Lane X). A SignCream face in a
+-- TimberBrown frame with Brass corners, on two timber posts, its front (-Z) turned to the street, with
 -- one server-owned SurfaceGui on it: the title, then the top ten in two
 -- columns of five (rank medal, name, "$X earned"), or one message line when
 -- there is nothing to list. A plaque under it says how to get on the board.
---   * Ten parts: Board, four frame rails, two posts, two post caps, the
---     plaque. No light. Only the posts, the field and the plaque collide.
+--   * Fourteen parts: Board, two frame rails, two stiles, four brass corners,
+--     two posts, two post caps, the plaque. No light. Only the posts, the
+--     field and the plaque collide.
 --   * Every label is a direct child of the SurfaceGui with a scale position,
 --     so the preview renderer can place each one.
---   * The look is the GAD placeholder palette: walnut #2A1F17, brass #C9A24A,
---     cream #F3E7C9, amber #F2C14E for the top three.
+--   * T414e look (Palette names): TimberBrown frame, posts and plaque,
+--     SignCream face with SignInk lettering, Brass corners and caps. The
+--     ten rows sit on ShoreSand plates in SignInk, BarnRed for the top three.
 -- Build() makes the model around the origin (ground at y = 0, front toward
 -- -Z); the service places it. Fill() writes a TownBoardLogic.View into it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 local TownBoardLogic = require(ReplicatedStorage.Shared.TownBoardLogic)
 
 local TownBoardArt = {}
 
 TownBoardArt.Look = {
-	Walnut = Color3.fromHex("#2A1F17"), -- the field
-	Plate = Color3.fromHex("#3A2B20"), -- a row's plate
-	Brass = Color3.fromHex("#C9A24A"), -- frame, caps, the rule under the title
-	Cream = Color3.fromHex("#F3E7C9"), -- names, title
-	Dim = Color3.fromHex("#D9CBA8"), -- the cash line
-	Amber = Color3.fromHex("#F2C14E"), -- ranks 1 to 3
-	Medal = Color3.fromHex("#5A4636"), -- rank 4 and under
-	MedalTop = Color3.fromHex("#6B5324"), -- ranks 1 to 3 (a warmer brass-dark ring)
-	TimberBrown = Color3.fromHex("#7A5230"), -- posts
+	Walnut = Palette.SignCream, -- the face (the old name stays for callers)
+	Ink = Palette.SignInk, -- title and message on the cream face
+	Text = Palette.SignInk, -- rank, name and the lettering on the cream
+	Top = Palette.BarnRed, -- ranks 1 to 3: a red that reads on cream (amber does not)
+	Plate = Palette.ShoreSand, -- a row's plate, a shade under the face
+	Brass = Palette.Brass, -- corners, caps, the rule under the title
+	Cream = Palette.SignCream, -- the plaque's lettering on its timber
+	Dim = Palette.TimberBrown, -- the cash line
+	Medal = Palette.PlankHoney, -- rank 4 and under
+	MedalTop = Palette.CoinGold, -- ranks 1 to 3
+	TimberBrown = Palette.TimberBrown, -- frame, posts, plaque
 }
 local L = TownBoardArt.Look
 
@@ -108,7 +113,7 @@ local function buildFace(board: Part): SurfaceGui
 		TownBoardLogic.TitleRect(),
 		TITLE_FONT,
 		TownBoardLogic.TitleTextPx,
-		L.Cream,
+		L.Ink,
 		Enum.TextXAlignment.Center
 	)
 	title.Text = TownBoardLogic.Title
@@ -121,8 +126,8 @@ local function buildFace(board: Part): SurfaceGui
 		plate.Visible = false
 		local medal = frame(gui, "Medal" .. i, slot.medal, L.Medal, slot.medal.w // 2)
 		medal.Visible = false
-		label(gui, "Rank" .. i, slot.rank, TEXT_FONT, 52, L.Cream, Enum.TextXAlignment.Center)
-		label(gui, "Name" .. i, slot.name, TEXT_FONT, TownBoardLogic.NameTextPx, L.Cream, Enum.TextXAlignment.Left)
+		label(gui, "Rank" .. i, slot.rank, TEXT_FONT, 52, L.Text, Enum.TextXAlignment.Center)
+		label(gui, "Name" .. i, slot.name, TEXT_FONT, TownBoardLogic.NameTextPx, L.Text, Enum.TextXAlignment.Left)
 		label(gui, "Cash" .. i, slot.cash, TEXT_FONT, TownBoardLogic.CashTextPx, L.Dim, Enum.TextXAlignment.Left)
 	end
 	label(
@@ -131,7 +136,7 @@ local function buildFace(board: Part): SurfaceGui
 		TownBoardLogic.MessageRect(),
 		TEXT_FONT,
 		TownBoardLogic.MessageTextPx,
-		L.Cream,
+		L.Ink,
 		Enum.TextXAlignment.Center
 	)
 	return gui
@@ -165,8 +170,8 @@ function TownBoardArt.Fill(model: Model, view: TownBoardLogic.View)
 				rank.Text = line.rank
 				name.Text = line.name
 				cash.Text = line.cash
-				rank.TextColor3 = if line.top then L.Amber else L.Cream
-				name.TextColor3 = if line.top then L.Amber else L.Cream
+				rank.TextColor3 = if line.top then L.Top else L.Text
+				name.TextColor3 = if line.top then L.Top else L.Text
 			else
 				rank.Text = ""
 				name.Text = ""
@@ -194,10 +199,10 @@ function TownBoardArt.Build(): Model
 	local fieldY = TownBoardLogic.OuterBottom + f + size.Y / 2
 	local outerTop = fieldY + size.Y / 2 + f
 
-	local board = Kit.part(model, "Board", size, CFrame.new(0, fieldY, 0), L.Walnut, Enum.Material.WoodPlanks)
+	local board = Kit.part(model, "Board", size, CFrame.new(0, fieldY, 0), L.Walnut, Enum.Material.SmoothPlastic)
 	buildFace(board)
 	-- The back reads as a sign too (the title in brass), not a blank slab.
-	Kit.signText(board, TownBoardLogic.Title, L.Brass, { Enum.NormalId.Back }, TITLE_FONT, 0.25)
+	Kit.signText(board, TownBoardLogic.Title, L.Ink, { Enum.NormalId.Back }, TITLE_FONT, 0.25)
 
 	local outerW = size.X + f * 2
 	for _, y in ipairs({ fieldY + size.Y / 2 + f / 2, fieldY - size.Y / 2 - f / 2 }) do
@@ -206,8 +211,8 @@ function TownBoardArt.Build(): Model
 			"FrameRail",
 			Vector3.new(outerW, f, size.Z + 0.12),
 			CFrame.new(0, y, 0),
-			L.Brass,
-			Enum.Material.Metal
+			L.TimberBrown,
+			Enum.Material.Wood
 		)
 		rail.CanCollide = false
 	end
@@ -217,10 +222,24 @@ function TownBoardArt.Build(): Model
 			"FrameStile",
 			Vector3.new(f, size.Y, size.Z + 0.12),
 			CFrame.new(side * (size.X / 2 + f / 2), fieldY, 0),
-			L.Brass,
-			Enum.Material.Metal
+			L.TimberBrown,
+			Enum.Material.Wood
 		)
 		stile.CanCollide = false
+	end
+	-- Brass corner pieces, a hair bigger than the frame all round (no shared face).
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sy in ipairs({ -1, 1 }) do
+			local bracket = Kit.part(
+				model,
+				"FrameCorner",
+				Vector3.new(f + 0.16, f + 0.16, size.Z + 0.24),
+				CFrame.new(sx * (size.X / 2 + f / 2), fieldY + sy * (size.Y / 2 + f / 2), 0),
+				L.Brass,
+				Enum.Material.Metal
+			)
+			bracket.CanCollide = false
+		end
 	end
 
 	local top = outerTop + TownBoardLogic.PostOver
@@ -252,10 +271,10 @@ function TownBoardArt.Build(): Model
 		"Plaque",
 		TownBoardLogic.PlaqueSize,
 		CFrame.new(0, TownBoardLogic.PlaqueY, 0),
-		L.Walnut,
+		L.TimberBrown,
 		Enum.Material.WoodPlanks
 	)
-	Kit.signText(plaque, TownBoardLogic.SignText, L.Brass, { Enum.NormalId.Front }, TEXT_FONT, 0.25)
+	Kit.signText(plaque, TownBoardLogic.SignText, L.Cream, { Enum.NormalId.Front }, TEXT_FONT, 0.25)
 
 	TownBoardArt.Fill(model, TownBoardLogic.View(nil, false))
 	return model

@@ -415,4 +415,120 @@ return function(t)
 		t.ok(not WorldLayout.NearPlotPad(PlotData.Homes[1].x + half + 10, PlotData.Homes[1].z, 0))
 		t.ok(WorldLayout.NearPlotPad(PlotData.Homes[1].x + half + 10, PlotData.Homes[1].z, 12))
 	end)
+
+	-- T414e: a built stone curb and a dirt rim. The slide off the edge is a
+	-- Studio check (cloud tests run no physics); these are the numbers it rests on.
+	local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
+	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+
+	t.test("T414e: the edge is a StoneBase curb over a TrailDirt rim, no part of it a grey slab", function()
+		local model = t.roblox.Instance.new("Model")
+		local layout = PlotPlatform.Layout(110, { "1,0", "0,1" })
+		local _, _, ramps, curbs = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+		t.eq(#ramps, #layout.ramps)
+		t.eq(#curbs, #layout.ramps, "one curb band on every exposed edge")
+		for _, ramp in ipairs(ramps) do
+			t.eq(ramp.Color, Palette.TrailDirt, "the rim is dirt")
+			t.ok(ramp.Material ~= t.roblox.Enum.Material.Concrete, "and not concrete")
+		end
+		for _, curb in ipairs(curbs) do
+			t.eq(curb.Name, "Curb")
+			t.eq(curb.Color, Palette.StoneBase, "the curb is stone")
+			t.ok(curb.CanCollide and curb.Anchored)
+		end
+	end)
+
+	t.test("T414e: no lip on the pad edge higher than 0.25, and the rim reaches the terrain", function()
+		t.ok(PlotPlatform.MaxLip() <= 0.25, "lip " .. PlotPlatform.MaxLip())
+		local model = t.roblox.Instance.new("Model")
+		local layout = PlotPlatform.Layout(110, { "1,0", "-1,1" })
+		local _, _, ramps, curbs = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+		for i, curb in ipairs(curbs) do
+			-- The curb's highest point (its back edge) against the pad top at y = 0.
+			local high = curb.CFrame:PointToWorldSpace(Vector3.new(0, curb.Size.Y / 2, curb.Size.Z / 2)).Y
+			t.ok(high <= 0.25, "curb top is " .. high .. " over the pad top")
+			t.ok(high >= -0.1, "and flush with it, not sunk")
+			-- Where the curb ends the dirt rim carries on: the step is the curb's proud edge.
+			local low = curb.CFrame:PointToWorldSpace(Vector3.new(0, -curb.Size.Y / 2, -curb.Size.Z / 2)).Y
+			local r = layout.ramps[i]
+			local mid = (r.from + r.to) / 2
+			local rim = if r.dz ~= 0
+				then PlotPlatform.RiseAt(layout, mid, r.at + r.dz * PlotPlatform.CurbWidth)
+				else PlotPlatform.RiseAt(layout, r.at + r.dx * PlotPlatform.CurbWidth, mid)
+			t.ok(math.abs((low + HEIGHT) - rim) <= 0.25, "the curb's outer edge meets the rim within 0.25")
+		end
+		for _, wedge in ipairs(ramps) do
+			local foot = wedge.CFrame:PointToWorldSpace(Vector3.new(0, -wedge.Size.Y / 2, -wedge.Size.Z / 2)).Y
+			t.ok(math.abs(foot + HEIGHT) < 1e-4, "the rim's foot is on the terrain: no gap, no step")
+		end
+		t.ok(HEIGHT <= 1, "the whole rise is a stud: no step over 1 where a pad meets paving")
+	end)
+
+	t.test(
+		"T414e: curbs facing the same way never overlap (ones facing apart cross at a corner, as ramps do)",
+		function()
+			for _, squares in ipairs(squareSets()) do
+				local layout = PlotPlatform.Layout(110, squares)
+				local model = t.roblox.Instance.new("Model")
+				local _, _, _, curbs = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+				for i = 1, #curbs do
+					for k = i + 1, #curbs do
+						local ra, rb = layout.ramps[i], layout.ramps[k]
+						if ra.dx == rb.dx and ra.dz == rb.dz then
+							local function box(r)
+								local cw = PlotPlatform.CurbWidth
+								local lo, hi =
+									math.min(r.at, r.at + (r.dx + r.dz) * cw), math.max(r.at, r.at + (r.dx + r.dz) * cw)
+								if r.dz ~= 0 then
+									return { x0 = r.from, x1 = r.to, z0 = lo, z1 = hi }
+								end
+								return { x0 = lo, x1 = hi, z0 = r.from, z1 = r.to }
+							end
+							t.eq(overlap(box(ra), box(rb)), 0, "two curbs facing the same way do not stack")
+						end
+					end
+				end
+			end
+		end
+	)
+
+	t.test("T414e: saved plots load unchanged: the layout, the slab rects and the origin are as they were", function()
+		local layout = PlotPlatform.Layout(110, { "1,0" })
+		t.eq(#layout.land, 1)
+		t.eq(#layout.ramps, 8, "four sides, plus the notch a bought square makes")
+		t.eq(layout.tier, { x0 = -55, x1 = 55, z0 = -55, z1 = 55 })
+		t.eq(HEIGHT, 1)
+		t.eq(RAMP, 6)
+		local origin = PlotPlatform.Origin(1)
+		local home = PlotData.Homes[1]
+		t.ok(math.abs(origin.Position.Y - (TerrainGen.HeightAt(home.x, home.z) + HEIGHT)) < 1e-3, "flush to HeightAt")
+		-- A build on the pad still lands on its top: plot-local y = 0.
+		t.eq(PlotPlatform.RiseAt(layout, 0, 0), HEIGHT)
+	end)
+
+	-- The curb and rim sit inside the old ramp footprint (the same 6 studs), so this change moves no
+	-- footprint onto a road. At the largest size (the 200 shelf) a few homes already come within a
+	-- road's width of one on main (Orchard, Pine, Climb, North); that is reported in the PR, not
+	-- changed here (PlotData and the roads are not this job's). Every home at every tier a player
+	-- can buy first (the Campsite and the Homestead) is clear.
+	t.test("T414e: no pad at its first two tiers, with its curb and rim, reaches a road", function()
+		local reach = PlotData.Tiers[2].size / 2 + RAMP
+		for _, home in ipairs(PlotData.Homes) do
+			for _, road in ipairs(WorldLayout.Roads) do
+				if road.name ~= "PlotSpur" then
+					local pts = road.points
+					for i = 1, #pts - 1 do
+						local a, b = pts[i], pts[i + 1]
+						local steps = math.max(1, math.ceil((b - a).Magnitude / 4))
+						for s = 0, steps do
+							local p = a:Lerp(b, s / steps)
+							local dx = math.max(math.abs(p.X - home.x) - reach, 0)
+							local dz = math.max(math.abs(p.Y - home.z) - reach, 0)
+							t.ok(math.sqrt(dx * dx + dz * dz) >= road.width / 2, home.id .. " reaches " .. road.name)
+						end
+					end
+				end
+			end
+		end
+	end)
 end

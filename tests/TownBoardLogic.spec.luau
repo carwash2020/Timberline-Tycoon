@@ -102,7 +102,7 @@ return function(t)
 		t.eq(TownBoardLogic.CanvasSize.X, size.X * TownBoardLogic.PxPerStud)
 		t.eq(TownBoardLogic.CanvasSize.Y, size.Y * TownBoardLogic.PxPerStud)
 		t.eq(TownBoardLogic.MaxDistance, 120)
-		t.ok(TownBoardLogic.PartCap <= 12)
+		t.ok(TownBoardLogic.PartCap <= 14)
 	end)
 
 	t.test(

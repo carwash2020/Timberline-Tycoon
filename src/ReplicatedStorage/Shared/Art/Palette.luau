@@ -47,6 +47,7 @@ local HEX: { [string]: string } = {
 	SparkTeal = "#3FC9C0",
 	FrostTrim = "#E8F2FF",
 	LumenCream = "#F2E6C8",
+	KraftTan = "#B8925F",
 }
 
 function Palette.Hex(name: string): string
@@ -109,5 +110,6 @@ Palette.StarfallGlow = Kit.hex(HEX.StarfallGlow)
 Palette.SparkTeal = Kit.hex(HEX.SparkTeal)
 Palette.FrostTrim = Kit.hex(HEX.FrostTrim)
 Palette.LumenCream = Kit.hex(HEX.LumenCream)
+Palette.KraftTan = Kit.hex(HEX.KraftTan)
 
 return Palette

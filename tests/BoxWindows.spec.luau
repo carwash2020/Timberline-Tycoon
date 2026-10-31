@@ -101,85 +101,90 @@ return function(t)
 		return n, contents
 	end
 
-	t.test("LOWER takes the item out of every window and tints the glass; HIGHER keeps the box as built", function()
-		for _, rec in ipairs(makeBoxes()) do
-			local model = rec.model
-			local label = rec.slotId
-			local total, items = count(model)
-			t.ok(items >= 1, label .. " is built with an item in its window")
-			t.ok(model:FindFirstChild("Contents") ~= nil)
-			local windows = {}
-			for _, name in ipairs(BoxWindows.WindowNames) do
-				local pane = model:FindFirstChild(name)
-				if pane then
-					windows[name] = { color = pane.Color, transparency = pane.Transparency }
+	t.test(
+		"LOWER takes the item out of the box and leaves the kraft cardboard alone; HIGHER keeps the box as built",
+		function()
+			for _, rec in ipairs(makeBoxes()) do
+				local model = rec.model
+				local label = rec.slotId
+				local total, items = count(model)
+				t.ok(items >= 1, label .. " is built with an item in its window")
+				t.ok(model:FindFirstChild("Contents") ~= nil)
+				local windows = {}
+				for _, name in ipairs(BoxWindows.WindowNames) do
+					local pane = model:FindFirstChild(name)
+					if pane then
+						windows[name] = { color = pane.Color, transparency = pane.Transparency }
+					end
 				end
-			end
-			t.ok(windows.Window ~= nil and windows.WindowTop ~= nil)
+				t.ok(windows.Window ~= nil and windows.WindowTop ~= nil)
 
-			-- HIGHER: nothing at all changes.
-			local as_built = snapshot(model)
-			t.eq(BoxWindows.Apply(model, true), false, label .. ": Higher on a fresh box changes nothing")
-			t.eq(snapshot(model), as_built)
-			t.eq((count(model)), total)
-			t.ok(BoxWindows.ShowsItem(model))
-			t.eq(BoxWindows.IsTinted(model), false)
+				-- HIGHER: nothing at all changes.
+				local as_built = snapshot(model)
+				t.eq(BoxWindows.Apply(model, true), false, label .. ": Higher on a fresh box changes nothing")
+				t.eq(snapshot(model), as_built)
+				t.eq((count(model)), total)
+				t.ok(BoxWindows.ShowsItem(model))
+				t.eq(BoxWindows.IsTinted(model), false)
 
-			-- LOWER: the item is gone, the glass is the accent colour, nothing else moved.
-			t.eq(BoxWindows.Apply(model, false), true)
-			t.eq(model:FindFirstChild("Contents"), nil, label .. ": no item copy in the window")
-			t.eq(BoxWindows.ShowsItem(model), false)
-			t.eq(BoxWindows.IsTinted(model), true)
-			local lowTotal, lowItems = count(model)
-			t.eq(lowItems, 0)
-			t.eq(lowTotal, total - items, label .. ": exactly the item's parts are gone")
-			t.ok(lowTotal <= BoxLogic.ShellPartCap, label .. " is just the shell now: " .. lowTotal)
-			local accent = model:FindFirstChild("Strip").Color
-			for name, was in pairs(windows) do
-				local pane = model:FindFirstChild(name)
-				t.eq(pane.Color, accent, label .. " " .. name .. " is tinted in the item's accent colour")
-				t.ok(math.abs(pane.Transparency - BoxWindows.TintTransparency) < 1e-3)
-				t.ok(pane.Transparency < 1 and pane.Transparency > 0, "still glass, not a hole")
-				t.ok(pane.Color ~= was.color, "and it did change")
-				t.eq(pane.Size, snapshot(model).parts[name].size)
-			end
-			-- Hover marks, attributes, tags, sizes and collisions are identical.
-			t.eq(snapshot(model), as_built, label .. ": everything else is as the server built it")
-			t.eq(HoverTag.SpecOf(model), as_built.hover, label .. ": the same hover tag")
-			t.ok(model:HasTag("ShopBox"))
-			t.eq(model:GetAttribute("ForSale"), true)
-			t.eq(model:GetAttribute("HoverKind"), rec.itemKind)
-			t.eq(model:GetAttribute("HoverId"), rec.itemId)
-			t.ok(model:GetAttribute("BoxUid") ~= nil)
-			t.eq(rec.part.CanCollide, true, "the box still collides, is aimed at and carried")
-			t.eq(rec.part.CanQuery, true)
-			t.eq(model:FindFirstChild("Window").CanQuery, true, "the glass is still aimed through")
+				-- LOWER: the item is gone, the glass is the accent colour, nothing else moved.
+				t.eq(BoxWindows.Apply(model, false), true)
+				t.eq(model:FindFirstChild("Contents"), nil, label .. ": no item copy in the window")
+				t.eq(BoxWindows.ShowsItem(model), false)
+				t.eq(
+					BoxWindows.IsTinted(model),
+					false,
+					label .. ": cardboard is never tinted (T414e: nothing is glass)"
+				)
+				local lowTotal, lowItems = count(model)
+				t.eq(lowItems, 0)
+				t.eq(lowTotal, total - items, label .. ": exactly the item's parts are gone")
+				t.ok(lowTotal <= BoxLogic.ShellPartCap, label .. " is just the shell now: " .. lowTotal)
+				for name, was in pairs(windows) do
+					local pane = model:FindFirstChild(name)
+					t.eq(pane.Color, was.color, label .. " " .. name .. " stays kraft")
+					t.eq(pane.Transparency, 0, "and stays solid, not a hole")
+					t.eq(pane.Material, t.roblox.Enum.Material.Cardboard)
+					t.eq(pane.Size, snapshot(model).parts[name].size)
+				end
+				-- Hover marks, attributes, tags, sizes and collisions are identical.
+				t.eq(snapshot(model), as_built, label .. ": everything else is as the server built it")
+				t.eq(HoverTag.SpecOf(model), as_built.hover, label .. ": the same hover tag")
+				t.ok(model:HasTag("ShopBox"))
+				t.eq(model:GetAttribute("ForSale"), true)
+				t.eq(model:GetAttribute("HoverKind"), rec.itemKind)
+				t.eq(model:GetAttribute("HoverId"), rec.itemId)
+				t.ok(model:GetAttribute("BoxUid") ~= nil)
+				t.eq(rec.part.CanCollide, true, "the box still collides, is aimed at and carried")
+				t.eq(rec.part.CanQuery, true)
+				t.eq(model:FindFirstChild("Window").CanQuery, true, "the face is still aimed at")
 
-			-- Again is a no-op.
-			t.eq(BoxWindows.Apply(model, false), false)
-			t.eq((count(model)), lowTotal)
+				-- Again is a no-op.
+				t.eq(BoxWindows.Apply(model, false), false)
+				t.eq((count(model)), lowTotal)
 
-			-- Back to HIGHER: the same item, the same glass.
-			t.eq(BoxWindows.Apply(model, true), true)
-			t.ok(model:FindFirstChild("Contents") ~= nil, label .. ": the item is back")
-			t.eq((count(model)), total)
-			t.eq(BoxWindows.IsTinted(model), false)
-			for name, was in pairs(windows) do
-				local pane = model:FindFirstChild(name)
-				t.eq(pane.Color, was.color, name .. " is clear glass again")
-				t.ok(math.abs(pane.Transparency - was.transparency) < 1e-3)
-			end
-			t.eq(snapshot(model), as_built, label .. ": exactly as it was built")
-			-- The item itself is still decor: weightless, no collision, never aimed at.
-			for _, p in ipairs(model:FindFirstChild("Contents"):GetDescendants()) do
-				if p:IsA("BasePart") then
-					t.eq(p.CanCollide, false)
-					t.eq(p.CanQuery, false)
-					t.eq(p.Massless, true)
+				-- Back to HIGHER: the same item, the same glass.
+				t.eq(BoxWindows.Apply(model, true), true)
+				t.ok(model:FindFirstChild("Contents") ~= nil, label .. ": the item is back")
+				t.eq((count(model)), total)
+				t.eq(BoxWindows.IsTinted(model), false)
+				for name, was in pairs(windows) do
+					local pane = model:FindFirstChild(name)
+					t.eq(pane.Color, was.color, name .. " is clear glass again")
+					t.ok(math.abs(pane.Transparency - was.transparency) < 1e-3)
+				end
+				t.eq(snapshot(model), as_built, label .. ": exactly as it was built")
+				-- The item itself is still decor: weightless, no collision, never aimed at.
+				for _, p in ipairs(model:FindFirstChild("Contents"):GetDescendants()) do
+					if p:IsA("BasePart") then
+						t.eq(p.CanCollide, false)
+						t.eq(p.CanQuery, false)
+						t.eq(p.Massless, true)
+					end
 				end
 			end
 		end
-	end)
+	)
 
 	t.test("the budgets pick it: low strips, medium and high keep, by QualityBudgets.BoxContents", function()
 		local model = makeBoxes()[1].model
