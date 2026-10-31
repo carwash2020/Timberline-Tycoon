@@ -523,10 +523,10 @@ return function(t)
 				at and at:IsA("BasePart"),
 				marker.name .. ": TimberlineMap." .. table.concat(marker.path, ".") .. " is a part"
 			)
-			-- Its model: the SellArea is Persistent (the client's carry loop waits on it); a shop is interactive,
+			-- Its model: the SellArea and the StoreBoard are Persistent (the carry loop and the prompt wait on them); a shop is interactive,
 			-- so it streams in whole (T415: Atomic, never Persistent).
 			local model = s.map:FindFirstChild(marker.path[1])
-			local want = if marker.path[1] == "SellArea"
+			local want = if marker.path[1] == "SellArea" or marker.path[1] == "StoreBoard"
 				then roblox.Enum.ModelStreamingMode.Persistent
 				else roblox.Enum.ModelStreamingMode.Atomic
 			t.eq(model.ModelStreamingMode, want, marker.path[1] .. " streams as " .. want.Name)
