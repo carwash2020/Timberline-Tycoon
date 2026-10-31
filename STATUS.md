@@ -2,6 +2,10 @@
 
 Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `1a9e158` (T413 fixes, #279).** This branch is T414a town ground (`cursor/t414a-town-ground-1e4c`), rebased onto that main. Outside town the graded TrailDirt shoulder stays. Inside town the streets are paint.
 
+## T414b Dealership fleet look (31 October 2026, branch `cursor/t414b-dealership-fleet`)
+
+The style-guide 12 colours are on the part-built vehicle parts and the kept hull parts of a meshed one (mesh colours stay baked in the GLBs). Glass is one #9CCBE0 at 0.4. The lot's bays are at least vehicle width + 4 wide. The Rustbucket part budget is 58. No prices, stats, MeshIds or services changed. Details and Studio checks: PHASE2_NOTES.md "T414b Dealership fleet look". Shots: `preview/t414b/`. Nothing here has been seen in Studio.
+
 ## T414a town ground (30 October 2026, branch `cursor/t414a-town-ground-1e4c`)
 
 Town roads, lanes, the lot and the footpaths are terrain paint (`TownGround.MaterialAt`, drawn by `TerrainGen.SurfaceMaterial`). The flat strips are gone. Kerbs are a 0.6-stud StoneBase slate bar, `CanCollide` false, `TownGroundArt.KerbMeshId` 0 until Connor uploads a mesh. Town lanes and the lot are cobble `#9C958A`. East Link, South Link and the yards are asphalt-gravel `#A8A49C`. Footpaths are TrailDirt, 8 wide, and the edge feathers into grass. The graded bed stays 28 (`WorldLayout.PlanWidth`): widening it moves trees and puts rocks in cabins, so paint does not pass that bed. Drive widths stay 32 and 24. The T413 shoulder (14 to 18 on a main) still paints Ground outside town; a town piece wins only where `TownGround.MaterialAt` returns a material. Shop pins, the mill, the Weigh House, bridges and docks did not move. Shots: `preview/t414a/`. Studio checks: PHASE2_NOTES.md "T414a town ground". Nothing here has been seen in Studio. Cloud has no physics.

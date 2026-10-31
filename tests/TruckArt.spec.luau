@@ -299,7 +299,8 @@ return function(t)
 			-- one invisible BedZone per bed (M1.6), raised on purpose.
 			-- Per-tier caps. A trailer is counted on its own, at most 37.
 			local BUDGET = {
-				Rustbucket = 55,
+				-- Rustbucket 58: T414b's primer patch and two dirt skins on the lower panels (no part budget in the brief).
+				Rustbucket = 58,
 				-- Pickup 90: the dished wheel (rim, dish, cap, four lug nuts) is 5 to 6 parts more a wheel.
 				Pickup = 90,
 				ScoutATV = 40,
@@ -982,7 +983,10 @@ return function(t)
 		t.eq(outs, 1, "one Rustbucket headlight is out")
 		local pane = named(rust, "Windshield")[1]
 		t.eq(pane.Material.Name, "Glass")
-		t.ok(math.abs(pane.Transparency - 0.6) < 1e-6, "cracked windshield is glass at 0.6")
+		t.ok(
+			math.abs(pane.Transparency - 0.4) < 1e-6,
+			"cracked windshield is glass at 0.4 (T414b: one glass for every vehicle)"
+		)
 		local grey = 0
 		for _, p in ipairs(named(rust, "Door")) do
 			local c = p.Color
@@ -1016,5 +1020,151 @@ return function(t)
 		same(rig.Hitch, 79514319620242, Vector3.new(0.7, 1.06, 1.68), Vector3.new(0, 2.005, 23.275))
 		same(rig.Wheel, 88377082453341, Vector3.new(1.546, 4.56, 4.55), nil)
 		t.eq(rig.Wheel.mirrorLeft, true)
+	end)
+
+	-- T414b: the style-guide 12 colour table, for the part-built parts (a mesh's colours are baked in its GLB and
+	-- code never recolours it, so a vehicle whose meshes loaded shows these only on the parts it keeps).
+	local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
+	local function hexOf(h)
+		return t.roblox.Color3.fromHex(h)
+	end
+	local function dist(a, b)
+		return math.max(math.abs(a.R - b.R), math.abs(a.G - b.G), math.abs(a.B - b.B))
+	end
+	local function allNear(model, name, color, tol, label)
+		local list = named(model, name)
+		t.ok(#list > 0, label .. " has " .. name)
+		for _, p in ipairs(list) do
+			t.ok(dist(p.Color, color) <= tol, label .. " " .. name .. " is the table colour")
+		end
+	end
+	local WOOD_TOL = 0.1 -- Kit.vary keeps boards hand painted
+	local function truck(id, trailerId)
+		local def = ItemCatalog.GetTruck(id)
+		local trailer = if trailerId then ItemCatalog.GetTrailer(trailerId) else nil
+		return build({ def = def, trailer = trailer })
+	end
+
+	t.test("colour table: Rustbucket (body, primer door, cream, bare metal, wood, wear)", function()
+		local m = truck("Rustbucket")
+		local L = "Rustbucket"
+		allNear(m, "BedFloor", Palette.PlankHoney, WOOD_TOL, L)
+		allNear(m, "BedBoard", Palette.PlankHoney, WOOD_TOL, L)
+		allNear(m, "Tailgate", Palette.PlankHoney, WOOD_TOL, L)
+		allNear(m, "RunningBoard", Palette.TimberBrown, WOOD_TOL, L)
+		allNear(m, "BumperBlock", Palette.TimberBrown, WOOD_TOL, L)
+		allNear(m, "Bumper", hexOf("#6E5D50"), 0.01, L)
+		allNear(m, "Grille", hexOf("#D8C6A0"), 0.01, L)
+		allNear(m, "Hood", hexOf("#964830"), 0.01, L)
+		local primer = 0
+		for _, p in ipairs(named(m, "Door")) do
+			if dist(p.Color, hexOf("#9A9A94")) <= 0.01 then
+				primer += 1
+			end
+		end
+		t.eq(primer, 1, "one primer #9A9A94 door")
+		allNear(m, "PrimerPatch", hexOf("#9A9A94"), 0.01, L)
+		t.ok(#named(m, "LowerDirt") >= 2, "dirt on the lower panels")
+	end)
+
+	t.test("colour table: Pickup chrome #D3D8DC; Timber Classic chrome, trim, rims and rails", function()
+		local m = truck("Pickup")
+		allNear(m, "Bumper", hexOf("#D3D8DC"), 0.01, "Pickup")
+		allNear(m, "Grille", hexOf("#D3D8DC"), 0.01, "Pickup")
+		allNear(m, "Hood", hexOf("#2F6DB5"), 0.01, "Pickup")
+		local c = truck("TimberClassic")
+		allNear(c, "Bumper", hexOf("#EEF0F2"), 0.01, "Classic")
+		allNear(c, "Grille", hexOf("#EEF0F2"), 0.01, "Classic")
+		allNear(c, "Trim", hexOf("#5A3B26"), 0.01, "Classic")
+		allNear(c, "BedRail", Palette.PlankHoney, WOOD_TOL, "Classic")
+		allNear(c, "BedPost", Palette.PlankHoney, WOOD_TOL, "Classic")
+		for _, w in ipairs(named(c, "Wheel")) do
+			t.ok(dist(w:FindFirstChild("Rim").Color, hexOf("#5A3B26")) <= 0.15, "Classic rims are trim brown")
+		end
+	end)
+
+	t.test("colour table: ScoutATV, Flatbed and Logging Rig", function()
+		local atv = truck("ScoutATV")
+		allNear(atv, "Nose", hexOf("#5E8C31"), 0.01, "ScoutATV")
+		allNear(atv, "Frame", hexOf("#33302D"), 0.01, "ScoutATV")
+		allNear(atv, "Basket", Palette.TimberBrown, 0.01, "ScoutATV")
+		local fb = truck("Flatbed")
+		allNear(fb, "BedFloor", Palette.PlankHoney, WOOD_TOL, "Flatbed")
+		allNear(fb, "Stake", Palette.TimberBrown, WOOD_TOL, "Flatbed")
+		allNear(fb, "StakeRail", Palette.PlankHoney, WOOD_TOL, "Flatbed")
+		allNear(fb, "AccentStripe", hexOf("#B0241C"), 0.01, "Flatbed")
+		local grey = 0
+		for _, p in ipairs(named(fb, "Fender")) do
+			if dist(p.Color, hexOf("#8E949A")) <= 0.01 then
+				grey += 1
+			end
+		end
+		t.ok(grey >= 2, "Flatbed tandem fenders are #8E949A")
+		local rig = truck("LoggingRig")
+		allNear(rig, "Hood", hexOf("#B23A26"), 0.01, "LoggingRig")
+		allNear(rig, "HeadacheRack", Palette.Brass, 0.01, "LoggingRig")
+		allNear(rig, "BedFloor", Palette.TimberBrown, WOOD_TOL, "LoggingRig")
+		t.eq(#named(rig, "StanchionCap"), #named(rig, "Stanchion"), "a brass cap on every stanchion")
+		allNear(rig, "StanchionCap", Palette.Brass, 0.01, "LoggingRig")
+	end)
+
+	t.test("colour table: the three trailers", function()
+		local pony = truck("Pickup", "PonyTrailer")
+		allNear(pony, "TrailerBed", Palette.PlankHoney, WOOD_TOL, "Pony")
+		for _, p in ipairs(named(pony, "TrailerBoard")) do
+			t.ok(dist(p.Color, hexOf("#7A5A3A")) <= WOOD_TOL, "Pony boards are #7A5A3A")
+		end
+		local ranch = truck("Pickup", "RanchTrailer")
+		allNear(ranch, "TrailerStake", hexOf("#6E7F46"), 0.01, "Ranch")
+		allNear(ranch, "TrailerRail", Palette.PlankHoney, WOOD_TOL, "Ranch")
+		t.eq(#named(ranch, "TrailerBoard"), 0, "Ranch is open stake-sided: no side boards")
+		local axles = {}
+		for _, w in ipairs(named(ranch, "Wheel")) do
+			if w:GetAttribute("TrailerBody") == true then
+				axles[string.format("%.2f", w.CFrame.Position.Z)] = true
+			end
+		end
+		local n = 0
+		for _ in pairs(axles) do
+			n += 1
+		end
+		t.eq(n, 2, "Ranch Trailer rides on 2 axles")
+		local heavy = truck("Pickup", "HeavyHauler")
+		allNear(heavy, "TrailerStanchion", hexOf("#242321"), 0.01, "Heavy Hauler bunks")
+		allNear(heavy, "TrailerFront", hexOf("#4A4F57"), 0.01, "Heavy Hauler")
+		for _, tr in ipairs({ pony, ranch, heavy }) do
+			for _, p in ipairs(named(tr, "Fender")) do
+				if p:GetAttribute("TrailerBody") == true then
+					t.ok(dist(p.Color, hexOf("#8E949A")) <= 0.01, "trailer fenders #8E949A")
+				end
+			end
+		end
+	end)
+
+	t.test("colour table: shared tyres, bolts, lamps, glass and coupler on every rig", function()
+		for _, rig in ipairs(rigs()) do
+			local model = build(rig)
+			local label = rig.label
+			for _, w in ipairs(named(model, "Wheel")) do
+				t.ok(dist(w.Color, hexOf("#2A2624")) <= 0.01, label .. " tyre #2A2624")
+				local bolt = w:FindFirstChild("HubBolt")
+				if bolt then
+					t.ok(dist(bolt.Color, hexOf("#9AA1A8")) <= 0.01, label .. " bolt #9AA1A8")
+				end
+			end
+			for _, p in ipairs(parts(model)) do
+				if p.Material.Name == "Glass" then
+					t.ok(dist(p.Color, hexOf("#9CCBE0")) <= 0.01, label .. " glass #9CCBE0")
+					t.ok(math.abs(p.Transparency - 0.4) < 1e-6, label .. " glass transparency 0.4")
+					t.eq(p.CanCollide, false, label .. " glass does not collide")
+				end
+				if p.Name == "Coupler" then
+					t.ok(dist(p.Color, hexOf("#B0241C")) <= 0.01, label .. " coupler red")
+				end
+				if p.Name == "Marker" or p.Name == "Beacon" then
+					t.ok(dist(p.Color, hexOf("#FFB23F")) <= 0.01, label .. " amber marker")
+				end
+			end
+		end
 	end)
 end
