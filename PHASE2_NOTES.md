@@ -4610,3 +4610,14 @@ Plan: `docs/T414D2_PLAN.md`. Specs: `Scatter.spec` (keep-outs re-derived from th
 4. Phone or low quality: fewer and nearer cover (radius 100) and at most 12 critters; high shows cover out to 160 with the far ring fading.
 5. In the Bayou reeds stand in the mud; on Red Mesa dry scrub and sand-coloured stone; in Frost the shrubs wear snow.
 
+## T415 performance pass (31 October 2026, branch `t415-performance-pass`, issue #286)
+
+Plan: `docs/T415_PLAN.md`. Pure rules in `Shared/PerfPolicy` (preload cap 96, the Persistent list, the shadow size rule, the duplicate-MeshId check, `CheckWorld`) and `Shared/FirstView`. Specs: `Streaming`, `PerfAssets`, `Preload`, `Shadows`, `NoFallbackVisible`, `FerryStream`. No look changed: only streaming, fidelity and shadow flags, a preload and a ferry stream request.
+
+**Studio checks for Connor**
+1. MicroProfiler (Ctrl+F6) and Developer Console (F9, memory): join on a phone emulator; note join to playable, memory, and any frame over 100 ms when you enter a biome.
+2. Fly or drive to the map edge and the Skyroot: the horizon (Backdrop) is still there; the Skyroot, isles and lighthouse now stream like decor (they were Persistent).
+3. Ride the ferry both ways: no empty water or missing dock when you land.
+4. Debug Stats (Shift+F1 to F5): triangles and instances in town; model LevelOfDetail (SLIM) is not set by script, set it in Studio if wanted.
+5. Real phone or Xbox join: the card holds a few seconds for the first view, then the town has its real meshes.
+
