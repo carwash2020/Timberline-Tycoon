@@ -756,4 +756,46 @@ function CritterArt.SkyMoth(seed: number): Model
 	return model
 end
 
+---------------------------------------------------------------------------
+-- Road critters (T414d-2): a deer, a rabbit or a bird beside the road. The
+-- client's RoadCritters module clones one template of each (they live in
+-- ReplicatedStorage, built on the client) and moves them in one Heartbeat
+-- loop. They never collide, are never queried or touched, and exist on
+-- clients only.
+---------------------------------------------------------------------------
+
+-- Most road critters alive at once, by quality tier (a phone gets 12, high 40).
+CritterArt.RoadCap = table.freeze({ low = 12, medium = 24, high = 40 } :: { [string]: number })
+
+function CritterArt.RoadCapFor(tier: string): number
+	return CritterArt.RoadCap[tier] or CritterArt.RoadCap.high
+end
+
+CritterArt.RoadKinds = table.freeze({ "Deer", "Rabbit", "Bird" })
+
+-- The template for a road critter kind: standing on y = 0, every part looks only.
+function CritterArt.RoadTemplate(kind: string, seed: number): Model
+	local model: Model
+	if kind == "Deer" then
+		model = CritterArt.Deer(seed)
+	elseif kind == "Rabbit" then
+		model = CritterArt.Rabbit(seed, false, CritterArt.RabbitScale)
+	else
+		model = CritterArt.Bird(seed, nil, false)
+	end
+	Kit.decorAll(model)
+	model:SetAttribute("Critter", kind)
+	return model
+end
+
+-- Whether every part of `model` is looks only (no collide, query or touch).
+function CritterArt.IsSilent(model: Model): boolean
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and (d.CanCollide or d.CanQuery or d.CanTouch) then
+			return false
+		end
+	end
+	return true
+end
+
 return CritterArt

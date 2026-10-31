@@ -37,6 +37,7 @@ local DealershipLot = require(script.Parent.DealershipLot)
 local ModelSlots = require(script.Parent.ModelSlots)
 local ShopFacade = require(script.Parent.ShopFacade)
 local PropArt = require(script.Parent.PropArt)
+local Greenery = require(script.Parent.Greenery)
 local ShopDoor = require(script.Parent.ShopDoor)
 local ShopFit = require(script.Parent.ShopFit)
 local ShopInterior = require(script.Parent.ShopInterior)
@@ -3569,16 +3570,7 @@ end
 -- three "Rock" stones (COL-01), which collide and can be clicked. An
 -- unknown kind builds a bush. On the ground at the origin.
 function BuildingArt.Greenery(kind: string, size: number, seed: number, woodId: string?): Model
-	if kind == "tree" then
-		return BuildingArt.TownTree(woodId or "birch", seed, size)
-	elseif kind == "flowers" then
-		return flowerBed(size, seed)
-	elseif kind == "rock" then
-		local rock = PropArt.Rock(size, seed, STONE)
-		Kit.decorAll(rock, { Rock = true })
-		return rock
-	end
-	return PropArt.Bush(size, seed, LEAF)
+	return Greenery.Build(kind, size, seed, woodId, BuildingArt.TownTree, flowerBed)
 end
 
 -- The Sky Bin item's art (MachineArt.BuildSkyBin wraps it for the plot),
