@@ -73,14 +73,7 @@ function NodeArt.Build(seed: number, ore: string?): Model
 	}
 	for i, b in ipairs(bodies) do
 		local turn = CFrame.Angles(0, rng:range(0, math.pi), 0)
-		local p = Kit.ellipsoid(
-			model,
-			"Rock",
-			b.r * 2,
-			CFrame.new(b.c) * turn,
-			b.color,
-			Enum.Material.Slate
-		)
+		local p = Kit.ellipsoid(model, "Rock", b.r * 2, CFrame.new(b.c) * turn, b.color, Enum.Material.Slate)
 		Kit.decor(p)
 		if i == 1 then
 			-- an angular shoulder, so the outline is not all round
