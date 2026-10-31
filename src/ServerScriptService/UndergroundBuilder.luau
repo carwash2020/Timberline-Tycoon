@@ -6,13 +6,13 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local Palette = require(ReplicatedStorage.Shared.Art.Palette)
 local NatureArt = require(ReplicatedStorage.Shared.Art.NatureArt)
 local UndergroundData = require(ReplicatedStorage.Shared.World.UndergroundData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 
 local UndergroundBuilder = {}
 
-local ROCK = Color3.fromRGB(90, 84, 76)
 local INK = Color3.fromRGB(42, 36, 32)
 
 local function rubbleModel(parent: Instance, rubble: UndergroundData.Rubble): Model
@@ -21,17 +21,14 @@ local function rubbleModel(parent: Instance, rubble: UndergroundData.Rubble): Mo
 	model:SetAttribute("RubbleId", rubble.id)
 	model:SetAttribute("Tier", rubble.tier)
 	local cf = CFrame.new(rubble.x, rubble.y + rubble.sy / 2, rubble.z) * CFrame.Angles(0, math.rad(rubble.yaw), 0)
-	-- Eight blocks, under the 12-part cap. Anchored, so it stays until Lane M clears it.
+	-- Eight boulders (the old cubes' centres, so the heap still plugs the passage), under the
+	-- 12-part cap, in CliffRock and QuarrySlate. Anchored, so it stays until Lane M clears it.
 	local seeds = { 0, 1.2, -1.1, 0.6, -0.5, 1.4, -1.3, 0.3 }
 	for i, ox in ipairs(seeds) do
-		local part = Kit.part(
-			model,
-			"Stone",
-			Vector3.new(4, 4, 4),
-			cf * CFrame.new((i - 4.5) * 1.6, (i % 3) * 1.2 - 1, ox),
-			ROCK,
-			Enum.Material.Slate
-		)
+		local size = Vector3.new(4.4, 3.8 + (i % 3) * 0.3, 4.4)
+		local at = cf * CFrame.new((i - 4.5) * 1.6, (i % 3) * 1.2 - 1, ox) * CFrame.Angles(0, i * 1.7, 0)
+		local color = if i % 2 == 0 then Palette.QuarrySlate else Palette.CliffRock
+		local part = Kit.ellipsoid(model, "Stone", size, at, color, Enum.Material.Slate)
 		part.Anchored = true
 	end
 	model.Parent = parent

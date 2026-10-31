@@ -13,7 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
-local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
+local NodeArt = require(ReplicatedStorage.Shared.Art.NodeArt)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local ProfileService = require(script.Parent.ProfileService)
@@ -25,7 +25,7 @@ local NODE_TAG = "Node"
 type NodeRecord = {
 	model: Model,
 	part: BasePart,
-	look: Model, -- the crystals you see (PropArt), out of the world while mined
+	look: Model, -- the rock and ore veins you see (NodeArt), out of the world while mined
 	materialId: string,
 	hp: number,
 	alive: boolean,
@@ -47,7 +47,7 @@ local function setVisible(rec: NodeRecord, visible: boolean)
 	rec.look.Parent = if visible then rec.model else nil
 end
 
--- A crystal cluster standing on the ground at `position`, parented to `parent`.
+-- A rock outcrop with ore veins standing on the ground at `position`, parented to `parent`.
 function NodeService.Spawn(materialId: string, position: Vector3, parent: Instance): Model
 	local material = ItemCatalog.Materials[materialId]
 	assert(material, "[NodeService] Unknown material " .. materialId)
@@ -55,24 +55,20 @@ function NodeService.Spawn(materialId: string, position: Vector3, parent: Instan
 	local model = Instance.new("Model")
 	model.Name = "Node_" .. materialId
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	-- An invisible hit box you aim at and bump into; the look is PropArt's.
-	local color = Color3.fromHex(material.node.color)
+	-- An invisible hit box you aim at and bump into; the look is NodeArt's. It wraps the
+	-- whole rock and its centre stays 2.25 up, where the range check has always measured.
 	local part = Instance.new("Part")
 	part.Name = "Crystal"
-	part.Size = Vector3.new(3, 4.5, 3)
-	part.CFrame = CFrame.new(position + Vector3.new(0, 2.25, 0))
+	part.Size = Vector3.new(NodeArt.Footprint.X, NodeArt.Height, NodeArt.Footprint.Z)
+	part.CFrame = CFrame.new(position + Vector3.new(0, NodeArt.Height / 2, 0))
 	part.Transparency = 1
 	part.Anchored = true
+	Kit.blocker(part, "the node's hit box: you aim at it and bump into it while it stands")
 	part.Parent = model
 	local seed = Kit.seedAt(position.X, position.Z)
-	local look = PropArt.Crystal(seed, color, 4)
+	local look = NodeArt.Build(seed)
 	look.Name = "Look"
-	Kit.placeAt(look, CFrame.new(position) * CFrame.Angles(0, Kit.rng(seed):range(0, math.pi * 2), 0))
-	local glow = Instance.new("PointLight")
-	glow.Color = color
-	glow.Range = 12
-	glow.Brightness = 1.2
-	glow.Parent = look.PrimaryPart or look:FindFirstChildWhichIsA("BasePart", true)
+	Kit.placeAt(look, CFrame.new(position))
 	look.Parent = model
 	model.PrimaryPart = part
 	model:SetAttribute("Material", materialId)
@@ -97,7 +93,7 @@ function NodeService.Hit(player: Player, uid: string): string?
 	if not rec or not rec.alive or not hrp or not profile then
 		return nil
 	end
-	if not ((hrp.Position - rec.part.Position).Magnitude <= GameConfig.ChopRange + GameConfig.RangeTolerance) then
+	if not ((hrp.Position - rec.part.CFrame.Position).Magnitude <= GameConfig.ChopRange + GameConfig.RangeTolerance) then
 		return "far"
 	end
 	rec.hp -= 1
