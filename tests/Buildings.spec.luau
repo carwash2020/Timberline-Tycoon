@@ -279,4 +279,59 @@ return function(t)
 			end
 		end
 	end)
+	t.test("6. no daylight between wall planks: every wall point (outside the door) is covered by a part", function()
+		local cases = {
+			{ build = BuildingArt.Sparkworks, hx = 7, hz = 6, front = -5.8, side = 6.8, y0 = 0.5, y1 = 12.4, door = 4 },
+			{
+				build = BuildingArt.LandOffice,
+				hx = 9,
+				hz = 7,
+				front = -6.75,
+				side = 8.75,
+				y0 = 0.4,
+				y1 = 12.3,
+				door = 4,
+			},
+		}
+		for _, c in ipairs(cases) do
+			local model = c.build()
+			local all = parts(model)
+			local function covered(x, y, z)
+				for _, p in ipairs(all) do
+					if (p.Name == "Wall" or p.Name == "WallBacking") and inside(p, x, y, z) then
+						return true
+					end
+				end
+				return false
+			end
+			local gaps = 0
+			local y = c.y0 + 0.05
+			while y < c.y1 do
+				-- front wall (outside the opening, below the header), back wall, both side walls
+				local x = -c.hx + 0.3
+				while x < c.hx - 0.3 do
+					if not (math.abs(x) < c.door and y < 10.3) then
+						if not covered(x, y, c.front) then
+							gaps += 1
+						end
+					end
+					if not covered(x, y, -c.front) then
+						gaps += 1
+					end
+					x += 0.5
+				end
+				local z = -c.hz + 1
+				while z < c.hz - 1 do
+					for _, s in ipairs({ -1, 1 }) do
+						if not covered(s * c.side, y, z) then
+							gaps += 1
+						end
+					end
+					z += 0.5
+				end
+				y += 0.1
+			end
+			t.eq(gaps, 0, c.build == BuildingArt.Sparkworks and "Sparkworks wall gaps" or "LandOffice wall gaps")
+		end
+	end)
 end
