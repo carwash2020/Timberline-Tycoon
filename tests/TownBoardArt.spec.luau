@@ -1,5 +1,5 @@
 --!nocheck
--- TownBoardArt: ten parts, no light, a SurfaceGui on the front (the street
+-- TownBoardArt: fourteen parts (T414e added four brass corners), no light, a SurfaceGui on the front (the street
 -- side) with real text, nothing floating or sunk, and every state fits.
 return function(t)
 	local TownBoardArt = t.shared("Art/TownBoardArt")
@@ -56,10 +56,11 @@ return function(t)
 		return list
 	end
 
-	t.test("ten parts, no light, a persistent-ready model with one front face", function()
+	t.test("fourteen parts, no light, a persistent-ready model with one front face", function()
 		local model = TownBoardArt.Build()
 		t.eq(model.Name, "TownBoard")
-		t.eq(#parts(model), 10)
+		t.eq(#parts(model), 14)
+		t.eq(#named(model, "FrameCorner"), 4)
 		t.ok(#parts(model) <= TownBoardLogic.PartCap)
 		for _, d in ipairs(model:GetDescendants()) do
 			t.ok(not d:IsA("Light"), "no light: " .. d.Name)
@@ -122,6 +123,63 @@ return function(t)
 				"frame flush with a post"
 			)
 		end
+	end)
+
+	t.test("T414e: a TimberBrown frame and posts, a SignCream face, Brass corners, SignInk lettering", function()
+		local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
+		local model = TownBoardArt.Build()
+		t.eq(model:FindFirstChild("Board").Color, Palette.SignCream, "the face")
+		for _, name in ipairs({ "FrameRail", "FrameStile", "Post", "Plaque" }) do
+			for _, p in ipairs(named(model, name)) do
+				t.eq(p.Color, Palette.TimberBrown, name)
+			end
+		end
+		for _, name in ipairs({ "FrameCorner", "PostCap" }) do
+			for _, p in ipairs(named(model, name)) do
+				t.eq(p.Color, Palette.Brass, name)
+			end
+		end
+		t.eq(face(model):FindFirstChild("Title").TextColor3, Palette.SignInk, "the title is ink on the cream")
+		-- Nothing on the board is the old walnut or a wood-planks slab.
+		t.ok(model:FindFirstChild("Board").Material ~= t.roblox.Enum.Material.Metal)
+	end)
+
+	t.test("T414e: it reads at phone distance, and the plate text has the contrast to do it", function()
+		-- A phone (667 x 375, 70 degree vertical field): pixels a stud covers at a distance.
+		local function phonePx(studsHigh, distance)
+			return studsHigh * 375 / (2 * distance * math.tan(math.rad(35)))
+		end
+		local per = TownBoardLogic.PxPerStud
+		t.ok(phonePx(TownBoardLogic.TitleTextPx / per, 30) >= 10, "the title from 30 studs")
+		t.ok(phonePx(TownBoardLogic.NameTextPx / per, 14) >= 10, "a name from the far side of the street")
+		t.ok(phonePx(TownBoardLogic.CashTextPx / per, 14) >= 7, "the cash line from there")
+		local function luma(c)
+			return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
+		end
+		local model = TownBoardArt.Build()
+		TownBoardArt.Fill(model, TownBoardLogic.View(rows(10), false))
+		local gui = face(model)
+		local field = luma(model:FindFirstChild("Board").Color)
+		t.ok(math.abs(luma(gui:FindFirstChild("Title").TextColor3) - field) >= 0.5, "title on the face")
+		t.ok(math.abs(luma(gui:FindFirstChild("Message").TextColor3) - field) >= 0.5, "the message line on the face")
+		for _, name in ipairs({ "Name1", "Name4", "Cash1", "Rank1", "Rank4" }) do
+			local plate = luma(gui:FindFirstChild("Plate1").BackgroundColor3)
+			t.ok(math.abs(luma(gui:FindFirstChild(name).TextColor3) - plate) >= 0.4, name .. " on its plate")
+		end
+		t.eq(gui.MaxDistance, TownBoardLogic.MaxDistance)
+	end)
+
+	t.test("T414e: the board does not block the walk: a wide opening between the posts, a thin solid", function()
+		local model = TownBoardArt.Build()
+		local posts = named(model, "Post")
+		local gap = 2 * TownBoardLogic.PostX - TownBoardLogic.PostWidth
+		t.ok(gap >= 12, "the posts stand " .. gap .. " apart")
+		for _, p in ipairs(parts(model)) do
+			if p.CanCollide then
+				t.ok(p.Size.Z <= 1, p.Name .. " is no deeper than a stud")
+			end
+		end
+		t.eq(#posts, 2)
 	end)
 
 	t.test("only the posts, the field and the plaque collide", function()
