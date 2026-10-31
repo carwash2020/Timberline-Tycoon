@@ -202,6 +202,41 @@ return function(t)
 		end
 	end)
 
+	-- The instanced counts, cover and built together, per region (the PR states the same table). A change to the
+	-- plan moves these on purpose: update them with the reason.
+	local EXPECTED = {
+		["bayou"] = { fern = 12, flower = 10, grass = 32, pebble = 27, reed = 32, rock = 1, shrub = 20 },
+		["country"] = { fern = 212, flower = 173, grass = 1049, pebble = 239, rock = 63, shrub = 321, stump = 92 },
+		["gloam"] = { grass = 4, pebble = 3, sapling = 4, shrub = 1, snag = 1 },
+		["hills"] = {
+			fern = 23,
+			flower = 17,
+			grass = 118,
+			pebble = 25,
+			rock = 4,
+			sapling = 3,
+			shrub = 33,
+			snag = 2,
+			stump = 7,
+		},
+		["isle"] = { fern = 3, flower = 1, grass = 22, pebble = 9, rock = 2, shrub = 8 },
+		["mesa"] = { flower = 6, grass = 28, pebble = 11, rock = 4, scrub = 14 },
+		["shore"] = { fern = 2, grass = 8, pebble = 3, shrub = 2 },
+		["snow"] = { fern = 9, grass = 32, pebble = 8, rock = 1, sapling = 4, shrub = 8, stump = 2 },
+		["starter"] = { fern = 2, grass = 10, pebble = 3, sapling = 1, shrub = 2, stump = 1 },
+		["volcano"] = {
+			fern = 4,
+			flower = 3,
+			grass = 20,
+			pebble = 4,
+			rock = 1,
+			sapling = 4,
+			shrub = 6,
+			snag = 1,
+			stump = 2,
+		},
+	}
+
 	t.test("instanced counts per region", function()
 		local counts = Scatter.Counts()
 		local total = 0
@@ -211,6 +246,22 @@ return function(t)
 			end
 		end
 		t.eq(total, #all())
-		print(require("@lune/serde").encode("json", counts))
+		t.eq(counts, EXPECTED)
+	end)
+
+	t.test(
+		"the region looks: reeds in the bayou, dry scrub on the mesa, shrubs capped with snow on the heights",
+		function()
+			local counts = Scatter.Counts()
+			t.ok((counts.bayou.reed or 0) > 10 and (counts.mesa.scrub or 0) > 5, "reeds and scrub")
+			t.eq(counts.mesa.reed, nil)
+			t.eq(counts.bayou.scrub, nil)
+			t.ok((counts.snow.shrub or 0) > 0, "snow shrubs (Greenery caps them with FreshSnow)")
+		end
+	)
+
+	t.test("cover radius is 160 studs on high, narrower on weaker devices", function()
+		t.eq(Scatter.CoverRadius.high, 160)
+		t.ok(Scatter.CoverRadius.low < Scatter.CoverRadius.medium and Scatter.CoverRadius.medium < 160)
 	end)
 end

@@ -320,24 +320,29 @@ local function corridor(items: { Item }, flowers: { [string]: boolean }): number
 						slice()
 					end
 					for _, side in ipairs({ -1, 1 }) do
-						id += 1
-						local rng = Kit.rng(Scatter.Seed * 17 + id)
-						local before = #items
-						-- Random offsets first, then a sweep of the whole band.
-						for attempt = 1, 18 do
-							local off, along
-							if attempt <= 5 then
-								off = rng:range(Scatter.BandNear + 1, Scatter.BandFar - 4)
-								along = rng:range(-8, 8)
-							else
-								off = Scatter.BandNear + 2 * (attempt - 5) % 22 + 1
-								along = 0
-							end
-							local px = a.X + dir.X * (s + along) + nx * side * off
-							local pz = a.Y + dir.Y * (s + along) + nz * side * off
-							cluster(items, id, px, pz, road.name, flowers)
-							if #items > before then
-								break
+						-- The window's own cluster (random offsets first, then a sweep of the whole band, so an open
+						-- band always gets one), then a second, nearer or farther, three times in five.
+						for pass = 1, 2 do
+							id += 1
+							local rng = Kit.rng(Scatter.Seed * 17 + id)
+							if pass == 1 or rng:next() < 0.6 then
+								local before = #items
+								for attempt = 1, if pass == 1 then 18 else 5 do
+									local off, along
+									if attempt <= 5 then
+										off = rng:range(Scatter.BandNear + 1, Scatter.BandFar - 4)
+										along = rng:range(-8, 8)
+									else
+										off = Scatter.BandNear + 2 * (attempt - 5) % 22 + 1
+										along = 0
+									end
+									local px = a.X + dir.X * (s + along) + nx * side * off
+									local pz = a.Y + dir.Y * (s + along) + nz * side * off
+									cluster(items, id, px, pz, road.name, flowers)
+									if #items > before then
+										break
+									end
+								end
 							end
 						end
 					end

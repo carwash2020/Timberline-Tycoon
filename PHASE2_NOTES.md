@@ -4591,3 +4591,15 @@ The style-guide 12 colour table is on the part-built vehicle parts (`Art/TruckAr
 3. Buy and spawn a Rustbucket, a Flatbed and a Logging Rig, hitch a trailer: seat, drive and tow as before; the hull boards, stakes, rails and brass caps that show on the meshed truck are the table colours.
 4. Look for any mesh whose colour is not the table (Scout ATV, Timber Classic): list it so the GLB can be recoloured and re-uploaded.
 5. Glass on every vehicle reads the same light blue, see-through, and you can walk through none of it.
+
+## T414d-2 roadside greenery, stumps, saplings and critters (31 October 2026, branch `cursor/t414d2-greenery-critters`)
+
+Plan: `docs/T414D2_PLAN.md`. Specs: `Scatter.spec` (keep-outs re-derived from the raw layout, grounding, a cluster in every open 24-stud window, counts per region), `ScatterWorld.spec` (the real MapBuilder build: solids only on stumps and rocks, square Block stumps, grounding, mill lane boxes, the overlap pass, no cover and no critter on the server), `CritterCap.spec`, `T414d2Names.spec`. Nothing here uses MeshId 0 or an invented asset id: rocks use the PropArt rock that TownMeshes already dresses; the rest is part-built.
+
+**Studio checks for Connor**
+1. Walk spawn to the mill, then drive the Hills Road, the Snow Road and the Mesa Road: grass, ferns, shrubs and rocks line both verges from 18 studs out; no bare band, nothing on the road or in the mill's log lane or a shop door.
+2. At a stump near a forest edge: it is a square block with a pale cut face and a crack, you bump it and cannot chop it, and a truck or log cannot be driven into it because the lane stays clear.
+3. A deer, rabbit or bird sits on the verge and moves off when you come within about 30 studs (deer), 20 (rabbit), 16 (bird); none runs onto the road.
+4. Phone or low quality: fewer and nearer cover (radius 100) and at most 12 critters; high shows cover out to 160 with the far ring fading.
+5. In the Bayou reeds stand in the mud; on Red Mesa dry scrub and sand-coloured stone; in Frost the shrubs wear snow.
+
