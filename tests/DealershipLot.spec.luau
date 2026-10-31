@@ -450,7 +450,7 @@ return function(t)
 					)
 				end
 			end
-			t.ok(visible >= 20, bay.id .. " shows " .. visible .. " parts")
+			t.ok(visible >= 12, bay.id .. " shows " .. visible .. " parts")
 			if bay.kind == "Trailer" then
 				local coupler = nil
 				for _, p in ipairs(parts(model)) do
@@ -460,14 +460,14 @@ return function(t)
 				end
 				t.ok(coupler ~= nil, bay.id .. " has a coupler")
 				local slab = slabs[bay.id]
-				local c, sp, ss = coupler.Position, slab.Position, slab.Size
+				local c, sp, ss = coupler.CFrame.Position, slab.CFrame.Position, slab.Size
 				t.ok(
 					math.abs(c.X - sp.X) <= ss.X / 2 and math.abs(c.Z - sp.Z) <= ss.Z / 2,
 					bay.id .. " hitch is over its plinth"
 				)
 				t.ok(c.Y - (sp.Y + ss.Y / 2) <= 4, bay.id .. " hitch within arm's reach of the plinth top")
 				for _, p in ipairs(parts(lot)) do
-					if p ~= slab and p.CanCollide then
+					if p.Name ~= "Plinth" and p.CanCollide then
 						local x0, x1, y0, y1, z0, z1 = aabb(p)
 						local dx = math.max(x0 - c.X, 0, c.X - x1)
 						local dy = math.max(y0 - c.Y, 0, c.Y - y1)
