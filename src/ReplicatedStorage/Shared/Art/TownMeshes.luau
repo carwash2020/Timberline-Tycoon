@@ -11,6 +11,7 @@ local CollectionService = game:GetService("CollectionService")
 
 local BacklogModels = require(script.Parent.BacklogModels)
 local MeshKit = require(script.Parent.MeshKit)
+local PerfPolicy = require(script.Parent.Parent.PerfPolicy)
 local TownModels = require(script.Parent.TownModels)
 
 local TownMeshes = {}
@@ -158,8 +159,8 @@ local function shadowless(asset: TownModels.Asset): boolean
 	return FLAT_UNCOUNTED[asset.id] == true
 end
 
-function TownMeshes.FidelityFor(name: string, tris: number?): Enum.RenderFidelity
-	if tris ~= nil and tris < 300 then
+function TownMeshes.FidelityFor(name: string, tris: number?, assetId: string?): Enum.RenderFidelity
+	if tris ~= nil and tris < 300 or PerfPolicy.IsScatter(assetId) then
 		return Enum.RenderFidelity.Performance
 	end
 	if name == "Body" or name == "Roof" or name == "Head" then
@@ -263,7 +264,7 @@ local function finishPiece(
 	if shadowless(asset) then
 		part.CastShadow = false
 	end
-	MeshKit.Fidelity(part, TownMeshes.FidelityFor(name, asset.tris))
+	MeshKit.Fidelity(part, TownMeshes.FidelityFor(name, asset.tris, asset.id))
 	part.Anchored = true
 	if GLOW[name] then
 		part.Material = Enum.Material.Neon

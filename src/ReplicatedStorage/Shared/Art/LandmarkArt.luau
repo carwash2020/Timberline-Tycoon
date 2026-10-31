@@ -891,7 +891,7 @@ function LandmarkArt.BuildW2(parent: Instance)
 		end
 	end
 
-	local water = stream(LandmarkArt.DeepWater(), Enum.ModelStreamingMode.Persistent)
+	local water = stream(LandmarkArt.DeepWater(), Enum.ModelStreamingMode.Default)
 	water.Parent = parent
 	for _, part in ipairs(water:GetChildren()) do
 		if part:IsA("BasePart") then

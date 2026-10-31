@@ -523,13 +523,13 @@ return function(t)
 				at and at:IsA("BasePart"),
 				marker.name .. ": TimberlineMap." .. table.concat(marker.path, ".") .. " is a part"
 			)
-			-- Its model is Persistent: always streamed in on every client.
+			-- Its model: the SellArea and the StoreBoard are Persistent (the carry loop and the prompt wait on them); a shop is interactive,
+			-- so it streams in whole (T415: Atomic, never Persistent).
 			local model = s.map:FindFirstChild(marker.path[1])
-			t.eq(
-				model.ModelStreamingMode,
-				roblox.Enum.ModelStreamingMode.Persistent,
-				marker.path[1] .. " is Persistent"
-			)
+			local want = if marker.path[1] == "SellArea" or marker.path[1] == "StoreBoard"
+				then roblox.Enum.ModelStreamingMode.Persistent
+				else roblox.Enum.ModelStreamingMode.Atomic
+			t.eq(model.ModelStreamingMode, want, marker.path[1] .. " streams as " .. want.Name)
 		end
 	end)
 
@@ -1277,8 +1277,9 @@ return function(t)
 		t.eq(s.warnings, {})
 		local Persistent = roblox.Enum.ModelStreamingMode.Persistent
 		local sawmill = s.map:FindFirstChild("Sawmill")
-		t.eq(sawmill.ModelStreamingMode, Persistent, "the sawmill is Persistent")
-		t.eq(s.map:FindFirstChild("HearthAndHome").ModelStreamingMode, Persistent, "the town hall is Persistent")
+		local Atomic = roblox.Enum.ModelStreamingMode.Atomic
+		t.eq(sawmill.ModelStreamingMode, Atomic, "the sawmill is Atomic (T415)")
+		t.eq(s.map:FindFirstChild("HearthAndHome").ModelStreamingMode, Atomic, "the town hall is Atomic (T415)")
 		t.eq(s.map:FindFirstChild("Lighthouse", true).ModelStreamingMode, Persistent, "the lighthouse is Persistent")
 		local rounds = s.map:FindFirstChild("PathRounds")
 		t.ok(rounds and #rounds:GetChildren() == 6, "three rounds on each of the two shop paths")

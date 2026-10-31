@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Geometry = require(script.Parent.Geometry)
 local Lanes = require(script.Parent.Lanes)
 local MustKeep = require(script.Parent.MustKeep)
+local PerfPolicy = require(ReplicatedStorage.Shared.PerfPolicy)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 
 local CloudCheck = {}
@@ -53,7 +54,12 @@ function CloudCheck.Run(
 		end
 	end
 
-	section("lint (2b, 2c)", Geometry.Run(map, data.allow, nil, { skipStale = true }).failures)
+	-- The lint, plus T415's streaming and fidelity flags (a Persistent model off the list, a Precise mesh).
+	local lintFindings = Geometry.Run(map, data.allow, nil, { skipStale = true }).failures
+	for _, line in ipairs(PerfPolicy.CheckWorld(map)) do
+		table.insert(lintFindings, line)
+	end
+	section("lint (2b, 2c), streaming and fidelity flags", lintFindings)
 	if deps.engineOverlaps then
 		section("engine overlap (GetPartBoundsInBox)", deps.engineOverlaps(map, data.allow))
 	end

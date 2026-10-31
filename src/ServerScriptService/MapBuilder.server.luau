@@ -439,7 +439,7 @@ local function deferPlanned<T>(
 end
 
 -- The sell area beside the sawmill, east of its lean-to (the sell station).
--- SellArea is Persistent so every
+-- SellArea is Persistent (the client's carry loop waits on it with no timeout) so every
 -- client always has the sell zone (CarryController's prompt). It is made
 -- here so the last steps can always parent it (last of all: GameServer
 -- starts once it appears, so the whole world must exist by then); the
@@ -506,11 +506,11 @@ step("4. The town", function()
 
 	-- The sawmill, and the sell area in front of it.
 	step("4. The sawmill", function()
-		-- Persistent: the mill is the landmark you steer by from the biomes.
+		-- Atomic (T415): the mill is interactive, so it streams in whole.
 		-- (Lookout towers, further out and numerous, use a StreamingMesh
-		-- instead — see the scenery step. The lighthouse is Persistent too.
-		-- Hearth & Home, the town hall, is Persistent with the other shops.)
-		local sawmill = standOnGround(place(persistent(BuildingArt.Sawmill()), town.sawmill))
+		-- instead — see the scenery step. The lighthouse stays Persistent.
+		-- Every shop is Atomic.)
+		local sawmill = standOnGround(place(atomic(BuildingArt.Sawmill()), town.sawmill))
 		local blade = sawmill:FindFirstChild("SawBlade", true)
 		if blade then
 			CollectionService:AddTag(blade, "SawBlade") -- TownFX spins it
@@ -536,7 +536,7 @@ step("4. The town", function()
 		BuildingArt.PinPivotHeight(sellArea, 6)
 	end)
 
-	-- Shops: Persistent, with a Counter whose ShopPoint is where the client's
+	-- Shops: Atomic, with a Counter whose ShopPoint is where the client's
 	-- "Browse" prompt appears and what ShopService measures range from.
 	-- The old station pad stays flat. A sign points up the north road.
 	-- It is not one of WorldPlan.Town().signs, so those rocks do not move.
@@ -549,10 +549,8 @@ step("4. The town", function()
 	local function finishShop(shop: Model, kind: string, sells: boolean)
 		shop.Name = kind
 		local row = ShopPins.Get(kind)
-		-- Town markers stay Persistent so they are in on join. The rest stream as one model.
-		shop.ModelStreamingMode = if row and row.preload
-			then Enum.ModelStreamingMode.Persistent
-			else Enum.ModelStreamingMode.Atomic
+		-- Every shop is interactive: it streams in as one model (T415: none is Persistent).
+		shop.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 		shop:SetAttribute("StreamPolicy", if row and row.preload then "preload" else "ahead")
 		local counter = shop:FindFirstChild("Counter")
 		if counter and counter:IsA("BasePart") then
@@ -1475,13 +1473,10 @@ do
 		local fall = sky.waterfall
 		local fromRoot = WorldPlan.IslesFromRoot(sky)
 
-		-- The Skyroot: seen from anywhere, so Persistent. Its limbs reach up
+		-- The Skyroot: seen from afar, streamed as Default (T415). Its limbs reach up
 		-- into each isle, its hollow faces town, it parts round the fall.
 		defer("6. The Skyroot", 3, sky.root, function(_slice)
-			place(
-				persistent(IsleArt.Skyroot(sky.trunkHeight, fromRoot, sky.main.dir, fall.top - sky.root)),
-				CFrame.new(sky.root)
-			)
+			place(IsleArt.Skyroot(sky.trunkHeight, fromRoot, sky.main.dir, fall.top - sky.root), CFrame.new(sky.root))
 		end)
 
 		local islesFolder = Instance.new("Folder")
@@ -1491,7 +1486,7 @@ do
 			local mainIsle =
 				IsleArt.Isle(sky.main.radius, 1, { clear = WorldPlan.IsleClearPoints(sky, sky.main.center) })
 			mainIsle.Name = "MainIsle"
-			place(persistent(mainIsle), CFrame.new(sky.main.center), islesFolder)
+			place(mainIsle, CFrame.new(sky.main.center), islesFolder)
 			for i, isle in ipairs(sky.isles) do
 				local options: IsleArt.IsleOptions = {
 					clear = WorldPlan.IsleClearPoints(sky, isle.center),
@@ -1499,14 +1494,13 @@ do
 				}
 				local model = IsleArt.Isle(isle.radius, i + 1, options)
 				model.Name = "Isle" .. i
-				place(persistent(model), CFrame.new(isle.center), islesFolder)
+				place(model, CFrame.new(isle.center), islesFolder)
 				slice()
 			end
 		end)
 		defer("6. The bridges", 3, sky.root, function(slice)
 			for _, bridge in ipairs(sky.bridges) do
 				local model = BuildingArt.Bridge(bridge.a, bridge.b, 6)
-				model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 				model.Parent = islesFolder
 				-- A lantern at each bridge head.
 				for k, at in ipairs({ bridge.a, bridge.b }) do
@@ -1528,7 +1522,7 @@ do
 			clouds.Name = "CloudBanks"
 			clouds.Parent = map
 			for i, spot in ipairs(IsleArt.CloudSpots(fromRoot, sky.trunkHeight, 99, sky.main.dir)) do
-				place(persistent(IsleArt.CloudBank(spot.size, i)), CFrame.new(sky.root) * spot.cframe, clouds)
+				place(IsleArt.CloudBank(spot.size, i), CFrame.new(sky.root) * spot.cframe, clouds)
 			end
 		end)
 		defer("6. The Lumenwood", 3, sky.root, function(slice)
@@ -1595,7 +1589,7 @@ do
 		-- The waterfall pouring off an outer isle into the river's spring.
 		defer("6. The waterfall", 3, sky.root, function(_slice)
 			place(
-				persistent(IsleArt.Waterfall(fall.top.Y - fall.bottom.Y, 10)),
+				IsleArt.Waterfall(fall.top.Y - fall.bottom.Y, 10),
 				CFrame.lookAt(fall.top, fall.top + fall.dir) -- its -Z away from the isle
 			)
 		end)

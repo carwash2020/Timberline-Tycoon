@@ -350,7 +350,9 @@ function TravelArt.Build(parent: Instance)
 	if liftBooth and liftBooth:IsA("Model") then
 		liftBooth.Name = "LiftBooth"
 		liftBooth.Parent = parent
-		persistent(liftBooth)
+		pcall(function()
+			liftBooth.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- the toll prompt: interactive, not Persistent
+		end)
 	end
 	local stone = TravelArt.StoneBridge()
 	atGround(stone, -420, 110)

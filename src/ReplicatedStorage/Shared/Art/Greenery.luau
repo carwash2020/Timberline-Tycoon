@@ -17,6 +17,7 @@
 
 local Kit = require(script.Parent.Kit)
 local Palette = require(script.Parent.Palette)
+local PerfPolicy = require(script.Parent.Parent.PerfPolicy)
 local PropArt = require(script.Parent.PropArt)
 local TreeArt = require(script.Parent.TreeArt)
 local WoodData = require(script.Parent.Parent.WoodData)
@@ -332,18 +333,24 @@ function Greenery.Snag(_region: string, variant: number, height: number): Model
 	return cover(model)
 end
 
--- Any planned item's model, by kind (cover or built).
+-- Any planned item's model, by kind (cover or built). Parts too small for a shadow to read cast none (T415).
 function Greenery.Item(kind: string, region: string, variant: number, size: number): Model?
+	local model: Model?
 	if kind == "stump" then
-		return Greenery.Stump(region, variant, size)
+		model = Greenery.Stump(region, variant, size)
 	elseif kind == "rock" then
-		return Greenery.Rock(region, variant, size)
+		model = Greenery.Rock(region, variant, size)
 	elseif kind == "sapling" then
-		return Greenery.Sapling(region, variant, size)
+		model = Greenery.Sapling(region, variant, size)
 	elseif kind == "snag" then
-		return Greenery.Snag(region, variant, size)
+		model = Greenery.Snag(region, variant, size)
+	else
+		model = Greenery.Cover(kind, region, variant)
 	end
-	return Greenery.Cover(kind, region, variant)
+	if model then
+		PerfPolicy.TrimShadows(model)
+	end
+	return model
 end
 
 return Greenery

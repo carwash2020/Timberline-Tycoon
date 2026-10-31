@@ -18,6 +18,9 @@
 --     terrain there is written before anyone is let in). The card holds
 --     for that for at most NEAR_RING_WAIT seconds after the character and
 --     the save are in; no attribute (an older server) means no wait.
+--   * It also waits (at most PRELOAD_WAIT seconds) for the client's first-view preload: the player attribute
+--     "FirstViewReady" is false while FirstViewPreload fetches the axe, Murph and the spawn town's meshes;
+--     no attribute means no wait.
 --   * It never leaves the screen blocked: an error removes the card at
 --     once, and a backstop removes it a little after MAX_SECONDS even if
 --     this script stalls.
@@ -58,6 +61,7 @@ local LoadingTips = loadTips()
 
 local MAX_SECONDS = 30 -- the card never stays up longer than this
 local NEAR_RING_WAIT = 6 -- seconds past "character and save in" the card waits for the area round the spawn
+local PRELOAD_WAIT = 4 -- seconds past "character and save in" the card waits for the first-view preload (FirstViewReady)
 local FADE_SECONDS = 0.6
 local BACKSTOP_SECONDS = MAX_SECONDS + FADE_SECONDS + 5
 local FAILSAFE_SECONDS = 4 -- after the hand-over, one last look for a card left behind
@@ -298,7 +302,9 @@ local function ready(): boolean
 	end
 	local since = readySince or os.clock()
 	readySince = since
-	return nearRing() ~= false or os.clock() - since >= NEAR_RING_WAIT
+	local waited = os.clock() - since
+	local viewOk = player:GetAttribute("FirstViewReady") ~= false or waited >= PRELOAD_WAIT
+	return (nearRing() ~= false or waited >= NEAR_RING_WAIT) and viewOk
 end
 
 -- PlayerGui, waiting in short tries (never a bare WaitForChild).
