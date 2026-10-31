@@ -55,6 +55,7 @@ Until you run it every status below is `not checked yet`; nothing here has been 
 Not asset ids, so not listed: `rbxasset://` built-ins (engine particle textures, `FellSound`, most of
 `SoundData`), empty sound slots (`id = ""`, silent), badge ids (all 0 by decision), and the owner user id.
 `meshId = 0` slots (no upload yet, part build kept by design): 156. They are not listed.
+Known gap: `TownGroundArt.KerbMeshId` is 0. The kerb stays the StoneBase slate bar until that strip is uploaded.
 
 ## Store item models (one slot per item: `Shared/StoreModelSlots.luau`)
 

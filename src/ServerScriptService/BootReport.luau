@@ -80,6 +80,11 @@ function BootReport.Line(world: any, players: number): string
 	if type(stretch) == "number" and stretch > 0 then
 		line ..= string.format(", stumpStretchViolations %d", stretch)
 	end
+	-- T414a: how long the town paint plan and the country shoulder fill took.
+	local townGround = stat("TownGroundSeconds")
+	if type(townGround) == "number" then
+		line ..= string.format(", town ground %.1fs", townGround)
+	end
 	return line
 end
 

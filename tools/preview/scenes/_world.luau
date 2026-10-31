@@ -249,7 +249,7 @@ function World.build(ctx, opts)
 				slab.name,
 				V3.new(3.2, 0.25, 7),
 				slab.cframe,
-				C3.fromRGB(156, 94, 64),
+				C3.fromRGB(142, 108, 74), -- TrailDirt #8E6C4A
 				roblox.Enum.Material.Ground
 			),
 			false

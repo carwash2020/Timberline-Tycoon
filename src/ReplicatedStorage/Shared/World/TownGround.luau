@@ -10,13 +10,14 @@
 --   * Roads: MainStreet (the plaza's cobbles cut it in two), the East Link
 --     and South Link stretches, the three 16-22 stud lanes (Forest Path,
 --     Mill Road, Lot Loop), the yards (the sawmill apron, the sell yard, the
---     three mouths) and the parking lot's pavement. Asphalt #55585A, 0.2
---     thick, the top 0.05 over the graded ground, one part per straight run
+--     three mouths) and the parking lot's pavement. Streets are Asphalt
+--     #A8A49C and lanes and the lot are Cobblestone #9C958A. Paint is
+--     flush with the ground, one straight run
 --     of at most 64 studs (the lot's slab and the yards are one part wide
 --     and long, split only past 64 studs across). A bend of a lane gets a
 --     disc (one part) over its outer corner, where two straight runs leave
 --     a gap.
---   * Curbs: CurbConcrete #9A968C, 0.3 wide and 0.15 tall, on both edges of
+--   * Curbs: StoneBase #8C877E Slate, 0.3 wide and 0.6 tall, on both edges of
 --     the straight main roads (MainStreet, East Link, South Link). The lanes
 --     and yards have none: a 16 stud lane cannot leave a 20 stud gap, and a
 --     lane or yard a truck turns in needs none. Wherever another road, yard,
@@ -32,8 +33,7 @@
 --   * Plot borders: a 1 wide Grass strip (#5A8A3C) round each homestead pad,
 --     flush (0.05 proud), broken by a 24 stud driveway gap where the pad's
 --     lane meets it.
--- The terrain under every road part is Grass (TerrainGen paints no Asphalt
--- in the zone). Country roads stay terrain.
+-- The street is the terrain paint. Country roads stay terrain, on the 28-stud bed.
 
 local Kit = require(script.Parent.Parent.Art.Kit)
 local PlotData = require(script.Parent.Parent.PlotData)
@@ -59,6 +59,10 @@ TownGround.CurbHeight = 0.6 -- visible lip; at most 1, and the part does not col
 TownGround.LotCurbWidth = 0.5
 TownGround.LotCurbHeight = 0.6
 TownGround.PathWidth = 8
+TownGround.PaveHalf = WorldLayout.TownPaveHalf
+TownGround.BedHalf = WorldLayout.TownBedHalf
+TownGround.KerbOffset = WorldLayout.TownKerbOffset
+TownGround.BlendOuter = WorldLayout.TownBlendOuter
 TownGround.PathProud = 0
 TownGround.LineWidth = 0.3
 TownGround.EdgeWidth = 1
@@ -437,7 +441,8 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 	if street then
 		local x0 = math.max(street.x0, zone.x0)
 		local zc = (street.z0 + street.z1) / 2
-		local w = street.z1 - street.z0
+		-- Paving is half-width 16. The paint rect is only the old 22-stud slot.
+		local w = TownGround.PaveHalf * 2
 		local cuts: { { number } } = { { x0, street.x1 } }
 		if plaza and plaza.z0 < street.z1 and plaza.z1 > street.z0 then
 			cuts = { { x0, plaza.x0 }, { plaza.x1, street.x1 } }
@@ -462,9 +467,10 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 			for i = 1, #road.points - 1 do
 				local sa, sb = clipToZone(road.points[i], road.points[i + 1])
 				if sa and sb and (sb - sa).Magnitude >= 3 then
-					-- The slab stays on the plan bed. The drive width is wider,
-					-- and a slab that wide leaves the flat grade.
-					local bed = WorldLayout.PlanWidth(road)
+					-- Town mains pave to half-width 16. Lanes stay on the plan bed.
+					-- The country plan bed is still 28; this piece is only the
+					-- stretch inside the town zone.
+					local bed = if class == "Road" then TownGround.PaveHalf * 2 else WorldLayout.PlanWidth(road)
 					local def: RoadDef = { name = road.name, class = class, a = sa, b = sb, width = bed }
 					if prev and (prev.b - sa).Magnitude < 0.01 then
 						local d1, d2 = (prev.b - prev.a).Unit, (sb - sa).Unit
@@ -552,7 +558,7 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 		})
 	end
 
-	-- Footpaths (the 6 wide TrailDirt strips), trimmed back to the road they meet.
+	-- Footpaths (the 8 wide TrailDirt strips), trimmed back to the road they meet.
 	local pathDefs: { RoadDef } = {}
 	for _, name in ipairs(PATHS) do
 		for _, p in ipairs(paintsNamed(name)) do
@@ -633,20 +639,21 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 		end
 	end
 
-	-- Curbs and lines along the straight main roads.
-	local halfCurb = TownGround.CurbWidth / 2
+	-- Curbs and lines along the straight main roads. The kerb line is
+	-- TownKerbOffset off the centre, and its top is HeightAt on that line.
 	for _, d in ipairs(defs) do
 		if d.class == "Road" then
 			local dir = (d.b - d.a).Unit
 			local normal = Vector2.new(-dir.Y, dir.X)
 			local len = (d.b - d.a).Magnitude
 			for _, side in ipairs({ 1, -1 }) do
-				local off = d.width / 2 - halfCurb
+				local off = TownGround.KerbOffset
 				local from, to = d.a + normal * (side * off), d.b + normal * (side * off)
 				local testOff = d.width / 2 + 1
 				local exposed, byVehicle =
 					exposure(covers, d.name, from, to, d.a + normal * (side * testOff), d.b + normal * (side * testOff))
-				local runs, gapSpans = runsAndGaps(exposed, byVehicle, len, 3, TownGround.MinGap)
+				-- minRun 0: a short bar stays. Dropping it opened a gap that was not a path or a drive.
+				local runs, gapSpans = runsAndGaps(exposed, byVehicle, len, 0, TownGround.MinGap)
 				for _, r in ipairs(runs) do
 					for _, run in
 						ipairs(
@@ -786,7 +793,7 @@ local function build(): { pieces: { Piece }, gaps: { Gap }, covers: { Shape } }
 			local from, to = side.a - side.out * inset, side.b - side.out * inset
 			local exposed, byVehicle =
 				exposure(lotCovers, "Lot", from, to, side.a + side.out * 1, side.b + side.out * 1)
-			local runs, gapSpans = runsAndGaps(exposed, byVehicle, len, 3, TownGround.MinGap)
+			local runs, gapSpans = runsAndGaps(exposed, byVehicle, len, 0, TownGround.MinGap)
 			for _, r in ipairs(runs) do
 				for _, run in
 					ipairs(fitRuns(from + dir * r[1], from + dir * r[2], TownGround.LotCurbHeight, TownGround.MaxRun))
@@ -969,6 +976,17 @@ function TownGround.TopAt(p: Piece, x: number, z: number): number?
 	return p.ya + (p.yb - p.ya) * along / len
 end
 
+-- True when a road, yard, path, plaza or lot cover crosses this point.
+-- A kerb gap that is not one of these is a hole, not a cut.
+function TownGround.IsCut(x: number, z: number): boolean
+	for _, s in ipairs(built().covers) do
+		if inside(s, x, z, 1) then
+			return true
+		end
+	end
+	return false
+end
+
 -- Whether (x, z) is on a road, yard, bend, path, curb... piece of `kinds`
 -- (a set), with `grow` studs of slack.
 function TownGround.Covers(x: number, z: number, kinds: { [string]: boolean }, grow: number?): boolean
@@ -1009,9 +1027,7 @@ function TownGround.Counts(): (number, number)
 	return zoneCount, plotCount
 end
 
--- How far (x, z) sits inside a piece, or nil when it is outside. The feather
--- uses this so a painted edge breaks into grass instead of ending in a line.
-local FEATHER = 1.6
+-- How far (x, z) sits inside a piece, or nil when it is outside.
 local function insetOf(p: Piece, x: number, z: number): number?
 	if p.shape == "Cylinder" then
 		local dx, dz = x - p.a.X, z - p.a.Y
@@ -1037,9 +1053,33 @@ local function insetOf(p: Piece, x: number, z: number): number?
 	return p.width / 2 - across
 end
 
+-- Distance off a piece's centre line, or nil past its ends.
+local function acrossOf(p: Piece, x: number, z: number): number?
+	local d = p.b - p.a
+	local len = d.Magnitude
+	if len < 1e-6 then
+		return nil
+	end
+	local ux, uz = d.X / len, d.Y / len
+	local px, pz = x - p.a.X, z - p.a.Y
+	local along = px * ux + pz * uz
+	if along < -0.5 or along > len + 0.5 then
+		return nil
+	end
+	return math.abs(px * -uz + pz * ux)
+end
+
+-- MainStreet, East Link and South Link. Their paint is solid out to the
+-- flat bed. Grass dithers only outward of that, never back into the paving.
+local function curbedStreet(name: string): boolean
+	return string.find(name, "MainStreet", 1, true) ~= nil or name == "EastLink" or name == "SouthLink"
+end
+
 -- Terrain material for a town road, lane, yard, lot or footpath, or nil
--- (grass). Haul pieces are already PlanWidth wide, so this does not paint
--- past the graded bed. The outer FEATHER studs dither into the grass.
+-- (grass). Curbed streets pave solid out to PaveHalf (16) and no further:
+-- nothing grey feathers past the kerb. From there out to BlendOuter the
+-- band is meadow grass (terrain Grass), outward only. Other pieces are
+-- solid to their own edge, so grass does not speckle inside the paving.
 function TownGround.MaterialAt(x: number, z: number): string?
 	if not WorldLayout.InTownZone(x, z) then
 		return nil
@@ -1057,14 +1097,18 @@ function TownGround.MaterialAt(x: number, z: number): string?
 			r = 2
 		end
 		if mat and r >= rank then
-			local inset = insetOf(p, x, z)
-			if inset then
-				local keep = true
-				if inset < FEATHER then
-					local h = math.noise(x / 4.5, z / 4.5, 2.2) * 0.5 + 0.5
-					keep = inset / FEATHER >= h
+			if p.kind == "Road" and curbedStreet(p.name) and not WorldLayout.OnStorePad(x, z) then
+				local across = acrossOf(p, x, z)
+				if across and across <= TownGround.BlendOuter and r >= rank then
+					-- Paving stops at 16. Past that, through the kerb and out
+					-- to 20.3, the ground is meadow grass. No street colour
+					-- spills past the kerb.
+					best = if across > TownGround.PaveHalf then "Grass" else mat
+					rank = r
 				end
-				if keep then
+			else
+				local inset = insetOf(p, x, z)
+				if inset and r >= rank then
 					best = mat
 					rank = r
 				end

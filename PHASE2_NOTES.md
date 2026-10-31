@@ -1,8 +1,8 @@
 # Phase 2+ build notes
 
-## T414a town ground (30 October 2026, branch `cursor/t414a-town-ground-1e4c`)
+## T414a fixes (30 October 2026, branch `cursor/t414a-fixes`)
 
-Nothing here has been seen in Studio. Cloud tests paint the street and check that kerbs do not collide. They do not walk or drive. Outside town, the T413 TrailDirt shoulder (below) is unchanged.
+Nothing here has been seen in Studio. Cloud tests paint the street and check that kerbs do not collide. They do not walk or drive. Outside town, the T413 TrailDirt shoulder (below) is unchanged. Inside town the bed is flat to half-width 16.3, paving runs to 16, the kerb is at 16.15, and grass blends outward from 16.3 to 20.3. The 28-stud plan bed stays on the country stretch. Known gap: `TownGroundArt.KerbMeshId` is 0.
 
 Studio checks:
 1. Spawn on the plaza and walk to Hearth & Home. The street is cobble, the path is dirt, and neither flickers.

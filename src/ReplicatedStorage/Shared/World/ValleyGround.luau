@@ -88,7 +88,7 @@ local SPUR_GRADE = 0.19
 local JUNCTION = 3
 
 local buckets: { [number]: { Seg } } = {}
-local liveLines: { { line: any, half: number, drive: number } } = {}
+local liveLines: { { line: any, half: number, drive: number, name: string } } = {}
 
 local function bucketKey(ix: number, iz: number): number
 	return (ix + 80) * 400 + (iz + 80)
@@ -131,10 +131,20 @@ end
 -- the tree plan keep using liveClear / PlanWidth.
 local function driveClear(x: number, z: number): number
 	local best = 1e6
+	local inTown = WorldLayout.InTownZone(x, z)
 	for _, road in ipairs(liveLines) do
-		local reach = road.drive + 2
+		local drive = road.drive
+		if
+			inTown
+			and WorldLayout.TownBedRoads[road.name]
+			and not WorldLayout.OnStorePad(x, z)
+			and not WorldLayout.OnPlotPad(x, z)
+		then
+			drive = math.max(drive, WorldLayout.TownBedHalf)
+		end
+		local reach = drive + 2
 		local d = WorldLayout.FastDistance(road.line, x, z, reach)
-		local clear = d - road.drive
+		local clear = d - drive
 		if clear < best then
 			best = clear
 		end
@@ -436,6 +446,7 @@ local function buildRoads()
 			line = WorldLayout.FastLine(road.points),
 			half = WorldLayout.PlanWidth(road) / 2,
 			drive = WorldLayout.DriveHalf(road),
+			name = road.name,
 		})
 	end
 	local groups: { { Sample } } = {}
