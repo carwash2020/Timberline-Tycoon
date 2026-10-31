@@ -23,25 +23,51 @@ NodeArt.Height = 4.5
 NodeArt.Veins = { "Amber", "Garnet" }
 NodeArt.VeinHex = { Amber = "#D98A1E", Garnet = "#7A2038" } -- ore hex (style guide 15)
 
--- A vein on the ellipsoid (centre `c`, radii `r`): a chain of four short ore bars laid up the skin
--- from yaw `theta` and elevation `phi`, wandering a little, half sunk, so it reads as a seam of ore
--- running through the stone and not as one stuck-on disc.
-local function skinPoint(c: Vector3, r: Vector3, theta: number, phi: number, lift: number): Vector3
-	local dir = Vector3.new(math.cos(phi) * math.cos(theta), math.sin(phi), math.cos(phi) * math.sin(theta))
-	local normal = Vector3.new(dir.X / r.X, dir.Y / r.Y, dir.Z / r.Z).Unit
-	return c + Vector3.new(dir.X * r.X, dir.Y * r.Y, dir.Z * r.Z) + normal * lift
+-- One faceted rock: a ridge, two wedges set back to back so their tall edges meet along the crest (a
+-- pitched roof of stone). `cf` is the ridge's frame (its crest runs along local Z), `w` the width across
+-- the foot, `h` the crest height over the foot and `len` the length. Both wedges are Slate and both are
+-- looks only. Returns the frame, for the ore seams.
+type Ridge = { cf: CFrame, w: number, h: number, len: number }
+
+local function ridge(parent: Instance, cf: CFrame, w: number, h: number, len: number, color: Color3): Ridge
+	-- A wedge's tall (back) face is its local +Z. The first wedge stands on the near half with its tall
+	-- face on the middle line; the second is turned half a circle and stands on the far half.
+	local front = Kit.wedge(
+		parent,
+		"Rock",
+		Vector3.new(w, h, len / 2),
+		cf * CFrame.new(0, 0, -len / 4),
+		color,
+		Enum.Material.Slate
+	)
+	local back = Kit.wedge(
+		parent,
+		"Rock",
+		Vector3.new(w, h, len / 2),
+		cf * CFrame.new(0, 0, len / 4) * CFrame.Angles(0, math.pi, 0),
+		color,
+		Enum.Material.Slate
+	)
+	Kit.decor(front)
+	Kit.decor(back)
+	return { cf = cf, w = w, h = h, len = len }
 end
 
-local function vein(parent: Instance, c: Vector3, r: Vector3, theta: number, phi: number, length: number, color: Color3)
-	local wander = { 0, 0.14, -0.08, 0.12 }
-	local rise = length / 3 / math.max(r.Y, 0.5)
-	local last = skinPoint(c, r, theta, phi, 0.05)
+-- An ore seam laid on a ridge's skin: four short bars from (x, z) `from` to `to` in the ridge's frame, the
+-- height read off the pitched roof (crest on the middle line z = 0, falling to the foot at both ends),
+-- wandering a little, standing a hair proud so the ore reads as running through the stone.
+local function seam(parent: Instance, r: Ridge, fromX: number, fromZ: number, toX: number, toZ: number, color: Color3)
+	local wander = { 0, 0.1, -0.07, 0.08 }
+	local function skin(x: number, z: number): Vector3
+		local y = r.h / 2 - r.h * math.abs(z) / (r.len / 2) + 0.07
+		return r.cf:PointToWorldSpace(Vector3.new(x, y, z))
+	end
+	local last = skin(fromX, fromZ)
 	for k = 1, 4 do
-		local here = skinPoint(c, r, theta + wander[k], phi + k * rise, 0.05)
-		if (here - last).Magnitude > 0.05 then
-			local bar = Kit.beam(parent, "Vein", last, here, 0.3 - k * 0.04, 0.2, color, Enum.Material.Metal)
-			Kit.decor(bar, false)
-		end
+		local f = k / 4
+		local here = skin(fromX + (toX - fromX) * f + wander[k], fromZ + (toZ - fromZ) * f)
+		local bar = Kit.beam(parent, "Vein", last, here, 0.34 - k * 0.04, 0.22, color, Enum.Material.Metal)
+		Kit.decor(bar, false)
 		last = here
 	end
 end
@@ -54,67 +80,19 @@ function NodeArt.Build(seed: number, ore: string?): Model
 	local veinColor = Kit.hex(NodeArt.VeinHex[oreName] or NodeArt.VeinHex.Amber)
 	local cliff, slate = Palette.CliffRock, Palette.QuarrySlate
 
-	-- The stone: a cluster of faceted wedges, every one turned off the axes (yaw, pitch and roll all
-	-- different) so no two faces line up and nothing is a cube or a ball. Each sinks into the ground a
-	-- little and the facets overlap into one outcrop. `c` is the centre, `size` the wedge's box, `a` the
-	-- yaw, pitch and roll; `r` is the radii of the ellipsoid the ore bars are laid on (a hair inside the
-	-- facets, so the ore shows through them).
-	local bodies = {
-		{
-			c = Vector3.new(0, 0.95, 0),
-			size = Vector3.new(2.6, 1.9, 2.0),
-			a = { 0.45, 0.14, 0.1 },
-			color = cliff,
-			r = Vector3.new(1.15, 0.85, 0.95),
-		},
-		{
-			c = Vector3.new(-0.45, 1.9, 0.15),
-			size = Vector3.new(1.5, 2.4, 1.3),
-			a = { 2.0, -0.15, 0.12 },
-			color = slate,
-			r = Vector3.new(0.6, 1.1, 0.55),
-		},
-		{
-			c = Vector3.new(0.95, 0.55, -0.65),
-			size = Vector3.new(1.3, 1.1, 1.2),
-			a = { 3.5, 0.2, -0.15 },
-			color = cliff,
-			r = Vector3.new(0.5, 0.45, 0.5),
-		},
-		{
-			c = Vector3.new(-1.0, 0.4, -0.7),
-			size = Vector3.new(1.2, 0.9, 1.1),
-			a = { 5.0, -0.2, 0.1 },
-			color = slate,
-			r = Vector3.new(0.45, 0.35, 0.45),
-		},
-		{
-			c = Vector3.new(0.55, 0.4, 0.95),
-			size = Vector3.new(1.3, 0.9, 1.0),
-			a = { 0.8, 0.15, 0.2 },
-			color = slate,
-			r = Vector3.new(0.5, 0.35, 0.4),
-		},
-		{
-			c = Vector3.new(-1.2, 0.5, 0.7),
-			size = Vector3.new(1.1, 1.0, 1.0),
-			a = { 2.4, 0.18, -0.12 },
-			color = cliff,
-			r = Vector3.new(0.4, 0.4, 0.4),
-		},
-		{
-			c = Vector3.new(0.1, 2.4, -0.1),
-			size = Vector3.new(0.9, 1.4, 0.8),
-			a = { 4.0, 0.2, 0.15 },
-			color = cliff,
-			r = Vector3.new(0.3, 0.55, 0.3),
-		},
-	}
-	for _, b in ipairs(bodies) do
-		local turn = CFrame.Angles(b.a[2], b.a[1] + rng:range(-0.08, 0.08), b.a[3])
-		local p = Kit.wedge(model, "Rock", b.size, CFrame.new(b.c) * turn, b.color, Enum.Material.Slate)
-		Kit.decor(p)
+	-- The stone: ridges (pairs of wedges, no cube and no ball), each turned a different way and tilted
+	-- on all three axes, so no two faces line up. They sink into the ground a little and overlap into
+	-- one faceted outcrop. a = yaw, pitch, roll.
+	local function frame(x: number, y: number, z: number, yaw: number, pitch: number, roll: number): CFrame
+		return CFrame.new(x, y, z) * CFrame.Angles(pitch, yaw + rng:range(-0.06, 0.06), roll)
 	end
+	local main = ridge(model, frame(0, 0.7, 0, 0.45, 0.06, 0.05), 2.4, 1.5, 2.6, cliff)
+	local cross = ridge(model, frame(-0.1, 0.95, 0.05, 2.0, -0.05, 0.07), 2.0, 1.9, 2.0, slate)
+	local spire = ridge(model, frame(-0.35, 1.75, 0.1, 0.9, 0.05, -0.06), 1.1, 1.7, 1.2, cliff)
+	local lowA = ridge(model, frame(0.95, 0.35, -0.65, 3.6, 0.1, -0.08), 1.1, 0.9, 1.3, cliff)
+	ridge(model, frame(-1.0, 0.3, -0.7, 5.0, -0.09, 0.07), 1.0, 0.8, 1.2, slate)
+	ridge(model, frame(0.55, 0.3, 0.95, 0.8, 0.08, 0.1), 1.1, 0.8, 1.1, slate)
+	ridge(model, frame(-1.2, 0.35, 0.7, 2.4, 0.09, -0.07), 1.0, 0.9, 1.1, cliff)
 	-- One angular ledge low on the front, so the outline is broken at the foot as well.
 	local ledge = Kit.wedge(
 		model,
@@ -125,14 +103,13 @@ function NodeArt.Build(seed: number, ore: string?): Model
 		Enum.Material.Slate
 	)
 	Kit.decor(ledge)
-	local yaw = -math.pi / 2 + rng:range(-0.5, 0.5) -- the first seam faces -Z, the way a node is most often met
-	local main, tall = bodies[1], bodies[2]
-	vein(model, main.c, main.r, yaw, 0.35, 1.7, veinColor)
-	vein(model, main.c, main.r, yaw + 0.5, 0.15, 1.2, veinColor)
-	vein(model, tall.c, tall.r, yaw + 2.2, 0.25, 1.5, veinColor)
-	vein(model, tall.c, tall.r, yaw + 3.4, 0.55, 1.0, veinColor)
-	vein(model, bodies[3].c, bodies[3].r, yaw + 4.4, 0.4, 0.8, veinColor)
-	vein(model, main.c, main.r, yaw + math.pi, 0.3, 1.5, veinColor) -- and one round the back
+	-- Ore seams: along each big crest, and down the slope facing -Z (the way a node is most often met).
+	seam(model, main, -0.8, 0, 0.8, 0, veinColor)
+	seam(model, main, 0.4, -0.15, -0.2, -0.95, veinColor)
+	seam(model, cross, -0.6, 0, 0.6, 0, veinColor)
+	seam(model, cross, 0.3, -0.1, -0.1, -0.7, veinColor)
+	seam(model, spire, -0.3, 0, 0.3, 0, veinColor)
+	seam(model, lowA, -0.3, 0.05, 0.3, 0.05, veinColor)
 	return model
 end
 
