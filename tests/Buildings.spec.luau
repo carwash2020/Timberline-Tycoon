@@ -118,7 +118,18 @@ return function(t)
 
 	t.test("1. names, tags and attributes that code reads still exist", function()
 		local spark = BuildingArt.Sparkworks()
-		for _, name in ipairs({ "Pad", "Floor", "Wall", "Roof", "Counter", "Lamp", "Switch", "Wire", "GlowStrip", "DemoBoard" }) do
+		for _, name in ipairs({
+			"Pad",
+			"Floor",
+			"Wall",
+			"Roof",
+			"Counter",
+			"Lamp",
+			"Switch",
+			"Wire",
+			"GlowStrip",
+			"DemoBoard",
+		}) do
 			t.ok(find(spark, name) ~= nil, "Sparkworks " .. name)
 		end
 		local board = find(spark, "DemoBoard")
@@ -160,25 +171,28 @@ return function(t)
 		t.eq(spark.z, -700)
 	end)
 
-	t.test("2. the clerk faces the door: Hank faces south from his spot; the office counter is behind the door line", function()
-		local hank = NPCData.Get(PlotSalesman.Id)
-		t.eq(hank.spot.position.X, 153.5)
-		t.eq(hank.spot.position.Z, 100)
-		t.eq(hank.spot.lookAt.Z - hank.spot.position.Z, 100, "his facing is unchanged (south)")
-		local office = BuildingArt.LandOffice()
-		local counter = find(office, "Counter")
-		local z = frontZ(office)
-		local a, b = bounds(counter)
-		t.ok(a.Z > z + 3, "the counter is well inside the door")
-		t.ok(b.X - a.X >= 6, "the counter spans the room, facing the door")
-		-- The clerk's side is behind the counter (+Z): clear floor for a clerk to stand.
-		local clerk = V3.new((a.X + b.X) / 2, 1.5, b.Z + 1.2)
-		for _, p in ipairs(solids(office)) do
-			if p.Name ~= "Wall" and p.Name ~= "Roof" then
-				t.ok(not inside(p, clerk.X, clerk.Y, clerk.Z), p.Name .. " is where the clerk stands")
+	t.test(
+		"2. the clerk faces the door: Hank faces south from his spot; the office counter is behind the door line",
+		function()
+			local hank = NPCData.Get(PlotSalesman.Id)
+			t.eq(hank.spot.position.X, 153.5)
+			t.eq(hank.spot.position.Z, 100)
+			t.eq(hank.spot.lookAt.Z - hank.spot.position.Z, 100, "his facing is unchanged (south)")
+			local office = BuildingArt.LandOffice()
+			local counter = find(office, "Counter")
+			local z = frontZ(office)
+			local a, b = bounds(counter)
+			t.ok(a.Z > z + 3, "the counter is well inside the door")
+			t.ok(b.X - a.X >= 6, "the counter spans the room, facing the door")
+			-- The clerk's side is behind the counter (+Z): clear floor for a clerk to stand.
+			local clerk = V3.new((a.X + b.X) / 2, 1.5, b.Z + 1.2)
+			for _, p in ipairs(solids(office)) do
+				if p.Name ~= "Wall" and p.Name ~= "Roof" then
+					t.ok(not inside(p, clerk.X, clerk.Y, clerk.Z), p.Name .. " is where the clerk stands")
+				end
 			end
 		end
-	end)
+	)
 
 	t.test("3. Sparkworks stays on Lantern Isle, ferry required until the ferry binds", function()
 		local town = WorldPlan.Town()
