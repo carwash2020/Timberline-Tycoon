@@ -229,7 +229,7 @@ function TownBoardArt.Build(): Model
 	-- Brass corner pieces, a hair bigger than the frame all round (no shared face).
 	for _, sx in ipairs({ -1, 1 }) do
 		for _, sy in ipairs({ -1, 1 }) do
-			local corner = Kit.part(
+			local bracket = Kit.part(
 				model,
 				"FrameCorner",
 				Vector3.new(f + 0.16, f + 0.16, size.Z + 0.24),
@@ -237,7 +237,7 @@ function TownBoardArt.Build(): Model
 				L.Brass,
 				Enum.Material.Metal
 			)
-			corner.CanCollide = false
+			bracket.CanCollide = false
 		end
 	end
 
