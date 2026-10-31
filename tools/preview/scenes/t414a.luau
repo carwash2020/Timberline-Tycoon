@@ -22,11 +22,12 @@ return {
 				{ pos = { 20, 260, 30 }, target = { 20, 0, 30 }, fov = 45, label = "midday overlap" },
 				{ pos = { -20, 1.8, 66 }, target = { -50, 1.2, 80 }, fov = 70, label = "midday eye level, plaza" },
 				{
-					pos = { 138, 4, 50 },
-					target = { 162, 0.4, 66 },
+					pos = { 141, 1.8, 52 },
+					target = { 160, 0.6, 64 },
 					fov = 45,
 					label = "midday East Link kerb, outside the drive edge",
 				},
+				{ pos = { 60, 1.8, 0 }, target = { 100, 0.4, 30 }, fov = 65, label = "midday lot cobble, eye height" },
 			},
 		}
 	end,

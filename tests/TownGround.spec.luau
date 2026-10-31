@@ -1097,4 +1097,23 @@ return function(t)
 		end
 		t.ok(cuts >= 1, "the town streets do have real cuts")
 	end)
+
+	t.test("T414a: lot slabs are Cobblestone TownCobble #9C958A, the same as the lane strips", function()
+		local lots, lanes = 0, 0
+		for _, p in ipairs(pieces) do
+			if p.name == "Lot" then
+				lots += 1
+				t.eq(p.material, "Cobblestone", "lot slab material")
+				t.eq(p.color:ToHex(), "9C958A", "lot slab colour")
+			elseif p.name == "LotLoop" or p.name == "ForestPath" or p.name == "MillRoad" then
+				lanes += 1
+				t.eq(p.material, "Cobblestone", p.name .. " material")
+				t.eq(p.color:ToHex(), "9C958A", p.name .. " colour")
+			end
+		end
+		t.ok(lots >= 1 and lanes >= 1, "lot slabs and lane strips exist")
+		-- And the terrain under the lot is that cobble, not asphalt.
+		t.eq(surface(73, 20), "Cobblestone", "terrain under the lot")
+		t.eq(TerrainGen.MaterialColors.Cobblestone:ToHex(), "9C958A")
+	end)
 end
