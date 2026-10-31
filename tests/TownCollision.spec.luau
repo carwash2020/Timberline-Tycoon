@@ -269,7 +269,8 @@ return function(t)
 	t.test("6: no part was added (counts match main)", function()
 		-- Hearth lost the coat, boots and lantern boxes (T412).
 		-- T414d adds the shelf, two items, two tags, the nosing and the hero (7) on the three town shops.
-		local want = { Dealership = 422, GeneralStore = 111, ToolShed = 456, HearthAndHome = 438, Sparkworks = 412 }
+		-- The finish adds the plank ceiling to the Tool Shed and the Dealership, and two painted lobby stripes to the Dealership.
+		local want = { Dealership = 425, GeneralStore = 111, ToolShed = 457, HearthAndHome = 438, Sparkworks = 412 }
 		for _, kind in ipairs(KINDS) do
 			t.eq(#parts(models[kind]), want[kind], kind .. " part count")
 		end
