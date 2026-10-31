@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `9b2a43f` (T414a town ground, #278).** This branch is T414d shops (`cursor/t414d-shops-living-world`).
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `80fd596` (T414b, #285).** This branch is the T414a fixes (`cursor/t414a-fixes`). Outside town the graded TrailDirt shoulder stays. Inside town the street is flat to half-width 16.3.
 
 ## T414d-1 shop aisles and seated stock (30 October 2026)
 
@@ -13,9 +13,9 @@ Dressed: Tool Shed, Hearth & Home, Dealership, Coat Kiosk, Heat Boots, Odds and 
 
 The style-guide 12 colours are on the part-built vehicle parts and the kept hull parts of a meshed one (mesh colours stay baked in the GLBs). Glass is one #9CCBE0 at 0.4. The lot's bays are at least vehicle width + 4 wide. The Rustbucket part budget is 58. No prices, stats, MeshIds or services changed. Details and Studio checks: PHASE2_NOTES.md "T414b Dealership fleet look". Shots: `preview/t414b/`. Nothing here has been seen in Studio.
 
-## T414a town ground (30 October 2026, branch `cursor/t414a-town-ground-1e4c`)
+## T414a fixes (30 October 2026, branch `cursor/t414a-fixes`)
 
-Town roads, lanes, the lot and the footpaths are terrain paint (`TownGround.MaterialAt`, drawn by `TerrainGen.SurfaceMaterial`). The flat strips are gone. Kerbs are a 0.6-stud StoneBase slate bar, `CanCollide` false, `TownGroundArt.KerbMeshId` 0 until Connor uploads a mesh. Town lanes and the lot are cobble `#9C958A`. East Link, South Link and the yards are asphalt-gravel `#A8A49C`. Footpaths are TrailDirt, 8 wide, and the edge feathers into grass. The graded bed stays 28 (`WorldLayout.PlanWidth`): widening it moves trees and puts rocks in cabins, so paint does not pass that bed. Drive widths stay 32 and 24. The T413 shoulder (14 to 18 on a main) still paints Ground outside town; a town piece wins only where `TownGround.MaterialAt` returns a material. Shop pins, the mill, the Weigh House, bridges and docks did not move. Shots: `preview/t414a/`. Studio checks: PHASE2_NOTES.md "T414a town ground". Nothing here has been seen in Studio. Cloud has no physics.
+Town roads, lanes, the lot and the footpaths are terrain paint (`TownGround.MaterialAt`, drawn by `TerrainGen.SurfaceMaterial`). Inside town the street is flat out to half-width 16.3, paved to 16, with the kerb at 16.15 (StoneBase slate `#8C877E`, 0.6 high, no collision, top from `HeightAt` on the kerb line). Grass blends outward only, from 16.3 to 20.3. A store pad and a homestead pad keep y = 0. Streets are Asphalt `#A8A49C`. Lanes and the lot are Cobblestone `#9C958A`. Footpaths are TrailDirt, 8 wide. No orange-red. `WorldLayout.PlanWidth` stays 28, and that assertion is for the road outside town: the T413 shoulder (14 to 18) still paints Ground there. `MapBuilder` and `TerrainBuilder` both require `TownGround` before the fill. The boot line includes `town ground` seconds. Known gap: `TownGroundArt.KerbMeshId` is 0, so the kerb is the slate bar until the mesh is uploaded. Shop pins, the mill, the Weigh House, bridges and docks did not move. Midday shots: `preview/t414a/` (plaza top-down, phone-width crop, street and plaza eye level, kerb, East Link kerb outside the drive edge). They are three.js previews, not Studio lighting, and the preview cannot load uploaded Roblox meshes. The preview's Ground texture is lightened so TrailDirt reads `#8E6C4A`. Studio checks: PHASE2_NOTES.md "T414a fixes". Nothing here has been seen in Studio. Cloud has no physics.
 
 ## T413 roads, the car ferry, and the Skyroot climb (28 October 2026)
 

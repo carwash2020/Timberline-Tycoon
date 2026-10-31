@@ -596,8 +596,10 @@ local function export(name: string, def)
 	if t then
 		local nx = math.floor((t.x1 - t.x0) / t.step) + 1
 		local nz = math.floor((t.z1 - t.z0) / t.step) + 1
-		local h, m, wet = table.create(nx * nz), table.create(nx * nz), table.create(nx * nz)
+		local h, m, matOf, wet =
+			table.create(nx * nz), table.create(nx * nz), table.create(nx * nz), table.create(nx * nz)
 		local palette, paletteIndex = {}, {}
+		local matNames, matIndex = {}, {}
 		for iz = 0, nz - 1 do
 			for ix = 0, nx - 1 do
 				local height, material, water = t.sample(t.x0 + ix * t.step, t.z0 + iz * t.step)
@@ -609,8 +611,15 @@ local function export(name: string, def)
 					pi = #palette - 1
 					paletteIndex[color] = pi
 				end
+				local mi = matIndex[material]
+				if mi == nil then
+					table.insert(matNames, material)
+					mi = #matNames - 1
+					matIndex[material] = mi
+				end
 				h[iz * nx + ix + 1] = round(height, 2)
 				m[iz * nx + ix + 1] = pi
+				matOf[iz * nx + ix + 1] = mi
 			end
 		end
 		scene.terrain = {
@@ -621,6 +630,8 @@ local function export(name: string, def)
 			nz = nz,
 			h = h,
 			m = m,
+			mat = matOf,
+			matNames = matNames,
 			palette = palette,
 			wet = wet,
 			waterColor = t.waterColor,

@@ -221,6 +221,7 @@ emit('`SoundData`), empty sound slots (`id = ""`, silent), badge ids (all 0 by d
 emit(
 	string.format("`meshId = 0` slots (no upload yet, part build kept by design): %d. They are not listed.", Scan.Zeros)
 )
+emit("Known gap: `TownGroundArt.KerbMeshId` is 0. The kerb stays the StoneBase slate bar until that strip is uploaded.")
 emit("")
 
 -- The store item model slots (Shared/StoreModelSlots): one slot per store item, each

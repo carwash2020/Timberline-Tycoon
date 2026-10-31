@@ -99,7 +99,8 @@ return function(t)
 	t.test("the surface band is 3 voxels deep (was 2)", function()
 		local TerrainBuilder = builder()
 		t.eq(TerrainBuilder.SurfaceBand, 3)
-		-- Flat grass in the town: the top three solid voxels are Grass, the ones under are Ground.
+		-- This chunk is the parking lot. The fill requires TownGround, so the
+		-- top three solid voxels are that cobble and the ones under are Ground.
 		local terrain, writes = recordingTerrain()
 		TerrainBuilder._writeChunk(terrain, 40, 20, 4, 4)
 		local col = column(writes[1], 2, 2)
@@ -109,9 +110,9 @@ return function(t)
 				table.insert(solid, voxel.name)
 			end
 		end
-		t.eq(solid[1], "Grass")
-		t.eq(solid[2], "Grass")
-		t.eq(solid[3], "Grass")
+		t.eq(solid[1], "Cobblestone")
+		t.eq(solid[2], "Cobblestone")
+		t.eq(solid[3], "Cobblestone")
 		t.eq(solid[4], "Ground", "the 4th voxel down is the under-layer")
 		t.eq(solid[5], "Ground")
 	end)

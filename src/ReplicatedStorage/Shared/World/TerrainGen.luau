@@ -1330,6 +1330,7 @@ type GradedRoad = {
 	along: { number },
 	half: number,
 	plan: number,
+	townBed: boolean,
 	minX: number,
 	maxX: number,
 	minZ: number,
@@ -1486,6 +1487,7 @@ local function buildHaulGrades(grades: { GradedRoad }, cap: number, pinJoins: bo
 			along = along,
 			half = gradeHalf,
 			plan = planHalf,
+			townBed = WorldLayout.TownBedRoads[road.name] == true,
 			minX = minX,
 			maxX = maxX,
 			minZ = minZ,
@@ -1593,12 +1595,25 @@ local function haulField(x: number, z: number): (number?, number?, number)
 				end
 			end
 			local distN = math.sqrt(dist)
+			-- Inside town the East Link and South Link are flat out to
+			-- TownBedHalf (the kerb). A store pad or a homestead pad keeps
+			-- its own floor. Outside town the drive stays DriveHalf.
+			local townStreet = g.townBed
+				and WorldLayout.InTownZone(x, z)
+				and not WorldLayout.OnStorePad(x, z)
+				and not WorldLayout.OnPlotPad(x, z)
+			if townStreet then
+				half = math.max(half, WorldLayout.TownBedHalf)
+			end
 			local driveEdge = distN - half
 			-- The bank still starts at the plan edge, so ground past the
 			-- drive (and every tree standing there) keeps its old height.
 			-- Only the band between the plan bed and the drive goes flat.
+			-- A town street does not hold the shelf: the kerb has to sit level
+			-- with the crown. Pads still hold.
 			local planEdge = distN - g.plan
-			local holdFlat = planEdge > 0 and WorldLayout.FlatWeight(x, z) > 0.85
+			local townFlat = townStreet and distN <= WorldLayout.TownBedHalf
+			local holdFlat = planEdge > 0 and WorldLayout.FlatWeight(x, z) > 0.85 and not townFlat
 			if driveEdge <= 0 and not holdFlat then
 				if dist < onD then
 					onD = dist
@@ -1916,9 +1931,14 @@ local shoulderHere = false
 -- and slope (rise over run), before the town zone's rules (below).
 local function surfaceMaterial(x: number, z: number, h: number, slope: number): string
 	shoulderHere = false
-	-- The dirt band (14 to 18 on a main) wins over grass and sand. A
-	-- homestead shelf, the town, and the lot stay the flat they already are.
-	if onShoulder(x, z) and WorldLayout.FlatWeight(x, z) < 0.5 and not WorldLayout.OnPlotPad(x, z) then
+	-- The dirt band (14 to 18 on a main) wins over grass, sand and snow. A
+	-- homestead pad, a store pad and the town keep the floor they already have.
+	if
+		onShoulder(x, z)
+		and not WorldLayout.OnPlotPad(x, z)
+		and not WorldLayout.OnStorePad(x, z)
+		and not WorldLayout.InTownZone(x, z)
+	then
 		shoulderHere = true
 		return "Ground"
 	end
