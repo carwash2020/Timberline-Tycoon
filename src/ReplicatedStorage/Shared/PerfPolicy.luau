@@ -20,8 +20,9 @@ PerfPolicy.Persistent = {
 	MainlandDock = true,
 	IslandDock = true,
 	-- spawn landmarks: the two boards at the spawn, the tutorial's two guides, the sell area the client's
-	-- carry loop waits on with no timeout, and the Backdrop (the horizon, which no other model provides)
+	-- carry loop waits on with no timeout, and the horizon (Backdrop, Lighthouse: MapBuilder.spec pins them visible)
 	TownBoard = true,
+	Lighthouse = true,
 	SellArea = true,
 	Backdrop = true,
 	StoreBoard = true,

@@ -486,8 +486,13 @@ return function(t)
 				table.insert(clientPreloads, path)
 			end
 		end
-		t.eq(clientPreloads, { "src/StarterPlayer/StarterPlayerScripts/UIArt.luau" })
-		t.ok(string.find(codeOf[clientPreloads[1]], "later%(function%(%)%s*local ContentProvider") ~= nil)
+		-- T415: FirstViewPreload is the second, capped, on its own script; the card waits for it at most PRELOAD_WAIT.
+		table.sort(clientPreloads)
+		t.eq(clientPreloads, {
+			"src/StarterPlayer/StarterPlayerScripts/FirstViewPreload.client.luau",
+			"src/StarterPlayer/StarterPlayerScripts/UIArt.luau",
+		})
+		t.ok(string.find(codeOf[clientPreloads[2]], "later%(function%(%)%s*local ContentProvider") ~= nil)
 		-- Client dressers are the same non-blocking MeshKit: AmbientLife builds
 		-- rocks and mushrooms through NatureArt on the client's render thread.
 		t.eq(filesWith("MeshKit.CreateAwait(", true), { MESHKIT, "src/ReplicatedStorage/Shared/ItemMeshes.luau" })

@@ -58,6 +58,7 @@ return function(t)
 			"GateLodge",
 			"IslandDock",
 			"LiftBridge",
+			"Lighthouse",
 			"MainlandDock",
 			"Murph",
 			"OldHank",
@@ -86,9 +87,10 @@ return function(t)
 
 	t.test("the persistent() helpers wrap only the listed models", function()
 		local map = code("src/ServerScriptService/MapBuilder.server.luau")
-		t.eq(count(map, "[^%w_]persistent%("), 3, "the definition and two calls")
+		t.eq(count(map, "[^%w_]persistent%("), 4, "the definition, StoreBoard, GateLodge and the lighthouse")
 		t.ok(string.find(map, "persistent(StoreBoard.Build())", 1, true))
 		t.ok(string.find(map, "persistent(BuildingArt.GateLodge())", 1, true))
+		t.ok(string.find(map, "persistent(LandmarkArt.Lighthouse())", 1, true))
 		local travel = code("src/ReplicatedStorage/Shared/Art/TravelArt.luau")
 		t.eq(count(travel, "[^%w_]persistent%("), 4, "the definition and three calls")
 		t.ok(string.find(travel, "persistent(lift)", 1, true))

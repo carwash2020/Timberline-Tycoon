@@ -508,7 +508,7 @@ step("4. The town", function()
 	step("4. The sawmill", function()
 		-- Atomic (T415): the mill is interactive, so it streams in whole.
 		-- (Lookout towers, further out and numerous, use a StreamingMesh
-		-- instead — see the scenery step. The lighthouse is plain decor (Default).
+		-- instead — see the scenery step. The lighthouse stays Persistent.
 		-- Every shop is Atomic.)
 		local sawmill = standOnGround(place(atomic(BuildingArt.Sawmill()), town.sawmill))
 		local blade = sawmill:FindFirstChild("SawBlade", true)
@@ -1391,7 +1391,7 @@ end
 -- TimberlineMap.BoulderClusters; then, under TimberlineMap.Landmarks, a
 -- timber footbridge over the river with its TIMBER BRIDGE sign, plank
 -- docks on Mirror Lake and the east coast with a moored rowboat each, and
--- the lighthouse on the coast's headland (Default streaming, T415: the town sees it on
+-- the lighthouse on the coast's headland (Persistent: the town sees it on
 -- the horizon; its "LampGlow" lights at dusk). Rocks, decks, posts, rails
 -- and the tower collide; the rowboats are looks only. Each part of this
 -- step runs on its own.
@@ -1454,7 +1454,7 @@ do
 	defer("5. The lighthouse", 2, nil, function(_slice)
 		local lighthouse = WorldPlan.Lighthouse()
 		if lighthouse then
-			place(LandmarkArt.Lighthouse(), lighthouse.cframe, landmarks)
+			place(persistent(LandmarkArt.Lighthouse()), lighthouse.cframe, landmarks)
 		end
 	end)
 end

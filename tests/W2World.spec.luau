@@ -117,7 +117,7 @@ return function(t)
 			end
 		end
 		local water = folder:FindFirstChild("DeepWater")
-		t.eq(water.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Persistent)
+		t.eq(water.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Default) -- T415: decor, no longer Persistent
 		t.ok(#partsOf(water) <= 60, "deep water parts")
 		t.eq(folder:FindFirstChild("NorthStrip").ModelStreamingMode, roblox.Enum.ModelStreamingMode.Default)
 		t.eq(folder:FindFirstChild("FerryIsland").ModelStreamingMode, roblox.Enum.ModelStreamingMode.Default)
