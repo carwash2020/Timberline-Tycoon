@@ -19,11 +19,12 @@ Mesh upload (`ShopShelf` and `ShopCounter` attribute MeshId is 0; registry rows 
 
 ## T414a fixes (30 October 2026, branch `cursor/t414a-fixes`)
 
+
 ## T414c Land Office and Sparkworks art (31 October 2026, branch `cursor/t414c-landoffice-sparkworks`)
 
 Studio checks: (1) The preview builders `BuildingArt.LandOffice` and `BuildingArt.Sparkworks` are not placed in the world; nothing in town or on Lantern Isle should look different. (2) Old Hank still stands at the PLOT DISTRICT sign and his Talk prompt opens the plot picker. (3) Sparkworks on Lantern Isle is still shut until the ferry binds. (4) No Sky Forge court on the ground; the summit anvil and four relic sockets at cloud Y 840 are unchanged. Nothing seen in Studio.
 
-## T414a town ground (30 October 2026, branch `cursor/t414a-town-ground-1e4c`)
+## T414a fixes (30 October 2026, branch `cursor/t414a-fixes`)
 
 Nothing here has been seen in Studio. Cloud tests paint the street and check that kerbs do not collide. They do not walk or drive. Outside town, the T413 TrailDirt shoulder (below) is unchanged. Inside town the bed is flat to half-width 16.3, paving runs to 16, the kerb is at 16.15, and grass blends outward from 16.3 to 20.3. The 28-stud plan bed stays on the country stretch. Known gap: `TownGroundArt.KerbMeshId` is 0.
 
