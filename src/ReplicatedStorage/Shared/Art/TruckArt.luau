@@ -68,6 +68,7 @@ local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
+local Palette = require(script.Parent.Palette)
 local TreeArt = require(script.Parent.TreeArt)
 local VehicleMeshes = require(script.Parent.VehicleMeshes)
 
@@ -105,6 +106,13 @@ local TAILLIGHT = hex("#B0241C")
 local AMBER = hex("#FFB23F")
 -- The trailer coupler's red (T421): the same red as the tail lamps' #B0241C.
 local COUPLER = hex("#B0241C")
+
+-- T414b (style-guide 12): bolts, the grey fenders of the trailers and the Flatbed's tandem, the dirt of a working
+-- truck's lower panels (a dark earth, not the red dirt) and the one glass see-through (0.4).
+local BOLT = hex("#9AA1A8")
+local FENDER_GREY = hex("#8E949A")
+local DIRT = hex("#5B4B3C")
+local GLASS_T = 0.4
 
 TruckArt.HeadlightColor = HEADLIGHT
 TruckArt.TaillightColor = TAILLIGHT
@@ -206,11 +214,16 @@ local function hull(
 	return p
 end
 
-local function glass(parent: Instance, name: string, size: Vector3, cf: CFrame, transparency: number?): Part
+local function glass(parent: Instance, name: string, size: Vector3, cf: CFrame): Part
 	local p = deco(parent, name, size, cf, GLASS, M.Glass)
-	p.Transparency = transparency or 0.45
+	p.Transparency = GLASS_T
 	p.CastShadow = false
 	return p
+end
+
+-- Working-fleet wear: a thin dark-earth skin on a lower panel's outside face (x = the face), `len` long. Looks only.
+local function dirt(parent: Instance, side: number, face: number, y: number, z: number, len: number)
+	deco(parent, "LowerDirt", V3(0.05, 0.5, len), CF(side * (face + STRIPE_PROUD - 0.025), y, z), DIRT, M.SmoothPlastic)
 end
 
 -- Glossy paint: every part of `model` painted `paint` turns to clean
@@ -331,7 +344,7 @@ local function wheel(parent: Instance, center: Vector3, r: number, w: number, s:
 		decoCyl(tyre, "Rim", w + 0.16, rimDia, cf, s.rim, s.rimMaterial or M.Metal)
 		decoCyl(tyre, "RimDish", w + 0.04, rimDia * DISH, cf, Kit.shade(s.rim, -0.12), M.Metal)
 		decoCyl(tyre, "Hub", w + 0.2, r * HUB_CAP, cf, s.hub or CHROME_HI, M.Metal)
-		decoCyl(tyre, "HubBolt", w + 0.24, r * HUB_BOLT, cf * CF(0, r * HUB_BOLT_AT, 0), BLACK, M.Metal)
+		decoCyl(tyre, "HubBolt", w + 0.24, r * HUB_BOLT, cf * CF(0, r * HUB_BOLT_AT, 0), BOLT, M.Metal)
 		for i = 1, 3 do
 			local ang = i * math.pi / 2
 			decoCyl(
@@ -340,7 +353,7 @@ local function wheel(parent: Instance, center: Vector3, r: number, w: number, s:
 				w + 0.24,
 				r * HUB_BOLT,
 				cf * CF(0, r * HUB_BOLT_AT * math.cos(ang), r * HUB_BOLT_AT * math.sin(ang)),
-				BLACK,
+				BOLT,
 				M.Metal
 			)
 		end
@@ -349,7 +362,7 @@ local function wheel(parent: Instance, center: Vector3, r: number, w: number, s:
 	decoCyl(tyre, "Rim", w + 0.06, r * 2 * (s.rimScale or 0.6), cf, s.rim, s.rimMaterial or M.Metal)
 	if s.hub then
 		decoCyl(tyre, "Hub", w + 0.12, r * HUB_CAP, cf, s.hub, M.Metal)
-		decoCyl(tyre, "HubBolt", w + 0.16, r * HUB_BOLT, cf * CF(0, r * HUB_BOLT_AT, 0), BLACK, M.Metal)
+		decoCyl(tyre, "HubBolt", w + 0.16, r * HUB_BOLT, cf * CF(0, r * HUB_BOLT_AT, 0), BOLT, M.Metal)
 	end
 	return tyre
 end
@@ -522,7 +535,7 @@ builders.farm = function(c: Ctx)
 	local primer = hex("#9A9A94") -- the one replacement door, primer grey
 	local cream = hex("#D8C6A0")
 	local oldMetal = hex("#6E5D50")
-	local wood = hex("#7C5A3A")
+	local wood = Palette.PlankHoney
 	local hoodW = W * 0.5
 
 	deco(m, "Frame", V3(W - 1.6, 0.9, lay.length - 1.0), CF(0, 1.95, 0), FRAME, M.Metal)
@@ -540,8 +553,24 @@ builders.farm = function(c: Ctx)
 	deco(m, "Hood", V3(hoodW, 1.6, 3.4), CF(0, 3.1, f + 2.45), paint, M.Metal)
 	deco(m, "Grille", V3(hoodW + 0.15, 2.0, 0.35), CF(0, 3.05, f + 0.6), cream, M.Metal)
 	deco(m, "GrilleSlats", V3(hoodW - 0.45, 1.5, 0.1), CF(0, 3.0, f + 0.4), hex("#2B2420"), M.Metal)
+	-- A primer patch on the hood (the door is not the only repair).
+	deco(
+		m,
+		"PrimerPatch",
+		V3(hoodW * 0.4, 0.05, 1.2),
+		CF(hoodW * 0.18, 3.9 + STRIPE_PROUD - 0.025, f + 2.0),
+		primer,
+		M.Metal
+	)
 	for _, side in ipairs({ -1, 1 }) do
-		deco(m, "BumperBlock", V3(0.7, 0.4, 0.5), CF(side * (W / 2 - 0.55), 1.2, f + 0.2), wood, M.SmoothPlastic)
+		deco(
+			m,
+			"BumperBlock",
+			V3(0.7, 0.4, 0.5),
+			CF(side * (W / 2 - 0.55), 1.2, f + 0.2),
+			Palette.TimberBrown,
+			M.SmoothPlastic
+		)
 	end
 	local fenderTop = 2 * r + 0.6
 	for _, side in ipairs({ -1, 1 }) do
@@ -581,7 +610,7 @@ builders.farm = function(c: Ctx)
 	local rake = CFrame.Angles(0.12, 0, 0)
 	local screen = CF(0, 4.95, f + 4.75) * rake
 	deco(m, "WindshieldTop", V3(W - 0.4, 0.2, 0.2), screen * CF(0, 0.95, 0), oldMetal, M.Metal)
-	glass(m, "Windshield", V3(W - 0.8, 1.65, 0.07), screen, 0.6)
+	glass(m, "Windshield", V3(W - 0.8, 1.65, 0.07), screen)
 	deco(m, "Crack", V3(0.04, 0.7, 0.02), screen * CF(0.55, -0.15, 0.05), hex("#2A241C"), M.SmoothPlastic)
 	for _, side in ipairs({ -1, 1 }) do
 		deco(
@@ -630,6 +659,9 @@ builders.farm = function(c: Ctx)
 			M.CorrodedMetal
 		)
 	end
+	for _, side in ipairs({ -1, 1 }) do
+		dirt(m, side, W / 2, floorTop + 0.3, lay.bedCenterZ, lay.bedLength - 0.6)
+	end
 	local hinge = CF(0, floorTop, bedEnd - 0.12) * CFrame.Angles(0.22, 0, 0)
 	local gateW, gateH = W - 0.7, lay.wallHeight - 0.05
 	hull(m, "Tailgate", V3(gateW, gateH, 0.24), hinge * CF(0, gateH / 2, 0), Kit.vary(wood, rng, 0.05), M.WoodPlanks)
@@ -651,7 +683,7 @@ builders.farm = function(c: Ctx)
 			"RunningBoard",
 			V3(1.2, 0.2, z1 - z0),
 			CF(side * (wx - 0.05), 1.9, (z0 + z1) / 2),
-			Kit.vary(wood, rng, 0.05),
+			Kit.vary(Palette.TimberBrown, rng, 0.05),
 			M.WoodPlanks
 		)
 	end
@@ -709,13 +741,17 @@ builders.pickup = function(c: Ctx)
 	local wallY = floorTop + lay.wallHeight / 2
 	local seatTop, seatZ = SEAT_TOP.pickup, f + 6.1
 	local cream = hex("#EFE6D2")
+	-- The Timber Classic wears brighter chrome and brown trim and rims; the Pickup's chrome is #D3D8DC.
+	local classic = c.def.classic == true
+	local chrome = if classic then CHROME_HI else CHROME
+	local trimBrown = hex("#5A3B26")
 
 	deco(m, "Frame", V3(W - 1.8, 0.9, L - 1.2), CF(0, 1.95, 0), FRAME, M.Metal)
-	deco(m, "Bumper", V3(W + 0.45, 0.6, 0.55), CF(0, 1.75, f + 0.27), CHROME, M.Metal)
+	deco(m, "Bumper", V3(W + 0.45, 0.6, 0.55), CF(0, 1.75, f + 0.27), chrome, M.Metal)
 	deco(m, "Nose", V3(W - 1.0, 1.6, 4.0), CF(0, 2.85, f + 2.5), paint, M.Metal)
 	deco(m, "Hood", V3(W - 2.2, 0.65, 3.5), CF(0, 3.975, f + 2.75), paint, M.Metal)
 	decoWedge(m, "HoodNose", V3(W - 2.2, 0.65, 0.5), CF(0, 3.975, f + 0.75), paint, M.Metal)
-	deco(m, "Grille", V3(W - 2.4, 1.3, 0.16), CF(0, 2.85, f + 0.45), CHROME_HI, M.Metal)
+	deco(m, "Grille", V3(W - 2.4, 1.3, 0.16), CF(0, 2.85, f + 0.45), chrome, M.Metal)
 	for i = 0, 3 do
 		deco(m, "GrilleSlat", V3(W - 2.9, 0.1, 0.06), CF(0, 2.45 + i * 0.26, f + 0.36), hex("#2A2D33"), M.Metal)
 	end
@@ -726,7 +762,7 @@ builders.pickup = function(c: Ctx)
 		local x = side * (wx + 0.05)
 		deco(m, "Fender", V3(1.6, 0.8, fz1 - fz0), CF(x, 3.2, (fz0 + fz1) / 2), paint, M.Metal)
 		decoWedge(m, "Fender", V3(1.6, 0.8, 1.2), CF(x, 3.2, fz1 + 0.6) * CFrame.Angles(0, math.pi, 0), paint, M.Metal)
-		roundLamp(m, "Headlight", CF(x, 3.2, fz0), 0.7, 0.3, CHROME, HEADLIGHT, -1)
+		roundLamp(m, "Headlight", CF(x, 3.2, fz0), 0.7, 0.3, chrome, HEADLIGHT, -1)
 	end
 
 	-- Cab: glass all round under a cream roof, from the body's top (`belt`)
@@ -744,10 +780,9 @@ builders.pickup = function(c: Ctx)
 		m,
 		"CabGlass",
 		V3(W - 0.4, roofY - belt, glassZ1 - glassZ0),
-		CF(0, (belt + roofY) / 2, (glassZ0 + glassZ1) / 2),
-		0.45
+		CF(0, (belt + roofY) / 2, (glassZ0 + glassZ1) / 2)
 	)
-	glass(m, "Windshield", V3(W - 0.6, rise.Magnitude, 0.07), screen, 0.4)
+	glass(m, "Windshield", V3(W - 0.6, rise.Magnitude, 0.07), screen)
 	for _, side in ipairs({ -1, 1 }) do
 		deco(
 			m,
@@ -765,7 +800,7 @@ builders.pickup = function(c: Ctx)
 			cream,
 			M.Metal
 		)
-		deco(m, "Mirror", V3(0.18, 0.5, 0.65), CF(side * (W / 2 + 0.15), belt + 0.6, cabZ0 + 0.3), CHROME_HI, M.Metal)
+		deco(m, "Mirror", V3(0.18, 0.5, 0.65), CF(side * (W / 2 + 0.15), belt + 0.6, cabZ0 + 0.3), chrome, M.Metal)
 	end
 	deco(
 		m,
@@ -794,7 +829,7 @@ builders.pickup = function(c: Ctx)
 			"Trim",
 			V3(0.07, 0.15, bedEnd - cabZ0),
 			CF(side * (W / 2 + STRIPE_PROUD - 0.035), belt - 0.3, (cabZ0 + bedEnd) / 2),
-			CHROME_HI,
+			if classic then trimBrown else chrome,
 			M.Metal
 		)
 		-- The one mudflap of the part-built Pickup (a meshed Pickup drops it: the mesh has its own,
@@ -805,7 +840,7 @@ builders.pickup = function(c: Ctx)
 
 	-- Bed: smooth painted walls with chrome caps; a flared rear fender over
 	-- each wheel.
-	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#5E4632"))
+	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, Palette.TimberBrown)
 	for _, side in ipairs({ -1, 1 }) do
 		local x = side * (W / 2 - wall / 2)
 		hull(m, "BedWall", V3(wall, lay.wallHeight, lay.bedLength), CF(x, wallY, lay.bedCenterZ), paint, M.Metal)
@@ -814,7 +849,7 @@ builders.pickup = function(c: Ctx)
 			"BedCap",
 			V3(wall + 0.12, 0.12, lay.bedLength),
 			CF(x, floorTop + lay.wallHeight + 0.06, lay.bedCenterZ),
-			CHROME_HI,
+			chrome,
 			M.Metal
 		)
 		local fx = side * (W / 2 + 0.4)
@@ -835,7 +870,7 @@ builders.pickup = function(c: Ctx)
 	-- The Timber Classic's bed is a farm stake bed: three wooden stake posts a side, standing on
 	-- the deck outside the walls, and a top rail along them. Looks only (the walls are the hull).
 	if c.def.classic == true then
-		local wood = hex("#8A6038")
+		local wood = Palette.PlankHoney
 		local rng = c.rng
 		local postH = lay.wallHeight + 0.3
 		for _, side in ipairs({ -1, 1 }) do
@@ -860,11 +895,12 @@ builders.pickup = function(c: Ctx)
 			)
 		end
 	end
-	deco(m, "RearBumper", V3(W + 0.25, 0.55, 0.5), CF(0, 1.95, L / 2 - 0.2), CHROME, M.Metal)
-	exhaust(m, V3(1.7, 1.6, bedEnd - 0.8), V3(1.75, 1.55, L / 2 + 0.3), 0.3, CHROME, M.Metal, 0.3, hex("#8A8580"))
+	deco(m, "RearBumper", V3(W + 0.25, 0.55, 0.5), CF(0, 1.95, L / 2 - 0.2), chrome, M.Metal)
+	exhaust(m, V3(1.7, 1.6, bedEnd - 0.8), V3(1.75, 1.55, L / 2 + 0.3), 0.3, chrome, M.Metal, 0.3, hex("#8A8580"))
 
-	local front = { rim = cream, rimScale = 0.64, hub = CHROME_HI, dished = true, steer = true, rear = false }
-	local back = { rim = cream, rimScale = 0.64, hub = CHROME_HI, dished = true, steer = false, rear = true }
+	local rimColor = if classic then trimBrown else cream
+	local front = { rim = rimColor, rimScale = 0.64, hub = chrome, dished = true, steer = true, rear = false }
+	local back = { rim = rimColor, rimScale = 0.64, hub = chrome, dished = true, steer = false, rear = true }
 	wheels(m, lay, front, back)
 	gloss(m, paint, 0.05)
 end
@@ -876,7 +912,7 @@ builders.atv = function(c: Ctx)
 	local r, tw, wx = lay.wheelRadius, lay.tyreWidth, lay.wheelX
 	local zF, zR = lay.wheelZ[1], lay.wheelZ[2]
 	local plastic = hex("#34372F")
-	local rack = hex("#45484A")
+	local rack = Palette.TimberBrown
 
 	deco(m, "Frame", V3(2.0, 1.0, 4.7), CF(0, 1.85, 0), FRAME, M.Metal)
 	decoCyl(m, "Engine", 2.35, 1.1, CF(0, 1.95, 0.25), hex("#7E8287"), M.Metal)
@@ -912,7 +948,7 @@ builders.atv = function(c: Ctx)
 	-- straight legs (the seat's top + 0.5).
 	local barY = seatTop + 0.7
 	deco(m, "Tank", V3(1.6, 0.7, 1.25), CF(0, 3.2, -1.3), paint, M.SmoothPlastic)
-	decoRod(m, "Handlebar", V3(-1.3, barY, -1.45), V3(1.3, barY, -1.45), 0.17, rack, M.Metal)
+	decoRod(m, "Handlebar", V3(-1.3, barY, -1.45), V3(1.3, barY, -1.45), 0.17, FRAME, M.Metal)
 	deco(m, "SeatBase", V3(1.75, 0.65, 2.75), CF(0, seatTop - 0.875, seatZ), plastic, M.SmoothPlastic)
 	driverSeat(m, V3(1.5, 0.55, 2.4), CF(0, seatTop - 0.275, seatZ), hex("#6B4A33"), M.Leather)
 
@@ -958,7 +994,7 @@ local function boxCab(
 	roof: Color3
 )
 	deco(m, "Cab", V3(W, y1 - y0, length), CF(0, (y0 + y1) / 2, z), paint, M.Metal)
-	glass(m, "CabGlass", V3(W - 0.4, y2 - y1, length - 0.3), CF(0, (y1 + y2) / 2, z), 0.45)
+	glass(m, "CabGlass", V3(W - 0.4, y2 - y1, length - 0.3), CF(0, (y1 + y2) / 2, z))
 	for _, side in ipairs({ -1, 1 }) do
 		for _, end_ in ipairs({ -1, 1 }) do
 			deco(
@@ -986,7 +1022,7 @@ builders.flatbed = function(c: Ctx)
 	local wall = (W - lay.bedWidth) / 2
 	local seatTop, seatZ = SEAT_TOP.flatbed, f + 6.3
 	local steel = hex("#6A6E72")
-	local stake = hex("#A0703F")
+	local stake, railWood = Palette.TimberBrown, Palette.PlankHoney
 
 	deco(m, "Frame", V3(W - 2.4, 0.9, L - 1.4), CF(0, 1.95, 0), FRAME, M.Metal)
 	deco(m, "Bumper", V3(W + 0.6, 0.7, 0.6), CF(0, 1.85, f + 0.28), BLACK, M.Metal)
@@ -1013,7 +1049,7 @@ builders.flatbed = function(c: Ctx)
 			thick = 0.38,
 			front = { 0.6, 2.4 },
 			back = { 0.6, 2.4 },
-			color = BLACK,
+			color = FENDER_GREY,
 			material = M.Metal,
 		})
 		deco(m, "Mirror", V3(0.18, 1.0, 0.55), CF(side * (W / 2 + 0.25), 5.0, f + 4.7), BLACK, M.Metal)
@@ -1025,6 +1061,18 @@ builders.flatbed = function(c: Ctx)
 	local cabZ0 = f + 4.55
 	local roofY = seatTop + HEADROOM.flatbed
 	boxCab(m, W, (cabZ0 + bedStart) / 2, bedStart - cabZ0, 2.15, seatTop + 1.1, roofY, paint, BLACK, hex("#EEEBE3"))
+	-- The red accent (#B0241C) down each cab side, and the working truck's dirt below it.
+	for _, side in ipairs({ -1, 1 }) do
+		deco(
+			m,
+			"AccentStripe",
+			V3(0.05, 0.3, bedStart - cabZ0),
+			CF(side * (W / 2 + STRIPE_PROUD - 0.025), 3.2, (cabZ0 + bedStart) / 2),
+			TAILLIGHT,
+			M.SmoothPlastic
+		)
+		dirt(m, side, W / 2, 2.45, (cabZ0 + bedStart) / 2, bedStart - cabZ0)
+	end
 	deco(m, "Beacon", V3(1.0, 0.4, 0.5), CF(0, roofY + 0.52, f + 5.4), AMBER, M.Neon)
 	deco(m, "LightBar", V3(W - 1.2, 0.16, 0.28), CF(0, roofY + 0.55, f + 5.4), BLACK, M.Metal)
 	driverSeat(m, V3(2.6, 0.5, 1.4), CF(0, seatTop - 0.25, seatZ), hex("#4A4440"), M.Fabric)
@@ -1049,7 +1097,7 @@ builders.flatbed = function(c: Ctx)
 	deco(m, "HeadacheRack", V3(W - 0.6, 0.24, 0.24), CF(0, deckTop + 2.1, rackZ), steel, M.Metal)
 
 	-- Deck and stake sides (open at the back).
-	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#161616"))
+	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, Palette.PlankHoney)
 	for _, side in ipairs({ -1, 1 }) do
 		local x = side * (W / 2 - wall / 2)
 		for _, z in ipairs({ bedStart + 0.9, lay.bedCenterZ, bedEnd - 0.5 }) do
@@ -1069,7 +1117,7 @@ builders.flatbed = function(c: Ctx)
 				"StakeRail",
 				V3(wall - 0.04, 0.5, lay.bedLength - 0.6),
 				CF(x, y, lay.bedCenterZ + 0.2),
-				Kit.vary(stake, rng, 0.06),
+				Kit.vary(railWood, rng, 0.06),
 				M.WoodPlanks
 			)
 		end
@@ -1189,10 +1237,10 @@ builders.rig = function(c: Ctx)
 	local cz = bedStart + 0.2
 	local bulkH = bulkTop - deckTop
 	deco(m, "Bulkhead", V3(W, bulkH, 0.4), CF(0, deckTop + bulkH / 2, cz), hex("#5C6166"), M.Metal)
-	deco(m, "HeadacheRack", V3(W - 0.3, 0.35, 0.4), CF(0, deckTop + bulkH + 0.15, cz), steel, M.Metal)
+	deco(m, "HeadacheRack", V3(W - 0.3, 0.35, 0.4), CF(0, deckTop + bulkH + 0.15, cz), Palette.Brass, M.Metal)
 
 	-- Deck with steel bunk stakes, a pair at each third and at the back.
-	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#5E4636"))
+	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, Palette.TimberBrown)
 	for _, z in ipairs({ bedStart + lay.bedLength / 3, bedStart + lay.bedLength * 2 / 3, bedEnd - 0.3 }) do
 		for _, side in ipairs({ -1, 1 }) do
 			hull(
@@ -1201,6 +1249,14 @@ builders.rig = function(c: Ctx)
 				V3(wall, lay.wallHeight, wall),
 				CF(side * (W / 2 - wall / 2), deckTop + lay.wallHeight / 2, z),
 				post,
+				M.Metal
+			)
+			deco(
+				m,
+				"StanchionCap",
+				V3(wall + 0.12, 0.14, wall + 0.12),
+				CF(side * (W / 2 - wall / 2), deckTop + lay.wallHeight + 0.07, z),
+				Palette.Brass,
 				M.Metal
 			)
 		end
@@ -1255,9 +1311,8 @@ local function drawTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
 	local deckTop = y + FLOOR / 2
 	local wall = (W - tl.bedWidth) / 2
 	local wallH = tl.wallHeight
-	local wood = hex("#8A6038")
 
-	local deckColor = if tl.style == "heavy" then hex("#5B4A3C") else wood
+	local deckColor = if tl.style == "heavy" then Palette.TimberBrown else Palette.PlankHoney
 	bedFloor(model, "TrailerBed", W, tl.bedLength, y, bc, deckColor)
 	deco(model, "TrailerFrame", V3(W - 1.5, 0.45, tl.bedLength), CF(0, y - 0.5, bc), FRAME, M.Metal)
 
@@ -1291,7 +1346,7 @@ local function drawTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
 		end
 	end
 	local z0, z1 = tl.axleZ[1], tl.axleZ[#tl.axleZ]
-	local fenderColor = if heavy then hex("#8E949A") else paint
+	local fenderColor = FENDER_GREY
 	local fenderW = tw + 0.24
 	for _, side in ipairs({ -1, 1 }) do
 		local x = side * (W / 2 + fenderW / 2 - 0.1)
@@ -1349,7 +1404,7 @@ local function drawTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
 		)
 	elseif tl.style == "ranch" then
 		-- Painted stake posts with two wooden rails, a tall headboard.
-		local rail = hex("#A77B4C")
+		local rail = Palette.PlankHoney
 		for _, side in ipairs({ -1, 1 }) do
 			local x = side * (W / 2 - wall / 2)
 			for _, z in ipairs({ bs + 0.35, bc, be - 0.35 }) do
@@ -1368,8 +1423,8 @@ local function drawTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
 		end
 		hull(model, "TrailerFront", V3(W, wallH, 0.25), CF(0, deckTop + wallH / 2, bs + 0.125), paint, M.Metal)
 	else
-		-- Heavy Hauler: a steel headboard, tall stanchions, amber markers.
-		local steel = hex("#9AA1A8")
+		-- Heavy Hauler: a steel headboard, tall black bunk stanchions (#242321), amber markers.
+		local steel = BLACK
 		for _, side in ipairs({ -1, 1 }) do
 			for _, z in ipairs({ bs + 0.4, bc + 0.8, be - 0.35 }) do
 				hull(

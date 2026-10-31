@@ -54,6 +54,7 @@ DealershipLot.FloorY = 0.4 -- the hall floor's top (BuildingArt's slab)
 -- The box stands ON its plinth, at the edge facing the central aisle, with
 -- the vehicle behind it; the aisle between the two rows stays clear.
 DealershipLot.PlinthMargin = 0.4
+DealershipLot.WidthRoom = 4 -- T414b: a bay is at least its vehicle's width + this
 DealershipLot.BayGap = 1.5
 DealershipLot.SideMargin = 3
 DealershipLot.FrontMargin = 3.5
@@ -167,7 +168,8 @@ function DealershipLot.Layout(): Layout
 			length = m.length,
 			span = m.span,
 			box = fit.size,
-			bay = math.max(m.length, fit.size.X) + 2 * DealershipLot.PlinthMargin,
+			bay = math.max(m.length, fit.size.X, m.span + DealershipLot.WidthRoom - 2 * DealershipLot.PlinthMargin)
+				+ 2 * DealershipLot.PlinthMargin, -- T414b: also its vehicle's width + 4
 		})
 	end
 	local function rowWidth(from: number, to: number): number

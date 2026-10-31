@@ -1,6 +1,10 @@
 # STATUS: read this first in a new session
 
-Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `9b2a43f` (T414a, #278).** This branch is the T414a fixes (`cursor/t414a-fixes`). Outside town the graded TrailDirt shoulder stays. Inside town the street is flat to half-width 16.3.
+Shed Blueprint: placing the ghost now costs $0 (Connor's decision, 13 Oct 2026; branch `phase-2/shed-blueprint-free-place`, `Blueprint.placeFee`). Last updated 30 October 2026. **Main is at `80fd596` (T414b, #285).** This branch is the T414a fixes (`cursor/t414a-fixes`). Outside town the graded TrailDirt shoulder stays. Inside town the street is flat to half-width 16.3.
+
+## T414b Dealership fleet look (31 October 2026, branch `cursor/t414b-dealership-fleet`)
+
+The style-guide 12 colours are on the part-built vehicle parts and the kept hull parts of a meshed one (mesh colours stay baked in the GLBs). Glass is one #9CCBE0 at 0.4. The lot's bays are at least vehicle width + 4 wide. The Rustbucket part budget is 58. No prices, stats, MeshIds or services changed. Details and Studio checks: PHASE2_NOTES.md "T414b Dealership fleet look". Shots: `preview/t414b/`. Nothing here has been seen in Studio.
 
 ## T414a fixes (30 October 2026, branch `cursor/t414a-fixes`)
 
