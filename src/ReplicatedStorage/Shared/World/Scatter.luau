@@ -88,6 +88,9 @@ local SITES: { { x: number, z: number, r: number } } = {
 	{ x = WorldLayout.BridgeCenterX, z = WorldLayout.BridgeCenterZ, r = 40 },
 	{ x = WorldLayout.BoothX, z = WorldLayout.BoothZ, r = 22 },
 	{ x = -40, z = 720, r = 30 }, -- the gate lodge
+	{ x = -420, z = 110, r = 36 }, -- the stone bridge on the Hills Road
+	{ x = -565, z = -455, r = 25 }, -- the foot bridge
+	{ x = 690, z = 275, r = 60 }, -- the Skyroot's trunk and roots
 	{ x = WorldLayout.SecretCaveX, z = WorldLayout.SecretCaveZ, r = WorldLayout.SecretCaveRadius + 6 },
 }
 
