@@ -81,6 +81,7 @@ local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local CorridorStamps = require(script.Parent.CorridorStamps)
+local ScatterBuilder = require(script.Parent.ScatterBuilder)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local BuiltMoves = require(ReplicatedStorage.Shared.World.BuiltMoves)
 local TreeSpread = require(ReplicatedStorage.Shared.World.TreeSpread)
@@ -1584,6 +1585,11 @@ do
 		-- Roadside stamps. Streamed, not a remote, and not a tree you can cut.
 		defer("6b. The corridors", 4, nil, function(slice)
 			CorridorStamps.Build(map, slice)
+		end)
+
+		-- Roadside stumps, large rocks, saplings and snags (T414d-2). Cover under 4 studs is the client's.
+		defer("6c. Roadside greenery", 4, nil, function(slice)
+			ScatterBuilder.Build(map, slice)
 		end)
 
 		-- The waterfall pouring off an outer isle into the river's spring.

@@ -27,6 +27,7 @@ local DealershipLot = require(script.Parent.Parent.Art.DealershipLot)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local PlotData = require(script.Parent.Parent.PlotData)
 local PropArt = require(script.Parent.Parent.Art.PropArt)
+local Scatter = require(script.Parent.Scatter)
 local TownTreeData = require(script.Parent.Parent.TownTreeData)
 local TreeSpread = require(script.Parent.TreeSpread)
 local WoodData = require(script.Parent.Parent.WoodData)
@@ -196,6 +197,18 @@ function OverlapCheck.Build(plan: any): (Clearance.Grid, { [string]: number })
 		)
 	end
 
+	-- The roadside stumps and large rocks (T414d-2): the solid ones, as discs.
+	for i, item in ipairs(Scatter.Built()) do
+		if item.solid then
+			Clearance.Add(
+				grid,
+				string.format("scatter#%d %s", i, item.kind),
+				"scatter",
+				Clearance.Disc(item.x, item.z, Scatter.Radius(item))
+			)
+		end
+	end
+
 	local counts: { [string]: number } = {}
 	for _, e in ipairs(grid.all) do
 		counts[e.kind] = (counts[e.kind] or 0) + 1
@@ -263,6 +276,25 @@ function OverlapCheck.Run(grid: Clearance.Grid): { Result }
 		"tree trunk vs tree trunk closer than 2 studs (should be none; TREE_GAP is 10)",
 		Clearance.Hits(grid, "tree", "tree", 2)
 	)
+	return results
+end
+
+-- The roadside stumps and large rocks against everything else solid on the ground (Run's own list is
+-- unchanged). Each needs 2 studs of clear ground from a tree trunk, a boulder or another of its kind.
+function OverlapCheck.RunScatter(grid: Clearance.Grid): { Result }
+	local results: { Result } = {}
+	local function report(title: string, hits: { Clearance.Hit })
+		table.insert(results, { title = title, hits = hits })
+	end
+	report("scatter stump or rock vs tree trunk (needs 2 studs)", Clearance.Hits(grid, "scatter", "tree", 2))
+	report("scatter stump or rock vs boulder (needs 2 studs)", Clearance.Hits(grid, "scatter", "boulder", 2))
+	report("scatter stump or rock vs cluster rock (no overlap)", Clearance.Hits(grid, "scatter", "cluster", 0.0001))
+	report("scatter stump or rock vs scenery piece (no overlap)", Clearance.Hits(grid, "scatter", "scenery", 0.0001))
+	report("scatter stump or rock vs building (no overlap)", Clearance.Hits(grid, "scatter", "building", 0.0001))
+	report("scatter stump or rock vs building part (no overlap)", Clearance.Hits(grid, "scatter", "part", 0.0001))
+	report("scatter stump or rock vs prop (no overlap)", Clearance.Hits(grid, "scatter", "prop", 0.0001))
+	report("scatter stump or rock vs plot pad (no overlap)", Clearance.Hits(grid, "scatter", "plot", 0.0001))
+	report("scatter stump or rock vs another (needs 2 studs)", Clearance.Hits(grid, "scatter", "scatter", 2))
 	return results
 end
 

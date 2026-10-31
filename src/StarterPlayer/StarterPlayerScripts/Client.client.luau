@@ -56,6 +56,8 @@ local MODULES = {
 	"ForgeUI",
 	"GamepadNav",
 	"GrassTufts",
+	"RoadCritters",
+	"ScatterCover",
 	"HUD",
 	"HammerController",
 	"HoverTagUI",
@@ -160,6 +162,8 @@ local DEFERRED: { [string]: number } = {
 	CanopyFade = 25,
 	StoreStandState = 26,
 	GrassTufts = 30, -- last: it plans the grass on its own, after the player is in
+	ScatterCover = 31, -- the roadside cover, planned after the player is in
+	RoadCritters = 32, -- the roadside critters, after the cover
 }
 -- Frames the queue waits after the player can play (the loading card's fade).
 local RELEASE_SETTLE_FRAMES = 30
@@ -458,6 +462,18 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "GrassTufts",
 		get = function()
 			return require(script.Parent.GrassTufts)
+		end,
+	},
+	{
+		name = "ScatterCover",
+		get = function()
+			return require(script.Parent.ScatterCover)
+		end,
+	},
+	{
+		name = "RoadCritters",
+		get = function()
+			return require(script.Parent.RoadCritters)
 		end,
 	},
 	{
