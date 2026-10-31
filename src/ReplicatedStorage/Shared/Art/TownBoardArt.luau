@@ -11,7 +11,7 @@
 --     so the preview renderer can place each one.
 --   * T414e look (Palette names): TimberBrown frame, posts and plaque,
 --     SignCream face with SignInk lettering, Brass corners and caps. The
---     ten rows sit on dark SignInk plates in cream, CoinGold for the top three.
+--     ten rows sit on ShoreSand plates in SignInk, BarnRed for the top three.
 -- Build() makes the model around the origin (ground at y = 0, front toward
 -- -Z); the service places it. Fill() writes a TownBoardLogic.View into it.
 
@@ -25,14 +25,15 @@ local TownBoardArt = {}
 
 TownBoardArt.Look = {
 	Walnut = Palette.SignCream, -- the face (the old name stays for callers)
-	Ink = Palette.SignInk, -- title, message and the back's lettering on the cream
-	Plate = Palette.SignInk, -- a row's plate
+	Ink = Palette.SignInk, -- title and message on the cream face
+	Text = Palette.SignInk, -- rank, name and the lettering on the cream
+	Top = Palette.BarnRed, -- ranks 1 to 3: a red that reads on cream (amber does not)
+	Plate = Palette.ShoreSand, -- a row's plate, a shade under the face
 	Brass = Palette.Brass, -- corners, caps, the rule under the title
-	Cream = Palette.SignCream, -- names on the plates
-	Dim = Palette.PlankHoney, -- the cash line
-	Amber = Palette.CoinGold, -- ranks 1 to 3
-	Medal = Palette.WetMud, -- rank 4 and under
-	MedalTop = Palette.TimberBrown, -- ranks 1 to 3
+	Cream = Palette.SignCream, -- the plaque's lettering on its timber
+	Dim = Palette.TimberBrown, -- the cash line
+	Medal = Palette.PlankHoney, -- rank 4 and under
+	MedalTop = Palette.CoinGold, -- ranks 1 to 3
 	TimberBrown = Palette.TimberBrown, -- frame, posts, plaque
 }
 local L = TownBoardArt.Look
@@ -125,8 +126,8 @@ local function buildFace(board: Part): SurfaceGui
 		plate.Visible = false
 		local medal = frame(gui, "Medal" .. i, slot.medal, L.Medal, slot.medal.w // 2)
 		medal.Visible = false
-		label(gui, "Rank" .. i, slot.rank, TEXT_FONT, 52, L.Cream, Enum.TextXAlignment.Center)
-		label(gui, "Name" .. i, slot.name, TEXT_FONT, TownBoardLogic.NameTextPx, L.Cream, Enum.TextXAlignment.Left)
+		label(gui, "Rank" .. i, slot.rank, TEXT_FONT, 52, L.Text, Enum.TextXAlignment.Center)
+		label(gui, "Name" .. i, slot.name, TEXT_FONT, TownBoardLogic.NameTextPx, L.Text, Enum.TextXAlignment.Left)
 		label(gui, "Cash" .. i, slot.cash, TEXT_FONT, TownBoardLogic.CashTextPx, L.Dim, Enum.TextXAlignment.Left)
 	end
 	label(
@@ -169,8 +170,8 @@ function TownBoardArt.Fill(model: Model, view: TownBoardLogic.View)
 				rank.Text = line.rank
 				name.Text = line.name
 				cash.Text = line.cash
-				rank.TextColor3 = if line.top then L.Amber else L.Cream
-				name.TextColor3 = if line.top then L.Amber else L.Cream
+				rank.TextColor3 = if line.top then L.Top else L.Text
+				name.TextColor3 = if line.top then L.Top else L.Text
 			else
 				rank.Text = ""
 				name.Text = ""
