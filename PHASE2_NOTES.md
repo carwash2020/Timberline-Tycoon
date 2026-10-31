@@ -4603,3 +4603,23 @@ Plan: `docs/T414D2_PLAN.md`. Specs: `Scatter.spec` (keep-outs re-derived from th
 4. Phone or low quality: fewer and nearer cover (radius 100) and at most 12 critters; high shows cover out to 160 with the far ring fading.
 5. In the Bayou reeds stand in the mud; on Red Mesa dry scrub and sand-coloured stone; in Frost the shrubs wear snow.
 
+
+## T414e plot pads, mining nodes, town board and boxes (branch `cursor/t414e-pads-nodes-boxes`)
+
+Part-built greyboxes, warm stylized realism, Midday; nothing here has been seen in Studio and cloud has no physics. Renders are three.js previews (not Studio lighting), and the preview tool cannot load uploaded Roblox meshes. Shots: `preview/t414e/` (`pad`, `node`, `board`, `box`, each `-before` and `-after`).
+
+- **Plot pad edge** (`PlotPlatform`): the ramp is TrailDirt (`Ground`), and a StoneBase `Curb` band 1.5 deep lies on the top of each slope, 0.04 proud. The curb's high edge is 0.01 under the pad top, so nothing stands on the edge for a log to catch on; the outer end of the curb is a 0.04 step, then dirt down to the grass. `PlotPlatform.MaxLip()` is 0.04 (spec: at most 0.25). Layout, slab rects, `Origin` and `RiseAt` are unchanged, so saved plots load as before. The curb is a thin part-built band; a real stone curb mesh is a follow-up.
+- **Mining nodes** (`NodeArt`, `NodeService`): a CliffRock / QuarrySlate boulder cluster (ellipsoids and a wedge, no cube) with Amber or Garnet ore veins, no light. The `Crystal` hit box, the `Node` tag, `Material`/`HP`/`MaxHP`/`Uid`/`BarOffset`, hits, yield and respawn are as before (`NodeService.spec` pins them). The hit box is now 4.4 x 4.5 x 3.8 around the whole rock. The mine's rubble (`UndergroundBuilder`) is boulders on the old cubes' centres, same tag, attributes and cap.
+- **Town board** (`TownBoardArt`): TimberBrown frame, posts and plaque, SignCream face with SignInk title and message, Brass corners and caps, dark SignInk row plates with cream and CoinGold names. Four `FrameCorner` parts are new, so `TownBoardLogic.PartCap` is 14 (was 12) and its spec says so.
+- **Boxes** (`BoxArt`, `BoxWindows`): KraftTan Cardboard walls, front and lid (the `Window`, `WindowTop`, `SideWindow` names are kept), a SignCream `Tape` along the lid, a SignCream name label in SignInk print. The foot flange keeps the item's accent colour. No Glass, ForceField or Neon. The rim bars and the aisle pane's edge bar went with the glass lid. `PriceTag`, its tag and recolouring, welds, collision and the `Open` attribute are untouched. The item still sits inside, out of sight, until the box is opened (removing the hidden copy is a follow-up). `BoxWindows` only tints a pane that is still glass, so kraft is never made see-through on Lower quality. `RobuxBoxArt` had no glass and is unchanged. `KraftTan` #B8925F is new in the palette.
+
+**Existing specs changed on purpose:** `BoxArt`, `StoreBoxes`, `BoxWindows` (the glass assertions became kraft ones), `TownBoardArt` (14 parts, new palette), `TownBoardLogic` (PartCap 14), `Palette` (40 names).
+
+**Known gaps:** a convex pad corner is still an open 1-stud step (the old design left the corner square empty: filling it needs a corner mesh); at the largest plot size (the 200 shelf) Orchard, Pine, Climb and North already come within a road's width of a road on main (not changed here; the spec covers the first two tiers). No MeshId 0 items were added.
+
+**Studio checks for Connor**
+1. Drop a log on a pad's edge, at the middle of a side: it slides off over the stone curb and down the dirt without catching.
+2. Walk and drive a truck up a pad edge: the stone band and the dirt slope feel the same as before (a 9.5 degree rise, one 0.04 step).
+3. Mine a Sky Shard node on the Aether Isles: it reads as rock with ore veins, takes the same number of swings, pays the same, grows back.
+4. Walk past the town board at the street and at the far kerb: the title and ten names read on a phone; the posts do not block the path.
+5. Walk into a shop: a taped kraft box shows the name label and price tag; carry one, drop one, open one.
