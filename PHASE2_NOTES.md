@@ -4580,3 +4580,14 @@ Connor's Studio playtest: second porch roofs clip inside building fronts (the Sa
 5. Eaves: stand under each shop's roof edge: about 1 stud of overhang on all four sides, the Dealership too (the hall's roof now reaches 1 stud past its front wall, over its path).
 6. Sparkworks yard: the two planters beside the awning posts do not touch them.
 7. Sawmill with meshes off: the mill shed's roof edge 1 stud past the walls on all four sides, the lean-to on the east clear of the wall; with meshes on, no stray door frame from the office cabin shows through.
+
+## T414b Dealership fleet look (31 October 2026, branch `cursor/t414b-dealership-fleet`)
+
+The style-guide 12 colour table is on the part-built vehicle parts (`Art/TruckArt`); a mesh's colours are baked in its GLB and code never recolours one. On a vehicle whose meshes loaded, the table reaches the player only through the parts `VehicleMeshes.KEEP` leaves (hull boards, stakes, rails, stanchions and their brass caps, wheels, lamps, coupler); every other colour is the GLB's, checked in Studio only. Wood is PlankHoney or TimberBrown from `Palette`. Brass rack and stanchion caps on the Rig, red accent stripe on the Flatbed, TimberBrown rack on the Scout, Timber Classic chrome #EEF0F2 with trim and rims #5A3B26, bolts #9AA1A8 on every hub, trailer and Flatbed tandem fenders #8E949A, Heavy Hauler bunks #242321, all part-built glass #9CCBE0 at 0.4 (the Rustbucket's cracked windshield was 0.6; its spec line moved to 0.4). Wear: a primer patch and two lower-panel dirt skins on the Rustbucket, dirt skins on the Flatbed cab (the Pickup stays at its 90-part budget, so no dirt there). The Rustbucket's part budget in `TruckArt.spec` went 55 to 58 for its three wear parts. `DealershipLot` bays are now at least the vehicle's width + 4 wide (`WidthRoom`; only the ScoutATV bay grew, 13.21 to 13.31). No MeshId changed, nothing zeroed: no id is known to be stale. Trailers keep their own bays; a hitched trailer in every truck bay would lengthen the hall (follow-up). Shots: `preview/t414b/` (three.js previews; the preview cannot load uploaded meshes, so trailers on the lot show wheels only there and the fleet shots draw them part-built).
+
+**Studio checks for Connor**
+1. Walk the Dealership lot: all eight bays show a truck or trailer (trailers fully dressed in their meshes), none floating, none overlapping a neighbour, no vehicle invisible.
+2. Stand at each trailer's hitch end: you can walk up to the coupler on the plinth, nothing solid in the way.
+3. Buy and spawn a Rustbucket, a Flatbed and a Logging Rig, hitch a trailer: seat, drive and tow as before; the hull boards, stakes, rails and brass caps that show on the meshed truck are the table colours.
+4. Look for any mesh whose colour is not the table (Scout ATV, Timber Classic): list it so the GLB can be recoloured and re-uploaded.
+5. Glass on every vehicle reads the same light blue, see-through, and you can walk through none of it.
