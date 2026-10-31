@@ -43,11 +43,11 @@ end
 local function vein(parent: Instance, c: Vector3, r: Vector3, theta: number, phi: number, length: number, color: Color3)
 	local wander = { 0, 0.14, -0.08, 0.12 }
 	local rise = length / 3 / math.max(r.Y, 0.5)
-	local last = skinPoint(c, r, theta, phi, 0)
+	local last = skinPoint(c, r, theta, phi, 0.05)
 	for k = 1, 4 do
-		local here = skinPoint(c, r, theta + wander[k], phi + k * rise, 0)
+		local here = skinPoint(c, r, theta + wander[k], phi + k * rise, 0.05)
 		if (here - last).Magnitude > 0.05 then
-			local bar = Kit.beam(parent, "Vein", last, here, 0.2 - k * 0.025, 0.12, color, Enum.Material.Metal)
+			local bar = Kit.beam(parent, "Vein", last, here, 0.3 - k * 0.04, 0.2, color, Enum.Material.Metal)
 			Kit.decor(bar, false)
 		end
 		last = here
