@@ -229,4 +229,54 @@ return function(t)
 			t.ok(sky:FindFirstChild("Anvil") ~= nil, "the summit anvil socket is intact")
 		end
 	end)
+	t.test("5. Art fix: the Sparkworks back board is TimberBrown plank, framed in Brass, not a black panel", function()
+		local Palette = t.load("ReplicatedStorage/Shared/Art/Palette")
+		local spark = BuildingArt.Sparkworks()
+		local board = find(spark, "DemoBoard")
+		t.eq(board.Material, roblox.Enum.Material.WoodPlanks)
+		t.eq(board.Color, Palette.TimberBrown)
+		local brass = 0
+		for _, p in ipairs(parts(spark)) do
+			if p.Name == "DemoFrame" and p.Color == Palette.Brass then
+				brass += 1
+			end
+		end
+		t.eq(brass, 4, "four brass frame bars")
+		local lit = false
+		for _, d in ipairs(spark:GetDescendants()) do
+			if d:IsA("PointLight") and d.Parent.Name == "DemoLamp" then
+				lit = true
+			end
+		end
+		t.ok(lit, "the board is lit by a lantern PointLight")
+	end)
+
+	t.test("5. Art fix: every invisible volume in the builders is Transparency 1 (and stays non-colliding)", function()
+		for _, case in ipairs(BUILDERS) do
+			local model = case.build()
+			for _, p in ipairs(parts(model)) do
+				local name = string.lower(p.Name)
+				local volume = string.find(name, "trigger", 1, true)
+					or string.find(name, "prompt", 1, true)
+					or string.find(name, "clearance", 1, true)
+					or string.find(name, "opening", 1, true)
+					or string.find(name, "zone", 1, true)
+				if volume then
+					t.eq(p.Transparency, 1, case.name .. " " .. p.Name .. " is invisible")
+					t.eq(p.CanCollide, false, case.name .. " " .. p.Name .. " does not collide")
+				end
+				-- A non-colliding, untouchable, unqueryable part that is not a looks-only piece is a volume.
+				t.ok(
+					not (
+							p.Transparency == 0
+							and p.CanCollide == false
+							and p.CanQuery == false
+							and p.Size.Y > 9
+							and p.Size.X >= 8
+						),
+					case.name .. " " .. p.Name .. " is a visible door-sized ghost"
+				)
+			end
+		end
+	end)
 end
