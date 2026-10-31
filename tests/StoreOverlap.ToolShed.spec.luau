@@ -187,6 +187,7 @@ return function(t)
 		Ramp = "the ramp at the door (a wedge: not box-tested)",
 		Gable = "the gable wedges (not box-tested)",
 		CeilingBeam = "a cross beam",
+		ShopCeiling = "the plank ceiling (looks only, over the beams)",
 		CeilingRafter = "the rafter",
 		TieBeam = "the shell's tie beam",
 		SignTie = "a header's collar tie",

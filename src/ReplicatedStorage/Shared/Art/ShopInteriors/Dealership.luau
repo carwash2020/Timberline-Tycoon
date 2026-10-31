@@ -398,7 +398,7 @@ function Dealership.Build(model: Model, frame: Frame, west: number, east: number
 			model,
 			"LobbyStripe",
 			V3(0.4, 0.07, depth - 8),
-			CF(lobbyCx + s * 3.0, fy + LAYER3, midZ),
+			CF(lobbyCx + s * 1.4, fy + LAYER3, midZ),
 			BRASS_STRIPE,
 			MAT.SmoothPlastic
 		)

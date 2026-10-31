@@ -308,6 +308,8 @@ return function(t)
 		"AisleRunner",
 		"AisleRunnerEdge",
 		"AisleStripe",
+		"LobbyStripe",
+		"ShopCeiling", -- the plank ceiling, looks only, above the beams
 		"LobbyRunner",
 		"LobbyRunnerEdge",
 		"KeeperMat",
