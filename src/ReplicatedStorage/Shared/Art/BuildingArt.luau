@@ -4002,7 +4002,7 @@ function BuildingArt.Sparkworks(): Model
 	local model = Kit.model("Sparkworks")
 	local rng = Kit.rng(4071)
 	-- Each plank panel gets a thin backing layer, so the seams between planks show wood, not daylight.
-	local function wall(
+	local function wallPanel(
 		parent: Instance,
 		frame: CFrame,
 		x0: number,
@@ -4038,12 +4038,12 @@ function BuildingArt.Sparkworks(): Model
 	dBox(model, "Foundation", V3(14.6, 0.6, 0.8), CF(0, 0.3, 6.2), Palette.StoneBase, MAT.Cobblestone)
 	local front = CF(0, 0, -5.8)
 	-- The front: an 8 wide opening, 3 studs of wall each side, a header over it.
-	wall(model, front, -7, -4, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
-	wall(model, front, 4, 7, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
-	wall(model, front, -4, 4, 10.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
-	wall(model, CF(0, 0, 5.8) * ANG(0, PI, 0), -7, 7, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
-	wall(model, CF(-6.8, 0, 0) * ANG(0, PI / 2, 0), -5.6, 5.6, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
-	wall(model, CF(6.8, 0, 0) * ANG(0, -PI / 2, 0), -5.6, 5.6, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, front, -7, -4, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, front, 4, 7, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, front, -4, 4, 10.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, CF(0, 0, 5.8) * ANG(0, PI, 0), -7, 7, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, CF(-6.8, 0, 0) * ANG(0, PI / 2, 0), -5.6, 5.6, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
+	wallPanel(model, CF(6.8, 0, 0) * ANG(0, -PI / 2, 0), -5.6, 5.6, 0.5, TOP, 0.4, rng, PLANK_DARK, 1.75)
 	-- Gable ends with battens, a slate roof, a brass ridge band.
 	local frontTop = CF(0, TOP, -5.8)
 	gable(model, frontTop, 14, 3.5, 0.4, PLANK_DARK[2])
@@ -4147,7 +4147,7 @@ function BuildingArt.LandOffice(): Model
 	local model = Kit.model("LandOffice")
 	local rng = Kit.rng(4004)
 	-- Each plank panel gets a thin backing layer, so the seams between planks show wood, not daylight.
-	local function wall(
+	local function wallPanel(
 		parent: Instance,
 		frame: CFrame,
 		x0: number,
@@ -4181,12 +4181,12 @@ function BuildingArt.LandOffice(): Model
 	dBox(model, "Foundation", V3(19, 0.6, 0.9), CF(0, 0.3, 7.05), Palette.StoneBase, MAT.Cobblestone)
 	local front = CF(0, 0, -6.75)
 	-- The front: an 8 wide opening, 5 studs of wall each side, a header over it.
-	wall(model, front, -9, -4, 0.4, TOP, 0.5, rng, PLANK, 1.75)
-	wall(model, front, 4, 9, 0.4, TOP, 0.5, rng, PLANK, 1.75)
-	wall(model, front, -4, 4, 10.4, TOP, 0.5, rng, PLANK, 1.75)
-	wall(model, CF(0, 0, 6.75) * ANG(0, PI, 0), -9, 9, 0.4, TOP, 0.5, rng, PLANK, 1.75)
-	wall(model, CF(-8.75, 0, 0) * ANG(0, PI / 2, 0), -6.5, 6.5, 0.4, TOP, 0.5, rng, PLANK, 1.75)
-	wall(model, CF(8.75, 0, 0) * ANG(0, -PI / 2, 0), -6.5, 6.5, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, front, -9, -4, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, front, 4, 9, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, front, -4, 4, 10.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, CF(0, 0, 6.75) * ANG(0, PI, 0), -9, 9, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, CF(-8.75, 0, 0) * ANG(0, PI / 2, 0), -6.5, 6.5, 0.4, TOP, 0.5, rng, PLANK, 1.75)
+	wallPanel(model, CF(8.75, 0, 0) * ANG(0, -PI / 2, 0), -6.5, 6.5, 0.4, TOP, 0.5, rng, PLANK, 1.75)
 	-- Battens over the front shoulders and the gable (board-and-batten).
 	local batten = Kit.shade(Palette.PlankHoney, -0.22)
 	for _, x in ipairs({ -8.4, -7, -5.6, 5.6, 7, 8.4 }) do
