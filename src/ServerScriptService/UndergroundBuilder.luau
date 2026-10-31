@@ -194,7 +194,7 @@ function UndergroundBuilder.PlaceMouth(parent: Instance): Model
 	local model = NatureArt.CaveMouth()
 	model.Name = "MineMouth"
 	Kit.placeAt(model, UndergroundBuilder.MouthCFrame())
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- the way into the mine is interactive
 	model.Parent = parent
 	CollectionService:AddTag(model, "MineMouth")
 	return model

@@ -102,6 +102,33 @@ function FerryLogic.State(now: number): State
 	return { leg = "main", alpha = 0, docked = "main" }
 end
 
+-- T415: the server asks a rider's client to stream the far dock this many seconds before arrival.
+FerryLogic.PreStreamSec = 10
+
+-- The dock a crossing leg ends at (nil for a leg that is a dock).
+function FerryLogic.Destination(leg: Leg): Dock?
+	if leg == "toIsland" then
+		return "island"
+	elseif leg == "toMain" then
+		return "main"
+	end
+	return nil
+end
+
+-- Seconds until the boat ties up, while it sails; nil while it is docked.
+function FerryLogic.SecondsToArrival(now: number): number?
+	local cycle = FerryLogic.Cycle()
+	local half = cycle / 2
+	local travel = FerryLogic.TravelSec
+	local phase = now % cycle
+	if phase < travel then
+		return travel - phase
+	elseif phase >= half and phase < half + travel then
+		return half + travel - phase
+	end
+	return nil
+end
+
 -- The boat's deck centre height: the sea surface plus the rise.
 function FerryLogic.DeckY(): number
 	return WorldLayout.SeaLevel + FerryLogic.DeckRise

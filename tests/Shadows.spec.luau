@@ -34,7 +34,19 @@ return function(t)
 	t.test("every built scatter kind: parts under the size rule cast no shadow, in every region", function()
 		local checked, kept = 0, 0
 		for _, region in ipairs(Scatter.Regions) do
-			for _, kind in ipairs({ "stump", "rock", "sapling", "snag", "grass", "fern", "shrub", "scrub", "reed", "flower", "pebble" }) do
+			for _, kind in ipairs({
+				"stump",
+				"rock",
+				"sapling",
+				"snag",
+				"grass",
+				"fern",
+				"shrub",
+				"scrub",
+				"reed",
+				"flower",
+				"pebble",
+			}) do
 				for variant = 1, 3 do
 					for _, size in ipairs({ 1.5, 3, 6 }) do
 						local model = Greenery.Item(kind, region, variant, size)
@@ -58,8 +70,14 @@ return function(t)
 
 	t.test("every critter part casts no shadow", function()
 		local made = {
-			CritterArt.Bird(1), CritterArt.Butterfly(1), CritterArt.Rabbit(1), CritterArt.Deer(1),
-			CritterArt.Duck(1), CritterArt.Fish(1), CritterArt.Gull(1), CritterArt.SnowFox(1),
+			CritterArt.Bird(1),
+			CritterArt.Butterfly(1),
+			CritterArt.Rabbit(1),
+			CritterArt.Deer(1),
+			CritterArt.Duck(1),
+			CritterArt.Fish(1),
+			CritterArt.Gull(1),
+			CritterArt.SnowFox(1),
 		}
 		for _, model in ipairs(made) do
 			for _, p in ipairs(parts(model)) do

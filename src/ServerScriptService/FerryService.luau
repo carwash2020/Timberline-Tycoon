@@ -51,6 +51,7 @@ local boat: Model? = nil
 local deckPart: BasePart? = nil
 local weldFolder: Folder? = nil
 local lastLeg: FerryLogic.Leg? = nil
+local preStreamed: FerryLogic.Leg? = nil -- the leg whose far dock has been asked for
 local textClock = 0
 local moveClock = -math.huge -- the server clock when the boat's copy was last moved
 local bound = false
@@ -115,6 +116,18 @@ local function stand(player: Player, point: Vector3)
 		char:PivotTo(CFrame.new(point))
 		root.AssemblyLinearVelocity = Vector3.zero
 		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
+-- T415: Player:RequestStreamAroundAsync (pcall: a missing method or a failed request never strands anyone)
+-- so the far dock is in before the rider is put there. Yields up to STREAM_TIMEOUT.
+local STREAM_TIMEOUT = 5
+local function streamAround(player: Player, point: Vector3)
+	local ask = (player :: any).RequestStreamAroundAsync
+	if type(ask) == "function" then
+		pcall(function()
+			ask(player, point, STREAM_TIMEOUT)
+		end)
 	end
 end
 
@@ -309,7 +322,15 @@ local function arrive(dock: FerryLogic.Dock)
 			-- The deck is truck-length. The dock is not. Keep the landing on the planks.
 			local ox = math.clamp(sx / 2, -6, 6)
 			local oz = math.clamp(sz / 2, -6, 6)
-			stand(player, point + Vector3.new(ox, 0, oz))
+			local landing = point + Vector3.new(ox, 0, oz)
+			-- Ask for the far dock first, then stand the rider on it. On its own thread: a slow
+			-- stream never holds the boat's step.
+			coroutine.wrap(function()
+				streamAround(player, landing)
+				if player.Parent then
+					stand(player, landing)
+				end
+			end)()
 		end
 	end
 	riders = {}
@@ -348,6 +369,25 @@ function FerryService.Step(now: number?)
 	local arrived = FerryLogic.Arrived(lastLeg, state.leg)
 	if arrived then
 		arrive(arrived)
+	end
+	-- Once per crossing, shortly before arrival: stream the far dock around each rider.
+	local left = FerryLogic.SecondsToArrival(clock)
+	if left ~= nil and left <= FerryLogic.PreStreamSec then
+		if preStreamed ~= state.leg then
+			preStreamed = state.leg
+			local dock = FerryLogic.Destination(state.leg)
+			local side = if dock then sides[dock] else nil
+			if side then
+				local point = standPoint(side)
+				for player in pairs(riders) do
+					if player.Parent then
+						coroutine.wrap(streamAround)(player, point)
+					end
+				end
+			end
+		end
+	elseif left == nil then
+		preStreamed = nil
 	end
 	lastLeg = state.leg
 	if clock - textClock >= 1 then

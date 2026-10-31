@@ -58,8 +58,11 @@ return function(t)
 				local path = dir .. "/" .. name
 				if fs.isDir(path) then
 					walk(path)
-				elseif string.sub(name, -5) == ".luau" and string.find(fs.readFile(path), "ContentProvider", 1, true)
-					and string.find(fs.readFile(path), "PreloadAsync", 1, true) then
+				elseif
+					string.sub(name, -5) == ".luau"
+					and string.find(fs.readFile(path), "ContentProvider", 1, true)
+					and string.find(fs.readFile(path), "PreloadAsync", 1, true)
+				then
 					table.insert(found, path)
 				end
 			end

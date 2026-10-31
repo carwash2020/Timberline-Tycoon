@@ -53,6 +53,7 @@ return function(t)
 		end
 		table.sort(names)
 		t.eq(names, {
+			"Backdrop",
 			"FerryBoat",
 			"GateLodge",
 			"IslandDock",
@@ -60,6 +61,7 @@ return function(t)
 			"MainlandDock",
 			"Murph",
 			"OldHank",
+			"SellArea",
 			"StoreBoard",
 			"TownBoard",
 		})
@@ -70,9 +72,11 @@ return function(t)
 		local allowed = {
 			["src/ServerScriptService/FerryService.luau"] = 1, -- FerryBoat
 			["src/ReplicatedStorage/Shared/Art/TravelArt.luau"] = 1, -- the persistent() helper (lift, two docks)
-			["src/ServerScriptService/MapBuilder.server.luau"] = 1, -- the persistent() helper (StoreBoard, GateLodge)
+			-- the persistent() helper (StoreBoard, GateLodge), SellArea and Backdrop
+			["src/ServerScriptService/MapBuilder.server.luau"] = 3,
 			["src/ServerScriptService/NPCService.luau"] = 1, -- NPCData persistent (Murph, Old Hank)
 			["src/ServerScriptService/TownBoardService.luau"] = 1, -- TownBoard
+			["src/ReplicatedStorage/Shared/PerfPolicy.luau"] = 1, -- CheckWorld reads the mode, it sets nothing
 		}
 		for _, path in ipairs(walk("src", {})) do
 			local n = count(code(path), "ModelStreamingMode%.Persistent")
@@ -94,11 +98,11 @@ return function(t)
 		t.eq(count(npc, "persistent = true"), 2, "Murph and Old Hank")
 	end)
 
-	t.test("shops, the sawmill, the sell area and the mine mouth are Atomic, not Persistent", function()
+	t.test("shops, the sawmill and the mine mouth are Atomic, not Persistent", function()
 		local map = code("src/ServerScriptService/MapBuilder.server.luau")
-		t.eq(string.find(map, "row.preload", 1, true), nil, "no shop streams as Persistent")
+		t.eq(string.find(map, "then Enum.ModelStreamingMode.Persistent", 1, true), nil, "no shop streams as Persistent")
+		t.ok(string.find(map, "shop.ModelStreamingMode = Enum.ModelStreamingMode.Atomic", 1, true))
 		t.ok(string.find(map, "atomic(BuildingArt.Sawmill())", 1, true))
-		t.ok(string.find(map, "sellArea.ModelStreamingMode = Enum.ModelStreamingMode.Atomic", 1, true))
 		local under = code("src/ServerScriptService/UndergroundBuilder.luau")
 		t.ok(string.find(under, "ModelStreamingMode.Atomic", 1, true))
 		local travel = code("src/ReplicatedStorage/Shared/Art/TravelArt.luau")
@@ -126,4 +130,19 @@ return function(t)
 		local landmark = code("src/ReplicatedStorage/Shared/Art/LandmarkArt.luau")
 		t.eq(string.find(landmark, "DeepWater(), Enum.ModelStreamingMode.Persistent", 1, true), nil)
 	end)
+
+	t.test(
+		"the built town carries no Persistent model outside the list (the cloud test runs the same check)",
+		function()
+			local TownBuild = t.load("ReplicatedStorage/Shared/Lint/TownBuild")
+			local map = TownBuild.Build()
+			t.eq(PerfPolicy.CheckWorld(map), {})
+			-- control: a stray Persistent model is caught
+			local stray = t.roblox.Instance.new("Model")
+			stray.Name = "Stray"
+			stray.ModelStreamingMode = t.roblox.Enum.ModelStreamingMode.Persistent
+			stray.Parent = map
+			t.eq(#PerfPolicy.CheckWorld(map), 1)
+		end
+	)
 end

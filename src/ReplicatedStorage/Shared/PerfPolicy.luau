@@ -1,7 +1,7 @@
 --!strict
 -- PerfPolicy (T415): the performance rules as data, so specs can pin them. Pure; no engine calls.
 --
---   * PreloadCap        the most ids the client's first-view ContentProvider:PreloadAsync may take
+--   * PreloadCap        the most ids the client's first-view preload call may take
 --   * Persistent        the models that stream as Persistent, by name. Everything interactive is Atomic and
 --                       pure decor is Default (Streaming.spec scans the source for every other site).
 --   * NoShadowSize      a part whose largest side is under this casts no shadow
@@ -19,8 +19,11 @@ PerfPolicy.Persistent = {
 	GateLodge = true,
 	MainlandDock = true,
 	IslandDock = true,
-	-- spawn landmarks: the two boards at the spawn and the tutorial's two guides
+	-- spawn landmarks: the two boards at the spawn, the tutorial's two guides, the sell area the client's
+	-- carry loop waits on with no timeout, and the Backdrop (the horizon, which no other model provides)
 	TownBoard = true,
+	SellArea = true,
+	Backdrop = true,
 	StoreBoard = true,
 	Murph = true,
 	OldHank = true,
@@ -69,6 +72,22 @@ function PerfPolicy.TrimShadows(root: Instance): number
 	return n
 end
 
+-- Findings on a built world: a Persistent model that is not in the list, a MeshPart at Precise fidelity.
+-- Cloud-test and the specs run it over the built town.
+function PerfPolicy.CheckWorld(root: Instance): { string }
+	local lines: { string } = {}
+	for _, d in ipairs(root:GetDescendants()) do
+		if d:IsA("Model") and d.ModelStreamingMode == Enum.ModelStreamingMode.Persistent then
+			if not PerfPolicy.Persistent[d.Name] then
+				table.insert(lines, string.format("[PerfPolicy] %s is Persistent and not in the list", d:GetFullName()))
+			end
+		elseif d:IsA("MeshPart") and d.RenderFidelity == Enum.RenderFidelity.Precise then
+			table.insert(lines, string.format("[PerfPolicy] %s is Precise", d:GetFullName()))
+		end
+	end
+	return lines
+end
+
 export type Manifest = { [string]: { file: string, node: string } }
 
 -- One line per source mesh (glb file + node) that has more than one of `ids` (the live MeshIds) in `manifest`
@@ -96,7 +115,10 @@ function PerfPolicy.Duplicates(ids: { number }, manifest: Manifest): { string }
 		end
 		if #found > 1 then
 			table.sort(found)
-			table.insert(lines, string.format("[PerfAssets] %s has %d live MeshIds: %s", key, #found, table.concat(found, ", ")))
+			table.insert(
+				lines,
+				string.format("[PerfAssets] %s has %d live MeshIds: %s", key, #found, table.concat(found, ", "))
+			)
 		end
 	end
 	return lines
