@@ -142,7 +142,8 @@ function T414.scene(ctx, id, withScatter)
 		{
 			pos = { site.top[1], site.top[3], site.top[2] + 1 },
 			target = { site.top[1], 0, site.top[2] },
-			label = "from above: the road and its verge" .. (withScatter and process.env.T414_OVERLAY == "1" and ", keep-outs in red" or ""),
+			label = "from above: the road and its verge"
+				.. (withScatter and process.env.T414_OVERLAY == "1" and ", keep-outs in red" or ""),
 			fov = 60,
 		},
 	}

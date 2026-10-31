@@ -96,4 +96,46 @@ return function(t)
 			t.ok(highest <= NodeArt.Height, "under the hit box top, " .. highest)
 		end
 	end)
+
+	-- T416 item 4: the body is faceted. Wedge clusters, turned off the axes, in Slate; no ellipsoid
+	-- (a sphere mesh), no bare block, and the veins and hit-box footprint are as before.
+	local function alignedToAxes(cf)
+		local function axisAligned(v)
+			return math.max(math.abs(v.X), math.abs(v.Y), math.abs(v.Z)) > 0.995
+		end
+		return axisAligned(cf.XVector) and axisAligned(cf.YVector) and axisAligned(cf.ZVector)
+	end
+
+	t.test(
+		"T416: the rock is faceted wedge clusters in Slate: no sphere mesh, no block, none left square to the axes",
+		function()
+			local colours = {}
+			for seed = 1, 12 do
+				local model = NodeArt.Build(seed)
+				local rocks = 0
+				for _, d in ipairs(model:GetDescendants()) do
+					t.ok(not d:IsA("SpecialMesh"), "no sphere or mesh stand-in (" .. d.Name .. ")")
+					if d:IsA("BasePart") and (d.Name == "Rock" or d.Name == "RockFace") then
+						rocks += 1
+						t.eq(d.ClassName, "WedgePart", d.Name .. " is a wedge facet")
+						t.eq(d.Material, Enum.Material.Slate)
+						t.ok(not alignedToAxes(d.CFrame), "a facet turned off the axes")
+						colours[tostring(d.Color)] = true
+					end
+				end
+				t.ok(rocks >= 8, "a cluster of facets: " .. rocks)
+			end
+			t.ok(colours[tostring(Palette.CliffRock)] and colours[tostring(Palette.QuarrySlate)], "both stone colours")
+		end
+	)
+
+	t.test("T416: no part of a node is a ball, a bare block or a cylinder except the thin ore bars", function()
+		for seed = 1, 12 do
+			for _, p in ipairs(parts(NodeArt.Build(seed))) do
+				if p.Name ~= "Vein" then
+					t.eq(p.ClassName, "WedgePart", p.Name)
+				end
+			end
+		end
+	end)
 end

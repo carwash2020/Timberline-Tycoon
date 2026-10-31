@@ -505,11 +505,52 @@ export type SignSpec = {
 	board: Color3?,
 	ink: Color3?,
 	name: string?,
+	house: boolean?, -- T416: the house sign style (SignCream board, SignInk text, TimberBrown frame, Brass brackets)
 }
+
+-- T416: the house sign style, the same board the plot sign and the town's name boards wear: a SignCream
+-- board (the text is on its own faces), SignInk lettering, a TimberBrown top rail and under-rail, Brass
+-- bracket bar on the top rail where the chains are hung. Part names match the old sign (`<name>Frame`,
+-- `<name>Chain`), plus `<name>Bracket`. The old coloured under-bar (`<name>Accent`, the blue under the plan
+-- boards) is gone: its part is the Bracket's, so a shop's part count does not move.
+function ShopKit.houseSign(parent: Instance, s: SignSpec, name: string, thick: number): Part
+	local cream, ink = hex("#F3E7C9"), hex("#2A2420") -- Palette SignCream, SignInk
+	local timber, brass = hex("#7A5230"), hex("#C9A24A") -- Palette TimberBrown, Brass
+	local board = dBox(parent, s.name or name, V3(s.w, s.h, 0.3), CF(s.cx, s.cy, s.z), cream, MAT.Wood)
+	board:SetAttribute("SignText", s.text)
+	Kit.signText(board, s.text, ink, nil, Enum.Font.FredokaOne, 0.2)
+	dBox(
+		parent,
+		name .. "Frame",
+		V3(s.w + 0.5, thick, 0.5),
+		CF(s.cx, s.cy + s.h / 2 + thick / 2 - 0.02, s.z),
+		timber,
+		MAT.Wood
+	)
+	local top = s.cy + s.h / 2 + thick
+	-- one brass bracket bar across the top rail, under both chain hooks: a cap on the rail (wider than it, sunk
+	-- in its top), above the board's top edge, so nothing crosses the lettering
+	dBox(parent, name .. "Bracket", V3(s.w - 0.2, 0.12, 0.62), CF(s.cx, top - 0.12, s.z), brass, MAT.Metal)
+	for _, side in ipairs({ -1, 1 }) do
+		local len = math.max(s.ceilY - top, 0.2)
+		dBox(
+			parent,
+			name .. "Chain",
+			V3(0.12, len, 0.12),
+			CF(s.cx + side * (s.w / 2 - 0.5), top + len / 2, s.z),
+			IRON,
+			MAT.Metal
+		)
+	end
+	return board
+end
 
 -- A board hung on two chains, facing -Z, the text on both faces (so it reads
 -- walking in and walking out), a brass bar over it and an accent bar under it.
 local function hung(parent: Instance, s: SignSpec, name: string, thick: number): Part
+	if s.house then
+		return ShopKit.houseSign(parent, s, name, thick)
+	end
 	local board = dBox(parent, s.name or name, V3(s.w, s.h, 0.3), CF(s.cx, s.cy, s.z), s.board or WALNUT, MAT.Wood)
 	board:SetAttribute("SignText", s.text)
 	Kit.signText(board, s.text, s.ink or CREAM, nil, Enum.Font.FredokaOne, 0.2)
@@ -905,6 +946,7 @@ function ShopKit.SectionSigns(
 		subShift: number?,
 		tieTop: number?,
 		noTie: boolean?,
+		house: boolean?, -- T416: the house sign style
 	}
 )
 	local placements = StoreStock.Placements(shop)
@@ -948,6 +990,7 @@ function ShopKit.SectionSigns(
 			text = section.header,
 			accent = section.accent,
 			ceilY = chainTop,
+			house = cfg.house,
 		})
 		for subIndex, sub in ipairs(section.subs) do
 			local want: { [string]: boolean } = {}

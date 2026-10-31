@@ -5,8 +5,8 @@
 --
 -- The model stands on the ground at the origin and is looks only: the hit box
 -- NodeService makes (the part you aim at and bump into) is the collision, so
--- every part here is decor. The body is CliffRock and QuarrySlate boulders
--- (ellipsoids and a wedge: no cube anywhere), and the veins are thin ore
+-- every part here is decor. The body is CliffRock and QuarrySlate faceted wedge
+-- clusters (T416: no ellipsoid, no cube anywhere), and the veins are thin ore
 -- ribbons laid on the boulders' skin in Amber or Garnet, half sunk so they
 -- read as ore running through the stone. No Neon, no light.
 --
@@ -54,26 +54,73 @@ function NodeArt.Build(seed: number, ore: string?): Model
 	local veinColor = Kit.hex(NodeArt.VeinHex[oreName] or NodeArt.VeinHex.Amber)
 	local cliff, slate = Palette.CliffRock, Palette.QuarrySlate
 
-	-- The boulders: centre, radii (full size = 2r), colour, turn and a tilt, so no two sit alike. Each
-	-- sinks into the ground a little; the parts overlap into one outcrop.
+	-- The stone: a cluster of faceted wedges, every one turned off the axes (yaw, pitch and roll all
+	-- different) so no two faces line up and nothing is a cube or a ball. Each sinks into the ground a
+	-- little and the facets overlap into one outcrop. `c` is the centre, `size` the wedge's box, `a` the
+	-- yaw, pitch and roll; `r` is the radii of the ellipsoid the ore bars are laid on (a hair inside the
+	-- facets, so the ore shows through them).
 	local bodies = {
-		{ c = Vector3.new(0, 1.05, 0), r = Vector3.new(1.65, 1.15, 1.4), color = cliff, tilt = 0.08 },
-		{ c = Vector3.new(-0.5, 1.85, 0.2), r = Vector3.new(0.95, 1.35, 0.85), color = slate, tilt = -0.18 },
-		{ c = Vector3.new(0.95, 0.6, -0.65), r = Vector3.new(0.75, 0.7, 0.7), color = cliff, tilt = 0.25 },
-		{ c = Vector3.new(-1.0, 0.45, -0.7), r = Vector3.new(0.65, 0.55, 0.6), color = slate, tilt = -0.3 },
-		{ c = Vector3.new(0.5, 0.4, 1.1), r = Vector3.new(0.7, 0.5, 0.55), color = slate, tilt = 0.2 },
+		{
+			c = Vector3.new(0, 0.95, 0),
+			size = Vector3.new(2.6, 1.9, 2.0),
+			a = { 0.45, 0.14, 0.1 },
+			color = cliff,
+			r = Vector3.new(1.15, 0.85, 0.95),
+		},
+		{
+			c = Vector3.new(-0.45, 1.9, 0.15),
+			size = Vector3.new(1.5, 2.4, 1.3),
+			a = { 2.0, -0.15, 0.12 },
+			color = slate,
+			r = Vector3.new(0.6, 1.1, 0.55),
+		},
+		{
+			c = Vector3.new(0.95, 0.55, -0.65),
+			size = Vector3.new(1.3, 1.1, 1.2),
+			a = { 3.5, 0.2, -0.15 },
+			color = cliff,
+			r = Vector3.new(0.5, 0.45, 0.5),
+		},
+		{
+			c = Vector3.new(-1.0, 0.4, -0.7),
+			size = Vector3.new(1.2, 0.9, 1.1),
+			a = { 5.0, -0.2, 0.1 },
+			color = slate,
+			r = Vector3.new(0.45, 0.35, 0.45),
+		},
+		{
+			c = Vector3.new(0.55, 0.4, 0.95),
+			size = Vector3.new(1.3, 0.9, 1.0),
+			a = { 0.8, 0.15, 0.2 },
+			color = slate,
+			r = Vector3.new(0.5, 0.35, 0.4),
+		},
+		{
+			c = Vector3.new(-1.2, 0.5, 0.7),
+			size = Vector3.new(1.1, 1.0, 1.0),
+			a = { 2.4, 0.18, -0.12 },
+			color = cliff,
+			r = Vector3.new(0.4, 0.4, 0.4),
+		},
+		{
+			c = Vector3.new(0.1, 2.4, -0.1),
+			size = Vector3.new(0.9, 1.4, 0.8),
+			a = { 4.0, 0.2, 0.15 },
+			color = cliff,
+			r = Vector3.new(0.3, 0.55, 0.3),
+		},
 	}
 	for _, b in ipairs(bodies) do
-		local turn = CFrame.Angles(b.tilt, rng:range(0, math.pi), b.tilt * 0.6)
-		local p = Kit.ellipsoid(model, "Rock", b.r * 2, CFrame.new(b.c) * turn, b.color, Enum.Material.Slate)
+		local turn = CFrame.Angles(b.a[2], b.a[1] + rng:range(-0.08, 0.08), b.a[3])
+		local p = Kit.wedge(model, "Rock", b.size, CFrame.new(b.c) * turn, b.color, Enum.Material.Slate)
 		Kit.decor(p)
 	end
-	-- One angular ledge, so the outline is not all round.
+	-- One angular ledge low on the front, so the outline is broken at the foot as well.
 	local ledge = Kit.wedge(
 		model,
 		"RockFace",
-		Vector3.new(1.6, 0.9, 1.1),
-		CFrame.new(0.2, 0.3, 1.0) * CFrame.Angles(0, math.pi + rng:range(-0.4, 0.4), 0),
+		Vector3.new(1.5, 0.8, 1.0),
+		CFrame.new(0.2, 0.3, 1.0) * CFrame.Angles(0.12, math.pi + 0.5 + rng:range(-0.2, 0.2), -0.1),
 		slate,
 		Enum.Material.Slate
 	)

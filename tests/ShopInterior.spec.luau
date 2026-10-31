@@ -224,4 +224,68 @@ return function(t)
 		t.ok(model:FindFirstChild("Counter") ~= nil)
 		t.ok(findPart(model, "DoorBlock") ~= nil or findPart(model, "DoorOpening") ~= nil)
 	end)
+
+	-- T416 item 2: Heat Boots and the Secret Shop have a wall shelf run in honey WoodPlanks and one
+	-- Lantern pendant. These are new tests; the ones above are unchanged.
+	local Clearance = t.load("ReplicatedStorage/Shared/World/Clearance")
+	local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
+	local BOOTHS = { "HeatBoots", "SecretShop" }
+
+	-- A box test that counts decor too (ShopBounds.Hits only counts parts that collide).
+	local function overlaps(box, part)
+		local shape = Clearance.Box(box.cf, box.size)
+		return Clearance.BoxDepth(shape, Clearance.Box(part.CFrame, part.Size)) > 0.05
+	end
+
+	for _, kind in ipairs(BOOTHS) do
+		t.test(
+			"T416 " .. kind .. ": a honey WoodPlanks shelf run that stays out of the walk and the shoulders",
+			function()
+				local model = build(kind)
+				local runs = partsNamed(model, "WallShelfRun")
+				t.ok(#runs >= 2, kind .. " shelf run boards: " .. #runs)
+				local door = ShopBounds.Door(model)
+				local walk = ShopBounds.Walk(model)
+				local counter = model:FindFirstChild("Counter")
+				for _, run in ipairs(runs) do
+					t.eq(run.Material, roblox.Enum.Material.WoodPlanks, kind .. " run material")
+					t.eq(run.Color, Palette.PlankHoney, kind .. " run colour")
+					t.eq(overlaps(walk, run), false, kind .. " shelf run in the 8-wide walk")
+					for _, shoulder in ipairs(ShopBounds.Shoulders(door, counter.CFrame.Position, ShopBounds.Shoulder)) do
+						t.eq(overlaps(shoulder, run), false, kind .. " shelf run on a shoulder")
+					end
+					t.eq(overlaps(door, run), false, kind .. " shelf run in the door")
+				end
+				-- and the stock on the run
+				t.ok(#partsNamed(model, "WallRunStock") >= 4, kind .. " stock on the run")
+			end
+		)
+
+		t.test("T416 " .. kind .. ": one Lantern pendant, small light, 10 studs clear under it", function()
+			local model = build(kind)
+			local bodies = partsNamed(model, "ShopLantern")
+			t.eq(#bodies, 1, kind .. " lanterns")
+			local body = bodies[1]
+			t.eq(body.Color, Kit.hex("#FFC45C"), kind .. " lantern colour")
+			t.ok(body.Material ~= roblox.Enum.Material.Neon, kind .. " lantern is not Neon")
+			local light = body:FindFirstChildOfClass("PointLight")
+			t.ok(light ~= nil, kind .. " lantern light")
+			t.ok(light.Range <= 16 and light.Brightness <= 1.2, kind .. " light is small")
+			local door = ShopBounds.Door(model)
+			local floorY = door.cf.Position.Y - door.size.Y / 2
+			local lowest = body.CFrame.Position.Y - body.Size.Y / 2
+			for _, base in ipairs(partsNamed(model, "ShopLanternBase")) do
+				lowest = math.min(lowest, base.CFrame.Position.Y - base.Size.Y / 2)
+			end
+			local clear = lowest - floorY
+			t.ok(clear >= 10, kind .. " clear height under the lantern " .. clear)
+			local walk = ShopBounds.Walk(model)
+			t.eq(#partsNamed(model, "ShopLanternChain") >= 1, true, kind .. " hangs on a chain")
+			-- it hangs above the walk's top, so nothing walks into it
+			t.ok(
+				body.CFrame.Position.Y - body.Size.Y / 2 >= walk.cf.Position.Y + walk.size.Y / 2 - 0.05,
+				kind .. " lantern above the walk box"
+			)
+		end)
+	end
 end

@@ -19,6 +19,7 @@ local PLANKS = Enum.Material.WoodPlanks
 local METAL = Enum.Material.Metal
 local STONE = Enum.Material.Cobblestone
 local CONCRETE = Enum.Material.Concrete
+local ROAD = Enum.Material.Asphalt -- WorldLayout.RoadMaterial, the town street (SnowRoadLook.spec pins the two together)
 local PLASTIC = Enum.Material.SmoothPlastic
 local GROUND = Enum.Material.Ground
 local SAND = Enum.Material.Sand
@@ -304,7 +305,7 @@ function TravelArt.SkyrootRoad(): Model
 				V3(TravelPlan.MainWidth, 0.6, len),
 				mid * CFrame.Angles(0, yaw, 0),
 				Palette.RoadGravel,
-				CONCRETE
+				ROAD -- the town street's material: Asphalt, RoadGravel (T416)
 			)
 			part(
 				model,

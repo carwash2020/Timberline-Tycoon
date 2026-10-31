@@ -269,6 +269,7 @@ function Hearth.Build(model: Model, frame: Frame)
 		tieY = Hearth.TieY,
 		tieTop = ceil,
 		subShift = 0, -- the side units are 6.8 wide against a wall: centred, a sub-sign stays in the room
+		house = true,
 	})
 	-- CHECKOUT hangs flat on the back wall over the keeper, 3 studs over his head and under the shop's own name board,
 	-- so it reads from the door over the counter and nothing stands on the counter's top; no plaque on the face.
@@ -284,6 +285,7 @@ function Hearth.Build(model: Model, frame: Frame)
 		accent = ShopKit.Colors.Brass,
 		ceilY = lampTop,
 		name = "StoreSign",
+		house = true,
 	})
 
 	-- Plants at the front corners of the shelving, and a stock corner by the

@@ -27,6 +27,7 @@ return function(t)
 		HeaderSignFrame = "headersign",
 		HeaderSignAccent = "headersign",
 		HeaderSignChain = "headersign",
+		HeaderSignBracket = "headersign", -- T416: the house board's brass bracket bar (in the sign's own family)
 		StoreSign = "headersign",
 		SubSign = "subsign",
 		SubSignFrame = "subsign",

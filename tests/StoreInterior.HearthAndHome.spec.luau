@@ -424,6 +424,7 @@ return function(t)
 			"SubSignFrame",
 			"HeaderSignAccent",
 			"SubSignAccent",
+			"HeaderSignBracket", -- T416: the house boards' brass bracket bar
 		}) do
 			for _, p in ipairs(named(model, name)) do
 				local x0, x1, y0, y1, z0, z1 = aabb(p)
@@ -444,6 +445,9 @@ return function(t)
 				-- (a sign's own frame and accent touch its board by design)
 				local ownBoard = (a.p.Name .. "Frame" == b.p.Name or a.p.Name .. "Accent" == b.p.Name)
 					or (b.p.Name .. "Frame" == a.p.Name or b.p.Name .. "Accent" == a.p.Name)
+					-- (the bracket bar is a cap on its own sign's top rail)
+					or (a.p.Name == "HeaderSignBracket" and b.p.Name == "HeaderSignFrame")
+					or (b.p.Name == "HeaderSignBracket" and a.p.Name == "HeaderSignFrame")
 				if overlap(a, b) and not ownBoard then
 					t.ok(
 						false,

@@ -658,11 +658,14 @@ return function(t)
 			)
 			t.eq(plot.PrimaryPart, pad)
 			local folder = plot:FindFirstChild("Platform")
-			t.eq(count(folder, "Ramp"), 4)
+			-- (T416: the sloped Ramp is a Curb and three Rim treads on each edge)
+			t.eq(count(folder, "Ramp"), 0)
+			t.eq(count(folder, "Curb"), 4)
+			t.eq(count(folder, "Rim"), 12)
 			t.eq(count(folder, "Land"), 0)
-			for _, ramp in ipairs(folder:GetChildren()) do
-				t.eq(ramp.ClassName, "WedgePart")
-				t.eq(ramp.CanCollide, true)
+			for _, edge in ipairs(folder:GetChildren()) do
+				t.eq(edge.ClassName, "Part")
+				t.eq(edge.CanCollide, true)
 			end
 			-- Plot-local y = 0 is the platform's top: a saved piece at (0, 0) stands on it.
 			local ann, profile = s.newPlayer(1, "Ann")
@@ -680,7 +683,7 @@ return function(t)
 			local layout = PlotPlatform.Layout(80, squares)
 			t.eq(#layout.land, 1)
 			t.eq(count(folder, "Land"), 1)
-			t.eq(count(folder, "Ramp"), #layout.ramps)
+			t.eq(count(folder, "Curb"), #layout.ramps)
 			-- The tier grows the slab; the square's slab shrinks to what the tier leaves.
 			profile.cash = 20000
 			s.P.Upgrade(ann)
@@ -688,7 +691,8 @@ return function(t)
 			t.ok(math.abs(pad.CFrame.Position.Y + pad.Size.Y / 2 - (ground + 1)) < 1e-6, "still 1 stud up")
 			layout = PlotPlatform.Layout(110, squares)
 			t.eq(count(folder, "Land"), #layout.land)
-			t.eq(count(folder, "Ramp"), #layout.ramps)
+			t.eq(count(folder, "Curb"), #layout.ramps)
+			t.eq(count(folder, "Rim"), 3 * #layout.ramps)
 			-- The sign stands on the grass past the ramps, nothing flat shares a plane with the platform.
 			local top = ground + 1
 			for _, marker in ipairs(plot:FindFirstChild("Border"):GetChildren()) do

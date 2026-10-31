@@ -28,6 +28,7 @@ return function(t)
 		HeaderSignFrame = "headersign",
 		HeaderSignAccent = "headersign",
 		HeaderSignChain = "headersign",
+		HeaderSignBracket = "headersign", -- T416: the house board's brass brackets
 		CheckoutSign = "checkout",
 		CheckoutSignAccent = "checkout",
 		CheckoutChain = "checkout",
@@ -506,6 +507,7 @@ return function(t)
 			HeaderSignFrame = true,
 			HeaderSignAccent = true,
 			HeaderSignChain = true,
+			HeaderSignBracket = true,
 			CeilingBeam = true,
 			CeilingRafter = true,
 			LampChain = true,
