@@ -198,7 +198,7 @@ end
 ---------------------------------------------------------------------------
 
 local WOODS: { [string]: { string } } = {
-	starter = { "oak", "birch" },
+	starter = { "oak", "maple" }, -- (birch: its cut face and bark read white, so no decor stump is birch)
 	hills = { "pine", "oak" },
 	snow = { "pine" }, -- (frostwood's core is ice white: a white stump is not wanted)
 	gloam = { "phantomwood" },
@@ -206,7 +206,7 @@ local WOODS: { [string]: { string } } = {
 }
 
 local function woodFor(region: string, variant: number): WoodData.WoodDef
-	local list = WOODS[region] or { "oak", "maple", "birch" }
+	local list = WOODS[region] or { "oak", "maple" }
 	local def = WoodData.Get(list[(variant % #list) + 1]) or WoodData.Get("oak")
 	assert(def, "[Greenery] no oak in WoodData")
 	return def
@@ -224,7 +224,7 @@ function Greenery.Stump(region: string, variant: number, width: number): Model
 	-- Bark on the sides. A pale bark (birch) is weathered grey-brown on a cut stump, so no stump reads white.
 	local bark = def.trunkColor
 	if 0.299 * bark.R + 0.587 * bark.G + 0.114 * bark.B > 0.5 then
-		bark = Kit.shade(bark, -0.45)
+		bark = Kit.shade(bark, -0.32)
 	end
 	local body = Kit.part(
 		model,

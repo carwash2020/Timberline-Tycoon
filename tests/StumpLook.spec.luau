@@ -11,9 +11,9 @@ return function(t)
 	local function luma(c)
 		return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
 	end
-	-- White or near white: bright overall, or every channel above 0.92.
+	-- White or near white: bright overall (luma over 0.85: birch's cream core is 0.89), or every channel above 0.92.
 	local function nearWhite(c)
-		return luma(c) > 0.9 or (c.R > 0.92 and c.G > 0.92 and c.B > 0.92)
+		return luma(c) > 0.85 or (c.R > 0.92 and c.G > 0.92 and c.B > 0.92)
 	end
 
 	local function eachStump(fn)
@@ -38,6 +38,7 @@ return function(t)
 		end)
 		t.ok(seen.oak and seen.pine, "the common species are covered")
 		t.ok(not seen.frostwood, "frostwood (an ice-white core) is not a decor stump")
+		t.ok(not seen.birch, "birch (a cream core, white bark) is not a decor stump")
 	end)
 
 	t.test("sides are bark, never white", function()
