@@ -138,4 +138,26 @@ return function(t)
 			end
 		end
 	end)
+
+	-- T416 round 2: the rock is grey stone, not brown. Body parts are Slate in CliffRock #7E766C or
+	-- QuarrySlate #5B5650 and nothing else (both are low-saturation warm greys).
+	t.test("T416: rock body parts are Slate and exactly CliffRock #7E766C or QuarrySlate #5B5650", function()
+		local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
+		local cliff, slate = Kit.hex("#7E766C"), Kit.hex("#5B5650")
+		t.eq(Palette.CliffRock, cliff)
+		t.eq(Palette.QuarrySlate, slate)
+		for seed = 1, 12 do
+			for _, ore in ipairs({ "Amber", "Garnet" }) do
+				for _, p in ipairs(parts(NodeArt.Build(seed, ore))) do
+					if p.Name ~= "Vein" then
+						t.eq(p.Material, Enum.Material.Slate, p.Name .. " material")
+						t.ok(p.Color == cliff or p.Color == slate, p.Name .. " colour")
+						local mx, mn =
+							math.max(p.Color.R, p.Color.G, p.Color.B), math.min(p.Color.R, p.Color.G, p.Color.B)
+						t.ok((mx - mn) / mx < 0.2, p.Name .. " is a grey, not a brown")
+					end
+				end
+			end
+		end
+	end)
 end

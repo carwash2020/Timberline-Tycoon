@@ -280,9 +280,10 @@ local function band(
 	d1: number,
 	top: number,
 	color: Color3,
-	material: Enum.Material
+	material: Enum.Material,
+	height: number?
 ): Part
-	local bottom = -PlotData.PlatformHeight - PlotPlatform.Sink
+	local bottom = if height then top - height else -PlotData.PlatformHeight - PlotPlatform.Sink
 	local thick = top - bottom
 	local mid = (r.from + r.to) / 2
 	local out = (d0 + d1) / 2
@@ -315,7 +316,18 @@ function PlotPlatform.MaxLip(): number
 end
 
 local function curb(r: Ramp, origin: CFrame): Part
-	return band(r, origin, "Curb", 0, PlotPlatform.CurbWidth, 0, Palette.StoneBase, Enum.Material.Cobblestone)
+	-- one StoneBase Slate riser, RiseStep tall, standing on the first rim tread
+	return band(
+		r,
+		origin,
+		"Curb",
+		0,
+		PlotPlatform.CurbWidth,
+		0,
+		Palette.StoneBase,
+		Enum.Material.Slate,
+		PlotPlatform.RiseStep()
+	)
 end
 
 local function rims(r: Ramp, origin: CFrame): { Part }
@@ -323,8 +335,10 @@ local function rims(r: Ramp, origin: CFrame): { Part }
 	local tread = PlotPlatform.TreadWidth()
 	local step = PlotPlatform.RiseStep()
 	for k = 1, PlotPlatform.RimTreads do
-		local d0 = PlotPlatform.CurbWidth + (k - 1) * tread
-		table.insert(out, band(r, origin, "Rim", d0, d0 + tread, -step * k, Palette.TrailDirt, Enum.Material.Ground))
+		-- (the first tread also runs under the curb, which stands on it)
+		local d0 = if k == 1 then 0 else PlotPlatform.CurbWidth + (k - 1) * tread
+		local d1 = PlotPlatform.CurbWidth + k * tread
+		table.insert(out, band(r, origin, "Rim", d0, d1, -step * k, Palette.TrailDirt, Enum.Material.Ground))
 	end
 	return out
 end

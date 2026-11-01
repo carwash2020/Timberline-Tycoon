@@ -206,7 +206,12 @@ return function(t)
 				local r = layout.ramps[i]
 				t.ok(curb.CanCollide and curb.Anchored)
 				t.ok(math.abs(curb.CFrame.Position.Y + curb.Size.Y / 2) < 1e-4, "the curb top is the pad top")
-				t.ok(curb.CFrame.Position.Y - curb.Size.Y / 2 <= -HEIGHT, "and it reaches the ground")
+				-- (changed in T416 round 2: the curb is one 0.25 riser standing on the first rim tread)
+				t.ok(math.abs(curb.Size.Y - PlotPlatform.RiseStep()) < 1e-3, "the curb is one riser tall")
+				t.ok(
+					math.abs(curb.CFrame.Position.Y - curb.Size.Y / 2 + PlotPlatform.RiseStep()) < 1e-3,
+					"on the first tread"
+				)
 				local along = if r.dz ~= 0 then curb.Size.X else curb.Size.Z
 				t.ok(math.abs(along - (r.to - r.from)) < 1e-4, "it runs the edge")
 				local depth = if r.dz ~= 0 then curb.Size.Z else curb.Size.X
@@ -590,11 +595,14 @@ return function(t)
 		t.eq(#parts.rims, 3 * #layout.ramps, "three rim treads on every exposed edge")
 		for _, curb in ipairs(parts.curbs) do
 			t.eq(curb.Color, Palette.StoneBase)
+			t.eq(curb.Material, t.roblox.Enum.Material.Slate, "the curb is Slate")
+			t.ok(math.abs(curb.Size.Y - 0.25) < 1e-3, "the curb is 0.25 tall: " .. curb.Size.Y)
 			t.ok(math.abs(curb.CFrame.Position.Y + curb.Size.Y / 2) < 1e-3, "curb top is the pad top (y = 0)")
 			t.ok(curb.CanCollide and curb.Anchored)
 		end
 		for _, rim in ipairs(parts.rims) do
 			t.eq(rim.Color, Palette.TrailDirt)
+			t.eq(rim.Material, t.roblox.Enum.Material.Ground, "the treads are Ground")
 			t.ok(rim.CFrame.UpVector.Y > 0.9999, "a rim tread is level: no slope")
 			t.ok(rim.CanCollide and rim.Anchored)
 		end
@@ -702,8 +710,9 @@ return function(t)
 					local sameWay = facing[i].dx == facing[k].dx and facing[i].dz == facing[k].dz
 					local ox = (a.Size.X + b.Size.X) / 2 - math.abs(a.CFrame.Position.X - b.CFrame.Position.X)
 					local oz = (a.Size.Z + b.Size.Z) / 2 - math.abs(a.CFrame.Position.Z - b.CFrame.Position.Z)
+					local oy = (a.Size.Y + b.Size.Y) / 2 - math.abs(a.CFrame.Position.Y - b.CFrame.Position.Y)
 					t.ok(
-						not (sameWay and ox > 1e-3 and oz > 1e-3),
+						not (sameWay and ox > 1e-3 and oz > 1e-3 and oy > 1e-3),
 						string.format(
 							"two edge parts share ground: %s %s at (%.1f,%.1f) vs (%.1f,%.1f) overlap %.2f x %.2f",
 							a.Name,
@@ -720,4 +729,29 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test(
+		"T416: the top riser is one StoneBase Slate curb 0.25 tall, the lower treads are Ground TrailDirt, every riser at most 0.25",
+		function()
+			local model = t.roblox.Instance.new("Model")
+			local layout = PlotPlatform.Layout(110, {})
+			PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+			local parts = edgeParts(model)
+			t.eq(#parts.curbs, 4)
+			for _, curb in ipairs(parts.curbs) do
+				t.eq(curb.Material, t.roblox.Enum.Material.Slate)
+				t.eq(curb.Color, Palette.StoneBase)
+				t.ok(math.abs(curb.Size.Y - 0.25) < 1e-3)
+			end
+			local tops = {}
+			for _, rim in ipairs(parts.rims) do
+				t.eq(rim.Material, t.roblox.Enum.Material.Ground)
+				t.eq(rim.Color, Palette.TrailDirt)
+				tops[math.floor((rim.CFrame.Position.Y + rim.Size.Y / 2) * 100 + 0.5)] = true
+			end
+			-- three tread levels under the curb top (0): -0.25, -0.5, -0.75, then the grass at -1
+			t.ok(tops[-25] and tops[-50] and tops[-75], "tread tops at -0.25, -0.5 and -0.75")
+			t.ok(PlotPlatform.RiseStep() <= 0.25)
+		end
+	)
 end
