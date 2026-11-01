@@ -4641,3 +4641,27 @@ Part-built greyboxes, warm stylized realism, Midday; nothing here has been seen 
 3. Mine a Sky Shard node on the Aether Isles: it reads as rock with ore veins, takes the same number of swings, pays the same, grows back.
 4. Walk past the town board at the street and at the far kerb: the title and ten names read on a phone; the posts do not block the path.
 5. Walk into a shop: a taped kraft box shows the name label and price tag; carry one, drop one, open one.
+
+
+## T416 look fixes and T415 proofs (31 October 2026, branch `t416-look-fixes`, PR #288)
+
+Plan: `docs/T416_PLAN.md`. Part-built greyboxes, warm stylized realism, Midday; nothing here has been seen in Studio and cloud has no physics. Shots are three.js previews (not Studio lighting) and the preview tool cannot load uploaded Roblox meshes. They are in `preview/t416/`.
+
+- **No overlay** (`NoOverlay.spec`): nothing under `TimberlineMap` or `src/` is a keep-out overlay. The preview helper `_t414d2.luau` draws it only with `T414_OVERLAY=1`.
+- **House boards** (`ShopKit.houseSign`, flag `house` on `HeaderSign` / `SectionSigns`): Hearth & Home (GEAR, BUILD PLANS, HOME PLANS, LAMPS, HEARTH & HOME) and the Tool Shed (AXES & BELTS, MACHINES). The under-bar `HeaderSignAccent` is gone from these boards (the Tool Shed is at its 1200-part store budget, so the Brass bracket bar takes its place). Sparkworks and the Dealership boards are unchanged.
+- **Booths** (`ShopFinish`): Heat Boots and the Secret Shop only. `WallShelfRun` (two honey boards under the high rows, `WallRunStock` on them) and `ShopLantern` (chain, cap, glass body #FFC45C, base, PointLight 0.8 / 14).
+- **Plot pad edge** (`PlotPlatform`): `Curb` (0.75 deep, top at the pad top) and three `Rim` treads (1.75 deep each, tops 0.25, 0.5, 0.75 under the pad top); every riser is `RiseStep` 0.25; the same 6 studs as the old ramp. `BuildEdges` and `Build` now return lands, curbs, rims. A convex corner is still open.
+- **Nodes** (`NodeArt`): seven ridges (two wedges each) and one ledge, all turned off the axes; six ore seams.
+- **Stumps** (`Greenery.Stump`): the model carries a `Species` attribute for the spec; snow stumps are pine only.
+- **Skyroot deck** (`TravelArt.SkyrootRoad`): Asphalt, RoadGravel.
+
+**Existing specs changed on purpose:** `PlotPlatform` (the ramp geometry and slope tests became curb, rim and riser tests; two rectangle-only walk checks keep their rectangles), `PlotService` (Ramp count 4 became Curb 4 and Rim 12), `StoreOverlap.ToolShed` and `StoreOverlap.HearthAndHome` (`HeaderSignBracket` joins the sign family), `StoreInterior.HearthAndHome` (the bracket is counted in the sign overlap check and is exempt against its own frame).
+
+**Known gaps:** the pad edge is stairs, not a flush step (Connor's one-stud pad lock); a convex pad corner stays open; node seams on slopes sink in the preview; the Hearth / Tool Shed boards lost their coloured under-bar and have no full frame (part budget); nothing seen in Studio.
+
+**Studio checks for Connor**
+1. Walk into Hearth & Home and the Tool Shed: the boards are cream with dark lettering, brown rail, brass bar; read them from the door on a phone.
+2. Heat Boots and Secret Shop: the lantern glows warm over the walk, you walk under it without touching it; the low shelf run is behind the counter.
+3. Drop a log on a pad edge, then walk and drive a truck over the curb and three steps: nothing catches.
+4. Mine a node: faceted rock, same swings and payout, the ore reads.
+5. Drive the Skyroot climb and the snow road: the same grey as town streets; look at a birch stump by the road.
