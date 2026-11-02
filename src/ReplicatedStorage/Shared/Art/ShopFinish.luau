@@ -17,6 +17,7 @@ local RUNNER = Kit.hex("#8A3B2E")
 local RUNNER_EDGE = Kit.hex("#E3C98A")
 local SLATE = Kit.hex("#8C877E")
 local IRON = Kit.hex("#3B3634")
+local LANTERN = Kit.hex("#FFC45C") -- the warm lantern gold the town's lamps use
 
 local SIGN_TEXT: { [string]: string } = {
 	CoatKiosk = "COATS",
@@ -216,6 +217,110 @@ local function shelves(model: Model, room: Room, sideGap: { number })
 	end
 end
 
+-- T416: a shelf run along the foot of the back wall (two honey boards with a gap for the keeper to
+-- step through, stock on both), under the two high rows. It stays on the back wall, so the 8-wide walk
+-- and the door's shoulders are untouched.
+local function shelfRun(model: Model, room: Room, sideGap: { number })
+	local x0 = room.x0 + 0.6 + sideGap[1]
+	local x1 = room.x1 - 0.6 - sideGap[2]
+	local mid = (x0 + x1) / 2
+	local halfW = (x1 - x0 - 0.8) / 2
+	local depth = 0.5
+	local zc = room.z1 - depth / 2
+	local y = room.floorY + 4.2
+	for side, sx in ipairs({ -1, 1 }) do
+		local cx = mid + sx * (0.4 + halfW / 2)
+		decor(
+			Kit.part(
+				model,
+				"WallShelfRun",
+				Vector3.new(halfW, 0.25, depth),
+				CFrame.new(cx, y, zc),
+				Palette.PlankHoney,
+				PLANKS
+			),
+			false
+		)
+		local n = math.max(2, math.floor(halfW / 1.3))
+		local pitch = halfW / n
+		for i = 1, n do
+			local hgt = 0.6 + ((i * 5 + side * 3) % 3) * 0.2
+			decor(
+				Kit.part(
+					model,
+					"WallRunStock",
+					Vector3.new(pitch * 0.68, hgt, depth * 0.8),
+					CFrame.new(cx - halfW / 2 + pitch * (i - 0.5), y + 0.125 + hgt / 2, zc),
+					STOCK[((i + side * 2) % #STOCK) + 1],
+					PLANKS
+				),
+				false
+			)
+		end
+	end
+end
+
+-- T416: one lantern pendant over the walk: a short chain from the ceiling boards, a brass cap and base
+-- and a gold glass body with a small warm PointLight. Its lowest point is over 10 studs above the floor.
+local function lantern(model: Model, room: Room)
+	local x, z = 0, room.z0 + 3.5
+	local top = room.ceilY
+	local chain = 0.2
+	decor(
+		Kit.part(
+			model,
+			"ShopLanternChain",
+			Vector3.new(0.08, chain + 0.04, 0.08),
+			CFrame.new(x, top - chain / 2 + 0.02, z),
+			IRON,
+			Enum.Material.Metal
+		),
+		false
+	)
+	local capY = top - chain - 0.06
+	decor(
+		Kit.part(
+			model,
+			"ShopLanternCap",
+			Vector3.new(0.56, 0.12, 0.56),
+			CFrame.new(x, capY, z),
+			Palette.Brass,
+			Enum.Material.Metal
+		),
+		false
+	)
+	local bodyY = capY - 0.06 - 0.3
+	local body = decor(
+		Kit.part(
+			model,
+			"ShopLantern",
+			Vector3.new(0.48, 0.6, 0.48),
+			CFrame.new(x, bodyY, z),
+			LANTERN,
+			Enum.Material.Glass
+		),
+		false
+	)
+	decor(
+		Kit.part(
+			model,
+			"ShopLanternBase",
+			Vector3.new(0.4, 0.12, 0.4),
+			CFrame.new(x, bodyY - 0.36, z),
+			Palette.Brass,
+			Enum.Material.Metal
+		),
+		false
+	)
+	local light = Instance.new("PointLight")
+	light.Name = "LanternLight"
+	light.Color = LANTERN
+	light.Brightness = 0.8
+	light.Range = 14
+	light.Shadows = false
+	light.Parent = body
+end
+
 -- A peg board flat on each side wall, with a few flat tags hung on it. It
 -- stays inside the 4-stud half walk.
 local function pegboards(model: Model, room: Room, z0: number, z1: number)
@@ -351,6 +456,10 @@ function ShopFinish.Apply(model: Model, kind: string)
 		end
 	end
 	shelves(model, room, gap)
+	if kind == "HeatBoots" or kind == "SecretShop" then
+		shelfRun(model, room, gap)
+		lantern(model, room)
+	end
 	-- Peg boards on the side walls, from the door's inside to the shelves.
 	pegboards(model, room, room.z0 + 0.5, room.z1 - 1.2)
 end

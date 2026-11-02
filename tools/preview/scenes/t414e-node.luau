@@ -27,6 +27,13 @@ return {
 		return {
 			root = root,
 			fov = 45,
+			-- T416: neutral light. The viewer's default is a warm sun (#ffe2b0) over a brown ground bounce
+			-- (#8a7a5c), which turns the grey CliffRock / QuarrySlate hexes brown on screen.
+			lighting = {
+				sunColor = "#f6f6f4",
+				ground = "#767672",
+				skyBottom = "#e6e6e4",
+			},
 			cameras = {
 				{ pos = { -4 - 6, 3.2, -8 }, target = { -4, 1.6, 0 }, label = "a node, three-quarter" },
 				{ pos = { 0, 22, -1 }, target = { 0, 0, 0 }, label = "top-down" },

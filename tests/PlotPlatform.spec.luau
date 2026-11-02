@@ -191,36 +191,57 @@ return function(t)
 		t.eq(PlotPlatform.Origin(#PlotData.Homes + 1), nil)
 	end)
 
-	t.test("each ramp's high edge meets the slab top and its low edge meets the grass, 6 studs out", function()
+	-- T416: the sloped Ramp wedge is gone. This test pinned its geometry (high edge under the slab top, low
+	-- edge on the grass, 6 studs out). The same 6 studs are now a curb and three rim treads: flush with
+	-- the pad at the top, ending PlatformRamp out, reaching down into the ground.
+	t.test("each edge's curb meets the pad top and its rim treads end on the grass, 6 studs out", function()
 		local origin = CFrame.new(0, 0, 0)
 		local model = t.roblox.Instance.new("Model")
 		for _, squares in ipairs(squareSets()) do
 			local layout = PlotPlatform.Layout(140, squares)
-			local _, _, ramps = PlotPlatform.Build(model, layout, origin, PlotData.Look(2))
-			for i, wedge in ipairs(ramps) do
+			local _, _, curbs, rims = PlotPlatform.Build(model, layout, origin, PlotData.Look(2))
+			t.eq(#curbs, #layout.ramps)
+			t.eq(#rims, #layout.ramps * PlotPlatform.RimTreads)
+			for i, curb in ipairs(curbs) do
 				local r = layout.ramps[i]
-				t.eq(wedge.ClassName, "WedgePart")
-				t.ok(wedge.CanCollide and wedge.Anchored)
-				-- A wedge's high back face is +Z, its slope runs down to -Z.
-				local high = wedge.CFrame:PointToWorldSpace(Vector3.new(0, wedge.Size.Y / 2, wedge.Size.Z / 2))
-				local low = wedge.CFrame:PointToWorldSpace(Vector3.new(0, -wedge.Size.Y / 2, -wedge.Size.Z / 2))
-				local topLine = HEIGHT - PlotData.PlatformEdgeClear
-				t.ok(math.abs(high.Y - -PlotData.PlatformEdgeClear) < 1e-4, "the top edge sits just under the slab top")
-				t.ok(math.abs(low.Y - -HEIGHT) < 1e-4, "the low edge is on the ground")
-				t.ok(topLine > 0)
-				local out = if r.dz ~= 0 then (high.Z - r.at) * r.dz else (high.X - r.at) * r.dx
-				t.ok(math.abs(out + PlotPlatform.Inset) < 1e-4, "the back tucks under the slab")
-				local reach = if r.dz ~= 0 then (low.Z - r.at) * r.dz else (low.X - r.at) * r.dx
-				t.ok(math.abs(reach - RAMP) < 1e-4, "the low edge is a ramp's length out")
-				t.ok(math.abs(wedge.Size.X - (r.to - r.from)) < 1e-4, "it runs the edge")
+				t.ok(curb.CanCollide and curb.Anchored)
+				t.ok(math.abs(curb.CFrame.Position.Y + curb.Size.Y / 2) < 1e-4, "the curb top is the pad top")
+				-- (changed in T416 round 2: the curb is one 0.25 riser standing on the first rim tread)
+				t.ok(math.abs(curb.Size.Y - PlotPlatform.RiseStep()) < 1e-3, "the curb is one riser tall")
+				t.ok(
+					math.abs(curb.CFrame.Position.Y - curb.Size.Y / 2 + PlotPlatform.RiseStep()) < 1e-3,
+					"on the first tread"
+				)
+				local along = if r.dz ~= 0 then curb.Size.X else curb.Size.Z
+				t.ok(math.abs(along - (r.to - r.from)) < 1e-4, "it runs the edge")
+				local depth = if r.dz ~= 0 then curb.Size.Z else curb.Size.X
+				t.ok(math.abs(depth - PlotPlatform.CurbWidth) < 1e-4, "a curb wide")
+				local outer = if r.dz ~= 0
+					then (curb.CFrame.Position.Z - r.at) * r.dz + curb.Size.Z / 2
+					else (curb.CFrame.Position.X - r.at) * r.dx + curb.Size.X / 2
+				t.ok(math.abs(outer - PlotPlatform.CurbWidth) < 1e-4, "the curb starts at the pad's edge")
+			end
+			for k = 1, #rims do
+				local rim = rims[k]
+				t.ok(rim.CanCollide and rim.Anchored)
+				t.ok(rim.CFrame.Position.Y - rim.Size.Y / 2 <= -HEIGHT, "a tread reaches the ground")
+			end
+			-- the last tread of every edge ends a ramp's length out
+			for i, r in ipairs(layout.ramps) do
+				local last = rims[i * PlotPlatform.RimTreads]
+				local outer = if r.dz ~= 0
+					then (last.CFrame.Position.Z - r.at) * r.dz + last.Size.Z / 2
+					else (last.CFrame.Position.X - r.at) * r.dx + last.Size.X / 2
+				t.ok(math.abs(outer - RAMP) < 1e-4, "the rim ends a ramp's length out")
 			end
 			model:ClearAllChildren()
 		end
 	end)
 
-	t.test("walking or driving up any ramp, the rise follows the ramp's slope and never jumps", function()
-		local slope = HEIGHT / RAMP
-		local maxStep = slope * 0.25 + 1e-6 -- per quarter stud
+	-- T416: was "the rise follows the ramp's slope and never jumps" (a step of slope * 0.25 per quarter stud).
+	-- The edge is risers now: no single rise or drop is over 0.25, and the walk still ends on the top.
+	t.test("walking or driving up any edge, no riser is over 0.25 and the rise ends on the top", function()
+		local maxStep = PlotPlatform.RiseStep() + 1e-6
 		local checked = 0
 		-- Whole rectangles only (a tier alone, a column of squares, the whole
 		-- grid): where bought squares make a notch, a ramp's open end is a
@@ -424,12 +445,13 @@ return function(t)
 	t.test("T414e: the edge is a StoneBase curb over a TrailDirt rim, no part of it a grey slab", function()
 		local model = t.roblox.Instance.new("Model")
 		local layout = PlotPlatform.Layout(110, { "1,0", "0,1" })
-		local _, _, ramps, curbs = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
-		t.eq(#ramps, #layout.ramps)
-		t.eq(#curbs, #layout.ramps, "one curb band on every exposed edge")
-		for _, ramp in ipairs(ramps) do
-			t.eq(ramp.Color, Palette.TrailDirt, "the rim is dirt")
-			t.ok(ramp.Material ~= t.roblox.Enum.Material.Concrete, "and not concrete")
+		-- (T416: Build's third and fourth results are the curbs and the rim treads; there is no ramp)
+		local _, _, curbs, rims = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+		t.eq(#rims, #layout.ramps * PlotPlatform.RimTreads)
+		t.eq(#curbs, #layout.ramps, "one curb on every exposed edge")
+		for _, rim in ipairs(rims) do
+			t.eq(rim.Color, Palette.TrailDirt, "the rim is dirt")
+			t.ok(rim.Material ~= t.roblox.Enum.Material.Concrete, "and not concrete")
 		end
 		for _, curb in ipairs(curbs) do
 			t.eq(curb.Name, "Curb")
@@ -442,24 +464,23 @@ return function(t)
 		t.ok(PlotPlatform.MaxLip() <= 0.25, "lip " .. PlotPlatform.MaxLip())
 		local model = t.roblox.Instance.new("Model")
 		local layout = PlotPlatform.Layout(110, { "1,0", "-1,1" })
-		local _, _, ramps, curbs = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+		local _, _, curbs, rims = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
 		for i, curb in ipairs(curbs) do
-			-- The curb's highest point (its back edge) against the pad top at y = 0.
-			local high = curb.CFrame:PointToWorldSpace(Vector3.new(0, curb.Size.Y / 2, curb.Size.Z / 2)).Y
+			-- The curb's top against the pad top at y = 0: flush.
+			local high = curb.CFrame.Position.Y + curb.Size.Y / 2
 			t.ok(high <= 0.25, "curb top is " .. high .. " over the pad top")
 			t.ok(high >= -0.1, "and flush with it, not sunk")
-			-- Where the curb ends the dirt rim carries on: the step is the curb's proud edge.
-			local low = curb.CFrame:PointToWorldSpace(Vector3.new(0, -curb.Size.Y / 2, -curb.Size.Z / 2)).Y
+			-- Where the curb ends the first rim tread carries on, one riser lower.
 			local r = layout.ramps[i]
 			local mid = (r.from + r.to) / 2
 			local rim = if r.dz ~= 0
-				then PlotPlatform.RiseAt(layout, mid, r.at + r.dz * PlotPlatform.CurbWidth)
-				else PlotPlatform.RiseAt(layout, r.at + r.dx * PlotPlatform.CurbWidth, mid)
-			t.ok(math.abs((low + HEIGHT) - rim) <= 0.25, "the curb's outer edge meets the rim within 0.25")
+				then PlotPlatform.RiseAt(layout, mid, r.at + r.dz * (PlotPlatform.CurbWidth + 0.01))
+				else PlotPlatform.RiseAt(layout, r.at + r.dx * (PlotPlatform.CurbWidth + 0.01), mid)
+			t.ok(math.abs(HEIGHT - rim) <= 0.25 + 1e-9, "the curb's outer edge meets the rim within 0.25")
 		end
-		for _, wedge in ipairs(ramps) do
-			local foot = wedge.CFrame:PointToWorldSpace(Vector3.new(0, -wedge.Size.Y / 2, -wedge.Size.Z / 2)).Y
-			t.ok(math.abs(foot + HEIGHT) < 1e-4, "the rim's foot is on the terrain: no gap, no step")
+		for _, tread in ipairs(rims) do
+			local foot = tread.CFrame.Position.Y - tread.Size.Y / 2
+			t.ok(foot <= -HEIGHT + 1e-4, "the rim's foot is in the terrain: no gap")
 		end
 		t.ok(HEIGHT <= 1, "the whole rise is a stud: no step over 1 where a pad meets paving")
 	end)
@@ -470,7 +491,7 @@ return function(t)
 			for _, squares in ipairs(squareSets()) do
 				local layout = PlotPlatform.Layout(110, squares)
 				local model = t.roblox.Instance.new("Model")
-				local _, _, _, curbs = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+				local _, _, curbs = PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
 				for i = 1, #curbs do
 					for k = i + 1, #curbs do
 						local ra, rb = layout.ramps[i], layout.ramps[k]
@@ -531,4 +552,206 @@ return function(t)
 			end
 		end
 	end)
+
+	-- T416 item 3: no sloped skirt. The edge is a StoneBase curb flush with the pad top and flat TrailDirt
+	-- rim treads down to the grass. The pad stands a stud over the grass (Connor's lock), so the drop is
+	-- taken in risers of at most 0.25, with no wedge anywhere.
+	local function edgeParts(model)
+		local out = { curbs = {}, rims = {}, others = {} }
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				if d.Name == "Curb" then
+					table.insert(out.curbs, d)
+				elseif d.Name == "Rim" then
+					table.insert(out.rims, d)
+				elseif d.Name ~= "Pad" and d.Name ~= "Land" then
+					table.insert(out.others, d)
+				end
+			end
+		end
+		return out
+	end
+
+	t.test("T416: no ramp part and no wedge anywhere on the pad edge", function()
+		for _, squares in ipairs(squareSets()) do
+			local model = t.roblox.Instance.new("Model")
+			PlotPlatform.Build(model, PlotPlatform.Layout(110, squares), CFrame.new(0, 0, 0), PlotData.Look(1))
+			for _, d in ipairs(model:GetDescendants()) do
+				t.ok(d.Name ~= "Ramp", "a part named Ramp")
+				t.ok(not d:IsA("WedgePart"), "a wedge: " .. d.Name)
+			end
+			local parts = edgeParts(model)
+			t.eq(#parts.others, 0, "only Pad, Land, Curb and Rim parts")
+			t.ok(#parts.curbs >= 4 and #parts.rims >= 12)
+		end
+	end)
+
+	t.test("T416: the curb is StoneBase with its top flush with the pad top, the rim is flat TrailDirt", function()
+		local model = t.roblox.Instance.new("Model")
+		local layout = PlotPlatform.Layout(110, { "1,0", "0,1" })
+		PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+		local parts = edgeParts(model)
+		t.eq(#parts.curbs, #layout.ramps, "one curb on every exposed edge")
+		t.eq(#parts.rims, 3 * #layout.ramps, "three rim treads on every exposed edge")
+		for _, curb in ipairs(parts.curbs) do
+			t.eq(curb.Color, Palette.StoneBase)
+			t.eq(curb.Material, t.roblox.Enum.Material.Slate, "the curb is Slate")
+			t.ok(math.abs(curb.Size.Y - 0.25) < 1e-3, "the curb is 0.25 tall: " .. curb.Size.Y)
+			t.ok(math.abs(curb.CFrame.Position.Y + curb.Size.Y / 2) < 1e-3, "curb top is the pad top (y = 0)")
+			t.ok(curb.CanCollide and curb.Anchored)
+		end
+		for _, rim in ipairs(parts.rims) do
+			t.eq(rim.Color, Palette.TrailDirt)
+			t.eq(rim.Material, t.roblox.Enum.Material.Ground, "the treads are Ground")
+			t.ok(rim.CFrame.UpVector.Y > 0.9999, "a rim tread is level: no slope")
+			t.ok(rim.CanCollide and rim.Anchored)
+		end
+	end)
+
+	t.test("T416: walking out from every edge the drop is in risers of at most 0.25, ending on the grass", function()
+		local checked = 0
+		-- Whole rectangles only (a tier alone, a column, a row, the grid): where bought squares make a
+		-- notch, the line out of an edge can run into the next edge, and a step there is allowed.
+		local grid = {}
+		for ix = -2, 2 do
+			for iz = -2, 2 do
+				table.insert(grid, PlotLogic.Key(ix, iz))
+			end
+		end
+		-- (the row "-1,2".."1,2" is left out: it stands a 5 stud trench off the tier, where the two edges'
+		-- treads meet and the ground rightly climbs again)
+		for _, squares in ipairs({ {}, { "1,0", "1,1", "1,-1" }, grid }) do
+			local layout = PlotPlatform.Layout(110, squares)
+			local model = t.roblox.Instance.new("Model")
+			PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+			local parts = edgeParts(model)
+			local function topAt(x, z)
+				local best = -HEIGHT -- the grass
+				for _, list in ipairs({ parts.curbs, parts.rims }) do
+					for _, p in ipairs(list) do
+						local c, h = p.CFrame.Position, p.Size / 2
+						if math.abs(x - c.X) <= h.X and math.abs(z - c.Z) <= h.Z then
+							best = math.max(best, c.Y + h.Y)
+						end
+					end
+				end
+				return best
+			end
+			for _, r in ipairs(layout.ramps) do
+				-- lines a ramp's length in from either end of the run (a notch's corner is past the ends)
+				local lo, hi = r.from + RAMP + 0.5, r.to - RAMP - 0.5
+				if hi < lo then
+					continue
+				end
+				local mid = (lo + hi) / 2
+				local last = 0 -- the pad top
+				for k = 0, math.floor((RAMP + 1) / 0.05) do
+					local depth = 0.02 + k * 0.05
+					local x, z
+					if r.dz ~= 0 then
+						x, z = mid, r.at + r.dz * depth
+					else
+						x, z = r.at + r.dx * depth, mid
+					end
+					local top = topAt(x, z)
+					t.ok(last - top <= 0.25 + 1e-3, string.format("riser %.3f at depth %.2f", last - top, depth))
+					t.ok(
+						top <= last + 1e-3,
+						string.format(
+							"never up again: %.3f then %.3f at depth %.2f, run at %.1f dx %d dz %d from %.1f to %.1f, squares %d",
+							last,
+							top,
+							depth,
+							r.at,
+							r.dx,
+							r.dz,
+							r.from,
+							r.to,
+							#squares
+						)
+					)
+					last = top
+				end
+				t.ok(math.abs(last + HEIGHT) < 1e-3, "ends on the grass")
+				checked += 1
+			end
+		end
+		t.ok(checked >= 10, checked .. " edges walked")
+	end)
+
+	t.test("T416: rim treads and curbs running the same way never overlap", function()
+		for _, squares in ipairs(squareSets()) do
+			local layout = PlotPlatform.Layout(110, squares)
+			local model = t.roblox.Instance.new("Model")
+			PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+			-- Build makes, per edge run in order, one Curb then its three Rim treads.
+			local list, facing = {}, {}
+			local curbs, rims = {}, {}
+			for _, d in ipairs(model:GetChildren()) do
+				if d.Name == "Curb" then
+					table.insert(curbs, d)
+				elseif d.Name == "Rim" then
+					table.insert(rims, d)
+				end
+			end
+			for i, r in ipairs(layout.ramps) do
+				table.insert(list, curbs[i])
+				table.insert(facing, r)
+				for k = 1, PlotPlatform.RimTreads do
+					table.insert(list, rims[(i - 1) * PlotPlatform.RimTreads + k])
+					table.insert(facing, r)
+				end
+			end
+			for i = 1, #list do
+				for k = i + 1, #list do
+					local a, b = list[i], list[k]
+					-- (edges that meet at a notch's corner cross each other, as the old ramps did: only parts
+					-- running the same way are asked to be disjoint)
+					local sameWay = facing[i].dx == facing[k].dx and facing[i].dz == facing[k].dz
+					local ox = (a.Size.X + b.Size.X) / 2 - math.abs(a.CFrame.Position.X - b.CFrame.Position.X)
+					local oz = (a.Size.Z + b.Size.Z) / 2 - math.abs(a.CFrame.Position.Z - b.CFrame.Position.Z)
+					local oy = (a.Size.Y + b.Size.Y) / 2 - math.abs(a.CFrame.Position.Y - b.CFrame.Position.Y)
+					t.ok(
+						not (sameWay and ox > 1e-3 and oz > 1e-3 and oy > 1e-3),
+						string.format(
+							"two edge parts share ground: %s %s at (%.1f,%.1f) vs (%.1f,%.1f) overlap %.2f x %.2f",
+							a.Name,
+							b.Name,
+							a.CFrame.Position.X,
+							a.CFrame.Position.Z,
+							b.CFrame.Position.X,
+							b.CFrame.Position.Z,
+							ox,
+							oz
+						)
+					)
+				end
+			end
+		end
+	end)
+
+	t.test(
+		"T416: the top riser is one StoneBase Slate curb 0.25 tall, the lower treads are Ground TrailDirt, every riser at most 0.25",
+		function()
+			local model = t.roblox.Instance.new("Model")
+			local layout = PlotPlatform.Layout(110, {})
+			PlotPlatform.Build(model, layout, CFrame.new(0, 0, 0), PlotData.Look(1))
+			local parts = edgeParts(model)
+			t.eq(#parts.curbs, 4)
+			for _, curb in ipairs(parts.curbs) do
+				t.eq(curb.Material, t.roblox.Enum.Material.Slate)
+				t.eq(curb.Color, Palette.StoneBase)
+				t.ok(math.abs(curb.Size.Y - 0.25) < 1e-3)
+			end
+			local tops = {}
+			for _, rim in ipairs(parts.rims) do
+				t.eq(rim.Material, t.roblox.Enum.Material.Ground)
+				t.eq(rim.Color, Palette.TrailDirt)
+				tops[math.floor((rim.CFrame.Position.Y + rim.Size.Y / 2) * 100 + 0.5)] = true
+			end
+			-- three tread levels under the curb top (0): -0.25, -0.5, -0.75, then the grass at -1
+			t.ok(tops[-25] and tops[-50] and tops[-75], "tread tops at -0.25, -0.5 and -0.75")
+			t.ok(PlotPlatform.RiseStep() <= 0.25)
+		end
+	)
 end

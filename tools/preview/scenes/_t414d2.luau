@@ -3,6 +3,7 @@
 -- without (before) what Scatter plans: cover, stumps, rocks, saplings, snags. After also draws the
 -- keep-out lines (red, 0.4 wide) beside every road in the shot so the clear band can be seen.
 -- A helper (files starting with _ are not scenes): T414.scene(ctx, site, withScatter).
+local process = require("@lune/process")
 local Site = require("./_site")
 
 local T414 = {}
@@ -90,11 +91,15 @@ function T414.scene(ctx, id, withScatter)
 			end
 		end
 		-- The keep-out lines: red strips along each road's keep-out distance, both sides.
+		-- A debug aid for Scatter work only: OFF unless T414_OVERLAY=1 (T416: the shots and the
+		-- built world never carry it).
 		local lines = roblox.Instance.new("Model")
 		lines.Name = "KeepOuts"
-		lines.Parent = root
+		if process.env.T414_OVERLAY == "1" then
+			lines.Parent = root
+		end
 		local TerrainGen = ctx.load("ReplicatedStorage/Shared/World/TerrainGen")
-		for _, road in ipairs(WorldLayout.Roads) do
+		for _, road in ipairs(if process.env.T414_OVERLAY == "1" then WorldLayout.Roads else {}) do
 			local keep = if road.width >= 32 then Scatter.MainKeep else Scatter.BranchKeep
 			for i = 1, #road.points - 1 do
 				local a, b = road.points[i], road.points[i + 1]
@@ -137,7 +142,8 @@ function T414.scene(ctx, id, withScatter)
 		{
 			pos = { site.top[1], site.top[3], site.top[2] + 1 },
 			target = { site.top[1], 0, site.top[2] },
-			label = "from above: the road and its verge" .. (withScatter and ", keep-outs in red" or ""),
+			label = "from above: the road and its verge"
+				.. (withScatter and process.env.T414_OVERLAY == "1" and ", keep-outs in red" or ""),
 			fov = 60,
 		},
 	}

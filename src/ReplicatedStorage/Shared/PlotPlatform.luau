@@ -15,18 +15,15 @@
 --     so no two slabs share a face (no z-fighting). Each slab is
 --     PlatformThick tall: its top is PlatformHeight above the grass and the
 --     rest sinks into the ground, so a slab never shows a gap.
---   * "Ramp": a wedge along every exposed edge, PlatformRamp studs deep and
---     PlatformHeight high, in a darker grey. It is the bevel and the way
---     up: a rise of 1 over 6 studs (9.5 degrees), far gentler than a
---     Humanoid's limit and than a truck wheel (radius 1.25 to 1.75 times
---     the truck scale, ground-ray driving) needs. Convex corners are left
---     open: nobody drives a plot's corner.
---   * T414e: the Ramp is TrailDirt (the dirt rim) and a StoneBase "Curb"
---     band, CurbWidth deep, lies on the top of each ramp's slope, a
---     CurbProud hair proud of it. The curb's high edge is flush with the pad
---     top (it sits 0.01 under it), so no lip stands on the edge for a log to
---     catch on; its outer end is a step of CurbProud, then the dirt carries
---     on down to the grass. MaxLip is the number the spec holds under 0.25.
+--   * T416: no sloped skirt. Each exposed edge is a StoneBase "Curb"
+--     block whose top is flush with the pad top, CurbWidth deep, then
+--     RimTreads flat TrailDirt "Rim" treads down to the grass, each tread
+--     RiseStep lower than the one before. The pad stands PlatformHeight (1
+--     stud, Connor's lock) over the grass, so the drop is taken in risers of
+--     at most RiseStep (0.25) and nothing is a wedge. Curb and treads cover
+--     the same PlatformRamp (6) studs the old ramp did, so no footprint
+--     moved. A convex corner is left open, as before. MaxLip is the number
+--     the spec holds under 0.25.
 -- Layout is pure (testable); Build makes the Parts.
 
 local GameConfig = require(script.Parent.GameConfig)
@@ -39,8 +36,9 @@ local PlotPlatform = {}
 
 PlotPlatform.Cell = 5 -- studs: every tier and square edge is a multiple of this
 PlotPlatform.Inset = 0.05 -- a ramp's back tucks this far under its slab (no hairline gap)
-PlotPlatform.CurbWidth = 1.5 -- studs: the stone band along the top of the slope
-PlotPlatform.CurbProud = 0.04 -- studs: the curb stands this far off the slope (no coplanar faces)
+PlotPlatform.CurbWidth = 0.75 -- studs: the stone curb along the pad's edge, its top flush with the pad top
+PlotPlatform.RimTreads = 3 -- flat dirt treads between the curb and the grass
+PlotPlatform.Sink = 0.3 -- studs: every curb and tread block reaches this far below the grass, so no gap shows
 
 export type Rect = { x0: number, x1: number, z0: number, z1: number }
 -- A ramp along one exposed edge. (dx, dz) is the way down (outward). The
@@ -177,9 +175,19 @@ function PlotPlatform.Layout(tierSize: number, squares: { string }?): Layout
 	}
 end
 
+-- The riser between the curb, each tread and the grass: PlatformHeight over RimTreads + 1 steps.
+function PlotPlatform.RiseStep(): number
+	return PlotData.PlatformHeight / (PlotPlatform.RimTreads + 1)
+end
+
+-- How deep (outward) each rim tread is: what the curb leaves of PlatformRamp, shared out.
+function PlotPlatform.TreadWidth(): number
+	return (PlotData.PlatformRamp - PlotPlatform.CurbWidth) / PlotPlatform.RimTreads
+end
+
 -- How far above the grass the platform is at plot-local (x, z): 0 off it,
--- PlatformHeight on a slab, and a straight slope on a ramp (the higher of
--- two where ramps cross). Pure; the specs read the walkable slope from it.
+-- PlatformHeight on a slab and on its curb, and one RiseStep less on each
+-- rim tread out from it (the higher of two where edges cross). Pure; the specs read the walkable slope from it.
 function PlotPlatform.RiseAt(layout: Layout, x: number, z: number): number
 	local height = PlotData.PlatformHeight
 	local function onRect(r: Rect): boolean
@@ -195,6 +203,8 @@ function PlotPlatform.RiseAt(layout: Layout, x: number, z: number): number
 	end
 	local best = 0
 	local run = PlotData.PlatformRamp
+	local step = PlotPlatform.RiseStep()
+	local tread = PlotPlatform.TreadWidth()
 	for _, ramp in ipairs(layout.ramps) do
 		local along, depth
 		if ramp.dz ~= 0 then
@@ -203,7 +213,10 @@ function PlotPlatform.RiseAt(layout: Layout, x: number, z: number): number
 			along, depth = z, (x - ramp.at) * ramp.dx
 		end
 		if along >= ramp.from and along <= ramp.to and depth >= 0 and depth <= run then
-			best = math.max(best, height * (1 - depth / run))
+			local k = if depth < PlotPlatform.CurbWidth
+				then 0
+				else math.min(math.floor((depth - PlotPlatform.CurbWidth) / tread) + 1, PlotPlatform.RimTreads + 1)
+			best = math.max(best, height - step * k)
 		end
 	end
 	return best
@@ -257,74 +270,38 @@ function PlotPlatform.FitPad(pad: Part, layout: Layout, origin: CFrame, look: Pl
 	setSlab(pad, layout.tier, origin, topColor(look))
 end
 
-local function ramp(r: Ramp, origin: CFrame, color: Color3): WedgePart
-	-- The ramp stops PlatformEdgeClear short of the slab's top, so its high
-	-- edge never shares a plane with the slab (no z-fighting); its foot is
-	-- on the ground.
-	local height, run = PlotData.PlatformHeight - PlotData.PlatformEdgeClear, PlotData.PlatformRamp
-	local depth = run + PlotPlatform.Inset
+-- One flat block along an exposed edge, from `d0` to `d1` studs out of the slab's edge, its top `top`
+-- (plot-local, the pad top is 0) and its bottom Sink under the grass.
+local function band(
+	r: Ramp,
+	origin: CFrame,
+	name: string,
+	d0: number,
+	d1: number,
+	top: number,
+	color: Color3,
+	material: Enum.Material,
+	height: number?
+): Part
+	local bottom = if height then top - height else -PlotData.PlatformHeight - PlotPlatform.Sink
+	local thick = top - bottom
 	local mid = (r.from + r.to) / 2
-	-- The footprint spans from Inset under the slab to `run` out from the edge.
-	local reach = (run - PlotPlatform.Inset) / 2
+	local out = (d0 + d1) / 2
 	local x, z
-	if r.dz ~= 0 then
-		x, z = mid, r.at + r.dz * reach
-	else
-		x, z = r.at + r.dx * reach, mid
-	end
-	local at = Vector3.new(x, -PlotData.PlatformHeight + height / 2, z)
-	local p = Instance.new("WedgePart")
-	p.Name = "Ramp"
-	p.Size = Vector3.new(r.to - r.from, height, depth)
-	-- A wedge's high (back) face is +Z and its slope runs down to -Z: look
-	-- outward, so the high end is against the slab.
-	p.CFrame = origin * CFrame.lookAt(at, at + Vector3.new(r.dx, 0, r.dz))
-	p.Color = color
-	p.Material = Enum.Material.Ground
-	p.Anchored = true
-	p.CanCollide = true
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	return p
-end
-
--- The slope's top surface, rising above the grass, `depth` studs out from the
--- slab's edge (the ramp's own line: high edge PlatformEdgeClear under the slab
--- top at -Inset, the grass at the end of the run).
-local function slopeTop(depth: number): number
-	local run = PlotData.PlatformRamp
-	return (PlotData.PlatformHeight - PlotData.PlatformEdgeClear) * (run - depth) / (run + PlotPlatform.Inset)
-end
-
--- The most the edge stands above the pad top, or steps down, along any line
--- straight out from the pad: the curb's back against the pad, then the curb's
--- outer step onto the dirt. Pure, for the spec.
-function PlotPlatform.MaxLip(): number
-	local proud = PlotPlatform.CurbProud
-	local overPad = slopeTop(0) + proud - PlotData.PlatformHeight
-	local outerStep = proud
-	return math.max(overPad, outerStep, 0)
-end
-
-local function curb(r: Ramp, origin: CFrame): WedgePart
-	local cw = PlotPlatform.CurbWidth
-	local proud = PlotPlatform.CurbProud
-	local rise = slopeTop(0) - slopeTop(cw) -- the slope's drop over the band
-	local mid = (r.from + r.to) / 2
-	local out = cw / 2
-	local x, z
+	local size
 	if r.dz ~= 0 then
 		x, z = mid, r.at + r.dz * out
+		size = Vector3.new(r.to - r.from, thick, d1 - d0)
 	else
 		x, z = r.at + r.dx * out, mid
+		size = Vector3.new(d1 - d0, thick, r.to - r.from)
 	end
-	local at = Vector3.new(x, -PlotData.PlatformHeight + slopeTop(cw) + proud + rise / 2, z)
-	local p = Instance.new("WedgePart")
-	p.Name = "Curb"
-	p.Size = Vector3.new(r.to - r.from, rise, cw)
-	p.CFrame = origin * CFrame.lookAt(at, at + Vector3.new(r.dx, 0, r.dz))
-	p.Color = Palette.StoneBase
-	p.Material = Enum.Material.Cobblestone
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = origin * CFrame.new(x, top - thick / 2, z)
+	p.Color = color
+	p.Material = material
 	p.Anchored = true
 	p.CanCollide = true
 	p.TopSurface = Enum.SurfaceType.Smooth
@@ -332,14 +309,48 @@ local function curb(r: Ramp, origin: CFrame): WedgePart
 	return p
 end
 
--- The "Land" slabs, the ramps and the curbs for `layout` (everything but the
--- Pad), parented to `parent`.
+-- The most any one riser on the pad edge stands: curb to tread, tread to tread, last tread to grass.
+-- Pure, for the spec.
+function PlotPlatform.MaxLip(): number
+	return PlotPlatform.RiseStep()
+end
+
+local function curb(r: Ramp, origin: CFrame): Part
+	-- one StoneBase Slate riser, RiseStep tall, standing on the first rim tread
+	return band(
+		r,
+		origin,
+		"Curb",
+		0,
+		PlotPlatform.CurbWidth,
+		0,
+		Palette.StoneBase,
+		Enum.Material.Slate,
+		PlotPlatform.RiseStep()
+	)
+end
+
+local function rims(r: Ramp, origin: CFrame): { Part }
+	local out: { Part } = {}
+	local tread = PlotPlatform.TreadWidth()
+	local step = PlotPlatform.RiseStep()
+	for k = 1, PlotPlatform.RimTreads do
+		-- (the first tread also runs under the curb, which stands on it)
+		local d0 = if k == 1 then 0 else PlotPlatform.CurbWidth + (k - 1) * tread
+		local d1 = PlotPlatform.CurbWidth + k * tread
+		table.insert(out, band(r, origin, "Rim", d0, d1, -step * k, Palette.TrailDirt, Enum.Material.Ground))
+	end
+	return out
+end
+
+-- The "Land" slabs, the curbs and the rim treads for `layout` (everything but the Pad), parented to
+-- `parent`.
 function PlotPlatform.BuildEdges(
 	parent: Instance,
 	layout: Layout,
 	origin: CFrame,
 	look: PlotData.Look
-): ({ Part }, { WedgePart }, { WedgePart })
+): ({ Part }, { Part }, { Part })
 	local top = topColor(look)
 	local lands: { Part } = {}
 	for _, rect in ipairs(layout.land) do
@@ -347,33 +358,32 @@ function PlotPlatform.BuildEdges(
 		p.Parent = parent
 		table.insert(lands, p)
 	end
-	local ramps: { WedgePart } = {}
+	local curbs: { Part } = {}
+	local treads: { Part } = {}
 	for _, r in ipairs(layout.ramps) do
-		local p = ramp(r, origin, Palette.TrailDirt)
-		p.Parent = parent
-		table.insert(ramps, p)
+		local c = curb(r, origin)
+		c.Parent = parent
+		table.insert(curbs, c)
+		for _, p in ipairs(rims(r, origin)) do
+			p.Parent = parent
+			table.insert(treads, p)
+		end
 	end
-	local curbs: { WedgePart } = {}
-	for _, r in ipairs(layout.ramps) do
-		local p = curb(r, origin)
-		p.Parent = parent
-		table.insert(curbs, p)
-	end
-	return lands, ramps, curbs
+	return lands, curbs, treads
 end
 
 -- All of it into `parent` at `origin` (the platform's top centre), for the
--- previews and specs: the Pad, the Land slabs and the ramps.
+-- previews and specs: the Pad, the Land slabs, the curbs and the rim treads.
 function PlotPlatform.Build(
 	parent: Instance,
 	layout: Layout,
 	origin: CFrame,
 	look: PlotData.Look
-): (Part, { Part }, { WedgePart }, { WedgePart })
+): (Part, { Part }, { Part }, { Part })
 	local pad = PlotPlatform.NewPad(layout, origin, look)
 	pad.Parent = parent
-	local lands, ramps, curbs = PlotPlatform.BuildEdges(parent, layout, origin, look)
-	return pad, lands, ramps, curbs
+	local lands, curbs, treads = PlotPlatform.BuildEdges(parent, layout, origin, look)
+	return pad, lands, curbs, treads
 end
 
 return PlotPlatform

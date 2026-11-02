@@ -375,6 +375,7 @@ function ToolShed.Build(model: Model, frame: Frame)
 		headerZ = ToolShed.HeaderBeamZ,
 		tieY = ToolShed.TieY,
 		noTie = true,
+		house = true,
 	})
 	-- (the back wall is the axe rack, so the board hangs from the last beam, at the counter's back edge, over the keeper)
 	ShopKit.CheckoutSign(model, frame, {
