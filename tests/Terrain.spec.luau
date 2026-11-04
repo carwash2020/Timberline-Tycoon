@@ -367,6 +367,7 @@ return function(t)
 		local written = {}
 		local terrain = {
 			WriteVoxels = function(_, region, res, mats, occs)
+				t.support("StrictTerrain").check(region, res, mats, occs) -- the engine's rules (T417)
 				table.insert(written, { region = region, res = res, mats = mats, occs = occs })
 			end,
 		}
@@ -402,7 +403,8 @@ return function(t)
 	t.test("written water reaches the bed in every wet column (the pond, the lake)", function()
 		local written = {}
 		local terrain = {
-			WriteVoxels = function(_, region, _, mats)
+			WriteVoxels = function(_, region, res, mats, occs)
+				t.support("StrictTerrain").check(region, res, mats, occs) -- the engine's rules (T417)
 				table.insert(written, { region = region, mats = mats })
 			end,
 		}
@@ -413,7 +415,9 @@ return function(t)
 		-- and the lake's south-east shore.
 		for _, chunk in ipairs({ { pond.x - 24, pond.z - 24, 12, 12 }, { lake.x, lake.z - 160, 40, 40 } }) do
 			table.clear(written)
-			local x0, z0, nx, nz = chunk[1], chunk[2], chunk[3], chunk[4]
+			-- T417: the chunk starts on the voxel grid, as every real block does (the pond's
+			-- corner at 71 was 3 studs off it, which the engine refuses); same columns tested.
+			local x0, z0, nx, nz = math.floor(chunk[1] / 4) * 4, math.floor(chunk[2] / 4) * 4, chunk[3], chunk[4]
 			TerrainBuilder._writeChunk(terrain, x0, z0, nx, nz)
 			local mats = written[1].mats
 			local wet = 0

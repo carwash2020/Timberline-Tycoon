@@ -22,7 +22,8 @@ return function(t)
 			FillBlock = function()
 				table.insert(log, "fill")
 			end,
-			WriteVoxels = function(_, region)
+			WriteVoxels = function(_, region, res, mats, occs)
+				t.support("StrictTerrain").check(region, res, mats, occs) -- the engine's rules (T417)
 				local p, s = region.CFrame.Position, region.Size
 				table.insert(log, { x0 = p.X - s.X / 2, x1 = p.X + s.X / 2, z0 = p.Z - s.Z / 2, z1 = p.Z + s.Z / 2 })
 			end,
