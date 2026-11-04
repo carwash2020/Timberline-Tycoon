@@ -88,6 +88,14 @@ end
 -- heights. Returns the region it wrote.
 local function writeChunk(terrain: Terrain, x0: number, z0: number, nx: number, nz: number, shift: number?): Region3
 	local lift = shift or 0
+	-- T417: Terrain:WriteVoxels needs a Region3 on the voxel grid (the world's multiples
+	-- of VOXEL) and arrays of exactly that region's voxel counts. Expand the request the
+	-- way Region3:ExpandToGrid does (min down, max up), so no origin can misalign.
+	local gx0 = math.floor(x0 / VOXEL + 1e-9) * VOXEL
+	local gz0 = math.floor(z0 / VOXEL + 1e-9) * VOXEL
+	nx = math.floor((x0 + nx * VOXEL - gx0) / VOXEL - 1e-9) + 1
+	nz = math.floor((z0 + nz * VOXEL - gz0) / VOXEL - 1e-9) + 1
+	x0, z0 = gx0, gz0
 	-- Heights with a one-column border, for slopes.
 	local heights: { { number } } = table.create(nx + 2)
 	for i = 1, nx + 2 do
@@ -280,9 +288,17 @@ end
 
 export type Job = { x0: number, z0: number, nx: number, nz: number, dist: number }
 
+-- Half the generated square: the playable square plus the skirt, rounded up to the
+-- voxel grid. T409 made WorldHalf 1350, so the plain sum (1550) was 2 studs off the
+-- 4-stud grid and every chunk origin (-half + k * 256) with it (T417). WorldHalf itself
+-- is not changed: the edge walls, preload and the rest keep the playable square.
+function TerrainBuilder.GeneratedHalf(): number
+	return math.ceil((WorldLayout.WorldHalf + WorldLayout.TerrainSkirt) / VOXEL) * VOXEL
+end
+
 -- Every chunk of the world, nearest the sawmill first.
 function TerrainBuilder.Jobs(): { Job }
-	local half = WorldLayout.WorldHalf + WorldLayout.TerrainSkirt
+	local half = TerrainBuilder.GeneratedHalf()
 	local totalColumns = math.floor(2 * half / VOXEL)
 	local chunksPerSide = math.ceil(totalColumns / CHUNK)
 	local jobs: { Job } = {}

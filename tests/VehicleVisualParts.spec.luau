@@ -1,6 +1,5 @@
 --!nocheck
--- T421: every visual MeshPart VehicleMeshes adds is looks only (Massless, no collide, no query, no touch, Box
--- fidelity), and the colliding parts TruckArt builds are unchanged: tests/vehicle_collision_baseline.json is every
+-- T421: every visual MeshPart VehicleMeshes adds is looks only (Massless, no collide, no query, no touch), and the colliding parts TruckArt builds are unchanged: tests/vehicle_collision_baseline.json is every
 -- truck and every rig as main built them before T421 (tools/vehicle_snapshot.luau); a fresh build must match.
 return function(t)
 	local roblox = t.roblox
@@ -49,29 +48,39 @@ return function(t)
 				t.eq(d.CanCollide, false, who .. " CanCollide")
 				t.eq(d.CanQuery, false, who .. " CanQuery")
 				t.eq(d.CanTouch, false, who .. " CanTouch")
-				t.eq(d.CollisionFidelity, roblox.Enum.CollisionFidelity.Box, who .. " CollisionFidelity")
+				-- T417: the Box fidelity is not written by game code (the engine refuses). It is the creation
+				-- request (MeshKit.Create's `collision`, which the test Override applies to its master, as
+				-- CreateMeshPartAsync's options do), so a clone carries it. tests/MeshFidelity.spec scans src/.
+				t.eq(
+					d.CollisionFidelity,
+					roblox.Enum.CollisionFidelity.Box,
+					who .. " CollisionFidelity (from creation)"
+				)
 			end
 		end
 		return n
 	end
 
-	t.test("every visual MeshPart is Massless, CanCollide/CanQuery/CanTouch false, Box fidelity", function()
-		withMeshes(function()
-			local total = 0
-			for _, def in ipairs(ItemCatalog.TruckList()) do
-				local lay = TruckLayout.For(def)
-				total += checkVisual(TruckArt.Build(def, lay), def.id)
-				if def.look.bedLength > 0 then
-					for _, trailer in ipairs(ItemCatalog.TrailerList()) do
-						local model = TruckArt.Build(def, lay, trailer, TruckLayout.ForTrailer(trailer, lay))
-						t.eq(model:GetAttribute("VehicleMesh"), true, def.id .. " + " .. trailer.id .. " is meshed")
-						total += checkVisual(model, def.id .. " + " .. trailer.id)
+	t.test(
+		"every visual MeshPart is Massless, CanCollide/CanQuery/CanTouch false, Box fidelity asked at creation",
+		function()
+			withMeshes(function()
+				local total = 0
+				for _, def in ipairs(ItemCatalog.TruckList()) do
+					local lay = TruckLayout.For(def)
+					total += checkVisual(TruckArt.Build(def, lay), def.id)
+					if def.look.bedLength > 0 then
+						for _, trailer in ipairs(ItemCatalog.TrailerList()) do
+							local model = TruckArt.Build(def, lay, trailer, TruckLayout.ForTrailer(trailer, lay))
+							t.eq(model:GetAttribute("VehicleMesh"), true, def.id .. " + " .. trailer.id .. " is meshed")
+							total += checkVisual(model, def.id .. " + " .. trailer.id)
+						end
 					end
 				end
-			end
-			t.ok(total > 100, "visual meshes were found: " .. total)
-		end)
-	end)
+				t.ok(total > 100, "visual meshes were found: " .. total)
+			end)
+		end
+	)
 
 	t.test("the colliding parts TruckArt builds are unchanged for every truck and rig", function()
 		local base = serde.decode("json", fs.readFile("tests/vehicle_collision_baseline.json"))

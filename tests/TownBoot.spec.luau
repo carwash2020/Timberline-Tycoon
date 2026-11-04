@@ -14,7 +14,8 @@ return function(t)
 			Clear = function() end,
 			SetMaterialColor = function() end,
 			FillBlock = function() end,
-			WriteVoxels = function(_, region, _, mats, occs)
+			WriteVoxels = function(_, region, res, mats, occs)
+				t.support("StrictTerrain").check(region, res, mats, occs) -- the engine's rules (T417)
 				table.insert(writes, { region = region, mats = mats, occs = occs })
 			end,
 		}

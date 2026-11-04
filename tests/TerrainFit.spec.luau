@@ -83,6 +83,7 @@ return function(t)
 	local function fakeTerrain()
 		local terrain = { live = {}, writes = 0, clears = 0 }
 		function terrain.WriteVoxels(_, region, res, mats, occs)
+			t.support("StrictTerrain").check(region, res, mats, occs) -- the engine's rules (T417)
 			terrain.writes += 1
 			table.insert(terrain.live, { region = region, res = res, mats = mats, occs = occs })
 		end

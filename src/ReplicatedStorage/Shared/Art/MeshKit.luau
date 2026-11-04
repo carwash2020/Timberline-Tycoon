@@ -242,7 +242,11 @@ function MeshKit.Reset()
 	requestActive = 0
 end
 
-local function finish(part: MeshPart, name: string, size: Vector3, collision: Enum.CollisionFidelity): MeshPart
+-- T417: game scripts cannot assign MeshPart.CollisionFidelity ("lacking capability
+-- PluginOrOpenCloud"), so a clone keeps the fidelity its master was CREATED with
+-- (AssetService:CreateMeshPartAsync options, see fromAssetService) or the one the
+-- uploaded asset carries. Nothing here writes it. tests/MeshFidelity.spec scans src/.
+local function finish(part: MeshPart, name: string, size: Vector3): MeshPart
 	part.Name = name
 	local native = part.Size
 	local pivot = part.PivotOffset
@@ -255,10 +259,16 @@ local function finish(part: MeshPart, name: string, size: Vector3, collision: En
 			part:SetAttribute("MeshPivot", "authored")
 		end
 	end
-	pcall(function()
-		part.CollisionFidelity = collision
-	end)
 	return part
+end
+
+-- Tests only (MeshKit.Override stands in for CreateMeshPartAsync): the creation
+-- options carry the fidelity in the engine, so the stand-in master gets it here,
+-- once, before it is cloned. Never reached on the engine path.
+local function creationFidelity(master: MeshPart, collision: Enum.CollisionFidelity)
+	pcall(function()
+		master.CollisionFidelity = collision -- t417-seam: Override only
+	end)
 end
 
 local function fromTemplate(meshId: number): MeshPart?
@@ -650,7 +660,7 @@ local function create(
 	local fidelity = collision or Enum.CollisionFidelity.Box
 	local master = masters[meshId]
 	if master then
-		return finish(master:Clone(), name, size, fidelity)
+		return finish(master:Clone(), name, size)
 	end
 
 	local override = MeshKit.Override
@@ -660,8 +670,9 @@ local function create(
 			failed[meshId] = true
 			return nil
 		end
+		creationFidelity(part, fidelity)
 		remember(meshId, part)
-		return finish(part:Clone(), name, size, fidelity)
+		return finish(part:Clone(), name, size)
 	end
 
 	-- The engine's import pivot (CreateMeshPartAsync) beats a template,
@@ -676,7 +687,7 @@ local function create(
 		end
 		local after = masters[meshId]
 		if after then
-			return finish(after:Clone(), name, size, fidelity)
+			return finish(after:Clone(), name, size)
 		end
 		local seen = collecting
 		if seen then
@@ -691,7 +702,7 @@ local function create(
 	if not loaded then
 		return nil
 	end
-	return finish(loaded:Clone(), name, size, fidelity)
+	return finish(loaded:Clone(), name, size)
 end
 
 -- A MeshPart named `name` at `size`, or nil. Never throws and NEVER YIELDS:
