@@ -4665,3 +4665,17 @@ Plan: `docs/T416_PLAN.md`. Part-built greyboxes, warm stylized realism, Midday; 
 3. Drop a log on a pad edge, then walk and drive a truck over the curb and three steps: nothing catches.
 4. Mine a node: faceted rock, same swings and payout, the ore reads.
 5. Drive the Skyroot climb and the snow road: the same grey as town streets; look at a birch stump by the road.
+
+## T417 Studio boot fixes (4 November 2026, branch `t417-studio-boot-fixes`)
+
+Plan: `docs/T417_PLAN.md`. Connor's first Studio run of main `fbd97bf` had no ground, no Dealership lot and a long error log.
+
+1. **Terrain off the grid.** T409 (#270, commit 0eff8b8) raised `WorldLayout.WorldHalf` from 1000 to 1350. `TerrainBuilder.Jobs` started its chunks at `-(WorldHalf + TerrainSkirt)` = -1550, 2 studs off the 4-stud voxel grid, so every block's Region3 was refused (`Region has to be aligned to the grid`, `Bad argument materials to 'WriteVoxels'`). Now `TerrainBuilder.GeneratedHalf()` rounds that half up to a multiple of VOXEL (1552) and `Jobs` uses it; `WorldHalf` is unchanged. `writeChunk` also expands any request to the grid (min down, max up) and sizes its arrays to the expanded region. `tests/support/StrictTerrain` is the fake the terrain specs now share: it errors on an unaligned Region3 and on arrays that differ from the region's voxel counts. `tests/TerrainGrid.spec`: every Jobs / Split / Order block is on the grid and the town ground reads 0 with the strict fake.
+2. **CollisionFidelity.** Game scripts cannot write it. `MeshKit.finish`, `VehicleMeshes.addRole` and `StumpMeshes` no longer do; fidelity is the creation request (`AssetService:CreateMeshPartAsync` options) or the uploaded asset's own. `DealershipLot` builds each vehicle under pcall (`DealershipLot.Failures`, a warning, the plinth shows "coming soon"). `tests/MeshFidelity.spec` scans src for a member write; `tests/DealershipSurvives.spec`.
+3. **ContentId "Asset type does not match requested type"**: investigated, not changed (see the PR).
+
+**Studio checks for Connor**
+1. Output: no `Region has to be aligned` and no `[TerrainBuilder] ... failed` lines; the ground appears within about 10 s of spawn; the town ground line reads 0.
+2. The Dealership lot builds (no "4. The dealership lot failed" line, no CollisionFidelity warning).
+3. Select the uploaded stump, spool and vehicle meshes in Studio and read CollisionFidelity in Properties; set it there if it is not what you want (Hull for stumps and wheels, Box for the rest). Game code no longer sets it.
+4. Say whether the ContentId lines are still there and how many.

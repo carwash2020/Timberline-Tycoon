@@ -406,12 +406,13 @@ local function addRole(
 	fidelity(part, role)
 	if role ~= "Wheel" then
 		MeshKit.Visual(part, piece.meshId)
-		-- Looks only, in every flag (T421): no mass, no collision, no touch, no query, box fidelity.
+		-- Looks only, in every flag (T421): no mass, no collision, no touch, no query. The Box
+		-- fidelity is asked for at creation (MeshKit.Create's `collision`): a game script cannot
+		-- write CollisionFidelity on a MeshPart (T417).
 		part.Massless = true
 		part.CanCollide = false
 		part.CanQuery = false
 		part.CanTouch = false
-		part.CollisionFidelity = Enum.CollisionFidelity.Box
 		if role == "Glass" then
 			-- A GLB cannot store these: see-through and no shadow, set here.
 			part.Transparency = VehicleMeshes.GlassTransparency

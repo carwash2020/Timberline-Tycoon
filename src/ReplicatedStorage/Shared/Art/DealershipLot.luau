@@ -519,6 +519,22 @@ local function modelOf(kind: string, id: string, fitted: boolean?): Model?
 	return model
 end
 
+-- T417: one vehicle that cannot be built (an engine error in its meshes) never takes the
+-- whole lot with it. The error is logged with the vehicle's name and kept in
+-- DealershipLot.Failures (specs assert it is empty); the bay stays as a plinth that says
+-- "coming soon", like a vehicle whose meshes are not all in.
+DealershipLot.Failures = {} :: { string }
+local function safeModelOf(kind: string, id: string, fitted: boolean?): Model?
+	local ok, result = pcall(modelOf, kind, id, fitted)
+	if ok then
+		return result :: Model?
+	end
+	local line = string.format("%s %s: %s", kind, id, tostring(result))
+	table.insert(DealershipLot.Failures, line)
+	warn("[DealershipLot] could not build " .. line .. " (the lot stands without it)")
+	return nil
+end
+
 -- The one display copy of a vehicle, as the lot stands it before it is put on a plinth (a spec
 -- compares it with the bought vehicle).
 function DealershipLot.Vehicle(kind: string, id: string): Model?
@@ -546,7 +562,7 @@ end
 
 measureVehicle = function(kind: string, id: string, fitted: boolean?): Measured
 	measuring = true
-	local model = modelOf(kind, id, fitted)
+	local model = safeModelOf(kind, id, fitted)
 	measuring = false
 	if model == nil then
 		return { length = 20, span = 10, cx = 0, cz = 0, feet = 2 }
@@ -626,6 +642,7 @@ end
 -- The lot around the origin, front (-Z) toward the path. Place it with
 -- Kit.placeAt. Returns the model; each vehicle is a child model.
 function DealershipLot.Build(): Model
+	table.clear(DealershipLot.Failures)
 	DealershipLot.Preload()
 	local layout = DealershipLot.Layout()
 	local depth = layout.depth
@@ -698,8 +715,8 @@ function DealershipLot.Build(): Model
 		-- T421: a vehicle whose meshes are not all in is not stocked: no vehicle, no box (nothing can be bought),
 		-- and never a part-built stand-in. The plinth stays (the hall is laid out round it) and says so.
 		local stocked = VehicleMeshGate.Complete(bay.kind, bay.id)
-		local model = if stocked then modelOf(bay.kind, bay.id, true) else nil
-		if not stocked then
+		local model = if stocked then safeModelOf(bay.kind, bay.id, true) else nil
+		if not stocked or model == nil then
 			DealershipLot.ComingSoon(lot, bay, cx, oz + bay.vz, top, aisleSide, nameOf(bay.kind, bay.id))
 		end
 		if model then

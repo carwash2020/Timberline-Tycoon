@@ -102,13 +102,8 @@ local function load(key: number)
 	end
 	local template = mesh:Clone()
 	template:ClearAllChildren()
-	-- Hull collision: a round stump's box would be wider than it looks.
-	local fidelityOk, fidelityErr = pcall(function()
-		template.CollisionFidelity = Enum.CollisionFidelity.Hull
-	end)
-	if not fidelityOk then
-		warn("[StumpMeshes] CollisionFidelity Hull could not be set: " .. tostring(fidelityErr))
-	end
+	-- Collision fidelity is the uploaded mesh's own (set in Studio at upload): a game script
+	-- cannot write MeshPart.CollisionFidelity ("lacking capability PluginOrOpenCloud", T417).
 	finish(key, template)
 end
 
